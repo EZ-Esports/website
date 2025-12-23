@@ -64,58 +64,17 @@ export default function HomePage() {
       {/* 2. Live Streaming Section */}
       <ContentSection
         heading="Live Streaming on Twitch.tv"
-        description="Get live broadcasts from schools on 300+ concurrent streams"
+        description="Get live broadcasts from schools on 500+ concurrent streams"
         theme="dark"
       />
 
       {/* 3. Photo Gallery #1 */}
       <MediaGrid items={galleryImages1} columns={3} theme="dark" />
 
-      {/* 4. Mission Statement */}
-      <ContentSection
-        heading="Building Tomorrow's Workforce"
-        description="Building tomorrow's workforce through their passion for esports today"
-        theme="light"
-        imagePosition="left"
-      >
-        <div className="space-y-6">
-          <div className="border-2 border-gray-900 p-6 rounded-lg">
-            <p className="text-2xl font-bold mb-2">{SEASON_INFO.name}</p>
-            <div className="space-y-2">
-              <div className="border border-gray-900 p-3 rounded">
-                <p className="text-sm text-gray-600">Start:</p>
-                <p className="font-semibold">{SEASON_INFO.startDate}</p>
-              </div>
-              <div className="border border-gray-900 p-3 rounded">
-                <p className="text-sm text-gray-600">End:</p>
-                <p className="font-semibold">{SEASON_INFO.endDate}</p>
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-lg font-semibold mb-4">Connect us!</p>
-            <div className="flex gap-3">
-              {SOCIAL_LINKS.filter((s) => ['discord', 'instagram', 'messenger'].includes(s.platform)).map((social) => (
-                <Link
-                  key={social.platform}
-                  href={social.url}
-                  aria-label={social.label}
-                  className="focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 rounded-full"
-                >
-                  <SocialIcon platform={social.platform} />
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </ContentSection>
-
       {/* 5. Video Showcase */}
       <VideoShowcase
         videos={videos}
-        description="Our live broadcasts have reached over 300 concurrent streams, bringing the excitement of high school esports to audiences across New York City. We provide professional-grade streaming infrastructure that showcases student talent and builds community around competitive gaming."
-        reportLink="#report"
-        sizzleLink="#sizzle"
+        description="Our live broadcasts have reached over 500 concurrent viewers, bringing the excitement of high school esports to audiences across New York City."
       />
 
       {/* 6. Photo Gallery #2 */}

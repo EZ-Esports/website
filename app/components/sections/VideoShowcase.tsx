@@ -1,17 +1,11 @@
-import Link from 'next/link';
-
 interface VideoShowcaseProps {
   videos: Array<{ videoId: string; title: string }>;
   description: string;
-  reportLink: string;
-  sizzleLink: string;
 }
 
 export default function VideoShowcase({
   videos,
   description,
-  reportLink,
-  sizzleLink,
 }: VideoShowcaseProps) {
   return (
     <section className="bg-gray-900 text-white py-16 md:py-24">
@@ -29,22 +23,8 @@ export default function VideoShowcase({
             </div>
           ))}
         </div>
-        <div className="text-center mb-8">
+        <div className="text-center">
           <p className="text-lg leading-relaxed max-w-4xl mx-auto">{description}</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href={reportLink}
-            className="px-6 py-3 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors text-center focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-          >
-            Read the 2022-2023 Impact Report
-          </Link>
-          <Link
-            href={sizzleLink}
-            className="px-6 py-3 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors text-center focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-          >
-            Watch the Sizzle
-          </Link>
         </div>
       </div>
     </section>
