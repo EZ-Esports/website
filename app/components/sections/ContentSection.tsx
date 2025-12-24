@@ -1,12 +1,14 @@
 import Image from 'next/image';
+import type { Theme, ImagePosition } from '@/app/types';
+import { THEME_CLASSES } from '@/app/lib/constants';
 
 interface ContentSectionProps {
   heading: string;
   description: string;
   imageSrc?: string;
   imageAlt?: string;
-  imagePosition?: 'left' | 'right';
-  theme?: 'dark' | 'light';
+  imagePosition?: ImagePosition;
+  theme?: Theme;
   children?: React.ReactNode;
 }
 
@@ -20,11 +22,11 @@ export default function ContentSection({
   children,
 }: ContentSectionProps) {
   const themeClasses = theme === 'dark' 
-    ? 'bg-gray-900 text-white' 
-    : 'bg-rose-50 text-gray-900';
+    ? `${THEME_CLASSES.dark.bg} ${THEME_CLASSES.dark.text}` 
+    : `${THEME_CLASSES.light.bg} ${THEME_CLASSES.light.text}`;
 
   const imageElement = imageSrc ? (
-    <div className="relative w-full aspect-video rounded-lg overflow-hidden">
+    <div key="image" className="relative w-full aspect-video rounded-lg overflow-hidden">
       <Image
         src={imageSrc}
         alt={imageAlt || heading}

@@ -1,5 +1,8 @@
+import type { VideoItem } from '@/app/types';
+import { YOUTUBE_EMBED_BASE_URL } from '@/app/lib/constants';
+
 interface VideoShowcaseProps {
-  videos: Array<{ videoId: string; title: string }>;
+  videos: VideoItem[];
   description: string;
 }
 
@@ -12,9 +15,9 @@ export default function VideoShowcase({
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           {videos.map((video, index) => (
-            <div key={index} className="relative aspect-video rounded-lg overflow-hidden">
+            <div key={video.id || index} className="relative aspect-video rounded-lg overflow-hidden">
               <iframe
-                src={`https://www.youtube.com/embed/${video.videoId}`}
+                src={`${YOUTUBE_EMBED_BASE_URL}/${video.videoId}`}
                 title={video.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen

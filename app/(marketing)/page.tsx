@@ -4,50 +4,35 @@ import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
-import { SEASON_INFO, SOCIAL_LINKS } from '@/app/lib/constants';
-import Link from 'next/link';
-
-function SocialIcon({ platform }: { platform: string }) {
-  const getInitial = (platform: string): string => {
-    const initials: Record<string, string> = {
-      discord: 'D',
-      instagram: 'I',
-      messenger: 'M',
-    };
-    return initials[platform.toLowerCase()] || platform[0].toUpperCase();
-  };
-
-  return (
-    <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white text-sm font-semibold hover:bg-gray-700 transition-colors">
-      {getInitial(platform)}
-    </div>
-  );
-}
+import type { Image, Game, VideoItem } from '@/app/types';
 
 export default function HomePage() {
   // Gallery images
-  const galleryImages1 = Array.from({ length: 9 }, (_, i) => ({
-    src: `/images/gallery-${i + 1}.png`,
+  const galleryImages1: Image[] = Array.from({ length: 9 }, (_, i) => ({
+    id: `gallery-${i + 1}`,
+    src: `/images/gallery/gallery-${i + 1}.png`,
     alt: `Event photo ${i + 1}`,
   }));
 
-  const galleryImages2 = [
-    { src: '/images/gallery-10.png', alt: 'Event photo 10' },
-    { src: '/images/gallery-11.png', alt: 'Event photo 11' },
+  const galleryImages2: Image[] = [
+    { id: 'gallery-10', src: '/images/gallery/gallery-10.png', alt: 'Event photo 10' },
+    { id: 'gallery-11', src: '/images/gallery/gallery-11.png', alt: 'Event photo 11' },
   ];
 
-  const games = [
-    { title: 'League of Legends', imageUrl: '/images/lol-banner.png' },
-    { title: 'Valorant', imageUrl: '/images/val-banner.png' },
-    { title: 'Tactical Fight Tatics', imageUrl: '/images/tft-banner.png' },
+  const games: Game[] = [
+    { id: 'lol', title: 'League of Legends', imageUrl: '/images/lol-banner.png' },
+    { id: 'val', title: 'Valorant', imageUrl: '/images/val-banner.png' },
+    { id: 'tft', title: 'Tactical Fight Tatics', imageUrl: '/images/tft-banner.png' },
   ];
 
-  const videos = [
+  const videos: VideoItem[] = [
     {
+      id: 'video-1',
       videoId: 'Sr7MF9YMQaI',
       title: 'ACE FOR OT?? - February 11, 2022 - Stuyvesant (6-0) vs. Bronx Science (6-0)',
     },
     {
+      id: 'video-2',
       videoId: 'g03Fg6ofrAU',
       title: 'Midline Event at Long Island University - August 15, 2022',
     },
