@@ -22,7 +22,7 @@ export default function HomePage() {
   const games: Game[] = [
     { id: 'lol', title: 'League of Legends', imageUrl: '/images/lol-banner.png' },
     { id: 'val', title: 'Valorant', imageUrl: '/images/val-banner.png' },
-    { id: 'tft', title: 'Tactical Fight Tatics', imageUrl: '/images/tft-banner.png' },
+    { id: 'tft', title: 'Team Fight Tactics', imageUrl: '/images/tft-banner.png' },
   ];
 
   const videos: VideoItem[] = [

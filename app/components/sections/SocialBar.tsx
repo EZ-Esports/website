@@ -1,19 +1,16 @@
 import Link from 'next/link';
 import type { Theme } from '@/app/types';
-import { SOCIAL_LINKS, SOCIAL_ICON_INITIALS, THEME_CLASSES } from '@/app/lib/constants';
+import { SOCIAL_LINKS, THEME_CLASSES } from '@/app/lib/constants';
+import { getSocialIconInitial } from '@/app/lib/utils';
 
 interface SocialBarProps {
   theme?: Theme;
 }
 
 function SocialIcon({ platform }: { platform: string }) {
-  const getInitial = (platform: string): string => {
-    return SOCIAL_ICON_INITIALS[platform.toLowerCase()] || platform[0]?.toUpperCase() || '?';
-  };
-
   return (
     <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white text-sm font-semibold hover:bg-gray-700 transition-colors">
-      {getInitial(platform)}
+      {getSocialIconInitial(platform)}
     </div>
   );
 }

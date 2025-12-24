@@ -99,7 +99,7 @@ export type Year = string;
 // Game Types
 // ============================================================================
 
-export type GameSlug = 'valorant' | 'league-of-legends' | 'tactical-fight-tactics';
+export type GameSlug = 'valorant' | 'league-of-legends' | 'team-fight-tactics';
 
 export interface GameConfig {
   slug: GameSlug;

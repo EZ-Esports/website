@@ -1,14 +1,11 @@
 import Link from 'next/link';
-import { FOOTER_LINKS, SOCIAL_LINKS, SITE_CONFIG, SOCIAL_ICON_INITIALS } from '@/app/lib/constants';
+import { FOOTER_LINKS, SOCIAL_LINKS, SITE_CONFIG } from '@/app/lib/constants';
+import { getSocialIconInitial } from '@/app/lib/utils';
 
 function SocialIcon({ platform }: { platform: string }) {
-  const getInitial = (platform: string): string => {
-    return SOCIAL_ICON_INITIALS[platform.toLowerCase()] || platform[0]?.toUpperCase() || '?';
-  };
-
   return (
     <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white text-sm font-semibold hover:bg-gray-700 transition-colors">
-      {getInitial(platform)}
+      {getSocialIconInitial(platform)}
     </div>
   );
 }

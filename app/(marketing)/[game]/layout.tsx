@@ -18,3 +18,4 @@ export default async function GameLayout({ children, params }: GameLayoutProps) 
   return <>{children}</>;
 }
 
+

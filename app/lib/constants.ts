@@ -42,15 +42,15 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     shortName: 'League',
     imageUrl: '/images/games/lol-banner.png',
   },
-  'tactical-fight-tactics': {
-    slug: 'tactical-fight-tactics',
-    displayName: 'Tactical Fight Tactics',
+  'team-fight-tactics': {
+    slug: 'team-fight-tactics',
+    displayName: 'Team fight tactics',
     shortName: 'TFT',
     imageUrl: '/images/games/tft-banner.png',
   },
 } as const;
 
-export const GAME_SLUGS: GameSlug[] = ['valorant', 'league-of-legends', 'tactical-fight-tactics'];
+export const GAME_SLUGS: GameSlug[] = ['valorant', 'league-of-legends', 'team-fight-tactics'];
 
 // ============================================================================
 // Game Route Helpers

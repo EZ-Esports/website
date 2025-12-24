@@ -70,3 +70,4 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
   );
 }
 
+
