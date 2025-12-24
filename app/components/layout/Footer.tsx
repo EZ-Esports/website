@@ -1,18 +1,9 @@
 import Link from 'next/link';
-import { FOOTER_LINKS, SOCIAL_LINKS, SITE_CONFIG } from '@/app/lib/constants';
+import { FOOTER_LINKS, SOCIAL_LINKS, SITE_CONFIG, SOCIAL_ICON_INITIALS } from '@/app/lib/constants';
 
 function SocialIcon({ platform }: { platform: string }) {
   const getInitial = (platform: string): string => {
-    const initials: Record<string, string> = {
-      discord: 'D',
-      instagram: 'I',
-      twitter: 'T',
-      facebook: 'F',
-      youtube: 'Y',
-      twitch: 'Tw',
-      messenger: 'M',
-    };
-    return initials[platform.toLowerCase()] || platform[0].toUpperCase();
+    return SOCIAL_ICON_INITIALS[platform.toLowerCase()] || platform[0]?.toUpperCase() || '?';
   };
 
   return (

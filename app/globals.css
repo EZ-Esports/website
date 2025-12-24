@@ -2,7 +2,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1c1c1c;
 }
 
 @theme inline {
@@ -10,12 +10,42 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Brand colors */
+  --color-ez-pink: #f4cccc;
+  --color-ez-black: #1c1c1c;
+  --color-ez-white: #ffffff;
+  
+  /* Gray scale mapped to shades of black (#1c1c1c) */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e8e8e8;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #404040;
+  --color-gray-800: #2d2d2d;
+  --color-gray-900: #1c1c1c;
+  --color-gray-950: #0f0f0f;
+  
+  /* Rose scale mapped to shades of pink (#f4cccc) */
+  --color-rose-50: #fef2f2;
+  --color-rose-100: #fce7e7;
+  --color-rose-200: #f9cfcf;
+  --color-rose-300: #f4cccc;
+  --color-rose-400: #f0b8b8;
+  --color-rose-500: #eba5a5;
+  --color-rose-600: #e69191;
+  --color-rose-700: #e17d7d;
+  --color-rose-800: #dc6969;
+  --color-rose-900: #d75555;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1c1c1c;
+    --foreground: #ffffff;
   }
 }
 

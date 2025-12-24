@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { NAV_ITEMS, SITE_CONFIG } from '@/app/lib/constants';
+import { SITE_CONFIG } from '@/app/lib/constants';
+import Navigation from './Navigation';
 
 export default function Header() {
   return (
@@ -10,19 +11,10 @@ export default function Header() {
             {SITE_CONFIG.company}
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-white hover:text-rose-300 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-gray-900 rounded"
-              >
-                {item.label}
-              </Link>
-            ))}
+            <Navigation />
           </div>
         </div>
       </nav>
     </header>
   );
 }
-

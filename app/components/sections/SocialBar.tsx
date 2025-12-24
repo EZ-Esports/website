@@ -1,22 +1,14 @@
 import Link from 'next/link';
-import { SOCIAL_LINKS } from '@/app/lib/constants';
+import type { Theme } from '@/app/types';
+import { SOCIAL_LINKS, SOCIAL_ICON_INITIALS, THEME_CLASSES } from '@/app/lib/constants';
 
 interface SocialBarProps {
-  theme?: 'dark' | 'light';
+  theme?: Theme;
 }
 
 function SocialIcon({ platform }: { platform: string }) {
   const getInitial = (platform: string): string => {
-    const initials: Record<string, string> = {
-      discord: 'D',
-      instagram: 'I',
-      twitter: 'T',
-      facebook: 'F',
-      youtube: 'Y',
-      twitch: 'Tw',
-      messenger: 'M',
-    };
-    return initials[platform.toLowerCase()] || platform[0].toUpperCase();
+    return SOCIAL_ICON_INITIALS[platform.toLowerCase()] || platform[0]?.toUpperCase() || '?';
   };
 
   return (
@@ -27,10 +19,11 @@ function SocialIcon({ platform }: { platform: string }) {
 }
 
 export default function SocialBar({ theme = 'light' }: SocialBarProps) {
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-900';
+  const textColor = theme === 'dark' ? THEME_CLASSES.dark.text : THEME_CLASSES.light.text;
+  const bgColor = theme === 'dark' ? THEME_CLASSES.dark.bg : THEME_CLASSES.light.bg;
 
   return (
-    <section className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-rose-50'} py-8`}>
+    <section className={`${bgColor} py-8`}>
       <div className="container mx-auto px-4">
         <div className="flex flex-wrap items-center justify-center gap-4">
           <span className={`${textColor} text-sm font-medium`}>Follow us:</span>
