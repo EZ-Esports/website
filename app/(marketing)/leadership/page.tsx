@@ -5,3 +5,4 @@ export default function LeadershipIndex() {
   const currentYear = new Date().getFullYear().toString();
   redirect(`/leadership/${currentYear}`);
 }
+

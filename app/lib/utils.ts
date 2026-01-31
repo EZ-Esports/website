@@ -11,3 +11,4 @@ export function getSocialIconInitial(platform: string): string {
   return SOCIAL_ICON_INITIALS[normalizedPlatform] || (platform.length > 0 ? platform[0].toUpperCase() : '?');
 }
 
+
