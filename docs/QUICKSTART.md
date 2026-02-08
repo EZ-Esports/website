@@ -9,7 +9,11 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). See [project README](../../README.md) for full setup.
+Open [http://localhost:3000](http://localhost:3000). See [project README](../README.md) for full setup.
+
+### Environment
+
+The app uses Supabase. Create a `.env` file with the required variables — **ping core team members for env secrets** (see [Supabase setup](dev/SUPABASE.md)).
 
 ## Tech Stack
 
@@ -79,8 +83,11 @@ Games are defined in `app/lib/constants.ts` via `GAMES` and `GAME_SLUGS`. Adding
 | Shared types | `app/types/index.ts` |
 | Main nav logic | `app/components/layout/Navigation.tsx` |
 | Global styles | `app/globals.css` |
+| Supabase (client) | `app/lib/supabase.js` |
+| Supabase (server) | `app/lib/supabaseServer.js` |
 
 ## Documentation
 
+- [Supabase setup](dev/SUPABASE.md) — Env vars, client vs server usage
 - [Commit message style](dev/COMMIT_STYLE.md) — Conventional commits format
 - [Project README](../README.md) — Run instructions

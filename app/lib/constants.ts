@@ -1,4 +1,4 @@
-import type { NavigationItem, SocialLink, Theme, GameSlug, GameConfig, NavigationStateResult } from '@/app/types';
+import type { NavigationItem, SocialLink, Theme, GameSlug, GameConfig, NavigationStateResult, Game } from '@/app/types';
 
 // ============================================================================
 // Site Configuration
@@ -81,6 +81,31 @@ export const getNavigationState = (pathname: string): NavigationStateResult => {
     return { state: 'game', game };
   }
   return { state: 'league' };
+};
+
+// ============================================================================
+// Game Data Helpers
+// ============================================================================
+
+// Map game slugs to short IDs for GameShowcase component
+const gameSlugToId: Record<GameSlug, string> = {
+  'league-of-legends': 'lol',
+  'valorant': 'val',
+  'team-fight-tactics': 'tft',
+} as const;
+
+/**
+ * Converts GAMES constant to Game[] format for use in GameShowcase component
+ */
+export const getGamesForShowcase = (): Game[] => {
+  return GAME_SLUGS.map((slug) => {
+    const gameConfig = GAMES[slug];
+    return {
+      id: gameSlugToId[slug],
+      title: gameConfig.displayName,
+      imageUrl: gameConfig.imageUrl,
+    };
+  });
 };
 
 // ============================================================================
@@ -182,6 +207,41 @@ export const METADATA = {
   defaultTitle: SITE_CONFIG.name,
   defaultDescription: SITE_CONFIG.description,
   siteName: SITE_CONFIG.name,
+} as const;
+
+// ============================================================================
+// Loading Screen Constants
+// ============================================================================
+
+export const LOADING_SCREEN_TIMINGS = {
+  fade: 800,
+  pause1: 900,
+  extend: 800,
+  slide: 1100,
+  cleanup: 400,
+} as const;
+
+export const LOADING_SCREEN_ANIMATIONS = {
+  slide: {
+    duration: 0.9,
+    ease: [0.7, 0, 0.3, 1] as [number, number, number, number],
+  },
+  extend: {
+    duration: 0.6,
+    ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
+  },
+  opacity: {
+    duration: 0.01,
+  },
+  exit: {
+    duration: 0.3,
+  },
+  textFade: {
+    duration: 0.2,
+  },
+  esportsFade: {
+    duration: 0.5,
+  },
 } as const;
 
 

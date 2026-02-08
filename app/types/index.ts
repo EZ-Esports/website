@@ -121,4 +121,13 @@ export interface GameNavigationItem {
   key: string;
 }
 
+// ============================================================================
+// Loading Screen Types
+// ============================================================================
+
+export interface LoadingScreenProps {
+  onComplete?: () => void;
+  reducedMotion?: boolean;
+}
+
 
