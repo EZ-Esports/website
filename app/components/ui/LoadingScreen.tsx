@@ -9,23 +9,11 @@ import AnimatedBar from "./AnimatedBar";
 /**
  * EZesports Loading Screen
  *
- * Props:
- *  - onComplete?: () => void  — fires when animation ends and component unmounts
- *  - reducedMotion?: boolean  — force reduced motion (auto-detects by default)
- *
  * Phases:
- *  0 → "EZesports" visible
- *  1 → "esports" fades out
- *  2 → bars extend vertically
- *  3 → bars slide off-screen
- *  4 → overlay fades out, unmount
- *
- * Accessibility:
- *  - role="status" + aria-live="polite" announces loading state
- *  - aria-busy on document.body while loading
- *  - Respects prefers-reduced-motion: skips to content instantly
- *  - Focus is trapped away from hidden content via inert
- *  - Announces completion to screen readers
+ *  0 → Small slanted E & Z bars + "esports" text visible
+ *  1 → "esports" slides left into Z bar and disappears behind it
+ *  2 → Bars extend vertically to full screen
+ *  3 → Overlay fades out, unmount
  */
 export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScreenProps) {
   const [phase, setPhase] = useState(0);
@@ -40,11 +28,9 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
   }, [onComplete]);
 
   useEffect(() => {
-    // Mark body as busy & inert main content while loading
     setAriaBusy(true);
     setMainContentInert(true);
 
-    // Skip animation entirely if reduced motion preferred
     if (prefersReduced) {
       finish();
       return;
@@ -57,15 +43,13 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
       timeouts.push(setTimeout(fn, t));
     };
 
-    after(LOADING_SCREEN_TIMINGS.fade, () => setPhase(1));
-    after(LOADING_SCREEN_TIMINGS.pause1, () => setPhase(2));
-    after(LOADING_SCREEN_TIMINGS.extend, () => setPhase(3));
-    after(LOADING_SCREEN_TIMINGS.slide, () => setPhase(4));
+    after(LOADING_SCREEN_TIMINGS.showLogo, () => setPhase(1));
+    after(LOADING_SCREEN_TIMINGS.esportsSlide, () => setPhase(2));
+    after(LOADING_SCREEN_TIMINGS.barsExtend, () => setPhase(3));
     after(LOADING_SCREEN_TIMINGS.cleanup, finish);
 
     return () => {
       timeouts.forEach(clearTimeout);
-      // Cleanup on unmount
       setAriaBusy(false);
       setMainContentInert(false);
     };
@@ -79,49 +63,52 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
           role="status"
           aria-live="polite"
           aria-label="Loading EZesports"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-200"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: LOADING_SCREEN_ANIMATIONS.exit.duration } }}
+          exit={{
+            opacity: 0,
+            transition: { duration: LOADING_SCREEN_ANIMATIONS.overlayFade.duration },
+          }}
         >
-          {/* Screen reader announcement */}
           <span className="sr-only">
-            {phase < 4 ? "Loading, please wait…" : "Content loaded."}
+            {phase < 3 ? "Loading, please wait…" : "Content loaded."}
           </span>
 
-          {/* ---- Text logo ---- */}
           <motion.div
-            className="absolute flex items-baseline font-black z-20"
-            style={{ fontSize: "clamp(3rem, 8vw, 5rem)" }}
-            animate={{ opacity: phase >= 2 ? 0 : 1 }}
-            transition={{ duration: LOADING_SCREEN_ANIMATIONS.textFade.duration }}
+            className="absolute z-[10] font-black text-gray-800 overflow-visible whitespace-nowrap"
+            style={{
+              fontSize: "clamp(3rem, 8vw, 5rem)",
+              left: "50%",
+              marginLeft: "clamp(50px, 6vw, 80px)",
+            }}
+            initial={{ x: 0, opacity: 1 }}
+            animate={{
+              x: phase >= 1 ? "clamp(-200px, -20vw, -120px)" : 0,
+              opacity: phase >= 2 ? 0 : 1,
+            }}
+            transition={{
+              x: {
+                duration: LOADING_SCREEN_ANIMATIONS.esportsSlide.duration,
+                ease: LOADING_SCREEN_ANIMATIONS.esportsSlide.ease,
+              },
+              opacity: { duration: 0.01 },
+            }}
             aria-hidden="true"
           >
-            <span className="text-rose-300">E</span>
-            <span className="text-gray-800">Z</span>
-            <motion.span
-              className="text-gray-800"
-              animate={{ opacity: phase >= 1 ? 0 : 1 }}
-              transition={{ duration: LOADING_SCREEN_ANIMATIONS.esportsFade.duration }}
-            >
-              esports
-            </motion.span>
+            esports
           </motion.div>
 
-          {/* ---- E Bar (rose) ---- */}
           <AnimatedBar
             letter="E"
             backgroundColor="bg-rose-300"
-            initialX="calc(-100% - 2px)"
-            slideDirection="left"
+            offsetX="calc(-6vw - 52px)"
             phase={phase}
           />
 
-          {/* ---- Z Bar (white) ---- */}
           <AnimatedBar
             letter="Z"
             backgroundColor="bg-white"
-            initialX="2px"
-            slideDirection="right"
+            offsetX="2px"
             phase={phase}
           />
         </motion.div>

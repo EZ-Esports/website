@@ -214,34 +214,22 @@ export const METADATA = {
 // ============================================================================
 
 export const LOADING_SCREEN_TIMINGS = {
-  fade: 800,
-  pause1: 900,
-  extend: 800,
-  slide: 1100,
+  showLogo: 800,
+  esportsSlide: 900,
+  barsExtend: 800,
   cleanup: 400,
 } as const;
 
 export const LOADING_SCREEN_ANIMATIONS = {
-  slide: {
-    duration: 0.9,
-    ease: [0.7, 0, 0.3, 1] as [number, number, number, number],
+  esportsSlide: {
+    duration: 0.7,
+    ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
   },
-  extend: {
+  barsExtend: {
     duration: 0.6,
     ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
   },
-  opacity: {
-    duration: 0.01,
-  },
-  exit: {
+  overlayFade: {
     duration: 0.3,
   },
-  textFade: {
-    duration: 0.2,
-  },
-  esportsFade: {
-    duration: 0.5,
-  },
 } as const;
-
-
