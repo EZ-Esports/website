@@ -7,11 +7,10 @@ import { usePrefersReducedMotion } from "@/app/lib/hooks/usePrefersReducedMotion
 import AnimatedBar from "./AnimatedBar";
 
 /**
- * EZesports Loading Screen
+ * EZ Loading Screen
  *
  * Phases:
- *  0 → Small slanted E & Z bars + "esports" text visible
- *  1 → "esports" slides left into Z bar and disappears behind it
+ *  0 → Small slanted E & Z bars visible
  *  2 → Bars extend vertically to full screen
  *  3 → Overlay fades out, unmount
  */
@@ -43,8 +42,7 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
       timeouts.push(setTimeout(fn, t));
     };
 
-    after(LOADING_SCREEN_TIMINGS.showLogo, () => setPhase(1));
-    after(LOADING_SCREEN_TIMINGS.esportsSlide, () => setPhase(2));
+    after(LOADING_SCREEN_TIMINGS.showLogo, () => setPhase(2));
     after(LOADING_SCREEN_TIMINGS.barsExtend, () => setPhase(3));
     after(LOADING_SCREEN_TIMINGS.cleanup, finish);
 
@@ -58,14 +56,16 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
   return (
     <AnimatePresence>
       {visible && (
+        // Phase 0: small E & Z bars | Phase 2: bars extend | Phase 3: exit triggers overlay fade
         <motion.div
           key="loader"
           role="status"
           aria-live="polite"
-          aria-label="Loading EZesports"
+          aria-label="Loading EZ"
           className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900"
           initial={{ opacity: 1 }}
           exit={{
+            /* Phase 3: overlay fade out */
             opacity: 0,
             transition: { duration: LOADING_SCREEN_ANIMATIONS.overlayFade.duration },
           }}
@@ -74,30 +74,7 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
             {phase < 3 ? "Loading, please wait…" : "Content loaded."}
           </span>
 
-          <motion.div
-            className="absolute z-[10] font-black text-gray-800 overflow-visible whitespace-nowrap"
-            style={{
-              fontSize: "clamp(3rem, 8vw, 5rem)",
-              left: "50%",
-              marginLeft: "clamp(50px, 6vw, 80px)",
-            }}
-            initial={{ x: 0, opacity: 1 }}
-            animate={{
-              x: phase >= 1 ? "clamp(-200px, -20vw, -120px)" : 0,
-              opacity: phase >= 2 ? 0 : 1,
-            }}
-            transition={{
-              x: {
-                duration: LOADING_SCREEN_ANIMATIONS.esportsSlide.duration,
-                ease: LOADING_SCREEN_ANIMATIONS.esportsSlide.ease,
-              },
-              opacity: { duration: 0.01 },
-            }}
-            aria-hidden="true"
-          >
-            esports
-          </motion.div>
-
+          {/* Phase 0 & 2: E bar - extends when phase === 2 */}
           <AnimatedBar
             letter="E"
             backgroundColor="bg-rose-300"
@@ -105,6 +82,7 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
             phase={phase}
           />
 
+          {/* Phase 0 & 2: Z bar - extends when phase === 2 */}
           <AnimatedBar
             letter="Z"
             backgroundColor="bg-white"

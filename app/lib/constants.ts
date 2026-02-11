@@ -215,16 +215,11 @@ export const METADATA = {
 
 export const LOADING_SCREEN_TIMINGS = {
   showLogo: 800,
-  esportsSlide: 900,
   barsExtend: 800,
   cleanup: 400,
 } as const;
 
 export const LOADING_SCREEN_ANIMATIONS = {
-  esportsSlide: {
-    duration: 0.7,
-    ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
-  },
   barsExtend: {
     duration: 0.6,
     ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
