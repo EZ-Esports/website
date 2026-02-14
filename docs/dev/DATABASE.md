@@ -2,7 +2,7 @@
 
 ## Overview
 
-A multi-game, multi-season database for managing a school esports league. Designed for Supabase (Postgres). Handles student turnover, multiple games, team rosters, match results, staff roles at three levels (team, school, organization), and computed standings.
+A multi-game, multi-season database for managing a school esports league. Designed for Supabase (Postgres). Handles student turnover, multiple games, team rosters, match results, staff roles at three levels (team, school, organization), and computed standings. Reference `docs/dev/DATABASE_SCHEMA.md` for the database schema.
 
 ---
 
