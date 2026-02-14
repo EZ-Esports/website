@@ -44,3 +44,6 @@ const { data } = await supabaseServer.from('table').select()
 | Server Components | `supabaseServer` |
 | Route Handlers / API routes | `supabaseServer` |
 | Server Actions | `supabaseServer` |
+
+### READ
+`docs/dev/SUPABASE.md` for information on the database schema and TODOs.
