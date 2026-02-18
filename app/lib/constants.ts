@@ -163,12 +163,12 @@ export const NAV_ITEMS: NavigationItem[] = [
 ];
 
 export const SOCIAL_LINKS: SocialLink[] = [
-  { platform: 'discord', url: '#', label: 'Discord' },
-  { platform: 'instagram', url: '#', label: 'Instagram' },
-  { platform: 'twitter', url: '#', label: 'Twitter' },
+  { platform: 'discord', url: 'https://discord.com/invite/RajSZqNyvu', label: 'Discord' },
+  { platform: 'instagram', url: 'https://www.instagram.com/e.z.esports/', label: 'Instagram' },
+  { platform: 'twitter', url: 'https://x.com/ezesportsleague', label: 'Twitter' },
   { platform: 'facebook', url: '#', label: 'Facebook' },
-  { platform: 'youtube', url: '#', label: 'YouTube' },
-  { platform: 'twitch', url: '#', label: 'Twitch' },
+  { platform: 'youtube', url: 'https://www.youtube.com/channel/UCs6cNSviggm11aZwfV8XrAg', label: 'YouTube' },
+  { platform: 'twitch', url: 'https://www.twitch.tv/ezesportsNYC', label: 'Twitch' },
   { platform: 'messenger', url: '#', label: 'Messenger' },
 ];
 
