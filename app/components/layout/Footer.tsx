@@ -1,14 +1,6 @@
 import Link from 'next/link';
-import { FOOTER_LINKS, SOCIAL_LINKS, SITE_CONFIG } from '@/app/lib/constants';
-import { getSocialIconInitial } from '@/app/lib/utils';
-
-function SocialIcon({ platform }: { platform: string }) {
-  return (
-    <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white text-sm font-semibold hover:bg-gray-700 transition-colors">
-      {getSocialIconInitial(platform)}
-    </div>
-  );
-}
+import { FOOTER_LINKS, SITE_CONFIG } from '@/app/lib/constants';
+import SocialLinks from '@/app/components/ui/SocialLinks';
 
 export default function Footer() {
   return (
@@ -33,18 +25,7 @@ export default function Footer() {
         </div>
 
         {/* Social icons */}
-        <div className="flex justify-center items-center gap-4">
-          {SOCIAL_LINKS.map((social) => (
-            <Link
-              key={social.platform}
-              href={social.url}
-              aria-label={social.label}
-              className="focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-full"
-            >
-              <SocialIcon platform={social.platform} />
-            </Link>
-          ))}
-        </div>
+        <SocialLinks />
       </div>
     </footer>
   );

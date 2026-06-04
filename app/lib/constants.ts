@@ -140,20 +140,6 @@ export const EXTERNAL_LINKS = {
 } as const;
 
 // ============================================================================
-// Social Icon Constants
-// ============================================================================
-
-export const SOCIAL_ICON_INITIALS: Record<string, string> = {
-  discord: 'D',
-  instagram: 'I',
-  twitter: 'T',
-  facebook: 'F',
-  youtube: 'Y',
-  twitch: 'Tw',
-  messenger: 'M',
-} as const;
-
-// ============================================================================
 // Navigation
 // ============================================================================
 
@@ -166,10 +152,8 @@ export const SOCIAL_LINKS: SocialLink[] = [
   { platform: 'discord', url: 'https://discord.com/invite/RajSZqNyvu', label: 'Discord' },
   { platform: 'instagram', url: 'https://www.instagram.com/e.z.esports/', label: 'Instagram' },
   { platform: 'twitter', url: 'https://x.com/ezesportsleague', label: 'Twitter' },
-  { platform: 'facebook', url: '#', label: 'Facebook' },
   { platform: 'youtube', url: 'https://www.youtube.com/channel/UCs6cNSviggm11aZwfV8XrAg', label: 'YouTube' },
   { platform: 'twitch', url: 'https://www.twitch.tv/ezesportsNYC', label: 'Twitch' },
-  { platform: 'messenger', url: '#', label: 'Messenger' },
 ];
 
 export const FOOTER_LINKS = [

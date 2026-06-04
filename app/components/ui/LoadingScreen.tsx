@@ -30,21 +30,21 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
     setAriaBusy(true);
     setMainContentInert(true);
 
-    if (prefersReduced) {
-      finish();
-      return;
-    }
-
     const timeouts: NodeJS.Timeout[] = [];
-    let t = 0;
-    const after = (ms: number, fn: () => void) => {
-      t += ms;
-      timeouts.push(setTimeout(fn, t));
-    };
 
-    after(LOADING_SCREEN_TIMINGS.showLogo, () => setPhase(2));
-    after(LOADING_SCREEN_TIMINGS.barsExtend, () => setPhase(3));
-    after(LOADING_SCREEN_TIMINGS.cleanup, finish);
+    if (prefersReduced) {
+      timeouts.push(setTimeout(finish, 0));
+    } else {
+      let t = 0;
+      const after = (ms: number, fn: () => void) => {
+        t += ms;
+        timeouts.push(setTimeout(fn, t));
+      };
+
+      after(LOADING_SCREEN_TIMINGS.showLogo, () => setPhase(2));
+      after(LOADING_SCREEN_TIMINGS.barsExtend, () => setPhase(3));
+      after(LOADING_SCREEN_TIMINGS.cleanup, finish);
+    }
 
     return () => {
       timeouts.forEach(clearTimeout);

@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Game } from '@/app/types';
+import type { Game, GameSlug } from '@/app/types';
 import { getGameRoute } from '@/app/lib/constants';
 
 interface GameShowcaseProps {
@@ -9,10 +9,10 @@ interface GameShowcaseProps {
 }
 
 // Map game IDs to game slugs
-const gameIdToSlug: Record<string, string> = {
+const gameIdToSlug: Record<string, GameSlug> = {
   'lol': 'league-of-legends',
   'val': 'valorant',
-  'tft': 'tactical-fight-tactics',
+  'tft': 'team-fight-tactics',
 };
 
 export default function GameShowcase({ title, games }: GameShowcaseProps) {
@@ -23,7 +23,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {games.map((game, index) => {
             const gameSlug = game.id ? gameIdToSlug[game.id] : null;
-            const href = gameSlug ? getGameRoute(gameSlug as any) : '#';
+            const href = gameSlug ? getGameRoute(gameSlug) : '#';
             
             const content = (
               <div

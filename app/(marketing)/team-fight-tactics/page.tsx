@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { GAMES, getGameSubRoute } from '@/app/lib/constants';
 import Button from '@/app/components/ui/Button';
 import Hero from '@/app/components/sections/Hero';

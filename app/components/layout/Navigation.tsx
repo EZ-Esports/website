@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { ROUTES, GAMES, GAME_SLUGS, getGameRoute, getGameSubRoute, getNavigationState } from '@/app/lib/constants';
-import type { GameSlug } from '@/app/types';
 
 export default function Navigation() {
   const pathname = usePathname();

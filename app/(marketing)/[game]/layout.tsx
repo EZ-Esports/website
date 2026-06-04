@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
+import { GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 
 interface GameLayoutProps {

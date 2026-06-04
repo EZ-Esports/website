@@ -15,7 +15,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
   }
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <main className="container mx-auto px-4 py-12">
       {/* Page Header */}
       <div className="mb-12 text-center">
         <h1 className="text-4xl font-bold mb-4">
@@ -75,7 +75,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
           </div>
         ))}
       </div>
-    </div>
+    </main>
   );
 }
 

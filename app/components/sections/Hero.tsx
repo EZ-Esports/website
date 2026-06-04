@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import type { Image as ImageType } from '@/app/types';
 
 interface HeroProps {
   title: string;

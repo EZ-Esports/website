@@ -1,16 +1,3 @@
-import { SOCIAL_ICON_INITIALS } from '@/app/lib/constants';
-
-/**
- * Gets the initial character for a social media platform.
- * First checks SOCIAL_ICON_INITIALS for a predefined initial,
- * otherwise returns the first character of the platform name (uppercased),
- * or '?' if the platform name is empty.
- */
-export function getSocialIconInitial(platform: string): string {
-  const normalizedPlatform = platform.toLowerCase();
-  return SOCIAL_ICON_INITIALS[normalizedPlatform] || (platform.length > 0 ? platform[0].toUpperCase() : '?');
-}
-
 // ============================================================================
 // DOM Utilities
 // ============================================================================
@@ -30,20 +17,22 @@ export function setAriaBusy(busy: boolean): void {
 }
 
 /**
- * Sets or removes the inert attribute on the main-content element.
+ * Sets or removes the inert attribute on the primary site elements (header, main, footer).
+ * This ensures that when an overlay like the loading screen is active, users cannot
+ * interact with or focus elements on the rest of the page.
  * SSR-safe: only runs in browser environment.
  */
 export function setMainContentInert(inert: boolean): void {
   if (typeof window === 'undefined') return;
   
-  const mainContent = document.getElementById('main-content');
-  if (!mainContent) return;
-  
-  if (inert) {
-    mainContent.setAttribute('inert', '');
-  } else {
-    mainContent.removeAttribute('inert');
-  }
+  const elements = document.querySelectorAll('header, main, footer');
+  elements.forEach((el) => {
+    if (inert) {
+      el.setAttribute('inert', '');
+    } else {
+      el.removeAttribute('inert');
+    }
+  });
 }
 
 
