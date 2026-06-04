@@ -1,17 +1,24 @@
-import { db } from '../app/lib/db';
-import * as schema from '../app/lib/db/schema';
+import { loadEnvConfig } from '@next/env';
+// Load env variables before importing database modules
+loadEnvConfig(process.cwd());
 
 async function seed() {
   console.log('🌱 Start seeding database...');
 
-  // 1. Clean existing records (Optional / Safe seed)
-  console.log('Clearing existing data...');
-  await db.delete(schema.matches);
-  await db.delete(schema.rosters);
-  await db.delete(schema.teams);
-  await db.delete(schema.seasons);
-  await db.delete(schema.games);
-  await db.delete(schema.newsPosts);
+  const { db } = await import('../app/lib/db');
+  const schema = await import('../app/lib/db/schema');
+
+  // Check if data is already seeded to prevent duplicating or overwriting active data
+  try {
+    const existingGames = await db.select().from(schema.games).limit(1);
+    if (existingGames.length > 0) {
+      console.log('⚠️ Database already contains games. Skipping seed to prevent duplicating data.');
+      process.exit(0);
+    }
+  } catch {
+    // If table doesn't exist, we let it fail or log it
+    console.log('Checking database status... (Tables might not be pushed yet)');
+  }
 
   // 2. Insert Games
   console.log('Seeding games...');
