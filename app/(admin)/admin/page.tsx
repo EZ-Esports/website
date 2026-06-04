@@ -1,6 +1,4 @@
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { count } from 'drizzle-orm';
+import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews } from '@/app/lib/db/queries';
 import Link from 'next/link';
 
 export default async function AdminDashboardPage() {
@@ -10,16 +8,18 @@ export default async function AdminDashboardPage() {
 
   try {
     if (process.env.DATABASE_URL) {
-      const gamesCount = await db.select({ val: count() }).from(schema.games);
-      const teamsCount = await db.select({ val: count() }).from(schema.teams);
-      const matchesCount = await db.select({ val: count() }).from(schema.matches);
-      const newsCount = await db.select({ val: count() }).from(schema.newsPosts);
+      const [games, teams, matches, news] = await Promise.all([
+        getCachedGames(),
+        getCachedTeams(),
+        getCachedMatches(),
+        getCachedNews(),
+      ]);
 
       stats = {
-        games: gamesCount[0]?.val || 0,
-        teams: teamsCount[0]?.val || 0,
-        matches: matchesCount[0]?.val || 0,
-        news: newsCount[0]?.val || 0,
+        games: games.length,
+        teams: teams.length,
+        matches: matches.length,
+        news: news.length,
       };
       dbConfigured = true;
     }

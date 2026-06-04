@@ -3,7 +3,7 @@
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 // Helper to generate slugs
@@ -36,6 +36,7 @@ export async function createNewsPost(formData: FormData) {
     category,
   });
 
+  revalidateTag('news', 'max');
   revalidatePath('/news');
   revalidatePath('/admin/news');
   return redirect('/admin/news');
@@ -64,6 +65,7 @@ export async function updateNewsPost(id: string, formData: FormData) {
     })
     .where(eq(schema.newsPosts.id, id));
 
+  revalidateTag('news', 'max');
   revalidatePath('/news');
   revalidatePath(`/news/${slug}`);
   revalidatePath('/admin/news');
@@ -73,6 +75,7 @@ export async function updateNewsPost(id: string, formData: FormData) {
 export async function deleteNewsPost(id: string) {
   await db.delete(schema.newsPosts).where(eq(schema.newsPosts.id, id));
   
+  revalidateTag('news', 'max');
   revalidatePath('/news');
   revalidatePath('/admin/news');
 }

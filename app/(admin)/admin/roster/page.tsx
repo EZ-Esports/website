@@ -1,17 +1,21 @@
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
+import { getCachedRosters, getCachedTeams, getCachedGames } from '@/app/lib/db/queries';
 import { createRosterMember, deleteRosterMember } from './actions';
 
 export default async function AdminRosterPage() {
-  let rostersList: typeof schema.rosters.$inferSelect[] = [];
-  let teams: typeof schema.teams.$inferSelect[] = [];
-  let games: typeof schema.games.$inferSelect[] = [];
+  let rostersList: Awaited<ReturnType<typeof getCachedRosters>> = [];
+  let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
+  let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let dbError = false;
 
   try {
-    rostersList = await db.select().from(schema.rosters);
-    teams = await db.select().from(schema.teams);
-    games = await db.select().from(schema.games);
+    const [rostersRes, teamsRes, gamesRes] = await Promise.all([
+      getCachedRosters(),
+      getCachedTeams(),
+      getCachedGames(),
+    ]);
+    rostersList = rostersRes;
+    teams = teamsRes;
+    games = gamesRes;
   } catch {
     dbError = true;
   }

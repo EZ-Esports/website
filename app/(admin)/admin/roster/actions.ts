@@ -3,7 +3,7 @@
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 export async function createRosterMember(formData: FormData) {
   const teamId = formData.get('teamId') as string;
@@ -22,12 +22,14 @@ export async function createRosterMember(formData: FormData) {
     bio,
   });
 
+  revalidateTag('rosters', 'max');
   revalidatePath('/admin/roster');
   revalidatePath('/');
 }
 
 export async function deleteRosterMember(id: string) {
   await db.delete(schema.rosters).where(eq(schema.rosters.id, id));
+  revalidateTag('rosters', 'max');
   revalidatePath('/admin/roster');
   revalidatePath('/');
 }

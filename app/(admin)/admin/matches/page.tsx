@@ -1,20 +1,24 @@
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { getCachedMatches, getCachedTeams, getCachedSeasons, getCachedGames } from '@/app/lib/db/queries';
 import { createMatch, updateMatchScore, deleteMatch } from './actions';
 
 export default async function AdminMatchesPage() {
-  let matches: typeof schema.matches.$inferSelect[] = [];
-  let teams: typeof schema.teams.$inferSelect[] = [];
-  let seasons: typeof schema.seasons.$inferSelect[] = [];
-  let games: typeof schema.games.$inferSelect[] = [];
+  let matches: Awaited<ReturnType<typeof getCachedMatches>> = [];
+  let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
+  let seasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
+  let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let dbError = false;
 
   try {
-    matches = await db.select().from(schema.matches).orderBy(desc(schema.matches.scheduledAt));
-    teams = await db.select().from(schema.teams);
-    seasons = await db.select().from(schema.seasons).where(eq(schema.seasons.isActive, true));
-    games = await db.select().from(schema.games);
+    const [matchesRes, teamsRes, seasonsRes, gamesRes] = await Promise.all([
+      getCachedMatches(),
+      getCachedTeams(),
+      getCachedSeasons(),
+      getCachedGames(),
+    ]);
+    matches = matchesRes;
+    teams = teamsRes;
+    seasons = seasonsRes;
+    games = gamesRes;
   } catch {
     dbError = true;
   }

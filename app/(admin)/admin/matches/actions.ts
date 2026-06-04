@@ -3,7 +3,7 @@
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 export async function createMatch(formData: FormData) {
   const seasonId = formData.get('seasonId') as string;
@@ -23,6 +23,7 @@ export async function createMatch(formData: FormData) {
     status: 'scheduled',
   });
 
+  revalidateTag('matches', 'max');
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }
@@ -87,12 +88,15 @@ export async function updateMatchScore(id: string, formData: FormData) {
     }
   }
 
+  revalidateTag('matches', 'max');
+  revalidateTag('teams', 'max');
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }
 
 export async function deleteMatch(id: string) {
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
+  revalidateTag('matches', 'max');
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }

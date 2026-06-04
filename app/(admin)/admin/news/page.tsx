@@ -1,18 +1,13 @@
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { desc } from 'drizzle-orm';
+import { getCachedNews } from '@/app/lib/db/queries';
 import Link from 'next/link';
 import { deleteNewsPost } from './actions';
 
 export default async function AdminNewsPage() {
-  let posts: typeof schema.newsPosts.$inferSelect[] = [];
+  let posts: Awaited<ReturnType<typeof getCachedNews>> = [];
   let dbError = false;
 
   try {
-    posts = await db
-      .select()
-      .from(schema.newsPosts)
-      .orderBy(desc(schema.newsPosts.publishedAt));
+    posts = await getCachedNews();
   } catch {
     dbError = true;
   }

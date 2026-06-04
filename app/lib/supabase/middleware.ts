@@ -27,6 +27,13 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = pathname.startsWith('/admin') || pathname.startsWith('/login');
+
+  if (!isAuthRoute) {
+    return supabaseResponse;
+  }
+
   // Refresh session if expired and retrieve authenticated user
   const {
     data: { user },
