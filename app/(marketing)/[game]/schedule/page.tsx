@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
+import { db } from '@/app/lib/db';
+import * as schema from '@/app/lib/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
 
 interface SchedulePageProps {
   params: Promise<{ game: string }>;
@@ -16,15 +19,72 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
 
   const gameConfig = GAMES[game as GameSlug];
 
-  // Placeholder schedule data
-  const schedule = [
-    { date: 'March 15, 2025', time: '2:00 PM', team1: 'Stuyvesant', team2: 'Bronx Science', division: 'Varsity', status: 'Upcoming' },
-    { date: 'March 15, 2025', time: '4:00 PM', team1: 'Brooklyn Tech', team2: 'Midwood', division: 'Varsity', status: 'Upcoming' },
-    { date: 'March 8, 2025', time: '2:00 PM', team1: 'Stuyvesant', team2: 'Brooklyn Tech', division: 'Varsity', status: 'Completed', result: 'W 2-0' },
-    { date: 'March 8, 2025', time: '4:00 PM', team1: 'Bronx Science', team2: 'Staten Island Tech', division: 'Varsity', status: 'Completed', result: 'W 2-1' },
-    { date: 'March 1, 2025', time: '2:00 PM', team1: 'Stuyvesant', team2: 'Midwood', division: 'Varsity', status: 'Completed', result: 'W 2-1' },
-    { date: 'March 1, 2025', time: '4:00 PM', team1: 'Brooklyn Tech', team2: 'Staten Island Tech', division: 'Varsity', status: 'Completed', result: 'L 1-2' },
-  ];
+  interface ScheduleItem {
+    date: string;
+    time: string;
+    team1: string;
+    team2: string;
+    division: string;
+    status: string;
+    result?: string;
+  }
+
+  let schedule: ScheduleItem[] = [];
+  try {
+    const gameRow = await db
+      .select()
+      .from(schema.games)
+      .where(eq(schema.games.slug, game))
+      .limit(1);
+
+    if (gameRow[0]) {
+      const activeSeason = await db
+        .select()
+        .from(schema.seasons)
+        .where(and(eq(schema.seasons.gameId, gameRow[0].id), eq(schema.seasons.isActive, true)))
+        .limit(1);
+
+      if (activeSeason[0]) {
+        const matchesList = await db
+          .select()
+          .from(schema.matches)
+          .where(eq(schema.matches.seasonId, activeSeason[0].id))
+          .orderBy(desc(schema.matches.scheduledAt));
+
+        const teamsList = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.gameId, gameRow[0].id));
+
+        const teamMap = new Map(teamsList.map((t) => [t.id, t]));
+
+        schedule = matchesList.map((m) => {
+          const team1 = teamMap.get(m.homeTeamId);
+          const team2 = teamMap.get(m.awayTeamId);
+          return {
+            date: new Date(m.scheduledAt).toLocaleDateString(undefined, {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            time: new Date(m.scheduledAt).toLocaleTimeString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit',
+            }),
+            team1: team1?.name || 'Home Team',
+            team2: team2?.name || 'Away Team',
+            division: team1?.division || 'Varsity',
+            status: m.status === 'completed' ? 'Completed' : m.status === 'live' ? 'Live' : 'Upcoming',
+            result: m.status === 'completed' && m.homeScore !== null && m.awayScore !== null
+              ? `${m.homeScore > m.awayScore ? 'W' : 'L'} ${m.homeScore}-${m.awayScore}`
+              : undefined,
+          };
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load schedule from database', error);
+  }
 
   return (
     <main>
@@ -59,34 +119,39 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
 
           {/* Schedule List */}
           <div className="space-y-4">
-            {schedule.map((match, index) => (
-              <div
-                key={index}
-                className="bg-gray-800 rounded-lg p-6 flex items-center justify-between"
-              >
-                <div className="flex-1">
-                  <div className="text-sm text-gray-400 mb-2">
-                    {match.date} • {match.time} • {match.division}
-                  </div>
-                  <div className="text-xl font-semibold text-white">
-                    {match.team1} vs. {match.team2}
-                  </div>
-                </div>
-                <div className="text-right">
-                  {match.status === 'Completed' ? (
-                    <div className="text-rose-300 font-bold">{match.result}</div>
-                  ) : (
-                    <div className="text-gray-400">Upcoming</div>
-                  )}
-                </div>
+            {schedule.length === 0 ? (
+              <div className="text-center p-8 text-gray-500 text-sm bg-gray-800 rounded-lg">
+                No scheduled match fixtures for this season yet.
               </div>
-            ))}
+            ) : (
+              schedule.map((match, index) => (
+                <div
+                  key={index}
+                  className="bg-gray-800 rounded-lg p-6 flex items-center justify-between"
+                >
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-400 mb-2">
+                      {match.date} • {match.time} • {match.division}
+                    </div>
+                    <div className="text-xl font-semibold text-white">
+                      {match.team1} vs. {match.team2}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {match.status === 'Completed' ? (
+                      <div className="text-rose-300 font-bold">{match.result}</div>
+                    ) : match.status === 'Live' ? (
+                      <div className="text-emerald-400 font-bold animate-pulse">Live</div>
+                    ) : (
+                      <div className="text-gray-400">Upcoming</div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </ContentSection>
     </main>
   );
 }
-
-
-

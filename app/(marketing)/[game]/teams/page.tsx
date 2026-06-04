@@ -3,6 +3,9 @@ import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import Card from '@/app/components/ui/Card';
+import { db } from '@/app/lib/db';
+import * as schema from '@/app/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 interface TeamsPageProps {
   params: Promise<{ game: string }>;
@@ -17,17 +20,38 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
   const gameConfig = GAMES[game as GameSlug];
 
-  // Placeholder teams data
-  const teams = [
-    { id: '1', name: 'Stuyvesant', record: '12-3', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '2', name: 'Bronx Science', record: '11-4', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '3', name: 'Brooklyn Tech', record: '10-5', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '4', name: 'Midwood', record: '9-6', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '5', name: 'Staten Island Tech', record: '8-7', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '6', name: 'Queens Tech', record: '6-9', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '7', name: 'Manhattan Center', record: '5-10', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-    { id: '8', name: 'Brooklyn Latin', record: '4-11', division: 'Varsity', logoUrl: '/images/logos/logo.png' },
-  ];
+  interface TeamItem {
+    id: string;
+    name: string;
+    record: string;
+    division: string;
+  }
+
+  let teams: TeamItem[] = [];
+  try {
+    const gameRow = await db
+      .select()
+      .from(schema.games)
+      .where(eq(schema.games.slug, game))
+      .limit(1);
+
+    if (gameRow[0]) {
+      const teamRows = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.gameId, gameRow[0].id))
+        .orderBy(schema.teams.name);
+
+      teams = teamRows.map((t) => ({
+        id: t.id,
+        name: t.name,
+        record: `${t.wins}-${t.losses}`,
+        division: t.division,
+      }));
+    }
+  } catch (error) {
+    console.error('Failed to load teams from database', error);
+  }
 
   return (
     <main>
@@ -49,26 +73,29 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
           {/* Teams Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {teams.map((team) => (
-              <Card key={team.id} className="bg-gray-800 text-white">
-                <div className="text-center">
-                  <div className="mb-4">
-                    <div className="w-20 h-20 mx-auto bg-gray-700 rounded-full flex items-center justify-center">
-                      <span className="text-2xl font-bold">{team.name.charAt(0)}</span>
+            {teams.length === 0 ? (
+              <div className="text-center p-8 text-gray-500 text-sm bg-gray-800 rounded-lg col-span-full">
+                No teams registered for this game yet.
+              </div>
+            ) : (
+              teams.map((team) => (
+                <Card key={team.id} className="bg-gray-800 text-white">
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <div className="w-20 h-20 mx-auto bg-gray-700 rounded-full flex items-center justify-center">
+                        <span className="text-2xl font-bold">{team.name.charAt(0)}</span>
+                      </div>
                     </div>
+                    <h3 className="text-xl font-semibold mb-2">{team.name}</h3>
+                    <div className="text-gray-400 text-sm mb-1">{team.division}</div>
+                    <div className="text-rose-300 font-bold">{team.record}</div>
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">{team.name}</h3>
-                  <div className="text-gray-400 text-sm mb-1">{team.division}</div>
-                  <div className="text-rose-300 font-bold">{team.record}</div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))
+            )}
           </div>
         </div>
       </ContentSection>
     </main>
   );
 }
-
-
-
