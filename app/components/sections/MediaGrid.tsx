@@ -47,16 +47,16 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
             <div 
               key={item.id || index} 
               onClick={() => openLightbox(index)}
-              className="aspect-square rounded-2xl overflow-hidden relative border border-slate-800/80 hover:border-ez-pink/40 hover:scale-[1.03] hover:shadow-lg hover:shadow-ez-pink/5 cursor-pointer transition-all duration-300 group"
+              className="aspect-square rounded-xl overflow-hidden relative border border-slate-900 cursor-pointer transition-all duration-200 group"
             >
               <Image
                 src={item.src}
                 alt={item.alt}
                 fill
-                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                className="object-cover transition-opacity duration-300 group-hover:opacity-80"
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                <span className="text-white bg-ez-pink px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-300">
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                <span className="text-white bg-ez-pink px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
                   View Photo
                 </span>
               </div>

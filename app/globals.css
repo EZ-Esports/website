@@ -44,6 +44,17 @@ body {
   background: #ff2a5f;
 }
 
+/* Hide number input spinner buttons (incremental arrows) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Glassmorphism utility */
 .glass-panel {
   background: rgba(15, 23, 42, 0.45);
@@ -51,17 +62,4 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Glow text effect */
-.text-glow {
-  text-shadow: 0 0 15px rgba(255, 42, 95, 0.3);
-}
-
-/* Gradient border hover effect */
-.hover-glow {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.hover-glow:hover {
-  border-color: rgba(255, 42, 95, 0.4);
-  box-shadow: 0 10px 30px -10px rgba(255, 42, 95, 0.15);
-}
 

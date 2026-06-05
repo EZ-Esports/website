@@ -46,11 +46,10 @@ export default function ContentSection({
   const shouldUseGrid = hasImage && (hasCustomContent || description);
 
   return (
-    <section className={`${themeClasses} py-20 md:py-28 relative z-10`}>
+    <section className={`${themeClasses} py-16 md:py-24 relative z-10`}>
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight uppercase">{heading}</h2>
-          <div className="w-12 h-1 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto rounded-full" />
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white uppercase">{heading}</h2>
         </div>
         
         {isTextOnly ? (
