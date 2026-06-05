@@ -6,7 +6,6 @@ import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
-import LoadingScreen from '@/app/components/ui/LoadingScreen';
 import {
   galleryImages1,
   galleryImages2,
@@ -21,7 +20,6 @@ export default function HomePage() {
 
   return (
     <>
-      <LoadingScreen />
       <main>
       {/* 1. Hero Section */}
       <Hero

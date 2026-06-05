@@ -165,6 +165,7 @@ export const FOOTER_LINKS = [
   { label: 'API Terms', href: '#' },
   { label: 'Press', href: '#' },
   { label: 'FAQs', href: '#' },
+  { label: 'Staff Login', href: '/login' },
 ] as const;
 
 // ============================================================================

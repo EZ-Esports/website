@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { SITE_CONFIG } from '@/app/lib/constants';
 import Navigation from './Navigation';
+import GameSubHeader from './GameSubHeader';
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,6 +56,7 @@ export default function Header() {
           </div>
         )}
       </nav>
+      <GameSubHeader />
     </header>
   );
 }
