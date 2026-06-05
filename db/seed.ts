@@ -97,55 +97,102 @@ async function seed() {
     .insert(schema.teams)
     .values([
       // Valorant
-      { gameId: valorantDb.id, name: 'Stuyvesant', division: 'Varsity', wins: 12, losses: 3 },
-      { gameId: valorantDb.id, name: 'Bronx Science', division: 'Varsity', wins: 11, losses: 4 },
-      { gameId: valorantDb.id, name: 'Brooklyn Tech', division: 'Varsity', wins: 10, losses: 5 },
-      { gameId: valorantDb.id, name: 'Midwood', division: 'Varsity', wins: 9, losses: 6 },
-      { gameId: valorantDb.id, name: 'Staten Island Tech', division: 'Varsity', wins: 8, losses: 7 },
+      { gameId: valorantDb.id, name: 'Stuyvesant' },
+      { gameId: valorantDb.id, name: 'Bronx Science' },
+      { gameId: valorantDb.id, name: 'Brooklyn Tech' },
+      { gameId: valorantDb.id, name: 'Midwood' },
+      { gameId: valorantDb.id, name: 'Staten Island Tech' },
 
       // League
-      { gameId: lolDb.id, name: 'Bronx Science', division: 'Varsity', wins: 13, losses: 2 },
-      { gameId: lolDb.id, name: 'Stuyvesant', division: 'Varsity', wins: 10, losses: 5 },
-      { gameId: lolDb.id, name: 'Brooklyn Tech', division: 'Varsity', wins: 9, losses: 6 },
-      { gameId: lolDb.id, name: 'Midwood', division: 'Varsity', wins: 8, losses: 7 },
-      { gameId: lolDb.id, name: 'Staten Island Tech', division: 'Varsity', wins: 7, losses: 8 },
+      { gameId: lolDb.id, name: 'Bronx Science' },
+      { gameId: lolDb.id, name: 'Stuyvesant' },
+      { gameId: lolDb.id, name: 'Brooklyn Tech' },
+      { gameId: lolDb.id, name: 'Midwood' },
+      { gameId: lolDb.id, name: 'Staten Island Tech' },
 
       // TFT
-      { gameId: tftDb.id, name: 'Midwood', division: 'Varsity', wins: 11, losses: 4 },
-      { gameId: tftDb.id, name: 'Stuyvesant', division: 'Varsity', wins: 9, losses: 6 },
-      { gameId: tftDb.id, name: 'Brooklyn Tech', division: 'Varsity', wins: 8, losses: 7 },
-      { gameId: tftDb.id, name: 'Bronx Science', division: 'Varsity', wins: 7, losses: 8 },
-      { gameId: tftDb.id, name: 'Staten Island Tech', division: 'Varsity', wins: 6, losses: 9 },
+      { gameId: tftDb.id, name: 'Midwood' },
+      { gameId: tftDb.id, name: 'Stuyvesant' },
+      { gameId: tftDb.id, name: 'Brooklyn Tech' },
+      { gameId: tftDb.id, name: 'Bronx Science' },
+      { gameId: tftDb.id, name: 'Staten Island Tech' },
     ])
     .returning();
 
-  // Get specific team records for matching
+  // Get specific team records for roster creation
   const stuyVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Stuyvesant')!;
   const bxSciVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Bronx Science')!;
   const bkTechVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Brooklyn Tech')!;
   const midwoodVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Midwood')!;
+  const sitVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Staten Island Tech')!;
 
+  const bxSciLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Bronx Science')!;
   const stuyLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Stuyvesant')!;
   const bkTechLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Brooklyn Tech')!;
   const midwoodLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Midwood')!;
+  const sitLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Staten Island Tech')!;
 
-  // 5. Seeding sample match rosters
+  const midwoodTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Midwood')!;
+  const stuyTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Stuyvesant')!;
+  const bkTechTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Brooklyn Tech')!;
+  const bxSciTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Bronx Science')!;
+  const sitTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Staten Island Tech')!;
+
+  // 5. Seed Rosters under Teams
   console.log('Seeding team rosters...');
-  await db.insert(schema.rosters).values([
-    // Stuyvesant Valorant Roster
-    { teamId: stuyVal.id, name: 'Alex Chen', role: 'Captain', bio: 'Dual duelist specialist. Focuses on entry routing.' },
-    { teamId: stuyVal.id, name: 'Sam Wu', role: 'Player', bio: 'Initiator/Controller player.' },
-    { teamId: stuyVal.id, name: 'Emily Li', role: 'Player', bio: 'Sentinel main. Keeps sites locked down.' },
-    { teamId: stuyVal.id, name: 'Leo Lopez', role: 'Player', bio: 'Flex player.' },
-    { teamId: stuyVal.id, name: 'Jason Kim', role: 'Player', bio: 'Controller main.' },
+  const insertedRosters = await db
+    .insert(schema.rosters)
+    .values([
+      // Valorant
+      { teamId: stuyVal.id, name: 'Varsity', division: 'Varsity', wins: 12, losses: 3 },
+      { teamId: stuyVal.id, name: 'JV', division: 'JV', wins: 8, losses: 5 },
+      { teamId: bxSciVal.id, name: 'Varsity', division: 'Varsity', wins: 11, losses: 4 },
+      { teamId: bkTechVal.id, name: 'Varsity', division: 'Varsity', wins: 10, losses: 5 },
+      { teamId: midwoodVal.id, name: 'Varsity', division: 'Varsity', wins: 9, losses: 6 },
+      { teamId: sitVal.id, name: 'Varsity', division: 'Varsity', wins: 8, losses: 7 },
 
-    // Stuyvesant LoL Roster
-    { teamId: stuyLol.id, name: 'Brian Zhang', role: 'Captain', bio: 'Mid lane main. Enjoys control mages.' },
-    { teamId: stuyLol.id, name: 'Kevin Wang', role: 'Player', bio: 'Jungle main. Focuses on objective control.' },
-    { teamId: stuyLol.id, name: 'Chloe Ho', role: 'Player', bio: 'Support main. Specializes in enchanters.' },
+      // League
+      { teamId: bxSciLol.id, name: 'Varsity', division: 'Varsity', wins: 13, losses: 2 },
+      { teamId: stuyLol.id, name: 'Varsity', division: 'Varsity', wins: 10, losses: 5 },
+      { teamId: bkTechLol.id, name: 'Varsity', division: 'Varsity', wins: 9, losses: 6 },
+      { teamId: midwoodLol.id, name: 'Varsity', division: 'Varsity', wins: 8, losses: 7 },
+      { teamId: sitLol.id, name: 'Varsity', division: 'Varsity', wins: 7, losses: 8 },
+
+      // TFT
+      { teamId: midwoodTft.id, name: 'Varsity', division: 'Varsity', wins: 11, losses: 4 },
+      { teamId: stuyTft.id, name: 'Varsity', division: 'Varsity', wins: 9, losses: 6 },
+      { teamId: bkTechTft.id, name: 'Varsity', division: 'Varsity', wins: 8, losses: 7 },
+      { teamId: bxSciTft.id, name: 'Varsity', division: 'Varsity', wins: 7, losses: 8 },
+      { teamId: sitTft.id, name: 'Varsity', division: 'Varsity', wins: 6, losses: 9 },
+    ])
+    .returning();
+
+  const stuyValVarsity = insertedRosters.find((r) => r.teamId === stuyVal.id && r.division === 'Varsity')!;
+  const bxSciValVarsity = insertedRosters.find((r) => r.teamId === bxSciVal.id && r.division === 'Varsity')!;
+  const bkTechValVarsity = insertedRosters.find((r) => r.teamId === bkTechVal.id && r.division === 'Varsity')!;
+  const midwoodValVarsity = insertedRosters.find((r) => r.teamId === midwoodVal.id && r.division === 'Varsity')!;
+
+  const stuyLolVarsity = insertedRosters.find((r) => r.teamId === stuyLol.id && r.division === 'Varsity')!;
+  const bkTechLolVarsity = insertedRosters.find((r) => r.teamId === bkTechLol.id && r.division === 'Varsity')!;
+  const midwoodLolVarsity = insertedRosters.find((r) => r.teamId === midwoodLol.id && r.division === 'Varsity')!;
+
+  // 6. Seed Players under Rosters
+  console.log('Seeding players...');
+  await db.insert(schema.players).values([
+    // Stuyvesant Valorant Varsity
+    { rosterId: stuyValVarsity.id, name: 'Alex Chen', role: 'Captain', bio: 'Dual duelist specialist. Focuses on entry routing.' },
+    { rosterId: stuyValVarsity.id, name: 'Sam Wu', role: 'Player', bio: 'Initiator/Controller player.' },
+    { rosterId: stuyValVarsity.id, name: 'Emily Li', role: 'Player', bio: 'Sentinel main. Keeps sites locked down.' },
+    { rosterId: stuyValVarsity.id, name: 'Leo Lopez', role: 'Player', bio: 'Flex player.' },
+    { rosterId: stuyValVarsity.id, name: 'Jason Kim', role: 'Player', bio: 'Controller main.' },
+
+    // Stuyvesant LoL Varsity
+    { rosterId: stuyLolVarsity.id, name: 'Brian Zhang', role: 'Captain', bio: 'Mid lane main. Enjoys control mages.' },
+    { rosterId: stuyLolVarsity.id, name: 'Kevin Wang', role: 'Player', bio: 'Jungle main. Focuses on objective control.' },
+    { rosterId: stuyLolVarsity.id, name: 'Chloe Ho', role: 'Player', bio: 'Support main. Specializes in enchanters.' },
   ]);
 
-  // 6. Seeding matches
+  // 7. Seeding matches
   console.log('Seeding matches...');
   const nextSaturday = new Date();
   nextSaturday.setDate(nextSaturday.getDate() + (6 - nextSaturday.getDay()));
@@ -161,15 +208,15 @@ async function seed() {
     // Valorant Matches
     {
       seasonId: valSeason.id,
-      homeTeamId: stuyVal.id,
-      awayTeamId: bxSciVal.id,
+      homeRosterId: stuyValVarsity.id,
+      awayRosterId: bxSciValVarsity.id,
       scheduledAt: nextSaturday,
       status: 'scheduled',
     },
     {
       seasonId: valSeason.id,
-      homeTeamId: stuyVal.id,
-      awayTeamId: bkTechVal.id,
+      homeRosterId: stuyValVarsity.id,
+      awayRosterId: bkTechValVarsity.id,
       scheduledAt: oneWeekAgo,
       homeScore: 2,
       awayScore: 0,
@@ -177,8 +224,8 @@ async function seed() {
     },
     {
       seasonId: valSeason.id,
-      homeTeamId: stuyVal.id,
-      awayTeamId: midwoodVal.id,
+      homeRosterId: stuyValVarsity.id,
+      awayRosterId: midwoodValVarsity.id,
       scheduledAt: twoWeeksAgo,
       homeScore: 2,
       awayScore: 1,
@@ -188,15 +235,15 @@ async function seed() {
     // LoL Matches
     {
       seasonId: lolSeason.id,
-      homeTeamId: stuyLol.id,
-      awayTeamId: bkTechLol.id,
+      homeRosterId: stuyLolVarsity.id,
+      awayRosterId: bkTechLolVarsity.id,
       scheduledAt: nextSaturday,
       status: 'scheduled',
     },
     {
       seasonId: lolSeason.id,
-      homeTeamId: stuyLol.id,
-      awayTeamId: midwoodLol.id,
+      homeRosterId: stuyLolVarsity.id,
+      awayRosterId: midwoodLolVarsity.id,
       scheduledAt: oneWeekAgo,
       homeScore: 2,
       awayScore: 0,

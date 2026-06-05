@@ -6,13 +6,14 @@ import ContentSection from '@/app/components/sections/ContentSection';
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 
 export default async function ValorantHubPage() {
   const game = GAMES.valorant;
 
   // Graceful fallbacks
   let record = '12-3';
+  let jvRecord = '8-5';
   let nextMatch = { date: 'Saturday, March 15, 2025', teams: 'Stuyvesant vs. Bronx Science', division: 'Varsity' };
   let recentResults = [
     { date: 'March 8, 2025', teams: 'Stuyvesant vs. Brooklyn Tech', result: 'W 2-0', division: 'Varsity' },
@@ -37,20 +38,30 @@ export default async function ValorantHubPage() {
     if (gameRow[0]) {
       const gameId = gameRow[0].id;
 
-      // 1. Record
-      const stuyTeam = await db
+      // Get team rows
+      const teamRows = await db
         .select()
         .from(schema.teams)
-        .where(
-          and(
-            eq(schema.teams.gameId, gameId),
-            eq(schema.teams.name, 'Stuyvesant'),
-            eq(schema.teams.division, 'Varsity')
-          )
-        )
-        .limit(1);
-      if (stuyTeam[0]) {
-        record = `${stuyTeam[0].wins}-${stuyTeam[0].losses}`;
+        .where(eq(schema.teams.gameId, gameId));
+      const teamMap = new Map(teamRows.map((t) => [t.id, t]));
+      const teamIds = teamRows.map((t) => t.id);
+
+      const rosterRows = teamIds.length > 0
+        ? await db.select().from(schema.rosters).where(inArray(schema.rosters.teamId, teamIds))
+        : [];
+      const rosterMap = new Map(rosterRows.map((r) => [r.id, r]));
+
+      // 1. Record
+      const stuyTeam = teamRows.find((t) => t.name === 'Stuyvesant');
+      if (stuyTeam) {
+        const varsityRoster = rosterRows.find((r) => r.teamId === stuyTeam.id && r.division === 'Varsity');
+        if (varsityRoster) {
+          record = `${varsityRoster.wins}-${varsityRoster.losses}`;
+        }
+        const jvRoster = rosterRows.find((r) => r.teamId === stuyTeam.id && r.division === 'JV');
+        if (jvRoster) {
+          jvRecord = `${jvRoster.wins}-${jvRoster.losses}`;
+        }
       }
 
       // 2. Next Match
@@ -61,12 +72,6 @@ export default async function ValorantHubPage() {
         .limit(1);
 
       if (activeSeason[0]) {
-        const teamRows = await db
-          .select()
-          .from(schema.teams)
-          .where(eq(schema.teams.gameId, gameId));
-        const teamMap = new Map(teamRows.map((t) => [t.id, t]));
-
         const nextMatchRow = await db
           .select()
           .from(schema.matches)
@@ -80,8 +85,10 @@ export default async function ValorantHubPage() {
           .limit(1);
 
         if (nextMatchRow[0]) {
-          const home = teamMap.get(nextMatchRow[0].homeTeamId);
-          const away = teamMap.get(nextMatchRow[0].awayTeamId);
+          const homeRoster = rosterMap.get(nextMatchRow[0].homeRosterId);
+          const awayRoster = rosterMap.get(nextMatchRow[0].awayRosterId);
+          const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+          const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
           nextMatch = {
             date: new Date(nextMatchRow[0].scheduledAt).toLocaleDateString('en-US', {
               timeZone: 'America/New_York',
@@ -91,7 +98,7 @@ export default async function ValorantHubPage() {
               year: 'numeric',
             }),
             teams: `${home?.name || 'Home'} vs. ${away?.name || 'Away'}`,
-            division: home?.division || 'Varsity',
+            division: homeRoster?.division || 'Varsity',
           };
         }
 
@@ -110,8 +117,10 @@ export default async function ValorantHubPage() {
 
         if (recentRows.length > 0) {
           recentResults = recentRows.map((r) => {
-            const home = teamMap.get(r.homeTeamId);
-            const away = teamMap.get(r.awayTeamId);
+            const homeRoster = rosterMap.get(r.homeRosterId);
+            const awayRoster = rosterMap.get(r.awayRosterId);
+            const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+            const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
             const isHomeStuy = home?.name === 'Stuyvesant';
             const stuyWon = r.homeScore! > r.awayScore! ? isHomeStuy : !isHomeStuy;
             return {
@@ -123,29 +132,37 @@ export default async function ValorantHubPage() {
               }),
               teams: `${home?.name} vs. ${away?.name}`,
               result: `${stuyWon ? 'W' : 'L'} ${r.homeScore}-${r.awayScore}`,
-              division: home?.division || 'Varsity',
+              division: homeRoster?.division || 'Varsity',
             };
           });
         }
       }
 
       // 4. Top Teams
-      const topRows = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.gameId, gameId))
-        .orderBy(desc(schema.teams.wins))
-        .limit(5);
+      const topRows = teamIds.length > 0
+        ? await db
+            .select()
+            .from(schema.rosters)
+            .where(
+              and(
+                inArray(schema.rosters.teamId, teamIds),
+                eq(schema.rosters.division, 'Varsity')
+              )
+            )
+            .orderBy(desc(schema.rosters.wins), schema.rosters.losses)
+            .limit(5)
+        : [];
 
       if (topRows.length > 0) {
-        topTeams = topRows.map((t, idx) => {
-          const played = t.wins + t.losses;
-          const winPct = played > 0 ? t.wins / played : 0;
+        topTeams = topRows.map((r, idx) => {
+          const team = teamMap.get(r.teamId);
+          const played = r.wins + r.losses;
+          const winPct = played > 0 ? r.wins / played : 0;
           return {
             rank: idx + 1,
-            team: t.name,
-            wins: t.wins,
-            losses: t.losses,
+            team: team?.name || 'Unknown',
+            wins: r.wins,
+            losses: r.losses,
             winPct,
           };
         });
@@ -176,7 +193,7 @@ export default async function ValorantHubPage() {
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Varsity Record</div>
           </Card>
           <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2">8-5</div>
+            <div className="text-4xl font-black text-ez-pink mb-2">{jvRecord}</div>
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">JV Record</div>
           </Card>
           <Card className="hover:scale-[1.03] transition-all text-center">

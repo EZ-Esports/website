@@ -1,23 +1,26 @@
-import { getCachedMatches, getCachedTeams, getCachedSeasons, getCachedGames } from '@/app/lib/db/queries';
+import { getCachedMatches, getCachedTeams, getCachedRosters, getCachedSeasons, getCachedGames } from '@/app/lib/db/queries';
 import { createMatch, updateMatchScore, deleteMatch } from './actions';
 import Card from '@/app/components/ui/Card';
 
 export default async function AdminMatchesPage() {
   let matches: Awaited<ReturnType<typeof getCachedMatches>> = [];
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
+  let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
   let seasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let dbError = false;
 
   try {
-    const [matchesRes, teamsRes, seasonsRes, gamesRes] = await Promise.all([
+    const [matchesRes, teamsRes, rostersRes, seasonsRes, gamesRes] = await Promise.all([
       getCachedMatches(),
       getCachedTeams(),
+      getCachedRosters(),
       getCachedSeasons(),
       getCachedGames(),
     ]);
     matches = matchesRes;
     teams = teamsRes;
+    rosters = rostersRes;
     seasons = seasonsRes;
     games = gamesRes;
   } catch {
@@ -26,6 +29,7 @@ export default async function AdminMatchesPage() {
 
   // Build maps for fast lookups
   const teamMap = new Map(teams.map((t) => [t.id, t]));
+  const rosterMap = new Map(rosters.map((r) => [r.id, r]));
   const seasonMap = new Map(seasons.map((s) => [s.id, s]));
   const gameMap = new Map(games.map((g) => [g.id, g]));
 
@@ -59,7 +63,7 @@ export default async function AdminMatchesPage() {
 
             <form action={createMatch} className="space-y-4">
               <div>
-                <label htmlFor="seasonId" className="block text-xs font-bold text-slate-450 uppercase tracking-wider mb-1.5">
+                <label htmlFor="seasonId" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                   Active Season
                 </label>
                 <select
@@ -80,20 +84,21 @@ export default async function AdminMatchesPage() {
               </div>
 
               <div>
-                <label htmlFor="homeTeamId" className="block text-xs font-bold text-slate-450 uppercase tracking-wider mb-1.5">
-                  Home Team
+                <label htmlFor="homeRosterId" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+                  Home Roster
                 </label>
                 <select
-                  id="homeTeamId"
-                  name="homeTeamId"
+                  id="homeRosterId"
+                  name="homeRosterId"
                   required
                   className={inputClass}
                 >
-                  {teams.map((t) => {
-                    const game = gameMap.get(t.gameId);
+                  {rosters.map((r) => {
+                    const team = teamMap.get(r.teamId);
+                    const game = team ? gameMap.get(team.gameId) : null;
                     return (
-                      <option key={t.id} value={t.id} className="bg-slate-900 text-white">
-                        {t.name} ({t.division}) - {game?.shortName}
+                      <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                        {team?.name} ({r.division}) - {game?.shortName}
                       </option>
                     );
                   })}
@@ -101,20 +106,21 @@ export default async function AdminMatchesPage() {
               </div>
 
               <div>
-                <label htmlFor="awayTeamId" className="block text-xs font-bold text-slate-450 uppercase tracking-wider mb-1.5">
-                  Away Team
+                <label htmlFor="awayRosterId" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+                  Away Roster
                 </label>
                 <select
-                  id="awayTeamId"
-                  name="awayTeamId"
+                  id="awayRosterId"
+                  name="awayRosterId"
                   required
                   className={inputClass}
                 >
-                  {teams.map((t) => {
-                    const game = gameMap.get(t.gameId);
+                  {rosters.map((r) => {
+                    const team = teamMap.get(r.teamId);
+                    const game = team ? gameMap.get(team.gameId) : null;
                     return (
-                      <option key={t.id} value={t.id} className="bg-slate-900 text-white">
-                        {t.name} ({t.division}) - {game?.shortName}
+                      <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                        {team?.name} ({r.division}) - {game?.shortName}
                       </option>
                     );
                   })}
@@ -122,7 +128,7 @@ export default async function AdminMatchesPage() {
               </div>
 
               <div>
-                <label htmlFor="scheduledAt" className="block text-xs font-bold text-slate-450 uppercase tracking-wider mb-1.5">
+                <label htmlFor="scheduledAt" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                   Date & Time
                 </label>
                 <input
@@ -167,8 +173,10 @@ export default async function AdminMatchesPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-850 text-sm">
                       {matches.map((match) => {
-                        const homeTeam = teamMap.get(match.homeTeamId);
-                        const awayTeam = teamMap.get(match.awayTeamId);
+                        const homeRoster = rosterMap.get(match.homeRosterId);
+                        const awayRoster = rosterMap.get(match.awayRosterId);
+                        const homeTeam = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+                        const awayTeam = awayRoster ? teamMap.get(awayRoster.teamId) : null;
                         const season = seasonMap.get(match.seasonId);
                         const game = season ? gameMap.get(season.gameId) : null;
                         const deleteActionWithId = deleteMatch.bind(null, match.id);
@@ -198,7 +206,7 @@ export default async function AdminMatchesPage() {
                                 {/* Home Team */}
                                 <div className="text-right w-28 truncate">
                                   <span className="block font-semibold text-white text-sm">{homeTeam?.name || 'Home'}</span>
-                                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{homeTeam?.division}</span>
+                                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{homeRoster?.division}</span>
                                 </div>
 
                                 {/* Score Inputs */}
@@ -227,7 +235,7 @@ export default async function AdminMatchesPage() {
                                 {/* Away Team */}
                                 <div className="text-left w-28 truncate">
                                   <span className="block font-semibold text-white text-sm">{awayTeam?.name || 'Away'}</span>
-                                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{awayTeam?.division}</span>
+                                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{awayRoster?.division}</span>
                                 </div>
                               </form>
                             </td>

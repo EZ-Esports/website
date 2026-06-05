@@ -4,14 +4,17 @@ import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
+import Link from 'next/link';
 
 interface SchedulePageProps {
   params: Promise<{ game: string }>;
+  searchParams: Promise<{ division?: string }>;
 }
 
-export default async function SchedulePage({ params }: SchedulePageProps) {
+export default async function SchedulePage({ params, searchParams }: SchedulePageProps) {
   const { game } = await params;
+  const { division = 'Varsity' } = await searchParams;
   
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();
@@ -57,10 +60,19 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
           .where(eq(schema.teams.gameId, gameRow[0].id));
 
         const teamMap = new Map(teamsList.map((t) => [t.id, t]));
+        const teamIds = teamsList.map((t) => t.id);
 
-        schedule = matchesList.map((m) => {
-          const team1 = teamMap.get(m.homeTeamId);
-          const team2 = teamMap.get(m.awayTeamId);
+        const rostersList = teamIds.length > 0
+          ? await db.select().from(schema.rosters).where(inArray(schema.rosters.teamId, teamIds))
+          : [];
+
+        const rosterMap = new Map(rostersList.map((r) => [r.id, r]));
+
+        const allMapped = matchesList.map((m) => {
+          const homeRoster = rosterMap.get(m.homeRosterId);
+          const awayRoster = rosterMap.get(m.awayRosterId);
+          const team1 = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+          const team2 = awayRoster ? teamMap.get(awayRoster.teamId) : null;
           return {
             date: new Date(m.scheduledAt).toLocaleDateString('en-US', {
               timeZone: 'America/New_York',
@@ -75,13 +87,15 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
             }),
             team1: team1?.name || 'Home Team',
             team2: team2?.name || 'Away Team',
-            division: team1?.division || 'Varsity',
+            division: homeRoster?.division || 'Varsity',
             status: m.status === 'completed' ? 'Completed' : m.status === 'live' ? 'Live' : 'Upcoming',
             result: m.status === 'completed' && m.homeScore !== null && m.awayScore !== null
               ? `${m.homeScore > m.awayScore ? 'W' : 'L'} ${m.homeScore}-${m.awayScore}`
               : undefined,
           };
         });
+
+        schedule = allMapped.filter((item) => item.division.toLowerCase() === division.toLowerCase());
       }
     }
   } catch (error) {
@@ -99,10 +113,10 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
           {/* Week Navigation */}
           <div className="mb-8 flex items-center justify-between">
             <div className="flex gap-2">
-              <button className="px-4 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-300 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
+              <button className="px-4 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-330 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
                 ← Previous Week
               </button>
-              <button className="px-4 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-300 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
+              <button className="px-4 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-330 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
                 Next Week →
               </button>
             </div>
@@ -111,19 +125,33 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
 
           {/* Division Filter */}
           <div className="mb-8 flex gap-2">
-            <button className="px-4 py-1.5 text-sm font-bold bg-ez-pink text-white rounded-lg hover:bg-rose-700 transition-all cursor-pointer">
+            <Link
+              href={`/${game}/schedule?division=Varsity`}
+              className={`px-4 py-1.5 text-sm font-bold rounded-lg transition-all ${
+                division === 'Varsity' 
+                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+              }`}
+            >
               Varsity
-            </button>
-            <button className="px-4 py-1.5 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
+            </Link>
+            <Link
+              href={`/${game}/schedule?division=JV`}
+              className={`px-4 py-1.5 text-sm font-bold rounded-lg transition-all ${
+                division === 'JV' 
+                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+              }`}
+            >
               JV
-            </button>
+            </Link>
           </div>
 
           {/* Schedule List */}
           <div className="space-y-4">
             {schedule.length === 0 ? (
               <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/30 border border-slate-800/60 rounded-xl">
-                No scheduled match fixtures for this season yet.
+                No scheduled match fixtures for this season and division yet.
               </div>
             ) : (
               schedule.map((match, index) => (

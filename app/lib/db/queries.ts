@@ -43,6 +43,14 @@ export const getCachedRosters = unstable_cache(
   { tags: ['rosters'] }
 );
 
+export const getCachedPlayers = unstable_cache(
+  async () => {
+    return db.select().from(schema.players);
+  },
+  ['players-list'],
+  { tags: ['players'] }
+);
+
 export const getCachedNews = unstable_cache(
   async () => {
     return db.select().from(schema.newsPosts).orderBy(desc(schema.newsPosts.publishedAt));

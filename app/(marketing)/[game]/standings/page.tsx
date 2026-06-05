@@ -4,14 +4,17 @@ import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray, and } from 'drizzle-orm';
+import Link from 'next/link';
 
 interface StandingsPageProps {
   params: Promise<{ game: string }>;
+  searchParams: Promise<{ division?: string }>;
 }
 
-export default async function StandingsPage({ params }: StandingsPageProps) {
+export default async function StandingsPage({ params, searchParams }: StandingsPageProps) {
   const { game } = await params;
+  const { division = 'Varsity' } = await searchParams;
   
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();
@@ -40,21 +43,37 @@ export default async function StandingsPage({ params }: StandingsPageProps) {
       const teamRows = await db
         .select()
         .from(schema.teams)
-        .where(eq(schema.teams.gameId, gameRow[0].id))
-        .orderBy(desc(schema.teams.wins), schema.teams.losses);
+        .where(eq(schema.teams.gameId, gameRow[0].id));
 
-      standings = teamRows.map((t, index) => {
-        const gamesPlayed = t.wins + t.losses;
-        const winPct = gamesPlayed > 0 ? t.wins / gamesPlayed : 0;
-        return {
-          rank: index + 1,
-          team: t.name,
-          wins: t.wins,
-          losses: t.losses,
-          winPct,
-          gamesPlayed,
-        };
-      });
+      const teamIds = teamRows.map((t) => t.id);
+      const teamMap = new Map(teamRows.map((t) => [t.id, t]));
+
+      if (teamIds.length > 0) {
+        const rosterRows = await db
+          .select()
+          .from(schema.rosters)
+          .where(
+            and(
+              inArray(schema.rosters.teamId, teamIds),
+              eq(schema.rosters.division, division)
+            )
+          )
+          .orderBy(desc(schema.rosters.wins), schema.rosters.losses);
+
+        standings = rosterRows.map((r, index) => {
+          const team = teamMap.get(r.teamId);
+          const gamesPlayed = r.wins + r.losses;
+          const winPct = gamesPlayed > 0 ? r.wins / gamesPlayed : 0;
+          return {
+            rank: index + 1,
+            team: team?.name || 'Unknown',
+            wins: r.wins,
+            losses: r.losses,
+            winPct,
+            gamesPlayed,
+          };
+        });
+      }
     }
   } catch (error) {
     console.error('Failed to load standings from database', error);
@@ -70,19 +89,33 @@ export default async function StandingsPage({ params }: StandingsPageProps) {
         <div className="max-w-6xl mx-auto">
           {/* Division Filter */}
           <div className="mb-8 flex gap-2">
-            <button className="px-5 py-2 text-sm font-bold bg-ez-pink text-white rounded-lg hover:bg-rose-700 transition-all cursor-pointer">
+            <Link
+              href={`/${game}/standings?division=Varsity`}
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
+                division === 'Varsity' 
+                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+              }`}
+            >
               Varsity
-            </button>
-            <button className="px-5 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
+            </Link>
+            <Link
+              href={`/${game}/standings?division=JV`}
+              className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
+                division === 'JV' 
+                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+              }`}
+            >
               JV
-            </button>
+            </Link>
           </div>
 
           {/* Standings Table */}
           <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
             {standings.length === 0 ? (
               <div className="text-center p-12 text-slate-500 text-sm">
-                No teams registered for this game yet.
+                No teams registered for this game and division yet.
               </div>
             ) : (
               <table className="w-full border-collapse">

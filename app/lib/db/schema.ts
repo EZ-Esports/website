@@ -28,24 +28,35 @@ export const teams = pgTable('teams', {
     .references(() => games.id)
     .notNull(),
   name: text('name').notNull(), // e.g. "Stuyvesant"
-  division: text('division').notNull(), // "Varsity" | "JV"
-  wins: integer('wins').default(0).notNull(),
-  losses: integer('losses').default(0).notNull(),
 }, (table) => [
   index('teams_game_id_idx').on(table.gameId),
 ]);
 
-// Roster members for teams
+// Rosters for teams
 export const rosters = pgTable('rosters', {
   id: uuid('id').defaultRandom().primaryKey(),
   teamId: uuid('team_id')
     .references(() => teams.id, { onDelete: 'cascade' })
     .notNull(),
-  name: text('name').notNull(),
-  role: text('role').notNull(), // "Captain", "Player"
-  bio: text('bio'),
+  name: text('name').notNull(), // e.g. "Varsity", "JV"
+  division: text('division').notNull(), // "Varsity" | "JV"
+  wins: integer('wins').default(0).notNull(),
+  losses: integer('losses').default(0).notNull(),
 }, (table) => [
   index('rosters_team_id_idx').on(table.teamId),
+]);
+
+// Players under a roster
+export const players = pgTable('players', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  rosterId: uuid('roster_id')
+    .references(() => rosters.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  role: text('role').notNull(), // "Captain", "Player", "Coach", "Sub"
+  bio: text('bio'),
+}, (table) => [
+  index('players_roster_id_idx').on(table.rosterId),
 ]);
 
 // Match schedules and scores
@@ -54,11 +65,11 @@ export const matches = pgTable('matches', {
   seasonId: uuid('season_id')
     .references(() => seasons.id)
     .notNull(),
-  homeTeamId: uuid('home_team_id')
-    .references(() => teams.id)
+  homeRosterId: uuid('home_roster_id')
+    .references(() => rosters.id, { onDelete: 'cascade' })
     .notNull(),
-  awayTeamId: uuid('away_team_id')
-    .references(() => teams.id)
+  awayRosterId: uuid('away_roster_id')
+    .references(() => rosters.id, { onDelete: 'cascade' })
     .notNull(),
   scheduledAt: timestamp('scheduled_at').notNull(),
   homeScore: integer('home_score'),
@@ -67,8 +78,8 @@ export const matches = pgTable('matches', {
 }, (table) => [
   index('matches_scheduled_at_idx').on(table.scheduledAt),
   index('matches_season_id_idx').on(table.seasonId),
-  index('matches_home_team_id_idx').on(table.homeTeamId),
-  index('matches_away_team_id_idx').on(table.awayTeamId),
+  index('matches_home_roster_id_idx').on(table.homeRosterId),
+  index('matches_away_roster_id_idx').on(table.awayRosterId),
 ]);
 
 // News Posts / CMS Articles

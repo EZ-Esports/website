@@ -1,20 +1,23 @@
-import { getCachedRosters, getCachedTeams, getCachedGames } from '@/app/lib/db/queries';
+import { getCachedPlayers, getCachedRosters, getCachedTeams, getCachedGames } from '@/app/lib/db/queries';
 import { createRosterMember, deleteRosterMember } from './actions';
 import Card from '@/app/components/ui/Card';
 
 export default async function AdminRosterPage() {
-  let rostersList: Awaited<ReturnType<typeof getCachedRosters>> = [];
+  let playersList: Awaited<ReturnType<typeof getCachedPlayers>> = [];
+  let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let dbError = false;
 
   try {
-    const [rostersRes, teamsRes, gamesRes] = await Promise.all([
+    const [playersRes, rostersRes, teamsRes, gamesRes] = await Promise.all([
+      getCachedPlayers(),
       getCachedRosters(),
       getCachedTeams(),
       getCachedGames(),
     ]);
-    rostersList = rostersRes;
+    playersList = playersRes;
+    rosters = rostersRes;
     teams = teamsRes;
     games = gamesRes;
   } catch {
@@ -22,6 +25,7 @@ export default async function AdminRosterPage() {
   }
 
   // Maps
+  const rosterMap = new Map(rosters.map((r) => [r.id, r]));
   const teamMap = new Map(teams.map((t) => [t.id, t]));
   const gameMap = new Map(games.map((g) => [g.id, g]));
   const inputClass = "w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all text-sm";
@@ -49,25 +53,26 @@ export default async function AdminRosterPage() {
           <Card className="lg:col-span-1 h-fit space-y-6">
             <div>
               <h2 className="text-lg font-black text-white uppercase tracking-wider">Add Roster Member</h2>
-              <p className="text-slate-400 text-xs mt-1 leading-relaxed">Register a player onto a team.</p>
+              <p className="text-slate-400 text-xs mt-1 leading-relaxed">Register a player onto a team roster.</p>
             </div>
 
             <form action={createRosterMember} className="space-y-5">
               <div>
-                <label htmlFor="teamId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Assign Team
+                <label htmlFor="rosterId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Assign Roster
                 </label>
                 <select
-                  id="teamId"
-                  name="teamId"
+                  id="rosterId"
+                  name="rosterId"
                   required
                   className={inputClass}
                 >
-                  {teams.map((t) => {
-                    const game = gameMap.get(t.gameId);
+                  {rosters.map((r) => {
+                    const team = teamMap.get(r.teamId);
+                    const game = team ? gameMap.get(team.gameId) : null;
                     return (
-                      <option key={t.id} value={t.id} className="bg-slate-900 text-white">
-                        {t.name} ({t.division}) - {game?.shortName}
+                      <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                        {team?.name} ({r.division}) - {game?.shortName}
                       </option>
                     );
                   })}
@@ -129,7 +134,7 @@ export default async function AdminRosterPage() {
 
           {/* Rosters List Column */}
           <div className="lg:col-span-2 bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
-            {rostersList.length === 0 ? (
+            {playersList.length === 0 ? (
               <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl">
                 No roster members found. Add players using the left form panel!
               </div>
@@ -139,14 +144,15 @@ export default async function AdminRosterPage() {
                   <thead className="bg-[#0b101d] border-b border-slate-800/80">
                     <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Name / Bio</th>
-                      <th className="px-6 py-4">Team</th>
+                      <th className="px-6 py-4">Roster</th>
                       <th className="px-6 py-4">Role</th>
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-850 text-sm">
-                    {rostersList.map((player) => {
-                      const team = teamMap.get(player.teamId);
+                    {playersList.map((player) => {
+                      const roster = rosterMap.get(player.rosterId);
+                      const team = roster ? teamMap.get(roster.teamId) : null;
                       const game = team ? gameMap.get(team.gameId) : null;
                       const deleteActionWithId = deleteRosterMember.bind(null, player.id);
 
@@ -161,7 +167,7 @@ export default async function AdminRosterPage() {
                           <td className="px-6 py-4">
                             <span className="block font-bold text-white tracking-tight">{team?.name || 'Unknown'}</span>
                             <span className="block text-xs text-slate-400 font-semibold mt-0.5">
-                              {game?.shortName} • {team?.division} Division
+                              {game?.shortName} • {roster?.division} Division
                             </span>
                           </td>
                           <td className="px-6 py-4">
