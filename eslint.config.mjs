@@ -12,9 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    "db/*.cjs",
-    "simulate_flow.ts",
-    "test-view.ts",
   ]),
   {
     rules: {
