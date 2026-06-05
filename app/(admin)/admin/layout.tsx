@@ -32,9 +32,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Sidebar Header */}
         <div className="h-16 px-6 border-b border-slate-900 flex items-center justify-between">
           <Link href="/admin" className="font-extrabold text-xl tracking-tight text-white flex items-center gap-2 cursor-pointer hover:opacity-90">
-            <span className="text-ez-pink text-glow">EZ</span> <span className="text-slate-200">Admin</span>
+            <span className="text-white font-extrabold">EZ Admin</span>
           </Link>
-          <span className="text-[10px] bg-ez-pink/10 text-ez-pink font-bold px-2 py-0.5 rounded border border-ez-pink/20 uppercase tracking-wider">
+          <span className="text-[10px] bg-slate-900 text-slate-450 font-bold px-2 py-0.5 rounded border border-slate-800 uppercase tracking-wider">
             CMS v1.0
           </span>
         </div>
@@ -49,7 +49,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 href={item.href}
                 className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-300 group cursor-pointer ${
                   isActive
-                    ? 'bg-gradient-to-r from-ez-pink/10 to-ez-purple/5 text-white border-l-2 border-ez-pink pl-3 px-4 font-bold'
+                    ? 'bg-slate-900 text-white border-l-2 border-white pl-3 px-4 font-bold'
                     : 'text-slate-400 hover:text-white hover:bg-slate-900/50 pl-4 px-4'
                 }`}
               >
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <form action={logout}>
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-ez-pink/10 hover:text-ez-pink border border-slate-800/80 hover:border-ez-pink/25 text-slate-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-850 hover:text-white border border-slate-800/80 hover:border-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
             >
               <span>🚪</span>
               <span>Sign Out</span>

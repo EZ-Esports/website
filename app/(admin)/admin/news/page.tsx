@@ -65,7 +65,7 @@ export default async function AdminNewsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-ez-pink/15 text-ez-pink border border-ez-pink/25">
+                          <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-slate-900 text-slate-300 border border-slate-800">
                             {post.category}
                           </span>
                         </td>
@@ -87,7 +87,7 @@ export default async function AdminNewsPage() {
                             <form action={deleteActionWithId} className="inline-block">
                               <button
                                 type="submit"
-                                className="px-3 py-1.5 bg-ez-pink/10 hover:bg-ez-pink/20 font-bold text-xs uppercase tracking-wider rounded-lg text-ez-pink border border-ez-pink/25 hover:border-ez-pink/40 transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-350 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
                               >
                                 Delete
                               </button>

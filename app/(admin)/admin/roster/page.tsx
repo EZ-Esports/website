@@ -120,7 +120,7 @@ export default async function AdminRosterPage() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-ez-pink to-ez-purple text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:brightness-110 shadow-lg shadow-ez-pink/15 transition-all cursor-pointer"
+                className="w-full py-3 bg-white hover:bg-slate-200 text-slate-950 text-sm font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
               >
                 Add Player
               </button>
@@ -167,7 +167,7 @@ export default async function AdminRosterPage() {
                           <td className="px-6 py-4">
                             <span className={`inline-block px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded border ${
                               player.role === 'Captain' 
-                                ? 'bg-ez-pink/15 text-ez-pink border-ez-pink/35' 
+                                ? 'bg-white/10 text-white border-white/20' 
                                 : 'bg-slate-950/40 text-slate-400 border-slate-800/80'
                             }`}>
                               {player.role}
@@ -177,7 +177,7 @@ export default async function AdminRosterPage() {
                             <form action={deleteActionWithId}>
                               <button
                                 type="submit"
-                                className="px-3 py-1.5 bg-ez-pink/10 hover:bg-ez-pink/20 font-bold text-xs uppercase tracking-wider rounded-lg text-ez-pink border border-ez-pink/25 hover:border-ez-pink/40 transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-350 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
                               >
                                 Remove
                               </button>

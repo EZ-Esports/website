@@ -30,7 +30,7 @@ export default async function AdminMatchesPage() {
   const seasonMap = new Map(seasons.map((s) => [s.id, s]));
   const gameMap = new Map(games.map((g) => [g.id, g]));
 
-  const inputClass = "w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-ez-pink transition-all";
+  const inputClass = "w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 transition-all";
 
   return (
     <div className="space-y-6">
@@ -137,7 +137,7 @@ export default async function AdminMatchesPage() {
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-ez-pink hover:bg-[#e11d48] text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-md shadow-ez-pink/10 transition-all cursor-pointer"
+                className="w-full py-2.5 bg-white hover:bg-slate-200 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
               >
                 Schedule Match
               </button>
@@ -205,19 +205,21 @@ export default async function AdminMatchesPage() {
                                 <div className="flex items-center gap-1">
                                   <input
                                     name="homeScore"
-                                    type="number"
-                                    min={0}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     defaultValue={match.homeScore ?? ''}
-                                    className="w-10 h-8 bg-slate-950 border border-slate-850 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-ez-pink text-xs font-bold"
+                                    className="w-10 h-8 bg-slate-950 border border-slate-800 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 text-xs font-bold"
                                     placeholder="-"
                                   />
-                                  <span className="text-slate-650 text-[10px] font-bold uppercase select-none">vs</span>
+                                  <span className="text-slate-600 text-[10px] font-bold uppercase select-none">vs</span>
                                   <input
                                     name="awayScore"
-                                    type="number"
-                                    min={0}
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     defaultValue={match.awayScore ?? ''}
-                                    className="w-10 h-8 bg-slate-950 border border-slate-850 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-ez-pink text-xs font-bold"
+                                    className="w-10 h-8 bg-slate-950 border border-slate-800 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 text-xs font-bold"
                                     placeholder="-"
                                   />
                                 </div>
@@ -236,7 +238,7 @@ export default async function AdminMatchesPage() {
                                 name="status"
                                 form={`form-${match.id}`}
                                 defaultValue={match.status}
-                                className="px-2 py-1 bg-slate-950 border border-slate-850 rounded text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-ez-pink cursor-pointer font-medium"
+                                className="px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-ez-pink/50 cursor-pointer font-medium"
                               >
                                 <option value="scheduled" className="bg-slate-900 text-white">Scheduled</option>
                                 <option value="live" className="bg-slate-900 text-white">Live</option>
@@ -257,7 +259,7 @@ export default async function AdminMatchesPage() {
                                 <form action={deleteActionWithId} className="inline-block">
                                   <button
                                     type="submit"
-                                    className="px-3 py-1.5 bg-ez-pink/10 hover:bg-ez-pink/20 font-bold text-xs uppercase tracking-wider rounded text-ez-pink border border-ez-pink/25 hover:border-ez-pink/40 transition-all cursor-pointer"
+                                    className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-350 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
                                   >
                                     Delete
                                   </button>

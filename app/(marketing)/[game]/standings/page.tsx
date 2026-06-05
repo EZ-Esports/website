@@ -70,7 +70,7 @@ export default async function StandingsPage({ params }: StandingsPageProps) {
         <div className="max-w-6xl mx-auto">
           {/* Division Filter */}
           <div className="mb-8 flex gap-2">
-            <button className="px-5 py-2 text-sm font-bold bg-gradient-to-r from-ez-pink to-ez-purple text-white rounded-lg shadow-md shadow-ez-pink/10 cursor-pointer">
+            <button className="px-5 py-2 text-sm font-bold bg-ez-pink text-white rounded-lg hover:bg-rose-700 transition-all cursor-pointer">
               Varsity
             </button>
             <button className="px-5 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
@@ -100,7 +100,7 @@ export default async function StandingsPage({ params }: StandingsPageProps) {
                     <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-slate-300">
                         {entry.rank === 1 ? (
-                          <span className="text-yellow-500 text-glow">🏆 1</span>
+                          <span className="text-yellow-500 font-bold">🏆 1</span>
                         ) : entry.rank === 2 ? (
                           <span className="text-slate-400">🥈 2</span>
                         ) : entry.rank === 3 ? (
@@ -111,7 +111,7 @@ export default async function StandingsPage({ params }: StandingsPageProps) {
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-ez-pink">{(entry.winPct * 100).toFixed(1)}%</td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">{(entry.winPct * 100).toFixed(1)}%</td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.gamesPlayed}</td>
                     </tr>
                   ))}

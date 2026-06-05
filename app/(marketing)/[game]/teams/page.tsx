@@ -63,7 +63,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         <div className="max-w-6xl mx-auto">
           {/* Division Filter */}
           <div className="mb-8 flex gap-2">
-            <button className="px-5 py-2 text-sm font-bold bg-gradient-to-r from-ez-pink to-ez-purple text-white rounded-lg shadow-md shadow-ez-pink/10 cursor-pointer">
+            <button className="px-5 py-2 text-sm font-bold bg-ez-pink text-white rounded-lg hover:bg-rose-700 transition-all cursor-pointer">
               Varsity
             </button>
             <button className="px-5 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
@@ -82,7 +82,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
                 <Card key={team.id} className="text-white hover:scale-[1.03] transition-all duration-300">
                   <div className="text-center">
                     <div className="mb-4">
-                      <div className="w-20 h-20 mx-auto bg-gradient-to-tr from-ez-pink/10 to-ez-purple/20 border border-ez-pink/20 rounded-full flex items-center justify-center text-ez-pink shadow-md shadow-ez-pink/5">
+                      <div className="w-20 h-20 mx-auto bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center text-white">
                         <span className="text-2xl font-extrabold">{team.name.charAt(0)}</span>
                       </div>
                     </div>

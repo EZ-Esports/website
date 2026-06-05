@@ -123,7 +123,7 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
             </Link>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-gradient-to-r from-ez-pink to-ez-purple text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:brightness-110 shadow-lg shadow-ez-pink/15 transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-white text-slate-950 hover:bg-slate-200 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
             >
               Save Changes
             </button>

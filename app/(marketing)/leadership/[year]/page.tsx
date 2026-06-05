@@ -22,7 +22,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
         <h1 className="text-4xl sm:text-5xl font-black mb-4 tracking-tight uppercase">
           {year} Leadership Team
         </h1>
-        <div className="w-12 h-1 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto rounded-full mb-4" />
+        <div className="w-12 h-0.5 bg-slate-700 mx-auto rounded-full mb-4" />
         <p className="text-slate-400 font-medium">
           Meet the leaders who guide our organization
         </p>
@@ -38,7 +38,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
               href={getLeadershipRoute(y)}
               className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
                 isActive
-                  ? 'bg-gradient-to-r from-ez-pink to-ez-purple text-white shadow-lg shadow-ez-pink/15 scale-105'
+                  ? 'bg-ez-pink text-white font-bold scale-105 shadow-none'
                   : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
               }`}
             >
@@ -62,7 +62,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
             */}
             
             {/* Placeholder for image */}
-            <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-gradient-to-tr from-ez-pink/10 to-ez-purple/20 border-2 border-ez-pink/25 flex items-center justify-center text-ez-pink shadow-lg shadow-ez-pink/5">
+            <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-slate-900 border-2 border-slate-800 flex items-center justify-center text-white">
               <span className="text-3xl font-extrabold tracking-tight">
                 {leader.name.split(' ').map(n => n[0]).join('')}
               </span>

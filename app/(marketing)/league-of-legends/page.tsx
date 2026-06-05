@@ -170,15 +170,15 @@ export default async function LeagueOfLegendsHubPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2 text-glow">{record}</div>
+            <div className="text-4xl font-black text-ez-pink mb-2">{record}</div>
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Varsity Record</div>
           </Card>
           <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2 text-glow">7-8</div>
+            <div className="text-4xl font-black text-ez-pink mb-2">7-8</div>
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">JV Record</div>
           </Card>
           <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2 text-glow">Week 7</div>
+            <div className="text-4xl font-black text-ez-pink mb-2">Week 7</div>
             <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Current Week</div>
           </Card>
         </div>
@@ -270,7 +270,7 @@ export default async function LeagueOfLegendsHubPage() {
                     <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-slate-300">
                         {entry.rank === 1 ? (
-                          <span className="text-yellow-500 text-glow">🏆 1</span>
+                          <span className="text-yellow-500 font-bold">🏆 1</span>
                         ) : entry.rank === 2 ? (
                           <span className="text-slate-400">🥈 2</span>
                         ) : entry.rank === 3 ? (
@@ -281,7 +281,7 @@ export default async function LeagueOfLegendsHubPage() {
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-ez-pink">{(entry.winPct * 100).toFixed(1)}%</td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">{(entry.winPct * 100).toFixed(1)}%</td>
                     </tr>
                   );
                 })}

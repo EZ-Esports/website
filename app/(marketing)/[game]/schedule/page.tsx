@@ -109,7 +109,7 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
 
           {/* Division Filter */}
           <div className="mb-8 flex gap-2">
-            <button className="px-4 py-1.5 text-sm font-bold bg-gradient-to-r from-ez-pink to-ez-purple text-white rounded-lg shadow-md shadow-ez-pink/10 cursor-pointer">
+            <button className="px-4 py-1.5 text-sm font-bold bg-ez-pink text-white rounded-lg hover:bg-rose-700 transition-all cursor-pointer">
               Varsity
             </button>
             <button className="px-4 py-1.5 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">

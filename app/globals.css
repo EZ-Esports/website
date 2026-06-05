@@ -11,9 +11,9 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   
-  /* Brand colors */
-  --color-ez-pink: #ff2a5f; /* Radiant neon pink */
-  --color-ez-purple: #7c3aed; /* Neon violet */
+  /* Brand colors - Premium Sleek */
+  --color-ez-pink: #e11d48; /* Premium Rose Crimson */
+  --color-ez-purple: #4f46e5; /* Premium Indigo Violet */
   --color-ez-black: #080c14;
   --color-ez-white: #ffffff;
 }
@@ -41,7 +41,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ff2a5f;
+  background: #e11d48;
 }
 
 /* Hide number input spinner buttons (incremental arrows) */
