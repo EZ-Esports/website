@@ -15,7 +15,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { label: 'Overview', href: '/admin', icon: '📊' },
     { label: 'Matches & Standings', href: '/admin/matches', icon: '🏆' },
     { label: 'News & Announcements', href: '/admin/news', icon: '📰' },
-    { label: 'Roster Manager', href: '/admin/roster', icon: '👥' },
+    { label: 'Teams & Rosters', href: '/admin/roster', icon: '👥' },
     { label: 'Leadership Manager', href: '/admin/leadership', icon: '👔' },
     { label: 'Public Site', href: '/', icon: '🌐' },
   ];

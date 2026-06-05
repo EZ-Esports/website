@@ -307,12 +307,9 @@ export default async function LeagueOfLegendsHubPage() {
             </table>
           </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="flex justify-center mt-6">
           <Link href={getGameSubRoute('league-of-legends', 'teams')}>
-            <Button variant="primary">See All Teams</Button>
-          </Link>
-          <Link href={getGameSubRoute('league-of-legends', 'roster')}>
-            <Button variant="secondary">View Roster</Button>
+            <Button variant="primary">See Teams & Rosters</Button>
           </Link>
         </div>
       </ContentSection>

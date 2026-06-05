@@ -16,8 +16,7 @@ export default function GameSubHeader() {
     { label: 'Overview', href: getGameRoute(gameSlug) },
     { label: 'Schedule', href: getGameSubRoute(gameSlug, 'schedule') },
     { label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') },
-    { label: 'Teams', href: getGameSubRoute(gameSlug, 'teams') },
-    { label: 'Roster', href: getGameSubRoute(gameSlug, 'roster') },
+    { label: 'Teams & Rosters', href: getGameSubRoute(gameSlug, 'teams') },
   ];
 
   return (
