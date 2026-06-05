@@ -189,12 +189,12 @@ export default async function AdminDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-slate-700 transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-slate-350 transition-colors">Create Match Event</h4>
+              <h4 className="font-extrabold text-white group-hover:text-slate-300 transition-colors">Create Match Event</h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">Schedule new matches, input results, and manage varsity matchups.</p>
             </div>
             <Link
               href="/admin/matches"
-              className="text-xs font-bold text-slate-350 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-slate-300 hover:text-white hover:underline uppercase tracking-wider"
             >
               Go to Match Manager →
             </Link>
@@ -202,12 +202,12 @@ export default async function AdminDashboardPage() {
 
           <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-slate-700 transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-slate-350 transition-colors">Write Announcement</h4>
+              <h4 className="font-extrabold text-white group-hover:text-slate-300 transition-colors">Write Announcement</h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">Publish new blog posts, tournament notifications, and updates for clubs.</p>
             </div>
             <Link
               href="/admin/news"
-              className="text-xs font-bold text-slate-350 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-slate-300 hover:text-white hover:underline uppercase tracking-wider"
             >
               Create News Article →
             </Link>
@@ -215,12 +215,12 @@ export default async function AdminDashboardPage() {
 
           <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-slate-700 transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-slate-350 transition-colors">Roster Management</h4>
+              <h4 className="font-extrabold text-white group-hover:text-slate-300 transition-colors">Roster Management</h4>
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">Assign student captain roles, register roster lists, and edit player profiles.</p>
             </div>
             <Link
               href="/admin/roster"
-              className="text-xs font-bold text-slate-350 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-slate-300 hover:text-white hover:underline uppercase tracking-wider"
             >
               Manage Roster Lists →
             </Link>

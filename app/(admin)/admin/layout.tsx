@@ -20,10 +20,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { label: 'Public Site', href: '/', icon: '🌐' },
   ];
 
-  // Helper to determine the current page title
+  // Helper to determine the current page title, including nested routes
   const getPageTitle = () => {
-    const current = sidebarItems.find(item => item.href === pathname);
-    return current ? current.label : 'Dashboard';
+    if (pathname === '/admin/news/new') return 'New Article';
+    if (pathname.startsWith('/admin/news/')) return 'Edit Article';
+
+    // Pick the most specific sidebar item whose path prefixes the current route
+    const match = sidebarItems
+      .filter(item => item.href !== '/' && (pathname === item.href || pathname.startsWith(`${item.href}/`)))
+      .sort((a, b) => b.href.length - a.href.length)[0];
+
+    return match ? match.label : 'Dashboard';
   };
 
   return (
@@ -66,7 +73,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <form action={logout}>
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-850 hover:text-white border border-slate-800/80 hover:border-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 hover:text-white border border-slate-800/80 hover:border-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
             >
               <span>🚪</span>
               <span>Sign Out</span>
@@ -81,10 +88,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <header className="h-16 border-b border-slate-900 bg-[#080c14]/40 backdrop-blur-md flex items-center px-8 justify-between z-10">
           <div className="flex items-center gap-4">
             <h2 className="text-base font-bold text-white uppercase tracking-wider">{getPageTitle()}</h2>
-          </div>
-          <div className="flex items-center gap-2.5 px-3 py-1 bg-slate-900/60 rounded-full border border-slate-850">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider select-none">Database Connected</span>
           </div>
         </header>
 

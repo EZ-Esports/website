@@ -111,7 +111,7 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-850 text-sm">
+            <tbody className="divide-y divide-slate-800 text-sm">
               {filteredMatches.map((match) => {
                 const homeRoster = rosterMap.get(match.homeRosterId);
                 const awayRoster = rosterMap.get(match.awayRosterId);
@@ -197,14 +197,14 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                         <button
                           type="submit"
                           form={`form-${match.id}`}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-850 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
                         >
                           Save
                         </button>
                         <form action={deleteActionWithId} className="inline-block">
                           <button
                             type="submit"
-                            className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-350 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
                           >
                             Delete
                           </button>

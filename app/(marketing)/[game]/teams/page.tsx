@@ -48,10 +48,17 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
     if (gameRow[0]) {
       const teamsList = await db
-        .select()
+        .select({
+          id: schema.teams.id,
+          schoolId: schema.teams.schoolId,
+          gameId: schema.teams.gameId,
+          seasonId: schema.teams.seasonId,
+          name: schema.schools.name,
+        })
         .from(schema.teams)
+        .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
         .where(eq(schema.teams.gameId, gameRow[0].id))
-        .orderBy(schema.teams.name);
+        .orderBy(schema.schools.name);
 
       const teamIds = teamsList.map((t) => t.id);
 
@@ -63,7 +70,21 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
         const rosterIds = rostersList.map((r) => r.id);
         const playersList = rosterIds.length > 0
-          ? await db.select().from(schema.players).where(inArray(schema.players.rosterId, rosterIds))
+          ? await db
+              .select({
+                id: schema.players.id,
+                rosterId: schema.players.rosterId,
+                memberId: schema.players.memberId,
+                role: schema.players.role,
+                ign: schema.players.ign,
+                bio: schema.players.bio,
+                isCaptain: schema.players.isCaptain,
+                firstName: schema.members.firstName,
+                lastName: schema.members.lastName,
+              })
+              .from(schema.players)
+              .innerJoin(schema.members, eq(schema.players.memberId, schema.members.id))
+              .where(inArray(schema.players.rosterId, rosterIds))
           : [];
 
         // Group players by roster
@@ -71,8 +92,8 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         playersList.forEach((p) => {
           const arr = playersByRoster.get(p.rosterId) || [];
           arr.push({
-            name: p.name,
-            role: p.role,
+            name: p.ign ? `${p.firstName} "${p.ign}" ${p.lastName}` : `${p.firstName} ${p.lastName}`,
+            role: p.role.charAt(0).toUpperCase() + p.role.slice(1),
             bio: p.bio || 'Active Player',
           });
           playersByRoster.set(p.rosterId, arr);
@@ -85,7 +106,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
           arr.push({
             name: r.name,
             division: r.division,
-            record: `${r.wins}-${r.losses}`,
+            record: `${(r as any).wins || 0}-${(r as any).losses || 0}`,
             players: playersByRoster.get(r.id) || [],
           });
           rostersByTeam.set(r.teamId, arr);

@@ -36,7 +36,11 @@ interface MatchScheduleFormProps {
 
 export default function MatchScheduleForm({ seasons, rosters, teams, games }: MatchScheduleFormProps) {
   const [selectedSeasonId, setSelectedSeasonId] = useState(seasons[0]?.id || '');
-  
+  const [homeRosterId, setHomeRosterId] = useState('');
+  const [awayRosterId, setAwayRosterId] = useState('');
+
+  const sameRoster = homeRosterId !== '' && homeRosterId === awayRosterId;
+
   const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
   const gameMap = useMemo(() => new Map(games.map(g => [g.id, g])), [games]);
   const seasonMap = useMemo(() => new Map(seasons.map(s => [s.id, s])), [seasons]);
@@ -58,7 +62,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
   return (
     <form action={createMatch} className="space-y-4">
       <div>
-        <label htmlFor="seasonId" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+        <label htmlFor="seasonId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
           Active Season
         </label>
         <select
@@ -82,13 +86,15 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="homeRosterId" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+          <label htmlFor="homeRosterId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
             Home Roster
           </label>
           <select
             id="homeRosterId"
             name="homeRosterId"
             required
+            value={homeRosterId}
+            onChange={(e) => setHomeRosterId(e.target.value)}
             className={inputClass}
           >
             <option value="" className="bg-slate-900 text-slate-500">Select Team</option>
@@ -104,13 +110,15 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
         </div>
 
         <div>
-          <label htmlFor="awayRosterId" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+          <label htmlFor="awayRosterId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
             Away Roster
           </label>
           <select
             id="awayRosterId"
             name="awayRosterId"
             required
+            value={awayRosterId}
+            onChange={(e) => setAwayRosterId(e.target.value)}
             className={inputClass}
           >
             <option value="" className="bg-slate-900 text-slate-500">Select Team</option>
@@ -127,7 +135,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
       </div>
 
       <div>
-        <label htmlFor="scheduledAt" className="block text-xs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+        <label htmlFor="scheduledAt" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
           Date & Time
         </label>
         <input
@@ -141,11 +149,18 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
 
       <button
         type="submit"
-        className="w-full py-2.5 bg-white hover:bg-slate-200 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+        disabled={sameRoster}
+        className="w-full py-2.5 bg-white hover:bg-slate-200 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Schedule Match
       </button>
-      
+
+      {sameRoster && (
+        <p className="text-[10px] text-amber-500 font-bold mt-2">
+          ⚠️ Home and away rosters must be different.
+        </p>
+      )}
+
       {filteredRosters.length === 0 && selectedSeasonId && (
         <p className="text-[10px] text-amber-500 font-bold mt-2">
           ⚠️ No rosters found for this game. Register rosters first.

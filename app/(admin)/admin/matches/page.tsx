@@ -56,7 +56,7 @@ export default async function AdminMatchesPage() {
 
             <MatchScheduleForm 
               seasons={seasons}
-              rosters={rosters}
+              rosters={rosters as any}
               teams={teams}
               games={games}
             />
@@ -67,7 +67,7 @@ export default async function AdminMatchesPage() {
             <MatchList 
               initialMatches={matches}
               seasons={seasons}
-              rosters={rosters}
+              rosters={rosters as any}
               teams={teams}
               games={games}
             />

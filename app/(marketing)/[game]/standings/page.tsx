@@ -41,8 +41,15 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
 
     if (gameRow[0]) {
       const teamRows = await db
-        .select()
+        .select({
+          id: schema.teams.id,
+          schoolId: schema.teams.schoolId,
+          gameId: schema.teams.gameId,
+          seasonId: schema.teams.seasonId,
+          name: schema.schools.name,
+        })
         .from(schema.teams)
+        .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
         .where(eq(schema.teams.gameId, gameRow[0].id));
 
       const teamIds = teamRows.map((t) => t.id);
@@ -51,24 +58,26 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
       if (teamIds.length > 0) {
         const rosterRows = await db
           .select()
-          .from(schema.rosters)
+          .from(schema.rosterStandings)
           .where(
             and(
-              inArray(schema.rosters.teamId, teamIds),
-              eq(schema.rosters.division, division)
+              inArray(schema.rosterStandings.teamId, teamIds),
+              eq(schema.rosterStandings.division, division)
             )
           )
-          .orderBy(desc(schema.rosters.wins), schema.rosters.losses);
+          .orderBy(desc(schema.rosterStandings.wins), schema.rosterStandings.losses);
 
         standings = rosterRows.map((r, index) => {
-          const team = teamMap.get(r.teamId);
-          const gamesPlayed = r.wins + r.losses;
-          const winPct = gamesPlayed > 0 ? r.wins / gamesPlayed : 0;
+          const team = teamMap.get(r.teamId!);
+          const wins = r.wins || 0;
+          const losses = r.losses || 0;
+          const gamesPlayed = wins + losses;
+          const winPct = gamesPlayed > 0 ? wins / gamesPlayed : 0;
           return {
             rank: index + 1,
             team: team?.name || 'Unknown',
-            wins: r.wins,
-            losses: r.losses,
+            wins,
+            losses,
             winPct,
             gamesPlayed,
           };

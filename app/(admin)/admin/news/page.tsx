@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { deleteNewsPost } from './actions';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
+import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
 export default async function AdminNewsPage() {
   let posts: Awaited<ReturnType<typeof getCachedNews>> = [];
@@ -53,7 +54,7 @@ export default async function AdminNewsPage() {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-850 text-sm">
+                <tbody className="divide-y divide-slate-800 text-sm">
                   {posts.map((post) => {
                     const deleteActionWithId = deleteNewsPost.bind(null, post.id);
                     return (
@@ -81,18 +82,15 @@ export default async function AdminNewsPage() {
                           <div className="flex justify-end items-center gap-2">
                             <Link
                               href={`/admin/news/${post.id}`}
-                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-850 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
                             >
                               Edit
                             </Link>
-                            <form action={deleteActionWithId} className="inline-block">
-                              <button
-                                type="submit"
-                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-350 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
-                              >
-                                Delete
-                              </button>
-                            </form>
+                            <ConfirmDeleteButton
+                              action={deleteActionWithId}
+                              message={`Delete "${post.title}"? This permanently removes the article from the public site.`}
+                              className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                            />
                           </div>
                         </td>
                       </tr>

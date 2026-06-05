@@ -1,5 +1,5 @@
 // ============================================================================
-// Domain Types
+// UI & Component Types
 // ============================================================================
 
 export interface Image {
@@ -21,18 +21,6 @@ export interface NavigationItem {
   href: string;
 }
 
-export interface School {
-  id: string;
-  name: string;
-  logoUrl: string;
-}
-
-export interface Game {
-  id?: string;
-  title: string;
-  imageUrl: string;
-}
-
 export interface VideoItem {
   id?: string;
   videoId: string;
@@ -40,17 +28,6 @@ export interface VideoItem {
   thumbnailUrl?: string;
   videoUrl?: string;
 }
-
-export interface Leader {
-  name: string;
-  role: string;
-  bio?: string;
-  image?: string;
-}
-
-// ============================================================================
-// Common Prop Types
-// ============================================================================
 
 export type Theme = 'dark' | 'light';
 
@@ -65,10 +42,6 @@ export interface SectionProps {
   className?: string;
 }
 
-// ============================================================================
-// Route/Param Types
-// ============================================================================
-
 export interface RouteParams {
   [key: string]: string | string[] | undefined;
 }
@@ -81,22 +54,10 @@ export interface GameParams extends RouteParams {
   game: string;
 }
 
-// ============================================================================
-// Utility Types
-// ============================================================================
-
-export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-export type RequiredFields<T, K extends keyof T> = T & Required<Pick<T, K>>;
-
-// ============================================================================
-// Type Aliases
-// ============================================================================
-
 export type Year = string;
 
 // ============================================================================
-// Game Types
+// Game Logic Types
 // ============================================================================
 
 export type GameSlug = 'valorant' | 'league-of-legends' | 'team-fight-tactics';
@@ -122,6 +83,125 @@ export interface GameNavigationItem {
 }
 
 // ============================================================================
+// Database Entity Types (Aligned with schema.ts)
+// ============================================================================
+
+export interface DBGame {
+  id: string;
+  slug: string;
+  displayName: string;
+  shortName: string;
+  imageUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBSchool {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  joinedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  discord: string | null;
+  graduationYear: number | null;
+  schoolId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBTeam {
+  id: string;
+  schoolId: string;
+  gameId: string;
+  seasonId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBRoster {
+  id: string;
+  teamId: string;
+  name: string;
+  division: string;
+  createdAt: Date;
+  updatedAt: Date;
+  wins?: number;
+  losses?: number;
+}
+
+export interface DBPlayer {
+  id: string;
+  rosterId: string;
+  memberId: string;
+  role: 'captain' | 'player' | 'coach' | 'sub';
+  ign: string | null;
+  bio: string | null;
+  isCaptain: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBNewsPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  category: string;
+  publishedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBLeadership {
+  id: string;
+  memberId: string | null;
+  name: string;
+  role: string;
+  year: string;
+  bio: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface School {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+}
+
+export interface Game {
+  id?: string;
+  title: string;
+  imageUrl: string;
+}
+
+export interface Leader {
+  name: string;
+  role: string;
+  bio?: string;
+  image?: string;
+}
+
+export interface DBSeason {
+  id: string;
+  gameId: string;
+  name: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================================================
 // Loading Screen Types
 // ============================================================================
 
@@ -129,5 +209,3 @@ export interface LoadingScreenProps {
   onComplete?: () => void;
   reducedMotion?: boolean;
 }
-
-

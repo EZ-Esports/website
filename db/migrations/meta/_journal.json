@@ -15,6 +15,20 @@
       "when": 1780637693667,
       "tag": "0001_bent_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780655939819,
+      "tag": "0002_bouncy_dorian_gray",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780657437814,
+      "tag": "0003_special_moonstone",
+      "breakpoints": true
     }
   ]
 }

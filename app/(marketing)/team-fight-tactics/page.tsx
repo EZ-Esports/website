@@ -40,8 +40,15 @@ export default async function TFTHubPage() {
 
       // Get team rows
       const teamRows = await db
-        .select()
+        .select({
+          id: schema.teams.id,
+          schoolId: schema.teams.schoolId,
+          gameId: schema.teams.gameId,
+          seasonId: schema.teams.seasonId,
+          name: schema.schools.name,
+        })
         .from(schema.teams)
+        .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
         .where(eq(schema.teams.gameId, gameId));
       const teamMap = new Map(teamRows.map((t) => [t.id, t]));
       const teamIds = teamRows.map((t) => t.id);
@@ -56,11 +63,11 @@ export default async function TFTHubPage() {
       if (stuyTeam) {
         const varsityRoster = rosterRows.find((r) => r.teamId === stuyTeam.id && r.division === 'Varsity');
         if (varsityRoster) {
-          record = `${varsityRoster.wins}-${varsityRoster.losses}`;
+          record = `${(varsityRoster as any).wins || 0}-${(varsityRoster as any).losses || 0}`;
         }
         const jvRoster = rosterRows.find((r) => r.teamId === stuyTeam.id && r.division === 'JV');
         if (jvRoster) {
-          jvRecord = `${jvRoster.wins}-${jvRoster.losses}`;
+          jvRecord = `${(jvRoster as any).wins || 0}-${(jvRoster as any).losses || 0}`;
         }
       }
 
@@ -142,27 +149,29 @@ export default async function TFTHubPage() {
       const topRows = teamIds.length > 0
         ? await db
             .select()
-            .from(schema.rosters)
+            .from(schema.rosterStandings)
             .where(
               and(
-                inArray(schema.rosters.teamId, teamIds),
-                eq(schema.rosters.division, 'Varsity')
+                inArray(schema.rosterStandings.teamId, teamIds),
+                eq(schema.rosterStandings.division, 'Varsity')
               )
             )
-            .orderBy(desc(schema.rosters.wins), schema.rosters.losses)
+            .orderBy(desc(schema.rosterStandings.wins), schema.rosterStandings.losses)
             .limit(5)
         : [];
 
       if (topRows.length > 0) {
         topTeams = topRows.map((r, idx) => {
-          const team = teamMap.get(r.teamId);
-          const played = r.wins + r.losses;
-          const winPct = played > 0 ? r.wins / played : 0;
+          const team = teamMap.get(r.teamId!);
+          const wins = r.wins || 0;
+          const losses = r.losses || 0;
+          const played = wins + losses;
+          const winPct = played > 0 ? wins / played : 0;
           return {
             rank: idx + 1,
             team: team?.name || 'Unknown',
-            wins: r.wins,
-            losses: r.losses,
+            wins,
+            losses,
             winPct,
           };
         });

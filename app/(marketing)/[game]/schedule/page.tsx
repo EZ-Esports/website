@@ -55,8 +55,15 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
           .orderBy(desc(schema.matches.scheduledAt));
 
         const teamsList = await db
-          .select()
+          .select({
+            id: schema.teams.id,
+            schoolId: schema.teams.schoolId,
+            gameId: schema.teams.gameId,
+            seasonId: schema.teams.seasonId,
+            name: schema.schools.name,
+          })
           .from(schema.teams)
+          .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
           .where(eq(schema.teams.gameId, gameRow[0].id));
 
         const teamMap = new Map(teamsList.map((t) => [t.id, t]));

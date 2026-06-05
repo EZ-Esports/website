@@ -5,107 +5,344 @@ import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 
-export async function createRosterMember(formData: FormData) {
-  const rosterId = formData.get('rosterId') as string;
-  const name = formData.get('name') as string;
-  const role = formData.get('role') as string;
-  const bio = formData.get('bio') as string;
-
-  if (!rosterId || !name || !role) {
-    throw new Error('Roster, Name, and Role are required.');
+// Safe wrapper for cache revalidations to support testing/scripts outside Next.js runtime
+function safeRevalidateTag(tag: string) {
+  try {
+    revalidateTag(tag, 'max');
+  } catch {
+    // Safely ignore when called outside Next.js server context (e.g. testing)
   }
-
-  await db.insert(schema.players).values({
-    rosterId,
-    name,
-    role,
-    bio,
-  });
-
-  revalidateTag('players', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
 }
 
-export async function deleteRosterMember(id: string) {
-  await db.delete(schema.players).where(eq(schema.players.id, id));
-  revalidateTag('players', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Safely ignore when called outside Next.js server context (e.g. testing)
+  }
 }
+
+// --- SCHOOL ACTIONS ---
+
+export async function createSchool(formData: FormData) {
+  try {
+    const name = formData.get('name') as string;
+    const slug = formData.get('slug') as string;
+    const logoUrl = formData.get('logoUrl') as string;
+
+    if (!name || !slug) {
+      return { success: false, error: 'School name and slug are required.' };
+    }
+
+    const res = await db.insert(schema.schools).values({
+      name,
+      slug,
+      logoUrl: logoUrl || null,
+    }).returning();
+
+    safeRevalidateTag('schools');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, school: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to create school.' };
+  }
+}
+
+export async function updateSchool(id: string, formData: FormData) {
+  try {
+    const name = formData.get('name') as string;
+    const slug = formData.get('slug') as string;
+    const logoUrl = formData.get('logoUrl') as string;
+
+    if (!name || !slug) {
+      return { success: false, error: 'School name and slug are required.' };
+    }
+
+    const res = await db.update(schema.schools)
+      .set({ name, slug, logoUrl: logoUrl || null })
+      .where(eq(schema.schools.id, id))
+      .returning();
+
+    safeRevalidateTag('schools');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, school: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to update school.' };
+  }
+}
+
+export async function deleteSchool(id: string) {
+  try {
+    // School deletion will cascade teams, but restrict members
+    await db.delete(schema.schools).where(eq(schema.schools.id, id));
+    safeRevalidateTag('schools');
+    safeRevalidateTag('teams');
+    safeRevalidateTag('rosters');
+    safeRevalidateTag('players');
+    safeRevalidatePath('/admin/roster');
+    return { success: true };
+  } catch (error: any) {
+    console.error(error);
+    return { 
+      success: false, 
+      error: 'Cannot delete school. Please ensure all members are removed from this school first.' 
+    };
+  }
+}
+
+// --- MEMBER ACTIONS ---
+
+export async function createMember(formData: FormData) {
+  try {
+    const firstName = formData.get('firstName') as string;
+    const lastName = formData.get('lastName') as string;
+    const schoolId = formData.get('schoolId') as string;
+    const email = formData.get('email') as string;
+    const discord = formData.get('discord') as string;
+    const gradYear = formData.get('graduationYear') as string;
+
+    if (!firstName || !lastName || !schoolId) {
+      return { success: false, error: 'First Name, Last Name, and School are required.' };
+    }
+
+    const res = await db.insert(schema.members).values({
+      firstName,
+      lastName,
+      schoolId,
+      email: email || null,
+      discord: discord || null,
+      graduationYear: gradYear ? parseInt(gradYear, 10) : null,
+    }).returning();
+
+    safeRevalidateTag('members');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, member: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to create member.' };
+  }
+}
+
+export async function updateMember(id: string, formData: FormData) {
+  try {
+    const firstName = formData.get('firstName') as string;
+    const lastName = formData.get('lastName') as string;
+    const schoolId = formData.get('schoolId') as string;
+    const email = formData.get('email') as string;
+    const discord = formData.get('discord') as string;
+    const gradYear = formData.get('graduationYear') as string;
+
+    if (!firstName || !lastName || !schoolId) {
+      return { success: false, error: 'First Name, Last Name, and School are required.' };
+    }
+
+    const res = await db.update(schema.members)
+      .set({
+        firstName,
+        lastName,
+        schoolId,
+        email: email || null,
+        discord: discord || null,
+        graduationYear: gradYear ? parseInt(gradYear, 10) : null,
+      })
+      .where(eq(schema.members.id, id))
+      .returning();
+
+    safeRevalidateTag('members');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, member: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to update member.' };
+  }
+}
+
+export async function deleteMember(id: string) {
+  try {
+    await db.delete(schema.members).where(eq(schema.members.id, id));
+    safeRevalidateTag('members');
+    safeRevalidatePath('/admin/roster');
+    return { success: true };
+  } catch (error: any) {
+    console.error(error);
+    return { 
+      success: false, 
+      error: 'Cannot delete member. Please make sure this member is removed from all rosters first.' 
+    };
+  }
+}
+
+// --- TEAM ACTIONS ---
 
 export async function createTeam(formData: FormData) {
-  const gameId = formData.get('gameId') as string;
-  const name = formData.get('name') as string;
+  try {
+    const schoolId = formData.get('schoolId') as string;
+    const gameId = formData.get('gameId') as string;
+    const seasonId = formData.get('seasonId') as string;
 
-  if (!gameId || !name) {
-    throw new Error('Game and Team Name are required.');
+    if (!schoolId || !gameId || !seasonId) {
+      return { success: false, error: 'School, Game, and Season are required.' };
+    }
+
+    const res = await db.insert(schema.teams).values({
+      schoolId,
+      gameId,
+      seasonId,
+    }).returning();
+
+    safeRevalidateTag('teams');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, team: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: 'Failed to register team. Note: A school can only have one team per game/season.' };
   }
-
-  await db.insert(schema.teams).values({
-    gameId,
-    name,
-  });
-
-  revalidateTag('teams', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
 }
 
 export async function deleteTeam(id: string) {
-  await db.delete(schema.teams).where(eq(schema.teams.id, id));
-  revalidateTag('teams', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
+  try {
+    await db.delete(schema.teams).where(eq(schema.teams.id, id));
+    safeRevalidateTag('teams');
+    safeRevalidateTag('rosters');
+    safeRevalidateTag('players');
+    safeRevalidatePath('/admin/roster');
+    return { success: true };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to delete team.' };
+  }
 }
 
+// --- ROSTER ACTIONS ---
+
 export async function createRoster(formData: FormData) {
-  const teamId = formData.get('teamId') as string;
-  const name = formData.get('name') as string;
-  const division = formData.get('division') as string;
-  const winsStr = formData.get('wins') as string;
-  const lossesStr = formData.get('losses') as string;
+  try {
+    const teamId = formData.get('teamId') as string;
+    const name = formData.get('name') as string;
+    const division = formData.get('division') as string;
 
-  if (!teamId || !name || !division) {
-    throw new Error('Team, Roster Name, and Division are required.');
+    if (!teamId || !name || !division) {
+      return { success: false, error: 'Team, Roster Name, and Division are required.' };
+    }
+
+    const res = await db.insert(schema.rosters).values({
+      teamId,
+      name,
+      division,
+    }).returning();
+
+    safeRevalidateTag('rosters');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, roster: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: 'Failed to create roster. Note: Roster names must be unique within a team.' };
   }
+}
 
-  const wins = winsStr ? parseInt(winsStr, 10) : 0;
-  const losses = lossesStr ? parseInt(lossesStr, 10) : 0;
+export async function updateRoster(id: string, formData: FormData) {
+  try {
+    const name = formData.get('name') as string;
+    const division = formData.get('division') as string;
 
-  await db.insert(schema.rosters).values({
-    teamId,
-    name,
-    division,
-    wins,
-    losses,
-  });
+    if (!name || !division) {
+      return { success: false, error: 'Roster name and division are required.' };
+    }
 
-  revalidateTag('rosters', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
+    const res = await db.update(schema.rosters)
+      .set({ name, division })
+      .where(eq(schema.rosters.id, id))
+      .returning();
+
+    safeRevalidateTag('rosters');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, roster: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to update roster.' };
+  }
 }
 
 export async function deleteRoster(id: string) {
-  await db.delete(schema.rosters).where(eq(schema.rosters.id, id));
-  revalidateTag('rosters', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
+  try {
+    await db.delete(schema.rosters).where(eq(schema.rosters.id, id));
+    safeRevalidateTag('rosters');
+    safeRevalidateTag('players');
+    safeRevalidatePath('/admin/roster');
+    return { success: true };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to delete roster.' };
+  }
 }
 
-export async function updateRosterRecord(id: string, formData: FormData) {
-  const winsStr = formData.get('wins') as string;
-  const lossesStr = formData.get('losses') as string;
+// --- PLAYER / ROSTER MEMBER ACTIONS ---
 
-  const wins = winsStr ? parseInt(winsStr, 10) : 0;
-  const losses = lossesStr ? parseInt(lossesStr, 10) : 0;
+export async function createRosterMember(formData: FormData) {
+  try {
+    const rosterId = formData.get('rosterId') as string;
+    const memberId = formData.get('memberId') as string;
+    const role = formData.get('role') as any;
+    const ign = formData.get('ign') as string;
+    const bio = formData.get('bio') as string;
 
-  await db
-    .update(schema.rosters)
-    .set({ wins, losses })
-    .where(eq(schema.rosters.id, id));
+    if (!rosterId || !memberId || !role) {
+      return { success: false, error: 'Roster, Member, and Role are required.' };
+    }
 
-  revalidateTag('rosters', 'max');
-  revalidatePath('/admin/roster');
-  revalidatePath('/');
+    const res = await db.insert(schema.players).values({
+      rosterId,
+      memberId,
+      role,
+      ign: ign || null,
+      bio: bio || null,
+      // Captain is a role, not a separate flag. Keep the boolean in sync so any
+      // consumer reading isCaptain agrees with the displayed role.
+      isCaptain: role === 'captain',
+    }).returning();
+
+    safeRevalidateTag('players');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, player: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: 'Failed to register player. Note: A member can only be registered once per roster.' };
+  }
+}
+
+export async function updateRosterMember(id: string, formData: FormData) {
+  try {
+    const role = formData.get('role') as any;
+    const ign = formData.get('ign') as string;
+    const bio = formData.get('bio') as string;
+    // Captaincy is derived from the role so the two never disagree.
+    const isCaptain = role === 'captain';
+
+    const res = await db
+      .update(schema.players)
+      .set({ role, ign: ign || null, bio: bio || null, isCaptain })
+      .where(eq(schema.players.id, id))
+      .returning();
+
+    safeRevalidateTag('players');
+    safeRevalidatePath('/admin/roster');
+    return { success: true, player: res[0] };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to update player details.' };
+  }
+}
+
+export async function deleteRosterMember(id: string) {
+  try {
+    await db.delete(schema.players).where(eq(schema.players.id, id));
+    safeRevalidateTag('players');
+    safeRevalidatePath('/admin/roster');
+    return { success: true };
+  } catch (error: any) {
+    console.error(error);
+    return { success: false, error: error.message || 'Failed to remove player from roster.' };
+  }
 }

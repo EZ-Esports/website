@@ -11,9 +11,36 @@ export const getCachedGames = unstable_cache(
   { tags: ['games'] }
 );
 
+export const getCachedSchools = unstable_cache(
+  async () => {
+    return db.select().from(schema.schools);
+  },
+  ['schools-list'],
+  { tags: ['schools'] }
+);
+
+export const getCachedMembers = unstable_cache(
+  async () => {
+    return db.select().from(schema.members);
+  },
+  ['members-list'],
+  { tags: ['members'] }
+);
+
 export const getCachedTeams = unstable_cache(
   async () => {
-    return db.select().from(schema.teams);
+    return db
+      .select({
+        id: schema.teams.id,
+        schoolId: schema.teams.schoolId,
+        gameId: schema.teams.gameId,
+        seasonId: schema.teams.seasonId,
+        createdAt: schema.teams.createdAt,
+        updatedAt: schema.teams.updatedAt,
+        name: schema.schools.name,
+      })
+      .from(schema.teams)
+      .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id));
   },
   ['teams-list'],
   { tags: ['teams'] }
@@ -37,7 +64,7 @@ export const getCachedMatches = unstable_cache(
 
 export const getCachedRosters = unstable_cache(
   async () => {
-    return db.select().from(schema.rosters);
+    return db.select().from(schema.rosterStandings);
   },
   ['rosters-list'],
   { tags: ['rosters'] }

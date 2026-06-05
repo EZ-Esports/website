@@ -1,4 +1,17 @@
-import { pgTable, uuid, text, timestamp, integer, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+
+// Shared audit columns
+const auditColumns = {
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
+};
+
+// Enums for type safety and data integrity
+export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'completed', 'forfeit', 'cancelled']);
+export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
+
+// --- CORE ENTITIES ---
 
 // Games configuration table
 export const games = pgTable('games', {
@@ -7,7 +20,34 @@ export const games = pgTable('games', {
   displayName: text('display_name').notNull(),
   shortName: text('short_name').notNull(),
   imageUrl: text('image_url'),
+  ...auditColumns,
 });
+
+// Schools in the league
+export const schools = pgTable('schools', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').unique().notNull(),
+  slug: text('slug').unique().notNull(),
+  logoUrl: text('logo_url'),
+  joinedAt: timestamp('joined_at').defaultNow().notNull(),
+  ...auditColumns,
+});
+
+// Central repository for people (students, coaches, etc.)
+export const members = pgTable('members', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  email: text('email').unique(),
+  discord: text('discord'),
+  graduationYear: integer('graduation_year'),
+  schoolId: uuid('school_id')
+    .references(() => schools.id, { onDelete: 'restrict' })
+    .notNull(),
+  ...auditColumns,
+}, (table) => [
+  index('members_school_id_idx').on(table.schoolId),
+]);
 
 // Seasons config
 export const seasons = pgTable('seasons', {
@@ -17,47 +57,69 @@ export const seasons = pgTable('seasons', {
     .notNull(),
   name: text('name').notNull(), // e.g. "Spring 2025"
   isActive: boolean('is_active').default(true).notNull(),
+  ...auditColumns,
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),
+  uniqueIndex('seasons_game_id_name_unique_idx').on(table.gameId, table.name),
 ]);
 
-// Teams playing under a game
+// --- TEAMS & ROSTERS ---
+
+// A school's presence in a specific game/season
 export const teams = pgTable('teams', {
   id: uuid('id').defaultRandom().primaryKey(),
-  gameId: uuid('game_id')
-    .references(() => games.id)
+  schoolId: uuid('school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
     .notNull(),
-  name: text('name').notNull(), // e.g. "Stuyvesant"
+  gameId: uuid('game_id')
+    .references(() => games.id, { onDelete: 'cascade' })
+    .notNull(),
+  seasonId: uuid('season_id')
+    .references(() => seasons.id, { onDelete: 'cascade' })
+    .notNull(),
+  ...auditColumns,
 }, (table) => [
+  index('teams_school_id_idx').on(table.schoolId),
   index('teams_game_id_idx').on(table.gameId),
+  index('teams_season_id_idx').on(table.seasonId),
+  uniqueIndex('teams_school_game_season_unique_idx').on(table.schoolId, table.gameId, table.seasonId),
 ]);
 
-// Rosters for teams
+// Specific rosters under a team (e.g. "Varsity", "JV")
 export const rosters = pgTable('rosters', {
   id: uuid('id').defaultRandom().primaryKey(),
   teamId: uuid('team_id')
     .references(() => teams.id, { onDelete: 'cascade' })
     .notNull(),
   name: text('name').notNull(), // e.g. "Varsity", "JV"
-  division: text('division').notNull(), // "Varsity" | "JV"
-  wins: integer('wins').default(0).notNull(),
-  losses: integer('losses').default(0).notNull(),
+  division: text('division').notNull(), // "A" | "B" (aligned with docs)
+  ...auditColumns,
 }, (table) => [
   index('rosters_team_id_idx').on(table.teamId),
+  uniqueIndex('rosters_team_name_unique_idx').on(table.teamId, table.name),
 ]);
 
-// Players under a roster
+// Mapping members to specific rosters
 export const players = pgTable('players', {
   id: uuid('id').defaultRandom().primaryKey(),
   rosterId: uuid('roster_id')
     .references(() => rosters.id, { onDelete: 'cascade' })
     .notNull(),
-  name: text('name').notNull(),
-  role: text('role').notNull(), // "Captain", "Player", "Coach", "Sub"
+  memberId: uuid('member_id')
+    .references(() => members.id, { onDelete: 'restrict' })
+    .notNull(),
+  role: playerRoleEnum('role').default('player').notNull(),
+  ign: text('ign'),
   bio: text('bio'),
+  isCaptain: boolean('is_captain').default(false).notNull(),
+  ...auditColumns,
 }, (table) => [
   index('players_roster_id_idx').on(table.rosterId),
+  index('players_member_id_idx').on(table.memberId),
+  uniqueIndex('players_roster_member_unique_idx').on(table.rosterId, table.memberId),
 ]);
+
+// --- MATCHES ---
 
 // Match schedules and scores
 export const matches = pgTable('matches', {
@@ -74,13 +136,16 @@ export const matches = pgTable('matches', {
   scheduledAt: timestamp('scheduled_at').notNull(),
   homeScore: integer('home_score'),
   awayScore: integer('away_score'),
-  status: text('status').default('scheduled').notNull(), // "scheduled" | "live" | "completed"
+  status: matchStatusEnum('status').default('scheduled').notNull(),
+  ...auditColumns,
 }, (table) => [
   index('matches_scheduled_at_idx').on(table.scheduledAt),
   index('matches_season_id_idx').on(table.seasonId),
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
 ]);
+
+// --- CMS & LEADERSHIP ---
 
 // News Posts / CMS Articles
 export const newsPosts = pgTable('news_posts', {
@@ -91,6 +156,7 @@ export const newsPosts = pgTable('news_posts', {
   content: text('content').notNull(), // markdown/rich-text
   category: text('category').notNull(), // "Announcement", "Tournament", etc.
   publishedAt: timestamp('published_at').defaultNow().notNull(),
+  ...auditColumns,
 }, (table) => [
   index('news_posts_published_at_idx').on(table.publishedAt),
 ]);
@@ -98,11 +164,34 @@ export const newsPosts = pgTable('news_posts', {
 // Leadership team members
 export const leadership = pgTable('leadership', {
   id: uuid('id').defaultRandom().primaryKey(),
-  name: text('name').notNull(),
+  memberId: uuid('member_id')
+    .references(() => members.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(), // Fallback if memberId is null
   role: text('role').notNull(),
   year: text('year').notNull(), // e.g., "2025"
   bio: text('bio'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  ...auditColumns,
 }, (table) => [
   index('leadership_year_idx').on(table.year),
 ]);
+
+import { pgView } from 'drizzle-orm/pg-core';
+
+// View for rosters with dynamically computed standings (wins and losses)
+export const rosterStandings = pgView('roster_standings', {
+  id: uuid('id'),
+  teamId: uuid('team_id'),
+  name: text('name'),
+  division: text('division'),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+  wins: integer('wins'),
+  losses: integer('losses'),
+}).as(sql`
+  SELECT
+    r.id, r.team_id, r.name, r.division, r.created_at, r.updated_at,
+    (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score > m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score > m.home_score AND m.status IN ('completed', 'forfeit')))::int as wins,
+    (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit')))::int as losses
+  FROM rosters r
+`);
+

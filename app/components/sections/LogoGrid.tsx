@@ -21,7 +21,7 @@ export default function LogoGrid({ title, logos, theme = 'light' }: LogoGridProp
           {logos.map((logo, index) => (
             <div key={logo.id || index} className="aspect-square rounded-full bg-white p-4 flex items-center justify-center">
               <Image
-                src={logo.logoUrl}
+                src={logo.logoUrl || ''}
                 alt={logo.name}
                 width={200}
                 height={200}

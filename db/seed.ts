@@ -1,53 +1,23 @@
-import { loadEnvConfig } from '@next/env';
-// Load env variables before importing database modules
-loadEnvConfig(process.cwd());
+import { db } from '../app/lib/db';
+import * as schema from '../app/lib/db/schema';
 
-async function seed() {
-  console.log('🌱 Start seeding database...');
+async function main() {
+  console.log('Seeding started...');
 
-  const { db } = await import('../app/lib/db');
-  const schema = await import('../app/lib/db/schema');
+  // 1. Clear existing data (in order of dependencies)
+  console.log('Clearing old data...');
+  await db.delete(schema.newsPosts);
+  await db.delete(schema.leadership);
+  await db.delete(schema.matches);
+  await db.delete(schema.players);
+  await db.delete(schema.rosters);
+  await db.delete(schema.teams);
+  await db.delete(schema.seasons);
+  await db.delete(schema.members);
+  await db.delete(schema.schools);
+  await db.delete(schema.games);
 
-  // Seed leadership data if empty
-  try {
-    const existingLeadership = await db.select().from(schema.leadership).limit(1);
-    if (existingLeadership.length === 0) {
-      console.log('Seeding leadership data...');
-      await db.insert(schema.leadership).values([
-        // 2023
-        { name: 'John Doe', role: 'President', year: '2023', bio: 'Leading the organization with vision and dedication.' },
-        { name: 'Jane Smith', role: 'Vice President', year: '2023', bio: 'Driving innovation and strategic growth.' },
-        { name: 'Bob Johnson', role: 'Secretary', year: '2023', bio: 'Ensuring organizational excellence and communication.' },
-        // 2024
-        { name: 'Jane Smith', role: 'President', year: '2024', bio: 'Continuing our mission with renewed energy.' },
-        { name: 'Alice Williams', role: 'Vice President', year: '2024', bio: 'Championing member engagement and community building.' },
-        { name: 'Charlie Brown', role: 'Secretary', year: '2024', bio: 'Managing operations and member relations.' },
-        // 2025
-        { name: 'Alice Williams', role: 'President', year: '2025', bio: 'Leading us into an exciting new chapter.' },
-        { name: 'David Lee', role: 'Vice President', year: '2025', bio: 'Fostering partnerships and expanding our reach.' },
-        { name: 'Emma Davis', role: 'Secretary', year: '2025', bio: 'Streamlining processes and enhancing efficiency.' },
-      ]);
-      console.log('✅ Seeding leadership completed.');
-    } else {
-      console.log('⚠️ Leadership data already seeded. Skipping.');
-    }
-  } catch (error) {
-    console.error('Failed to seed leadership:', error);
-  }
-
-  // Check if data is already seeded to prevent duplicating or overwriting active data
-  try {
-    const existingGames = await db.select().from(schema.games).limit(1);
-    if (existingGames.length > 0) {
-      console.log('⚠️ Database already contains games. Skipping seed to prevent duplicating data.');
-      process.exit(0);
-    }
-  } catch {
-    // If table doesn't exist, we let it fail or log it
-    console.log('Checking database status... (Tables might not be pushed yet)');
-  }
-
-  // 2. Insert Games
+  // 2. Seed Games
   console.log('Seeding games...');
   const insertedGames = await db
     .insert(schema.games)
@@ -55,29 +25,58 @@ async function seed() {
       {
         slug: 'valorant',
         displayName: 'Valorant',
-        shortName: 'Valorant',
+        shortName: 'VAL',
         imageUrl: '/images/games/val-banner.png',
       },
       {
         slug: 'league-of-legends',
         displayName: 'League of Legends',
-        shortName: 'League',
+        shortName: 'LoL',
         imageUrl: '/images/games/lol-banner.png',
       },
       {
         slug: 'team-fight-tactics',
-        displayName: 'Team fight tactics',
+        displayName: 'Teamfight Tactics',
         shortName: 'TFT',
         imageUrl: '/images/games/tft-banner.png',
       },
     ])
     .returning();
 
-  const valorantDb = insertedGames.find((g) => g.slug === 'valorant')!;
-  const lolDb = insertedGames.find((g) => g.slug === 'league-of-legends')!;
-  const tftDb = insertedGames.find((g) => g.slug === 'team-fight-tactics')!;
+  const valorantDb = insertedGames.find((g: any) => g.slug === 'valorant')!;
+  const lolDb = insertedGames.find((g: any) => g.slug === 'league-of-legends')!;
+  const tftDb = insertedGames.find((g: any) => g.slug === 'team-fight-tactics')!;
 
-  // 3. Insert Active Seasons
+  // 3. Seed Schools
+  console.log('Seeding schools...');
+  const insertedSchools = await db
+    .insert(schema.schools)
+    .values([
+      { name: 'Stuyvesant', slug: 'stuyvesant', logoUrl: '/images/logos/stuy.png' },
+      { name: 'Bronx Science', slug: 'bronx-science', logoUrl: '/images/logos/bx-science.png' },
+      { name: 'Brooklyn Tech', slug: 'brooklyn-tech', logoUrl: '/images/logos/bk-tech.png' },
+      { name: 'Midwood', slug: 'midwood', logoUrl: '/images/logos/midwood.png' },
+      { name: 'Staten Island Tech', slug: 'staten-island-tech', logoUrl: '/images/logos/sit.png' },
+    ])
+    .returning();
+
+  const stuy = insertedSchools.find((s: any) => s.slug === 'stuyvesant')!;
+  const bxSci = insertedSchools.find((s: any) => s.slug === 'bronx-science')!;
+
+  // 4. Seed Members (People)
+  console.log('Seeding members...');
+  const insertedMembers = await db.insert(schema.members).values([
+    { firstName: 'Alex', lastName: 'Chen', schoolId: stuy.id, discord: 'alex#1234', graduationYear: 2026 },
+    { firstName: 'Sam', lastName: 'Wu', schoolId: stuy.id, discord: 'sam#5678', graduationYear: 2025 },
+    { firstName: 'Emily', lastName: 'Li', schoolId: stuy.id, discord: 'emily#9012', graduationYear: 2027 },
+    { firstName: 'Brian', lastName: 'Zhang', schoolId: stuy.id, discord: 'brian#3456', graduationYear: 2026 },
+    { firstName: 'Jane', lastName: 'Smith', schoolId: bxSci.id, discord: 'jane#7890', graduationYear: 2025 },
+  ]).returning();
+
+  const alex = insertedMembers.find((m: any) => m.firstName === 'Alex')!;
+  const brian = insertedMembers.find((m: any) => m.firstName === 'Brian')!;
+
+  // 5. Seed Seasons
   console.log('Seeding seasons...');
   const insertedSeasons = await db
     .insert(schema.seasons)
@@ -88,200 +87,53 @@ async function seed() {
     ])
     .returning();
 
-  const valSeason = insertedSeasons.find((s) => s.gameId === valorantDb.id)!;
-  const lolSeason = insertedSeasons.find((s) => s.gameId === lolDb.id)!;
+  const valSeason = insertedSeasons.find((s: any) => s.gameId === valorantDb.id)!;
+  const lolSeason = insertedSeasons.find((s: any) => s.gameId === lolDb.id)!;
 
-  // 4. Insert Teams (e.g. Stuyvesant, Bronx Science, Brooklyn Tech, Midwood, Staten Island Tech)
+  // 6. Seed Teams (School-Game-Season link)
   console.log('Seeding teams...');
-  const insertedTeams = await db
-    .insert(schema.teams)
-    .values([
-      // Valorant
-      { gameId: valorantDb.id, name: 'Stuyvesant' },
-      { gameId: valorantDb.id, name: 'Bronx Science' },
-      { gameId: valorantDb.id, name: 'Brooklyn Tech' },
-      { gameId: valorantDb.id, name: 'Midwood' },
-      { gameId: valorantDb.id, name: 'Staten Island Tech' },
+  const insertedTeams = await db.insert(schema.teams).values([
+    { schoolId: stuy.id, gameId: valorantDb.id, seasonId: valSeason.id },
+    { schoolId: stuy.id, gameId: lolDb.id, seasonId: lolSeason.id },
+    { schoolId: bxSci.id, gameId: valorantDb.id, seasonId: valSeason.id },
+  ]).returning();
 
-      // League
-      { gameId: lolDb.id, name: 'Bronx Science' },
-      { gameId: lolDb.id, name: 'Stuyvesant' },
-      { gameId: lolDb.id, name: 'Brooklyn Tech' },
-      { gameId: lolDb.id, name: 'Midwood' },
-      { gameId: lolDb.id, name: 'Staten Island Tech' },
+  const stuyValTeam = insertedTeams.find((t: any) => t.schoolId === stuy.id && t.gameId === valorantDb.id)!;
+  const stuyLolTeam = insertedTeams.find((t: any) => t.schoolId === stuy.id && t.gameId === lolDb.id)!;
 
-      // TFT
-      { gameId: tftDb.id, name: 'Midwood' },
-      { gameId: tftDb.id, name: 'Stuyvesant' },
-      { gameId: tftDb.id, name: 'Brooklyn Tech' },
-      { gameId: tftDb.id, name: 'Bronx Science' },
-      { gameId: tftDb.id, name: 'Staten Island Tech' },
-    ])
-    .returning();
+  // 7. Seed Rosters
+  console.log('Seeding rosters...');
+  const insertedRosters = await db.insert(schema.rosters).values([
+    { teamId: stuyValTeam.id, name: 'Varsity', division: 'A' },
+    { teamId: stuyLolTeam.id, name: 'Varsity', division: 'A' },
+  ]).returning();
 
-  // Get specific team records for roster creation
-  const stuyVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Stuyvesant')!;
-  const bxSciVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Bronx Science')!;
-  const bkTechVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Brooklyn Tech')!;
-  const midwoodVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Midwood')!;
-  const sitVal = insertedTeams.find((t) => t.gameId === valorantDb.id && t.name === 'Staten Island Tech')!;
+  const stuyValVarsity = insertedRosters.find((r: any) => r.teamId === stuyValTeam.id)!;
+  const stuyLolVarsity = insertedRosters.find((r: any) => r.teamId === stuyLolTeam.id)!;
 
-  const bxSciLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Bronx Science')!;
-  const stuyLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Stuyvesant')!;
-  const bkTechLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Brooklyn Tech')!;
-  const midwoodLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Midwood')!;
-  const sitLol = insertedTeams.find((t) => t.gameId === lolDb.id && t.name === 'Staten Island Tech')!;
-
-  const midwoodTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Midwood')!;
-  const stuyTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Stuyvesant')!;
-  const bkTechTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Brooklyn Tech')!;
-  const bxSciTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Bronx Science')!;
-  const sitTft = insertedTeams.find((t) => t.gameId === tftDb.id && t.name === 'Staten Island Tech')!;
-
-  // 5. Seed Rosters under Teams
-  console.log('Seeding team rosters...');
-  const insertedRosters = await db
-    .insert(schema.rosters)
-    .values([
-      // Valorant
-      { teamId: stuyVal.id, name: 'Varsity', division: 'Varsity', wins: 12, losses: 3 },
-      { teamId: stuyVal.id, name: 'JV', division: 'JV', wins: 8, losses: 5 },
-      { teamId: bxSciVal.id, name: 'Varsity', division: 'Varsity', wins: 11, losses: 4 },
-      { teamId: bkTechVal.id, name: 'Varsity', division: 'Varsity', wins: 10, losses: 5 },
-      { teamId: midwoodVal.id, name: 'Varsity', division: 'Varsity', wins: 9, losses: 6 },
-      { teamId: sitVal.id, name: 'Varsity', division: 'Varsity', wins: 8, losses: 7 },
-
-      // League
-      { teamId: bxSciLol.id, name: 'Varsity', division: 'Varsity', wins: 13, losses: 2 },
-      { teamId: stuyLol.id, name: 'Varsity', division: 'Varsity', wins: 10, losses: 5 },
-      { teamId: bkTechLol.id, name: 'Varsity', division: 'Varsity', wins: 9, losses: 6 },
-      { teamId: midwoodLol.id, name: 'Varsity', division: 'Varsity', wins: 8, losses: 7 },
-      { teamId: sitLol.id, name: 'Varsity', division: 'Varsity', wins: 7, losses: 8 },
-
-      // TFT
-      { teamId: midwoodTft.id, name: 'Varsity', division: 'Varsity', wins: 11, losses: 4 },
-      { teamId: stuyTft.id, name: 'Varsity', division: 'Varsity', wins: 9, losses: 6 },
-      { teamId: bkTechTft.id, name: 'Varsity', division: 'Varsity', wins: 8, losses: 7 },
-      { teamId: bxSciTft.id, name: 'Varsity', division: 'Varsity', wins: 7, losses: 8 },
-      { teamId: sitTft.id, name: 'Varsity', division: 'Varsity', wins: 6, losses: 9 },
-    ])
-    .returning();
-
-  const stuyValVarsity = insertedRosters.find((r) => r.teamId === stuyVal.id && r.division === 'Varsity')!;
-  const bxSciValVarsity = insertedRosters.find((r) => r.teamId === bxSciVal.id && r.division === 'Varsity')!;
-  const bkTechValVarsity = insertedRosters.find((r) => r.teamId === bkTechVal.id && r.division === 'Varsity')!;
-  const midwoodValVarsity = insertedRosters.find((r) => r.teamId === midwoodVal.id && r.division === 'Varsity')!;
-
-  const stuyLolVarsity = insertedRosters.find((r) => r.teamId === stuyLol.id && r.division === 'Varsity')!;
-  const bkTechLolVarsity = insertedRosters.find((r) => r.teamId === bkTechLol.id && r.division === 'Varsity')!;
-  const midwoodLolVarsity = insertedRosters.find((r) => r.teamId === midwoodLol.id && r.division === 'Varsity')!;
-
-  // 6. Seed Players under Rosters
+  // 8. Seed Players (Members in Rosters)
   console.log('Seeding players...');
   await db.insert(schema.players).values([
-    // Stuyvesant Valorant Varsity
-    { rosterId: stuyValVarsity.id, name: 'Alex Chen', role: 'Captain', bio: 'Dual duelist specialist. Focuses on entry routing.' },
-    { rosterId: stuyValVarsity.id, name: 'Sam Wu', role: 'Player', bio: 'Initiator/Controller player.' },
-    { rosterId: stuyValVarsity.id, name: 'Emily Li', role: 'Player', bio: 'Sentinel main. Keeps sites locked down.' },
-    { rosterId: stuyValVarsity.id, name: 'Leo Lopez', role: 'Player', bio: 'Flex player.' },
-    { rosterId: stuyValVarsity.id, name: 'Jason Kim', role: 'Player', bio: 'Controller main.' },
-
-    // Stuyvesant LoL Varsity
-    { rosterId: stuyLolVarsity.id, name: 'Brian Zhang', role: 'Captain', bio: 'Mid lane main. Enjoys control mages.' },
-    { rosterId: stuyLolVarsity.id, name: 'Kevin Wang', role: 'Player', bio: 'Jungle main. Focuses on objective control.' },
-    { rosterId: stuyLolVarsity.id, name: 'Chloe Ho', role: 'Player', bio: 'Support main. Specializes in enchanters.' },
+    { rosterId: stuyValVarsity.id, memberId: alex.id, role: 'captain' as any, ign: 'AlexVAL' },
+    { rosterId: stuyLolVarsity.id, memberId: brian.id, role: 'captain' as any, ign: 'BrianLoL' },
   ]);
 
-  // 7. Seeding matches
+  // 9. Matches
   console.log('Seeding matches...');
-  const nextSaturday = new Date();
-  nextSaturday.setDate(nextSaturday.getDate() + (6 - nextSaturday.getDay()));
-  nextSaturday.setHours(15, 0, 0, 0); // 3 PM
-
-  const twoWeeksAgo = new Date();
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
   await db.insert(schema.matches).values([
-    // Valorant Matches
     {
       seasonId: valSeason.id,
       homeRosterId: stuyValVarsity.id,
-      awayRosterId: bxSciValVarsity.id,
-      scheduledAt: nextSaturday,
-      status: 'scheduled',
-    },
-    {
-      seasonId: valSeason.id,
-      homeRosterId: stuyValVarsity.id,
-      awayRosterId: bkTechValVarsity.id,
-      scheduledAt: oneWeekAgo,
-      homeScore: 2,
-      awayScore: 0,
-      status: 'completed',
-    },
-    {
-      seasonId: valSeason.id,
-      homeRosterId: stuyValVarsity.id,
-      awayRosterId: midwoodValVarsity.id,
-      scheduledAt: twoWeeksAgo,
-      homeScore: 2,
-      awayScore: 1,
-      status: 'completed',
-    },
-
-    // LoL Matches
-    {
-      seasonId: lolSeason.id,
-      homeRosterId: stuyLolVarsity.id,
-      awayRosterId: bkTechLolVarsity.id,
-      scheduledAt: nextSaturday,
-      status: 'scheduled',
-    },
-    {
-      seasonId: lolSeason.id,
-      homeRosterId: stuyLolVarsity.id,
-      awayRosterId: midwoodLolVarsity.id,
-      scheduledAt: oneWeekAgo,
-      homeScore: 2,
-      awayScore: 0,
-      status: 'completed',
-    },
+      awayRosterId: stuyValVarsity.id, // In seed we can just simulate
+      scheduledAt: new Date(),
+      status: 'scheduled' as any,
+    }
   ]);
 
-  // 7. Seeding News Posts
-  console.log('Seeding news posts...');
-  await db.insert(schema.newsPosts).values([
-    {
-      title: 'Spring 2025 Season Kicks Off',
-      slug: 'spring-2025-season-kicks-off',
-      excerpt: 'The Spring 2025 season has officially begun with record participation across all three games.',
-      content: 'We are thrilled to launch the Spring 2025 season of the NYC High School Esports League! This season features over 15 participating schools competing across Valorant, League of Legends, and Teamfight Tactics. Good luck to all teams!',
-      category: 'Announcement',
-    },
-    {
-      title: 'Championship Tournament Dates Announced',
-      slug: 'championship-tournament-dates-announced',
-      excerpt: 'Mark your calendars! The championship tournament will take place on May 15-17, 2025.',
-      content: 'The postseason championship tournament will bring together the top teams from each division in a live, in-person bracket. Matches will run from May 15th to 17th. Further details about the venue and stream coverage will be released next month.',
-      category: 'Tournament',
-    },
-    {
-      title: 'New Streaming Partnership',
-      slug: 'new-streaming-partnership',
-      excerpt: 'We are excited to announce a new partnership that will enhance our live streaming capabilities.',
-      content: 'Thanks to our new partnership, we will now feature multi-cast coverage of match of the week broadcasts, fully equipped with overlay overlays, high-fidelity feeds, and student shoutcasters from across the league.',
-      category: 'Partnership',
-    },
-  ]);
-
-  console.log('✅ Seeding completed successfully!');
-  process.exit(0);
+  console.log('Seed complete!');
 }
 
-seed().catch((err) => {
-  console.error('❌ Seeding failed:', err);
+main().catch((err) => {
+  console.error('Seed failed:', err);
   process.exit(1);
 });

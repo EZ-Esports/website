@@ -1,6 +1,7 @@
 import { getCachedLeadership } from '@/app/lib/db/queries';
 import { createLeader, deleteLeader } from './actions';
 import Card from '@/app/components/ui/Card';
+import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
 export default async function AdminLeadershipPage() {
   let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
@@ -124,7 +125,7 @@ export default async function AdminLeadershipPage() {
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-850 text-sm">
+                  <tbody className="divide-y divide-slate-800 text-sm">
                     {leadershipList.map((leader) => {
                       const deleteActionWithId = deleteLeader.bind(null, leader.id, leader.year);
 
@@ -143,14 +144,12 @@ export default async function AdminLeadershipPage() {
                             {leader.year}
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <form action={deleteActionWithId}>
-                              <button
-                                type="submit"
-                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-350 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
-                              >
-                                Remove
-                              </button>
-                            </form>
+                            <ConfirmDeleteButton
+                              action={deleteActionWithId}
+                              label="Remove"
+                              message={`Remove ${leader.name} (${leader.role}, ${leader.year}) from the public leadership page?`}
+                              className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                            />
                           </td>
                         </tr>
                       );
