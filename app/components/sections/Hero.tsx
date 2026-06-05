@@ -36,17 +36,6 @@ export default function Hero({
       {/* Hero Content Container */}
       <div className="relative z-10 h-full flex items-center justify-center text-center px-4">
         <div className="max-w-4xl mx-auto flex flex-col items-center">
-          {isLarge && (
-            <motion.span
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
-              className="text-xs font-bold tracking-widest text-ez-pink uppercase mb-4 px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20"
-            >
-              Official League Hub
-            </motion.span>
-          )}
-
           {/* Heading */}
           <motion.h1
             initial={{ opacity: 0, y: 15 }}
