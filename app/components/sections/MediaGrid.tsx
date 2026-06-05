@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import type { Image as ImageType, Theme, GridColumns } from '@/app/types';
 import { THEME_CLASSES, GRID_COLUMNS } from '@/app/lib/constants';
@@ -14,18 +14,27 @@ interface MediaGridProps {
 export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
+  useEffect(() => {
+    if (selectedImageIndex !== null) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedImageIndex]);
+
   const themeClasses = theme === 'dark' 
     ? `${THEME_CLASSES.dark.bg} ${THEME_CLASSES.dark.text}` 
     : `${THEME_CLASSES.light.bg} ${THEME_CLASSES.light.text}`;
 
   const openLightbox = (index: number) => {
     setSelectedImageIndex(index);
-    document.body.style.overflow = 'hidden';
   };
 
   const closeLightbox = () => {
     setSelectedImageIndex(null);
-    document.body.style.overflow = 'unset';
   };
 
   const navigateLightbox = (direction: 'next' | 'prev', e: React.MouseEvent) => {

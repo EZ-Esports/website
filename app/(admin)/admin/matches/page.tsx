@@ -1,7 +1,6 @@
 import { getCachedMatches, getCachedTeams, getCachedSeasons, getCachedGames } from '@/app/lib/db/queries';
 import { createMatch, updateMatchScore, deleteMatch } from './actions';
 import Card from '@/app/components/ui/Card';
-import Button from '@/app/components/ui/Button';
 
 export default async function AdminMatchesPage() {
   let matches: Awaited<ReturnType<typeof getCachedMatches>> = [];
@@ -183,12 +182,13 @@ export default async function AdminMatchesPage() {
                                 {game?.shortName} • {season?.name}
                               </div>
                               <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                                {new Date(match.scheduledAt).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                })}
+                                 {new Date(match.scheduledAt).toLocaleDateString('en-US', {
+                                   timeZone: 'America/New_York',
+                                   month: 'short',
+                                   day: 'numeric',
+                                   hour: 'numeric',
+                                   minute: '2-digit',
+                                 })}
                               </div>
                             </td>
 

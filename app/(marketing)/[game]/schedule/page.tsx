@@ -62,12 +62,14 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
           const team1 = teamMap.get(m.homeTeamId);
           const team2 = teamMap.get(m.awayTeamId);
           return {
-            date: new Date(m.scheduledAt).toLocaleDateString(undefined, {
+            date: new Date(m.scheduledAt).toLocaleDateString('en-US', {
+              timeZone: 'America/New_York',
               month: 'long',
               day: 'numeric',
               year: 'numeric',
             }),
-            time: new Date(m.scheduledAt).toLocaleTimeString(undefined, {
+            time: new Date(m.scheduledAt).toLocaleTimeString('en-US', {
+              timeZone: 'America/New_York',
               hour: 'numeric',
               minute: '2-digit',
             }),

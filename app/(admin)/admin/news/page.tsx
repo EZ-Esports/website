@@ -70,7 +70,8 @@ export default async function AdminNewsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-slate-300 font-medium">
-                          {new Date(post.publishedAt).toLocaleDateString(undefined, {
+                          {new Date(post.publishedAt).toLocaleDateString('en-US', {
+                            timeZone: 'America/New_York',
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',

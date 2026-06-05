@@ -2,8 +2,59 @@
 
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Helper to dynamically recalculate team wins and losses based on completed matches
+async function recalculateTeamStandings(teamId: string) {
+  const homeMatches = await db
+    .select()
+    .from(schema.matches)
+    .where(
+      and(
+        eq(schema.matches.homeTeamId, teamId),
+        eq(schema.matches.status, 'completed')
+      )
+    );
+
+  const awayMatches = await db
+    .select()
+    .from(schema.matches)
+    .where(
+      and(
+        eq(schema.matches.awayTeamId, teamId),
+        eq(schema.matches.status, 'completed')
+      )
+    );
+
+  let wins = 0;
+  let losses = 0;
+
+  for (const m of homeMatches) {
+    if (m.homeScore !== null && m.awayScore !== null) {
+      if (m.homeScore > m.awayScore) {
+        wins++;
+      } else if (m.homeScore < m.awayScore) {
+        losses++;
+      }
+    }
+  }
+
+  for (const m of awayMatches) {
+    if (m.homeScore !== null && m.awayScore !== null) {
+      if (m.awayScore > m.homeScore) {
+        wins++;
+      } else if (m.awayScore < m.homeScore) {
+        losses++;
+      }
+    }
+  }
+
+  await db
+    .update(schema.teams)
+    .set({ wins, losses })
+    .where(eq(schema.teams.id, teamId));
+}
 
 export async function createMatch(formData: FormData) {
   const seasonId = formData.get('seasonId') as string;
@@ -58,35 +109,9 @@ export async function updateMatchScore(id: string, formData: FormData) {
     })
     .where(eq(schema.matches.id, id));
 
-  // If status is transitioning to completed for the first time, update standings
-  if (status === 'completed' && currentMatch.status !== 'completed' && homeScore !== null && awayScore !== null) {
-    const homeWin = homeScore > awayScore;
-    const awayWin = awayScore > homeScore;
-
-    // Increment home team
-    const homeTeams = await db.select().from(schema.teams).where(eq(schema.teams.id, currentMatch.homeTeamId)).limit(1);
-    if (homeTeams[0]) {
-      await db
-        .update(schema.teams)
-        .set({
-          wins: homeTeams[0].wins + (homeWin ? 1 : 0),
-          losses: homeTeams[0].losses + (awayWin ? 1 : 0),
-        })
-        .where(eq(schema.teams.id, currentMatch.homeTeamId));
-    }
-
-    // Increment away team
-    const awayTeams = await db.select().from(schema.teams).where(eq(schema.teams.id, currentMatch.awayTeamId)).limit(1);
-    if (awayTeams[0]) {
-      await db
-        .update(schema.teams)
-        .set({
-          wins: awayTeams[0].wins + (awayWin ? 1 : 0),
-          losses: awayTeams[0].losses + (homeWin ? 1 : 0),
-        })
-        .where(eq(schema.teams.id, currentMatch.awayTeamId));
-    }
-  }
+  // Recalculate standings for both teams involved
+  await recalculateTeamStandings(currentMatch.homeTeamId);
+  await recalculateTeamStandings(currentMatch.awayTeamId);
 
   revalidateTag('matches', 'max');
   revalidateTag('teams', 'max');
@@ -95,8 +120,19 @@ export async function updateMatchScore(id: string, formData: FormData) {
 }
 
 export async function deleteMatch(id: string) {
+  // Retrieve current match info before deleting to know which teams to recalculate
+  const currentMatches = await db.select().from(schema.matches).where(eq(schema.matches.id, id)).limit(1);
+  const currentMatch = currentMatches[0];
+
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
+
+  if (currentMatch) {
+    await recalculateTeamStandings(currentMatch.homeTeamId);
+    await recalculateTeamStandings(currentMatch.awayTeamId);
+  }
+
   revalidateTag('matches', 'max');
+  revalidateTag('teams', 'max');
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }

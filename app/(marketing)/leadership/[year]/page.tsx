@@ -8,7 +8,7 @@ import Card from '@/app/components/ui/Card';
 
 export default async function LeadershipPage({ params }: { params: Promise<LeadershipParams> }) {
   const { year } = await params;
-  let allLeaders: any[] = [];
+  let allLeaders: Awaited<ReturnType<typeof getCachedLeadership>> = [];
   try {
     allLeaders = await getCachedLeadership();
   } catch (error) {

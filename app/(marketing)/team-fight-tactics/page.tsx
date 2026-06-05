@@ -83,7 +83,8 @@ export default async function TeamFightTacticsHubPage() {
           const home = teamMap.get(nextMatchRow[0].homeTeamId);
           const away = teamMap.get(nextMatchRow[0].awayTeamId);
           nextMatch = {
-            date: new Date(nextMatchRow[0].scheduledAt).toLocaleDateString(undefined, {
+            date: new Date(nextMatchRow[0].scheduledAt).toLocaleDateString('en-US', {
+              timeZone: 'America/New_York',
               weekday: 'long',
               month: 'long',
               day: 'numeric',
@@ -114,7 +115,8 @@ export default async function TeamFightTacticsHubPage() {
             const isHomeStuy = home?.name === 'Stuyvesant';
             const stuyWon = r.homeScore! > r.awayScore! ? isHomeStuy : !isHomeStuy;
             return {
-              date: new Date(r.scheduledAt).toLocaleDateString(undefined, {
+              date: new Date(r.scheduledAt).toLocaleDateString('en-US', {
+                timeZone: 'America/New_York',
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric',
@@ -265,7 +267,6 @@ export default async function TeamFightTacticsHubPage() {
               </thead>
               <tbody className="divide-y divide-slate-850">
                 {topTeams.map((entry) => {
-                  const isTopThree = entry.rank <= 3;
                   return (
                     <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-slate-300">

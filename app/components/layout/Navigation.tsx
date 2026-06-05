@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
-import { ROUTES, GAMES, GAME_SLUGS, getGameRoute, getGameSubRoute, getNavigationState } from '@/app/lib/constants';
+import { ROUTES, GAMES, GAME_SLUGS, getGameRoute } from '@/app/lib/constants';
 
 interface NavigationProps {
   onNavigate?: () => void;
@@ -11,7 +11,6 @@ interface NavigationProps {
 
 export default function Navigation({ onNavigate }: NavigationProps) {
   const pathname = usePathname();
-  const navState = getNavigationState(pathname);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

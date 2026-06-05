@@ -3,7 +3,7 @@ import { createLeader, deleteLeader } from './actions';
 import Card from '@/app/components/ui/Card';
 
 export default async function AdminLeadershipPage() {
-  let leadershipList: any[] = [];
+  let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
   let dbError = false;
 
   try {

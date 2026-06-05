@@ -71,10 +71,8 @@ export async function updateNewsPost(id: string, formData: FormData) {
   revalidatePath('/admin/news');
   return redirect('/admin/news');
 }
-
 export async function deleteNewsPost(id: string) {
   await db.delete(schema.newsPosts).where(eq(schema.newsPosts.id, id));
-  
   revalidateTag('news', 'max');
   revalidatePath('/news');
   revalidatePath('/admin/news');

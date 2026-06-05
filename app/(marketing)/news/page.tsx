@@ -26,7 +26,8 @@ export default async function NewsPage() {
       title: p.title,
       category: p.category,
       excerpt: p.excerpt || '',
-      date: new Date(p.publishedAt).toLocaleDateString(undefined, {
+      date: new Date(p.publishedAt).toLocaleDateString('en-US', {
+        timeZone: 'America/New_York',
         month: 'long',
         day: 'numeric',
         year: 'numeric',
