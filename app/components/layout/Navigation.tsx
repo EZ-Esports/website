@@ -47,7 +47,6 @@ export default function Navigation({ onNavigate }: NavigationProps) {
     { label: 'Games', href: '#', isDropdown: true },
     { label: 'News', href: ROUTES.news },
     { label: 'Leadership', href: ROUTES.leadership },
-    { label: 'Archives', href: ROUTES.archives },
   ];
 
   return (
