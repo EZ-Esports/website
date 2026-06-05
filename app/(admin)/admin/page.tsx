@@ -1,5 +1,7 @@
 import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews } from '@/app/lib/db/queries';
 import Link from 'next/link';
+import Card from '@/app/components/ui/Card';
+import Button from '@/app/components/ui/Button';
 
 export default async function AdminDashboardPage() {
   let stats = { games: 0, teams: 0, matches: 0, news: 0 };
@@ -30,45 +32,43 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-rose-950/20 to-gray-900 border border-rose-900/10 rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <Card className="bg-gradient-to-r from-ez-pink/15 via-ez-purple/5 to-slate-900/50 border border-ez-pink/20 rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl hover:border-ez-pink/30 hover:shadow-ez-pink/5 duration-300">
         <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Welcome to EZ CMS</h1>
-          <p className="text-gray-400 text-sm mt-1">Manage public configurations, schedule rosters, and news entries from one place.</p>
+          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to EZ CMS</h1>
+          <p className="text-slate-400 text-sm mt-1.5 leading-relaxed max-w-xl">
+            Manage public competition schedules, teams, roster lists, and news announcements from a single, unified database dashboard.
+          </p>
         </div>
-        <Link
-          href="/"
-          className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 font-semibold text-sm rounded-lg shadow-lg hover:shadow-rose-600/10 transition-colors"
-        >
-          View Public Website
+        <Link href="/" className="shrink-0">
+          <Button variant="primary">View Public Website</Button>
         </Link>
-      </div>
+      </Card>
 
       {/* Database Warning */}
       {!dbConfigured && (
-        <div className="bg-amber-950/20 border border-amber-900/30 rounded-xl p-6 space-y-4">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl mt-0.5">⚠️</span>
-            <div>
-              <h3 className="text-lg font-bold text-amber-300">Database Connection Required</h3>
-              <p className="text-gray-300 text-sm mt-1">
-                To start saving data and viewing dynamic statistics, please configure your <code>DATABASE_URL</code> in your local <code>.env</code> file.
+        <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6 space-y-5 shadow-lg shadow-amber-500/[0.01]">
+          <div className="flex items-start gap-4">
+            <span className="text-3xl mt-0.5 select-none animate-pulse">⚠️</span>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-amber-400 tracking-tight">Database Connection Required</h3>
+              <p className="text-slate-300 text-sm leading-relaxed max-w-2xl">
+                To start registering teams and managing match scores, please update your database connection credentials. Configure your <code>DATABASE_URL</code> in your local <code>.env</code> file.
               </p>
               {connectionError && (
-                <p className="text-xs text-amber-400 font-mono mt-2 bg-black/40 p-2 rounded border border-amber-900/20">
-                  Error Details: {connectionError}
-                </p>
+                <div className="text-xs text-amber-500 font-mono mt-3 bg-black/60 p-3 rounded-lg border border-amber-500/10">
+                  <span className="font-bold text-amber-400">Error Details:</span> {connectionError}
+                </div>
               )}
             </div>
           </div>
           
-          <div className="pl-9 space-y-2">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Run the following commands in your shell to complete setup:</h4>
-            <div className="bg-gray-950 p-4 rounded-lg text-sm text-gray-300 font-mono space-y-1.5 border border-gray-900">
-              <p className="text-gray-500"># 1. Update your .env file with your database password</p>
-              <p className="text-gray-500"># 2. Push the schema to your Supabase Postgres database</p>
-              <p><span className="text-rose-400">npm run</span> db:push</p>
-              <p className="text-gray-500"># 3. Seed your database with games, teams, and sample match data</p>
-              <p><span className="text-rose-400">npm run</span> db:seed</p>
+          <div className="pl-11 space-y-3">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Execute setup commands in your project shell:</h4>
+            <div className="bg-[#04060a]/90 p-4 rounded-xl text-sm text-slate-300 font-mono space-y-2 border border-slate-900 shadow-inner">
+              <p className="text-slate-500 text-xs"># 1. Stash changes & push migrations to Supabase Postgres</p>
+              <p><span className="text-ez-pink">npm run</span> db:push</p>
+              <p className="text-slate-500 text-xs"># 2. Seed database with games, teams, and sample match fixtures</p>
+              <p><span className="text-ez-pink">npm run</span> db:seed</p>
             </div>
           </div>
         </div>
@@ -76,83 +76,83 @@ export default async function AdminDashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-2">
-          <div className="flex justify-between items-center text-gray-400 text-sm">
+        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
             <span>Competition Games</span>
-            <span className="text-xl">🎮</span>
+            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🎮</span>
           </div>
-          <p className="text-3xl font-extrabold text-white">{dbConfigured ? stats.games : '--'}</p>
-        </div>
+          <p className="text-4xl font-black text-white text-glow">{dbConfigured ? stats.games : '--'}</p>
+        </Card>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-2">
-          <div className="flex justify-between items-center text-gray-400 text-sm">
+        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
             <span>Registered Teams</span>
-            <span className="text-xl">👥</span>
+            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">👥</span>
           </div>
-          <p className="text-3xl font-extrabold text-white">{dbConfigured ? stats.teams : '--'}</p>
-        </div>
+          <p className="text-4xl font-black text-white text-glow">{dbConfigured ? stats.teams : '--'}</p>
+        </Card>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-2">
-          <div className="flex justify-between items-center text-gray-400 text-sm">
+        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
             <span>Scheduled Matches</span>
-            <span className="text-xl">🏆</span>
+            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🏆</span>
           </div>
-          <p className="text-3xl font-extrabold text-white">{dbConfigured ? stats.matches : '--'}</p>
-        </div>
+          <p className="text-4xl font-black text-white text-glow">{dbConfigured ? stats.matches : '--'}</p>
+        </Card>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-2">
-          <div className="flex justify-between items-center text-gray-400 text-sm">
+        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
+          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
             <span>Published Articles</span>
-            <span className="text-xl">📰</span>
+            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">📰</span>
           </div>
-          <p className="text-3xl font-extrabold text-white">{dbConfigured ? stats.news : '--'}</p>
-        </div>
+          <p className="text-4xl font-black text-white text-glow">{dbConfigured ? stats.news : '--'}</p>
+        </Card>
       </div>
 
       {/* Quick Action Tasks */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-white mb-4">Quick Administration Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-950 border border-gray-800 p-5 rounded-lg flex flex-col justify-between items-start gap-4">
+      <Card className="hover:border-slate-800/80 hover:shadow-none duration-300">
+        <h3 className="text-lg font-black text-white mb-6 uppercase tracking-wider">Quick Administration Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-ez-pink/25 transition-all duration-300 group">
             <div>
-              <h4 className="font-semibold text-white">Create Match Event</h4>
-              <p className="text-xs text-gray-400 mt-1">Schedule matches, assign scores, and manage varsity matchups.</p>
+              <h4 className="font-extrabold text-white group-hover:text-ez-pink transition-colors">Create Match Event</h4>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Schedule new matches, input results, and manage varsity matchups.</p>
             </div>
             <Link
               href="/admin/matches"
-              className="text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors"
+              className="text-xs font-bold text-ez-pink hover:underline uppercase tracking-wider"
             >
               Go to Match Manager →
             </Link>
           </div>
 
-          <div className="bg-gray-950 border border-gray-800 p-5 rounded-lg flex flex-col justify-between items-start gap-4">
+          <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-ez-pink/25 transition-all duration-300 group">
             <div>
-              <h4 className="font-semibold text-white">Write Announcement</h4>
-              <p className="text-xs text-gray-400 mt-1">Publish news posts, tournament details, and notices for clubs.</p>
+              <h4 className="font-extrabold text-white group-hover:text-ez-pink transition-colors">Write Announcement</h4>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Publish new blog posts, tournament notifications, and updates for clubs.</p>
             </div>
             <Link
               href="/admin/news"
-              className="text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors"
+              className="text-xs font-bold text-ez-pink hover:underline uppercase tracking-wider"
             >
               Create News Article →
             </Link>
           </div>
 
-          <div className="bg-gray-950 border border-gray-800 p-5 rounded-lg flex flex-col justify-between items-start gap-4">
+          <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-ez-pink/25 transition-all duration-300 group">
             <div>
-              <h4 className="font-semibold text-white">Roster Management</h4>
-              <p className="text-xs text-gray-400 mt-1">Assign captain roles, edit bios, and register roster members.</p>
+              <h4 className="font-extrabold text-white group-hover:text-ez-pink transition-colors">Roster Management</h4>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Assign student captain roles, register roster lists, and edit player profiles.</p>
             </div>
             <Link
               href="/admin/roster"
-              className="text-xs font-semibold text-rose-400 hover:text-rose-300 transition-colors"
+              className="text-xs font-bold text-ez-pink hover:underline uppercase tracking-wider"
             >
               Manage Roster Lists →
             </Link>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
