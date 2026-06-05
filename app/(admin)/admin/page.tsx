@@ -1,4 +1,4 @@
-import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews } from '@/app/lib/db/queries';
+import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews, getCachedRosters } from '@/app/lib/db/queries';
 import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
@@ -7,14 +7,23 @@ export default async function AdminDashboardPage() {
   let stats = { games: 0, teams: 0, matches: 0, news: 0 };
   let dbConfigured = false;
   let connectionError = '';
+  let alerts: Array<{
+    type: 'warning' | 'info';
+    label: string;
+    count: number;
+    message: string;
+    link: string;
+    linkText: string;
+  }> = [];
 
   try {
     if (process.env.DATABASE_URL) {
-      const [games, teams, matches, news] = await Promise.all([
+      const [games, teams, matches, news, rosters] = await Promise.all([
         getCachedGames(),
         getCachedTeams(),
         getCachedMatches(),
         getCachedNews(),
+        getCachedRosters(),
       ]);
 
       stats = {
@@ -23,6 +32,38 @@ export default async function AdminDashboardPage() {
         matches: matches.length,
         news: news.length,
       };
+
+      // Calculate actionable alerts
+      const now = new Date();
+      const pendingMatches = matches.filter(m => 
+        m.status === 'scheduled' && 
+        new Date(m.scheduledAt) < now && 
+        (m.homeScore === null || m.awayScore === null)
+      );
+
+      const teamsWithNoRoster = teams.filter(t => 
+        !rosters.some(r => r.teamId === t.id)
+      );
+
+      alerts = [
+        ...(pendingMatches.length > 0 ? [{
+          type: 'warning' as const,
+          label: 'Pending Results',
+          count: pendingMatches.length,
+          message: `${pendingMatches.length} completed matches are missing final scores.`,
+          link: '/admin/matches',
+          linkText: 'Enter Scores'
+        }] : []),
+        ...(teamsWithNoRoster.length > 0 ? [{
+          type: 'info' as const,
+          label: 'Incomplete Teams',
+          count: teamsWithNoRoster.length,
+          message: `${teamsWithNoRoster.length} registered teams have no competitive rosters assigned.`,
+          link: '/admin/roster',
+          linkText: 'Assign Rosters'
+        }] : [])
+      ];
+
       dbConfigured = true;
     }
   } catch (error) {
@@ -43,6 +84,39 @@ export default async function AdminDashboardPage() {
           <Button variant="primary">View Public Website</Button>
         </Link>
       </Card>
+
+      {/* Actionable Alerts */}
+      {alerts.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {alerts.map((alert, idx) => (
+            <div 
+              key={idx}
+              className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
+                alert.type === 'warning' 
+                  ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40' 
+                  : 'bg-blue-500/5 border-blue-500/20 hover:border-blue-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                  alert.type === 'warning' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
+                }`}>
+                  {alert.type === 'warning' ? '⚠️' : 'ℹ️'}
+                </div>
+                <div>
+                  <h4 className="font-bold text-white text-sm">{alert.label} ({alert.count})</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">{alert.message}</p>
+                </div>
+              </div>
+              <Link href={alert.link}>
+                <Button variant="secondary" className="py-1 px-3 text-[10px] h-auto">
+                  {alert.linkText}
+                </Button>
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Database Warning */}
       {!dbConfigured && (
