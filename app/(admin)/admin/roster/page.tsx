@@ -33,7 +33,6 @@ export default async function AdminRosterPage() {
   }
 
   // Maps
-  const rosterMap = new Map(rosters.map((r) => [r.id, r]));
   const teamMap = new Map(teams.map((t) => [t.id, t]));
   const gameMap = new Map(games.map((g) => [g.id, g]));
   
@@ -88,7 +87,7 @@ export default async function AdminRosterPage() {
             <Card className="space-y-4">
               <div>
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">1. Register School Team</h2>
-                <p className="text-slate-500 text-[10px] mt-0.5">Add a school to a game's competitive roster.</p>
+                <p className="text-slate-500 text-[10px] mt-0.5">Add a school to a game&apos;s competitive roster.</p>
               </div>
 
               <form action={createTeam} className="space-y-3.5">

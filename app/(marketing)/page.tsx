@@ -6,6 +6,8 @@ import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
+import Button from '@/app/components/ui/Button';
+import Image from 'next/image';
 import {
   galleryImages1,
   galleryImages2,
@@ -13,10 +15,11 @@ import {
   heroContent,
   sectionContent,
 } from '@/app/lib/homepage-data';
-import { getGamesForShowcase, SITE_CONFIG } from '@/app/lib/constants';
+import { getGamesForShowcase, SITE_CONFIG, SOCIAL_LINKS, ROUTES } from '@/app/lib/constants';
 
 export default function HomePage() {
   const games = getGamesForShowcase();
+  const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || '#';
 
   return (
     <>
@@ -27,6 +30,8 @@ export default function HomePage() {
         subtitle={SITE_CONFIG.description}
         backgroundImage={heroContent.backgroundImage}
         size="large"
+        primaryCTA={{ label: 'Join Discord', href: discordLink }}
+        secondaryCTA={{ label: 'Learn More', href: ROUTES.about }}
       />
 
       {/* 2. Live Streaming Section */}
@@ -34,7 +39,23 @@ export default function HomePage() {
         heading={sectionContent.liveStreaming.heading}
         description={sectionContent.liveStreaming.description}
         theme="dark"
-      />
+      >
+        <div className="flex flex-col items-center gap-6">
+          <p className="text-base sm:text-lg leading-relaxed text-center max-w-2xl text-slate-300">
+            {sectionContent.liveStreaming.description}
+          </p>
+          <Button 
+            href={SOCIAL_LINKS.find(l => l.platform === 'twitch')?.url || '#'} 
+            variant="secondary"
+            className="group"
+          >
+            <span className="flex items-center gap-2">
+              Watch on Twitch
+              <span className="w-2 h-2 rounded-full bg-ez-pink animate-pulse" />
+            </span>
+          </Button>
+        </div>
+      </ContentSection>
 
       {/* 3. Photo Gallery #1 */}
       <MediaGrid items={galleryImages1} columns={3} theme="dark" />
@@ -63,10 +84,26 @@ export default function HomePage() {
         description=""
         theme="dark"
       >
-        <div className="max-w-4xl mx-auto space-y-4 text-lg leading-relaxed text-center">
-          {sectionContent.ourStory.paragraphs.map((paragraph, index) => (
-            <p key={index}>{paragraph}</p>
-          ))}
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
+            {sectionContent.ourStory.paragraphs.map((paragraph, index) => (
+              <p key={index} className="text-slate-300">{paragraph}</p>
+            ))}
+            <div className="pt-4">
+              <Button href={ROUTES.about} variant="primary">
+                Read Full Story
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 relative w-full aspect-square max-w-md">
+            <div className="absolute inset-0 bg-ez-pink/20 rounded-full blur-3xl" />
+            <Image
+              src="/images/submark.png"
+              alt="EZ Esports Submark"
+              fill
+              className="object-contain relative z-10 opacity-80"
+            />
+          </div>
         </div>
       </ContentSection>
     </main>

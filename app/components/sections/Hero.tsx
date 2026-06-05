@@ -2,19 +2,29 @@
 
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import Button from '@/app/components/ui/Button';
+
+interface CTA {
+  label: string;
+  href: string;
+}
 
 interface HeroProps {
   title: string;
   subtitle?: string;
   backgroundImage: string;
   size?: 'large' | 'medium';
+  primaryCTA?: CTA;
+  secondaryCTA?: CTA;
 }
 
 export default function Hero({ 
   title, 
   subtitle, 
   backgroundImage, 
-  size = 'medium' 
+  size = 'medium',
+  primaryCTA,
+  secondaryCTA
 }: HeroProps) {
   const isLarge = size === 'large';
   
@@ -62,6 +72,27 @@ export default function Hero({
             >
               {subtitle}
             </motion.p>
+          )}
+
+          {/* CTAs */}
+          {(primaryCTA || secondaryCTA) && isLarge && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
+              className="flex flex-wrap items-center justify-center gap-4 mt-10"
+            >
+              {primaryCTA && (
+                <Button href={primaryCTA.href} variant="primary" className="min-w-[160px]">
+                  {primaryCTA.label}
+                </Button>
+              )}
+              {secondaryCTA && (
+                <Button href={secondaryCTA.href} variant="secondary" className="min-w-[160px]">
+                  {secondaryCTA.label}
+                </Button>
+              )}
+            </motion.div>
           )}
         </div>
       </div>

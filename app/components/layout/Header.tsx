@@ -14,16 +14,22 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full bg-[#080c14]/80 backdrop-blur-md border-b border-slate-800/80">
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="hover:opacity-85 transition-opacity flex items-center">
-            <Image
-              src="/images/logos/wordmark.png"
-              alt={SITE_CONFIG.company}
-              width={160}
-              height={48}
-              className="h-10 w-auto"
-              priority
-            />
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:opacity-85 transition-opacity flex items-center">
+              <Image
+                src="/images/logos/wordmark.png"
+                alt={SITE_CONFIG.company}
+                width={160}
+                height={48}
+                className="h-10 w-auto"
+                priority
+              />
+            </Link>
+            <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse" />
+              <span className="text-[10px] font-bold text-ez-pink uppercase tracking-widest">Live Every Week</span>
+            </div>
+          </div>
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
