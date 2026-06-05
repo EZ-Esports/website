@@ -31,14 +31,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Left Sidebar */}
       <aside className="w-64 bg-[#0b0f19] border-r border-slate-900 flex flex-col shrink-0 z-20">
         {/* Sidebar Header */}
-        <div className="h-16 px-6 border-b border-slate-900 flex items-center justify-between">
+        <div className="h-16 px-6 border-b border-slate-900 flex items-center">
           <Link href="/admin" className="font-extrabold text-xl tracking-tight text-white flex items-center gap-2 cursor-pointer hover:opacity-90">
             <span className="text-white font-extrabold">EZ Admin</span>
           </Link>
-          <span className="text-[10px] bg-slate-900 text-slate-450 font-bold px-2 py-0.5 rounded border border-slate-800 uppercase tracking-wider">
-            CMS v1.0
-          </span>
         </div>
+
 
         {/* Sidebar Items */}
         <nav className="flex-1 py-6 px-3 space-y-1">
