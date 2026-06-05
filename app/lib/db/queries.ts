@@ -50,3 +50,11 @@ export const getCachedNews = unstable_cache(
   ['news-list'],
   { tags: ['news'] }
 );
+
+export const getCachedLeadership = unstable_cache(
+  async () => {
+    return db.select().from(schema.leadership).orderBy(desc(schema.leadership.year));
+  },
+  ['leadership-list'],
+  { tags: ['leadership'] }
+);

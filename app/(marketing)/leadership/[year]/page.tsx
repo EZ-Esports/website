@@ -1,5 +1,5 @@
 // app/(marketing)/leadership/[year]/page.tsx
-import { leadershipByYear } from '@/app/lib/leadership-data';
+import { getCachedLeadership } from '@/app/lib/db/queries';
 import { notFound } from 'next/navigation';
 import type { LeadershipParams } from '@/app/types';
 import { getLeadershipRoute } from '@/app/lib/constants';
@@ -8,10 +8,18 @@ import Card from '@/app/components/ui/Card';
 
 export default async function LeadershipPage({ params }: { params: Promise<LeadershipParams> }) {
   const { year } = await params;
-  const leaders = leadershipByYear[year];
+  let allLeaders: any[] = [];
+  try {
+    allLeaders = await getCachedLeadership();
+  } catch (error) {
+    console.error('Failed to load leadership data', error);
+  }
+
+  const years = Array.from(new Set(allLeaders.map((l) => l.year))).sort().reverse();
+  const leaders = allLeaders.filter((l) => l.year === year);
   
-  // If year doesn't exist in data, show 404
-  if (!leaders) {
+  // If year doesn't exist in data and we have leadership records, show 404
+  if (years.length > 0 && !years.includes(year)) {
     notFound();
   }
 
@@ -30,7 +38,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
 
       {/* Year Selector */}
       <div className="mb-12 flex justify-center gap-2">
-        {Object.keys(leadershipByYear).map((y) => {
+        {years.map((y) => {
           const isActive = y === year;
           return (
             <Link
@@ -50,48 +58,50 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
 
       {/* Leadership Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-        {leaders.map((leader) => (
-          <Card key={leader.name} className="hover:scale-[1.02] duration-300">
-            {/* When you add images, uncomment below and add image to leadership-data.ts */}
-            {/* 
-            <img 
-              src={leader.image} 
-              alt={leader.name}
-              className="w-28 h-28 rounded-full mx-auto mb-6 object-cover border-2 border-ez-pink/20"
-            />
-            */}
-            
-            {/* Placeholder for image */}
-            <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-slate-900 border-2 border-slate-800 flex items-center justify-center text-white">
-              <span className="text-3xl font-extrabold tracking-tight">
-                {leader.name.split(' ').map(n => n[0]).join('')}
-              </span>
-            </div>
+        {leaders.length === 0 ? (
+          <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl col-span-full border border-slate-900">
+            No leadership members registered for {year} yet.
+          </div>
+        ) : (
+          leaders.map((leader) => (
+            <Card key={leader.name} className="hover:scale-[1.02] duration-300">
+              {/* Placeholder for image */}
+              <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-slate-900 border-2 border-slate-800 flex items-center justify-center text-white">
+                <span className="text-3xl font-extrabold tracking-tight">
+                  {leader.name.split(' ').map((n: string) => n[0]).join('')}
+                </span>
+              </div>
 
-            <div className="text-center">
-              <h2 className="text-xl font-bold mb-1 tracking-tight text-white">{leader.name}</h2>
-              <p className="text-ez-pink text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
-              
-              {/* Optional: Add bio */}
-              {leader.bio && (
-                <p className="text-slate-400 text-sm leading-relaxed border-t border-slate-800/80 pt-3 mt-3">{leader.bio}</p>
-              )}
-            </div>
-          </Card>
-        ))}
+              <div className="text-center">
+                <h2 className="text-xl font-bold mb-1 tracking-tight text-white">{leader.name}</h2>
+                <p className="text-ez-pink text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
+                
+                {leader.bio && (
+                  <p className="text-slate-400 text-sm leading-relaxed border-t border-slate-800/80 pt-3 mt-3">{leader.bio}</p>
+                )}
+              </div>
+            </Card>
+          ))
+        )}
       </div>
     </main>
   );
 }
 
-// Generate static pages for each year at build time
+// Generate static params dynamically
 export async function generateStaticParams() {
-  return Object.keys(leadershipByYear).map((year) => ({
-    year,
-  }));
+  try {
+    const allLeaders = await getCachedLeadership();
+    const years = Array.from(new Set(allLeaders.map((l) => l.year)));
+    return years.map((year) => ({
+      year,
+    }));
+  } catch {
+    return [];
+  }
 }
 
-// Optional: Generate metadata for SEO
+// Generate metadata dynamically
 export async function generateMetadata({ params }: { params: Promise<{ year: string }> }) {
   const { year } = await params;
   return {

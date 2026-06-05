@@ -83,3 +83,15 @@ export const newsPosts = pgTable('news_posts', {
 }, (table) => [
   index('news_posts_published_at_idx').on(table.publishedAt),
 ]);
+
+// Leadership team members
+export const leadership = pgTable('leadership', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  role: text('role').notNull(),
+  year: text('year').notNull(), // e.g., "2025"
+  bio: text('bio'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('leadership_year_idx').on(table.year),
+]);

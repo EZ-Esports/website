@@ -8,6 +8,33 @@ async function seed() {
   const { db } = await import('../app/lib/db');
   const schema = await import('../app/lib/db/schema');
 
+  // Seed leadership data if empty
+  try {
+    const existingLeadership = await db.select().from(schema.leadership).limit(1);
+    if (existingLeadership.length === 0) {
+      console.log('Seeding leadership data...');
+      await db.insert(schema.leadership).values([
+        // 2023
+        { name: 'John Doe', role: 'President', year: '2023', bio: 'Leading the organization with vision and dedication.' },
+        { name: 'Jane Smith', role: 'Vice President', year: '2023', bio: 'Driving innovation and strategic growth.' },
+        { name: 'Bob Johnson', role: 'Secretary', year: '2023', bio: 'Ensuring organizational excellence and communication.' },
+        // 2024
+        { name: 'Jane Smith', role: 'President', year: '2024', bio: 'Continuing our mission with renewed energy.' },
+        { name: 'Alice Williams', role: 'Vice President', year: '2024', bio: 'Championing member engagement and community building.' },
+        { name: 'Charlie Brown', role: 'Secretary', year: '2024', bio: 'Managing operations and member relations.' },
+        // 2025
+        { name: 'Alice Williams', role: 'President', year: '2025', bio: 'Leading us into an exciting new chapter.' },
+        { name: 'David Lee', role: 'Vice President', year: '2025', bio: 'Fostering partnerships and expanding our reach.' },
+        { name: 'Emma Davis', role: 'Secretary', year: '2025', bio: 'Streamlining processes and enhancing efficiency.' },
+      ]);
+      console.log('✅ Seeding leadership completed.');
+    } else {
+      console.log('⚠️ Leadership data already seeded. Skipping.');
+    }
+  } catch (error) {
+    console.error('Failed to seed leadership:', error);
+  }
+
   // Check if data is already seeded to prevent duplicating or overwriting active data
   try {
     const existingGames = await db.select().from(schema.games).limit(1);
