@@ -14,7 +14,7 @@ import {
   heroContent,
   sectionContent,
 } from '@/app/lib/homepage-data';
-import { getGamesForShowcase } from '@/app/lib/constants';
+import { getGamesForShowcase, SITE_CONFIG } from '@/app/lib/constants';
 
 export default function HomePage() {
   const games = getGamesForShowcase();
@@ -26,7 +26,9 @@ export default function HomePage() {
       {/* 1. Hero Section */}
       <Hero
         title={heroContent.title}
+        subtitle={SITE_CONFIG.description}
         backgroundImage={heroContent.backgroundImage}
+        size="large"
       />
 
       {/* 2. Live Streaming Section */}

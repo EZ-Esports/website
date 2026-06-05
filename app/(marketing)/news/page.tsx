@@ -51,19 +51,22 @@ export default async function NewsPage() {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {newsItems.length === 0 ? (
-              <div className="text-center p-12 text-gray-500 text-sm bg-gray-800 rounded-lg col-span-full">
+              <div className="text-center p-12 text-slate-400 text-sm bg-slate-900/30 border border-slate-800/60 rounded-xl col-span-full">
                 No league news articles found. Stay tuned for upcoming announcements!
               </div>
             ) : (
               newsItems.map((item) => (
-                <Card key={item.id} className="bg-gray-800 text-white h-full flex flex-col">
+                <Card key={item.id} className="text-white h-full flex flex-col hover:scale-[1.02] transition-all duration-300">
                   <div className="flex-1">
-                    <div className="text-sm text-rose-300 mb-2">{item.category}</div>
-                    <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-                    <p className="text-gray-400 mb-4">{item.excerpt}</p>
+                    <span className="inline-block px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-md bg-ez-pink/10 border border-ez-pink/20 text-ez-pink mb-3">
+                      {item.category}
+                    </span>
+                    <h3 className="text-xl font-bold mb-2 tracking-tight line-clamp-2 hover:text-ez-pink transition-colors cursor-pointer">{item.title}</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-4 line-clamp-3">{item.excerpt}</p>
                   </div>
-                  <div className="text-sm text-gray-500 border-t border-gray-700 pt-4 mt-4">
-                    {item.date}
+                  <div className="text-xs text-slate-500 border-t border-slate-800/80 pt-3 mt-4 flex items-center justify-between">
+                    <span>{item.date}</span>
+                    <span className="text-ez-pink font-semibold hover:underline cursor-pointer">Read More →</span>
                   </div>
                 </Card>
               ))

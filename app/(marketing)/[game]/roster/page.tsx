@@ -70,36 +70,36 @@ export default async function RosterPage({ params }: RosterPageProps) {
       >
         <div className="max-w-6xl mx-auto">
           {/* Roster Table */}
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
+          <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
             {players.length === 0 ? (
-              <div className="text-center p-8 text-gray-500 text-sm">
+              <div className="text-center p-12 text-slate-500 text-sm">
                 No active players registered for this game yet.
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-gray-700">
+              <table className="w-full border-collapse">
+                <thead className="bg-[#0b101d] border-b border-slate-800/80">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Player</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Team</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Bio / Info</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Player</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Role</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Bio / Info</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700">
+                <tbody className="divide-y divide-slate-850">
                   {players.map((player, index) => (
-                    <tr key={index} className="hover:bg-gray-700 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{player.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{player.team}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${
+                    <tr key={index} className="hover:bg-slate-800/10 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-white">{player.name}</td>
+                      <td className="px-6 py-4 text-sm text-slate-300 font-semibold">{player.team}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded border ${
                           player.role === 'Captain' 
-                            ? 'bg-rose-500/10 text-rose-300 border-rose-500/20' 
-                            : 'bg-gray-800 text-gray-300 border-gray-700'
+                            ? 'bg-ez-pink/15 text-ez-pink border-ez-pink/35' 
+                            : 'bg-slate-950/40 text-slate-400 border-slate-800/80'
                         }`}>
                           {player.role}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">{player.stats}</td>
+                      <td className="px-6 py-4 text-sm text-slate-400">{player.stats}</td>
                     </tr>
                   ))}
                 </tbody>

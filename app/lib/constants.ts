@@ -119,12 +119,12 @@ export const THEMES: Record<Theme, Theme> = {
 
 export const THEME_CLASSES: Record<Theme, { bg: string; text: string }> = {
   dark: {
-    bg: 'bg-gray-900',
-    text: 'text-white',
+    bg: 'bg-[#080c14]',
+    text: 'text-slate-100',
   },
   light: {
-    bg: 'bg-rose-50',
-    text: 'text-gray-900',
+    bg: 'bg-[#0d1321] border-y border-white/[0.04]',
+    text: 'text-slate-100',
   },
 } as const;
 

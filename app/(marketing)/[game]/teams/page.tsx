@@ -62,11 +62,11 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
       >
         <div className="max-w-6xl mx-auto">
           {/* Division Filter */}
-          <div className="mb-6 flex gap-2">
-            <button className="px-4 py-2 bg-rose-300 text-gray-900 rounded font-semibold">
+          <div className="mb-8 flex gap-2">
+            <button className="px-5 py-2 text-sm font-bold bg-gradient-to-r from-ez-pink to-ez-purple text-white rounded-lg shadow-md shadow-ez-pink/10 cursor-pointer">
               Varsity
             </button>
-            <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors">
+            <button className="px-5 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
               JV
             </button>
           </div>
@@ -79,16 +79,16 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
               </div>
             ) : (
               teams.map((team) => (
-                <Card key={team.id} className="bg-gray-800 text-white">
+                <Card key={team.id} className="text-white hover:scale-[1.03] transition-all duration-300">
                   <div className="text-center">
                     <div className="mb-4">
-                      <div className="w-20 h-20 mx-auto bg-gray-700 rounded-full flex items-center justify-center">
-                        <span className="text-2xl font-bold">{team.name.charAt(0)}</span>
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-tr from-ez-pink/10 to-ez-purple/20 border border-ez-pink/20 rounded-full flex items-center justify-center text-ez-pink shadow-md shadow-ez-pink/5">
+                        <span className="text-2xl font-extrabold">{team.name.charAt(0)}</span>
                       </div>
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">{team.name}</h3>
-                    <div className="text-gray-400 text-sm mb-1">{team.division}</div>
-                    <div className="text-rose-300 font-bold">{team.record}</div>
+                    <h3 className="text-xl font-bold mb-1 tracking-tight">{team.name}</h3>
+                    <div className="text-gray-400 text-sm mb-2">{team.division} Division</div>
+                    <div className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-sm font-bold">{team.record}</div>
                   </div>
                 </Card>
               ))

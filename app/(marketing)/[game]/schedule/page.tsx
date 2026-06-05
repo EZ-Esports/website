@@ -95,24 +95,24 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
       >
         <div className="max-w-6xl mx-auto">
           {/* Week Navigation */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-8 flex items-center justify-between">
             <div className="flex gap-2">
-              <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors">
+              <button className="px-4 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-300 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
                 ← Previous Week
               </button>
-              <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors">
+              <button className="px-4 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-300 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
                 Next Week →
               </button>
             </div>
-            <div className="text-white">Week 7</div>
+            <div className="text-white text-sm font-bold uppercase tracking-wider bg-slate-900/60 px-3 py-1 rounded-md border border-slate-800/80">Week 7</div>
           </div>
 
           {/* Division Filter */}
-          <div className="mb-6 flex gap-2">
-            <button className="px-4 py-2 bg-rose-300 text-gray-900 rounded font-semibold">
+          <div className="mb-8 flex gap-2">
+            <button className="px-4 py-1.5 text-sm font-bold bg-gradient-to-r from-ez-pink to-ez-purple text-white rounded-lg shadow-md shadow-ez-pink/10 cursor-pointer">
               Varsity
             </button>
-            <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors">
+            <button className="px-4 py-1.5 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
               JV
             </button>
           </div>
@@ -120,30 +120,36 @@ export default async function SchedulePage({ params }: SchedulePageProps) {
           {/* Schedule List */}
           <div className="space-y-4">
             {schedule.length === 0 ? (
-              <div className="text-center p-8 text-gray-500 text-sm bg-gray-800 rounded-lg">
+              <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/30 border border-slate-800/60 rounded-xl">
                 No scheduled match fixtures for this season yet.
               </div>
             ) : (
               schedule.map((match, index) => (
                 <div
                   key={index}
-                  className="bg-gray-800 rounded-lg p-6 flex items-center justify-between"
+                  className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-5 flex items-center justify-between hover:border-slate-750 transition-colors"
                 >
                   <div className="flex-1">
-                    <div className="text-sm text-gray-400 mb-2">
-                      {match.date} • {match.time} • {match.division}
+                    <div className="text-xs text-slate-400 font-semibold mb-1">
+                      {match.date} • {match.time} • {match.division} Division
                     </div>
-                    <div className="text-xl font-semibold text-white">
-                      {match.team1} vs. {match.team2}
+                    <div className="text-lg font-bold text-white tracking-tight">
+                      {match.team1} <span className="text-slate-500 font-medium px-1">vs</span> {match.team2}
                     </div>
                   </div>
                   <div className="text-right">
                     {match.status === 'Completed' ? (
-                      <div className="text-rose-300 font-bold">{match.result}</div>
+                      <span className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-sm font-extrabold">
+                        {match.result}
+                      </span>
                     ) : match.status === 'Live' ? (
-                      <div className="text-emerald-400 font-bold animate-pulse">Live</div>
+                      <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-extrabold animate-pulse">
+                        Live
+                      </span>
                     ) : (
-                      <div className="text-gray-400">Upcoming</div>
+                      <span className="inline-block px-3 py-1 rounded-full bg-slate-900 border border-slate-800/60 text-slate-400 text-xs font-semibold">
+                        Upcoming
+                      </span>
                     )}
                   </div>
                 </div>

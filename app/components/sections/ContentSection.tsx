@@ -46,20 +46,24 @@ export default function ContentSection({
   const shouldUseGrid = hasImage && (hasCustomContent || description);
 
   return (
-    <section className={`${themeClasses} py-16 md:py-24`}>
-      <div className="container mx-auto px-4">
-        <h2 className="text-4xl md:text-5xl font-bold mb-8 text-center">{heading}</h2>
+    <section className={`${themeClasses} py-20 md:py-28 relative z-10`}>
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight uppercase">{heading}</h2>
+          <div className="w-12 h-1 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto rounded-full" />
+        </div>
+        
         {isTextOnly ? (
-          <div className="max-w-4xl mx-auto">
-            <p className="text-lg leading-relaxed text-center">{description}</p>
+          <div className="max-w-4xl mx-auto text-slate-300">
+            <p className="text-base sm:text-lg leading-relaxed text-center">{description}</p>
           </div>
         ) : shouldUseGrid ? (
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="grid md:grid-cols-2 gap-12 items-center text-slate-300">
             {contentOrder}
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
-            {children || <p className="text-lg leading-relaxed text-center">{description}</p>}
+          <div className="max-w-4xl mx-auto text-slate-300">
+            {children || <p className="text-base sm:text-lg leading-relaxed text-center">{description}</p>}
           </div>
         )}
       </div>

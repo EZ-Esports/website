@@ -69,40 +69,50 @@ export default async function StandingsPage({ params }: StandingsPageProps) {
       >
         <div className="max-w-6xl mx-auto">
           {/* Division Filter */}
-          <div className="mb-6 flex gap-2">
-            <button className="px-4 py-2 bg-rose-300 text-gray-900 rounded font-semibold">
+          <div className="mb-8 flex gap-2">
+            <button className="px-5 py-2 text-sm font-bold bg-gradient-to-r from-ez-pink to-ez-purple text-white rounded-lg shadow-md shadow-ez-pink/10 cursor-pointer">
               Varsity
             </button>
-            <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors">
+            <button className="px-5 py-2 text-sm font-bold bg-slate-900 border border-slate-800/80 text-slate-400 rounded-lg hover:text-white hover:border-slate-700 transition-all cursor-pointer">
               JV
             </button>
           </div>
 
           {/* Standings Table */}
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
+          <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
             {standings.length === 0 ? (
-              <div className="text-center p-8 text-gray-500 text-sm">
+              <div className="text-center p-12 text-slate-500 text-sm">
                 No teams registered for this game yet.
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-gray-700">
+              <table className="w-full border-collapse">
+                <thead className="bg-[#0b101d] border-b border-slate-800/80">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Rank</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Team</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">W-L</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Win %</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Games</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rank</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">W-L</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Win %</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Games</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-700">
+                <tbody className="divide-y divide-slate-850">
                   {standings.map((entry) => (
-                    <tr key={entry.rank} className="hover:bg-gray-700 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{entry.rank}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">{entry.team}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{entry.wins}-{entry.losses}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{(entry.winPct * 100).toFixed(1)}%</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{entry.gamesPlayed}</td>
+                    <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-slate-300">
+                        {entry.rank === 1 ? (
+                          <span className="text-yellow-500 text-glow">🏆 1</span>
+                        ) : entry.rank === 2 ? (
+                          <span className="text-slate-400">🥈 2</span>
+                        ) : entry.rank === 3 ? (
+                          <span className="text-amber-600">🥉 3</span>
+                        ) : (
+                          entry.rank
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-ez-pink">{(entry.winPct * 100).toFixed(1)}%</td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.gamesPlayed}</td>
                     </tr>
                   ))}
                 </tbody>

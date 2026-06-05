@@ -1,5 +1,6 @@
 import ContentSection from '@/app/components/sections/ContentSection';
 import Hero from '@/app/components/sections/Hero';
+import Card from '@/app/components/ui/Card';
 
 export default function AboutPage() {
   return (
@@ -14,7 +15,7 @@ export default function AboutPage() {
         description=""
         theme="dark"
       >
-        <div className="max-w-4xl mx-auto space-y-6 text-lg leading-relaxed text-center">
+        <div className="max-w-4xl mx-auto space-y-6 text-base sm:text-lg leading-relaxed text-center text-slate-300">
           <p>
             EZ Esports was founded in November 2021 and developed by various NYC high school student club officers to provide their club members opportunity to compete in an accessible and organized esports league.
           </p>
@@ -33,21 +34,21 @@ export default function AboutPage() {
         theme="light"
       >
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="text-center">
-            <div className="text-4xl font-bold text-rose-300 mb-4">500+</div>
-            <div className="text-xl font-semibold text-gray-900 mb-2">Concurrent Viewers</div>
-            <div className="text-gray-600">Live broadcasts reaching audiences across NYC</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-rose-300 mb-4">100+</div>
-            <div className="text-xl font-semibold text-gray-900 mb-2">Active Players</div>
-            <div className="text-gray-600">Students competing across multiple games</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-rose-300 mb-4">15+</div>
-            <div className="text-xl font-semibold text-gray-900 mb-2">Participating Schools</div>
-            <div className="text-gray-600">High schools from all five boroughs</div>
-          </div>
+          <Card className="text-center hover:scale-[1.03] duration-300">
+            <div className="text-5xl font-black text-ez-pink mb-4 text-glow">500+</div>
+            <div className="text-xl font-bold text-white mb-2">Concurrent Viewers</div>
+            <div className="text-slate-400 text-sm">Live broadcasts reaching audiences across NYC</div>
+          </Card>
+          <Card className="text-center hover:scale-[1.03] duration-300">
+            <div className="text-5xl font-black text-ez-pink mb-4 text-glow">100+</div>
+            <div className="text-xl font-bold text-white mb-2">Active Players</div>
+            <div className="text-slate-400 text-sm">Students competing across multiple games</div>
+          </Card>
+          <Card className="text-center hover:scale-[1.03] duration-300">
+            <div className="text-5xl font-black text-ez-pink mb-4 text-glow">15+</div>
+            <div className="text-xl font-bold text-white mb-2">Participating Schools</div>
+            <div className="text-slate-400 text-sm">High schools from all five boroughs</div>
+          </Card>
         </div>
       </ContentSection>
 
@@ -57,29 +58,26 @@ export default function AboutPage() {
         theme="dark"
       >
         <div className="max-w-4xl mx-auto space-y-6">
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-2xl font-bold text-rose-300 mb-3">Accessibility</h3>
-            <p className="text-gray-300">
+          <Card className="hover:scale-[1.01] duration-300">
+            <h3 className="text-2xl font-black text-ez-pink mb-3">Accessibility</h3>
+            <p className="text-slate-300 leading-relaxed text-sm sm:text-base">
               We believe esports should be accessible to all students, regardless of skill level or background. Our league structure accommodates both varsity and junior varsity divisions.
             </p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-2xl font-bold text-rose-300 mb-3">Community</h3>
-            <p className="text-gray-300">
+          </Card>
+          <Card className="hover:scale-[1.01] duration-300">
+            <h3 className="text-2xl font-black text-ez-pink mb-3">Community</h3>
+            <p className="text-slate-300 leading-relaxed text-sm sm:text-base">
               Building connections between students, schools, and the broader esports community is at the heart of what we do. We foster a supportive and inclusive environment.
             </p>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-2xl font-bold text-rose-300 mb-3">Excellence</h3>
-            <p className="text-gray-300">
+          </Card>
+          <Card className="hover:scale-[1.01] duration-300">
+            <h3 className="text-2xl font-black text-ez-pink mb-3">Excellence</h3>
+            <p className="text-slate-300 leading-relaxed text-sm sm:text-base">
               We strive for excellence in competition, organization, and student development. Our structured leagues and professional streaming infrastructure reflect this commitment.
             </p>
-          </div>
+          </Card>
         </div>
       </ContentSection>
     </main>
   );
 }
-
-
-
