@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import Button from '@/app/components/ui/Button';
 
 interface CTA {
@@ -28,23 +28,34 @@ export default function Hero({
 }: HeroProps) {
   const isLarge = size === 'large';
   
+  const { scrollY } = useScroll();
+  const contentOpacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const contentY = useTransform(scrollY, [0, 300], [0, -40]);
+  const backgroundY = useTransform(scrollY, [0, 500], ['0%', '20%']);
+  
   return (
     <section className={`relative overflow-hidden w-full ${isLarge ? 'h-[75vh]' : 'h-[35vh]'}`}>
       {/* Background Image */}
-      <div className="absolute inset-0 select-none pointer-events-none z-0">
+      <motion.div 
+        style={{ y: backgroundY }}
+        className="absolute inset-0 select-none pointer-events-none z-0"
+      >
         <Image
           src={backgroundImage}
           alt={`${title} hero background`}
           fill
           priority
-          className="object-cover object-center"
+          className="object-cover object-center scale-110"
         />
         {/* Dark Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-[#080c14]" />
-      </div>
+      </motion.div>
 
       {/* Hero Content Container */}
-      <div className="relative z-10 h-full flex items-center justify-center text-center px-4">
+      <motion.div 
+        style={{ opacity: contentOpacity, y: contentY }}
+        className="relative z-10 h-full flex items-center justify-center text-center px-4"
+      >
         <div className="max-w-4xl mx-auto flex flex-col items-center">
           {/* Heading */}
           <motion.h1
@@ -95,8 +106,7 @@ export default function Hero({
             </motion.div>
           )}
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 }
-

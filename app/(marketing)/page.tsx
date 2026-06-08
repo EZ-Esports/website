@@ -6,6 +6,7 @@ import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
+import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import Button from '@/app/components/ui/Button';
 import Image from 'next/image';
 import {
@@ -35,54 +36,66 @@ export default function HomePage() {
       />
 
       {/* 3. Photo Gallery #1 */}
-      <MediaGrid items={galleryImages1} columns={3} theme="dark" />
+      <ScrollReveal>
+        <MediaGrid items={galleryImages1} columns={3} theme="dark" />
+      </ScrollReveal>
 
       {/* 5. Video Showcase */}
-      <VideoShowcase
-        videos={featuredVideos}
-        description={sectionContent.videoShowcase.description}
-      />
+      <ScrollReveal>
+        <VideoShowcase
+          videos={featuredVideos}
+          description={sectionContent.videoShowcase.description}
+        />
+      </ScrollReveal>
 
       {/* 6. Photo Gallery #2 */}
-      <MediaGrid items={galleryImages2} columns={2} theme="dark" />
+      <ScrollReveal>
+        <MediaGrid items={galleryImages2} columns={2} theme="dark" />
+      </ScrollReveal>
 
       {/* 7. Social Bar */}
-      <SocialBar theme="light" />
+      <ScrollReveal>
+        <SocialBar theme="light" />
+      </ScrollReveal>
 
       {/* 8. Competition Games */}
-      <GameShowcase
-        title={sectionContent.gameShowcase.title}
-        games={games}
-      />
+      <ScrollReveal>
+        <GameShowcase
+          title={sectionContent.gameShowcase.title}
+          games={games}
+        />
+      </ScrollReveal>
 
       {/* 9. Our Story */}
-      <ContentSection
-        heading={sectionContent.ourStory.heading}
-        description=""
-        theme="dark"
-      >
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
-            {sectionContent.ourStory.paragraphs.map((paragraph, index) => (
-              <p key={index} className="text-slate-300">{paragraph}</p>
-            ))}
-            <div className="pt-4">
-              <Button href={ROUTES.about} variant="primary">
-                Read Full Story
-              </Button>
+      <ScrollReveal>
+        <ContentSection
+          heading={sectionContent.ourStory.heading}
+          description=""
+          theme="dark"
+        >
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
+            <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
+              {sectionContent.ourStory.paragraphs.map((paragraph, index) => (
+                <p key={index} className="text-slate-300">{paragraph}</p>
+              ))}
+              <div className="pt-4">
+                <Button href={ROUTES.about} variant="primary">
+                  Read Full Story
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 relative w-full aspect-square max-w-md">
+              <div className="absolute inset-0 bg-ez-pink/20 rounded-full blur-3xl" />
+              <Image
+                src="/images/submark.png"
+                alt="EZ Esports Submark"
+                fill
+                className="object-contain relative z-10 opacity-80"
+              />
             </div>
           </div>
-          <div className="flex-1 relative w-full aspect-square max-w-md">
-            <div className="absolute inset-0 bg-ez-pink/20 rounded-full blur-3xl" />
-            <Image
-              src="/images/submark.png"
-              alt="EZ Esports Submark"
-              fill
-              className="object-contain relative z-10 opacity-80"
-            />
-          </div>
-        </div>
-      </ContentSection>
+        </ContentSection>
+      </ScrollReveal>
     </main>
     </>
   );
