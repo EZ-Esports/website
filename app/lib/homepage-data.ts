@@ -39,10 +39,6 @@ export const heroContent = {
 
 // Section content
 export const sectionContent = {
-  liveStreaming: {
-    heading: 'Live Streaming on Twitch.tv',
-    description: 'Get live broadcasts from schools on 500+ concurrent streams',
-  },
   videoShowcase: {
     description: 'Our live broadcasts have reached over 500 concurrent viewers, bringing the excitement of high school esports to audiences across New York City.',
   },

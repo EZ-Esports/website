@@ -34,29 +34,6 @@ export default function HomePage() {
         secondaryCTA={{ label: 'Learn More', href: ROUTES.about }}
       />
 
-      {/* 2. Live Streaming Section */}
-      <ContentSection
-        heading={sectionContent.liveStreaming.heading}
-        description={sectionContent.liveStreaming.description}
-        theme="dark"
-      >
-        <div className="flex flex-col items-center gap-6">
-          <p className="text-base sm:text-lg leading-relaxed text-center max-w-2xl text-slate-300">
-            {sectionContent.liveStreaming.description}
-          </p>
-          <Button 
-            href={SOCIAL_LINKS.find(l => l.platform === 'twitch')?.url || '#'} 
-            variant="secondary"
-            className="group"
-          >
-            <span className="flex items-center gap-2">
-              Watch on Twitch
-              <span className="w-2 h-2 rounded-full bg-ez-pink animate-pulse" />
-            </span>
-          </Button>
-        </div>
-      </ContentSection>
-
       {/* 3. Photo Gallery #1 */}
       <MediaGrid items={galleryImages1} columns={3} theme="dark" />
 
