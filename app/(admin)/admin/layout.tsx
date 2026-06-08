@@ -17,6 +17,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { label: 'News & Announcements', href: '/admin/news', icon: '📰' },
     { label: 'Teams & Rosters', href: '/admin/roster', icon: '👥' },
     { label: 'Leadership Manager', href: '/admin/leadership', icon: '👔' },
+    { label: 'Gallery', href: '/admin/gallery', icon: '🖼️' },
+    { label: 'Sponsors', href: '/admin/sponsors', icon: '🤝' },
+    { label: 'Applications', href: '/admin/applications', icon: '📋' },
+    { label: 'Page Content', href: '/admin/content', icon: '✏️' },
     { label: 'Public Site', href: '/', icon: '🌐' },
   ];
 
@@ -24,6 +28,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const getPageTitle = () => {
     if (pathname === '/admin/news/new') return 'New Article';
     if (pathname.startsWith('/admin/news/')) return 'Edit Article';
+    if (pathname.startsWith('/admin/gallery')) return 'Gallery';
+    if (pathname.startsWith('/admin/sponsors')) return 'Sponsors';
+    if (pathname.startsWith('/admin/applications')) return 'Applications';
+    if (pathname.startsWith('/admin/content')) return 'Page Content';
 
     // Pick the most specific sidebar item whose path prefixes the current route
     const match = sidebarItems

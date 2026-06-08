@@ -8,6 +8,8 @@ import Button from '@/app/components/ui/Button';
 
 export default function ApplyPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     name: '',
     school: '',
@@ -16,9 +18,29 @@ export default function ApplyPage() {
     message: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicantName: form.name,
+          schoolName: form.school,
+          role: form.role,
+          email: form.email,
+          message: form.message,
+        }),
+      });
+      if (!res.ok) throw new Error('Submission failed');
+      setSubmitted(true);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -142,10 +164,13 @@ export default function ApplyPage() {
                 />
               </div>
 
-              <div className="sm:flex sm:justify-start">
-                <Button type="submit" variant="primary" className="w-full sm:w-auto">
-                  Submit Application
+              <div className="sm:flex sm:justify-start flex-col gap-2">
+                <Button type="submit" variant="primary" className="w-full sm:w-auto" disabled={loading}>
+                  {loading ? 'Submitting…' : 'Submit Application'}
                 </Button>
+                {error && (
+                  <p className="text-red-500 text-sm mt-2">{error}</p>
+                )}
               </div>
             </form>
           )}

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Shared audit columns
@@ -10,6 +10,8 @@ const auditColumns = {
 // Enums for type safety and data integrity
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'completed', 'forfeit', 'cancelled']);
 export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
+export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
+export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted']);
 
 // --- CORE ENTITIES ---
 
@@ -175,8 +177,6 @@ export const leadership = pgTable('leadership', {
   index('leadership_year_idx').on(table.year),
 ]);
 
-import { pgView } from 'drizzle-orm/pg-core';
-
 // View for rosters with dynamically computed standings (wins and losses)
 export const rosterStandings = pgView('roster_standings', {
   id: uuid('id'),
@@ -194,4 +194,60 @@ export const rosterStandings = pgView('roster_standings', {
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit')))::int as losses
   FROM rosters r
 `);
+
+// --- PHASE 2 CMS TABLES ---
+
+// Gallery images for public gallery sections
+export const galleryImages = pgTable('gallery_images', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  src: text('src').notNull(),
+  caption: text('caption').notNull().default(''),
+  schoolName: text('school_name').default(''),
+  eventName: text('event_name').default(''),
+  displayOrder: integer('display_order').default(0).notNull(),
+  setId: integer('set_id').default(1).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  ...auditColumns,
+}, (table) => [
+  index('gallery_images_set_id_idx').on(table.setId),
+  index('gallery_images_display_order_idx').on(table.displayOrder),
+]);
+
+export const sponsors = pgTable('sponsors', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  logoUrl: text('logo_url').default(''),
+  tier: sponsorTierEnum('tier').default('community').notNull(),
+  websiteUrl: text('website_url').default(''),
+  isActive: boolean('is_active').default(true).notNull(),
+  displayOrder: integer('display_order').default(0).notNull(),
+  ...auditColumns,
+}, (table) => [
+  index('sponsors_tier_idx').on(table.tier),
+  index('sponsors_display_order_idx').on(table.displayOrder),
+]);
+
+export const schoolApplications = pgTable('school_applications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  applicantName: text('applicant_name').notNull(),
+  schoolName: text('school_name').notNull(),
+  role: text('role').notNull(),
+  email: text('email').notNull(),
+  message: text('message').default(''),
+  status: applicationStatusEnum('status').default('pending').notNull(),
+  submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+  ...auditColumns,
+}, (table) => [
+  index('school_applications_status_idx').on(table.status),
+  index('school_applications_submitted_at_idx').on(table.submittedAt),
+]);
+
+// CMS key-value content blocks for editable page text
+export const pageContent = pgTable('page_content', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: text('key').unique().notNull(),
+  label: text('label').notNull(),
+  content: text('content').notNull().default(''),
+  ...auditColumns,
+});
 
