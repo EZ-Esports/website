@@ -20,13 +20,13 @@ export default function GameSubHeader() {
   ];
 
   return (
-    <div className="border-t border-slate-900 bg-[#080c14]/90 backdrop-blur-md">
+    <div className="border-t border-custom-border/60 bg-background/90 backdrop-blur-md">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-12 overflow-x-auto no-scrollbar">
           {/* Active game label */}
           <div className="flex items-center gap-2 pr-4 shrink-0 select-none">
             <span className="w-1.5 h-1.5 rounded-full bg-ez-pink" />
-            <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+            <span className="text-xs font-black uppercase tracking-widest text-foreground-secondary">
               {gameConfig.shortName} Hub
             </span>
           </div>
@@ -42,7 +42,7 @@ export default function GameSubHeader() {
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all select-none cursor-pointer ${
                     isActive
                       ? 'bg-ez-pink text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
+                      : 'text-foreground-secondary hover:text-foreground hover:bg-background-secondary/50'
                   }`}
                 >
                   {item.label}

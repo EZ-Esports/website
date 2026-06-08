@@ -49,14 +49,14 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
   };
 
   return (
-    <section className={`${themeClasses} py-16 md:py-24 border-t border-slate-900/40`}>
+    <section className={`${themeClasses} py-16 md:py-24 border-t border-custom-border/30`}>
       <div className="container mx-auto px-4">
         <div className={`grid ${GRID_COLUMNS[columns]} gap-6`}>
           {items.map((item, index) => (
             <div 
               key={item.id || index} 
               onClick={() => openLightbox(index)}
-              className="aspect-square rounded-xl overflow-hidden relative border border-slate-900 cursor-pointer transition-all duration-200 group"
+              className="aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group"
             >
               <Image
                 src={item.src}

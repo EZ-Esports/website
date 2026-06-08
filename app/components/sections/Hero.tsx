@@ -47,8 +47,10 @@ export default function Hero({
           priority
           className="object-cover object-center scale-110"
         />
-        {/* Dark Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-[#080c14]" />
+        {/* Theme Responsive Overlay */}
+        <div 
+          className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--hero-overlay-from),var(--hero-overlay-via),var(--background))]" 
+        />
       </motion.div>
 
       {/* Hero Content Container */}
@@ -62,7 +64,7 @@ export default function Hero({
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
-            className={`font-extrabold tracking-tight text-white select-none ${
+            className={`font-extrabold tracking-tight text-foreground select-none ${
               isLarge 
                 ? 'text-4xl sm:text-5xl md:text-6xl leading-none' 
                 : 'text-3xl sm:text-4xl md:text-4xl'
@@ -77,7 +79,7 @@ export default function Hero({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
-              className={`text-slate-300 font-medium max-w-xl mx-auto leading-relaxed mt-6 ${
+              className={`text-foreground-secondary font-medium max-w-xl mx-auto leading-relaxed mt-6 ${
                 isLarge ? 'text-base md:text-lg' : 'text-sm md:text-base'
               }`}
             >

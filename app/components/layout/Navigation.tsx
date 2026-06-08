@@ -35,7 +35,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
     `transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 md:py-1 px-3 text-sm md:text-[15px] font-medium tracking-wide ${
       isActive 
         ? 'text-ez-pink bg-ez-pink/5 border-l-2 border-ez-pink md:border-l-0 md:bg-transparent md:px-0' 
-        : 'text-slate-300 hover:text-white md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'
+        : 'text-foreground-secondary hover:text-foreground md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'
     }`;
 
 
@@ -56,7 +56,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
             <div key="games" className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="text-slate-300 hover:text-white md:hover:text-ez-pink transition-all focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 px-3 flex items-center justify-between md:justify-start gap-1 w-full text-left font-medium border border-slate-800/80 md:border-0 bg-slate-950/20 md:bg-transparent cursor-pointer"
+                className="text-foreground-secondary hover:text-foreground md:hover:text-ez-pink transition-all focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 px-3 flex items-center justify-between md:justify-start gap-1 w-full text-left font-medium border border-custom-border/80 md:border-0 bg-background-secondary/20 md:bg-transparent cursor-pointer"
                 aria-expanded={isDropdownOpen}
                 aria-haspopup="true"
               >
@@ -72,7 +72,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-full md:w-52 bg-[#0d121f]/95 backdrop-blur-md rounded-xl shadow-2xl border border-slate-800/80 z-50 p-1">
+                <div className="absolute top-full left-0 mt-2 w-full md:w-52 bg-background-secondary/95 backdrop-blur-md rounded-xl shadow-2xl border border-custom-border/80 z-50 p-1">
                   <div className="py-1 space-y-1">
                     {GAME_SLUGS.map((slug) => {
                       const game = GAMES[slug];
@@ -84,7 +84,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
                           className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
                             isActive
                               ? 'bg-ez-pink/10 text-ez-pink font-bold'
-                              : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                              : 'text-foreground-secondary hover:bg-background-secondary/60 hover:text-foreground'
                           }`}
                           onClick={handleLinkClick}
                         >

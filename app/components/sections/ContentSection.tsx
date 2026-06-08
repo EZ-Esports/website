@@ -49,19 +49,19 @@ export default function ContentSection({
     <section className={`${themeClasses} py-16 md:py-24 relative z-10`}>
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white uppercase">{heading}</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground uppercase">{heading}</h2>
         </div>
         
         {isTextOnly ? (
-          <div className="max-w-4xl mx-auto text-slate-300">
+          <div className="max-w-4xl mx-auto text-foreground-secondary">
             <p className="text-base sm:text-lg leading-relaxed text-center">{description}</p>
           </div>
         ) : shouldUseGrid ? (
-          <div className="grid md:grid-cols-2 gap-12 items-center text-slate-300">
+          <div className="grid md:grid-cols-2 gap-12 items-center text-foreground-secondary">
             {contentOrder}
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto text-slate-300">
+          <div className="max-w-4xl mx-auto text-foreground-secondary">
             {children || <p className="text-base sm:text-lg leading-relaxed text-center">{description}</p>}
           </div>
         )}

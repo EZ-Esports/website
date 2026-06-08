@@ -20,7 +20,7 @@ interface SocialLinksProps {
 export default function SocialLinks({ className, iconClassName }: SocialLinksProps) {
   const iconStyles =
     iconClassName ??
-    'w-10 h-10 rounded-full bg-slate-900 border border-slate-800/80 flex items-center justify-center text-slate-300 hover:text-white hover:border-ez-pink/50 hover:bg-ez-pink/10 hover:scale-110 hover:shadow-lg hover:shadow-ez-pink/10 transition-all duration-300';
+    'w-10 h-10 rounded-full bg-background-secondary border border-custom-border/80 flex items-center justify-center text-foreground-secondary hover:text-white hover:border-transparent hover:bg-ez-pink hover:scale-110 hover:shadow-lg hover:shadow-ez-pink/20 transition-all duration-300';
 
   return (
     <div className={className ?? 'flex justify-center items-center gap-4'}>

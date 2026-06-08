@@ -25,10 +25,10 @@ export default function Button({
   href,
   ...props
 }: ButtonProps) {
-  const baseStyles = "px-6 py-2.5 rounded-lg font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 active:scale-95 cursor-pointer text-sm md:text-base inline-flex items-center justify-center";
+  const baseStyles = "px-6 py-2.5 rounded-lg font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background active:scale-95 cursor-pointer text-sm md:text-base inline-flex items-center justify-center";
   const variantStyles = {
     primary: "bg-ez-pink text-white hover:bg-rose-700 border border-transparent focus:ring-ez-pink/40",
-    secondary: "bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-850 border border-slate-800/80 focus:ring-slate-700",
+    secondary: "bg-foreground text-background hover:opacity-90 border border-transparent focus:ring-foreground/40",
   };
 
   const combinedClassName = `${baseStyles} ${variantStyles[variant]} ${className}`;

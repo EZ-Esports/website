@@ -2,12 +2,30 @@
 
 :root {
   --background: #080c14; /* Midnight navy dark background */
+  --background-secondary: #0d1321;
   --foreground: #f8fafc; /* Soft white foreground */
+  --foreground-secondary: #cbd5e1; /* slate-300 */
+  --border-color: #1e293b; /* slate-800 */
+  --hero-overlay-from: rgba(0, 0, 0, 0.65);
+  --hero-overlay-via: rgba(0, 0, 0, 0.3);
+}
+
+.theme-pink-white {
+  --background: #ffffff; /* Pure white background */
+  --background-secondary: #fff5f7; /* Soft pink background */
+  --foreground: #09090b; /* Deep black text */
+  --foreground-secondary: #4b5563; /* grey-600 secondary text */
+  --border-color: #ffe4e6; /* rose-100 border */
+  --hero-overlay-from: rgba(225, 29, 72, 0.12); /* light pink tint */
+  --hero-overlay-via: rgba(255, 255, 255, 0.85); /* fade to white */
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
   --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-custom-border: var(--border-color);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   
@@ -32,11 +50,11 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #080c14;
+  background: var(--background);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: var(--border-color);
   border-radius: 9999px;
 }
 
@@ -60,6 +78,22 @@ input[type="number"] {
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.theme-pink-white .glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(225, 29, 72, 0.1);
+}
+
+/* Invert logos for light pink-white theme */
+.theme-pink-white img[src*="wordmark.png"],
+.theme-pink-white img[src*="logo.png"] {
+  filter: invert(1) brightness(0.1) contrast(1.2);
+}
+
+.theme-pink-white img[src*="submark.png"] {
+  filter: invert(1) sepia(1) saturate(10) hue-rotate(320deg) brightness(0.7); /* Pink tint */
 }
 
 

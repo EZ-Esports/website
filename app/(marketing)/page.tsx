@@ -76,7 +76,7 @@ export default function HomePage() {
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
             <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
               {sectionContent.ourStory.paragraphs.map((paragraph, index) => (
-                <p key={index} className="text-slate-300">{paragraph}</p>
+                <p key={index} className="text-foreground-secondary">{paragraph}</p>
               ))}
               <div className="pt-4">
                 <Button href={ROUTES.about} variant="primary">

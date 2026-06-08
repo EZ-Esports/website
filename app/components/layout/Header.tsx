@@ -11,7 +11,7 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#080c14]/80 backdrop-blur-md border-b border-slate-800/80">
+    <header className="sticky top-0 z-50 w-full bg-background/85 backdrop-blur-md border-b border-custom-border/60">
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
@@ -21,7 +21,7 @@ export default function Header() {
                 alt={SITE_CONFIG.company}
                 width={160}
                 height={48}
-                className="h-10 w-auto"
+                className="h-10 w-auto filter-none theme-pink-white:invert-[0.1]"
                 priority
               />
             </Link>
@@ -39,7 +39,7 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden text-slate-300 hover:text-white focus:outline-none p-1.5 cursor-pointer rounded border border-slate-800 bg-slate-950/40"
+            className="md:hidden text-foreground-secondary hover:text-foreground focus:outline-none p-1.5 cursor-pointer rounded border border-custom-border bg-background-secondary/40"
             aria-expanded={isOpen}
             aria-label="Toggle Navigation Menu"
           >
@@ -57,7 +57,7 @@ export default function Header() {
 
         {/* Mobile Navigation Drawer */}
         {isOpen && (
-          <div className="md:hidden py-4 border-t border-slate-800/40 animate-fade-in bg-[#080c14]/95">
+          <div className="md:hidden py-4 border-t border-custom-border/40 animate-fade-in bg-background/95">
             <Navigation onNavigate={() => setIsOpen(false)} />
           </div>
         )}

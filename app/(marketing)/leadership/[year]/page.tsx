@@ -27,11 +27,11 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
     <main className="container mx-auto px-4 py-20">
       {/* Page Header */}
       <div className="mb-12 text-center">
-        <h1 className="text-4xl sm:text-5xl font-black mb-4 tracking-tight uppercase">
+        <h1 className="text-4xl sm:text-5xl font-black mb-4 tracking-tight uppercase text-foreground">
           {year} Leadership Team
         </h1>
-        <div className="w-12 h-0.5 bg-slate-700 mx-auto rounded-full mb-4" />
-        <p className="text-slate-400 font-medium">
+        <div className="w-12 h-0.5 bg-custom-border mx-auto rounded-full mb-4" />
+        <p className="text-foreground-secondary font-medium">
           Meet the leaders who guide our organization
         </p>
       </div>
@@ -47,7 +47,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
               className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
                 isActive
                   ? 'bg-ez-pink text-white font-bold scale-105 shadow-none'
-                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+                  : 'bg-background-secondary border border-custom-border/80 text-foreground-secondary hover:text-foreground hover:bg-background'
               }`}
             >
               {y}
@@ -59,25 +59,25 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
       {/* Leadership Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {leaders.length === 0 ? (
-          <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl col-span-full border border-slate-900">
+          <div className="p-16 text-center text-foreground-secondary text-sm bg-background-secondary/20 rounded-2xl col-span-full border border-custom-border">
             No leadership members registered for {year} yet.
           </div>
         ) : (
           leaders.map((leader) => (
             <Card key={leader.name} className="hover:scale-[1.02] duration-300">
               {/* Placeholder for image */}
-              <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-slate-900 border-2 border-slate-800 flex items-center justify-center text-white">
+              <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-background border-2 border-custom-border flex items-center justify-center text-foreground">
                 <span className="text-3xl font-extrabold tracking-tight">
                   {leader.name.split(' ').map((n: string) => n[0]).join('')}
                 </span>
               </div>
 
               <div className="text-center">
-                <h2 className="text-xl font-bold mb-1 tracking-tight text-white">{leader.name}</h2>
+                <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
                 <p className="text-ez-pink text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
                 
                 {leader.bio && (
-                  <p className="text-slate-400 text-sm leading-relaxed border-t border-slate-800/80 pt-3 mt-3">{leader.bio}</p>
+                  <p className="text-foreground-secondary text-sm leading-relaxed border-t border-custom-border/80 pt-3 mt-3">{leader.bio}</p>
                 )}
               </div>
             </Card>

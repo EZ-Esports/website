@@ -17,10 +17,10 @@ const gameIdToSlug: Record<string, GameSlug> = {
 
 export default function GameShowcase({ title, games }: GameShowcaseProps) {
   return (
-    <section className="bg-[#080c14] text-white py-16 md:py-24 border-t border-slate-900/40">
+    <section className="bg-background text-foreground py-16 md:py-24 border-t border-custom-border/30">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">{title}</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{title}</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {games.map((game, index) => {
@@ -29,7 +29,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
             
             const content = (
               <div
-                className="aspect-video relative rounded-xl overflow-hidden group cursor-pointer border border-slate-900 transition-all duration-200"
+                className="aspect-video relative rounded-xl overflow-hidden group cursor-pointer border border-custom-border/80 hover:border-ez-pink/60 transition-all duration-200"
                 role="img"
                 aria-label={`${game.title} game`}
               >
