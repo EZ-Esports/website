@@ -223,9 +223,9 @@ export default async function LeagueOfLegendsHubPage() {
             <span className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-xs font-bold uppercase tracking-widest mb-4">
               Upcoming Match
             </span>
-            <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">{nextMatch.date}</div>
-            <div className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">{nextMatch.teams}</div>
-            <div className="text-slate-400 text-sm font-medium mb-6">{nextMatch.division} Division</div>
+            <div className="text-xs text-foreground-secondary font-bold uppercase tracking-wider mb-2">{nextMatch.date}</div>
+            <div className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">{nextMatch.teams}</div>
+            <div className="text-foreground-secondary text-sm font-medium mb-6">{nextMatch.division} Division</div>
             
             <div className="flex justify-center">
               <Link href={getGameSubRoute('league-of-legends', 'schedule')}>
@@ -248,7 +248,7 @@ export default async function LeagueOfLegendsHubPage() {
             return (
               <div 
                 key={index} 
-                className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-5 flex items-center justify-between hover:border-slate-700/60 transition-colors"
+                className="bg-black/65 border border-zinc-900 rounded-xl p-5 flex items-center justify-between hover:border-zinc-800 transition-colors"
               >
                 <div>
                   <div className="text-xs text-slate-400 font-medium mb-1">{match.date} • {match.division} Division</div>
@@ -281,9 +281,9 @@ export default async function LeagueOfLegendsHubPage() {
         theme="light"
       >
         <div className="max-w-4xl mx-auto mb-10">
-          <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
+          <div className="bg-black border border-zinc-900 rounded-2xl overflow-hidden shadow-2xl shadow-black/20">
             <table className="w-full border-collapse">
-              <thead className="bg-[#0b101d] border-b border-slate-800/80">
+              <thead className="bg-zinc-950 border-b border-zinc-900">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rank</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
@@ -291,10 +291,10 @@ export default async function LeagueOfLegendsHubPage() {
                   <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Win %</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-850">
+              <tbody className="divide-y divide-zinc-900">
                 {topTeams.map((entry) => {
                   return (
-                    <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
+                    <tr key={entry.rank} className="hover:bg-zinc-900/40 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-slate-300">
                         {entry.rank === 1 ? (
                           <span className="text-yellow-500 font-bold">🏆 1</span>
