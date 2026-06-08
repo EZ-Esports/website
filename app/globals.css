@@ -16,8 +16,8 @@
   --foreground: #09090b; /* Deep black text */
   --foreground-secondary: #4b5563; /* grey-600 secondary text */
   --border-color: #ffe4e6; /* rose-100 border */
-  --hero-overlay-from: rgba(225, 29, 72, 0.12); /* light pink tint */
-  --hero-overlay-via: rgba(255, 255, 255, 0.85); /* fade to white */
+  --hero-overlay-from: rgba(0, 0, 0, 0.75); /* dark esports overlay */
+  --hero-overlay-via: rgba(0, 0, 0, 0.45); /* fade to transparent/background */
 }
 
 @theme inline {

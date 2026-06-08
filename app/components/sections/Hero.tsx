@@ -64,7 +64,7 @@ export default function Hero({
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
-            className={`font-extrabold tracking-tight text-foreground select-none ${
+            className={`font-extrabold tracking-tight text-white select-none ${
               isLarge 
                 ? 'text-4xl sm:text-5xl md:text-6xl leading-none' 
                 : 'text-3xl sm:text-4xl md:text-4xl'
@@ -79,7 +79,7 @@ export default function Hero({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
-              className={`text-foreground-secondary font-medium max-w-xl mx-auto leading-relaxed mt-6 ${
+              className={`text-slate-200 font-medium max-w-xl mx-auto leading-relaxed mt-6 ${
                 isLarge ? 'text-base md:text-lg' : 'text-sm md:text-base'
               }`}
             >

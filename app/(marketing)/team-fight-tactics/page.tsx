@@ -248,11 +248,11 @@ export default async function TFTHubPage() {
             return (
               <div 
                 key={index} 
-                className="bg-black/65 border border-zinc-900 rounded-xl p-5 flex items-center justify-between hover:border-zinc-800 transition-colors"
+                className="bg-background-secondary/80 border border-custom-border/80 rounded-xl p-5 flex items-center justify-between hover:border-ez-pink/50 transition-all duration-300"
               >
                 <div>
-                  <div className="text-xs text-slate-400 font-medium mb-1">{match.date} • {match.division} Division</div>
-                  <div className="text-white text-lg font-bold tracking-tight">{match.teams}</div>
+                  <div className="text-xs text-foreground-secondary font-medium mb-1">{match.date} • {match.division} Division</div>
+                  <div className="text-foreground text-lg font-bold tracking-tight">{match.teams}</div>
                 </div>
                 <div>
                   <span className={`inline-block px-3.5 py-1 rounded-full text-sm font-extrabold ${

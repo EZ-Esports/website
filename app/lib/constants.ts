@@ -119,8 +119,8 @@ export const THEMES: Record<Theme, Theme> = {
 
 export const THEME_CLASSES: Record<Theme, { bg: string; text: string }> = {
   dark: {
-    bg: 'bg-zinc-950',
-    text: 'text-slate-100',
+    bg: 'bg-background',
+    text: 'text-foreground',
   },
   light: {
     bg: 'bg-background-secondary border-y border-custom-border/30',

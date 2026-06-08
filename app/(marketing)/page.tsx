@@ -55,7 +55,7 @@ export default function HomePage() {
 
       {/* 7. Social Bar */}
       <ScrollReveal>
-        <SocialBar theme="dark" />
+        <SocialBar theme="light" />
       </ScrollReveal>
 
       {/* 8. Competition Games */}
