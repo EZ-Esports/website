@@ -15,7 +15,7 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -23,8 +23,16 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsDropdownOpen(false);
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleLinkClick = () => {
@@ -65,7 +73,7 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
                     : 'text-white/80 hover:text-white md:hover:text-ez-pink border-white/20 bg-white/10'
                 }`}
                 aria-expanded={isDropdownOpen}
-                aria-haspopup="true"
+                aria-haspopup="listbox"
               >
                 <span>Games</span>
                 <svg

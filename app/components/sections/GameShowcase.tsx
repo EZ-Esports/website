@@ -30,8 +30,6 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
             const content = (
               <div
                 className="aspect-video relative rounded-xl overflow-hidden group cursor-pointer border border-custom-border/80 hover:border-ez-pink/60 transition-all duration-200"
-                role="img"
-                aria-label={`${game.title} game`}
               >
                 <Image
                   src={game.imageUrl}
@@ -43,7 +41,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" aria-hidden="true" />
                 <div className="absolute bottom-0 left-0 right-0 p-5 flex flex-col justify-end h-1/2">
                   <h3 className="text-white text-lg font-bold mb-1 tracking-tight">{game.title}</h3>
-                  <div className="inline-flex items-center gap-1 text-ez-pink text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all duration-200">
+                  <div aria-hidden="true" className="inline-flex items-center gap-1 text-ez-pink text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all duration-200">
                     Explore Game <span className="text-sm">→</span>
                   </div>
                 </div>

@@ -37,6 +37,18 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
     setSelectedImageIndex(null);
   };
 
+  useEffect(() => {
+    if (selectedImageIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') setSelectedImageIndex(i => i === null ? null : (i + 1) % items.length);
+      if (e.key === 'ArrowLeft') setSelectedImageIndex(i => i === null ? null : (i - 1 + items.length) % items.length);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedImageIndex, items.length]);
+
   const navigateLightbox = (direction: 'next' | 'prev', e: React.MouseEvent) => {
     e.stopPropagation();
     if (selectedImageIndex === null) return;
@@ -53,9 +65,13 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
       <div className="container mx-auto px-4">
         <div className={`grid ${GRID_COLUMNS[columns]} gap-6`}>
           {items.map((item, index) => (
-            <div 
-              key={item.id || index} 
+            <div
+              key={item.id || index}
               onClick={() => openLightbox(index)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openLightbox(index)}
+              role="button"
+              tabIndex={0}
+              aria-label={`View photo: ${item.alt}`}
               className="aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group"
             >
               <Image

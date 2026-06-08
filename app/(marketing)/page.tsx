@@ -24,7 +24,7 @@ export default function HomePage() {
 
   return (
     <>
-      <main>
+      <main id="main-content">
       {/* 1. Hero Section */}
       <Hero
         title={heroContent.title}

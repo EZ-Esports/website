@@ -53,7 +53,7 @@ export default function Hero({
       >
         <Image
           src={backgroundImage}
-          alt={`${title} hero background`}
+          alt=""
           fill
           priority
           className="object-cover object-center scale-110"
@@ -87,7 +87,7 @@ export default function Hero({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
-                className="font-black tracking-tight text-foreground select-none text-3xl sm:text-4xl md:text-5xl leading-tight"
+                className="font-black tracking-tight text-foreground text-3xl sm:text-4xl md:text-5xl leading-tight"
               >
                 {renderTitle(title)}
               </motion.h1>
@@ -133,7 +133,7 @@ export default function Hero({
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
-              className="font-black tracking-tight text-white select-none text-2xl sm:text-3xl md:text-4xl"
+              className="font-black tracking-tight text-white text-2xl sm:text-3xl md:text-4xl"
             >
               {renderTitle(title)}
             </motion.h1>
