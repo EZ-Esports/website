@@ -13,6 +13,6 @@ export async function addSponsor(formData: FormData) {
   if (!name) return;
 
   await db.insert(schema.sponsors).values({ name, logoUrl, tier, websiteUrl, displayOrder });
-  revalidateTag('sponsors');
+  revalidateTag('sponsors', {});
   revalidatePath('/admin/sponsors');
 }

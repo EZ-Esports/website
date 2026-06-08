@@ -14,6 +14,6 @@ export async function addGalleryImage(formData: FormData) {
   if (!src) return;
 
   await db.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, setId, displayOrder });
-  revalidateTag('gallery-images');
+  revalidateTag('gallery-images', {});
   revalidatePath('/admin/gallery');
 }
