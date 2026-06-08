@@ -7,9 +7,10 @@ import { ROUTES, GAMES, GAME_SLUGS, getGameRoute } from '@/app/lib/constants';
 
 interface NavigationProps {
   onNavigate?: () => void;
+  isDarkText?: boolean;
 }
 
-export default function Navigation({ onNavigate }: NavigationProps) {
+export default function Navigation({ onNavigate, isDarkText = true }: NavigationProps) {
   const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -35,7 +36,9 @@ export default function Navigation({ onNavigate }: NavigationProps) {
     `transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 md:py-1 px-3 text-sm md:text-[15px] font-medium tracking-wide ${
       isActive 
         ? 'text-ez-pink bg-ez-pink/5 border-l-2 border-ez-pink md:border-l-0 md:bg-transparent md:px-0' 
-        : 'text-foreground-secondary hover:text-foreground md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'
+        : isDarkText
+          ? 'text-foreground-secondary hover:text-foreground md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'
+          : 'text-white/80 hover:text-white md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'
     }`;
 
 
@@ -56,7 +59,11 @@ export default function Navigation({ onNavigate }: NavigationProps) {
             <div key="games" className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="text-foreground-secondary hover:text-foreground md:hover:text-ez-pink transition-all focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 px-3 flex items-center justify-between md:justify-start gap-1 w-full text-left font-medium border border-custom-border/80 md:border-0 bg-background-secondary/20 md:bg-transparent cursor-pointer"
+                className={`transition-all focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 px-3 flex items-center justify-between md:justify-start gap-1 w-full text-left font-medium border md:border-0 md:bg-transparent cursor-pointer ${
+                  isDarkText
+                    ? 'text-foreground-secondary hover:text-foreground md:hover:text-ez-pink border-custom-border/80 bg-background-secondary/20'
+                    : 'text-white/80 hover:text-white md:hover:text-ez-pink border-white/20 bg-white/10'
+                }`}
                 aria-expanded={isDropdownOpen}
                 aria-haspopup="true"
               >

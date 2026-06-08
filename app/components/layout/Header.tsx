@@ -2,16 +2,49 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { SITE_CONFIG } from '@/app/lib/constants';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+    
+    // Set initial scroll state in case of reload
+    handleScroll();
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Check if current page features a dark hero banner at the top
+  const hasHero = pathname === '/' || 
+                  pathname === '/about' || 
+                  pathname === '/news' || 
+                  pathname === '/valorant' || 
+                  pathname === '/league-of-legends' || 
+                  pathname === '/team-fight-tactics';
+
+  const isDarkText = isScrolled || !hasHero;
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background/85 backdrop-blur-md border-b border-custom-border/60">
+    <header className={`sticky top-0 z-50 w-full transition-all duration-350 ease-in-out ${
+      isScrolled 
+        ? 'bg-background/90 backdrop-blur-md border-b border-custom-border/60 py-1 sm:py-2' 
+        : 'bg-transparent border-b-0 py-4 sm:py-6'
+    }`}>
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
@@ -21,7 +54,7 @@ export default function Header() {
                 alt={SITE_CONFIG.company}
                 width={160}
                 height={48}
-                className="h-10 w-auto filter-none theme-pink-white:invert-[0.1]"
+                className={`h-10 w-auto transition-all duration-300 ${isDarkText ? 'filter invert brightness-0 contrast-100' : 'filter-none'}`}
                 priority
               />
             </Link>
@@ -33,13 +66,17 @@ export default function Header() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            <Navigation />
+            <Navigation isDarkText={isDarkText} />
           </div>
 
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden text-foreground-secondary hover:text-foreground focus:outline-none p-1.5 cursor-pointer rounded border border-custom-border bg-background-secondary/40"
+            className={`md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-colors ${
+              isDarkText
+                ? 'text-foreground-secondary hover:text-foreground border-custom-border bg-background-secondary/40'
+                : 'text-white/95 hover:text-ez-pink border-white/20 bg-white/10'
+            }`}
             aria-expanded={isOpen}
             aria-label="Toggle Navigation Menu"
           >
@@ -57,8 +94,10 @@ export default function Header() {
 
         {/* Mobile Navigation Drawer */}
         {isOpen && (
-          <div className="md:hidden py-4 border-t border-custom-border/40 animate-fade-in bg-background/95">
-            <Navigation onNavigate={() => setIsOpen(false)} />
+          <div className={`md:hidden py-4 border-t border-custom-border/40 animate-fade-in rounded-b-xl px-2 ${
+            isDarkText ? 'bg-background/95' : 'bg-zinc-950/95'
+          }`}>
+            <Navigation isDarkText={isDarkText} onNavigate={() => setIsOpen(false)} />
           </div>
         )}
       </nav>
