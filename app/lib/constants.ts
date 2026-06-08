@@ -21,6 +21,8 @@ export const ROUTES = {
   leadership: '/leadership',
   archives: '/archives',
   support: '#support',
+  apply: '/apply',
+  sponsors: '/sponsors',
 } as const;
 
 export const getLeadershipRoute = (year: string): string => `${ROUTES.leadership}/${year}`;
@@ -44,7 +46,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
   },
   'team-fight-tactics': {
     slug: 'team-fight-tactics',
-    displayName: 'Team Fight Tactics',
+    displayName: 'Teamfight Tactics',
     shortName: 'TFT',
     imageUrl: '/images/games/tft-banner.png',
   },
@@ -165,6 +167,8 @@ export const FOOTER_LINKS = [
   { label: 'API Terms', href: '#' },
   { label: 'Press', href: '#' },
   { label: 'FAQs', href: '#' },
+  { label: 'Apply', href: '/apply' },
+  { label: 'Sponsors', href: '/sponsors' },
   { label: 'Staff Login', href: '/login' },
 ] as const;
 

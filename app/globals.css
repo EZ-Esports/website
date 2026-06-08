@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #080c14; /* Midnight navy dark background */
-  --background-secondary: #0d1321;
+  --background: #111111; /* Midnight graphite dark background */
+  --background-secondary: #1c1c1c; /* Elevated graphite, matching v1 background */
   --foreground: #f8fafc; /* Soft white foreground */
-  --foreground-secondary: #cbd5e1; /* slate-300 */
-  --border-color: #1e293b; /* slate-800 */
-  --hero-overlay-from: rgba(0, 0, 0, 0.65);
-  --hero-overlay-via: rgba(0, 0, 0, 0.3);
+  --foreground-secondary: #a1a1aa; /* zinc-400 */
+  --border-color: #27272a; /* zinc-800 */
+  --hero-overlay-from: rgba(17, 17, 17, 0.85);
+  --hero-overlay-via: rgba(17, 17, 17, 0.4);
 }
 
-.theme-pink-white {
-  --background: #ffffff; /* Pure white background */
-  --background-secondary: #fff5f7; /* Soft pink background */
-  --foreground: #09090b; /* Deep black text */
-  --foreground-secondary: #4b5563; /* grey-600 secondary text */
-  --border-color: #ffe4e6; /* rose-100 border */
-  --hero-overlay-from: rgba(0, 0, 0, 0.75); /* dark esports overlay */
-  --hero-overlay-via: rgba(0, 0, 0, 0.45); /* fade to transparent/background */
+.theme-graphite {
+  --background: #111111;
+  --background-secondary: #1c1c1c;
+  --foreground: #f8fafc;
+  --foreground-secondary: #a1a1aa;
+  --border-color: #27272a;
+  --hero-overlay-from: rgba(17, 17, 17, 0.85);
+  --hero-overlay-via: rgba(17, 17, 17, 0.4);
 }
 
 @theme inline {
@@ -32,7 +32,7 @@
   /* Brand colors - Premium Sleek */
   --color-ez-pink: #e11d48; /* Premium Rose Crimson */
   --color-ez-purple: #4f46e5; /* Premium Indigo Violet */
-  --color-ez-black: #080c14;
+  --color-ez-black: #111111;
   --color-ez-white: #ffffff;
 }
 
@@ -75,25 +75,15 @@ input[type="number"] {
 
 /* Glassmorphism utility */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(28, 28, 28, 0.45);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.theme-pink-white .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
+.theme-graphite .glass-panel {
+  background: rgba(28, 28, 28, 0.55);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(225, 29, 72, 0.1);
-}
-
-/* Invert logos for light pink-white theme */
-.theme-pink-white img[src*="wordmark.png"],
-.theme-pink-white img[src*="logo.png"] {
-  filter: invert(1) brightness(0.1) contrast(1.2);
-}
-
-.theme-pink-white img[src*="submark.png"] {
-  filter: invert(1) sepia(1) saturate(10) hue-rotate(320deg) brightness(0.7); /* Pink tint */
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 

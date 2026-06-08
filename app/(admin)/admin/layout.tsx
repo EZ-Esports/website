@@ -34,11 +34,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#080c14] flex text-slate-100 font-sans">
+    <div className="min-h-screen bg-[#111111] flex text-zinc-100 font-sans">
       {/* Left Sidebar */}
-      <aside className="w-64 bg-[#0b0f19] border-r border-slate-900 flex flex-col shrink-0 z-20">
+      <aside className="w-64 bg-[#1a1a1a] border-r border-zinc-800 flex flex-col shrink-0 z-20">
         {/* Sidebar Header */}
-        <div className="h-16 px-6 border-b border-slate-900 flex items-center">
+        <div className="h-16 px-6 border-b border-zinc-800 flex items-center">
           <Link href="/admin" className="font-extrabold text-xl tracking-tight text-white flex items-center gap-2 cursor-pointer hover:opacity-90">
             <span className="text-white font-extrabold">EZ Admin</span>
           </Link>
@@ -69,11 +69,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-900 bg-slate-950/20">
+        <div className="p-4 border-t border-zinc-800 bg-zinc-950/20">
           <form action={logout}>
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 hover:text-white border border-slate-800/80 hover:border-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 hover:text-white border border-zinc-800/80 hover:border-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
             >
               <span>🚪</span>
               <span>Sign Out</span>
@@ -85,7 +85,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-900 bg-[#080c14]/40 backdrop-blur-md flex items-center px-8 justify-between z-10">
+        <header className="h-16 border-b border-zinc-800 bg-[#111111]/40 backdrop-blur-md flex items-center px-8 justify-between z-10">
           <div className="flex items-center gap-4">
             <h2 className="text-base font-bold text-white uppercase tracking-wider">{getPageTitle()}</h2>
           </div>

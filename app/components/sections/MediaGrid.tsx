@@ -5,6 +5,34 @@ import Image from 'next/image';
 import type { Image as ImageType, Theme, GridColumns } from '@/app/types';
 import { THEME_CLASSES, GRID_COLUMNS } from '@/app/lib/constants';
 
+function GalleryItem({ item, index, onOpen }: { item: ImageType; index: number; onOpen: (i: number) => void }) {
+  const [errored, setErrored] = useState(false);
+  if (errored) return null;
+  return (
+    <div
+      onClick={() => onOpen(index)}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(index)}
+      role="button"
+      tabIndex={0}
+      aria-label={`View photo: ${item.alt}`}
+      className="aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group"
+    >
+      <Image
+        src={item.src}
+        alt={item.alt}
+        fill
+        className="object-cover transition-opacity duration-300 group-hover:opacity-80"
+        onError={() => setErrored(true)}
+      />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+        <span className="text-white bg-ez-pink px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
+          View Photo
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface MediaGridProps {
   items: ImageType[];
   columns?: GridColumns;
@@ -65,27 +93,7 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
       <div className="container mx-auto px-4">
         <div className={`grid ${GRID_COLUMNS[columns]} gap-6`}>
           {items.map((item, index) => (
-            <div
-              key={item.id || index}
-              onClick={() => openLightbox(index)}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openLightbox(index)}
-              role="button"
-              tabIndex={0}
-              aria-label={`View photo: ${item.alt}`}
-              className="aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group"
-            >
-              <Image
-                src={item.src}
-                alt={item.alt}
-                fill
-                className="object-cover transition-opacity duration-300 group-hover:opacity-80"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                <span className="text-white bg-ez-pink px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
-                  View Photo
-                </span>
-              </div>
-            </div>
+            <GalleryItem key={item.id || index} item={item} index={index} onOpen={openLightbox} />
           ))}
         </div>
       </div>

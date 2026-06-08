@@ -80,9 +80,7 @@ export default async function AdminDashboardPage() {
             Manage public competition schedules, teams, roster lists, and news announcements from a single, unified database dashboard.
           </p>
         </div>
-        <Link href="/" className="shrink-0">
-          <Button variant="primary">View Public Website</Button>
-        </Link>
+        <Button href="/" variant="primary" className="shrink-0">View Public Website</Button>
       </Card>
 
       {/* Actionable Alerts */}
@@ -108,11 +106,9 @@ export default async function AdminDashboardPage() {
                   <p className="text-slate-400 text-xs mt-0.5">{alert.message}</p>
                 </div>
               </div>
-              <Link href={alert.link}>
-                <Button variant="secondary" className="py-1 px-3 text-[10px] h-auto">
-                  {alert.linkText}
-                </Button>
-              </Link>
+              <Button href={alert.link} variant="secondary" className="py-1 px-3 text-[10px] h-auto shrink-0">
+                {alert.linkText}
+              </Button>
             </div>
           ))}
         </div>
@@ -187,40 +183,40 @@ export default async function AdminDashboardPage() {
       <Card className="hover:border-slate-800/80 hover:shadow-none duration-300">
         <h3 className="text-lg font-black text-white mb-6 uppercase tracking-wider">Quick Administration Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-slate-700 transition-all duration-300 group">
+          <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-zinc-700 transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-slate-300 transition-colors">Create Match Event</h4>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Schedule new matches, input results, and manage varsity matchups.</p>
+              <h4 className="font-extrabold text-white group-hover:text-zinc-300 transition-colors">Create Match Event</h4>
+              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Schedule new matches, input results, and manage varsity matchups.</p>
             </div>
             <Link
               href="/admin/matches"
-              className="text-xs font-bold text-slate-300 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-zinc-300 hover:text-white hover:underline uppercase tracking-wider"
             >
               Go to Match Manager →
             </Link>
           </div>
 
-          <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-slate-700 transition-all duration-300 group">
+          <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-zinc-700 transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-slate-300 transition-colors">Write Announcement</h4>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Publish new blog posts, tournament notifications, and updates for clubs.</p>
+              <h4 className="font-extrabold text-white group-hover:text-zinc-300 transition-colors">Write Announcement</h4>
+              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Publish new blog posts, tournament notifications, and updates for clubs.</p>
             </div>
             <Link
               href="/admin/news"
-              className="text-xs font-bold text-slate-300 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-zinc-300 hover:text-white hover:underline uppercase tracking-wider"
             >
               Create News Article →
             </Link>
           </div>
 
-          <div className="bg-[#0b0f19]/80 border border-slate-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-slate-700 transition-all duration-300 group">
+          <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-zinc-700 transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-slate-300 transition-colors">Roster Management</h4>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Assign student captain roles, register roster lists, and edit player profiles.</p>
+              <h4 className="font-extrabold text-white group-hover:text-zinc-300 transition-colors">Roster Management</h4>
+              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Assign student captain roles, register roster lists, and edit player profiles.</p>
             </div>
             <Link
               href="/admin/roster"
-              className="text-xs font-bold text-slate-300 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-zinc-300 hover:text-white hover:underline uppercase tracking-wider"
             >
               Manage Roster Lists →
             </Link>

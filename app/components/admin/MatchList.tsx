@@ -65,14 +65,13 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
       const searchStr = `${homeTeam?.name} ${awayTeam?.name} ${game?.shortName} ${season?.name}`.toLowerCase();
       const matchesSearch = filter === '' || searchStr.includes(filter.toLowerCase());
       const matchesStatus = statusFilter === 'all' || match.status === statusFilter;
-
       return matchesSearch && matchesStatus;
     });
   }, [initialMatches, filter, statusFilter, rosterMap, teamMap, seasonMap, gameMap]);
 
   return (
-    <div className="bg-[#0d1321]/60 border border-slate-900 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
-      <div className="px-6 py-5 border-b border-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="bg-[#1c1c1c]/60 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
+      <div className="px-6 py-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-base font-bold text-white uppercase tracking-wider">Match Fixtures</h2>
         
         <div className="flex items-center gap-3">
@@ -81,12 +80,12 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
             placeholder="Search teams or games..." 
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 w-full sm:w-48"
+            className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 w-full sm:w-48"
           />
           <select 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 cursor-pointer"
+            className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="scheduled">Scheduled</option>

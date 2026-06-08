@@ -4,6 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { SiTwitch } from 'react-icons/si';
 import { SITE_CONFIG } from '@/app/lib/constants';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
@@ -13,6 +15,9 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
 
+  const { scrollY } = useScroll();
+  const headerBg = useTransform(scrollY, [0, 80], ['rgba(17,17,17,0)', 'rgba(17,17,17,0.92)']);
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 20) {
@@ -21,30 +26,35 @@ export default function Header() {
         setIsScrolled(false);
       }
     };
-    
+
     // Set initial scroll state in case of reload
     handleScroll();
-    
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Check if current page features a dark hero banner at the top
-  const hasHero = pathname === '/' || 
-                  pathname === '/about' || 
-                  pathname === '/news' || 
-                  pathname === '/valorant' || 
-                  pathname === '/league-of-legends' || 
-                  pathname === '/team-fight-tactics';
+  const hasHero = pathname === '/' ||
+                  pathname === '/about' ||
+                  pathname === '/news' ||
+                  pathname === '/valorant' ||
+                  pathname === '/league-of-legends' ||
+                  pathname === '/team-fight-tactics' ||
+                  pathname === '/apply' ||
+                  pathname === '/sponsors';
 
   const isDarkText = isScrolled || !hasHero;
 
   return (
-    <header className={`sticky top-0 z-50 w-full transition-all duration-350 ease-in-out ${
-      isScrolled 
-        ? 'bg-background/90 backdrop-blur-md border-b border-custom-border/60 py-1 sm:py-2' 
-        : 'bg-transparent border-b-0 py-4 sm:py-6'
-    }`}>
+    <motion.header
+      style={{ backgroundColor: headerBg }}
+      className={`sticky top-0 z-50 w-full transition-all duration-300 ease-in-out backdrop-blur-md ${
+        isScrolled
+          ? 'border-b border-custom-border/60 py-1 sm:py-2'
+          : 'border-b-0 py-4 sm:py-6'
+      }`}
+    >
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
@@ -54,16 +64,23 @@ export default function Header() {
                 alt={SITE_CONFIG.company}
                 width={160}
                 height={48}
-                className={`h-10 w-auto transition-all duration-300 ${isDarkText ? 'filter invert brightness-0 contrast-100' : 'filter-none'}`}
+                className="h-10 w-auto transition-all duration-300"
                 priority
               />
             </Link>
-            <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse" />
-              <span className="text-[10px] font-bold text-ez-pink uppercase tracking-widest">Live Every Week</span>
-            </div>
+            <Link
+              href="https://www.twitch.tv/ezesportsNYC"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Watch EZ Esports live on Twitch (opens in new tab)"
+              className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 hover:bg-ez-pink/20 transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse" aria-hidden="true" />
+              <SiTwitch className="w-3 h-3 text-ez-pink" aria-hidden="true" />
+              <span className="text-[10px] font-bold text-ez-pink uppercase tracking-widest" aria-hidden="true">Watch Live</span>
+            </Link>
           </div>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
             <Navigation isDarkText={isDarkText} />
@@ -102,6 +119,6 @@ export default function Header() {
         )}
       </nav>
       <GameSubHeader />
-    </header>
+    </motion.header>
   );
 }

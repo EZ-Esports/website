@@ -6,6 +6,7 @@ import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
+import AudienceCTAs from '@/app/components/sections/AudienceCTAs';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import Button from '@/app/components/ui/Button';
 import Image from 'next/image';
@@ -32,8 +33,9 @@ export default function HomePage() {
         backgroundImage={heroContent.backgroundImage}
         size="large"
         primaryCTA={{ label: 'Join Discord', href: discordLink }}
-        secondaryCTA={{ label: 'Learn More', href: ROUTES.about }}
       />
+
+      <AudienceCTAs />
 
       {/* 3. Photo Gallery #1 */}
       <ScrollReveal>

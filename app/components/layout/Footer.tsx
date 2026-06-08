@@ -4,7 +4,7 @@ import SocialLinks from '@/app/components/ui/SocialLinks';
 
 export default function Footer() {
   return (
-    <footer className="bg-[#04060a] border-t border-slate-900 text-slate-400">
+    <footer className="bg-[#0a0a0c] border-t border-zinc-800/80 text-zinc-400">
       <div className="container mx-auto px-4 py-12">
         {/* Powered by section */}
         <div className="text-center mb-6">
@@ -27,7 +27,7 @@ export default function Footer() {
         </div>
 
         {/* Divider */}
-        <div className="w-16 h-0.5 bg-slate-900 mx-auto mb-8 rounded-full" />
+        <div className="w-16 h-0.5 bg-zinc-800 mx-auto mb-8 rounded-full" />
 
         {/* Social icons */}
         <SocialLinks />
