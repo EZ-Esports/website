@@ -1,7 +1,10 @@
-import { db } from './index';
-import * as schema from './schema';
+import { loadEnvConfig } from '@next/env';
+loadEnvConfig(process.cwd());
 
 async function seedPhase2() {
+  // Dynamic imports ensure DATABASE_URL is set before the postgres client initializes
+  const { db } = await import('./index');
+  const schema = await import('./schema');
   // Gallery images — descriptive captions for the 11 existing images
   const gallerySet1 = [
     { src: '/images/gallery/gallery-1.png', caption: 'Stuyvesant vs Bronx Science match — Spring 2022', schoolName: 'Stuyvesant High School', eventName: 'Spring 2022 Championship', setId: 1, displayOrder: 1 },
