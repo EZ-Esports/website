@@ -92,7 +92,7 @@ export default async function GalleryAdminPage() {
           <div className="sm:col-span-2">
             <button
               type="submit"
-              className="px-6 py-2.5 bg-ez-pink text-white rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer"
+              className="px-6 py-2.5 bg-ez-pink text-ez-black rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer"
             >
               Add Image
             </button>

@@ -130,7 +130,7 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
                 />
               </div>
             </div>
-            <button type="submit" disabled={pending} className="w-full px-3 py-1.5 bg-ez-pink hover:bg-ez-pink/80 font-bold text-xs uppercase tracking-wider rounded-lg text-white transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={pending} className="w-full px-3 py-1.5 bg-ez-pink hover:bg-ez-pink/80 font-bold text-xs uppercase tracking-wider rounded-lg text-ez-black transition-all cursor-pointer disabled:opacity-50">
               {pending ? 'Saving…' : 'Save Changes'}
             </button>
           </form>

@@ -79,7 +79,7 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
               <button
                 type="submit"
                 disabled={isPending}
-                className="px-4 py-2 bg-ez-pink text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-ez-pink/80 transition-all cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-ez-pink text-ez-black rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-ez-pink/80 transition-all cursor-pointer disabled:opacity-50"
               >
                 {isPending ? 'Saving…' : 'Save'}
               </button>

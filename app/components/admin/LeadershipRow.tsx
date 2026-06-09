@@ -58,7 +58,7 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
               </button>
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-ez-pink hover:bg-ez-pink/80 font-bold text-xs uppercase tracking-wider rounded-lg text-white transition-all cursor-pointer"
+                className="px-3 py-1.5 bg-ez-pink hover:bg-ez-pink/80 font-bold text-xs uppercase tracking-wider rounded-lg text-ez-black transition-all cursor-pointer"
               >
                 Save
               </button>
