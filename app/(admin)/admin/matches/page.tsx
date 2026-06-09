@@ -30,17 +30,19 @@ export default async function AdminMatchesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card className="hover:shadow-none duration-300">
-        <h1 className="text-xl font-bold text-white uppercase tracking-wider">Matches & Standings Manager</h1>
-        <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-          Schedule matches and input scores to recalculate team standings and seasonal records.
-        </p>
-      </Card>
+      <p className="text-slate-400 text-sm">
+        Schedule matches and input scores to recalculate team standings and seasonal records.
+      </p>
 
       {dbError && (
-        <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg">
-          Failed to fetch match configurations. Please ensure database migrations have run.
+        <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6">
+          <div className="flex items-start gap-4">
+            <span className="text-2xl select-none">⚠️</span>
+            <div>
+              <h3 className="text-base font-bold text-amber-400">Database Error</h3>
+              <p className="text-slate-300 text-sm leading-relaxed mt-0.5">Failed to fetch match configurations. Please ensure database migrations have run.</p>
+            </div>
+          </div>
         </div>
       )}
 
