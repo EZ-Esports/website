@@ -12,6 +12,7 @@ export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'com
 export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
 export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted']);
+export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
 
 // --- CORE ENTITIES ---
 
@@ -32,7 +33,12 @@ export const schools = pgTable('schools', {
   name: text('name').unique().notNull(),
   slug: text('slug').unique().notNull(),
   logoUrl: text('logo_url'),
+  storageKey: text('storage_key'),
+  websiteUrl: text('website_url').default(''),
+  isActive: boolean('is_active').default(true).notNull(),
+  displayOrder: integer('display_order').default(0).notNull(),
   joinedAt: timestamp('joined_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
   ...auditColumns,
 });
 
@@ -158,7 +164,9 @@ export const newsPosts = pgTable('news_posts', {
   excerpt: text('excerpt'),
   content: text('content').notNull(), // markdown/rich-text
   category: text('category').notNull(), // "Announcement", "Tournament", etc.
-  publishedAt: timestamp('published_at').defaultNow().notNull(),
+  status: newsStatusEnum('status').default('published').notNull(),
+  publishedAt: timestamp('published_at'),
+  deletedAt: timestamp('deleted_at'),
   ...auditColumns,
 }, (table) => [
   index('news_posts_published_at_idx').on(table.publishedAt),
@@ -173,6 +181,7 @@ export const leadership = pgTable('leadership', {
   role: text('role').notNull(),
   year: text('year').notNull(), // e.g., "2025"
   bio: text('bio'),
+  deletedAt: timestamp('deleted_at'),
   ...auditColumns,
 }, (table) => [
   index('leadership_year_idx').on(table.year),
@@ -209,6 +218,7 @@ export const galleryImages = pgTable('gallery_images', {
   setId: integer('set_id').default(1).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   storageKey: text('storage_key'),
+  deletedAt: timestamp('deleted_at'),
   ...auditColumns,
 }, (table) => [
   index('gallery_images_set_id_idx').on(table.setId),
@@ -224,6 +234,7 @@ export const sponsors = pgTable('sponsors', {
   isActive: boolean('is_active').default(true).notNull(),
   displayOrder: integer('display_order').default(0).notNull(),
   storageKey: text('storage_key'),
+  deletedAt: timestamp('deleted_at'),
   ...auditColumns,
 }, (table) => [
   index('sponsors_tier_idx').on(table.tier),
@@ -253,4 +264,14 @@ export const pageContent = pgTable('page_content', {
   content: text('content').notNull().default(''),
   ...auditColumns,
 });
+
+// Audit trail for page content edits
+export const pageContentHistory = pgTable('page_content_history', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  contentKey: text('content_key').notNull(),
+  previousContent: text('previous_content').notNull(),
+  savedAt: timestamp('saved_at').defaultNow().notNull(),
+}, (table) => [
+  index('page_content_history_key_idx').on(table.contentKey),
+]);
 

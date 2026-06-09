@@ -1,5 +1,3 @@
-'use client';
-
 import Hero from '@/app/components/sections/Hero';
 import ContentSection from '@/app/components/sections/ContentSection';
 import MediaGrid from '@/app/components/sections/MediaGrid';
@@ -7,6 +5,7 @@ import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
 import AudienceCTAs from '@/app/components/sections/AudienceCTAs';
+import SchoolWall from '@/app/components/sections/SchoolWall';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import Button from '@/app/components/ui/Button';
 import Image from 'next/image';
@@ -19,7 +18,7 @@ import {
 } from '@/app/lib/homepage-data';
 import { getGamesForShowcase, SITE_CONFIG, SOCIAL_LINKS, ROUTES } from '@/app/lib/constants';
 
-export default function HomePage() {
+export default async function HomePage() {
   const games = getGamesForShowcase();
   const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || 'https://discord.com/invite/RajSZqNyvu';
 
@@ -57,12 +56,17 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 5. Photo Gallery #1 */}
+      {/* 5. School Wall */}
+      <ScrollReveal>
+        <SchoolWall />
+      </ScrollReveal>
+
+      {/* 6. Photo Gallery #1 */}
       <ScrollReveal>
         <MediaGrid items={galleryImages1} columns={3} theme="dark" />
       </ScrollReveal>
 
-      {/* 6. Video Showcase */}
+      {/* 7. Video Showcase */}
       <ScrollReveal>
         <VideoShowcase
           videos={featuredVideos}
@@ -70,12 +74,12 @@ export default function HomePage() {
         />
       </ScrollReveal>
 
-      {/* 7. Photo Gallery #2 */}
+      {/* 8. Photo Gallery #2 */}
       <ScrollReveal>
         <MediaGrid items={galleryImages2} columns={2} theme="dark" />
       </ScrollReveal>
 
-      {/* 8. Our Story */}
+      {/* 9. Our Story */}
       <ScrollReveal>
         <ContentSection
           eyebrow="Our Story"
@@ -107,7 +111,7 @@ export default function HomePage() {
         </ContentSection>
       </ScrollReveal>
 
-      {/* 9. Social Bar */}
+      {/* 10. Social Bar */}
       <ScrollReveal>
         <SocialBar theme="dark" />
       </ScrollReveal>

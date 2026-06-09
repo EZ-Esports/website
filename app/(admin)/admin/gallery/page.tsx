@@ -1,12 +1,13 @@
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { isNull } from 'drizzle-orm';
 import { addGalleryImage } from './actions';
 import GalleryImageCard from '@/app/components/admin/GalleryImageCard';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 
 async function getAllGalleryImages() {
-  return db.select().from(schema.galleryImages).orderBy(schema.galleryImages.setId, schema.galleryImages.displayOrder);
+  return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.setId, schema.galleryImages.displayOrder);
 }
 
 export default async function GalleryAdminPage() {

@@ -4,7 +4,7 @@ import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import Card from '@/app/components/ui/Card';
 
 interface TeamsPageProps {
@@ -57,7 +57,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         })
         .from(schema.teams)
         .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-        .where(eq(schema.teams.gameId, gameRow[0].id))
+        .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)))
         .orderBy(schema.schools.name);
 
       const teamIds = teamsList.map((t) => t.id);

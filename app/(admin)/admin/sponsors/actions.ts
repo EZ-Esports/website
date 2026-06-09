@@ -73,7 +73,7 @@ export async function deleteSponsor(id: string) {
     .where(eq(schema.sponsors.id, id))
     .limit(1);
 
-  await db.delete(schema.sponsors).where(eq(schema.sponsors.id, id));
+  await db.update(schema.sponsors).set({ deletedAt: new Date() }).where(eq(schema.sponsors.id, id));
 
   // Remove from Supabase Storage if a key exists
   if (row?.storageKey) {

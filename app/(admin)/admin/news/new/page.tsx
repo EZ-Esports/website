@@ -92,9 +92,19 @@ export default function AdminNewNewsPostPage() {
             </Link>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-white text-slate-950 hover:bg-slate-200 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+              name="intent"
+              value="draft"
+              className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
             >
-              Publish Post
+              Save as Draft
+            </button>
+            <button
+              type="submit"
+              name="intent"
+              value="publish"
+              className="px-5 py-2.5 bg-ez-pink text-ez-black hover:bg-ez-pink/80 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+            >
+              Publish
             </button>
           </div>
         </form>

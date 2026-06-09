@@ -4,7 +4,7 @@ import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import Link from 'next/link';
 
 interface SchedulePageProps {
@@ -64,7 +64,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
           })
           .from(schema.teams)
           .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-          .where(eq(schema.teams.gameId, gameRow[0].id));
+          .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)));
 
         const teamMap = new Map(teamsList.map((t) => [t.id, t]));
         const teamIds = teamsList.map((t) => t.id);

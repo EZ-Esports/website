@@ -75,8 +75,8 @@ export async function updateSchool(id: string, formData: FormData) {
 
 export async function deleteSchool(id: string) {
   try {
-    // School deletion will cascade teams, but restrict members
-    await db.delete(schema.schools).where(eq(schema.schools.id, id));
+    // Soft delete: mark as deleted rather than removing the row (recoverable, no hard cascade)
+    await db.update(schema.schools).set({ deletedAt: new Date() }).where(eq(schema.schools.id, id));
     safeRevalidateTag('schools');
     safeRevalidateTag('teams');
     safeRevalidateTag('rosters');
@@ -85,9 +85,9 @@ export async function deleteSchool(id: string) {
     return { success: true };
   } catch (error: any) {
     console.error(error);
-    return { 
-      success: false, 
-      error: 'Cannot delete school. Please ensure all members are removed from this school first.' 
+    return {
+      success: false,
+      error: 'Could not delete school. Please try again.'
     };
   }
 }

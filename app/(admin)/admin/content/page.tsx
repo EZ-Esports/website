@@ -1,7 +1,7 @@
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { asc } from 'drizzle-orm';
+import { asc, desc } from 'drizzle-orm';
 import ContentEditor from './ContentEditor';
 
 const keyPageMap: Record<string, string> = {
@@ -20,11 +20,16 @@ async function getAllPageContent() {
 
 export default async function ContentAdminPage() {
   let rows: Awaited<ReturnType<typeof getAllPageContent>> = [];
+  let historyRows: { id: string; contentKey: string; previousContent: string; savedAt: Date }[] = [];
   let dbConfigured = false;
 
   try {
     if (process.env.DATABASE_URL) {
       rows = await getAllPageContent();
+      historyRows = await db
+        .select()
+        .from(schema.pageContentHistory)
+        .orderBy(desc(schema.pageContentHistory.savedAt));
       dbConfigured = true;
     }
   } catch {
@@ -76,6 +81,7 @@ export default async function ContentAdminPage() {
                   label={row.label}
                   contentKey={row.key}
                   initialContent={row.content}
+                  history={historyRows.filter((h) => h.contentKey === row.key)}
                 />
               </div>
             ))}

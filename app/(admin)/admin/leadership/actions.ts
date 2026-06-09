@@ -44,7 +44,7 @@ export async function updateLeader(id: string, year: string, formData: FormData)
 }
 
 export async function deleteLeader(id: string, year: string) {
-  await db.delete(schema.leadership).where(eq(schema.leadership.id, id));
+  await db.update(schema.leadership).set({ deletedAt: new Date() }).where(eq(schema.leadership.id, id));
 
   // Revalidate query cache and public pages
   revalidateTag('leadership', 'max');

@@ -1,12 +1,13 @@
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { isNull } from 'drizzle-orm';
 import { addSponsor } from './actions';
 import SponsorRow from '@/app/components/admin/SponsorRow';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 
 async function getAllSponsors() {
-  return db.select().from(schema.sponsors).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
+  return db.select().from(schema.sponsors).where(isNull(schema.sponsors.deletedAt)).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
 }
 
 

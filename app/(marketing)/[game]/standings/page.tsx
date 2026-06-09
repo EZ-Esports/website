@@ -4,7 +4,7 @@ import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, desc, inArray, and } from 'drizzle-orm';
+import { eq, desc, inArray, and, isNull } from 'drizzle-orm';
 import Link from 'next/link';
 
 interface StandingsPageProps {
@@ -50,7 +50,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
         })
         .from(schema.teams)
         .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-        .where(eq(schema.teams.gameId, gameRow[0].id));
+        .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)));
 
       const teamIds = teamRows.map((t) => t.id);
       const teamMap = new Map(teamRows.map((t) => [t.id, t]));

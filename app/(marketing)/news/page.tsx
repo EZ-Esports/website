@@ -3,7 +3,7 @@ import Hero from '@/app/components/sections/Hero';
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { desc } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 
 export default async function NewsPage() {
   interface NewsItem {
@@ -19,6 +19,7 @@ export default async function NewsPage() {
     const postRows = await db
       .select()
       .from(schema.newsPosts)
+      .where(and(eq(schema.newsPosts.status, 'published'), isNull(schema.newsPosts.deletedAt)))
       .orderBy(desc(schema.newsPosts.publishedAt));
 
     newsItems = postRows.map((p) => ({
@@ -26,12 +27,14 @@ export default async function NewsPage() {
       title: p.title,
       category: p.category,
       excerpt: p.excerpt || '',
-      date: new Date(p.publishedAt).toLocaleDateString('en-US', {
-        timeZone: 'America/New_York',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      }),
+      date: p.publishedAt
+        ? new Date(p.publishedAt).toLocaleDateString('en-US', {
+            timeZone: 'America/New_York',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        : '',
     }));
   } catch (error) {
     console.error('Failed to load news posts from database', error);

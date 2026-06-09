@@ -1,9 +1,9 @@
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { updateNewsPost } from '../actions';
+import { updateNewsPost, unpublishNewsPost } from '../actions';
 import Card from '@/app/components/ui/Card';
 
 interface EditNewsPageProps {
@@ -18,7 +18,7 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
     const posts = await db
       .select()
       .from(schema.newsPosts)
-      .where(eq(schema.newsPosts.id, id))
+      .where(and(eq(schema.newsPosts.id, id), isNull(schema.newsPosts.deletedAt)))
       .limit(1);
     currentPost = posts[0];
   } catch {
@@ -31,7 +31,23 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
 
   const categories = ['Announcement', 'Tournament', 'Partnership', 'Recognition', 'Update'];
   const updateNewsPostWithId = updateNewsPost.bind(null, id);
+  const unpublishNewsPostWithId = unpublishNewsPost.bind(null, id);
   const inputClass = "w-full px-4 py-2.5 bg-slate-950 border border-slate-800/80 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all text-sm";
+
+  const statusBadge =
+    currentPost.status === 'published' ? (
+      <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-green-500/10 text-green-400 border border-green-500/20">
+        Published
+      </span>
+    ) : currentPost.status === 'draft' ? (
+      <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+        Draft
+      </span>
+    ) : (
+      <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-zinc-800 text-zinc-500 border border-zinc-700">
+        Archived
+      </span>
+    );
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -43,9 +59,12 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
       </div>
 
       <Card className="p-8 space-y-6 hover:shadow-none hover:border-slate-800/80 duration-300">
-        <div>
-          <h1 className="text-2xl font-black text-white uppercase tracking-wider">Edit Announcement</h1>
-          <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">Modify properties and updates for your published post.</p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-black text-white uppercase tracking-wider">Edit Announcement</h1>
+            <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">Modify properties and updates for your post.</p>
+          </div>
+          <div className="shrink-0 mt-1">{statusBadge}</div>
         </div>
 
         <form action={updateNewsPostWithId} className="space-y-6">
@@ -114,22 +133,70 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-slate-900 pt-6">
+          <div className="flex justify-end gap-3 border-t border-slate-900 pt-6 flex-wrap">
             <Link
               href="/admin/news"
               className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-white text-slate-950 hover:bg-slate-200 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
-            >
-              Save Changes
-            </button>
+            {currentPost.status === 'draft' && (
+              <>
+                <button
+                  type="submit"
+                  name="intent"
+                  value="draft"
+                  className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="submit"
+                  name="intent"
+                  value="publish"
+                  className="px-5 py-2.5 bg-ez-pink text-ez-black hover:bg-ez-pink/80 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                >
+                  Publish
+                </button>
+              </>
+            )}
+            {currentPost.status === 'published' && (
+              <button
+                type="submit"
+                name="intent"
+                value="publish"
+                className="px-5 py-2.5 bg-ez-pink text-ez-black hover:bg-ez-pink/80 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+              >
+                Save & Keep Published
+              </button>
+            )}
+            {currentPost.status === 'archived' && (
+              <button
+                type="submit"
+                name="intent"
+                value="draft"
+                className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Save as Draft
+              </button>
+            )}
           </div>
         </form>
       </Card>
+
+      {/* Separate unpublish form for published posts — outside the edit form */}
+      {currentPost.status === 'published' && (
+        <div className="flex justify-end">
+          <form action={unpublishNewsPostWithId}>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-yellow-900/20 hover:bg-yellow-900/40 font-bold text-xs uppercase tracking-wider rounded-lg text-yellow-400 border border-yellow-800/30 hover:border-yellow-700/50 transition-all cursor-pointer"
+            >
+              Unpublish Post
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

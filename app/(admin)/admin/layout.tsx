@@ -11,6 +11,7 @@ import {
   HiOutlineUserGroup,
   HiOutlinePhoto,
   HiOutlineCurrencyDollar,
+  HiOutlineAcademicCap,
   HiOutlineClipboardDocument,
   HiOutlinePencilSquare,
   HiOutlineGlobeAlt,
@@ -39,6 +40,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { label: 'Leadership Manager', href: '/admin/leadership', icon: HiOutlineUserGroup },
     { label: 'Gallery', href: '/admin/gallery', icon: HiOutlinePhoto },
     { label: 'Sponsors', href: '/admin/sponsors', icon: HiOutlineCurrencyDollar },
+    { label: 'Schools', href: '/admin/schools', icon: HiOutlineAcademicCap },
     { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
     { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
   ];
@@ -49,6 +51,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     if (pathname.startsWith('/admin/news/')) return 'Edit Article';
     if (pathname.startsWith('/admin/gallery')) return 'Gallery';
     if (pathname.startsWith('/admin/sponsors')) return 'Sponsors';
+    if (pathname.startsWith('/admin/schools')) return 'Schools';
     if (pathname.startsWith('/admin/applications')) return 'Applications';
     if (pathname.startsWith('/admin/content')) return 'Page Content';
 

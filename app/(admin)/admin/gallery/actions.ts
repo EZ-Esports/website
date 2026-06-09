@@ -77,7 +77,7 @@ export async function deleteGalleryImage(id: string) {
     .where(eq(schema.galleryImages.id, id))
     .limit(1);
 
-  await db.delete(schema.galleryImages).where(eq(schema.galleryImages.id, id));
+  await db.update(schema.galleryImages).set({ deletedAt: new Date() }).where(eq(schema.galleryImages.id, id));
 
   // Remove from Supabase Storage if a key exists
   if (row?.storageKey) {
