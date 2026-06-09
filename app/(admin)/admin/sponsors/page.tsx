@@ -2,22 +2,12 @@ import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { addSponsor } from './actions';
+import SponsorRow from '@/app/components/admin/SponsorRow';
 
 async function getAllSponsors() {
   return db.select().from(schema.sponsors).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
 }
 
-const tierLabel: Record<string, string> = {
-  platinum: 'Platinum',
-  gold: 'Gold',
-  community: 'Community',
-};
-
-const tierBadgeClass: Record<string, string> = {
-  platinum: 'bg-slate-300/10 text-slate-300',
-  gold: 'bg-yellow-500/10 text-yellow-400',
-  community: 'bg-blue-500/10 text-blue-400',
-};
 
 export default async function SponsorsAdminPage() {
   let sponsors: Awaited<ReturnType<typeof getAllSponsors>> = [];
@@ -130,39 +120,13 @@ export default async function SponsorsAdminPage() {
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Tier</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Website</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Status</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Order</th>
+                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Order</th>
+                  <th className="text-right text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
                 {sponsors.map((sponsor) => (
-                  <tr key={sponsor.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="py-3 pr-4 font-semibold text-white">{sponsor.name}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${tierBadgeClass[sponsor.tier] ?? 'bg-zinc-800 text-zinc-400'}`}>
-                        {tierLabel[sponsor.tier] ?? sponsor.tier}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      {sponsor.websiteUrl ? (
-                        <a
-                          href={sponsor.websiteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-slate-400 hover:text-white transition-colors truncate max-w-[180px] block"
-                        >
-                          {sponsor.websiteUrl}
-                        </a>
-                      ) : (
-                        <span className="text-zinc-600">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sponsor.isActive ? 'bg-green-500/10 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                        {sponsor.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="py-3 text-slate-400">{sponsor.displayOrder}</td>
-                  </tr>
+                  <SponsorRow key={sponsor.id} sponsor={sponsor} />
                 ))}
               </tbody>
             </table>
