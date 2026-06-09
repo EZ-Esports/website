@@ -1,11 +1,12 @@
 'use server';
-
+import { requireUser } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 
 export async function createMatch(formData: FormData) {
+  await requireUser();
   const seasonId = formData.get('seasonId') as string;
   const homeRosterId = formData.get('homeRosterId') as string;
   const awayRosterId = formData.get('awayRosterId') as string;
@@ -33,6 +34,7 @@ export async function createMatch(formData: FormData) {
 }
 
 export async function updateMatchScore(id: string, formData: FormData) {
+  await requireUser();
   const homeScoreStr = formData.get('homeScore') as string;
   const awayScoreStr = formData.get('awayScore') as string;
   const status = formData.get('status') as any;
@@ -61,6 +63,7 @@ export async function updateMatchScore(id: string, formData: FormData) {
 }
 
 export async function deleteMatch(id: string) {
+  await requireUser();
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
 
   revalidateTag('matches', 'max');

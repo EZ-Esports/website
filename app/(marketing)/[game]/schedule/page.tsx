@@ -4,7 +4,7 @@ import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import Link from 'next/link';
 
 interface SchedulePageProps {
@@ -64,7 +64,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
           })
           .from(schema.teams)
           .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-          .where(eq(schema.teams.gameId, gameRow[0].id));
+          .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)));
 
         const teamMap = new Map(teamsList.map((t) => [t.id, t]));
         const teamIds = teamsList.map((t) => t.id);
@@ -180,7 +180,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
                         {match.result}
                       </span>
                     ) : match.status === 'Live' ? (
-                      <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-extrabold animate-pulse">
+                      <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-extrabold animate-pulse motion-reduce:animate-none">
                         Live
                       </span>
                     ) : (

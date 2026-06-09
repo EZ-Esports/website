@@ -111,7 +111,7 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
                             }`}
                             onClick={handleLinkClick}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-ez-pink animate-pulse' : 'bg-transparent'}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-ez-pink animate-pulse motion-reduce:animate-none' : 'bg-transparent'}`} />
                             <span>{game.displayName}</span>
                           </Link>
                         );

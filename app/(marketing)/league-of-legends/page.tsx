@@ -6,7 +6,7 @@ import ContentSection from '@/app/components/sections/ContentSection';
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 
 export default async function LeagueOfLegendsHubPage() {
   const game = GAMES['league-of-legends'];
@@ -49,7 +49,7 @@ export default async function LeagueOfLegendsHubPage() {
         })
         .from(schema.teams)
         .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-        .where(eq(schema.teams.gameId, gameId));
+        .where(and(eq(schema.teams.gameId, gameId), isNull(schema.schools.deletedAt)));
       const teamMap = new Map(teamRows.map((t) => [t.id, t]));
       const teamIds = teamRows.map((t) => t.id);
 

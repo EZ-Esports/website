@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 
 export const getCachedGames = unstable_cache(
   async () => {
@@ -13,7 +13,11 @@ export const getCachedGames = unstable_cache(
 
 export const getCachedSchools = unstable_cache(
   async () => {
-    return db.select().from(schema.schools);
+    return db
+      .select()
+      .from(schema.schools)
+      .where(and(eq(schema.schools.isActive, true), isNull(schema.schools.deletedAt)))
+      .orderBy(asc(schema.schools.displayOrder), asc(schema.schools.name));
   },
   ['schools-list'],
   { tags: ['schools'] }
@@ -40,7 +44,8 @@ export const getCachedTeams = unstable_cache(
         name: schema.schools.name,
       })
       .from(schema.teams)
-      .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id));
+      .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+      .where(isNull(schema.schools.deletedAt));
   },
   ['teams-list'],
   { tags: ['teams'] }
@@ -80,7 +85,11 @@ export const getCachedPlayers = unstable_cache(
 
 export const getCachedNews = unstable_cache(
   async () => {
-    return db.select().from(schema.newsPosts).orderBy(desc(schema.newsPosts.publishedAt));
+    return db
+      .select()
+      .from(schema.newsPosts)
+      .where(and(eq(schema.newsPosts.status, 'published'), isNull(schema.newsPosts.deletedAt)))
+      .orderBy(desc(schema.newsPosts.publishedAt));
   },
   ['news-list'],
   { tags: ['news'] }
@@ -88,29 +97,14 @@ export const getCachedNews = unstable_cache(
 
 export const getCachedLeadership = unstable_cache(
   async () => {
-    return db.select().from(schema.leadership).orderBy(desc(schema.leadership.year));
+    return db
+      .select()
+      .from(schema.leadership)
+      .where(isNull(schema.leadership.deletedAt))
+      .orderBy(desc(schema.leadership.year));
   },
   ['leadership-list'],
   { tags: ['leadership'] }
-);
-
-export const getCachedGalleryImages = unstable_cache(
-  async (setId?: number) => {
-    if (setId !== undefined) {
-      return db
-        .select()
-        .from(schema.galleryImages)
-        .where(and(eq(schema.galleryImages.isActive, true), eq(schema.galleryImages.setId, setId)))
-        .orderBy(schema.galleryImages.displayOrder);
-    }
-    return db
-      .select()
-      .from(schema.galleryImages)
-      .where(eq(schema.galleryImages.isActive, true))
-      .orderBy(schema.galleryImages.displayOrder);
-  },
-  ['gallery-images'],
-  { tags: ['gallery-images'] }
 );
 
 export const getCachedSponsors = unstable_cache(
@@ -118,7 +112,7 @@ export const getCachedSponsors = unstable_cache(
     db
       .select()
       .from(schema.sponsors)
-      .where(eq(schema.sponsors.isActive, true))
+      .where(and(eq(schema.sponsors.isActive, true), isNull(schema.sponsors.deletedAt)))
       .orderBy(schema.sponsors.tier, schema.sponsors.displayOrder),
   ['sponsors'],
   { tags: ['sponsors'] }

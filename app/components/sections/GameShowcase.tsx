@@ -22,9 +22,9 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
         <div className="text-center mb-12">
           <span className="inline-block text-ez-pink uppercase tracking-widest text-xs font-bold mb-3">Competition</span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground">{title}</h2>
-          <div className="w-12 h-0.5 bg-ez-pink mx-auto mt-4" />
+          <div className="w-12 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto mt-4" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="flex flex-wrap justify-center gap-8 max-w-6xl mx-auto">
           {games.map((game, index) => {
             const gameSlug = game.id ? gameIdToSlug[game.id] : null;
             const href = gameSlug ? getGameRoute(gameSlug) : '#';
@@ -52,14 +52,14 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
 
             if (gameSlug) {
               return (
-                <Link key={game.id || index} href={href} className="block">
+                <Link key={game.id || index} href={href} className="block w-full sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
                   {content}
                 </Link>
               );
             }
 
             return (
-              <div key={game.id || index} className="block">
+              <div key={game.id || index} className="block w-full sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
                 {content}
               </div>
             );

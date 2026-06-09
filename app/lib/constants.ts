@@ -171,11 +171,14 @@ export const FOOTER_LINKS = [
 // Component-Specific Constants
 // ============================================================================
 
-export const GRID_COLUMNS: Record<2 | 3 | 4 | 5, string> = {
-  2: 'grid-cols-2',
-  3: 'grid-cols-2 md:grid-cols-3',
-  4: 'grid-cols-2 md:grid-cols-4',
-  5: 'grid-cols-2 md:grid-cols-5',
+// Per-item width classes for a centered flex-wrap gallery (gap-6 = 1.5rem).
+// Width = (100% - (cols-1) * gap) / cols, so full rows fill edge-to-edge and any
+// partial last row stays centered instead of left-aligned. Mobile is always 2-up.
+export const GALLERY_ITEM_WIDTHS: Record<2 | 3 | 4 | 5, string> = {
+  2: 'w-[calc(50%_-_0.75rem)]',
+  3: 'w-[calc(50%_-_0.75rem)] md:w-[calc(33.333%_-_1rem)]',
+  4: 'w-[calc(50%_-_0.75rem)] md:w-[calc(25%_-_1.125rem)]',
+  5: 'w-[calc(50%_-_0.75rem)] md:w-[calc(20%_-_1.2rem)]',
 } as const;
 
 export const BUTTON_VARIANTS = {

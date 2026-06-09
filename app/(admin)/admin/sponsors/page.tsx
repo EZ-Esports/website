@@ -1,23 +1,15 @@
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { isNull } from 'drizzle-orm';
 import { addSponsor } from './actions';
+import SponsorRow from '@/app/components/admin/SponsorRow';
+import ImageUpload from '@/app/components/admin/ImageUpload';
 
 async function getAllSponsors() {
-  return db.select().from(schema.sponsors).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
+  return db.select().from(schema.sponsors).where(isNull(schema.sponsors.deletedAt)).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
 }
 
-const tierLabel: Record<string, string> = {
-  platinum: 'Platinum',
-  gold: 'Gold',
-  community: 'Community',
-};
-
-const tierBadgeClass: Record<string, string> = {
-  platinum: 'bg-slate-300/10 text-slate-300',
-  gold: 'bg-yellow-500/10 text-yellow-400',
-  community: 'bg-blue-500/10 text-blue-400',
-};
 
 export default async function SponsorsAdminPage() {
   let sponsors: Awaited<ReturnType<typeof getAllSponsors>> = [];
@@ -35,7 +27,7 @@ export default async function SponsorsAdminPage() {
   return (
     <div className="space-y-8">
       {/* Add Sponsor Form */}
-      <Card className="bg-slate-900/30 border border-slate-800">
+      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add Sponsor</h2>
         <form action={addSponsor} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -51,13 +43,7 @@ export default async function SponsorsAdminPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Logo URL</label>
-            <input
-              name="logoUrl"
-              type="text"
-              placeholder="https://example.com/logo.png"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
-            />
+            <ImageUpload name="logoUrl" storageKeyName="storageKey" label="Logo" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Tier</label>
@@ -92,7 +78,7 @@ export default async function SponsorsAdminPage() {
           <div className="sm:col-span-2">
             <button
               type="submit"
-              className="px-6 py-2.5 bg-ez-pink text-white rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer"
+              className="px-6 py-2.5 bg-ez-pink text-ez-black rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer"
             >
               Add Sponsor
             </button>
@@ -115,7 +101,7 @@ export default async function SponsorsAdminPage() {
       )}
 
       {/* Sponsors Table */}
-      <Card className="bg-slate-900/30 border border-slate-800">
+      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">
           All Sponsors ({sponsors.length})
         </h2>
@@ -130,39 +116,13 @@ export default async function SponsorsAdminPage() {
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Tier</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Website</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Status</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Order</th>
+                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Order</th>
+                  <th className="text-right text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
                 {sponsors.map((sponsor) => (
-                  <tr key={sponsor.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="py-3 pr-4 font-semibold text-white">{sponsor.name}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${tierBadgeClass[sponsor.tier] ?? 'bg-zinc-800 text-zinc-400'}`}>
-                        {tierLabel[sponsor.tier] ?? sponsor.tier}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      {sponsor.websiteUrl ? (
-                        <a
-                          href={sponsor.websiteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-slate-400 hover:text-white transition-colors truncate max-w-[180px] block"
-                        >
-                          {sponsor.websiteUrl}
-                        </a>
-                      ) : (
-                        <span className="text-zinc-600">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sponsor.isActive ? 'bg-green-500/10 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                        {sponsor.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="py-3 text-slate-400">{sponsor.displayOrder}</td>
-                  </tr>
+                  <SponsorRow key={sponsor.id} sponsor={sponsor} />
                 ))}
               </tbody>
             </table>
