@@ -2,7 +2,7 @@ import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews, getCac
 import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
-import { HiOutlineTrophy, HiOutlineUsers, HiOutlineCalendarDays, HiOutlineNewspaper } from 'react-icons/hi2';
+import { HiOutlineTrophy, HiOutlineUsers, HiOutlineCalendarDays, HiOutlineNewspaper, HiExclamationTriangle, HiInformationCircle } from 'react-icons/hi2';
 
 export default async function AdminDashboardPage() {
   let stats = { games: 0, teams: 0, matches: 0, news: 0 };
@@ -100,7 +100,7 @@ export default async function AdminDashboardPage() {
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
                   alert.type === 'warning' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
                 }`}>
-                  {alert.type === 'warning' ? '⚠️' : 'ℹ️'}
+                  {alert.type === 'warning' ? <HiExclamationTriangle className="w-5 h-5" /> : <HiInformationCircle className="w-5 h-5" />}
                 </div>
                 <div>
                   <h4 className="font-bold text-white text-sm">{alert.label} ({alert.count})</h4>
@@ -119,7 +119,7 @@ export default async function AdminDashboardPage() {
       {!dbConfigured && (
         <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6 space-y-5 shadow-lg shadow-amber-500/[0.01]">
           <div className="flex items-start gap-4">
-            <span className="text-3xl mt-0.5 select-none animate-pulse">⚠️</span>
+            <HiExclamationTriangle className="w-7 h-7 mt-0.5 text-amber-400 shrink-0 animate-pulse" />
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-amber-400 tracking-tight">Database Connection Required</h3>
               <p className="text-slate-300 text-sm leading-relaxed max-w-2xl">

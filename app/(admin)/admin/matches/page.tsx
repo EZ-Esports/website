@@ -2,6 +2,7 @@ import { getCachedMatches, getCachedTeams, getCachedRosters, getCachedSeasons, g
 import Card from '@/app/components/ui/Card';
 import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import MatchList from '@/app/components/admin/MatchList';
+import { HiExclamationTriangle } from 'react-icons/hi2';
 
 export default async function AdminMatchesPage() {
   let matches: Awaited<ReturnType<typeof getCachedMatches>> = [];
@@ -37,7 +38,7 @@ export default async function AdminMatchesPage() {
       {dbError && (
         <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6">
           <div className="flex items-start gap-4">
-            <span className="text-2xl select-none">⚠️</span>
+            <HiExclamationTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="text-base font-bold text-amber-400">Database Error</h3>
               <p className="text-slate-300 text-sm leading-relaxed mt-0.5">Failed to fetch match configurations. Please ensure database migrations have run.</p>
