@@ -40,7 +40,7 @@ export default function ContentEditor({ id, label, contentKey, initialContent }:
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 bg-ez-pink text-white rounded-lg font-bold text-xs hover:bg-rose-700 transition-all duration-300 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2 bg-ez-pink text-white rounded-lg font-bold text-xs hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>

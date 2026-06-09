@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { SiTwitch } from 'react-icons/si';
 import { SITE_CONFIG } from '@/app/lib/constants';
 import Navigation from './Navigation';
@@ -47,6 +47,13 @@ export default function Header() {
   const isDarkText = isScrolled || !hasHero;
 
   return (
+    <>
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-ez-pink focus:text-ez-black focus:font-bold focus:rounded-lg focus:shadow-lg"
+    >
+      Skip to main content
+    </a>
     <motion.header
       style={{ backgroundColor: headerBg }}
       className={`sticky top-0 z-50 w-full transition-all duration-300 ease-in-out backdrop-blur-md ${
@@ -77,7 +84,7 @@ export default function Header() {
             >
               <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse" aria-hidden="true" />
               <SiTwitch className="w-3 h-3 text-ez-pink" aria-hidden="true" />
-              <span className="text-[10px] font-bold text-ez-pink uppercase tracking-widest" aria-hidden="true">Watch Live</span>
+              <span className="text-xs font-bold text-ez-pink uppercase tracking-widest" aria-hidden="true">Watch Live</span>
             </Link>
           </div>
 
@@ -110,15 +117,25 @@ export default function Header() {
         </div>
 
         {/* Mobile Navigation Drawer */}
-        {isOpen && (
-          <div className={`md:hidden py-4 border-t border-custom-border/40 animate-fade-in rounded-b-xl px-2 ${
-            isDarkText ? 'bg-background/95' : 'bg-zinc-950/95'
-          }`}>
-            <Navigation isDarkText={isDarkText} onNavigate={() => setIsOpen(false)} />
-          </div>
-        )}
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              key="mobile-nav"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className={`md:hidden py-4 border-t border-custom-border/40 rounded-b-xl px-2 ${
+                isDarkText ? 'bg-background/95' : 'bg-zinc-950/95'
+              }`}
+            >
+              <Navigation isDarkText={isDarkText} onNavigate={() => setIsOpen(false)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
       <GameSubHeader />
     </motion.header>
+    </>
   );
 }

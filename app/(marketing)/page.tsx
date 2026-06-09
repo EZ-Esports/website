@@ -21,7 +21,7 @@ import { getGamesForShowcase, SITE_CONFIG, SOCIAL_LINKS, ROUTES } from '@/app/li
 
 export default function HomePage() {
   const games = getGamesForShowcase();
-  const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || '#';
+  const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || 'https://discord.com/invite/RajSZqNyvu';
 
   return (
     <>
@@ -35,32 +35,10 @@ export default function HomePage() {
         primaryCTA={{ label: 'Join Discord', href: discordLink }}
       />
 
+      {/* 2. Audience CTAs */}
       <AudienceCTAs />
 
-      {/* 3. Photo Gallery #1 */}
-      <ScrollReveal>
-        <MediaGrid items={galleryImages1} columns={3} theme="dark" />
-      </ScrollReveal>
-
-      {/* 5. Video Showcase */}
-      <ScrollReveal>
-        <VideoShowcase
-          videos={featuredVideos}
-          description={sectionContent.videoShowcase.description}
-        />
-      </ScrollReveal>
-
-      {/* 6. Photo Gallery #2 */}
-      <ScrollReveal>
-        <MediaGrid items={galleryImages2} columns={2} theme="dark" />
-      </ScrollReveal>
-
-      {/* 7. Social Bar */}
-      <ScrollReveal>
-        <SocialBar theme="light" />
-      </ScrollReveal>
-
-      {/* 8. Competition Games */}
+      {/* 3. Competition Games */}
       <ScrollReveal>
         <GameShowcase
           title={sectionContent.gameShowcase.title}
@@ -68,10 +46,40 @@ export default function HomePage() {
         />
       </ScrollReveal>
 
-      {/* 9. Our Story */}
+      {/* 4. CTA Strip */}
+      <div className="bg-background py-10 flex flex-col items-center gap-3 border-t border-b border-ez-pink/15">
+        <span className="text-ez-pink uppercase tracking-widest text-xs font-bold">Get Started</span>
+        <div className="w-8 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mb-1" />
+        <p className="text-foreground font-semibold text-base">Ready to compete?</p>
+        <div className="flex gap-4 flex-wrap justify-center">
+          <Button href={ROUTES.apply} variant="primary">Apply to Play</Button>
+          <Button href={ROUTES.about} variant="secondary">Learn More</Button>
+        </div>
+      </div>
+
+      {/* 5. Photo Gallery #1 */}
+      <ScrollReveal>
+        <MediaGrid items={galleryImages1} columns={3} theme="dark" />
+      </ScrollReveal>
+
+      {/* 6. Video Showcase */}
+      <ScrollReveal>
+        <VideoShowcase
+          videos={featuredVideos}
+          description={sectionContent.videoShowcase.description}
+        />
+      </ScrollReveal>
+
+      {/* 7. Photo Gallery #2 */}
+      <ScrollReveal>
+        <MediaGrid items={galleryImages2} columns={2} theme="dark" />
+      </ScrollReveal>
+
+      {/* 8. Our Story */}
       <ScrollReveal>
         <ContentSection
-          heading={sectionContent.ourStory.heading}
+          eyebrow="Our Story"
+          heading="Our Story"
           description=""
           theme="dark"
         >
@@ -98,9 +106,12 @@ export default function HomePage() {
           </div>
         </ContentSection>
       </ScrollReveal>
+
+      {/* 9. Social Bar */}
+      <ScrollReveal>
+        <SocialBar theme="dark" />
+      </ScrollReveal>
     </main>
     </>
   );
 }
-
-

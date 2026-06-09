@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ROUTES, GAMES, GAME_SLUGS, getGameRoute } from '@/app/lib/constants';
 
 interface NavigationProps {
@@ -73,7 +74,7 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
                     : 'text-white/80 hover:text-white md:hover:text-ez-pink border-white/20 bg-white/10'
                 }`}
                 aria-expanded={isDropdownOpen}
-                aria-haspopup="listbox"
+                aria-haspopup="true"
               >
                 <span>Games</span>
                 <svg
@@ -86,31 +87,39 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
                 </svg>
               </button>
 
-              {isDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-full md:w-52 bg-background-secondary/95 backdrop-blur-md rounded-xl shadow-2xl border border-custom-border/80 z-50 p-1">
-                  <div className="py-1 space-y-1">
-                    {GAME_SLUGS.map((slug) => {
-                      const game = GAMES[slug];
-                      const isActive = pathname.startsWith(getGameRoute(slug));
-                      return (
-                        <Link
-                          key={slug}
-                          href={getGameRoute(slug)}
-                          className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
-                            isActive
-                              ? 'bg-ez-pink/10 text-ez-pink font-bold'
-                              : 'text-foreground-secondary hover:bg-background-secondary/60 hover:text-foreground'
-                          }`}
-                          onClick={handleLinkClick}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-ez-pink animate-pulse' : 'bg-transparent'}`} />
-                          <span>{game.displayName}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute top-full left-0 mt-2 w-full md:w-52 bg-background-secondary/95 backdrop-blur-md rounded-xl shadow-2xl border border-custom-border/80 z-50 p-1"
+                  >
+                    <div className="py-1 space-y-1">
+                      {GAME_SLUGS.map((slug) => {
+                        const game = GAMES[slug];
+                        const isActive = pathname.startsWith(getGameRoute(slug));
+                        return (
+                          <Link
+                            key={slug}
+                            href={getGameRoute(slug)}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
+                              isActive
+                                ? 'bg-ez-pink/10 text-ez-pink font-bold'
+                                : 'text-foreground-secondary hover:bg-background-secondary/60 hover:text-foreground'
+                            }`}
+                            onClick={handleLinkClick}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-ez-pink animate-pulse' : 'bg-transparent'}`} />
+                            <span>{game.displayName}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         }

@@ -41,7 +41,7 @@ export default function GameSubHeader() {
                   href={item.href}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all select-none cursor-pointer ${
                     isActive
-                      ? 'bg-ez-pink text-white shadow-sm'
+                      ? 'bg-ez-pink text-ez-black shadow-sm'
                       : 'text-foreground-secondary hover:text-foreground hover:bg-background-secondary/50'
                   }`}
                 >

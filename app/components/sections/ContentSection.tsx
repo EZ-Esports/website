@@ -3,6 +3,7 @@ import type { Theme, ImagePosition } from '@/app/types';
 import { THEME_CLASSES } from '@/app/lib/constants';
 
 interface ContentSectionProps {
+  eyebrow?: string;
   heading: string;
   description: string;
   imageSrc?: string;
@@ -13,6 +14,7 @@ interface ContentSectionProps {
 }
 
 export default function ContentSection({
+  eyebrow,
   heading,
   description,
   imageSrc,
@@ -27,7 +29,7 @@ export default function ContentSection({
 
   const isDark = theme === 'dark';
   const headingColor = isDark ? 'text-white' : 'text-foreground';
-  const textColor = isDark ? 'text-slate-300' : 'text-foreground-secondary';
+  const textColor = isDark ? 'text-foreground' : 'text-foreground-secondary';
 
   const imageElement = imageSrc ? (
     <div key="image" className="relative w-full aspect-video rounded-lg overflow-hidden">
@@ -53,7 +55,11 @@ export default function ContentSection({
     <section className={`${themeClasses} py-16 md:py-24 relative z-10`}>
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="text-center mb-12">
-          <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight ${headingColor} uppercase`}>{heading}</h2>
+          {eyebrow && (
+            <span className="inline-block text-ez-pink uppercase tracking-widest text-xs font-bold mb-3">{eyebrow}</span>
+          )}
+          <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black tracking-tight ${headingColor}`}>{heading}</h2>
+          <div className="w-12 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto mt-4" />
         </div>
         
         {isTextOnly ? (

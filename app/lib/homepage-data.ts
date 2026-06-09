@@ -5,16 +5,22 @@ import type { Image, VideoItem } from '@/app/types';
 // ============================================================================
 
 // Gallery images - first set (9 images)
-export const galleryImages1: Image[] = Array.from({ length: 9 }, (_, i) => ({
-  id: `gallery-${i + 1}`,
-  src: `/images/gallery/gallery-${i + 1}.png`,
-  alt: `Event photo ${i + 1}`,
-}));
+export const galleryImages1: Image[] = [
+  { id: 'gallery-1', src: '/images/gallery/gallery-1.png', alt: 'EZ Esports players competing at a NYC high school event' },
+  { id: 'gallery-2', src: '/images/gallery/gallery-2.png', alt: 'Students gathered at an EZ Esports league match' },
+  { id: 'gallery-3', src: '/images/gallery/gallery-3.png', alt: 'EZ Esports team celebrating a victory' },
+  { id: 'gallery-4', src: '/images/gallery/gallery-4.png', alt: 'High school esports competitors at their stations' },
+  { id: 'gallery-5', src: '/images/gallery/gallery-5.png', alt: 'EZ Esports NYC league event crowd' },
+  { id: 'gallery-6', src: '/images/gallery/gallery-6.png', alt: 'Players focused during an EZ Esports match' },
+  { id: 'gallery-7', src: '/images/gallery/gallery-7.png', alt: 'EZ Esports community meetup at a NYC venue' },
+  { id: 'gallery-8', src: '/images/gallery/gallery-8.png', alt: 'Students competing in Valorant at EZ Esports' },
+  { id: 'gallery-9', src: '/images/gallery/gallery-9.png', alt: 'EZ Esports broadcast team running a live stream' },
+];
 
 // Gallery images - second set (2 images)
 export const galleryImages2: Image[] = [
-  { id: 'gallery-10', src: '/images/gallery/gallery-10.png', alt: 'Event photo 10' },
-  { id: 'gallery-11', src: '/images/gallery/gallery-11.png', alt: 'Event photo 11' },
+  { id: 'gallery-10', src: '/images/gallery/gallery-10.png', alt: 'EZ Esports end-of-season celebration' },
+  { id: 'gallery-11', src: '/images/gallery/gallery-11.png', alt: 'NYC high school teams lined up before an EZ Esports finals match' },
 ];
 
 // Featured videos
@@ -46,7 +52,7 @@ export const sectionContent = {
     title: 'Compete Against Other Students Across NYC',
   },
   ourStory: {
-    heading: 'OUR STORY',
+    heading: 'Our Story',
     paragraphs: [
       'EZ Esports was founded in November 2021 and developed by various NYC high school student club officers to provide their club members opportunity to compete in an accessible and organized esports league.',
       'Our mission is to provide competitive esports opportunities to NYC high school students, building community, developing skills, and creating pathways to careers in gaming and technology. We believe that esports can be a powerful tool for student engagement, skill development, and career preparation.',

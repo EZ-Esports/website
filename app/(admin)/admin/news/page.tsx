@@ -31,7 +31,7 @@ export default async function AdminNewsPage() {
       </Card>
 
       {dbError && (
-        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm px-4 py-3 rounded-lg">
+        <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg">
           Failed to fetch articles. Please make sure migrations have run.
         </div>
       )}

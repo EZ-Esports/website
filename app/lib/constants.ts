@@ -20,7 +20,6 @@ export const ROUTES = {
   news: '/news',
   leadership: '/leadership',
   archives: '/archives',
-  support: '#support',
   apply: '/apply',
   sponsors: '/sponsors',
 } as const;
@@ -147,7 +146,7 @@ export const EXTERNAL_LINKS = {
 
 export const NAV_ITEMS: NavigationItem[] = [
   { label: 'Leadership', href: ROUTES.leadership },
-  { label: 'Support ESports', href: ROUTES.support },
+  { label: 'Support ESports', href: ROUTES.sponsors },
 ];
 
 export const SOCIAL_LINKS: SocialLink[] = [
@@ -159,16 +158,12 @@ export const SOCIAL_LINKS: SocialLink[] = [
 ];
 
 export const FOOTER_LINKS = [
-  { label: 'Privacy Policy', href: '#' },
-  { label: 'Participant Agreement', href: '#' },
-  { label: 'Code of Conduct', href: '#' },
-  { label: 'EZ Talk', href: '#' },
-  { label: 'Contact', href: '#' },
-  { label: 'API Terms', href: '#' },
-  { label: 'Press', href: '#' },
-  { label: 'FAQs', href: '#' },
   { label: 'Apply', href: '/apply' },
+  { label: 'News', href: '/news' },
+  { label: 'Leadership', href: '/leadership' },
   { label: 'Sponsors', href: '/sponsors' },
+  { label: 'About & FAQs', href: '/about' },
+{ label: 'Privacy Policy', href: '/privacy' },
   { label: 'Staff Login', href: '/login' },
 ] as const;
 

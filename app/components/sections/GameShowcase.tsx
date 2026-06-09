@@ -20,7 +20,9 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
     <section className="bg-background text-foreground py-16 md:py-24 border-t border-custom-border/30">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{title}</h2>
+          <span className="inline-block text-ez-pink uppercase tracking-widest text-xs font-bold mb-3">Competition</span>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground">{title}</h2>
+          <div className="w-12 h-0.5 bg-ez-pink mx-auto mt-4" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {games.map((game, index) => {
@@ -29,7 +31,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
             
             const content = (
               <div
-                className="aspect-video relative rounded-xl overflow-hidden group cursor-pointer border border-custom-border/80 hover:border-ez-pink/60 transition-all duration-200"
+                className="aspect-video relative rounded-xl overflow-hidden group cursor-pointer border border-custom-border/80 hover:border-ez-pink/60 transition-all duration-200 active:scale-[0.98]"
               >
                 <Image
                   src={game.imageUrl}
@@ -41,7 +43,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" aria-hidden="true" />
                 <div className="absolute bottom-0 left-0 right-0 p-5 flex flex-col justify-end h-1/2">
                   <h3 className="text-white text-lg font-bold mb-1 tracking-tight">{game.title}</h3>
-                  <div aria-hidden="true" className="inline-flex items-center gap-1 text-ez-pink text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all duration-200">
+                  <div aria-hidden="true" className="inline-flex items-center gap-1 text-ez-pink text-xs font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-all duration-200">
                     Explore Game <span className="text-sm">→</span>
                   </div>
                 </div>

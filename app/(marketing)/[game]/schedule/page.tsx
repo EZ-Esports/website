@@ -136,7 +136,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
               href={`/${game}/schedule?division=Varsity`}
               className={`px-4 py-1.5 text-sm font-bold rounded-lg transition-all ${
                 division === 'Varsity' 
-                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
                   : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
               }`}
             >
@@ -145,8 +145,8 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             <Link
               href={`/${game}/schedule?division=JV`}
               className={`px-4 py-1.5 text-sm font-bold rounded-lg transition-all ${
-                division === 'JV' 
-                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                division === 'JV'
+                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80' 
                   : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
               }`}
             >

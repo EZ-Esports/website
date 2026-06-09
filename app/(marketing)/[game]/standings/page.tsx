@@ -102,7 +102,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               href={`/${game}/standings?division=Varsity`}
               className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
                 division === 'Varsity' 
-                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
                   : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
               }`}
             >
@@ -111,8 +111,8 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
             <Link
               href={`/${game}/standings?division=JV`}
               className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
-                division === 'JV' 
-                  ? 'bg-ez-pink text-white hover:bg-rose-700' 
+                division === 'JV'
+                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80' 
                   : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
               }`}
             >

@@ -31,6 +31,8 @@ export default function Footer() {
 
         {/* Social icons */}
         <SocialLinks />
+
+        <p className="text-center text-xs text-zinc-400 mt-6">© {new Date().getFullYear()} EZ Esports. All rights reserved.</p>
       </div>
     </footer>
   );

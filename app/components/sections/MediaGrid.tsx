@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { motion, AnimatePresence } from 'framer-motion';
+import FocusTrap from 'focus-trap-react';
 import type { Image as ImageType, Theme, GridColumns } from '@/app/types';
 import { THEME_CLASSES, GRID_COLUMNS } from '@/app/lib/constants';
 
@@ -25,7 +27,7 @@ function GalleryItem({ item, index, onOpen }: { item: ImageType; index: number; 
         onError={() => setErrored(true)}
       />
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-        <span className="text-white bg-ez-pink px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <span className="text-ez-black bg-ez-pink px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
           View Photo
         </span>
       </div>
@@ -99,16 +101,27 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
       </div>
 
       {/* Lightbox Modal */}
+      <AnimatePresence>
       {selectedImageIndex !== null && (
-        <div 
+        <FocusTrap focusTrapOptions={{ initialFocus: false, escapeDeactivates: false }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lightbox-title"
+          aria-describedby="lightbox-caption"
           onClick={closeLightbox}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out animate-fade-in"
         >
+          <span id="lightbox-title" className="sr-only">{items[selectedImageIndex]?.alt}</span>
           {/* Close Button */}
-          <button 
+          <button
             onClick={closeLightbox}
             className="absolute top-6 right-6 text-white hover:text-ez-pink p-2 bg-slate-950/40 rounded-full border border-slate-800/60 transition-colors cursor-pointer z-50"
-            aria-label="Close Gallery"
+            aria-label="Close photo viewer"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -119,7 +132,7 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
           <button 
             onClick={(e) => navigateLightbox('prev', e)}
             className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-white hover:text-ez-pink p-3 bg-slate-950/40 rounded-full border border-slate-800/60 transition-colors cursor-pointer z-50"
-            aria-label="Previous Image"
+            aria-label="Previous photo"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -129,7 +142,7 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
           <button 
             onClick={(e) => navigateLightbox('next', e)}
             className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-white hover:text-ez-pink p-3 bg-slate-950/40 rounded-full border border-slate-800/60 transition-colors cursor-pointer z-50"
-            aria-label="Next Image"
+            aria-label="Next photo"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -145,12 +158,14 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
               height={800}
               className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
             />
-            <div className="absolute bottom-[-40px] left-0 right-0 text-center text-slate-300 text-sm">
+            <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-slate-300 text-sm">
               {selectedImageIndex + 1} / {items.length} • {items[selectedImageIndex].alt}
             </div>
           </div>
-        </div>
+        </motion.div>
+        </FocusTrap>
       )}
+      </AnimatePresence>
     </section>
   );
 }

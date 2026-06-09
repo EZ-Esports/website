@@ -46,7 +46,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
               href={getLeadershipRoute(y)}
               className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
                 isActive
-                  ? 'bg-ez-pink text-white font-bold scale-105 shadow-none'
+                  ? 'bg-ez-pink text-ez-black font-bold scale-105 shadow-none'
                   : 'bg-background-secondary border border-custom-border/80 text-foreground-secondary hover:text-foreground hover:bg-background'
               }`}
             >

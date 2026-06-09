@@ -144,7 +144,7 @@ export default function Hero({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
-                className="text-slate-200 font-medium max-w-xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm"
+                className="text-foreground/90 font-medium max-w-xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm"
               >
                 {subtitle}
               </motion.p>

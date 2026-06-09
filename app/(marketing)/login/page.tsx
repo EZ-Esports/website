@@ -23,9 +23,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {/* Error Alert */}
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm px-4 py-3 rounded-lg flex items-start gap-2">
+          <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg flex items-start gap-2">
             <svg
-              className="w-5 h-5 text-rose-400 shrink-0 mt-0.5"
+              className="w-5 h-5 text-ez-pink shrink-0 mt-0.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -53,7 +53,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               type="email"
               required
               placeholder="admin@ezesports.com"
-              className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
             />
           </div>
 
@@ -67,13 +67,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               type="password"
               required
               placeholder="••••••••"
-              className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-rose-600/20 active:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all cursor-pointer mt-2"
+            className="w-full py-3 bg-ez-pink hover:bg-ez-pink/80 text-ez-black font-semibold rounded-lg shadow-lg hover:shadow-ez-pink/20 active:bg-ez-pink/70 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:ring-offset-2 focus:ring-offset-gray-900 transition-all cursor-pointer mt-2"
           >
             Sign In
           </button>

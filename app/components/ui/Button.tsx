@@ -27,7 +27,7 @@ export default function Button({
 }: ButtonProps) {
   const baseStyles = "px-6 py-2.5 rounded-lg font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background active:scale-95 cursor-pointer text-sm md:text-base inline-flex items-center justify-center";
   const variantStyles = {
-    primary: "bg-ez-pink text-white hover:bg-rose-700 border border-transparent focus:ring-ez-pink/40",
+    primary: "bg-ez-pink text-ez-black hover:bg-ez-pink/80 border border-transparent focus:ring-ez-pink/40",
     secondary: "bg-foreground text-background hover:opacity-90 border border-transparent focus:ring-foreground/40",
   };
 

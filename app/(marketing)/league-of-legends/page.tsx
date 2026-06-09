@@ -258,7 +258,7 @@ export default async function LeagueOfLegendsHubPage() {
                   <span className={`inline-block px-3.5 py-1 rounded-full text-sm font-extrabold ${
                     isWin 
                       ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-                      : 'bg-rose-500/10 border border-rose-500/20 text-ez-pink'
+                      : 'bg-ez-pink/10 border border-ez-pink/20 text-ez-pink'
                   }`}>
                     {match.result}
                   </span>
