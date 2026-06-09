@@ -22,6 +22,7 @@ export const games = pgTable('games', {
   displayName: text('display_name').notNull(),
   shortName: text('short_name').notNull(),
   imageUrl: text('image_url'),
+  storageKey: text('storage_key'),
   ...auditColumns,
 });
 
@@ -207,6 +208,7 @@ export const galleryImages = pgTable('gallery_images', {
   displayOrder: integer('display_order').default(0).notNull(),
   setId: integer('set_id').default(1).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  storageKey: text('storage_key'),
   ...auditColumns,
 }, (table) => [
   index('gallery_images_set_id_idx').on(table.setId),
@@ -221,6 +223,7 @@ export const sponsors = pgTable('sponsors', {
   websiteUrl: text('website_url').default(''),
   isActive: boolean('is_active').default(true).notNull(),
   displayOrder: integer('display_order').default(0).notNull(),
+  storageKey: text('storage_key'),
   ...auditColumns,
 }, (table) => [
   index('sponsors_tier_idx').on(table.tier),

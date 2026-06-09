@@ -3,6 +3,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { addSponsor } from './actions';
 import SponsorRow from '@/app/components/admin/SponsorRow';
+import ImageUpload from '@/app/components/admin/ImageUpload';
 
 async function getAllSponsors() {
   return db.select().from(schema.sponsors).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
@@ -41,13 +42,7 @@ export default async function SponsorsAdminPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Logo URL</label>
-            <input
-              name="logoUrl"
-              type="text"
-              placeholder="https://example.com/logo.png"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
-            />
+            <ImageUpload name="logoUrl" storageKeyName="storageKey" label="Logo" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Tier</label>

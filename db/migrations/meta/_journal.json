@@ -29,6 +29,13 @@
       "when": 1780657437814,
       "tag": "0003_special_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781001241952,
+      "tag": "0004_amused_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'fziqdmlymqtobxrngneh.supabase.co',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

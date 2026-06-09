@@ -4,10 +4,12 @@ import { useState } from 'react';
 import Image from 'next/image';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import { updateGalleryImage, toggleGalleryImageActive, deleteGalleryImage } from '@/app/(admin)/admin/gallery/actions';
+import ImageUpload from '@/app/components/admin/ImageUpload';
 
 interface GalleryImage {
   id: string;
   src: string;
+  storageKey: string | null;
   caption: string | null;
   schoolName: string | null;
   eventName: string | null;
@@ -90,14 +92,12 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
             className="mt-3 space-y-2 border-t border-zinc-800 pt-3"
           >
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Image URL</label>
-              <input
+              <ImageUpload
                 name="src"
-                type="text"
-                required
-                defaultValue={img.src}
-                placeholder='"/images/gallery/gallery-12.png" or Supabase Storage URL'
-                className={inputClass}
+                storageKeyName="storageKey"
+                currentSrc={img.src}
+                currentStorageKey={img.storageKey ?? undefined}
+                label="Change Image"
               />
             </div>
             <div>
