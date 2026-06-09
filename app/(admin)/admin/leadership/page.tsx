@@ -1,7 +1,7 @@
 import { getCachedLeadership } from '@/app/lib/db/queries';
-import { createLeader, deleteLeader } from './actions';
+import { createLeader } from './actions';
 import Card from '@/app/components/ui/Card';
-import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import LeadershipRow from '@/app/components/admin/LeadershipRow';
 
 export default async function AdminLeadershipPage() {
   let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
@@ -18,7 +18,7 @@ export default async function AdminLeadershipPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <Card className="hover:border-slate-800/80 hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Leadership Manager</h1>
         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
           Manage the student officers, roles, and bios displayed on the public leadership pages.
@@ -80,6 +80,7 @@ export default async function AdminLeadershipPage() {
                   type="text"
                   required
                   pattern="[0-9]{4}"
+                  title="Four-digit year, e.g. 2026"
                   placeholder="e.g. 2026"
                   defaultValue={new Date().getFullYear().toString()}
                   className={inputClass}
@@ -117,7 +118,7 @@ export default async function AdminLeadershipPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#0b101d] border-b border-slate-800/80">
+                  <thead className="bg-[#0b101d] border-b border-ez-pink/20">
                     <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Name / Bio</th>
                       <th className="px-6 py-4">Role</th>
@@ -126,34 +127,9 @@ export default async function AdminLeadershipPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 text-sm">
-                    {leadershipList.map((leader) => {
-                      const deleteActionWithId = deleteLeader.bind(null, leader.id, leader.year);
-
-                      return (
-                        <tr key={leader.id} className="hover:bg-slate-800/10 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-white text-base tracking-tight">{leader.name}</div>
-                            <div className="text-xs text-slate-400 max-w-xs truncate mt-1 leading-relaxed">
-                              {leader.bio || 'No bio provided.'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 font-bold text-slate-200">
-                            {leader.role}
-                          </td>
-                          <td className="px-6 py-4 text-slate-300 font-semibold">
-                            {leader.year}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <ConfirmDeleteButton
-                              action={deleteActionWithId}
-                              label="Remove"
-                              message={`Remove ${leader.name} (${leader.role}, ${leader.year}) from the public leadership page?`}
-                              className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {leadershipList.map((leader) => (
+                      <LeadershipRow key={leader.id} leader={leader} />
+                    ))}
                   </tbody>
                 </table>
               </div>

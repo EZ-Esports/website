@@ -29,6 +29,20 @@ export async function createLeader(formData: FormData) {
   revalidatePath(`/leadership/${year}`);
 }
 
+export async function updateLeader(id: string, year: string, formData: FormData) {
+  const name = formData.get('name') as string;
+  const role = formData.get('role') as string;
+  const newYear = formData.get('year') as string;
+  const bio = formData.get('bio') as string;
+  if (!name || !role || !newYear) throw new Error('Name, Role, and Year are required.');
+  await db.update(schema.leadership).set({ name, role, year: newYear, bio }).where(eq(schema.leadership.id, id));
+  revalidateTag('leadership', 'max');
+  revalidatePath('/admin/leadership');
+  revalidatePath('/leadership');
+  revalidatePath(`/leadership/${year}`);
+  revalidatePath(`/leadership/${newYear}`);
+}
+
 export async function deleteLeader(id: string, year: string) {
   await db.delete(schema.leadership).where(eq(schema.leadership.id, id));
 

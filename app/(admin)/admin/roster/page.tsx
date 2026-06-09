@@ -1,14 +1,15 @@
-import { 
-  getCachedPlayers, 
-  getCachedRosters, 
-  getCachedTeams, 
-  getCachedGames, 
-  getCachedSchools, 
+import {
+  getCachedPlayers,
+  getCachedRosters,
+  getCachedTeams,
+  getCachedGames,
+  getCachedSchools,
   getCachedMembers,
   getCachedSeasons
 } from '@/app/lib/db/queries';
 import { Suspense } from 'react';
 import RosterExplorer from '@/app/components/admin/RosterExplorer';
+import Card from '@/app/components/ui/Card';
 import { DBGame, DBTeam, DBRoster, DBPlayer, DBSchool, DBMember, DBSeason } from '@/app/types';
 
 export default async function AdminRosterPage() {
@@ -45,6 +46,12 @@ export default async function AdminRosterPage() {
 
   return (
     <div className="space-y-6">
+      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
+        <h1 className="text-2xl font-black text-white uppercase tracking-wider">Teams & Roster Manager</h1>
+        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+          Manage competitive rosters, assign players to teams, and configure game-specific lineups for each season.
+        </p>
+      </Card>
       {dbError ? (
         <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg">
           Failed to fetch database configurations. Please ensure database migrations and seeds have run properly.
