@@ -76,7 +76,6 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImageIndex, items.length]);
 
   const navigateLightbox = (direction: 'next' | 'prev', e: React.MouseEvent) => {

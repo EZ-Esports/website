@@ -36,10 +36,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });
   }
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+  // SVG is intentionally excluded: it can carry inline <script>, and files land
+  // in a public bucket served with their own content-type (stored-XSS vector).
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   if (!allowedTypes.includes(file.type)) {
     return NextResponse.json(
-      { error: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, SVG' },
+      { error: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP' },
       { status: 400 }
     );
   }
@@ -56,7 +58,6 @@ export async function POST(req: NextRequest) {
     'image/png': 'png',
     'image/gif': 'gif',
     'image/webp': 'webp',
-    'image/svg+xml': 'svg',
   };
   const ext = mimeToExt[file.type];
   const storageKey = `${crypto.randomUUID()}.${ext}`;

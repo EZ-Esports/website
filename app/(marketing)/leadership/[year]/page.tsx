@@ -57,14 +57,14 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
       </div>
 
       {/* Leadership Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+      <div className="flex flex-wrap justify-center gap-8 max-w-6xl mx-auto">
         {leaders.length === 0 ? (
-          <div className="p-16 text-center text-foreground-secondary text-sm bg-background-secondary/20 rounded-2xl col-span-full border border-custom-border">
+          <div className="p-16 text-center text-foreground-secondary text-sm bg-background-secondary/20 rounded-2xl w-full border border-custom-border">
             No leadership members registered for {year} yet.
           </div>
         ) : (
           leaders.map((leader) => (
-            <Card key={leader.name} className="hover:scale-[1.02] duration-300">
+            <Card key={leader.name} className="w-full md:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)] hover:scale-[1.02] duration-300">
               {/* Placeholder for image */}
               <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-background border-2 border-custom-border flex items-center justify-center text-foreground">
                 <span className="text-3xl font-extrabold tracking-tight">

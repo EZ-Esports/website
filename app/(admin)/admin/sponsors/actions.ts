@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -13,11 +14,18 @@ function revalidateAll() {
   revalidatePath('/sponsors');
 }
 
+// Only allow http(s) URLs; blank out anything else (e.g. a javascript: scheme) before it reaches an href.
+function safeUrl(url: string): string {
+  if (!url) return '';
+  return /^https?:\/\//i.test(url) ? url : '';
+}
+
 export async function addSponsor(formData: FormData) {
+  await requireUser();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const tier = formData.get('tier') as 'platinum' | 'gold' | 'community';
-  const websiteUrl = (formData.get('websiteUrl') as string) ?? '';
+  const websiteUrl = safeUrl((formData.get('websiteUrl') as string) ?? '');
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
   const storageKey = (formData.get('storageKey') as string) || null;
 
@@ -28,10 +36,11 @@ export async function addSponsor(formData: FormData) {
 }
 
 export async function updateSponsor(id: string, formData: FormData) {
+  await requireUser();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const tier = formData.get('tier') as 'platinum' | 'gold' | 'community';
-  const websiteUrl = (formData.get('websiteUrl') as string) ?? '';
+  const websiteUrl = safeUrl((formData.get('websiteUrl') as string) ?? '');
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
   const storageKey = (formData.get('storageKey') as string) || null;
 
@@ -58,6 +67,7 @@ export async function updateSponsor(id: string, formData: FormData) {
 }
 
 export async function toggleSponsorActive(id: string, isActive: boolean) {
+  await requireUser();
   await db
     .update(schema.sponsors)
     .set({ isActive })
@@ -66,6 +76,7 @@ export async function toggleSponsorActive(id: string, isActive: boolean) {
 }
 
 export async function deleteSponsor(id: string) {
+  await requireUser();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.sponsors.storageKey })

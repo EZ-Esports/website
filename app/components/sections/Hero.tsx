@@ -86,7 +86,7 @@ export default function Hero({
             <div className="relative z-10 flex flex-col items-center">
               {/* Division Badge */}
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-xs font-bold uppercase tracking-widest mb-6 select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse motion-reduce:animate-none" />
                 NYC Division
               </span>
 

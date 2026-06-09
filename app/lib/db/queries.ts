@@ -107,25 +107,6 @@ export const getCachedLeadership = unstable_cache(
   { tags: ['leadership'] }
 );
 
-export const getCachedGalleryImages = unstable_cache(
-  async (setId?: number) => {
-    if (setId !== undefined) {
-      return db
-        .select()
-        .from(schema.galleryImages)
-        .where(and(eq(schema.galleryImages.isActive, true), eq(schema.galleryImages.setId, setId), isNull(schema.galleryImages.deletedAt)))
-        .orderBy(schema.galleryImages.displayOrder);
-    }
-    return db
-      .select()
-      .from(schema.galleryImages)
-      .where(and(eq(schema.galleryImages.isActive, true), isNull(schema.galleryImages.deletedAt)))
-      .orderBy(schema.galleryImages.displayOrder);
-  },
-  ['gallery-images'],
-  { tags: ['gallery-images'] }
-);
-
 export const getCachedSponsors = unstable_cache(
   async () =>
     db

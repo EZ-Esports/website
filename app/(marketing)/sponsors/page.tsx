@@ -22,11 +22,11 @@ export default function SponsorsPage() {
       />
 
       <ContentSection heading="OUR PARTNERS" description="" theme="dark">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="flex flex-wrap justify-center gap-6">
           {PARTNERS.map((partner) => (
             <div
               key={partner.name}
-              className="rounded-xl border border-custom-border/60 bg-background-secondary/40 aspect-video flex flex-col items-center justify-center gap-2"
+              className="w-[calc(50%_-_0.75rem)] md:w-[calc(25%_-_1.125rem)] rounded-xl border border-custom-border/60 bg-background-secondary/40 aspect-video flex flex-col items-center justify-center gap-2"
             >
               <div className="w-12 h-12 rounded-lg bg-foreground-secondary/20" />
               <span className="text-foreground-secondary text-sm font-semibold">{partner.name}</span>

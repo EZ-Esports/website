@@ -53,14 +53,14 @@ export default async function NewsPage() {
         theme="dark"
       >
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-wrap justify-center gap-6">
             {newsItems.length === 0 ? (
-              <div className="text-center p-12 text-slate-400 text-sm bg-slate-900/30 border border-slate-800/60 rounded-xl col-span-full">
+              <div className="text-center p-12 text-slate-400 text-sm bg-slate-900/30 border border-slate-800/60 rounded-xl w-full">
                 No league news articles found. Stay tuned for upcoming announcements!
               </div>
             ) : (
               newsItems.map((item) => (
-                <Card key={item.id} className="text-white h-full flex flex-col hover:scale-[1.02] transition-all duration-300">
+                <Card key={item.id} className="w-full md:w-[calc(50%_-_0.75rem)] lg:w-[calc(33.333%_-_1rem)] text-white h-full flex flex-col hover:scale-[1.02] transition-all duration-300">
                   <div className="flex-1">
                     <span className="inline-block px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-md bg-ez-pink/10 border border-ez-pink/20 text-ez-pink mb-3">
                       {item.category}
