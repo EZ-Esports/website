@@ -18,7 +18,7 @@ export default async function SchoolWall() {
           <div className="w-12 h-0.5 bg-ez-pink mx-auto mt-4" />
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-4 max-w-5xl mx-auto">
+        <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
           {schools.map((school) => {
             const initials = school.name
               .split(' ')
@@ -28,7 +28,7 @@ export default async function SchoolWall() {
               .toUpperCase();
 
             const cardContent = (
-              <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#111111] border border-zinc-800 hover:border-ez-pink/40 transition-all duration-200 group hover:scale-105">
+              <div className="flex h-full flex-col items-center gap-3 p-4 rounded-xl bg-[#111111] border border-zinc-800 hover:border-ez-pink/40 transition-all duration-200 group hover:scale-105">
                 {school.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -55,7 +55,7 @@ export default async function SchoolWall() {
                   href={school.websiteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block"
+                  className="block w-32 sm:w-36"
                 >
                   {cardContent}
                 </a>
@@ -63,7 +63,7 @@ export default async function SchoolWall() {
             }
 
             return (
-              <div key={school.id}>
+              <div key={school.id} className="w-32 sm:w-36">
                 {cardContent}
               </div>
             );
