@@ -15,8 +15,8 @@ export default function VideoShowcase({
       <div className="container mx-auto px-4">
         <div className="text-center mb-10">
           <span className="inline-block text-ez-pink uppercase tracking-widest text-xs font-bold mb-2">Watch</span>
-          <h2 className="text-3xl sm:text-4xl font-black text-foreground mt-2 mb-4 text-center">Highlights &amp; Broadcasts</h2>
-          <div className="w-8 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto" />
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground mt-2 mb-4 text-center">Highlights &amp; Broadcasts</h2>
+          <div className="w-12 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 max-w-6xl mx-auto">
           {videos.map((video, index) => (

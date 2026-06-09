@@ -12,10 +12,10 @@ export default async function SchoolWall() {
           <span className="text-ez-pink uppercase tracking-widest text-xs font-bold text-center mb-3 block">
             Member Schools
           </span>
-          <h2 className="text-white font-bold text-3xl md:text-4xl text-center">
+          <h2 className="text-white font-black tracking-tight text-3xl sm:text-4xl md:text-5xl text-center">
             Our Schools
           </h2>
-          <div className="w-12 h-0.5 bg-ez-pink mx-auto mt-4" />
+          <div className="w-12 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto mt-4" />
         </div>
 
         <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Button from '@/app/components/ui/Button';
+import { usePrefersReducedMotion } from '@/app/lib/hooks/usePrefersReducedMotion';
 
 interface CTA {
   label: string;
@@ -27,11 +28,18 @@ export default function Hero({
   secondaryCTA
 }: HeroProps) {
   const isLarge = size === 'large';
-  
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // Scroll-linked parallax (hooks must run unconditionally), but fall back to
+  // static values when the user prefers reduced motion.
   const { scrollY } = useScroll();
-  const contentOpacity = useTransform(scrollY, [0, 300], [1, 0]);
-  const contentY = useTransform(scrollY, [0, 300], [0, -40]);
-  const backgroundY = useTransform(scrollY, [0, 500], ['0%', '20%']);
+  const contentOpacityMV = useTransform(scrollY, [0, 300], [1, 0]);
+  const contentYMV = useTransform(scrollY, [0, 300], [0, -40]);
+  const backgroundYMV = useTransform(scrollY, [0, 500], ['0%', '20%']);
+
+  const contentOpacity = prefersReducedMotion ? 1 : contentOpacityMV;
+  const contentY = prefersReducedMotion ? 0 : contentYMV;
+  const backgroundY = prefersReducedMotion ? '0%' : backgroundYMV;
 
   // Helper to dynamically color brand words "EZ" and "Esports" pink
   const renderTitle = (text: string) => {
@@ -84,7 +92,7 @@ export default function Hero({
 
               {/* Heading */}
               <motion.h1
-                initial={{ opacity: 0, y: 15 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
                 className="font-black tracking-tight text-foreground text-3xl sm:text-4xl md:text-5xl leading-tight"
@@ -95,7 +103,7 @@ export default function Hero({
               {/* Subtitle */}
               {subtitle && (
                 <motion.p
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
                   className="text-foreground-secondary font-medium max-w-xl mx-auto leading-relaxed mt-6 text-sm sm:text-base md:text-lg"
@@ -107,7 +115,7 @@ export default function Hero({
               {/* CTAs */}
               {(primaryCTA || secondaryCTA) && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
                   className="flex flex-wrap items-center justify-center gap-4 mt-8"
@@ -130,7 +138,7 @@ export default function Hero({
           <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
             {/* Heading */}
             <motion.h1
-              initial={{ opacity: 0, y: 15 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
               className="font-black tracking-tight text-white text-2xl sm:text-3xl md:text-4xl"
@@ -141,7 +149,7 @@ export default function Hero({
             {/* Subtitle */}
             {subtitle && (
               <motion.p
-                initial={{ opacity: 0, y: 10 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
                 className="text-foreground/90 font-medium max-w-xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm"

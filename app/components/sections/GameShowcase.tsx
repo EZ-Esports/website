@@ -22,7 +22,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
         <div className="text-center mb-12">
           <span className="inline-block text-ez-pink uppercase tracking-widest text-xs font-bold mb-3">Competition</span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground">{title}</h2>
-          <div className="w-12 h-0.5 bg-ez-pink mx-auto mt-4" />
+          <div className="w-12 h-0.5 bg-gradient-to-r from-ez-pink to-ez-purple mx-auto mt-4" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {games.map((game, index) => {
