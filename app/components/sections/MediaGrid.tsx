@@ -5,9 +5,9 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import FocusTrap from 'focus-trap-react';
 import type { Image as ImageType, Theme, GridColumns } from '@/app/types';
-import { THEME_CLASSES, GRID_COLUMNS } from '@/app/lib/constants';
+import { THEME_CLASSES, GALLERY_ITEM_WIDTHS } from '@/app/lib/constants';
 
-function GalleryItem({ item, index, onOpen }: { item: ImageType; index: number; onOpen: (i: number) => void }) {
+function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; index: number; widthClass: string; onOpen: (i: number) => void }) {
   const [errored, setErrored] = useState(false);
   if (errored) return null;
   return (
@@ -17,7 +17,7 @@ function GalleryItem({ item, index, onOpen }: { item: ImageType; index: number; 
       role="button"
       tabIndex={0}
       aria-label={`View photo: ${item.alt}`}
-      className="aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group"
+      className={`${widthClass} shrink-0 aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group`}
     >
       <Image
         src={item.src}
@@ -93,9 +93,9 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
   return (
     <section className={`${themeClasses} py-16 md:py-24 border-t border-custom-border/30`}>
       <div className="container mx-auto px-4">
-        <div className={`grid ${GRID_COLUMNS[columns]} gap-6`}>
+        <div className="flex flex-wrap justify-center gap-6">
           {items.map((item, index) => (
-            <GalleryItem key={item.id || index} item={item} index={index} onOpen={openLightbox} />
+            <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={openLightbox} />
           ))}
         </div>
       </div>
