@@ -47,7 +47,7 @@ export default async function ApplicationsAdminPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800">
+                <tr className="border-b border-ez-pink/20">
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Applicant</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">School</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Role</th>

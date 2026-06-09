@@ -105,7 +105,7 @@ export default async function SponsorsAdminPage() {
       )}
 
       {/* Sponsors Table */}
-      <Card className="bg-slate-900/30 border border-slate-800">
+      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">
           All Sponsors ({sponsors.length})
         </h2>
