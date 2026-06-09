@@ -4,6 +4,16 @@ import * as schema from '@/app/lib/db/schema';
 import { asc } from 'drizzle-orm';
 import ContentEditor from './ContentEditor';
 
+const keyPageMap: Record<string, string> = {
+  'hero.title': 'Homepage → Hero',
+  'hero.subtitle': 'Homepage → Hero',
+  'hero.cta': 'Homepage → Hero',
+  'about.mission': 'About Page → Mission',
+  'about.story': 'About Page → Story',
+  'apply.intro': 'Apply Page → Intro',
+  'sponsors.intro': 'Sponsors Page → Intro',
+};
+
 async function getAllPageContent() {
   return db.select().from(schema.pageContent).orderBy(asc(schema.pageContent.key));
 }
@@ -54,13 +64,17 @@ export default async function ContentAdminPage() {
         ) : (
           <div className="space-y-4">
             {rows.map((row) => (
-              <ContentEditor
-                key={row.id}
-                id={row.id}
-                label={row.label}
-                contentKey={row.key}
-                initialContent={row.content}
-              />
+              <div key={row.id} className="space-y-1">
+                <p className="text-xs text-slate-500 font-mono">
+                  <span className="text-slate-600">Appears on:</span> {keyPageMap[row.key] ?? row.key}
+                </p>
+                <ContentEditor
+                  id={row.id}
+                  label={row.label}
+                  contentKey={row.key}
+                  initialContent={row.content}
+                />
+              </div>
             ))}
           </div>
         )}

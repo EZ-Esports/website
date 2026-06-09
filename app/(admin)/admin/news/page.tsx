@@ -5,7 +5,8 @@ import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
-export default async function AdminNewsPage() {
+export default async function AdminNewsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q = '' } = await searchParams;
   let posts: Awaited<ReturnType<typeof getCachedNews>> = [];
   let dbError = false;
 
@@ -14,6 +15,14 @@ export default async function AdminNewsPage() {
   } catch {
     dbError = true;
   }
+
+  const filtered = q
+    ? posts.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q.toLowerCase()) ||
+          p.category.toLowerCase().includes(q.toLowerCase())
+      )
+    : posts;
 
   return (
     <div className="space-y-6">
@@ -38,68 +47,110 @@ export default async function AdminNewsPage() {
 
       {/* Articles Table */}
       {!dbError && (
-        <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
-          {posts.length === 0 ? (
-            <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl">
-              No news articles found. Click &ldquo;+ Write Article&rdquo; to create your first announcement!
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-[#0b101d] border-b border-slate-800/80">
-                  <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-                    <th className="px-6 py-4">Title</th>
-                    <th className="px-6 py-4">Category</th>
-                    <th className="px-6 py-4">Published Date</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-sm">
-                  {posts.map((post) => {
-                    const deleteActionWithId = deleteNewsPost.bind(null, post.id);
-                    return (
-                      <tr key={post.id} className="hover:bg-slate-800/10 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-white text-base tracking-tight">{post.title}</div>
-                          <div className="text-xs text-slate-400 max-w-md truncate mt-1 leading-relaxed">
-                            {post.excerpt || 'No excerpt provided.'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-slate-900 text-slate-300 border border-slate-800">
-                            {post.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-300 font-medium">
-                          {new Date(post.publishedAt).toLocaleDateString('en-US', {
-                            timeZone: 'America/New_York',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end items-center gap-2">
-                            <Link
-                              href={`/admin/news/${post.id}`}
-                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
-                            >
-                              Edit
-                            </Link>
-                            <ConfirmDeleteButton
-                              action={deleteActionWithId}
-                              message={`Delete "${post.title}"? This permanently removes the article from the public site.`}
-                              className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+        <div className="space-y-3">
+          {/* Search form */}
+          <form method="GET" className="flex gap-2">
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Search by title or category…"
+              className="flex-1 px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-lg text-sm font-bold transition-all cursor-pointer"
+            >
+              Search
+            </button>
+            {q && (
+              <a
+                href="/admin/news"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-lg text-sm font-bold transition-all"
+              >
+                Clear
+              </a>
+            )}
+          </form>
+
+          {q && (
+            <p className="text-xs text-slate-500">
+              Showing {filtered.length} of {posts.length} articles
+            </p>
           )}
+
+          <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
+            {filtered.length === 0 ? (
+              <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl">
+                {q
+                  ? `No articles match "${q}".`
+                  : 'No news articles found. Click “+ Write Article” to create your first announcement!'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-[#0b101d] border-b border-slate-800/80">
+                    <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                      <th className="px-6 py-4">Title</th>
+                      <th className="px-6 py-4">Category</th>
+                      <th className="px-6 py-4">Published Date</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-sm">
+                    {filtered.map((post) => {
+                      const deleteActionWithId = deleteNewsPost.bind(null, post.id);
+                      return (
+                        <tr key={post.id} className="hover:bg-slate-800/10 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-white text-base tracking-tight">{post.title}</div>
+                            <div className="text-xs text-slate-400 max-w-md truncate mt-1 leading-relaxed">
+                              {post.excerpt || 'No excerpt provided.'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-slate-900 text-slate-300 border border-slate-800">
+                              {post.category}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-300 font-medium">
+                            {new Date(post.publishedAt).toLocaleDateString('en-US', {
+                              timeZone: 'America/New_York',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end items-center gap-2">
+                              <a
+                                href={`/news/${post.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                              >
+                                View Live ↗
+                              </a>
+                              <Link
+                                href={`/admin/news/${post.id}`}
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                              >
+                                Edit
+                              </Link>
+                              <ConfirmDeleteButton
+                                action={deleteActionWithId}
+                                message={`Delete "${post.title}"? This permanently removes the article from the public site.`}
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
