@@ -8,3 +8,8 @@ export async function updateApplicationStatus(id: string, status: 'pending' | 'r
   await db.update(schema.schoolApplications).set({ status }).where(eq(schema.schoolApplications.id, id));
   revalidatePath('/admin/applications');
 }
+
+export async function deleteApplication(id: string) {
+  await db.delete(schema.schoolApplications).where(eq(schema.schoolApplications.id, id));
+  revalidatePath('/admin/applications');
+}

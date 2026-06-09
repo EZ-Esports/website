@@ -55,6 +55,7 @@ export default async function ApplicationsAdminPage() {
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Message</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Submitted</th>
+                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">

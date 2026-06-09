@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { updateApplicationStatus } from '@/app/(admin)/admin/applications/actions';
+import { updateApplicationStatus, deleteApplication } from '@/app/(admin)/admin/applications/actions';
+import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
 type Status = 'pending' | 'reviewed' | 'accepted';
 
@@ -87,6 +88,14 @@ export default function ApplicationRow({ app }: { app: Application }) {
           day: 'numeric',
           year: 'numeric',
         })}
+      </td>
+      <td className="py-3 pl-2">
+        <ConfirmDeleteButton
+          action={deleteApplication.bind(null, app.id)}
+          message={`Delete application from ${app.applicantName} (${app.schoolName})? This cannot be undone.`}
+          label="Delete"
+          className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer whitespace-nowrap"
+        />
       </td>
     </tr>
   );

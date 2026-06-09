@@ -80,6 +80,7 @@ export default async function AdminLeadershipPage() {
                   type="text"
                   required
                   pattern="[0-9]{4}"
+                  title="Four-digit year, e.g. 2026"
                   placeholder="e.g. 2026"
                   defaultValue={new Date().getFullYear().toString()}
                   className={inputClass}

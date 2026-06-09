@@ -42,11 +42,11 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Year</label>
-              <input name="year" type="text" required pattern="[0-9]{4}" defaultValue={leader.year} className={inputClass} />
+              <input name="year" type="text" required pattern="[0-9]{4}" title="Four-digit year, e.g. 2026" defaultValue={leader.year} className={inputClass} />
             </div>
-            <div>
+            <div className="sm:col-span-2 lg:col-span-4">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bio</label>
-              <input name="bio" type="text" defaultValue={leader.bio ?? ''} className={inputClass} />
+              <textarea name="bio" rows={3} defaultValue={leader.bio ?? ''} className={`${inputClass} resize-none`} />
             </div>
             <div className="sm:col-span-2 lg:col-span-4 flex gap-2 justify-end pt-1">
               <button

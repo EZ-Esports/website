@@ -2,6 +2,7 @@ import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews, getCac
 import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
+import { HiOutlineTrophy, HiOutlineUsers, HiOutlineCalendarDays, HiOutlineNewspaper } from 'react-icons/hi2';
 
 export default async function AdminDashboardPage() {
   let stats = { games: 0, teams: 0, matches: 0, news: 0 };
@@ -150,7 +151,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Competition Games</span>
-              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🎮</span>
+              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineTrophy className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.games : 'N/A'}</p>
           </Card>
@@ -160,7 +161,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Registered Teams</span>
-              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">👥</span>
+              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineUsers className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.teams : 'N/A'}</p>
           </Card>
@@ -170,7 +171,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Scheduled Matches</span>
-              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🏆</span>
+              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineCalendarDays className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.matches : 'N/A'}</p>
           </Card>
@@ -180,7 +181,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Published Articles</span>
-              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">📰</span>
+              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineNewspaper className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.news : 'N/A'}</p>
           </Card>

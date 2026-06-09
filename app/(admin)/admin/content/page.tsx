@@ -49,7 +49,10 @@ export default async function ContentAdminPage() {
 
       <Card className="bg-slate-900/30 border border-slate-800">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-black text-white uppercase tracking-wider">Page Content Blocks</h2>
+          <div>
+            <h2 className="text-lg font-black text-white uppercase tracking-wider">Page Content Blocks</h2>
+            <p className="text-xs text-slate-500 mt-1">These blocks are managed by the system. Contact a developer to add or remove content keys.</p>
+          </div>
           {dbConfigured && (
             <span className="text-slate-400 text-sm">{rows.length} block{rows.length !== 1 ? 's' : ''}</span>
           )}
