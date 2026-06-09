@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import { updateSponsor, toggleSponsorActive, deleteSponsor } from '@/app/(admin)/admin/sponsors/actions';
+import ImageUpload from '@/app/components/admin/ImageUpload';
 
 const tierBadgeClass: Record<string, string> = {
   platinum: 'bg-slate-300/10 text-slate-300',
@@ -20,6 +21,7 @@ interface Sponsor {
   id: string;
   name: string;
   logoUrl: string | null;
+  storageKey: string | null;
   tier: 'platinum' | 'gold' | 'community';
   websiteUrl: string | null;
   isActive: boolean | null;
@@ -56,8 +58,13 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
               <input name="name" required defaultValue={sponsor.name} className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Logo URL</label>
-              <input name="logoUrl" defaultValue={sponsor.logoUrl ?? ''} placeholder="https://…/logo.png" className={inputClass} />
+              <ImageUpload
+                name="logoUrl"
+                storageKeyName="storageKey"
+                currentSrc={sponsor.logoUrl ?? undefined}
+                currentStorageKey={sponsor.storageKey ?? undefined}
+                label="Change Logo"
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Tier</label>
