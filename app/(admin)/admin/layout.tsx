@@ -3,25 +3,44 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logout } from './actions';
+import {
+  HiOutlineChartBar,
+  HiOutlineTrophy,
+  HiOutlineNewspaper,
+  HiOutlineUsers,
+  HiOutlineUserGroup,
+  HiOutlinePhoto,
+  HiOutlineCurrencyDollar,
+  HiOutlineClipboardDocument,
+  HiOutlinePencilSquare,
+  HiOutlineGlobeAlt,
+  HiArrowRightOnRectangle,
+} from 'react-icons/hi2';
+import type { IconType } from 'react-icons';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+interface SidebarItem {
+  label: string;
+  href: string;
+  icon: IconType;
+}
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
 
-  const sidebarItems = [
-    { label: 'Overview', href: '/admin', icon: '📊' },
-    { label: 'Matches & Standings', href: '/admin/matches', icon: '🏆' },
-    { label: 'News & Announcements', href: '/admin/news', icon: '📰' },
-    { label: 'Teams & Rosters', href: '/admin/roster', icon: '👥' },
-    { label: 'Leadership Manager', href: '/admin/leadership', icon: '👔' },
-    { label: 'Gallery', href: '/admin/gallery', icon: '🖼️' },
-    { label: 'Sponsors', href: '/admin/sponsors', icon: '🤝' },
-    { label: 'Applications', href: '/admin/applications', icon: '📋' },
-    { label: 'Page Content', href: '/admin/content', icon: '✏️' },
-    { label: 'Public Site', href: '/', icon: '🌐' },
+  const sidebarItems: SidebarItem[] = [
+    { label: 'Overview', href: '/admin', icon: HiOutlineChartBar },
+    { label: 'Matches & Standings', href: '/admin/matches', icon: HiOutlineTrophy },
+    { label: 'News & Announcements', href: '/admin/news', icon: HiOutlineNewspaper },
+    { label: 'Teams & Rosters', href: '/admin/roster', icon: HiOutlineUsers },
+    { label: 'Leadership Manager', href: '/admin/leadership', icon: HiOutlineUserGroup },
+    { label: 'Gallery', href: '/admin/gallery', icon: HiOutlinePhoto },
+    { label: 'Sponsors', href: '/admin/sponsors', icon: HiOutlineCurrencyDollar },
+    { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
+    { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
   ];
 
   // Helper to determine the current page title, including nested routes
@@ -52,29 +71,38 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </Link>
         </div>
 
-
         {/* Sidebar Items */}
         <nav className="flex-1 py-6 px-3 space-y-1">
           {sidebarItems.map((item) => {
             const isActive = pathname === item.href;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-300 group cursor-pointer ${
+                className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-300 group cursor-pointer border-l-2 pl-3 px-4 ${
                   isActive
-                    ? 'bg-slate-900 text-white border-l-2 border-white pl-3 px-4 font-bold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50 pl-4 px-4'
+                    ? 'bg-slate-900 text-white border-white font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent'
                 }`}
               >
-                <span className={`text-lg transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-                  {item.icon}
-                </span>
+                <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
                 <span className="text-sm tracking-wide">{item.label}</span>
               </Link>
             );
           })}
         </nav>
+
+        {/* Public Site link — separated from admin nav */}
+        <div className="px-3 pb-3 border-b border-zinc-800">
+          <Link
+            href="/"
+            className="flex items-center gap-3 py-2.5 border-l-2 border-transparent pl-3 px-4 text-slate-400 hover:text-white hover:bg-slate-900/50 rounded-xl transition-all duration-300 text-sm tracking-wide"
+          >
+            <HiOutlineGlobeAlt className="w-5 h-5" />
+            <span>Public Site</span>
+          </Link>
+        </div>
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-zinc-800 bg-zinc-950/20">
@@ -83,7 +111,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               type="submit"
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 hover:text-white border border-zinc-800/80 hover:border-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
             >
-              <span>🚪</span>
+              <HiArrowRightOnRectangle className="w-4 h-4" />
               <span>Sign Out</span>
             </button>
           </form>
