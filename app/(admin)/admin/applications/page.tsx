@@ -1,17 +1,6 @@
 import Card from '@/app/components/ui/Card';
 import { getSchoolApplications } from '@/app/lib/db/queries';
-
-const statusBadgeClass: Record<string, string> = {
-  pending: 'bg-amber-500/10 text-amber-400',
-  reviewed: 'bg-blue-500/10 text-blue-400',
-  accepted: 'bg-green-500/10 text-green-400',
-};
-
-const statusLabel: Record<string, string> = {
-  pending: 'Pending',
-  reviewed: 'Reviewed',
-  accepted: 'Accepted',
-};
+import ApplicationRow from '@/app/components/admin/ApplicationRow';
 
 export default async function ApplicationsAdminPage() {
   let applications: Awaited<ReturnType<typeof getSchoolApplications>> = [];
@@ -70,39 +59,7 @@ export default async function ApplicationsAdminPage() {
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
                 {applications.map((app) => (
-                  <tr key={app.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">{app.applicantName}</td>
-                    <td className="py-3 pr-4 text-slate-300">{app.schoolName}</td>
-                    <td className="py-3 pr-4 text-slate-300 capitalize">{app.role}</td>
-                    <td className="py-3 pr-4">
-                      <a
-                        href={`mailto:${app.email}`}
-                        className="text-slate-400 hover:text-white transition-colors"
-                      >
-                        {app.email}
-                      </a>
-                    </td>
-                    <td className="py-3 pr-4 text-slate-400 max-w-[200px]">
-                      {app.message
-                        ? app.message.length > 60
-                          ? `${app.message.slice(0, 60)}…`
-                          : app.message
-                        : <span className="text-zinc-600 italic">—</span>
-                      }
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass[app.status] ?? 'bg-zinc-800 text-zinc-400'}`}>
-                        {statusLabel[app.status] ?? app.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-slate-400 whitespace-nowrap">
-                      {new Date(app.submittedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </td>
-                  </tr>
+                  <ApplicationRow key={app.id} app={app} />
                 ))}
               </tbody>
             </table>
