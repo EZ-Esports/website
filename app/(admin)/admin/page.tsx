@@ -35,13 +35,13 @@ export default async function AdminDashboardPage() {
 
       // Calculate actionable alerts
       const now = new Date();
-      const pendingMatches = matches.filter(m => 
-        m.status === 'scheduled' && 
-        new Date(m.scheduledAt) < now && 
+      const pendingMatches = matches.filter(m =>
+        m.status === 'scheduled' &&
+        new Date(m.scheduledAt) < now &&
         (m.homeScore === null || m.awayScore === null)
       );
 
-      const teamsWithNoRoster = teams.filter(t => 
+      const teamsWithNoRoster = teams.filter(t =>
         !rosters.some(r => r.teamId === t.id)
       );
 
@@ -87,11 +87,11 @@ export default async function AdminDashboardPage() {
       {alerts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {alerts.map((alert, idx) => (
-            <div 
+            <div
               key={idx}
               className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
-                alert.type === 'warning' 
-                  ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40' 
+                alert.type === 'warning'
+                  ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40'
                   : 'bg-blue-500/5 border-blue-500/20 hover:border-blue-500/40'
               }`}
             >
@@ -131,7 +131,7 @@ export default async function AdminDashboardPage() {
               )}
             </div>
           </div>
-          
+
           <div className="pl-11 space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Execute setup commands in your project shell:</h4>
             <div className="bg-[#04060a]/90 p-4 rounded-xl text-sm text-slate-300 font-mono space-y-2 border border-slate-900 shadow-inner">
@@ -146,37 +146,45 @@ export default async function AdminDashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
-          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
-            <span>Competition Games</span>
-            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🎮</span>
-          </div>
-          <p className="text-4xl font-black text-white">{dbConfigured ? stats.games : '--'}</p>
-        </Card>
+        <Link href="/admin/matches">
+          <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
+            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+              <span>Competition Games</span>
+              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🎮</span>
+            </div>
+            <p className="text-4xl font-black text-white">{dbConfigured ? stats.games : 'N/A'}</p>
+          </Card>
+        </Link>
 
-        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
-          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
-            <span>Registered Teams</span>
-            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">👥</span>
-          </div>
-          <p className="text-4xl font-black text-white">{dbConfigured ? stats.teams : '--'}</p>
-        </Card>
+        <Link href="/admin/roster">
+          <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
+            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+              <span>Registered Teams</span>
+              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">👥</span>
+            </div>
+            <p className="text-4xl font-black text-white">{dbConfigured ? stats.teams : 'N/A'}</p>
+          </Card>
+        </Link>
 
-        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
-          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
-            <span>Scheduled Matches</span>
-            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🏆</span>
-          </div>
-          <p className="text-4xl font-black text-white">{dbConfigured ? stats.matches : '--'}</p>
-        </Card>
+        <Link href="/admin/matches">
+          <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
+            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+              <span>Scheduled Matches</span>
+              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">🏆</span>
+            </div>
+            <p className="text-4xl font-black text-white">{dbConfigured ? stats.matches : 'N/A'}</p>
+          </Card>
+        </Link>
 
-        <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36">
-          <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
-            <span>Published Articles</span>
-            <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">📰</span>
-          </div>
-          <p className="text-4xl font-black text-white">{dbConfigured ? stats.news : '--'}</p>
-        </Card>
+        <Link href="/admin/news">
+          <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
+            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+              <span>Published Articles</span>
+              <span className="text-2xl p-1.5 bg-slate-900 rounded-lg border border-slate-800">📰</span>
+            </div>
+            <p className="text-4xl font-black text-white">{dbConfigured ? stats.news : 'N/A'}</p>
+          </Card>
+        </Link>
       </div>
 
       {/* Quick Action Tasks */}
