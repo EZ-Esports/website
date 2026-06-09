@@ -27,7 +27,7 @@ export default async function AdminNewsPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       {/* Header Panel */}
-      <Card className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-slate-800/80 hover:shadow-none duration-300">
+      <Card className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-l-4 border-l-ez-pink hover:shadow-none duration-300">
         <div>
           <h1 className="text-2xl font-black text-white uppercase tracking-wider">News & Announcements</h1>
           <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
@@ -88,7 +88,7 @@ export default async function AdminNewsPage({ searchParams }: { searchParams: Pr
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#0b101d] border-b border-slate-800/80">
+                  <thead className="bg-[#0b101d] border-b border-ez-pink/20">
                     <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Title</th>
                       <th className="px-6 py-4">Category</th>

@@ -47,7 +47,7 @@ export default async function ContentAdminPage() {
         </div>
       )}
 
-      <Card className="bg-slate-900/30 border border-slate-800">
+      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-black text-white uppercase tracking-wider">Page Content Blocks</h2>

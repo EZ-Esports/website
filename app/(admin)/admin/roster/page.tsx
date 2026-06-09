@@ -46,7 +46,7 @@ export default async function AdminRosterPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="hover:border-slate-800/80 hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Teams & Roster Manager</h1>
         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
           Manage competitive rosters, assign players to teams, and configure game-specific lineups for each season.

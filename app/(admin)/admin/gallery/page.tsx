@@ -27,7 +27,7 @@ export default async function GalleryAdminPage() {
   return (
     <div className="space-y-8">
       {/* Add Image Form */}
-      <Card className="bg-slate-900/30 border border-slate-800">
+      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add Gallery Image</h2>
         <form action={addGalleryImage} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">

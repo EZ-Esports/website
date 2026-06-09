@@ -74,9 +74,9 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <Card className="bg-slate-900/30 border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-none duration-300">
+      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-none duration-300">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to EZ CMS</h1>
+          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to <span className="text-ez-pink">EZ</span> CMS</h1>
           <p className="text-slate-400 text-sm mt-1.5 leading-relaxed max-w-xl">
             Manage public competition schedules, teams, roster lists, and news announcements from a single, unified database dashboard.
           </p>
@@ -151,7 +151,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Competition Games</span>
-              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineTrophy className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineTrophy className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.games : 'N/A'}</p>
           </Card>
@@ -161,7 +161,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Registered Teams</span>
-              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineUsers className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineUsers className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.teams : 'N/A'}</p>
           </Card>
@@ -171,7 +171,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Scheduled Matches</span>
-              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineCalendarDays className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineCalendarDays className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.matches : 'N/A'}</p>
           </Card>
@@ -181,7 +181,7 @@ export default async function AdminDashboardPage() {
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Published Articles</span>
-              <span className="p-1.5 bg-slate-900 rounded-lg border border-slate-800"><HiOutlineNewspaper className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineNewspaper className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.news : 'N/A'}</p>
           </Card>
@@ -199,7 +199,7 @@ export default async function AdminDashboardPage() {
             </div>
             <Link
               href="/admin/matches"
-              className="text-xs font-bold text-zinc-300 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-zinc-400 hover:text-ez-pink transition-colors uppercase tracking-wider"
             >
               Go to Match Manager →
             </Link>
@@ -212,7 +212,7 @@ export default async function AdminDashboardPage() {
             </div>
             <Link
               href="/admin/news"
-              className="text-xs font-bold text-zinc-300 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-zinc-400 hover:text-ez-pink transition-colors uppercase tracking-wider"
             >
               Create News Article →
             </Link>
@@ -225,7 +225,7 @@ export default async function AdminDashboardPage() {
             </div>
             <Link
               href="/admin/roster"
-              className="text-xs font-bold text-zinc-300 hover:text-white hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-zinc-400 hover:text-ez-pink transition-colors uppercase tracking-wider"
             >
               Manage Roster Lists →
             </Link>

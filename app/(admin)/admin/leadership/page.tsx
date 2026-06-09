@@ -18,7 +18,7 @@ export default async function AdminLeadershipPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <Card className="hover:border-slate-800/80 hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Leadership Manager</h1>
         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
           Manage the student officers, roles, and bios displayed on the public leadership pages.
@@ -118,7 +118,7 @@ export default async function AdminLeadershipPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#0b101d] border-b border-slate-800/80">
+                  <thead className="bg-[#0b101d] border-b border-ez-pink/20">
                     <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Name / Bio</th>
                       <th className="px-6 py-4">Role</th>

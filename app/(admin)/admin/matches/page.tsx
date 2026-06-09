@@ -31,9 +31,10 @@ export default async function AdminMatchesPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-400 text-sm">
-        Schedule matches and input scores to recalculate team standings and seasonal records.
-      </p>
+      <div className="flex items-center gap-3">
+        <span className="w-1 h-6 rounded-full bg-ez-pink shrink-0" />
+        <p className="text-slate-400 text-sm">Schedule matches and input scores to recalculate team standings and seasonal records.</p>
+      </div>
 
       {dbError && (
         <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6">
