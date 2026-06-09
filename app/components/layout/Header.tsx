@@ -82,7 +82,7 @@ export default function Header() {
               aria-label="Watch EZ Esports live on Twitch (opens in new tab)"
               className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 hover:bg-ez-pink/20 transition-colors"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse" aria-hidden="true" />
+              <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse motion-reduce:animate-none" aria-hidden="true" />
               <SiTwitch className="w-3 h-3 text-ez-pink" aria-hidden="true" />
               <span className="text-xs font-bold text-ez-pink uppercase tracking-widest" aria-hidden="true">Watch Live</span>
             </Link>

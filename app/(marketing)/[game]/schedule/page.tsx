@@ -180,7 +180,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
                         {match.result}
                       </span>
                     ) : match.status === 'Live' ? (
-                      <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-extrabold animate-pulse">
+                      <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-extrabold animate-pulse motion-reduce:animate-none">
                         Live
                       </span>
                     ) : (
