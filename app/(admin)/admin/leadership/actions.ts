@@ -24,7 +24,7 @@ export async function createLeader(formData: FormData) {
   });
 
   // Revalidate query cache and public pages
-  revalidateTag('leadership', 'max');
+  revalidateTag('leadership', {});
   revalidatePath('/admin/leadership');
   revalidatePath('/leadership');
   revalidatePath(`/leadership/${year}`);
@@ -38,7 +38,7 @@ export async function updateLeader(id: string, year: string, formData: FormData)
   const bio = formData.get('bio') as string;
   if (!name || !role || !newYear) throw new Error('Name, Role, and Year are required.');
   await db.update(schema.leadership).set({ name, role, year: newYear, bio }).where(eq(schema.leadership.id, id));
-  revalidateTag('leadership', 'max');
+  revalidateTag('leadership', {});
   revalidatePath('/admin/leadership');
   revalidatePath('/leadership');
   revalidatePath(`/leadership/${year}`);
@@ -46,11 +46,11 @@ export async function updateLeader(id: string, year: string, formData: FormData)
 }
 
 export async function deleteLeader(id: string, year: string) {
-  await requireUser();
-  await db.update(schema.leadership).set({ deletedAt: new Date() }).where(eq(schema.leadership.id, id));
+  const user = await requireUser();
+  await db.update(schema.leadership).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.leadership.id, id));
 
   // Revalidate query cache and public pages
-  revalidateTag('leadership', 'max');
+  revalidateTag('leadership', {});
   revalidatePath('/admin/leadership');
   revalidatePath('/leadership');
   revalidatePath(`/leadership/${year}`);

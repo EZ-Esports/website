@@ -3,6 +3,9 @@ import { db } from './index';
 import * as schema from './schema';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 
+/** Default page size for public-facing paginated lists. */
+export const DEFAULT_PAGE_SIZE = 20;
+
 export const getCachedGames = unstable_cache(
   async () => {
     return db.select().from(schema.games);
@@ -59,13 +62,26 @@ export const getCachedSeasons = unstable_cache(
   { tags: ['seasons'] }
 );
 
+/**
+ * Paginated match query for public-facing pages.
+ * Use getAdminMatches() in admin views where you need all rows.
+ */
 export const getCachedMatches = unstable_cache(
-  async () => {
-    return db.select().from(schema.matches).orderBy(desc(schema.matches.scheduledAt));
+  async (limit = DEFAULT_PAGE_SIZE, offset = 0) => {
+    return db
+      .select()
+      .from(schema.matches)
+      .orderBy(desc(schema.matches.scheduledAt))
+      .limit(limit)
+      .offset(offset);
   },
   ['matches-list'],
   { tags: ['matches'] }
 );
+
+/** Uncached: returns all matches for admin views. */
+export const getAdminMatches = () =>
+  db.select().from(schema.matches).orderBy(desc(schema.matches.scheduledAt));
 
 export const getCachedRosters = unstable_cache(
   async () => {
@@ -83,17 +99,31 @@ export const getCachedPlayers = unstable_cache(
   { tags: ['players'] }
 );
 
+/**
+ * Paginated published news for public pages.
+ * Use getAdminNews() in admin views where you need all statuses.
+ */
 export const getCachedNews = unstable_cache(
-  async () => {
+  async (limit = DEFAULT_PAGE_SIZE, offset = 0) => {
     return db
       .select()
       .from(schema.newsPosts)
       .where(and(eq(schema.newsPosts.status, 'published'), isNull(schema.newsPosts.deletedAt)))
-      .orderBy(desc(schema.newsPosts.publishedAt));
+      .orderBy(desc(schema.newsPosts.publishedAt))
+      .limit(limit)
+      .offset(offset);
   },
   ['news-list'],
   { tags: ['news'] }
 );
+
+/** Uncached: returns all posts (all statuses) for admin views. */
+export const getAdminNews = () =>
+  db
+    .select()
+    .from(schema.newsPosts)
+    .where(isNull(schema.newsPosts.deletedAt))
+    .orderBy(desc(schema.newsPosts.updatedAt));
 
 export const getCachedLeadership = unstable_cache(
   async () => {

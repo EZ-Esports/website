@@ -17,7 +17,7 @@ function generateSlug(title: string): string {
 }
 
 function revalidateAll() {
-  revalidateTag('news', 'max');
+  revalidateTag('news', {});
   revalidatePath('/news');
   revalidatePath('/admin/news');
 }
@@ -148,10 +148,10 @@ export async function archiveNewsPost(id: string) {
 }
 
 export async function deleteNewsPost(id: string) {
-  await requireUser();
+  const user = await requireUser();
   await db
     .update(schema.newsPosts)
-    .set({ deletedAt: new Date() })
+    .set({ deletedAt: new Date(), deletedBy: user.id })
     .where(eq(schema.newsPosts.id, id));
   revalidateAll();
 }

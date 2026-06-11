@@ -4,11 +4,12 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { sanitizeDbError } from '@/app/lib/text-utils';
 
 // Safe wrapper for cache revalidations to support testing/scripts outside Next.js runtime
 function safeRevalidateTag(tag: string) {
   try {
-    revalidateTag(tag, 'max');
+    revalidateTag(tag, {});
   } catch {
     // Safely ignore when called outside Next.js server context (e.g. testing)
   }
@@ -44,9 +45,9 @@ export async function createSchool(formData: FormData) {
     safeRevalidateTag('schools');
     safeRevalidatePath('/admin/roster');
     return { success: true, school: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to create school.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -69,17 +70,17 @@ export async function updateSchool(id: string, formData: FormData) {
     safeRevalidateTag('schools');
     safeRevalidatePath('/admin/roster');
     return { success: true, school: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to update school.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
 export async function deleteSchool(id: string) {
-  await requireUser();
+  const user = await requireUser();
   try {
     // Soft delete: mark as deleted rather than removing the row (recoverable, no hard cascade)
-    await db.update(schema.schools).set({ deletedAt: new Date() }).where(eq(schema.schools.id, id));
+    await db.update(schema.schools).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.schools.id, id));
     safeRevalidateTag('schools');
     safeRevalidateTag('teams');
     safeRevalidateTag('rosters');
@@ -123,9 +124,9 @@ export async function createMember(formData: FormData) {
     safeRevalidateTag('members');
     safeRevalidatePath('/admin/roster');
     return { success: true, member: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to create member.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -158,9 +159,9 @@ export async function updateMember(id: string, formData: FormData) {
     safeRevalidateTag('members');
     safeRevalidatePath('/admin/roster');
     return { success: true, member: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to update member.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -217,9 +218,9 @@ export async function deleteTeam(id: string) {
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to delete team.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -269,9 +270,9 @@ export async function updateRoster(id: string, formData: FormData) {
     safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
     return { success: true, roster: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to update roster.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -283,9 +284,9 @@ export async function deleteRoster(id: string) {
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to delete roster.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -342,9 +343,9 @@ export async function updateRosterMember(id: string, formData: FormData) {
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
     return { success: true, player: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to update player details.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }
 
@@ -355,8 +356,8 @@ export async function deleteRosterMember(id: string) {
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { success: false, error: error.message || 'Failed to remove player from roster.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }

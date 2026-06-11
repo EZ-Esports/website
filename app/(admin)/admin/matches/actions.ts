@@ -28,7 +28,7 @@ export async function createMatch(formData: FormData) {
     status: 'scheduled',
   });
 
-  revalidateTag('matches', 'max');
+  revalidateTag('matches', {});
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }
@@ -56,8 +56,8 @@ export async function updateMatchScore(id: string, formData: FormData) {
     })
     .where(eq(schema.matches.id, id));
 
-  revalidateTag('matches', 'max');
-  revalidateTag('rosters', 'max');
+  revalidateTag('matches', {});
+  revalidateTag('rosters', {});
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }
@@ -66,8 +66,8 @@ export async function deleteMatch(id: string) {
   await requireUser();
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
 
-  revalidateTag('matches', 'max');
-  revalidateTag('rosters', 'max');
+  revalidateTag('matches', {});
+  revalidateTag('rosters', {});
   revalidatePath('/admin/matches');
   revalidatePath('/');
 }

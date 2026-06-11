@@ -5,6 +5,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { createClient } from '@/app/lib/supabase/server';
+import { safeUrl } from '@/app/lib/text-utils';
 
 const BUCKET = 'admin-uploads';
 
@@ -12,12 +13,6 @@ function revalidateAll() {
   revalidateTag('sponsors', {});
   revalidatePath('/admin/sponsors');
   revalidatePath('/sponsors');
-}
-
-// Only allow http(s) URLs; blank out anything else (e.g. a javascript: scheme) before it reaches an href.
-function safeUrl(url: string): string {
-  if (!url) return '';
-  return /^https?:\/\//i.test(url) ? url : '';
 }
 
 export async function addSponsor(formData: FormData) {
@@ -76,7 +71,7 @@ export async function toggleSponsorActive(id: string, isActive: boolean) {
 }
 
 export async function deleteSponsor(id: string) {
-  await requireUser();
+  const user = await requireUser();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.sponsors.storageKey })
@@ -84,7 +79,7 @@ export async function deleteSponsor(id: string) {
     .where(eq(schema.sponsors.id, id))
     .limit(1);
 
-  await db.update(schema.sponsors).set({ deletedAt: new Date() }).where(eq(schema.sponsors.id, id));
+  await db.update(schema.sponsors).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.sponsors.id, id));
 
   // Remove from Supabase Storage if a key exists
   if (row?.storageKey) {

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logout } from './actions';
+import SessionWarning from '@/app/components/admin/SessionWarning';
 import {
   HiOutlineChartBar,
   HiOutlineTrophy,
@@ -137,6 +138,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {children}
         </main>
       </div>
+      <SessionWarning />
     </div>
   );
 }

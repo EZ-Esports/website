@@ -74,7 +74,7 @@ export async function toggleGalleryImageActive(id: string, isActive: boolean) {
 }
 
 export async function deleteGalleryImage(id: string) {
-  await requireUser();
+  const user = await requireUser();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.galleryImages.storageKey })
@@ -82,7 +82,7 @@ export async function deleteGalleryImage(id: string) {
     .where(eq(schema.galleryImages.id, id))
     .limit(1);
 
-  await db.update(schema.galleryImages).set({ deletedAt: new Date() }).where(eq(schema.galleryImages.id, id));
+  await db.update(schema.galleryImages).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.galleryImages.id, id));
 
   // Remove from Supabase Storage if a key exists
   if (row?.storageKey) {

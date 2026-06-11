@@ -39,6 +39,7 @@ export const schools = pgTable('schools', {
   displayOrder: integer('display_order').default(0).notNull(),
   joinedAt: timestamp('joined_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 });
 
@@ -126,6 +127,12 @@ export const players = pgTable('players', {
   index('players_roster_id_idx').on(table.rosterId),
   index('players_member_id_idx').on(table.memberId),
   uniqueIndex('players_roster_member_unique_idx').on(table.rosterId, table.memberId),
+  // Enforce DB-level invariant: only one captain per roster.
+  // isCaptain is derived from role === 'captain'; this index guarantees the
+  // two can never diverge even under concurrent writes.
+  uniqueIndex('players_roster_one_captain_idx')
+    .on(table.rosterId)
+    .where(sql`is_captain = true`),
 ]);
 
 // --- MATCHES ---
@@ -167,6 +174,7 @@ export const newsPosts = pgTable('news_posts', {
   status: newsStatusEnum('status').default('published').notNull(),
   publishedAt: timestamp('published_at'),
   deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
   index('news_posts_published_at_idx').on(table.publishedAt),
@@ -182,6 +190,7 @@ export const leadership = pgTable('leadership', {
   year: text('year').notNull(), // e.g., "2025"
   bio: text('bio'),
   deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
   index('leadership_year_idx').on(table.year),
@@ -219,6 +228,7 @@ export const galleryImages = pgTable('gallery_images', {
   isActive: boolean('is_active').default(true).notNull(),
   storageKey: text('storage_key'),
   deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
   index('gallery_images_set_id_idx').on(table.setId),
@@ -235,6 +245,7 @@ export const sponsors = pgTable('sponsors', {
   displayOrder: integer('display_order').default(0).notNull(),
   storageKey: text('storage_key'),
   deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
   index('sponsors_tier_idx').on(table.tier),

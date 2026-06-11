@@ -5,6 +5,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { createClient } from '@/app/lib/supabase/server';
+import { slugify, safeUrl } from '@/app/lib/text-utils';
 
 const BUCKET = 'admin-uploads';
 
@@ -12,21 +13,6 @@ function revalidateAll() {
   revalidateTag('schools', {});
   revalidatePath('/admin/schools');
   revalidatePath('/');
-}
-
-function slugify(name: string): string {
-  const base = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  // Names made up entirely of non-alphanumerics slugify to '' and would collide; fall back to a unique value.
-  return base || `school-${Date.now()}`;
-}
-
-// Only allow http(s) URLs; blank out anything else (e.g. a javascript: scheme) before it reaches an href.
-function safeUrl(url: string): string {
-  if (!url) return '';
-  return /^https?:\/\//i.test(url) ? url : '';
 }
 
 export async function addSchool(formData: FormData) {
@@ -78,7 +64,7 @@ export async function updateSchool(id: string, formData: FormData) {
 }
 
 export async function deleteSchool(id: string) {
-  await requireUser();
+  const user = await requireUser();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.schools.storageKey })
@@ -86,7 +72,7 @@ export async function deleteSchool(id: string) {
     .where(eq(schema.schools.id, id))
     .limit(1);
 
-  await db.update(schema.schools).set({ deletedAt: new Date() }).where(eq(schema.schools.id, id));
+  await db.update(schema.schools).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.schools.id, id));
 
   // Remove from Supabase Storage if a key exists
   if (row?.storageKey) {

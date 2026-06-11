@@ -20,7 +20,10 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    return redirect('/login?error=' + encodeURIComponent(error.message));
+    // Supabase auth messages are user-facing by design; pass them through.
+    // Fall back to a generic message if the error somehow has no message.
+    const msg = error.message || 'Sign-in failed. Please try again.';
+    return redirect('/login?error=' + encodeURIComponent(msg));
   }
 
   // Clear caches and redirect to admin dashboard
