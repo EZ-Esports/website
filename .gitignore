@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Archived seed source data — contains member PII (emails, Discord, etc.).
+# Keep local; do NOT commit to this public repo. Import via `npm run db:seed`.
+/*.csv
+
 # vercel
 .vercel
 
