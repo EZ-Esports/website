@@ -5,16 +5,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
-
-// Helper to generate slugs
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+import { slugify } from '@/app/lib/text-utils';
 
 function revalidateAll() {
   revalidateTag('news', {});
@@ -34,7 +25,7 @@ export async function createNewsPost(formData: FormData) {
     throw new Error('Title, content, and category are required.');
   }
 
-  const slug = generateSlug(title);
+  const slug = slugify(title);
 
   if (intent === 'publish') {
     await db.insert(schema.newsPosts).values({
@@ -74,7 +65,7 @@ export async function updateNewsPost(id: string, formData: FormData) {
     throw new Error('Title, content, and category are required.');
   }
 
-  const slug = generateSlug(title);
+  const slug = slugify(title);
 
   const [existing] = await db
     .select()

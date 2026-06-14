@@ -24,6 +24,7 @@ export function rateLimit(
   limit: number,
   windowMs = 60_000,
 ): RateLimitResult {
+  // NOTE: the in-process Map resets on cold starts in serverless environments — counters do not persist across invocations.
   const now = Date.now();
   const windowStart = now - windowMs;
 

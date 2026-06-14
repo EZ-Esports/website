@@ -87,7 +87,7 @@ export async function deleteSchool(id: string) {
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
     return {
       success: false,
@@ -172,11 +172,11 @@ export async function deleteMember(id: string) {
     safeRevalidateTag('members');
     safeRevalidatePath('/admin/roster');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
-    return { 
-      success: false, 
-      error: 'Cannot delete member. Please make sure this member is removed from all rosters first.' 
+    return {
+      success: false,
+      error: 'Cannot delete member. Please make sure this member is removed from all rosters first.'
     };
   }
 }
@@ -203,7 +203,7 @@ export async function createTeam(formData: FormData) {
     safeRevalidateTag('teams');
     safeRevalidatePath('/admin/roster');
     return { success: true, team: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
     return { success: false, error: 'Failed to register team. Note: A school can only have one team per game/season.' };
   }
@@ -246,7 +246,7 @@ export async function createRoster(formData: FormData) {
     safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
     return { success: true, roster: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
     return { success: false, error: 'Failed to create roster. Note: Roster names must be unique within a team.' };
   }
@@ -319,7 +319,7 @@ export async function createRosterMember(formData: FormData) {
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
     return { success: true, player: res[0] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error);
     return { success: false, error: 'Failed to register player. Note: A member can only be registered once per roster.' };
   }

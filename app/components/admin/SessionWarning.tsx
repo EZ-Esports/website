@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
-const WARN_THRESHOLD_S = 5 * 60; // surface warning at 5 minutes remaining
+const WARN_THRESHOLD_S = 5 * 60; // 5 minutes in seconds
 const CHECK_INTERVAL_MS = 30_000; // re-check every 30 seconds
 
 export default function SessionWarning() {
@@ -43,8 +43,10 @@ export default function SessionWarning() {
       </span>
       {secsLeft > 0 && (
         <button
+          type="button"
+          aria-label="Refresh session"
           onClick={() => window.location.reload()}
-          className="ml-1 rounded-md border border-amber-700/40 bg-amber-900/40 px-2.5 py-1 hover:bg-amber-900/70 transition-colors cursor-pointer"
+          className="ml-1 cursor-pointer rounded-md border border-amber-700/40 bg-amber-900/40 px-2.5 py-1 hover:bg-amber-900/70 transition-colors"
         >
           Refresh
         </button>

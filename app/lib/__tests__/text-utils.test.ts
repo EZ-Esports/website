@@ -23,6 +23,7 @@ describe('slugify', () => {
 
   it('falls back to a uuid-based slug for all-symbol input', () => {
     const result = slugify('!!!');
+    // crypto.randomUUID() returns lowercase hex per the Web Crypto API specification
     expect(result).toMatch(/^school-[0-9a-f]{8}$/);
   });
 

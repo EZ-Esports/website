@@ -37,7 +37,7 @@ export async function updateMatchScore(id: string, formData: FormData) {
   await requireUser();
   const homeScoreStr = formData.get('homeScore') as string;
   const awayScoreStr = formData.get('awayScore') as string;
-  const status = formData.get('status') as any;
+  const status = formData.get('status') as 'scheduled' | 'live' | 'completed' | 'forfeit' | 'cancelled';
 
   if (!status) {
     throw new Error('Status is required.');

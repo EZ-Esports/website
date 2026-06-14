@@ -4,6 +4,7 @@
  * to unit-test.
  */
 
+// Intentional behavior change from prior version: non-alphanumeric characters and underscores are normalized to hyphens.
 /** URL-safe slug from arbitrary text. */
 export function slugify(value: string): string {
   const base = value
@@ -33,7 +34,7 @@ export function safeUrl(url: string): string {
  * Callers should still log the original error server-side before calling this.
  */
 export function sanitizeDbError(error: unknown): string {
-  const code = (error as any)?.code as string | undefined;
+  const code = (error as Record<string, unknown>)?.code as string | undefined;
   switch (code) {
     case '23505': // unique_violation
       return 'A record with this information already exists.';
