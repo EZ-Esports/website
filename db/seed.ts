@@ -5,6 +5,10 @@
  *   - "complete_matches_valorant 2022-26.csv"  -> schools, seasons, teams, rosters, matches
  *   - "staff_completeroster.csv"               -> leadership
  *
+ * REQUIRED INPUT: both CSV files must be present at the repo root for this seed
+ * to run. They are gitignored (member PII, public repo), so they are NOT in the
+ * repository — obtain them out-of-band and drop them in before `npm run db:seed`.
+ *
  * Design notes
  * ------------
  * 1. The match CSV is schedule-only (no scores), so every match lands as
