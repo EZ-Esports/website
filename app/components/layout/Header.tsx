@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import FocusTrap from 'focus-trap-react';
 import { SiTwitch } from 'react-icons/si';
 import { SITE_CONFIG } from '@/app/lib/constants';
 import Navigation from './Navigation';
@@ -14,25 +15,43 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   const { scrollY } = useScroll();
   const headerBg = useTransform(scrollY, [0, 80], ['rgba(17,17,17,0)', 'rgba(17,17,17,0.92)']);
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 20) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
+      setIsScrolled(window.scrollY > 20);
     };
-
-    // Set initial scroll state in case of reload
     handleScroll();
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  // Close when route changes (deferred to avoid synchronous setState in effect body)
+  useEffect(() => {
+    const id = setTimeout(() => setIsOpen(false), 0);
+    return () => clearTimeout(id);
+  }, [pathname]);
+
+  const handleCloseMenu = () => {
+    setIsOpen(false);
+    toggleRef.current?.focus();
+  };
 
   // Check if current page features a dark hero banner at the top
   const hasHero = pathname === '/' ||
@@ -95,21 +114,23 @@ export default function Header() {
 
           {/* Mobile Menu Button */}
           <button
+            ref={toggleRef}
             onClick={() => setIsOpen(!isOpen)}
-            className={`md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-colors ${
+            className={`md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
               isDarkText
                 ? 'text-foreground-secondary hover:text-foreground border-custom-border bg-background-secondary/40'
                 : 'text-white/95 hover:text-ez-pink border-white/20 bg-white/10'
             }`}
             aria-expanded={isOpen}
-            aria-label="Toggle Navigation Menu"
+            aria-controls="mobile-nav"
+            aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
           >
             {isOpen ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             )}
@@ -119,18 +140,27 @@ export default function Header() {
         {/* Mobile Navigation Drawer */}
         <AnimatePresence>
           {isOpen && (
-            <motion.div
-              key="mobile-nav"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className={`md:hidden py-4 border-t border-custom-border/40 rounded-b-xl px-2 ${
-                isDarkText ? 'bg-background/95' : 'bg-zinc-950/95'
-              }`}
+            <FocusTrap
+              focusTrapOptions={{
+                escapeDeactivates: false,
+                allowOutsideClick: true,
+                returnFocusOnDeactivate: false,
+              }}
             >
-              <Navigation isDarkText={isDarkText} onNavigate={() => setIsOpen(false)} />
-            </motion.div>
+              <motion.div
+                id="mobile-nav"
+                key="mobile-nav"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className={`md:hidden py-4 border-t border-custom-border/40 rounded-b-xl px-2 ${
+                  isDarkText ? 'bg-background/95' : 'bg-zinc-950/95'
+                }`}
+              >
+                <Navigation isDarkText={isDarkText} onNavigate={handleCloseMenu} />
+              </motion.div>
+            </FocusTrap>
           )}
         </AnimatePresence>
       </nav>

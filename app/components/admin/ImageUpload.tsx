@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface ImageUploadProps {
   name: string;
@@ -24,10 +24,42 @@ export default function ImageUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Native form.reset() (used by AddEntityForm on a successful add) clears DOM
+  // fields but not React state — sync our preview/storageKey back to defaults so
+  // the next entry doesn't silently reuse the previous upload.
+  useEffect(() => {
+    const form = rootRef.current?.closest('form');
+    if (!form) return;
+    const onReset = () => {
+      setPreviewUrl(currentSrc ?? '');
+      setStorageKey(currentStorageKey ?? '');
+      setError(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    form.addEventListener('reset', onReset);
+    return () => form.removeEventListener('reset', onReset);
+  }, [currentSrc, currentStorageKey]);
+
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Client-side validation before hitting the server
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_SIZE_BYTES) {
+      setError('File too large. Maximum size is 5 MB.');
+      e.target.value = '';
+      return;
+    }
 
     setUploading(true);
     setError(null);
@@ -58,7 +90,7 @@ export default function ImageUpload({
   }
 
   return (
-    <div>
+    <div ref={rootRef}>
       <label className="block text-sm text-zinc-400 mb-1">
         {label}
         {required && <span className="text-ez-pink ml-1">*</span>}
@@ -98,7 +130,7 @@ export default function ImageUpload({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+        accept="image/jpeg,image/png,image/gif,image/webp"
         onChange={handleFileChange}
         className="hidden"
       />

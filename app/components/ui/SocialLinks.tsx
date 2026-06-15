@@ -30,7 +30,9 @@ export default function SocialLinks({ className, iconClassName }: SocialLinksPro
           <Link
             key={social.platform}
             href={social.url}
-            aria-label={social.label}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${social.label} (opens in new tab)`}
             className="focus:outline-none focus:ring-2 focus:ring-ez-pink/50 focus:ring-offset-2 focus:ring-offset-slate-950 rounded-full"
           >
             <div className={iconStyles}>

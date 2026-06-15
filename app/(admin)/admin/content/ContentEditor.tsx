@@ -34,6 +34,7 @@ function formatDate(date: Date): string {
 export default function ContentEditor({ id, label, contentKey, initialContent, history }: ContentEditorProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [currentContent, setCurrentContent] = useState(initialContent);
@@ -41,10 +42,16 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
   const handleSubmit = async (formData: FormData) => {
     setSaving(true);
     setSaved(false);
-    await updatePageContent(id, formData);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSaveError(null);
+    try {
+      await updatePageContent(id, formData);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Sort most-recent-first
@@ -78,6 +85,9 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
           </button>
           {saved && (
             <span className="text-green-400 text-xs font-semibold">Saved!</span>
+          )}
+          {saveError && (
+            <span className="text-red-400 text-xs font-semibold">{saveError}</span>
           )}
           {restored && (
             <span className="text-green-400 text-xs font-semibold">Restored!</span>

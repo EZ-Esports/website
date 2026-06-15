@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import { updateSponsor, toggleSponsorActive, deleteSponsor } from '@/app/(admin)/admin/sponsors/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
@@ -34,16 +34,38 @@ const inputClass =
 export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) firstFieldRef.current?.focus();
+  }, [editing]);
+
+  const closeEditing = () => {
+    setEditing(false);
+    setTimeout(() => editBtnRef.current?.focus(), 0);
+  };
 
   const handleSave = (formData: FormData) => {
+    setSaveError(null);
     startTransition(async () => {
-      await updateSponsor(sponsor.id, formData);
-      setEditing(false);
+      const res = await updateSponsor(sponsor.id, formData);
+      if (res && !res.success) {
+        setSaveError(res.error || 'Could not save changes.');
+        return;
+      }
+      closeEditing();
     });
   };
 
   const handleToggleActive = () => {
-    startTransition(() => toggleSponsorActive(sponsor.id, !sponsor.isActive));
+    setToggleError(null);
+    startTransition(async () => {
+      const res = await toggleSponsorActive(sponsor.id, !sponsor.isActive);
+      if (res && !res.success) setToggleError(res.error || 'Could not update status.');
+    });
   };
 
   if (editing) {
@@ -55,7 +77,7 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                 Name <span className="text-ez-pink">*</span>
               </label>
-              <input name="name" required defaultValue={sponsor.name} className={inputClass} />
+              <input ref={firstFieldRef} name="name" required defaultValue={sponsor.name} className={inputClass} />
             </div>
             <div>
               <ImageUpload
@@ -92,12 +114,15 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
               </button>
               <button
                 type="button"
-                onClick={() => setEditing(false)}
+                onClick={closeEditing}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
               >
                 Cancel
               </button>
             </div>
+            {saveError && (
+              <p role="alert" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
+            )}
           </form>
         </td>
       </tr>
@@ -136,11 +161,15 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
         >
           {sponsor.isActive ? 'Active' : 'Inactive'}
         </button>
+        {toggleError && (
+          <p role="alert" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
+        )}
       </td>
       <td className="py-3 pr-4 text-slate-400">{sponsor.displayOrder}</td>
       <td className="py-3 text-right">
         <div className="flex items-center justify-end gap-2">
           <button
+            ref={editBtnRef}
             onClick={() => setEditing(true)}
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
           >

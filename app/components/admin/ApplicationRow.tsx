@@ -5,6 +5,7 @@ import { updateApplicationStatus, deleteApplication } from '@/app/(admin)/admin/
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
 type Status = 'pending' | 'reviewed' | 'accepted';
+type StatusFilter = 'all' | Status;
 
 interface Application {
   id: string;
@@ -23,13 +24,19 @@ const activeBadgeClass: Record<Status, string> = {
   accepted: 'bg-green-500/10 text-green-400 border border-green-500/20',
 };
 
-export default function ApplicationRow({ app }: { app: Application }) {
+export default function ApplicationRow({ app, activeFilter = 'all' }: { app: Application; activeFilter?: StatusFilter }) {
   const [status, setStatus] = useState<Status>(app.status);
   const [expanded, setExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+  // On a filtered view, a row whose status no longer matches the filter should
+  // leave the list immediately (server revalidation confirms this shortly after).
+  const [removed, setRemoved] = useState(false);
 
   const message = app.message ?? '';
   const isLong = message.length > 80;
+
+  if (removed) return null;
 
   return (
     <tr className="hover:bg-zinc-900/40 transition-colors">
@@ -68,8 +75,18 @@ export default function ApplicationRow({ app }: { app: Application }) {
               key={s}
               disabled={isPending || status === s}
               onClick={() => {
-                startTransition(() => updateApplicationStatus(app.id, s));
+                const prev = status;
                 setStatus(s);
+                setActionError(null);
+                startTransition(async () => {
+                  try {
+                    await updateApplicationStatus(app.id, s);
+                    if (activeFilter !== 'all' && s !== activeFilter) setRemoved(true);
+                  } catch {
+                    setStatus(prev);
+                    setActionError('Failed to update status. Please try again.');
+                  }
+                });
               }}
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-default ${
                 status === s
@@ -80,6 +97,9 @@ export default function ApplicationRow({ app }: { app: Application }) {
               {s}
             </button>
           ))}
+          {actionError && (
+            <span className="text-[10px] text-red-400 ml-1">{actionError}</span>
+          )}
         </div>
       </td>
       <td className="py-3 text-slate-400 whitespace-nowrap">

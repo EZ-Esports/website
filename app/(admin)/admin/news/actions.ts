@@ -5,7 +5,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { slugify } from '@/app/lib/text-utils';
+import { slugify, sanitizeDbError } from '@/app/lib/text-utils';
 
 function revalidateAll() {
   revalidateTag('news', {});
@@ -22,35 +22,28 @@ export async function createNewsPost(formData: FormData) {
   const intent = formData.get('intent') as string;
 
   if (!title || !content || !category) {
-    throw new Error('Title, content, and category are required.');
+    return { success: false, error: 'Title, content, and category are required.' };
   }
 
   const slug = slugify(title);
 
-  if (intent === 'publish') {
+  try {
     await db.insert(schema.newsPosts).values({
       title,
       slug,
       excerpt,
       content,
       category,
-      status: 'published',
-      publishedAt: new Date(),
+      status: intent === 'publish' ? 'published' : 'draft',
+      publishedAt: intent === 'publish' ? new Date() : null,
     });
-  } else {
-    await db.insert(schema.newsPosts).values({
-      title,
-      slug,
-      excerpt,
-      content,
-      category,
-      status: 'draft',
-      publishedAt: null,
-    });
+  } catch (error) {
+    console.error('Failed to create news post', error);
+    return { success: false, error: sanitizeDbError(error) };
   }
 
   revalidateAll();
-  return redirect('/admin/news');
+  redirect('/admin/news');
 }
 
 export async function updateNewsPost(id: string, formData: FormData) {
@@ -62,46 +55,51 @@ export async function updateNewsPost(id: string, formData: FormData) {
   const intent = formData.get('intent') as string;
 
   if (!title || !content || !category) {
-    throw new Error('Title, content, and category are required.');
+    return { success: false, error: 'Title, content, and category are required.' };
   }
 
   const slug = slugify(title);
 
-  const [existing] = await db
-    .select()
-    .from(schema.newsPosts)
-    .where(eq(schema.newsPosts.id, id))
-    .limit(1);
+  try {
+    const [existing] = await db
+      .select()
+      .from(schema.newsPosts)
+      .where(eq(schema.newsPosts.id, id))
+      .limit(1);
 
-  let status: 'draft' | 'published' | 'archived' = existing?.status ?? 'draft';
-  let publishedAt: Date | null = existing?.publishedAt ?? null;
+    let status: 'draft' | 'published' | 'archived' = existing?.status ?? 'draft';
+    let publishedAt: Date | null = existing?.publishedAt ?? null;
 
-  if (intent === 'publish') {
-    status = 'published';
-    if (!publishedAt) {
-      publishedAt = new Date();
+    if (intent === 'publish') {
+      status = 'published';
+      if (!publishedAt) {
+        publishedAt = new Date();
+      }
+    } else {
+      // intent === 'draft': downgrade to draft regardless of current status
+      status = 'draft';
     }
-  } else {
-    // intent === 'draft': downgrade to draft regardless of current status
-    status = 'draft';
-  }
 
-  await db
-    .update(schema.newsPosts)
-    .set({
-      title,
-      slug,
-      excerpt,
-      content,
-      category,
-      status,
-      publishedAt,
-    })
-    .where(eq(schema.newsPosts.id, id));
+    await db
+      .update(schema.newsPosts)
+      .set({
+        title,
+        slug,
+        excerpt,
+        content,
+        category,
+        status,
+        publishedAt,
+      })
+      .where(eq(schema.newsPosts.id, id));
+  } catch (error) {
+    console.error('Failed to update news post', error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
 
   revalidateAll();
   revalidatePath(`/news/${slug}`);
-  return redirect('/admin/news');
+  redirect('/admin/news');
 }
 
 export async function publishNewsPost(id: string) {

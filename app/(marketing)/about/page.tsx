@@ -1,8 +1,32 @@
+import type { Metadata } from 'next';
 import ContentSection from '@/app/components/sections/ContentSection';
 import Hero from '@/app/components/sections/Hero';
 import Card from '@/app/components/ui/Card';
+import { getCachedSchools, getCachedPlayers, getCachedGames } from '@/app/lib/db/queries';
 
-export default function AboutPage() {
+export const metadata: Metadata = {
+  title: 'About EZ Esports | NYC High School Esports League',
+  description:
+    'Learn about EZ Esports — founded in 2021 by NYC high school students, building community and competitive esports pathways across the five boroughs.',
+};
+
+export default async function AboutPage() {
+  let schoolCount = 0;
+  let playerCount = 0;
+  let gameCount = 0;
+  try {
+    const [schools, players, games] = await Promise.all([
+      getCachedSchools(),
+      getCachedPlayers(),
+      getCachedGames(),
+    ]);
+    schoolCount = schools.length;
+    playerCount = players.length;
+    gameCount = games.length;
+  } catch (error) {
+    console.error('Failed to load About page stats', error);
+  }
+
   return (
     <main>
       <Hero
@@ -35,19 +59,19 @@ export default function AboutPage() {
       >
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <Card className="text-center hover:scale-[1.03] duration-300">
-            <div className="text-5xl font-black text-white mb-4">500+</div>
-            <div className="text-xl font-bold text-white mb-2">Concurrent Viewers</div>
-            <div className="text-slate-400 text-sm">Live broadcasts reaching audiences across NYC</div>
-          </Card>
-          <Card className="text-center hover:scale-[1.03] duration-300">
-            <div className="text-5xl font-black text-white mb-4">100+</div>
-            <div className="text-xl font-bold text-white mb-2">Active Players</div>
-            <div className="text-slate-400 text-sm">Students competing across multiple games</div>
-          </Card>
-          <Card className="text-center hover:scale-[1.03] duration-300">
-            <div className="text-5xl font-black text-white mb-4">15+</div>
+            <div className="text-5xl font-black text-white mb-4">{schoolCount > 0 ? schoolCount : '—'}</div>
             <div className="text-xl font-bold text-white mb-2">Participating Schools</div>
-            <div className="text-slate-400 text-sm">High schools from all five boroughs</div>
+            <div className="text-slate-400 text-sm">High schools from across New York City</div>
+          </Card>
+          <Card className="text-center hover:scale-[1.03] duration-300">
+            <div className="text-5xl font-black text-white mb-4">{playerCount > 0 ? playerCount : '—'}</div>
+            <div className="text-xl font-bold text-white mb-2">Registered Players</div>
+            <div className="text-slate-400 text-sm">Students competing across our leagues</div>
+          </Card>
+          <Card className="text-center hover:scale-[1.03] duration-300">
+            <div className="text-5xl font-black text-white mb-4">{gameCount > 0 ? gameCount : '—'}</div>
+            <div className="text-xl font-bold text-white mb-2">Competition Titles</div>
+            <div className="text-slate-400 text-sm">Live-streamed leagues with varsity & JV divisions</div>
           </Card>
         </div>
       </ContentSection>

@@ -22,6 +22,7 @@ export const ROUTES = {
   archives: '/archives',
   apply: '/apply',
   sponsors: '/sponsors',
+  privacy: '/privacy',
 } as const;
 
 export const getLeadershipRoute = (year: string): string => `${ROUTES.leadership}/${year}`;
@@ -146,7 +147,7 @@ export const EXTERNAL_LINKS = {
 
 export const NAV_ITEMS: NavigationItem[] = [
   { label: 'Leadership', href: ROUTES.leadership },
-  { label: 'Support ESports', href: ROUTES.sponsors },
+  { label: 'Support Esports', href: ROUTES.sponsors },
 ];
 
 export const SOCIAL_LINKS: SocialLink[] = [
@@ -162,8 +163,9 @@ export const FOOTER_LINKS = [
   { label: 'News', href: '/news' },
   { label: 'Leadership', href: '/leadership' },
   { label: 'Sponsors', href: '/sponsors' },
-  { label: 'About & FAQs', href: '/about' },
-{ label: 'Privacy Policy', href: '/privacy' },
+  { label: 'About', href: '/about' },
+  { label: 'Archives', href: '/archives' },
+  { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Staff Login', href: '/login' },
 ] as const;
 

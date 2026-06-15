@@ -22,7 +22,7 @@ export default function AudienceCTAs() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-foreground text-sm tracking-wide">Students &amp; Fans</div>
-              <div className="text-foreground-secondary text-sm mt-0.5">View leagues &amp; schedules</div>
+              <div className="text-foreground-secondary text-sm mt-0.5">View Valorant league &amp; schedule</div>
             </div>
             <span className="text-ez-pink text-lg opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" aria-hidden="true">→</span>
           </Link>

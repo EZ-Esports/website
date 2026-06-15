@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { GAMES, getGameSubRoute } from '@/app/lib/constants';
 import Button from '@/app/components/ui/Button';
@@ -8,25 +9,21 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 
+export const metadata: Metadata = {
+  title: 'League of Legends | EZ Esports',
+  description:
+    'Follow the EZ Esports League of Legends division — standings, schedules, match results, and school rosters for NYC high-school LoL competition.',
+};
+
 export default async function LeagueOfLegendsHubPage() {
   const game = GAMES['league-of-legends'];
 
-  // Graceful fallbacks
-  let record = '10-5';
-  let jvRecord = '7-8';
-  let nextMatch = { date: 'Saturday, March 15, 2025', teams: 'Stuyvesant vs. Brooklyn Tech', division: 'Varsity' };
-  let recentResults = [
-    { date: 'March 8, 2025', teams: 'Stuyvesant vs. Midwood', result: 'W 2-0', division: 'Varsity' },
-    { date: 'March 1, 2025', teams: 'Stuyvesant vs. Staten Island Tech', result: 'W 2-1', division: 'Varsity' },
-    { date: 'February 22, 2025', teams: 'Stuyvesant vs. Bronx Science', result: 'L 0-2', division: 'Varsity' },
-  ];
-  let topTeams = [
-    { rank: 1, team: 'Bronx Science', wins: 13, losses: 2, winPct: 0.867 },
-    { rank: 2, team: 'Stuyvesant', wins: 10, losses: 5, winPct: 0.667 },
-    { rank: 3, team: 'Brooklyn Tech', wins: 9, losses: 6, winPct: 0.600 },
-    { rank: 4, team: 'Midwood', wins: 8, losses: 7, winPct: 0.533 },
-    { rank: 5, team: 'Staten Island Tech', wins: 7, losses: 8, winPct: 0.467 },
-  ];
+  // Empty-state defaults — no fabricated data
+  let record: string | null = null;
+  let jvRecord: string | null = null;
+  let nextMatch: { date: string; teams: string; division: string } | null = null;
+  let recentResults: { date: string; teams: string; result: string; division: string }[] = [];
+  let topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[] = [];
 
   try {
     const gameRow = await db
@@ -38,7 +35,6 @@ export default async function LeagueOfLegendsHubPage() {
     if (gameRow[0]) {
       const gameId = gameRow[0].id;
 
-      // Get team rows
       const teamRows = await db
         .select({
           id: schema.teams.id,
@@ -58,20 +54,6 @@ export default async function LeagueOfLegendsHubPage() {
         : [];
       const rosterMap = new Map(rosterRows.map((r) => [r.id, r]));
 
-      // 1. Record
-      const stuyTeam = teamRows.find((t) => t.name === 'Stuyvesant');
-      if (stuyTeam) {
-        const varsityRoster = rosterRows.find((r) => r.teamId === stuyTeam.id && r.division === 'Varsity');
-        if (varsityRoster) {
-          record = `${(varsityRoster as any).wins || 0}-${(varsityRoster as any).losses || 0}`;
-        }
-        const jvRoster = rosterRows.find((r) => r.teamId === stuyTeam.id && r.division === 'JV');
-        if (jvRoster) {
-          jvRecord = `${(jvRoster as any).wins || 0}-${(jvRoster as any).losses || 0}`;
-        }
-      }
-
-      // 2. Next Match
       const activeSeason = await db
         .select()
         .from(schema.seasons)
@@ -109,7 +91,6 @@ export default async function LeagueOfLegendsHubPage() {
           };
         }
 
-        // 3. Recent Results
         const recentRows = await db
           .select()
           .from(schema.matches)
@@ -122,30 +103,26 @@ export default async function LeagueOfLegendsHubPage() {
           .orderBy(desc(schema.matches.scheduledAt))
           .limit(3);
 
-        if (recentRows.length > 0) {
-          recentResults = recentRows.map((r) => {
-            const homeRoster = rosterMap.get(r.homeRosterId);
-            const awayRoster = rosterMap.get(r.awayRosterId);
-            const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
-            const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
-            const isHomeStuy = home?.name === 'Stuyvesant';
-            const stuyWon = r.homeScore! > r.awayScore! ? isHomeStuy : !isHomeStuy;
-            return {
-              date: new Date(r.scheduledAt).toLocaleDateString('en-US', {
-                timeZone: 'America/New_York',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              }),
-              teams: `${home?.name} vs. ${away?.name}`,
-              result: `${stuyWon ? 'W' : 'L'} ${r.homeScore}-${r.awayScore}`,
-              division: homeRoster?.division || 'Varsity',
-            };
-          });
-        }
+        recentResults = recentRows.map((r) => {
+          const homeRoster = rosterMap.get(r.homeRosterId);
+          const awayRoster = rosterMap.get(r.awayRosterId);
+          const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+          const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
+          const homeWon = (r.homeScore ?? 0) > (r.awayScore ?? 0);
+          return {
+            date: new Date(r.scheduledAt).toLocaleDateString('en-US', {
+              timeZone: 'America/New_York',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            teams: `${home?.name ?? 'Home'} vs. ${away?.name ?? 'Away'}`,
+            result: `${homeWon ? 'W' : 'L'} ${r.homeScore ?? 0}-${r.awayScore ?? 0}`,
+            division: homeRoster?.division || 'Varsity',
+          };
+        });
       }
 
-      // 4. Top Teams
       const topRows = teamIds.length > 0
         ? await db
             .select()
@@ -160,21 +137,34 @@ export default async function LeagueOfLegendsHubPage() {
             .limit(5)
         : [];
 
+      topTeams = topRows.map((r, idx) => {
+        const team = teamMap.get(r.teamId!);
+        const wins = r.wins || 0;
+        const losses = r.losses || 0;
+        const played = wins + losses;
+        const winPct = played > 0 ? wins / played : 0;
+        return { rank: idx + 1, team: team?.name || 'Unknown', wins, losses, winPct };
+      });
+
       if (topRows.length > 0) {
-        topTeams = topRows.map((r, idx) => {
-          const team = teamMap.get(r.teamId!);
-          const wins = r.wins || 0;
-          const losses = r.losses || 0;
-          const played = wins + losses;
-          const winPct = played > 0 ? wins / played : 0;
-          return {
-            rank: idx + 1,
-            team: team?.name || 'Unknown',
-            wins,
-            losses,
-            winPct,
-          };
-        });
+        const totalVarsityW = topRows.reduce((acc, r) => acc + (r.wins || 0), 0);
+        const totalVarsityL = topRows.reduce((acc, r) => acc + (r.losses || 0), 0);
+        record = `${totalVarsityW}-${totalVarsityL}`;
+
+        const jvRows = teamIds.length > 0
+          ? await db
+              .select()
+              .from(schema.rosterStandings)
+              .where(
+                and(
+                  inArray(schema.rosterStandings.teamId, teamIds),
+                  eq(schema.rosterStandings.division, 'JV')
+                )
+              )
+          : [];
+        if (jvRows.length > 0) {
+          jvRecord = `${jvRows.reduce((a, r) => a + (r.wins || 0), 0)}-${jvRows.reduce((a, r) => a + (r.losses || 0), 0)}`;
+        }
       }
     }
   } catch (error) {
@@ -183,90 +173,94 @@ export default async function LeagueOfLegendsHubPage() {
 
   return (
     <main>
-      {/* Hero Section */}
       <Hero
         title={game.displayName}
         backgroundImage={game.imageUrl}
         size="medium"
       />
 
-      {/* Quick Stats Section */}
-      <ContentSection
-        heading="Current Season"
-        description=""
-        theme="dark"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2">{record}</div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Varsity Record</div>
-          </Card>
-          <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2">{jvRecord}</div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">JV Record</div>
-          </Card>
-          <Card className="hover:scale-[1.03] transition-all text-center">
-            <div className="text-4xl font-black text-ez-pink mb-2">Week 7</div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Current Week</div>
-          </Card>
-        </div>
-      </ContentSection>
-
-      {/* Next Match Preview */}
-      <ContentSection
-        heading="Next Match"
-        description=""
-        theme="light"
-      >
-        <Card className="max-w-2xl mx-auto hover:scale-[1.01] transition-all">
-          <div className="text-center">
-            <span className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-xs font-bold uppercase tracking-widest mb-4">
-              Upcoming Match
-            </span>
-            <div className="text-xs text-foreground-secondary font-bold uppercase tracking-wider mb-2">{nextMatch.date}</div>
-            <div className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">{nextMatch.teams}</div>
-            <div className="text-foreground-secondary text-sm font-medium mb-6">{nextMatch.division} Division</div>
-            
-            <div className="flex justify-center">
-              <Link href={getGameSubRoute('league-of-legends', 'schedule')}>
-                <Button variant="primary">View Full Schedule</Button>
-              </Link>
-            </div>
+      <ContentSection heading="Current Season" description="" theme="dark">
+        {record === null && jvRecord === null ? (
+          <div className="text-center py-8 text-foreground-secondary text-sm">
+            Season stats will appear once the season is underway.
           </div>
-        </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            {record !== null && (
+              <Card className="hover:scale-[1.03] transition-all text-center">
+                <div className="text-4xl font-black text-ez-pink mb-2">{record}</div>
+                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">League Varsity Record</div>
+              </Card>
+            )}
+            {jvRecord !== null && (
+              <Card className="hover:scale-[1.03] transition-all text-center">
+                <div className="text-4xl font-black text-ez-pink mb-2">{jvRecord}</div>
+                <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">League JV Record</div>
+              </Card>
+            )}
+          </div>
+        )}
       </ContentSection>
 
-      {/* Recent Results */}
-      <ContentSection
-        heading="Recent Results"
-        description=""
-        theme="dark"
-      >
-        <div className="max-w-4xl mx-auto space-y-4">
-          {recentResults.map((match, index) => {
-            const isWin = match.result.startsWith('W');
-            return (
-              <div 
-                key={index} 
-                className="bg-background-secondary/80 border border-custom-border/80 rounded-xl p-5 flex items-center justify-between hover:border-ez-pink/50 transition-all duration-300"
-              >
-                <div>
-                  <div className="text-xs text-foreground-secondary font-medium mb-1">{match.date} • {match.division} Division</div>
-                  <div className="text-foreground text-lg font-bold tracking-tight">{match.teams}</div>
-                </div>
-                <div>
-                  <span className={`inline-block px-3.5 py-1 rounded-full text-sm font-extrabold ${
-                    isWin 
-                      ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-                      : 'bg-ez-pink/10 border border-ez-pink/20 text-ez-pink'
-                  }`}>
-                    {match.result}
-                  </span>
-                </div>
+      <ContentSection heading="Next Match" description="" theme="light">
+        {nextMatch === null ? (
+          <div className="text-center py-8 text-foreground-secondary text-sm">
+            No upcoming matches scheduled.{' '}
+            <Link href={getGameSubRoute('league-of-legends', 'schedule')} className="text-ez-pink hover:underline">
+              View full schedule
+            </Link>
+          </div>
+        ) : (
+          <Card className="max-w-2xl mx-auto hover:scale-[1.01] transition-all">
+            <div className="text-center">
+              <span className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-xs font-bold uppercase tracking-widest mb-4">
+                Upcoming Match
+              </span>
+              <div className="text-xs text-foreground-secondary font-bold uppercase tracking-wider mb-2">{nextMatch.date}</div>
+              <div className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">{nextMatch.teams}</div>
+              <div className="text-foreground-secondary text-sm font-medium mb-6">{nextMatch.division} Division</div>
+              <div className="flex justify-center">
+                <Link href={getGameSubRoute('league-of-legends', 'schedule')}>
+                  <Button variant="primary">View Full Schedule</Button>
+                </Link>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </Card>
+        )}
+      </ContentSection>
+
+      <ContentSection heading="Recent Results" description="" theme="dark">
+        {recentResults.length === 0 ? (
+          <div className="text-center py-8 text-foreground-secondary text-sm">
+            No completed matches yet. Check back after season play begins.
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto space-y-4">
+            {recentResults.map((match, index) => {
+              const isWin = match.result.startsWith('W');
+              return (
+                <div
+                  key={index}
+                  className="bg-background-secondary/80 border border-custom-border/80 rounded-xl p-5 flex items-center justify-between hover:border-ez-pink/50 transition-all duration-300"
+                >
+                  <div>
+                    <div className="text-xs text-foreground-secondary font-medium mb-1">{match.date} • {match.division} Division</div>
+                    <div className="text-foreground text-lg font-bold tracking-tight">{match.teams}</div>
+                  </div>
+                  <div>
+                    <span className={`inline-block px-3.5 py-1 rounded-full text-sm font-extrabold ${
+                      isWin
+                        ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                        : 'bg-ez-pink/10 border border-ez-pink/20 text-ez-pink'
+                    }`}>
+                      {match.result}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="flex justify-center mt-10">
           <Link href={getGameSubRoute('league-of-legends', 'standings')}>
             <Button variant="secondary">View Full Standings</Button>
@@ -274,51 +268,61 @@ export default async function LeagueOfLegendsHubPage() {
         </div>
       </ContentSection>
 
-      {/* Standings Preview */}
-      <ContentSection
-        heading="Top Teams"
-        description=""
-        theme="light"
-      >
-        <div className="max-w-4xl mx-auto mb-10">
-          <div className="bg-black border border-zinc-900 rounded-2xl overflow-hidden shadow-2xl shadow-black/20">
-            <table className="w-full border-collapse">
-              <thead className="bg-zinc-950 border-b border-zinc-900">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rank</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">W-L</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Win %</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-900">
-                {topTeams.map((entry) => {
-                  return (
-                    <tr key={entry.rank} className="hover:bg-zinc-900/40 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold text-slate-300">
-                        {entry.rank === 1 ? (
-                          <span className="text-yellow-500 font-bold">🏆 1</span>
-                        ) : entry.rank === 2 ? (
-                          <span className="text-slate-400">🥈 2</span>
-                        ) : entry.rank === 3 ? (
-                          <span className="text-amber-600">🥉 3</span>
-                        ) : (
-                          entry.rank
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-white">{(entry.winPct * 100).toFixed(1)}%</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <ContentSection heading="Top Teams" description="" theme="light">
+        {topTeams.length === 0 ? (
+          <div className="text-center py-8 text-foreground-secondary text-sm">
+            No standings yet. Check back once season play begins.
           </div>
-        </div>
+        ) : (
+          <div className="max-w-4xl mx-auto mb-10">
+            <div className="overflow-x-auto">
+              <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/20">
+                <table className="w-full border-collapse">
+                  <thead className="bg-slate-900/60 border-b border-slate-800/80">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rank</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">W-L</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Win %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {topTeams.map((entry) => (
+                      <tr key={entry.rank} className="hover:bg-slate-800/20 transition-colors">
+                        <td className="px-6 py-4 text-sm font-bold text-slate-300">
+                          {entry.rank === 1 ? (
+                            <span className="text-yellow-500 font-bold">
+                              <span aria-hidden="true">🏆 </span>
+                              <span>1</span>
+                            </span>
+                          ) : entry.rank === 2 ? (
+                            <span className="text-slate-400">
+                              <span aria-hidden="true">🥈 </span>
+                              <span>2</span>
+                            </span>
+                          ) : entry.rank === 3 ? (
+                            <span className="text-amber-600">
+                              <span aria-hidden="true">🥉 </span>
+                              <span>3</span>
+                            </span>
+                          ) : (
+                            entry.rank
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-white">{(entry.winPct * 100).toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex justify-center mt-6">
           <Link href={getGameSubRoute('league-of-legends', 'teams')}>
-            <Button variant="primary">See Teams & Rosters</Button>
+            <Button variant="primary">See Teams &amp; Rosters</Button>
           </Link>
         </div>
       </ContentSection>

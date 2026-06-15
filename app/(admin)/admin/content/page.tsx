@@ -3,6 +3,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, desc } from 'drizzle-orm';
 import ContentEditor from './ContentEditor';
+import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 
 const keyPageMap: Record<string, string> = {
   'hero.title': 'Homepage → Hero',
@@ -38,19 +39,7 @@ export default async function ContentAdminPage() {
 
   return (
     <div className="space-y-8">
-      {!dbConfigured && (
-        <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6">
-          <div className="flex items-start gap-4">
-            <span className="text-3xl mt-0.5 select-none animate-pulse">⚠️</span>
-            <div>
-              <h3 className="text-lg font-bold text-amber-400 tracking-tight">Database Not Configured</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mt-1">
-                Set <code>DATABASE_URL</code> in your <code>.env</code> file and run <code>npm run db:push</code> to manage page content.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {!dbConfigured && <DbErrorNotice variant="not-configured" />}
 
       <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <div className="flex items-center justify-between mb-6">

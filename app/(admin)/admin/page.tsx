@@ -1,11 +1,11 @@
-import { getCachedGames, getCachedTeams, getCachedMatches, getCachedNews, getCachedRosters } from '@/app/lib/db/queries';
+import { getCachedGames, getCachedTeams, countScheduledMatches, countPublishedNews, countPendingResults, countTeamsWithoutRoster } from '@/app/lib/db/queries';
 import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import { HiOutlineTrophy, HiOutlineUsers, HiOutlineCalendarDays, HiOutlineNewspaper, HiExclamationTriangle, HiInformationCircle } from 'react-icons/hi2';
 
 export default async function AdminDashboardPage() {
-  let stats = { games: 0, teams: 0, matches: 0, news: 0 };
+  let stats = { games: 0, teams: 0, scheduledMatches: 0, publishedNews: 0 };
   let dbConfigured = false;
   let connectionError = '';
   let alerts: Array<{
@@ -19,47 +19,36 @@ export default async function AdminDashboardPage() {
 
   try {
     if (process.env.DATABASE_URL) {
-      const [games, teams, matches, news, rosters] = await Promise.all([
+      const [games, teams, scheduledMatchCount, publishedNewsCount, pendingResults, teamsWithNoRoster] = await Promise.all([
         getCachedGames(),
         getCachedTeams(),
-        getCachedMatches(),
-        getCachedNews(),
-        getCachedRosters(),
+        countScheduledMatches(),
+        countPublishedNews(),
+        countPendingResults(),
+        countTeamsWithoutRoster(),
       ]);
 
       stats = {
         games: games.length,
         teams: teams.length,
-        matches: matches.length,
-        news: news.length,
+        scheduledMatches: scheduledMatchCount,
+        publishedNews: publishedNewsCount,
       };
 
-      // Calculate actionable alerts
-      const now = new Date();
-      const pendingMatches = matches.filter(m =>
-        m.status === 'scheduled' &&
-        new Date(m.scheduledAt) < now &&
-        (m.homeScore === null || m.awayScore === null)
-      );
-
-      const teamsWithNoRoster = teams.filter(t =>
-        !rosters.some(r => r.teamId === t.id)
-      );
-
       alerts = [
-        ...(pendingMatches.length > 0 ? [{
+        ...(pendingResults > 0 ? [{
           type: 'warning' as const,
           label: 'Pending Results',
-          count: pendingMatches.length,
-          message: `${pendingMatches.length} completed matches are missing final scores.`,
+          count: pendingResults,
+          message: `${pendingResults} past ${pendingResults === 1 ? 'match still needs' : 'matches still need'} final scores.`,
           link: '/admin/matches',
           linkText: 'Enter Scores'
         }] : []),
-        ...(teamsWithNoRoster.length > 0 ? [{
+        ...(teamsWithNoRoster > 0 ? [{
           type: 'info' as const,
           label: 'Incomplete Teams',
-          count: teamsWithNoRoster.length,
-          message: `${teamsWithNoRoster.length} registered teams have no competitive rosters assigned.`,
+          count: teamsWithNoRoster,
+          message: `${teamsWithNoRoster} registered teams have no competitive rosters assigned.`,
           link: '/admin/roster',
           linkText: 'Assign Rosters'
         }] : [])
@@ -136,9 +125,9 @@ export default async function AdminDashboardPage() {
           <div className="pl-11 space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Execute setup commands in your project shell:</h4>
             <div className="bg-[#04060a]/90 p-4 rounded-xl text-sm text-slate-300 font-mono space-y-2 border border-slate-900 shadow-inner">
-              <p className="text-slate-500 text-xs"># 1. Stash changes & push migrations to Supabase Postgres</p>
+              <p className="text-slate-500 text-xs"># 1. Push schema migrations to your Supabase Postgres database</p>
               <p><span className="text-slate-100 font-semibold">npm run</span> db:push</p>
-              <p className="text-slate-500 text-xs"># 2. Seed database with games, teams, and sample match fixtures</p>
+              <p className="text-slate-500 text-xs"># 2. Seed with games, seasons, schools, and sample data</p>
               <p><span className="text-slate-100 font-semibold">npm run</span> db:seed</p>
             </div>
           </div>
@@ -147,7 +136,7 @@ export default async function AdminDashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link href="/admin/matches">
+        <Link href="/admin/league">
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
             <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
               <span>Competition Games</span>
@@ -173,7 +162,7 @@ export default async function AdminDashboardPage() {
               <span>Scheduled Matches</span>
               <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineCalendarDays className="w-6 h-6" /></span>
             </div>
-            <p className="text-4xl font-black text-white">{dbConfigured ? stats.matches : 'N/A'}</p>
+            <p className="text-4xl font-black text-white">{dbConfigured ? stats.scheduledMatches : 'N/A'}</p>
           </Card>
         </Link>
 
@@ -183,7 +172,7 @@ export default async function AdminDashboardPage() {
               <span>Published Articles</span>
               <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineNewspaper className="w-6 h-6" /></span>
             </div>
-            <p className="text-4xl font-black text-white">{dbConfigured ? stats.news : 'N/A'}</p>
+            <p className="text-4xl font-black text-white">{dbConfigured ? stats.publishedNews : 'N/A'}</p>
           </Card>
         </Link>
       </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { createServiceClient } from '@/app/lib/supabase/service';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
 
 const BUCKET = 'admin-uploads';
@@ -30,8 +30,10 @@ export async function POST(req: NextRequest) {
     }
   );
 
-  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !user) {
+  // getClaims() verifies the session JWT locally (no Auth API round-trip) when
+  // signing keys are enabled; the truthiness of claims is all this route needs.
+  const { data: claimsData, error: authError } = await supabaseAuth.auth.getClaims();
+  if (authError || !claimsData?.claims) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -78,10 +80,7 @@ export async function POST(req: NextRequest) {
   const arrayBuffer = await file.arrayBuffer();
 
   // Use secret key for storage to bypass RLS — safe because auth is already verified above
-  const supabaseStorage = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!
-  );
+  const supabaseStorage = createServiceClient();
 
   const { error: uploadError } = await supabaseStorage.storage
     .from(BUCKET)

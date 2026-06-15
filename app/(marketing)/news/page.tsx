@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
 import ContentSection from '@/app/components/sections/ContentSection';
 import Hero from '@/app/components/sections/Hero';
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, desc, eq, isNull } from 'drizzle-orm';
+
+export const metadata: Metadata = {
+  title: 'News & Announcements | EZ Esports',
+  description: 'Stay up to date with the latest news, tournament updates, and announcements from the EZ Esports NYC high-school esports league.',
+};
 
 export default async function NewsPage() {
   interface NewsItem {
@@ -65,12 +72,19 @@ export default async function NewsPage() {
                     <span className="inline-block px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-md bg-ez-pink/10 border border-ez-pink/20 text-ez-pink mb-3">
                       {item.category}
                     </span>
-                    <h3 className="text-xl font-bold mb-2 tracking-tight line-clamp-2 hover:text-ez-pink transition-colors cursor-pointer">{item.title}</h3>
+                    <Link href={`/news/${item.id}`}>
+                      <h2 className="text-xl font-bold mb-2 tracking-tight line-clamp-2 hover:text-ez-pink transition-colors">{item.title}</h2>
+                    </Link>
                     <p className="text-slate-400 text-sm leading-relaxed mb-4 line-clamp-3">{item.excerpt}</p>
                   </div>
                   <div className="text-xs text-slate-500 border-t border-slate-800/80 pt-3 mt-4 flex items-center justify-between">
                     <span>{item.date}</span>
-                    <span className="text-ez-pink font-semibold hover:underline cursor-pointer">Read More →</span>
+                    <Link
+                      href={`/news/${item.id}`}
+                      className="text-ez-pink font-semibold hover:underline"
+                    >
+                      Read More →
+                    </Link>
                   </div>
                 </Card>
               ))

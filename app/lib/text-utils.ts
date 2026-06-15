@@ -23,8 +23,18 @@ export function slugify(value: string): string {
  * Anything else (javascript:, data:, ftp:, …) is blanked out.
  */
 export function safeUrl(url: string): string {
-  if (!url) return '';
-  return /^https?:\/\//i.test(url) ? url : '';
+  const trimmed = url?.trim();
+  if (!trimmed) return '';
+  // Already an http(s) URL — keep as-is.
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // Reject any other explicit scheme (javascript:, data:, mailto:, …) for safety.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return '';
+  // Reject absolute/relative paths — these are not external links.
+  if (trimmed.startsWith('/') || trimmed.startsWith('.')) return '';
+  // Bare domain like "example.com" or "example.com/path" → assume https so the
+  // stored value is an absolute external link rather than being silently dropped.
+  if (/^[\w-]+(\.[\w-]+)+/.test(trimmed)) return `https://${trimmed}`;
+  return '';
 }
 
 /**

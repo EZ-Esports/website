@@ -6,6 +6,7 @@ import { deleteNewsPost, publishNewsPost, unpublishNewsPost, archiveNewsPost } f
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 
 type NewsPost = typeof schema.newsPosts.$inferSelect;
 
@@ -94,11 +95,7 @@ export default async function AdminNewsPage({
         </Link>
       </Card>
 
-      {dbError && (
-        <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg">
-          Failed to fetch articles. Please make sure migrations have run.
-        </div>
-      )}
+      {dbError && <DbErrorNotice variant="error" />}
 
       {!dbError && (
         <div className="space-y-3">
@@ -111,9 +108,10 @@ export default async function AdminNewsPage({
                   : `/admin/news${q ? `?q=${encodeURIComponent(q)}` : ''}`;
               const isActive = status === tab.value;
               return (
-                <a
+                <Link
                   key={tab.value}
                   href={href}
+                  scroll={false}
                   className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border transition-all ${
                     isActive
                       ? 'bg-ez-pink/10 text-ez-pink border-ez-pink/30'
@@ -122,7 +120,7 @@ export default async function AdminNewsPage({
                 >
                   {tab.label}
                   <span className="ml-1.5 text-[10px] opacity-70">{tab.count}</span>
-                </a>
+                </Link>
               );
             })}
           </div>

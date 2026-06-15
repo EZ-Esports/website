@@ -46,7 +46,7 @@ export const heroContent = {
 // Section content
 export const sectionContent = {
   videoShowcase: {
-    description: 'Our live broadcasts have reached over 500 concurrent viewers, bringing the excitement of high school esports to audiences across New York City.',
+    description: 'We live-stream our matches each season, bringing the excitement of high school esports to students, families, and fans across New York City.',
   },
   gameShowcase: {
     title: 'Compete Against Other Students Across NYC',

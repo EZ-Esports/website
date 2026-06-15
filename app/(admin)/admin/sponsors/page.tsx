@@ -5,6 +5,9 @@ import { isNull } from 'drizzle-orm';
 import { addSponsor } from './actions';
 import SponsorRow from '@/app/components/admin/SponsorRow';
 import ImageUpload from '@/app/components/admin/ImageUpload';
+import SubmitButton from '@/app/components/admin/SubmitButton';
+import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import AddEntityForm from '@/app/components/admin/AddEntityForm';
 
 async function getAllSponsors() {
   return db.select().from(schema.sponsors).where(isNull(schema.sponsors.deletedAt)).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
@@ -29,7 +32,7 @@ export default async function SponsorsAdminPage() {
       {/* Add Sponsor Form */}
       <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add Sponsor</h2>
-        <form action={addSponsor} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <AddEntityForm action={addSponsor} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
               Name <span className="text-ez-pink">*</span>
@@ -76,29 +79,16 @@ export default async function SponsorsAdminPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-ez-pink text-ez-black rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer"
-            >
-              Add Sponsor
-            </button>
+            <SubmitButton
+              label="Add Sponsor"
+              pendingLabel="Adding…"
+              className="px-6 py-2.5 bg-ez-pink text-ez-black rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            />
           </div>
-        </form>
+        </AddEntityForm>
       </Card>
 
-      {!dbConfigured && (
-        <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6">
-          <div className="flex items-start gap-4">
-            <span className="text-3xl mt-0.5 select-none animate-pulse">⚠️</span>
-            <div>
-              <h3 className="text-lg font-bold text-amber-400 tracking-tight">Database Not Configured</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mt-1">
-                Set <code>DATABASE_URL</code> in your <code>.env</code> file and run <code>npm run db:push</code> to enable sponsor management.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {!dbConfigured && <DbErrorNotice />}
 
       {/* Sponsors Table */}
       <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">

@@ -28,9 +28,9 @@
   --color-custom-border: var(--border-color);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  
+
   /* Brand colors */
-  --color-ez-pink: #f4cccc;
+  --color-ez-pink: #f4cccc;        /* Light pink — use on dark surfaces only */
   --color-ez-purple: #4f46e5;
   --color-ez-black: #1c1c1c;
   --color-ez-white: #ffffff;
@@ -105,6 +105,27 @@ input[type="number"] {
 }
 .animate-fade-in {
   animation: fade-in 0.15s ease-out forwards;
+}
+
+/* Hide scrollbar while keeping scroll functionality (MOBILE-002) */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Respect user preference for reduced motion (LOW-005) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 

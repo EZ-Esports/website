@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
@@ -12,10 +13,20 @@ interface StandingsPageProps {
   searchParams: Promise<{ division?: string }>;
 }
 
+export async function generateMetadata({ params }: StandingsPageProps): Promise<Metadata> {
+  const { game } = await params;
+  if (!GAME_SLUGS.includes(game as GameSlug)) return {};
+  const gameConfig = GAMES[game as GameSlug];
+  return {
+    title: `${gameConfig.displayName} Standings | EZ Esports`,
+    description: `Current season standings for the EZ Esports ${gameConfig.displayName} league.`,
+  };
+}
+
 export default async function StandingsPage({ params, searchParams }: StandingsPageProps) {
   const { game } = await params;
   const { division = 'Varsity' } = await searchParams;
-  
+
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();
   }
@@ -90,6 +101,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
 
   return (
     <main>
+      <h1 className="sr-only">{gameConfig.displayName} Standings — EZ Esports</h1>
       <ContentSection
         heading={`${gameConfig.displayName} Standings`}
         description="Current season standings for all teams"
@@ -100,20 +112,20 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
           <div className="mb-8 flex gap-2">
             <Link
               href={`/${game}/standings?division=Varsity`}
-              className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
-                division === 'Varsity' 
+              className={`px-5 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all ${
+                division === 'Varsity'
                   ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
-                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+                  : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700'
               }`}
             >
               Varsity
             </Link>
             <Link
               href={`/${game}/standings?division=JV`}
-              className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
+              className={`px-5 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all ${
                 division === 'JV'
-                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80' 
-                  : 'bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700'
+                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
+                  : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700'
               }`}
             >
               JV
@@ -127,38 +139,49 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
                 No teams registered for this game and division yet.
               </div>
             ) : (
-              <table className="w-full border-collapse">
-                <thead className="bg-[#0b101d] border-b border-slate-800/80">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rank</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">W-L</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Win %</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Games</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-850">
-                  {standings.map((entry) => (
-                    <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
-                      <td className="px-6 py-4 text-sm font-bold text-slate-300">
-                        {entry.rank === 1 ? (
-                          <span className="text-yellow-500 font-bold">🏆 1</span>
-                        ) : entry.rank === 2 ? (
-                          <span className="text-slate-400">🥈 2</span>
-                        ) : entry.rank === 3 ? (
-                          <span className="text-amber-600">🥉 3</span>
-                        ) : (
-                          entry.rank
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-white">{(entry.winPct * 100).toFixed(1)}%</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.gamesPlayed}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[#0b101d] border-b border-slate-800/80">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Rank</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Team</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">W-L</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Win %</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Games</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {standings.map((entry) => (
+                      <tr key={entry.rank} className="hover:bg-slate-800/10 transition-colors">
+                        <td className="px-6 py-4 text-sm font-bold text-slate-300">
+                          {entry.rank === 1 ? (
+                            <span className="text-yellow-500 font-bold">
+                              <span aria-hidden="true">🏆 </span>
+                              <span>1</span>
+                            </span>
+                          ) : entry.rank === 2 ? (
+                            <span className="text-slate-400">
+                              <span aria-hidden="true">🥈 </span>
+                              <span>2</span>
+                            </span>
+                          ) : entry.rank === 3 ? (
+                            <span className="text-amber-600">
+                              <span aria-hidden="true">🥉 </span>
+                              <span>3</span>
+                            </span>
+                          ) : (
+                            entry.rank
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-white">{entry.team}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.wins}-{entry.losses}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-white">{(entry.winPct * 100).toFixed(1)}%</td>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.gamesPlayed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

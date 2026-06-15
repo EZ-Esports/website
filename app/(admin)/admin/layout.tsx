@@ -16,6 +16,7 @@ import {
   HiOutlineClipboardDocument,
   HiOutlinePencilSquare,
   HiOutlineGlobeAlt,
+  HiOutlineCog6Tooth,
   HiArrowRightOnRectangle,
 } from 'react-icons/hi2';
 import type { IconType } from 'react-icons';
@@ -35,9 +36,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const sidebarItems: SidebarItem[] = [
     { label: 'Overview', href: '/admin', icon: HiOutlineChartBar },
+    { label: 'League Setup', href: '/admin/league', icon: HiOutlineCog6Tooth },
     { label: 'Matches & Standings', href: '/admin/matches', icon: HiOutlineTrophy },
-    { label: 'News & Announcements', href: '/admin/news', icon: HiOutlineNewspaper },
     { label: 'Teams & Rosters', href: '/admin/roster', icon: HiOutlineUsers },
+    { label: 'News & Announcements', href: '/admin/news', icon: HiOutlineNewspaper },
     { label: 'Leadership Manager', href: '/admin/leadership', icon: HiOutlineUserGroup },
     { label: 'Gallery', href: '/admin/gallery', icon: HiOutlinePhoto },
     { label: 'Sponsors', href: '/admin/sponsors', icon: HiOutlineCurrencyDollar },
@@ -55,6 +57,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     if (pathname.startsWith('/admin/schools')) return 'Schools';
     if (pathname.startsWith('/admin/applications')) return 'Applications';
     if (pathname.startsWith('/admin/content')) return 'Page Content';
+    if (pathname.startsWith('/admin/league')) return 'League Setup';
 
     // Pick the most specific sidebar item whose path prefixes the current route
     const match = sidebarItems
@@ -79,7 +82,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Sidebar Items */}
         <nav className="flex-1 py-6 px-3 space-y-1">
           {sidebarItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+            item.href === '/admin'
+              ? pathname === '/admin'
+              : pathname === item.href || pathname.startsWith(item.href + '/');
             const Icon = item.icon;
             return (
               <Link

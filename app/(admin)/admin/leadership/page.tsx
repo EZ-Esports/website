@@ -2,6 +2,9 @@ import { getCachedLeadership } from '@/app/lib/db/queries';
 import { createLeader } from './actions';
 import Card from '@/app/components/ui/Card';
 import LeadershipRow from '@/app/components/admin/LeadershipRow';
+import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import AddEntityForm from '@/app/components/admin/AddEntityForm';
+import SubmitButton from '@/app/components/admin/SubmitButton';
 
 export default async function AdminLeadershipPage() {
   let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
@@ -25,11 +28,7 @@ export default async function AdminLeadershipPage() {
         </p>
       </Card>
 
-      {dbError && (
-        <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg">
-          Failed to fetch leadership data. Please ensure database migrations have run.
-        </div>
-      )}
+      {dbError && <DbErrorNotice variant="error" />}
 
       {!dbError && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -41,7 +40,7 @@ export default async function AdminLeadershipPage() {
               <p className="text-slate-400 text-xs mt-1 leading-relaxed">Register a new officer for a specific year.</p>
             </div>
 
-            <form action={createLeader} className="space-y-5">
+            <AddEntityForm action={createLeader} className="space-y-5">
               <div>
                 <label htmlFor="name" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Officer Name
@@ -100,13 +99,12 @@ export default async function AdminLeadershipPage() {
                 />
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 bg-white hover:bg-slate-200 text-slate-950 text-sm font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
-              >
-                Add Officer
-              </button>
-            </form>
+              <SubmitButton
+                label="Add Officer"
+                pendingLabel="Adding…"
+                className="w-full py-3 bg-white hover:bg-slate-200 text-slate-950 text-sm font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </AddEntityForm>
           </Card>
 
           {/* Officers List Column */}

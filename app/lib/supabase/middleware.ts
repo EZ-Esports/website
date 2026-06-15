@@ -34,10 +34,11 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Refresh session if expired and retrieve authenticated user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh session if expired and retrieve authenticated user.
+  // getClaims() verifies the JWT locally when signing keys are enabled, avoiding
+  // a blocking call to the Supabase Auth API on every /admin and /login request.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   // Route protection for Admin Panel
   if (request.nextUrl.pathname.startsWith('/admin')) {

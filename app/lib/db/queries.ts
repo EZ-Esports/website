@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNull, lt, notExists, or } from 'drizzle-orm';
 
 /** Default page size for public-facing paginated lists. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -61,6 +61,9 @@ export const getCachedSeasons = unstable_cache(
   ['seasons-active'],
   { tags: ['seasons'] }
 );
+
+/** Uncached: all seasons (incl. inactive) for admin labels/lookups. */
+export const getAdminSeasons = () => db.select().from(schema.seasons);
 
 /**
  * Paginated match query for public-facing pages.
@@ -168,4 +171,64 @@ export const getSchoolApplications = async (status?: 'pending' | 'reviewed' | 'a
     .from(schema.schoolApplications)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(schema.schoolApplications.submittedAt));
+};
+
+/** Count of all scheduled matches (for dashboard). */
+export const countScheduledMatches = async (): Promise<number> => {
+  const [row] = await db
+    .select({ value: count() })
+    .from(schema.matches)
+    .where(eq(schema.matches.status, 'scheduled'));
+  return row?.value ?? 0;
+};
+
+/** Count of published (non-deleted) news posts (for dashboard). */
+export const countPublishedNews = async (): Promise<number> => {
+  const [row] = await db
+    .select({ value: count() })
+    .from(schema.newsPosts)
+    .where(and(eq(schema.newsPosts.status, 'published'), isNull(schema.newsPosts.deletedAt)));
+  return row?.value ?? 0;
+};
+
+/**
+ * Count of past scheduled matches still missing a final score (dashboard alert).
+ * Pushes the filter into SQL instead of pulling every match into JS.
+ */
+export const countPendingResults = async (): Promise<number> => {
+  const [row] = await db
+    .select({ value: count() })
+    .from(schema.matches)
+    .where(
+      and(
+        eq(schema.matches.status, 'scheduled'),
+        lt(schema.matches.scheduledAt, new Date()),
+        or(isNull(schema.matches.homeScore), isNull(schema.matches.awayScore))
+      )
+    );
+  return row?.value ?? 0;
+};
+
+/**
+ * Count of registered teams (on non-deleted schools) that have no roster yet
+ * (dashboard alert). Uses a NOT EXISTS anti-join rather than computing the
+ * full standings view just to test for roster presence.
+ */
+export const countTeamsWithoutRoster = async (): Promise<number> => {
+  const [row] = await db
+    .select({ value: count() })
+    .from(schema.teams)
+    .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+    .where(
+      and(
+        isNull(schema.schools.deletedAt),
+        notExists(
+          db
+            .select({ one: schema.rosters.id })
+            .from(schema.rosters)
+            .where(eq(schema.rosters.teamId, schema.teams.id))
+        )
+      )
+    );
+  return row?.value ?? 0;
 };

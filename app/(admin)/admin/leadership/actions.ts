@@ -4,6 +4,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { sanitizeDbError } from '@/app/lib/text-utils';
 
 export async function createLeader(formData: FormData) {
   await requireUser();
@@ -13,21 +14,27 @@ export async function createLeader(formData: FormData) {
   const bio = formData.get('bio') as string;
 
   if (!name || !role || !year) {
-    throw new Error('Name, Role, and Year are required.');
+    return { success: false, error: 'Name, Role, and Year are required.' };
   }
 
-  await db.insert(schema.leadership).values({
-    name,
-    role,
-    year,
-    bio,
-  });
+  try {
+    await db.insert(schema.leadership).values({
+      name,
+      role,
+      year,
+      bio,
+    });
+  } catch (error) {
+    console.error('Failed to create leader', error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
 
   // Revalidate query cache and public pages
   revalidateTag('leadership', {});
   revalidatePath('/admin/leadership');
   revalidatePath('/leadership');
   revalidatePath(`/leadership/${year}`);
+  return { success: true };
 }
 
 export async function updateLeader(id: string, year: string, formData: FormData) {
@@ -36,13 +43,19 @@ export async function updateLeader(id: string, year: string, formData: FormData)
   const role = formData.get('role') as string;
   const newYear = formData.get('year') as string;
   const bio = formData.get('bio') as string;
-  if (!name || !role || !newYear) throw new Error('Name, Role, and Year are required.');
-  await db.update(schema.leadership).set({ name, role, year: newYear, bio }).where(eq(schema.leadership.id, id));
+  if (!name || !role || !newYear) return { success: false, error: 'Name, Role, and Year are required.' };
+  try {
+    await db.update(schema.leadership).set({ name, role, year: newYear, bio }).where(eq(schema.leadership.id, id));
+  } catch (error) {
+    console.error('Failed to update leader', error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
   revalidateTag('leadership', {});
   revalidatePath('/admin/leadership');
   revalidatePath('/leadership');
   revalidatePath(`/leadership/${year}`);
   revalidatePath(`/leadership/${newYear}`);
+  return { success: true };
 }
 
 export async function deleteLeader(id: string, year: string) {

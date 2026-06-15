@@ -11,18 +11,17 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
   const [errored, setErrored] = useState(false);
   if (errored) return null;
   return (
-    <div
+    <button
+      type="button"
       onClick={() => onOpen(index)}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen(index)}
-      role="button"
-      tabIndex={0}
       aria-label={`View photo: ${item.alt}`}
-      className={`${widthClass} shrink-0 aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group`}
+      className={`${widthClass} shrink-0 aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ez-pink/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
     >
       <Image
         src={item.src}
         alt={item.alt}
         fill
+        sizes="(max-width: 768px) 50vw, 25vw"
         className="object-cover transition-opacity duration-300 group-hover:opacity-80"
         onError={() => setErrored(true)}
       />
@@ -31,7 +30,7 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
           View Photo
         </span>
       </div>
-    </div>
+    </button>
   );
 }
 

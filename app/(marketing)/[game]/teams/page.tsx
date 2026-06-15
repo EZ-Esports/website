@@ -1,19 +1,30 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import Card from '@/app/components/ui/Card';
 
 interface TeamsPageProps {
   params: Promise<{ game: string }>;
 }
 
+export async function generateMetadata({ params }: TeamsPageProps): Promise<Metadata> {
+  const { game } = await params;
+  if (!GAME_SLUGS.includes(game as GameSlug)) return {};
+  const gameConfig = GAMES[game as GameSlug];
+  return {
+    title: `${gameConfig.displayName} Teams & Rosters | EZ Esports`,
+    description: `View school teams, division squads, and registered player rosters for EZ Esports ${gameConfig.displayName}.`,
+  };
+}
+
 export default async function TeamsPage({ params }: TeamsPageProps) {
   const { game } = await params;
-  
+
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();
   }
@@ -27,6 +38,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
   }
 
   interface RosterItem {
+    id: string;
     name: string;
     division: string;
     record: string;
@@ -87,6 +99,24 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
               .where(inArray(schema.players.rosterId, rosterIds))
           : [];
 
+        // Fetch real standings for record display (DATA-001)
+        const standingsRows = await db
+          .select()
+          .from(schema.rosterStandings)
+          .where(inArray(schema.rosterStandings.teamId, teamIds))
+          .orderBy(desc(schema.rosterStandings.wins));
+
+        // Map standings by teamId + division key
+        const standingsMap = new Map<string, { wins: number; losses: number }>();
+        standingsRows.forEach((s) => {
+          if (s.teamId) {
+            standingsMap.set(`${s.teamId}-${s.division}`, {
+              wins: s.wins || 0,
+              losses: s.losses || 0,
+            });
+          }
+        });
+
         // Group players by roster
         const playersByRoster = new Map<string, PlayerItem[]>();
         playersList.forEach((p) => {
@@ -103,16 +133,18 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         const rostersByTeam = new Map<string, RosterItem[]>();
         rostersList.forEach((r) => {
           const arr = rostersByTeam.get(r.teamId) || [];
+          const standingKey = `${r.teamId}-${r.division}`;
+          const standing = standingsMap.get(standingKey);
           arr.push({
+            id: r.id,
             name: r.name,
             division: r.division,
-            record: `${(r as any).wins || 0}-${(r as any).losses || 0}`,
+            record: standing ? `${standing.wins}-${standing.losses}` : '0-0',
             players: playersByRoster.get(r.id) || [],
           });
           rostersByTeam.set(r.teamId, arr);
         });
 
-        // Map to final nested groups
         teamGroups = teamsList.map((t) => ({
           teamName: t.name,
           rosters: rostersByTeam.get(t.id) || [],
@@ -125,6 +157,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
   return (
     <main>
+      <h1 className="sr-only">{gameConfig.displayName} Teams &amp; Rosters — EZ Esports</h1>
       <ContentSection
         heading={`${gameConfig.displayName} Teams & Rosters`}
         description="View school teams, division squads, and registered player rosters"
@@ -138,7 +171,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
           ) : (
             teamGroups.map((group, index) => (
               <div key={index} className="space-y-6 bg-slate-950/20 p-6 sm:p-8 rounded-2xl border border-slate-900">
-                <div className="flex items-center gap-4 border-b border-slate-850 pb-4">
+                <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
                   <div className="w-12 h-12 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center text-white shrink-0">
                     <span className="text-lg font-black">{group.teamName.charAt(0)}</span>
                   </div>
@@ -146,8 +179,8 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
                 </div>
 
                 <div className="space-y-8">
-                  {group.rosters.map((roster, rIdx) => (
-                    <div key={rIdx} className="space-y-4">
+                  {group.rosters.map((roster) => (
+                    <div key={roster.id} className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
                           {roster.name} Division
@@ -167,8 +200,8 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
                                 <div className="flex items-center justify-between mb-2">
                                   <h4 className="font-bold text-base tracking-tight text-white">{player.name}</h4>
                                   <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
-                                    player.role === 'Captain' 
-                                      ? 'bg-ez-pink/15 text-ez-pink border-ez-pink/35' 
+                                    player.role === 'Captain'
+                                      ? 'bg-ez-pink/15 text-ez-pink border-ez-pink/35'
                                       : 'bg-slate-950/40 text-slate-400 border-slate-800/80'
                                   }`}>
                                     {player.role}

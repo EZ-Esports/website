@@ -16,16 +16,14 @@ interface HeroProps {
   backgroundImage: string;
   size?: 'large' | 'medium';
   primaryCTA?: CTA;
-  secondaryCTA?: CTA;
 }
 
-export default function Hero({ 
-  title, 
-  subtitle, 
-  backgroundImage, 
+export default function Hero({
+  title,
+  subtitle,
+  backgroundImage,
   size = 'medium',
   primaryCTA,
-  secondaryCTA
 }: HeroProps) {
   const isLarge = size === 'large';
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -64,6 +62,7 @@ export default function Hero({
           alt=""
           fill
           priority
+          sizes="100vw"
           className="object-cover object-center scale-110"
         />
         {/* Theme Responsive Overlay */}
@@ -113,23 +112,16 @@ export default function Hero({
               )}
 
               {/* CTAs */}
-              {(primaryCTA || secondaryCTA) && (
+              {primaryCTA && (
                 <motion.div
                   initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
                   className="flex flex-wrap items-center justify-center gap-4 mt-8"
                 >
-                  {primaryCTA && (
-                    <Button href={primaryCTA.href} variant="primary" className="min-w-[160px]">
-                      {primaryCTA.label}
-                    </Button>
-                  )}
-                  {secondaryCTA && (
-                    <Button href={secondaryCTA.href} variant="secondary" className="min-w-[160px]">
-                      {secondaryCTA.label}
-                    </Button>
-                  )}
+                  <Button href={primaryCTA.href} variant="primary" className="min-w-[160px]">
+                    {primaryCTA.label}
+                  </Button>
                 </motion.div>
               )}
             </div>

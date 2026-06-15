@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Hero from '@/app/components/sections/Hero';
 import ContentSection from '@/app/components/sections/ContentSection';
 import MediaGrid from '@/app/components/sections/MediaGrid';
@@ -18,13 +19,19 @@ import {
 } from '@/app/lib/homepage-data';
 import { getGamesForShowcase, SITE_CONFIG, SOCIAL_LINKS, ROUTES } from '@/app/lib/constants';
 
+export const metadata: Metadata = {
+  title: 'EZ Esports — NYC High School Esports League',
+  description:
+    'EZ Esports is NYC\'s premier high-school esports league. Compete in Valorant, League of Legends, and Teamfight Tactics — shaping tomorrow\'s leaders through esports.',
+};
+
 export default async function HomePage() {
   const games = getGamesForShowcase();
   const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || 'https://discord.com/invite/RajSZqNyvu';
 
   return (
     <>
-      <main id="main-content">
+      <main>
       {/* 1. Hero Section */}
       <Hero
         title={heroContent.title}
@@ -82,7 +89,7 @@ export default async function HomePage() {
       {/* 9. Our Story */}
       <ScrollReveal>
         <ContentSection
-          eyebrow="Our Story"
+          eyebrow="About Us"
           heading="Our Story"
           description=""
           theme="dark"
@@ -104,6 +111,7 @@ export default async function HomePage() {
                 src="/images/submark.png"
                 alt="EZ Esports Submark"
                 fill
+                sizes="(max-width: 768px) 80vw, 448px"
                 className="object-contain relative z-10 opacity-80"
               />
             </div>

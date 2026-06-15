@@ -4,8 +4,8 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { createClient } from '@/app/lib/supabase/server';
-import { slugify, safeUrl } from '@/app/lib/text-utils';
+import { createServiceClient } from '@/app/lib/supabase/service';
+import { slugify, safeUrl, sanitizeDbError } from '@/app/lib/text-utils';
 
 const BUCKET = 'admin-uploads';
 
@@ -23,12 +23,18 @@ export async function addSchool(formData: FormData) {
   const websiteUrl = safeUrl((formData.get('websiteUrl') as string) ?? '');
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
 
-  if (!name) return;
+  if (!name) return { success: false, error: 'School name is required.' };
 
   const slug = slugify(name);
 
-  await db.insert(schema.schools).values({ name, slug, logoUrl, storageKey, websiteUrl, displayOrder });
+  try {
+    await db.insert(schema.schools).values({ name, slug, logoUrl, storageKey, websiteUrl, displayOrder });
+  } catch (error) {
+    console.error('Failed to add school', error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
   revalidateAll();
+  return { success: true };
 }
 
 export async function updateSchool(id: string, formData: FormData) {
@@ -39,28 +45,34 @@ export async function updateSchool(id: string, formData: FormData) {
   const websiteUrl = safeUrl((formData.get('websiteUrl') as string) ?? '');
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
 
-  if (!name) return;
+  if (!name) return { success: false, error: 'School name is required.' };
 
-  const [old] = await db
-    .select({ storageKey: schema.schools.storageKey })
-    .from(schema.schools)
-    .where(eq(schema.schools.id, id))
-    .limit(1);
+  try {
+    const [old] = await db
+      .select({ storageKey: schema.schools.storageKey })
+      .from(schema.schools)
+      .where(eq(schema.schools.id, id))
+      .limit(1);
 
-  // Delete old file only if a new image was uploaded and differs from the old one
-  if (newStorageKey && old?.storageKey && old.storageKey !== newStorageKey) {
-    const supabase = await createClient();
-    await supabase.storage.from(BUCKET).remove([old.storageKey]);
+    // Delete old file only if a new image was uploaded and differs from the old one
+    if (newStorageKey && old?.storageKey && old.storageKey !== newStorageKey) {
+      const supabase = createServiceClient();
+      await supabase.storage.from(BUCKET).remove([old.storageKey]);
+    }
+
+    // Preserve existing storageKey if no new upload was made
+    const storageKey = newStorageKey ?? old?.storageKey ?? null;
+
+    await db
+      .update(schema.schools)
+      .set({ name, logoUrl, storageKey, websiteUrl, displayOrder })
+      .where(eq(schema.schools.id, id));
+  } catch (error) {
+    console.error('Failed to update school', error);
+    return { success: false, error: sanitizeDbError(error) };
   }
-
-  // Preserve existing storageKey if no new upload was made
-  const storageKey = newStorageKey ?? old?.storageKey ?? null;
-
-  await db
-    .update(schema.schools)
-    .set({ name, logoUrl, storageKey, websiteUrl, displayOrder })
-    .where(eq(schema.schools.id, id));
   revalidateAll();
+  return { success: true };
 }
 
 export async function deleteSchool(id: string) {
@@ -76,7 +88,7 @@ export async function deleteSchool(id: string) {
 
   // Remove from Supabase Storage if a key exists
   if (row?.storageKey) {
-    const supabase = await createClient();
+    const supabase = createServiceClient();
     await supabase.storage.from(BUCKET).remove([row.storageKey]);
   }
 
@@ -85,9 +97,15 @@ export async function deleteSchool(id: string) {
 
 export async function toggleSchoolActive(id: string, isActive: boolean) {
   await requireUser();
-  await db
-    .update(schema.schools)
-    .set({ isActive })
-    .where(eq(schema.schools.id, id));
+  try {
+    await db
+      .update(schema.schools)
+      .set({ isActive })
+      .where(eq(schema.schools.id, id));
+  } catch (error) {
+    console.error('Failed to toggle school active state', error);
+    return { success: false, error: 'Could not update status. Please try again.' };
+  }
   revalidateAll();
+  return { success: true };
 }

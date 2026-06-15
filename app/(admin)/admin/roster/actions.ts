@@ -23,78 +23,8 @@ function safeRevalidatePath(path: string) {
   }
 }
 
-// --- SCHOOL ACTIONS ---
-
-export async function createSchool(formData: FormData) {
-  await requireUser();
-  try {
-    const name = formData.get('name') as string;
-    const slug = formData.get('slug') as string;
-    const logoUrl = formData.get('logoUrl') as string;
-
-    if (!name || !slug) {
-      return { success: false, error: 'School name and slug are required.' };
-    }
-
-    const res = await db.insert(schema.schools).values({
-      name,
-      slug,
-      logoUrl: logoUrl || null,
-    }).returning();
-
-    safeRevalidateTag('schools');
-    safeRevalidatePath('/admin/roster');
-    return { success: true, school: res[0] };
-  } catch (error: unknown) {
-    console.error(error);
-    return { success: false, error: sanitizeDbError(error) };
-  }
-}
-
-export async function updateSchool(id: string, formData: FormData) {
-  await requireUser();
-  try {
-    const name = formData.get('name') as string;
-    const slug = formData.get('slug') as string;
-    const logoUrl = formData.get('logoUrl') as string;
-
-    if (!name || !slug) {
-      return { success: false, error: 'School name and slug are required.' };
-    }
-
-    const res = await db.update(schema.schools)
-      .set({ name, slug, logoUrl: logoUrl || null })
-      .where(eq(schema.schools.id, id))
-      .returning();
-
-    safeRevalidateTag('schools');
-    safeRevalidatePath('/admin/roster');
-    return { success: true, school: res[0] };
-  } catch (error: unknown) {
-    console.error(error);
-    return { success: false, error: sanitizeDbError(error) };
-  }
-}
-
-export async function deleteSchool(id: string) {
-  const user = await requireUser();
-  try {
-    // Soft delete: mark as deleted rather than removing the row (recoverable, no hard cascade)
-    await db.update(schema.schools).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.schools.id, id));
-    safeRevalidateTag('schools');
-    safeRevalidateTag('teams');
-    safeRevalidateTag('rosters');
-    safeRevalidateTag('players');
-    safeRevalidatePath('/admin/roster');
-    return { success: true };
-  } catch (error: unknown) {
-    console.error(error);
-    return {
-      success: false,
-      error: 'Could not delete school. Please try again.'
-    };
-  }
-}
+// School CRUD lives in app/(admin)/admin/schools/actions.ts (the canonical editor).
+// RosterExplorer links to /admin/schools for school management.
 
 // --- MEMBER ACTIONS ---
 
@@ -192,6 +122,21 @@ export async function createTeam(formData: FormData) {
 
     if (!schoolId || !gameId || !seasonId) {
       return { success: false, error: 'School, Game, and Season are required.' };
+    }
+
+    // A season belongs to exactly one game — reject mismatched game/season pairs
+    // so we never persist a team whose season is for a different game.
+    const season = await db
+      .select({ gameId: schema.seasons.gameId })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.id, seasonId))
+      .limit(1);
+
+    if (!season[0]) {
+      return { success: false, error: 'Selected season no longer exists.' };
+    }
+    if (season[0].gameId !== gameId) {
+      return { success: false, error: 'That season belongs to a different game. Pick a season for the selected game.' };
     }
 
     const res = await db.insert(schema.teams).values({
@@ -292,6 +237,15 @@ export async function deleteRoster(id: string) {
 
 // --- PLAYER / ROSTER MEMBER ACTIONS ---
 
+// The partial unique index players_roster_one_captain_idx allows only one captain
+// per roster; translate its violation into actionable guidance.
+function isCaptainConflict(error: unknown): boolean {
+  const e = error as { constraint_name?: string; message?: string };
+  return e?.constraint_name === 'players_roster_one_captain_idx'
+    || (typeof e?.message === 'string' && e.message.includes('players_roster_one_captain_idx'));
+}
+const CAPTAIN_CONFLICT_MSG = 'This roster already has a captain. Demote the current captain before assigning a new one.';
+
 export async function createRosterMember(formData: FormData) {
   await requireUser();
   try {
@@ -321,6 +275,7 @@ export async function createRosterMember(formData: FormData) {
     return { success: true, player: res[0] };
   } catch (error: unknown) {
     console.error(error);
+    if (isCaptainConflict(error)) return { success: false, error: CAPTAIN_CONFLICT_MSG };
     return { success: false, error: 'Failed to register player. Note: A member can only be registered once per roster.' };
   }
 }
@@ -345,6 +300,7 @@ export async function updateRosterMember(id: string, formData: FormData) {
     return { success: true, player: res[0] };
   } catch (error: unknown) {
     console.error(error);
+    if (isCaptainConflict(error)) return { success: false, error: CAPTAIN_CONFLICT_MSG };
     return { success: false, error: sanitizeDbError(error) };
   }
 }

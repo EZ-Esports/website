@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
-  FiArrowLeft, FiAward, FiChevronRight, FiEdit2, FiHome, FiPlus,
+  FiArrowLeft, FiAward, FiChevronRight, FiEdit2, FiExternalLink, FiHome, FiPlus,
   FiSearch, FiSettings, FiTrash2, FiUsers, FiX,
 } from 'react-icons/fi';
 import {
-  createSchool, updateSchool, deleteSchool,
   createMember, updateMember, deleteMember,
   createTeam, deleteTeam,
   createRoster, updateRoster, deleteRoster,
@@ -28,12 +28,6 @@ interface RosterExplorerProps {
 type ActionResult = { success: boolean; error?: string; [key: string]: unknown };
 
 const ROLES = ['player', 'captain', 'coach', 'sub'] as const;
-
-const slugify = (val: string) =>
-  val.toLowerCase().trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 
 // --- Shared styles -----------------------------------------------------------
 const input = 'w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all';
@@ -165,11 +159,7 @@ export default function RosterExplorer({
         <SchoolsView
           schools={schools}
           teams={teams}
-          isPending={isPending}
-          isAdding={openForm === 'school-create'}
-          onToggleAdd={() => toggle('school-create')}
           onOpen={goToSchool}
-          runForm={runForm}
         />
       )}
 
@@ -189,47 +179,34 @@ export default function RosterExplorer({
           />
 
           {openForm === 'school-edit' && (
-            <Panel title="Edit School" onClose={() => setOpenForm(null)}>
-              <SchoolForm
-                initial={school}
-                submitLabel="Save Changes"
-                isPending={isPending}
-                onSubmit={(fd) => runAction(() => updateSchool(school.id, fd), 'School updated.', () => setOpenForm(null))}
-              />
-              <div className="flex justify-end border-t border-slate-900 pt-3 mt-3">
-                <button
-                  onClick={() => confirmDelete(
-                    `Delete ${school.name}? This removes all of its teams, rosters, and players. Members must be removed first.`,
-                    () => deleteSchool(school.id), 'School deleted.', goToSchools,
-                  )}
-                  className="px-3.5 py-2 bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 text-red-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 cursor-pointer"
+            <Panel title="School Settings" onClose={() => setOpenForm(null)}>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                School details (name, logo, website, display order, active status) are managed in the{' '}
+                <Link href="/admin/schools" className="text-ez-pink hover:underline font-semibold inline-flex items-center gap-1">
+                  Schools page <FiExternalLink className="w-3 h-3" />
+                </Link>
+                . Navigate there to edit or delete this school.
+              </p>
+              <div className="flex justify-end pt-2">
+                <Link
+                  href="/admin/schools"
+                  className={secondaryBtn}
                 >
-                  <FiTrash2 /> Delete School
-                </button>
+                  <FiExternalLink className="w-3.5 h-3.5" /> Go to Schools
+                </Link>
               </div>
             </Panel>
           )}
 
           {openForm === 'team-create' && (
-            <Panel title="Register Game Team" onClose={() => setOpenForm(null)}>
-              <form
-                onSubmit={(e) => runForm(e, createTeam, 'Team registered.', { onSuccess: () => setOpenForm(null) })}
-                className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end"
-              >
-                <input type="hidden" name="schoolId" value={school.id} />
-                <Field label="Game">
-                  <select name="gameId" required defaultValue={games[0]?.id ?? ''} className={input}>
-                    {games.map(g => <option key={g.id} value={g.id}>{g.displayName}</option>)}
-                  </select>
-                </Field>
-                <Field label="Season">
-                  <select name="seasonId" required defaultValue={seasons[0]?.id ?? ''} className={input}>
-                    {seasons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </Field>
-                <button type="submit" disabled={isPending} className={primaryBtn}>Register</button>
-              </form>
-            </Panel>
+            <TeamCreateForm
+              schoolId={school.id}
+              games={games}
+              seasons={seasons}
+              isPending={isPending}
+              runForm={runForm}
+              onClose={() => setOpenForm(null)}
+            />
           )}
 
           {/* Teams grid */}
@@ -245,7 +222,7 @@ export default function RosterExplorer({
                   return (
                     <Tile key={t.id} onClick={() => goToTeam(t.id)}
                       onDelete={() => confirmDelete(
-                        `Unregister ${l.title} (${l.season})? This removes all its rosters and player assignments.`,
+                        `Permanently unregister ${l.title} (${l.season})? This removes all its rosters and player assignments. This cannot be undone.`,
                         () => deleteTeam(t.id), 'Team unregistered.',
                       )}
                       deleteLabel="Unregister team"
@@ -319,7 +296,7 @@ export default function RosterExplorer({
                   return (
                     <Tile key={r.id} onClick={() => goToRoster(r.id)}
                       onDelete={() => confirmDelete(
-                        `Delete roster “${r.name}”? This removes all assigned players.`,
+                        `Permanently delete roster “${r.name}”? This removes all assigned players and cannot be undone.`,
                         () => deleteRoster(r.id), 'Roster deleted.',
                       )}
                       deleteLabel="Delete roster"
@@ -366,15 +343,11 @@ export default function RosterExplorer({
  * SCHOOLS VIEW
  * ========================================================================== */
 function SchoolsView({
-  schools, teams, isPending, isAdding, onToggleAdd, onOpen, runForm,
+  schools, teams, onOpen,
 }: {
   schools: DBSchool[];
   teams: DBTeam[];
-  isPending: boolean;
-  isAdding: boolean;
-  onToggleAdd: () => void;
   onOpen: (id: string) => void;
-  runForm: (e: React.FormEvent<HTMLFormElement>, action: (fd: FormData) => Promise<ActionResult>, msg: string, opts?: { reset?: boolean; onSuccess?: (res: ActionResult) => void }) => void;
 }) {
   const [query, setQuery] = useState('');
   const filtered = schools.filter(s => s.name.toLowerCase().includes(query.toLowerCase()));
@@ -384,22 +357,12 @@ function SchoolsView({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-black text-white uppercase tracking-wider">Schools</h1>
-          <p className="text-xs text-slate-500 mt-1">Select a school to manage its teams, rosters, and members.</p>
+          <p className="text-xs text-slate-400 mt-1">Select a school to manage its teams, rosters, and members.</p>
         </div>
-        <button className={secondaryBtn} onClick={onToggleAdd}><FiPlus /> New School</button>
+        <Link href="/admin/schools" className={secondaryBtn}>
+          <FiExternalLink className="w-3.5 h-3.5" /> Manage Schools
+        </Link>
       </div>
-
-      {isAdding && (
-        <Panel title="Register School" onClose={onToggleAdd}>
-          <SchoolForm
-            submitLabel="Register School"
-            isPending={isPending}
-            onSubmitForm={(e) => runForm(e, createSchool, 'School registered.', {
-              onSuccess: (res) => { const s = res.school as DBSchool | undefined; if (s) onOpen(s.id); },
-            })}
-          />
-        </Panel>
-      )}
 
       <div className="relative max-w-sm">
         <FiSearch className="absolute left-3 top-2.5 text-slate-600 w-4 h-4" />
@@ -571,10 +534,10 @@ function RosterView({
                       <td className="px-4 py-2.5 text-slate-400 font-mono italic">{p.ign || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-400 capitalize">{p.role}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                           <button onClick={() => setEditingId(p.id)} className={iconBtn} aria-label="Edit player"><FiEdit2 className="w-3.5 h-3.5" /></button>
                           <button
-                            onClick={() => confirmDelete(`Remove ${member?.firstName} ${member?.lastName} from ${roster.name}?`, () => deleteRosterMember(p.id), 'Player removed.')}
+                            onClick={() => confirmDelete(`Permanently remove ${member?.firstName} ${member?.lastName} from ${roster.name}? This cannot be undone.`, () => deleteRosterMember(p.id), 'Player removed.')}
                             className={iconBtn} aria-label="Remove player"
                           ><FiTrash2 className="w-3.5 h-3.5 hover:text-red-400" /></button>
                         </div>
@@ -663,10 +626,10 @@ function MemberManager({
                       {m.email ? ` · ${m.email}` : ''}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
                     <button onClick={() => setEditingId(m.id)} className={iconBtn} aria-label="Edit member"><FiEdit2 className="w-3.5 h-3.5" /></button>
                     <button
-                      onClick={() => confirmDelete(`Delete ${m.firstName} ${m.lastName}? They will be removed from any rosters.`, () => deleteMember(m.id), 'Member deleted.')}
+                      onClick={() => confirmDelete(`Permanently delete ${m.firstName} ${m.lastName}? They will be removed from any rosters. This cannot be undone.`, () => deleteMember(m.id), 'Member deleted.')}
                       className={iconBtn} aria-label="Delete member"
                     ><FiTrash2 className="w-3.5 h-3.5 hover:text-red-400" /></button>
                   </div>
@@ -680,49 +643,6 @@ function MemberManager({
   );
 }
 
-/* ============================================================================
- * SCHOOL FORM (create / edit, with slug auto-fill)
- * ========================================================================== */
-function SchoolForm({
-  initial, submitLabel, isPending, onSubmit, onSubmitForm,
-}: {
-  initial?: DBSchool;
-  submitLabel: string;
-  isPending: boolean;
-  /** Used for edit: receives FormData. */
-  onSubmit?: (fd: FormData) => void;
-  /** Used for create: receives the form event (so the parent can reset/navigate). */
-  onSubmitForm?: (e: React.FormEvent<HTMLFormElement>) => void;
-}) {
-  const [name, setName] = useState(initial?.name ?? '');
-  const [slug, setSlug] = useState(initial?.slug ?? '');
-  const [slugTouched, setSlugTouched] = useState(Boolean(initial));
-
-  const handleName = (v: string) => {
-    setName(v);
-    if (!slugTouched) setSlug(slugify(v));
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        if (onSubmitForm) { onSubmitForm(e); return; }
-        e.preventDefault();
-        onSubmit?.(new FormData(e.currentTarget));
-      }}
-      className="space-y-3"
-    >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input name="name" required value={name} onChange={(e) => handleName(e.target.value)} placeholder="School name" className={input} autoFocus />
-        <input name="slug" required value={slug} onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }} placeholder="slug" className={input} />
-        <input name="logoUrl" defaultValue={initial?.logoUrl ?? ''} placeholder="Logo URL (optional)" className={input} />
-      </div>
-      <div className="flex justify-end">
-        <button type="submit" disabled={isPending} className={primaryBtn}>{submitLabel}</button>
-      </div>
-    </form>
-  );
-}
 
 /* ============================================================================
  * SMALL PRESENTATIONAL HELPERS
@@ -759,6 +679,80 @@ function Section({ title, icon, action, children }: { title: string; icon?: Reac
   );
 }
 
+function TeamCreateForm({
+  schoolId, games, seasons, isPending, runForm, onClose,
+}: {
+  schoolId: string;
+  games: DBGame[];
+  seasons: DBSeason[];
+  isPending: boolean;
+  runForm: (
+    e: React.FormEvent<HTMLFormElement>,
+    action: (fd: FormData) => Promise<ActionResult>,
+    successMsg: string,
+    opts?: { reset?: boolean; onSuccess?: (res: ActionResult) => void },
+  ) => void;
+  onClose: () => void;
+}) {
+  // A season belongs to exactly one game, so the Season options must track the
+  // selected game — otherwise an admin could pair e.g. Valorant with a LoL season.
+  const [gameId, setGameId] = useState(games[0]?.id ?? '');
+  const gameSeasons = seasons.filter(s => s.gameId === gameId);
+
+  return (
+    <Panel title="Register Game Team" onClose={onClose}>
+      <form
+        onSubmit={(e) => runForm(e, createTeam, 'Team registered.', { onSuccess: onClose })}
+        className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end"
+      >
+        <input type="hidden" name="schoolId" value={schoolId} />
+        <Field label="Game">
+          <select
+            name="gameId"
+            required
+            value={gameId}
+            onChange={(e) => setGameId(e.target.value)}
+            disabled={games.length === 0}
+            className={input}
+          >
+            {games.length === 0
+              ? <option value="">No games configured</option>
+              : games.map(g => <option key={g.id} value={g.id}>{g.displayName}</option>)}
+          </select>
+        </Field>
+        <Field label="Season">
+          <select
+            name="seasonId"
+            required
+            key={gameId}
+            defaultValue={gameSeasons[0]?.id ?? ''}
+            disabled={gameSeasons.length === 0}
+            className={input}
+          >
+            {gameSeasons.length === 0
+              ? <option value="">No seasons for this game</option>
+              : gameSeasons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </Field>
+        <button type="submit" disabled={isPending || gameSeasons.length === 0} className={primaryBtn}>Register</button>
+      </form>
+      {games.length === 0 ? (
+        <p className="text-[11px] text-amber-400/80 mt-2">
+          No games configured yet. Create a game in{' '}
+          <Link href="/admin/league" className="underline font-semibold">League Setup</Link>{' '}
+          first, then add a season for it.
+        </p>
+      ) : gameSeasons.length === 0 && (
+        <p className="text-[11px] text-amber-400/80 mt-2">
+          This game has no seasons yet. Create one in{' '}
+          <Link href="/admin/league" className="underline font-semibold">League Setup</Link>{' '}
+          before registering a team.
+        </p>
+      )}
+    </Panel>
+  );
+}
+
 function Panel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
@@ -776,14 +770,26 @@ function MemberFields({ schoolId, m }: { schoolId: string; m?: DBMember }) {
     <>
       <input type="hidden" name="schoolId" value={schoolId} />
       <div className="grid grid-cols-2 gap-2">
-        <input name="firstName" required defaultValue={m?.firstName ?? ''} placeholder="First name *" className={input} />
-        <input name="lastName" required defaultValue={m?.lastName ?? ''} placeholder="Last name *" className={input} />
+        <Field label="First name *">
+          <input name="firstName" required defaultValue={m?.firstName ?? ''} placeholder="First name" className={input} />
+        </Field>
+        <Field label="Last name *">
+          <input name="lastName" required defaultValue={m?.lastName ?? ''} placeholder="Last name" className={input} />
+        </Field>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <input name="email" type="email" defaultValue={m?.email ?? ''} placeholder="Email" className={`${input} col-span-2`} />
-        <input name="graduationYear" type="number" defaultValue={m?.graduationYear ?? ''} placeholder="Grad yr" className={input} />
+        <div className="col-span-2">
+          <Field label="Email">
+            <input name="email" type="email" defaultValue={m?.email ?? ''} placeholder="student@school.edu" className={input} />
+          </Field>
+        </div>
+        <Field label="Grad year">
+          <input name="graduationYear" type="number" defaultValue={m?.graduationYear ?? ''} placeholder="2026" className={input} />
+        </Field>
       </div>
-      <input name="discord" defaultValue={m?.discord ?? ''} placeholder="Discord (e.g. sam#1234)" className={input} />
+      <Field label="Discord">
+        <input name="discord" defaultValue={m?.discord ?? ''} placeholder="sam#1234" className={input} />
+      </Field>
     </>
   );
 }
@@ -803,7 +809,7 @@ function Tile({ children, onClick, onDelete, deleteLabel }: { children: React.Re
       <button onClick={onClick} className="text-left w-full cursor-pointer">{children}</button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="absolute top-3 right-3 p-1 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+        className="absolute top-3 right-3 p-1 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-all cursor-pointer"
         aria-label={deleteLabel} title={deleteLabel}
       ><FiTrash2 className="w-3.5 h-3.5" /></button>
     </div>

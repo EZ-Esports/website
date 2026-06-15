@@ -58,6 +58,11 @@ describe('safeUrl', () => {
     expect(safeUrl('/admin/delete?id=123')).toBe('');
   });
 
+  it('prepends https:// to a bare domain', () => {
+    expect(safeUrl('northeastern.edu')).toBe('https://northeastern.edu');
+    expect(safeUrl('example.com/path')).toBe('https://example.com/path');
+  });
+
   it('returns empty string for empty input', () => {
     expect(safeUrl('')).toBe('');
   });

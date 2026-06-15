@@ -41,10 +41,10 @@ export default function Navigation({ onNavigate, isDarkText = true }: Navigation
     onNavigate?.();
   };
 
-  const linkClass = (isActive: boolean) => 
-    `transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-1.5 md:py-1 px-3 text-sm md:text-[15px] font-medium tracking-wide ${
-      isActive 
-        ? 'text-ez-pink bg-ez-pink/5 border-l-2 border-ez-pink md:border-l-0 md:bg-transparent md:px-0' 
+  const linkClass = (isActive: boolean) =>
+    `transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-2.5 md:py-1 px-3 min-h-[44px] flex items-center text-sm md:text-[15px] font-medium tracking-wide ${
+      isActive
+        ? 'text-ez-pink bg-ez-pink/5 border-l-2 border-ez-pink md:border-l-0 md:bg-transparent md:px-0'
         : isDarkText
           ? 'text-foreground-secondary hover:text-foreground md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'
           : 'text-white/80 hover:text-white md:hover:text-ez-pink hover:translate-x-1 md:hover:translate-x-0'

@@ -10,6 +10,7 @@ import {
 import { Suspense } from 'react';
 import RosterExplorer from '@/app/components/admin/RosterExplorer';
 import Card from '@/app/components/ui/Card';
+import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { DBGame, DBTeam, DBRoster, DBPlayer, DBSchool, DBMember, DBSeason } from '@/app/types';
 
 export default async function AdminRosterPage() {
@@ -53,9 +54,7 @@ export default async function AdminRosterPage() {
         </p>
       </Card>
       {dbError ? (
-        <div className="bg-ez-pink/10 border border-ez-pink/20 text-ez-pink/80 text-sm px-4 py-3 rounded-lg">
-          Failed to fetch database configurations. Please ensure database migrations and seeds have run properly.
-        </div>
+        <DbErrorNotice variant="error" />
       ) : (
         <Suspense fallback={<div className="text-slate-500 text-sm">Loading…</div>}>
           <RosterExplorer

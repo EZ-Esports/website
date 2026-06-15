@@ -9,7 +9,7 @@ export default function MarketingLayout({
   return (
     <div className="theme-graphite min-h-screen bg-background text-foreground flex flex-col">
       <Header />
-      <div className="flex-grow">
+      <div id="main-content" tabIndex={-1} className="flex-grow">
         {children}
       </div>
       <Footer />

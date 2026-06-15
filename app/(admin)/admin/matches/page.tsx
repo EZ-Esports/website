@@ -1,29 +1,32 @@
-import { getCachedMatches, getCachedTeams, getCachedRosters, getCachedSeasons, getCachedGames } from '@/app/lib/db/queries';
+import { getAdminMatches, getCachedTeams, getCachedRosters, getCachedSeasons, getAdminSeasons, getCachedGames } from '@/app/lib/db/queries';
 import Card from '@/app/components/ui/Card';
 import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import MatchList from '@/app/components/admin/MatchList';
-import { HiExclamationTriangle } from 'react-icons/hi2';
+import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 
 export default async function AdminMatchesPage() {
-  let matches: Awaited<ReturnType<typeof getCachedMatches>> = [];
+  let matches: Awaited<ReturnType<typeof getAdminMatches>> = [];
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
   let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
-  let seasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
+  let activeSeasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
+  let allSeasons: Awaited<ReturnType<typeof getAdminSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let dbError = false;
 
   try {
-    const [matchesRes, teamsRes, rostersRes, seasonsRes, gamesRes] = await Promise.all([
-      getCachedMatches(),
+    const [matchesRes, teamsRes, rostersRes, activeSeasonsRes, allSeasonsRes, gamesRes] = await Promise.all([
+      getAdminMatches(),
       getCachedTeams(),
       getCachedRosters(),
       getCachedSeasons(),
+      getAdminSeasons(),
       getCachedGames(),
     ]);
     matches = matchesRes;
     teams = teamsRes;
     rosters = rostersRes;
-    seasons = seasonsRes;
+    activeSeasons = activeSeasonsRes;
+    allSeasons = allSeasonsRes;
     games = gamesRes;
   } catch {
     dbError = true;
@@ -36,17 +39,7 @@ export default async function AdminMatchesPage() {
         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">Schedule matches and input scores to recalculate team standings and seasonal records.</p>
       </Card>
 
-      {dbError && (
-        <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6">
-          <div className="flex items-start gap-4">
-            <HiExclamationTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-base font-bold text-amber-400">Database Error</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mt-0.5">Failed to fetch match configurations. Please ensure database migrations have run.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {dbError && <DbErrorNotice variant="error" />}
 
       {!dbError && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -58,8 +51,8 @@ export default async function AdminMatchesPage() {
               <p className="text-slate-400 text-xs mt-0.5">Register a new scheduled event.</p>
             </div>
 
-            <MatchScheduleForm 
-              seasons={seasons}
+            <MatchScheduleForm
+              seasons={activeSeasons}
               rosters={rosters as any}
               teams={teams}
               games={games}
@@ -68,9 +61,9 @@ export default async function AdminMatchesPage() {
 
           {/* Matches List Column */}
           <div className="lg:col-span-2">
-            <MatchList 
+            <MatchList
               initialMatches={matches}
-              seasons={seasons}
+              seasons={allSeasons}
               rosters={rosters as any}
               teams={teams}
               games={games}

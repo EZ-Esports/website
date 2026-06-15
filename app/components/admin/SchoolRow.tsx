@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import { updateSchool, toggleSchoolActive, deleteSchool } from '@/app/(admin)/admin/schools/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
@@ -21,16 +21,40 @@ const inputClass =
 export default function SchoolRow({ school }: { school: School }) {
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const editBtnRef = useRef<HTMLButtonElement>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
+  // Focus the first field when the form opens
+  useEffect(() => {
+    if (editing) firstFieldRef.current?.focus();
+  }, [editing]);
+
+  const closeEditing = () => {
+    setEditing(false);
+    // Return focus to the Edit trigger button
+    setTimeout(() => editBtnRef.current?.focus(), 0);
+  };
 
   const handleSave = (formData: FormData) => {
+    setSaveError(null);
     startTransition(async () => {
-      await updateSchool(school.id, formData);
-      setEditing(false);
+      const res = await updateSchool(school.id, formData);
+      if (res && !res.success) {
+        setSaveError(res.error || 'Could not save changes.');
+        return;
+      }
+      closeEditing();
     });
   };
 
   const handleToggleActive = () => {
-    startTransition(() => toggleSchoolActive(school.id, !school.isActive));
+    setToggleError(null);
+    startTransition(async () => {
+      const res = await toggleSchoolActive(school.id, !school.isActive);
+      if (res && !res.success) setToggleError(res.error || 'Could not update status.');
+    });
   };
 
   if (editing) {
@@ -42,7 +66,7 @@ export default function SchoolRow({ school }: { school: School }) {
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                 Name <span className="text-ez-pink">*</span>
               </label>
-              <input name="name" required defaultValue={school.name} className={inputClass} />
+              <input ref={firstFieldRef} name="name" required defaultValue={school.name} className={inputClass} />
             </div>
             <div>
               <ImageUpload
@@ -71,12 +95,15 @@ export default function SchoolRow({ school }: { school: School }) {
               </button>
               <button
                 type="button"
-                onClick={() => setEditing(false)}
+                onClick={closeEditing}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
               >
                 Cancel
               </button>
             </div>
+            {saveError && (
+              <p role="alert" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
+            )}
           </form>
         </td>
       </tr>
@@ -126,11 +153,15 @@ export default function SchoolRow({ school }: { school: School }) {
         >
           {school.isActive ? 'Active' : 'Inactive'}
         </button>
+        {toggleError && (
+          <p role="alert" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
+        )}
       </td>
       <td className="py-3 pr-4 text-slate-400">{school.displayOrder}</td>
       <td className="py-3 text-right">
         <div className="flex items-center justify-end gap-2">
           <button
+            ref={editBtnRef}
             onClick={() => setEditing(true)}
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
           >

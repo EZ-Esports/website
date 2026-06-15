@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useTransition } from 'react';
 import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
+import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
 interface Match {
   id: string;
@@ -47,6 +48,37 @@ interface MatchListProps {
 export default function MatchList({ initialMatches, seasons, rosters, teams, games }: MatchListProps) {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!toast || toast.type === 'error') return; // errors linger until next action
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const handleSave = (matchId: string) => (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    // Client-side mirror of the server guard for instant feedback.
+    const status = fd.get('status') as string;
+    const home = (fd.get('homeScore') as string)?.trim();
+    const away = (fd.get('awayScore') as string)?.trim();
+    if ((status === 'completed' || status === 'forfeit') && (!home || !away)) {
+      setToast({ message: 'Enter both scores before marking a match completed or forfeit.', type: 'error' });
+      return;
+    }
+    setSavingId(matchId);
+    startTransition(async () => {
+      const res = await updateMatchScore(matchId, fd);
+      setSavingId(null);
+      setToast(res?.success
+        ? { message: 'Match saved.', type: 'success' }
+        : { message: res?.error || 'Could not save match.', type: 'error' });
+    });
+  };
 
   const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
   const rosterMap = useMemo(() => new Map(rosters.map(r => [r.id, r])), [rosters]);
@@ -70,6 +102,20 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
   }, [initialMatches, filter, statusFilter, rosterMap, teamMap, seasonMap, gameMap]);
 
   return (
+    <>
+    {toast && (
+      <div
+        role="status"
+        aria-live="polite"
+        className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-semibold shadow-lg border ${
+          toast.type === 'success'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            : 'bg-red-500/10 border-red-500/30 text-red-300'
+        }`}
+      >
+        {toast.message}
+      </div>
+    )}
     <div className="bg-[#1c1c1c]/60 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
       <div className="px-6 py-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-base font-bold text-white uppercase tracking-wider">Match Fixtures</h2>
@@ -91,6 +137,8 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
             <option value="scheduled">Scheduled</option>
             <option value="live">Live</option>
             <option value="completed">Completed</option>
+            <option value="forfeit">Forfeit</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
@@ -119,8 +167,8 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                 const season = seasonMap.get(match.seasonId);
                 const game = season ? gameMap.get(season.gameId) : null;
                 
-                const updateActionWithId = updateMatchScore.bind(null, match.id);
                 const deleteActionWithId = deleteMatch.bind(null, match.id);
+                const isSaving = savingId === match.id;
 
                 return (
                   <tr key={match.id} className="hover:bg-slate-800/10 transition-colors">
@@ -141,9 +189,9 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
 
                     {/* Matchup & Score Inputs */}
                     <td className="px-6 py-4">
-                      <form id={`form-${match.id}`} action={updateActionWithId} className="flex items-center justify-center gap-3">
+                      <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-3">
                         <div className="text-right w-28 truncate">
-                          <span className="block font-semibold text-white text-sm">{homeTeam?.name || 'Home'}</span>
+                          <span className="block font-semibold text-white text-sm truncate" title={homeTeam?.name || 'Home'}>{homeTeam?.name || 'Home'}</span>
                           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{homeRoster?.division}</span>
                         </div>
 
@@ -170,7 +218,7 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                         </div>
 
                         <div className="text-left w-28 truncate">
-                          <span className="block font-semibold text-white text-sm">{awayTeam?.name || 'Away'}</span>
+                          <span className="block font-semibold text-white text-sm truncate" title={awayTeam?.name || 'Away'}>{awayTeam?.name || 'Away'}</span>
                           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{awayRoster?.division}</span>
                         </div>
                       </form>
@@ -187,6 +235,8 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                         <option value="scheduled" className="bg-slate-900 text-white">Scheduled</option>
                         <option value="live" className="bg-slate-900 text-white">Live</option>
                         <option value="completed" className="bg-slate-900 text-white">Completed</option>
+                        <option value="forfeit" className="bg-slate-900 text-white">Forfeit</option>
+                        <option value="cancelled" className="bg-slate-900 text-white">Cancelled</option>
                       </select>
                     </td>
 
@@ -196,18 +246,17 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                         <button
                           type="submit"
                           form={`form-${match.id}`}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                          disabled={isSaving}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Save
+                          {isSaving ? 'Saving…' : 'Save'}
                         </button>
-                        <form action={deleteActionWithId} className="inline-block">
-                          <button
-                            type="submit"
-                            className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
-                          >
-                            Delete
-                          </button>
-                        </form>
+                        <ConfirmDeleteButton
+                          action={deleteActionWithId}
+                          message={`Permanently delete this match (${homeTeam?.name ?? 'Home'} vs ${awayTeam?.name ?? 'Away'})? This cannot be undone.`}
+                          label="Delete"
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -218,5 +267,6 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
         </div>
       )}
     </div>
+    </>
   );
 }
