@@ -1,11 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { countAdminUsers } from '@/app/lib/db/queries';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { isValidEmail, sanitizeDbError } from '@/app/lib/text-utils';
 import { rateLimit } from '@/app/lib/rate-limit';
@@ -62,17 +61,21 @@ export async function inviteAdmin(formData: FormData): Promise<{
 
   try {
     // Supersede any outstanding invite for this email so there is at most one
-    // live token per address (re-inviting silently rotates the link).
-    await db
-      .delete(schema.adminInvites)
-      .where(and(eq(schema.adminInvites.email, email), isNull(schema.adminInvites.acceptedAt)));
+    // live token per address (re-inviting silently rotates the link). Both
+    // writes are in one transaction so concurrent invites for the same email
+    // can't both create live rows.
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(schema.adminInvites)
+        .where(and(eq(schema.adminInvites.email, email), isNull(schema.adminInvites.acceptedAt)));
 
-    await db.insert(schema.adminInvites).values({
-      email,
-      tokenHash,
-      role: requestedRole,
-      invitedBy: admin.id,
-      expiresAt,
+      await tx.insert(schema.adminInvites).values({
+        email,
+        tokenHash,
+        role: requestedRole,
+        invitedBy: admin.id,
+        expiresAt,
+      });
     });
   } catch (error) {
     console.error('Failed to create admin invite', error);
@@ -85,9 +88,31 @@ export async function inviteAdmin(formData: FormData): Promise<{
 
 /** Cancel a pending (unaccepted) invite. */
 export async function revokeInvite(inviteId: string): Promise<{ success: boolean; error?: string }> {
-  await requireAdmin();
+  const admin = await requireAdmin();
+
+  // Fetch the invite first so we can check role before deleting.
+  const [invite] = await db
+    .select({ role: schema.adminInvites.role })
+    .from(schema.adminInvites)
+    .where(eq(schema.adminInvites.id, inviteId))
+    .limit(1);
+
+  if (!invite) {
+    return { success: false, error: 'Invite not found or already accepted.' };
+  }
+
+  if (invite.role === 'super_admin' && admin.role !== 'super_admin') {
+    return { success: false, error: 'Only super-admins can revoke a super-admin invite.' };
+  }
+
   try {
-    await db.delete(schema.adminInvites).where(eq(schema.adminInvites.id, inviteId));
+    const deleted = await db
+      .delete(schema.adminInvites)
+      .where(and(eq(schema.adminInvites.id, inviteId), isNull(schema.adminInvites.acceptedAt)))
+      .returning({ id: schema.adminInvites.id });
+    if (deleted.length === 0) {
+      return { success: false, error: 'Invite not found or already accepted.' };
+    }
   } catch (error) {
     console.error('Failed to revoke admin invite', error);
     return { success: false, error: 'Could not revoke invite. Please try again.' };
@@ -99,7 +124,7 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
 /**
  * Remove an admin: delete the allowlist row and the underlying Supabase Auth
  * user (which also revokes their active sessions, so access is cut immediately).
- * Guards against self-removal and last-admin lockout.
+ * Guards against self-removal, last-admin lockout, and unauthorized super-admin removal.
  */
 export async function revokeAdmin(userId: string): Promise<{ success: boolean; error?: string }> {
   const admin = await requireAdmin();
@@ -108,16 +133,36 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
     return { success: false, error: 'You cannot remove your own admin access.' };
   }
 
-  const total = await countAdminUsers();
-  if (total <= 1) {
-    return { success: false, error: 'Cannot remove the last remaining admin.' };
+  // Verify the target IS an admin and fetch their role before acting.
+  const [target] = await db
+    .select({ role: schema.adminUsers.role })
+    .from(schema.adminUsers)
+    .where(eq(schema.adminUsers.userId, userId))
+    .limit(1);
+
+  if (!target) {
+    return { success: false, error: 'That user is not an admin.' };
   }
 
+  if (target.role === 'super_admin' && admin.role !== 'super_admin') {
+    return { success: false, error: 'Only super-admins can remove a super-admin.' };
+  }
+
+  // Atomic delete guarded by a subquery — prevents TOCTOU last-admin race where
+  // two concurrent revokes both pass the count check but together zero all admins.
+  let deleted: { userId: string }[];
   try {
-    await db.delete(schema.adminUsers).where(eq(schema.adminUsers.userId, userId));
+    deleted = await db
+      .delete(schema.adminUsers)
+      .where(and(eq(schema.adminUsers.userId, userId), sql`(select count(*) from admin_users) > 1`))
+      .returning({ userId: schema.adminUsers.userId });
   } catch (error) {
     console.error('Failed to remove admin row', error);
     return { success: false, error: 'Could not remove admin. Please try again.' };
+  }
+
+  if (deleted.length === 0) {
+    return { success: false, error: 'Cannot remove the last remaining admin.' };
   }
 
   // Best-effort: delete the auth account so the session is invalidated. The

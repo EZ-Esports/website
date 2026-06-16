@@ -5,8 +5,15 @@ interface LoginPageProps {
   searchParams: Promise<{ error?: string; message?: string }>;
 }
 
+// Allowlist of known message keys to fixed display strings — prevents arbitrary
+// text from ?message= being reflected into the page (open redirect / XSS vector).
+const MESSAGE_MAP: Record<string, string> = {
+  'account-created': 'Account created. Please sign in.',
+};
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { error, message } = await searchParams;
+  const displayMessage = message ? (MESSAGE_MAP[message] ?? null) : null;
 
   return (
     <main className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
@@ -23,9 +30,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         {/* Success Alert (e.g. after accepting an invite) */}
-        {message && !error && (
+        {displayMessage && !error && (
           <div className="bg-green-500/10 border border-green-500/30 text-green-300 text-sm px-4 py-3 rounded-lg" role="status">
-            {message}
+            {displayMessage}
           </div>
         )}
 

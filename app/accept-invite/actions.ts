@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { createServiceClient } from '@/app/lib/supabase/service';
@@ -65,16 +65,28 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
   }
 
   try {
-    await db.insert(schema.adminUsers).values({
-      userId: created.user.id,
-      email: invite.email,
-      role: invite.role,
-      invitedBy: invite.invitedBy,
+    // Both writes happen in one transaction so partial failure can't orphan an
+    // admin_users row or wedge the invite. The UPDATE uses AND accepted_at IS NULL
+    // to atomically claim the invite — if another request already consumed it the
+    // returning array will be empty and we abort.
+    await db.transaction(async (tx) => {
+      const claimed = await tx
+        .update(schema.adminInvites)
+        .set({ acceptedAt: sql`now()` })
+        .where(and(eq(schema.adminInvites.id, invite.id), isNull(schema.adminInvites.acceptedAt)))
+        .returning({ id: schema.adminInvites.id });
+
+      if (claimed.length === 0) {
+        throw new Error('Invite already consumed.');
+      }
+
+      await tx.insert(schema.adminUsers).values({
+        userId: created.user.id,
+        email: invite.email,
+        role: invite.role,
+        invitedBy: invite.invitedBy,
+      });
     });
-    await db
-      .update(schema.adminInvites)
-      .set({ acceptedAt: new Date() })
-      .where(eq(schema.adminInvites.id, invite.id));
   } catch (error) {
     console.error('Failed to finalize admin invite; rolling back auth user', error);
     // Undo the auth account so the invite can be retried cleanly.
@@ -82,5 +94,5 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
     return { error: sanitizeDbError(error) };
   }
 
-  redirect('/login?message=' + encodeURIComponent('Account created. Please sign in.'));
+  redirect('/login?message=account-created');
 }

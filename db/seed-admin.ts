@@ -13,7 +13,6 @@
  *
  * Idempotent: re-running for the same email updates the role to super_admin.
  */
-import { eq } from 'drizzle-orm';
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { createServiceClient } from '../app/lib/supabase/service';
@@ -54,12 +53,6 @@ async function main() {
       target: schema.adminUsers.userId,
       set: { role: 'super_admin', email },
     });
-
-  // Guard against an email-row collision (same email, different user id).
-  await db
-    .update(schema.adminUsers)
-    .set({ role: 'super_admin' })
-    .where(eq(schema.adminUsers.email, email));
 
   console.log(`✓ ${email} is now a super_admin (user_id ${userId}).`);
   process.exit(0);
