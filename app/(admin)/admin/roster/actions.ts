@@ -1,5 +1,5 @@
 'use server';
-import { requireUser } from '@/app/lib/auth';
+import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -29,7 +29,7 @@ function safeRevalidatePath(path: string) {
 // --- MEMBER ACTIONS ---
 
 export async function createMember(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
@@ -61,7 +61,7 @@ export async function createMember(formData: FormData) {
 }
 
 export async function updateMember(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
@@ -96,7 +96,7 @@ export async function updateMember(id: string, formData: FormData) {
 }
 
 export async function deleteMember(id: string) {
-  await requireUser();
+  await requireAdmin();
   try {
     await db.delete(schema.members).where(eq(schema.members.id, id));
     safeRevalidateTag('members');
@@ -114,7 +114,7 @@ export async function deleteMember(id: string) {
 // --- TEAM ACTIONS ---
 
 export async function createTeam(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const schoolId = formData.get('schoolId') as string;
     const gameId = formData.get('gameId') as string;
@@ -155,7 +155,7 @@ export async function createTeam(formData: FormData) {
 }
 
 export async function deleteTeam(id: string) {
-  await requireUser();
+  await requireAdmin();
   try {
     await db.delete(schema.teams).where(eq(schema.teams.id, id));
     safeRevalidateTag('teams');
@@ -172,7 +172,7 @@ export async function deleteTeam(id: string) {
 // --- ROSTER ACTIONS ---
 
 export async function createRoster(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const teamId = formData.get('teamId') as string;
     const name = formData.get('name') as string;
@@ -198,7 +198,7 @@ export async function createRoster(formData: FormData) {
 }
 
 export async function updateRoster(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const name = formData.get('name') as string;
     const division = formData.get('division') as string;
@@ -222,7 +222,7 @@ export async function updateRoster(id: string, formData: FormData) {
 }
 
 export async function deleteRoster(id: string) {
-  await requireUser();
+  await requireAdmin();
   try {
     await db.delete(schema.rosters).where(eq(schema.rosters.id, id));
     safeRevalidateTag('rosters');
@@ -247,7 +247,7 @@ function isCaptainConflict(error: unknown): boolean {
 const CAPTAIN_CONFLICT_MSG = 'This roster already has a captain. Demote the current captain before assigning a new one.';
 
 export async function createRosterMember(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const rosterId = formData.get('rosterId') as string;
     const memberId = formData.get('memberId') as string;
@@ -281,7 +281,7 @@ export async function createRosterMember(formData: FormData) {
 }
 
 export async function updateRosterMember(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   try {
     const role = formData.get('role') as any;
     const ign = formData.get('ign') as string;
@@ -306,7 +306,7 @@ export async function updateRosterMember(id: string, formData: FormData) {
 }
 
 export async function deleteRosterMember(id: string) {
-  await requireUser();
+  await requireAdmin();
   try {
     await db.delete(schema.players).where(eq(schema.players.id, id));
     safeRevalidateTag('players');

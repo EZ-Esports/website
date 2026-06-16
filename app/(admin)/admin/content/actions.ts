@@ -1,12 +1,12 @@
 'use server';
-import { requireUser } from '@/app/lib/auth';
+import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 
 export async function updatePageContent(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const content = formData.get('content') as string;
 
   // Snapshot the current value and overwrite atomically so history can never drift from content.
@@ -32,7 +32,7 @@ export async function updatePageContent(id: string, formData: FormData) {
 }
 
 export async function restorePageContent(id: string, historyId: string) {
-  await requireUser();
+  await requireAdmin();
   // Fetch the history entry
   const [entry] = await db
     .select()

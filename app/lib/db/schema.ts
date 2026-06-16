@@ -13,6 +13,10 @@ export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
 export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
+// Admin access tiers. 'super_admin' may invite/revoke other admins and grant
+// the super_admin role; 'admin' manages content only. Tier gating is enforced
+// in the team server actions, not in the schema.
+export const adminRoleEnum = pgEnum('admin_role', ['admin', 'super_admin']);
 
 // --- CORE ENTITIES ---
 
@@ -284,5 +288,40 @@ export const pageContentHistory = pgTable('page_content_history', {
   savedAt: timestamp('saved_at').defaultNow().notNull(),
 }, (table) => [
   index('page_content_history_key_idx').on(table.contentKey),
+]);
+
+// --- ADMIN ACCESS CONTROL ---
+
+// Allowlist of users permitted into the admin panel. This is the source of
+// truth for authorization: requireAdmin()/getAdmin() look up the session user
+// here, so a valid Supabase Auth session alone is NOT sufficient. userId equals
+// the auth.users.id; there is no cross-schema FK (Drizzle does not manage the
+// auth schema), so the link is maintained by the invite/revoke server actions.
+export const adminUsers = pgTable('admin_users', {
+  userId: uuid('user_id').primaryKey(),
+  email: text('email').notNull().unique(),
+  role: adminRoleEnum('role').default('admin').notNull(),
+  // user_id of the admin who invited this one; null for the bootstrapped first admin.
+  invitedBy: uuid('invited_by'),
+  ...auditColumns,
+}, (table) => [
+  index('admin_users_email_idx').on(table.email),
+]);
+
+// Pending, single-use admin invitations. We store only the SHA-256 hash of the
+// invite token (never the raw token), so a DB leak cannot be used to accept an
+// invite. A row is consumed by setting acceptedAt; expired/accepted rows are
+// ignored by the accept flow.
+export const adminInvites = pgTable('admin_invites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: text('email').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  role: adminRoleEnum('role').default('admin').notNull(),
+  invitedBy: uuid('invited_by').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  acceptedAt: timestamp('accepted_at'),
+  ...auditColumns,
+}, (table) => [
+  index('admin_invites_email_idx').on(table.email),
 ]);
 

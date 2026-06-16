@@ -71,6 +71,13 @@
       "when": 1781185789500,
       "tag": "0009_slippery_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781629132320,
+      "tag": "0010_rich_boomerang",
+      "breakpoints": true
     }
   ]
 }

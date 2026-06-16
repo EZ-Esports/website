@@ -1,5 +1,5 @@
 'use server';
-import { requireUser } from '@/app/lib/auth';
+import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -16,7 +16,7 @@ function revalidateAll() {
 }
 
 export async function addSponsor(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const tier = formData.get('tier') as 'platinum' | 'gold' | 'community';
@@ -37,7 +37,7 @@ export async function addSponsor(formData: FormData) {
 }
 
 export async function updateSponsor(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const tier = formData.get('tier') as 'platinum' | 'gold' | 'community';
@@ -74,7 +74,7 @@ export async function updateSponsor(id: string, formData: FormData) {
 }
 
 export async function toggleSponsorActive(id: string, isActive: boolean) {
-  await requireUser();
+  await requireAdmin();
   try {
     await db
       .update(schema.sponsors)
@@ -89,7 +89,7 @@ export async function toggleSponsorActive(id: string, isActive: boolean) {
 }
 
 export async function deleteSponsor(id: string) {
-  const user = await requireUser();
+  const user = await requireAdmin();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.sponsors.storageKey })

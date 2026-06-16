@@ -1,5 +1,5 @@
 'use server';
-import { requireUser } from '@/app/lib/auth';
+import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -14,7 +14,7 @@ function revalidateAll() {
 }
 
 export async function createNewsPost(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const title = formData.get('title') as string;
   const excerpt = formData.get('excerpt') as string;
   const content = formData.get('content') as string;
@@ -47,7 +47,7 @@ export async function createNewsPost(formData: FormData) {
 }
 
 export async function updateNewsPost(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const title = formData.get('title') as string;
   const excerpt = formData.get('excerpt') as string;
   const content = formData.get('content') as string;
@@ -103,7 +103,7 @@ export async function updateNewsPost(id: string, formData: FormData) {
 }
 
 export async function publishNewsPost(id: string) {
-  await requireUser();
+  await requireAdmin();
   const [existing] = await db
     .select({ publishedAt: schema.newsPosts.publishedAt })
     .from(schema.newsPosts)
@@ -119,7 +119,7 @@ export async function publishNewsPost(id: string) {
 }
 
 export async function unpublishNewsPost(id: string) {
-  await requireUser();
+  await requireAdmin();
   await db
     .update(schema.newsPosts)
     .set({ status: 'draft' })
@@ -128,7 +128,7 @@ export async function unpublishNewsPost(id: string) {
 }
 
 export async function archiveNewsPost(id: string) {
-  await requireUser();
+  await requireAdmin();
   await db
     .update(schema.newsPosts)
     .set({ status: 'archived' })
@@ -137,7 +137,7 @@ export async function archiveNewsPost(id: string) {
 }
 
 export async function deleteNewsPost(id: string) {
-  const user = await requireUser();
+  const user = await requireAdmin();
   await db
     .update(schema.newsPosts)
     .set({ deletedAt: new Date(), deletedBy: user.id })

@@ -17,6 +17,7 @@ import {
   HiOutlinePencilSquare,
   HiOutlineGlobeAlt,
   HiOutlineCog6Tooth,
+  HiOutlineShieldCheck,
   HiArrowRightOnRectangle,
 } from 'react-icons/hi2';
 import type { IconType } from 'react-icons';
@@ -46,6 +47,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { label: 'Schools', href: '/admin/schools', icon: HiOutlineAcademicCap },
     { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
     { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
+    { label: 'Admins', href: '/admin/team', icon: HiOutlineShieldCheck },
   ];
 
   // Helper to determine the current page title, including nested routes

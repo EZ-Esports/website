@@ -2,11 +2,11 @@ import { login } from './actions';
 import SubmitButton from './SubmitButton';
 
 interface LoginPageProps {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; message?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { error } = await searchParams;
+  const { error, message } = await searchParams;
 
   return (
     <main className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
@@ -21,6 +21,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Sign in to manage league configurations, news, and matches.
           </p>
         </div>
+
+        {/* Success Alert (e.g. after accepting an invite) */}
+        {message && !error && (
+          <div className="bg-green-500/10 border border-green-500/30 text-green-300 text-sm px-4 py-3 rounded-lg" role="status">
+            {message}
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (

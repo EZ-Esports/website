@@ -38,6 +38,17 @@ export function safeUrl(url: string): string {
 }
 
 /**
+ * Lightweight email shape check for invite/allowlist flows. Not RFC-exhaustive
+ * by design — it rejects obvious garbage (no `@`, whitespace, missing TLD) while
+ * staying permissive; Supabase Auth is the ultimate validator on account create.
+ */
+export function isValidEmail(value: string): boolean {
+  const v = value?.trim();
+  if (!v || v.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+/**
  * Map a raw DB/runtime error to a safe user-facing message.
  * Postgres error codes are exposed via the `code` property on the thrown error.
  *
