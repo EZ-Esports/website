@@ -73,11 +73,17 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
       const claimed = await tx
         .update(schema.adminInvites)
         .set({ acceptedAt: sql`now()` })
-        .where(and(eq(schema.adminInvites.id, invite.id), isNull(schema.adminInvites.acceptedAt)))
+        .where(
+          and(
+            eq(schema.adminInvites.id, invite.id),
+            isNull(schema.adminInvites.acceptedAt),
+            gt(schema.adminInvites.expiresAt, sql`now()`),
+          ),
+        )
         .returning({ id: schema.adminInvites.id });
 
       if (claimed.length === 0) {
-        throw new Error('Invite already consumed.');
+        throw new Error('INVITE_UNAVAILABLE');
       }
 
       await tx.insert(schema.adminUsers).values({
@@ -90,7 +96,12 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
   } catch (error) {
     console.error('Failed to finalize admin invite; rolling back auth user', error);
     // Undo the auth account so the invite can be retried cleanly.
-    await supabase.auth.admin.deleteUser(created.user.id).catch(() => {});
+    await supabase.auth.admin
+      .deleteUser(created.user.id)
+      .catch((e) => console.error('ORPHANED AUTH USER — manual cleanup required:', created.user.id, e));
+    if ((error as Error).message === 'INVITE_UNAVAILABLE') {
+      return { error: 'This invite link has already been used or has expired. Ask an admin for a new one.' };
+    }
     return { error: sanitizeDbError(error) };
   }
 

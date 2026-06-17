@@ -323,5 +323,6 @@ export const adminInvites = pgTable('admin_invites', {
   ...auditColumns,
 }, (table) => [
   index('admin_invites_email_idx').on(table.email),
+  uniqueIndex('admin_invites_email_pending_unique').on(table.email).where(sql`${table.acceptedAt} is null`),
 ]);
 

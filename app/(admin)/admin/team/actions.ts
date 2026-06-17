@@ -65,9 +65,15 @@ export async function inviteAdmin(formData: FormData): Promise<{
     // writes are in one transaction so concurrent invites for the same email
     // can't both create live rows.
     await db.transaction(async (tx) => {
-      await tx
+      const superseded = await tx
         .delete(schema.adminInvites)
-        .where(and(eq(schema.adminInvites.email, email), isNull(schema.adminInvites.acceptedAt)));
+        .where(and(eq(schema.adminInvites.email, email), isNull(schema.adminInvites.acceptedAt)))
+        .returning({ role: schema.adminInvites.role });
+
+      // A plain admin must not be able to silently overwrite a pending super_admin invite.
+      if (superseded.some((r) => r.role === 'super_admin') && admin.role !== 'super_admin') {
+        throw new Error('SUPERSEDE_FORBIDDEN');
+      }
 
       await tx.insert(schema.adminInvites).values({
         email,
@@ -78,6 +84,9 @@ export async function inviteAdmin(formData: FormData): Promise<{
       });
     });
   } catch (error) {
+    if ((error as Error).message === 'SUPERSEDE_FORBIDDEN') {
+      return { success: false, error: 'Only super-admins can replace a pending super-admin invite.' };
+    }
     console.error('Failed to create admin invite', error);
     return { success: false, error: sanitizeDbError(error) };
   }
@@ -148,14 +157,20 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
     return { success: false, error: 'Only super-admins can remove a super-admin.' };
   }
 
-  // Atomic delete guarded by a subquery — prevents TOCTOU last-admin race where
-  // two concurrent revokes both pass the count check but together zero all admins.
-  let deleted: { userId: string }[];
+  // Serialize admin-removal via a transaction-scoped advisory lock so two
+  // concurrent revokes of different admins can't both see count=2 and both
+  // proceed, zeroing the allowlist.
+  let deleted: { userId: string }[] = [];
   try {
-    deleted = await db
-      .delete(schema.adminUsers)
-      .where(and(eq(schema.adminUsers.userId, userId), sql`(select count(*) from admin_users) > 1`))
-      .returning({ userId: schema.adminUsers.userId });
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(8765001)`);
+      const [{ c }] = await tx.select({ c: sql<number>`count(*)::int` }).from(schema.adminUsers);
+      if (c <= 1) return; // leave deleted empty -> last-admin error below
+      deleted = await tx
+        .delete(schema.adminUsers)
+        .where(eq(schema.adminUsers.userId, userId))
+        .returning({ userId: schema.adminUsers.userId });
+    });
   } catch (error) {
     console.error('Failed to remove admin row', error);
     return { success: false, error: 'Could not remove admin. Please try again.' };
