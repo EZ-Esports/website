@@ -15,6 +15,15 @@ Open [http://localhost:3000](http://localhost:3000). See [project README](../REA
 
 The app uses Supabase. Create a `.env` file with the required variables — **ping core team members for env secrets** (see [Supabase setup](dev/SUPABASE.md)).
 
+### First deploy / bootstrap
+
+After running migrations, seed the first admin account or the `admin_users` allowlist will be empty and everyone will be locked out of the admin panel:
+
+```bash
+npm run db:migrate
+npm run db:seed-admin -- you@example.com
+```
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -83,8 +92,9 @@ Games are defined in `app/lib/constants.ts` via `GAMES` and `GAME_SLUGS`. Adding
 | Shared types | `app/types/index.ts` |
 | Main nav logic | `app/components/layout/Navigation.tsx` |
 | Global styles | `app/globals.css` |
-| Supabase (client) | `app/lib/supabase.js` |
-| Supabase (server) | `app/lib/supabaseServer.js` |
+| Supabase (browser client) | `app/lib/supabase/client.ts` |
+| Supabase (server client) | `app/lib/supabase/server.ts` |
+| Supabase (service role) | `app/lib/supabase/service.ts` |
 
 ## Documentation
 

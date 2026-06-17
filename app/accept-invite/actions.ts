@@ -7,8 +7,8 @@ import * as schema from '@/app/lib/db/schema';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { hashInviteToken } from '@/app/lib/invite-token';
 import { sanitizeDbError } from '@/app/lib/text-utils';
-
-const MIN_PASSWORD_LENGTH = 8;
+import { ActionError } from '@/app/lib/errors';
+import { MIN_PASSWORD_LENGTH } from './constants';
 
 /**
  * Look up a live (unaccepted, unexpired) invite by its raw token. Returns the
@@ -91,7 +91,7 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
         .returning({ id: schema.adminInvites.id });
 
       if (claimed.length === 0) {
-        throw new Error('INVITE_UNAVAILABLE');
+        throw new ActionError('INVITE_UNAVAILABLE', 'This invite link has already been used or has expired. Ask an admin for a new one.');
       }
 
       await tx.insert(schema.adminUsers).values({
@@ -107,8 +107,8 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
     await supabase.auth.admin
       .deleteUser(created.user.id)
       .catch((e) => console.error('ORPHANED AUTH USER — manual cleanup required:', created.user.id, e));
-    if ((error as Error).message === 'INVITE_UNAVAILABLE') {
-      return { error: 'This invite link has already been used or has expired. Ask an admin for a new one.' };
+    if (error instanceof ActionError) {
+      return { error: error.message };
     }
     return { error: sanitizeDbError(error) };
   }

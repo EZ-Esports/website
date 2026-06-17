@@ -481,6 +481,6 @@ RLS is **not enabled**. Before exposing through a frontend or Supabase client AP
 - **Public read** on non-sensitive tables: `games`, `schools`, `seasons`, `teams`, `players`, `matches`.
 - **Authenticated-only read** on sensitive tables: `people` (emails, discord), `team_staff`, `org_staff`.
 - **Authenticated-only write** on all tables.
-- **Optional: admin-only write** using an `admins` table and `auth.uid()` checks.
+- **Optional: admin-only write** using the `admin_users` allowlist table (implemented) and `auth.uid()` checks.
 
 Until then, use the **Supabase Dashboard** or **service_role key** for all access.

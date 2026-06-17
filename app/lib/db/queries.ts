@@ -238,7 +238,12 @@ export const countTeamsWithoutRoster = async (): Promise<number> => {
 /** All provisioned admins, oldest first (the bootstrapped admin leads). */
 export const listAdminUsers = async () => {
   return db
-    .select()
+    .select({
+      userId: schema.adminUsers.userId,
+      email: schema.adminUsers.email,
+      role: schema.adminUsers.role,
+      createdAt: schema.adminUsers.createdAt,
+    })
     .from(schema.adminUsers)
     .orderBy(asc(schema.adminUsers.createdAt));
 };
@@ -247,7 +252,13 @@ export const listAdminUsers = async () => {
  * whether its link has already expired (computed here so the UI stays pure). */
 export const listPendingAdminInvites = async () => {
   const rows = await db
-    .select()
+    .select({
+      id: schema.adminInvites.id,
+      email: schema.adminInvites.email,
+      role: schema.adminInvites.role,
+      expiresAt: schema.adminInvites.expiresAt,
+      createdAt: schema.adminInvites.createdAt,
+    })
     .from(schema.adminInvites)
     .where(isNull(schema.adminInvites.acceptedAt))
     .orderBy(desc(schema.adminInvites.createdAt));
@@ -255,8 +266,3 @@ export const listPendingAdminInvites = async () => {
   return rows.map((row) => ({ ...row, expired: row.expiresAt.getTime() < now }));
 };
 
-/** Total number of provisioned admins — used to block last-admin lockout. */
-export const countAdminUsers = async (): Promise<number> => {
-  const [row] = await db.select({ value: count() }).from(schema.adminUsers);
-  return row?.value ?? 0;
-};

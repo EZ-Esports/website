@@ -2,8 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { acceptInvite } from './actions';
-
-const MIN_PASSWORD_LENGTH = 8;
+import { MIN_PASSWORD_LENGTH } from './constants';
 
 export default function AcceptInviteForm({ token, email }: { token: string; email: string }) {
   const [isPending, startTransition] = useTransition();

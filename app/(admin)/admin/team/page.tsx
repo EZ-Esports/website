@@ -3,8 +3,9 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import InviteAdminForm from '@/app/components/admin/InviteAdminForm';
 import AdminRow from '@/app/components/admin/AdminRow';
 import InviteRow from '@/app/components/admin/InviteRow';
-import { getAdmin } from '@/app/lib/auth';
+import { getAdmin, isSuperAdmin } from '@/app/lib/auth';
 import { listAdminUsers, listPendingAdminInvites } from '@/app/lib/db/queries';
+import { INVITE_TTL_DAYS } from './constants';
 
 export default async function TeamAdminPage() {
   const current = await getAdmin();
@@ -22,7 +23,7 @@ export default async function TeamAdminPage() {
     // db not reachable
   }
 
-  const isSuperAdmin = current?.role === 'super_admin';
+  const isSuperAdminUser = current ? isSuperAdmin(current.role) : false;
 
   return (
     <div className="space-y-8">
@@ -32,10 +33,10 @@ export default async function TeamAdminPage() {
       <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-1">Invite an admin</h2>
         <p className="text-sm text-slate-400 mb-5">
-          Generates a single-use link that expires in 7 days. Copy it and send it to the new admin
+          Generates a single-use link that expires in {INVITE_TTL_DAYS} days. Copy it and send it to the new admin
           yourself — they&apos;ll set a password and gain access.
         </p>
-        <InviteAdminForm canGrantSuperAdmin={isSuperAdmin} />
+        <InviteAdminForm canGrantSuperAdmin={isSuperAdminUser} />
       </Card>
 
       {/* Current admins */}

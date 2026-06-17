@@ -2,17 +2,21 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { requireAdmin } from '@/app/lib/auth';
+import { requireAdmin, canActOnRole } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { isValidEmail, sanitizeDbError } from '@/app/lib/text-utils';
+import { ActionError } from '@/app/lib/errors';
 import { rateLimit } from '@/app/lib/rate-limit';
 import { generateInviteToken, hashInviteToken } from '@/app/lib/invite-token';
+import { INVITE_TTL_DAYS } from './constants';
 
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const INVITE_TTL_MS = INVITE_TTL_DAYS * 24 * 60 * 60 * 1000;
 const INVITE_RATE_LIMIT = 10; // invites per inviter per minute
 const INVITE_RATE_WINDOW_MS = 60_000;
+// app-scoped pg_advisory_xact_lock key; must not collide with other advisory locks
+const ADMIN_REVOKE_LOCK_KEY = 8765001;
 
 /**
  * Create a single-use admin invite. Returns the raw token ONCE so the caller can
@@ -41,7 +45,7 @@ export async function inviteAdmin(formData: FormData): Promise<{
   }
 
   // Only super-admins may mint other super-admins.
-  if (requestedRole === 'super_admin' && admin.role !== 'super_admin') {
+  if (!canActOnRole(admin.role, requestedRole)) {
     return { success: false, error: 'Only super-admins can grant the super-admin role.' };
   }
 
@@ -71,8 +75,8 @@ export async function inviteAdmin(formData: FormData): Promise<{
         .returning({ role: schema.adminInvites.role });
 
       // A plain admin must not be able to silently overwrite a pending super_admin invite.
-      if (superseded.some((r) => r.role === 'super_admin') && admin.role !== 'super_admin') {
-        throw new Error('SUPERSEDE_FORBIDDEN');
+      if (superseded.some((r) => !canActOnRole(admin.role, r.role))) {
+        throw new ActionError('SUPERSEDE_FORBIDDEN', 'Only super-admins can replace a pending super-admin invite.');
       }
 
       // Re-check inside the transaction: if the email was accepted and provisioned
@@ -83,7 +87,7 @@ export async function inviteAdmin(formData: FormData): Promise<{
         .where(eq(schema.adminUsers.email, email))
         .limit(1);
       if (nowAdmin) {
-        throw new Error('ALREADY_ADMIN');
+        throw new ActionError('ALREADY_ADMIN', 'That email already belongs to an admin.');
       }
 
       await tx.insert(schema.adminInvites).values({
@@ -95,11 +99,8 @@ export async function inviteAdmin(formData: FormData): Promise<{
       });
     });
   } catch (error) {
-    if ((error as Error).message === 'SUPERSEDE_FORBIDDEN') {
-      return { success: false, error: 'Only super-admins can replace a pending super-admin invite.' };
-    }
-    if ((error as Error).message === 'ALREADY_ADMIN') {
-      return { success: false, error: 'That email already belongs to an admin.' };
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
     }
     console.error('Failed to create admin invite', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -124,7 +125,7 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
     return { success: false, error: 'Invite not found or already accepted.' };
   }
 
-  if (invite.role === 'super_admin' && admin.role !== 'super_admin') {
+  if (!canActOnRole(admin.role, invite.role)) {
     return { success: false, error: 'Only super-admins can revoke a super-admin invite.' };
   }
 
@@ -167,7 +168,7 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
     return { success: false, error: 'That user is not an admin.' };
   }
 
-  if (target.role === 'super_admin' && admin.role !== 'super_admin') {
+  if (!canActOnRole(admin.role, target.role)) {
     return { success: false, error: 'Only super-admins can remove a super-admin.' };
   }
 
@@ -178,7 +179,7 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
   let wasLastAdmin = false;
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(8765001)`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${ADMIN_REVOKE_LOCK_KEY})`);
       const [{ c }] = await tx.select({ c: sql<number>`count(*)::int` }).from(schema.adminUsers);
       if (c <= 1) { wasLastAdmin = true; return; }
       deleted = await tx

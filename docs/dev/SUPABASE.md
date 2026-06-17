@@ -14,36 +14,43 @@ Create a `.env` file in the project root with:
 
 ## Supabase Clients
 
-### `app/lib/supabase.js` — Client-side
+### `app/lib/supabase/client.ts` — Browser client
 
-Use in React components, client components, and browser code. Uses the publishable (anon) key with Row Level Security (RLS) applied.
+Use in React client components and browser code. Uses the anon key with Row Level Security (RLS) applied.
 
-```js
-import { supabase } from '@/app/lib/supabase'
-
-// In a client component or browser context
-const { data } = await supabase.from('table').select()
+```ts
+import { createBrowserClient } from '@/app/lib/supabase/client'
 ```
 
-### `app/lib/supabaseServer.js` — Server-side
+### `app/lib/supabase/server.ts` — Server client (cookie-based)
 
-Use in Server Components, Route Handlers, API routes, and server actions. Uses the service role key and bypasses RLS — use only for trusted server logic.
+Use in Server Components, Route Handlers, and Server Actions. Reads/writes auth cookies to keep the session in sync. Subject to RLS.
 
-```js
-import { supabaseServer } from '@/app/lib/supabaseServer'
+```ts
+import { createClient } from '@/app/lib/supabase/server'
+```
 
-// In a Server Component or API route
-const { data } = await supabaseServer.from('table').select()
+### `app/lib/supabase/service.ts` — Service role client
+
+Uses the `SUPABASE_SECRET_KEY` (service role). Bypasses RLS — use only for trusted server logic where elevated access is required (e.g. creating admin auth accounts).
+
+```ts
+import { createServiceClient } from '@/app/lib/supabase/service'
 ```
 
 ## When to use which
 
 | Context | Client |
 |---------|--------|
-| `'use client'` components | `supabase` |
-| Server Components | `supabaseServer` |
-| Route Handlers / API routes | `supabaseServer` |
-| Server Actions | `supabaseServer` |
+| `'use client'` components | `client.ts` |
+| Server Components | `server.ts` |
+| Route Handlers / API routes | `server.ts` |
+| Server Actions | `server.ts` |
+| Privileged server actions (admin provisioning) | `service.ts` |
+
+## Authorization
+
+A valid Supabase Auth session alone is **not sufficient** for admin access. The user must also have a row in the `admin_users` allowlist table. `requireAdmin()` and `getAdmin()` in `app/lib/auth.ts` are the single authorization gate for all admin panel routes and server actions — they verify the session **and** check the allowlist on every call.
 
 ### READ
 `docs/dev/SUPABASE.md` for information on the database schema and TODOs.

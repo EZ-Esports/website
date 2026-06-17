@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slugify, safeUrl, sanitizeDbError } from '../text-utils';
+import { slugify, safeUrl, sanitizeDbError, isValidEmail } from '../text-utils';
 
 // ---------------------------------------------------------------------------
 // slugify
@@ -94,5 +94,31 @@ describe('sanitizeDbError', () => {
   it('handles non-object errors gracefully', () => {
     expect(sanitizeDbError('plain string error')).toMatch(/unexpected error/i);
     expect(sanitizeDbError(null)).toMatch(/unexpected error/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isValidEmail
+// ---------------------------------------------------------------------------
+describe('isValidEmail', () => {
+  it('accepts a normal address', () => {
+    expect(isValidEmail('user@example.com')).toBe(true);
+  });
+
+  it('rejects missing @', () => {
+    expect(isValidEmail('userexample.com')).toBe(false);
+  });
+
+  it('rejects whitespace inside', () => {
+    expect(isValidEmail('user @example.com')).toBe(false);
+  });
+
+  it('rejects addresses longer than 254 characters', () => {
+    const long = 'a'.repeat(249) + '@b.com'; // 255 chars total > 254
+    expect(isValidEmail(long)).toBe(false);
+  });
+
+  it('rejects missing TLD (e.g. a@b)', () => {
+    expect(isValidEmail('a@b')).toBe(false);
   });
 });

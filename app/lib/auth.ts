@@ -3,7 +3,9 @@ import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
 import { adminUsers } from '@/app/lib/db/schema';
 
-export type AdminRole = 'admin' | 'super_admin';
+export type { AdminRole } from '@/app/lib/roles';
+export { isSuperAdmin, canActOnRole } from '@/app/lib/roles';
+import type { AdminRole } from '@/app/lib/roles';
 
 export interface AdminIdentity {
   id: string;
