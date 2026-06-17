@@ -3,7 +3,7 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import InviteAdminForm from '@/app/components/admin/InviteAdminForm';
 import AdminRow from '@/app/components/admin/AdminRow';
 import InviteRow from '@/app/components/admin/InviteRow';
-import { getAdmin, isSuperAdmin } from '@/app/lib/auth';
+import { getAdmin, isSuperAdmin, canActOnRole } from '@/app/lib/auth';
 import { listAdminUsers, listPendingAdminInvites } from '@/app/lib/db/queries';
 import { INVITE_TTL_DAYS } from './constants';
 
@@ -64,6 +64,7 @@ export default async function TeamAdminPage() {
                     key={a.userId}
                     admin={{ userId: a.userId, email: a.email, role: a.role, createdAt: a.createdAt }}
                     isSelf={a.userId === current?.id}
+                    canRevoke={current ? canActOnRole(current.role, a.role) : false}
                   />
                 ))}
               </tbody>
@@ -97,6 +98,7 @@ export default async function TeamAdminPage() {
                     key={inv.id}
                     invite={{ id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt }}
                     expired={inv.expired}
+                    canRevoke={current ? canActOnRole(current.role, inv.role) : false}
                   />
                 ))}
               </tbody>

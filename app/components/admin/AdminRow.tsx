@@ -12,6 +12,8 @@ interface AdminRowProps {
     createdAt: Date;
   };
   isSelf: boolean;
+  /** Whether the current actor is allowed to remove this admin (server still enforces). */
+  canRevoke: boolean;
 }
 
 const roleBadge: Record<AdminRole, string> = {
@@ -19,7 +21,7 @@ const roleBadge: Record<AdminRole, string> = {
   super_admin: 'bg-ez-pink/10 text-ez-pink border border-ez-pink/30',
 };
 
-export default function AdminRow({ admin, isSelf }: AdminRowProps) {
+export default function AdminRow({ admin, isSelf, canRevoke }: AdminRowProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
@@ -55,6 +57,8 @@ export default function AdminRow({ admin, isSelf }: AdminRowProps) {
       <td className="py-3">
         {isSelf ? (
           <span className="text-xs text-zinc-600 italic">You</span>
+        ) : !canRevoke ? (
+          <span className="text-xs text-zinc-600 italic">—</span>
         ) : (
           <div className="flex items-center gap-2">
             <button
