@@ -2,18 +2,19 @@
 
 import { useState, useTransition } from 'react';
 import { revokeAdmin } from '@/app/(admin)/admin/team/actions';
+import type { AdminRole } from '@/app/lib/roles';
 
 interface AdminRowProps {
   admin: {
     userId: string;
     email: string;
-    role: 'admin' | 'super_admin';
+    role: AdminRole;
     createdAt: Date;
   };
   isSelf: boolean;
 }
 
-const roleBadge: Record<AdminRowProps['admin']['role'], string> = {
+const roleBadge: Record<AdminRole, string> = {
   admin: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
   super_admin: 'bg-ez-pink/10 text-ez-pink border border-ez-pink/30',
 };

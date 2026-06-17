@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from 'react';
 import { revokeInvite } from '@/app/(admin)/admin/team/actions';
+import type { AdminRole } from '@/app/lib/roles';
 
 interface InviteRowProps {
   invite: {
     id: string;
     email: string;
-    role: 'admin' | 'super_admin';
+    role: AdminRole;
     expiresAt: Date;
   };
   expired: boolean;
