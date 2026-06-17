@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { requireAdmin, canActOnRole } from '@/app/lib/auth';
+import { requireSuperAdmin, canActOnRole } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { createServiceClient } from '@/app/lib/supabase/service';
@@ -30,7 +30,7 @@ export async function inviteAdmin(formData: FormData): Promise<{
   token?: string;
   email?: string;
 }> {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
 
   const rl = rateLimit(`admin-invite:${admin.id}`, INVITE_RATE_LIMIT, INVITE_RATE_WINDOW_MS);
   if (!rl.allowed) {
@@ -112,7 +112,7 @@ export async function inviteAdmin(formData: FormData): Promise<{
 
 /** Cancel a pending (unaccepted) invite. */
 export async function revokeInvite(inviteId: string): Promise<{ success: boolean; error?: string }> {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
 
   // Fetch the invite first so we can check role before deleting.
   const [invite] = await db
@@ -151,7 +151,7 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
  * Guards against self-removal, last-admin lockout, and unauthorized super-admin removal.
  */
 export async function revokeAdmin(userId: string): Promise<{ success: boolean; error?: string }> {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
 
   if (userId === admin.id) {
     return { success: false, error: 'You cannot remove your own admin access.' };

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import Card from '@/app/components/ui/Card';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import InviteAdminForm from '@/app/components/admin/InviteAdminForm';
@@ -9,6 +10,13 @@ import { INVITE_TTL_DAYS } from './constants';
 
 export default async function TeamAdminPage() {
   const current = await getAdmin();
+
+  // Team management is super_admin-only; plain admins manage content only. The
+  // server actions enforce this too — this guard just keeps the page out of
+  // reach for direct navigation (the nav link is already hidden for them).
+  if (!current || !isSuperAdmin(current.role)) {
+    redirect('/admin');
+  }
 
   let admins: Awaited<ReturnType<typeof listAdminUsers>> = [];
   let invites: Awaited<ReturnType<typeof listPendingAdminInvites>> = [];

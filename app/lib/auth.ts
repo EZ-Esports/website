@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
 import { adminUsers } from '@/app/lib/db/schema';
+import { isSuperAdmin } from '@/app/lib/roles';
 import type { AdminRole } from '@/app/lib/roles';
 
 export type { AdminRole } from '@/app/lib/roles';
@@ -70,6 +71,22 @@ export async function requireAdmin(): Promise<AdminIdentity> {
   const admin = await getAdmin();
   if (!admin) {
     throw new Error('Unauthorized');
+  }
+  return admin;
+}
+
+/**
+ * Stricter guard for admin-team management (invite/revoke). Per the role model,
+ * only `super_admin`s manage the allowlist; a plain `admin` manages content
+ * only. Use this — not requireAdmin() — at the top of every team server action
+ * and team page.
+ *
+ * Throws when the caller is not an authenticated super_admin.
+ */
+export async function requireSuperAdmin(): Promise<AdminIdentity> {
+  const admin = await requireAdmin();
+  if (!isSuperAdmin(admin.role)) {
+    throw new Error('Forbidden');
   }
   return admin;
 }
