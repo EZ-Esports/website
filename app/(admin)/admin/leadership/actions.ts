@@ -1,5 +1,5 @@
 'use server';
-import { requireUser } from '@/app/lib/auth';
+import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -7,7 +7,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 
 export async function createLeader(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const name = formData.get('name') as string;
   const role = formData.get('role') as string;
   const year = formData.get('year') as string;
@@ -38,7 +38,7 @@ export async function createLeader(formData: FormData) {
 }
 
 export async function updateLeader(id: string, year: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const name = formData.get('name') as string;
   const role = formData.get('role') as string;
   const newYear = formData.get('year') as string;
@@ -59,7 +59,7 @@ export async function updateLeader(id: string, year: string, formData: FormData)
 }
 
 export async function deleteLeader(id: string, year: string) {
-  const user = await requireUser();
+  const user = await requireAdmin();
   await db.update(schema.leadership).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.leadership.id, id));
 
   // Revalidate query cache and public pages

@@ -12,8 +12,9 @@
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
-    "db:seed": "npx tsx --env-file-if-exists=.env db/seed.ts"
+    "db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate",
+    "db:seed": "npx tsx --env-file-if-exists=.env db/seed.ts",
+    "db:seed-admin": "npx tsx --env-file-if-exists=.env db/seed-admin.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

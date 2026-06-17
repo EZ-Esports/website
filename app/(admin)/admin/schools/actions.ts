@@ -1,5 +1,5 @@
 'use server';
-import { requireUser } from '@/app/lib/auth';
+import { requireAdmin } from '@/app/lib/auth';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -16,7 +16,7 @@ function revalidateAll() {
 }
 
 export async function addSchool(formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const storageKey = (formData.get('storageKey') as string) || null;
@@ -38,7 +38,7 @@ export async function addSchool(formData: FormData) {
 }
 
 export async function updateSchool(id: string, formData: FormData) {
-  await requireUser();
+  await requireAdmin();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const newStorageKey = (formData.get('storageKey') as string) || null;
@@ -76,7 +76,7 @@ export async function updateSchool(id: string, formData: FormData) {
 }
 
 export async function deleteSchool(id: string) {
-  const user = await requireUser();
+  const user = await requireAdmin();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.schools.storageKey })
@@ -96,7 +96,7 @@ export async function deleteSchool(id: string) {
 }
 
 export async function toggleSchoolActive(id: string, isActive: boolean) {
-  await requireUser();
+  await requireAdmin();
   try {
     await db
       .update(schema.schools)

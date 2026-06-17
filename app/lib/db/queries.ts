@@ -232,3 +232,37 @@ export const countTeamsWithoutRoster = async (): Promise<number> => {
     );
   return row?.value ?? 0;
 };
+
+// --- ADMIN ACCESS CONTROL ---
+
+/** All provisioned admins, oldest first (the bootstrapped admin leads). */
+export const listAdminUsers = async () => {
+  return db
+    .select({
+      userId: schema.adminUsers.userId,
+      email: schema.adminUsers.email,
+      role: schema.adminUsers.role,
+      createdAt: schema.adminUsers.createdAt,
+    })
+    .from(schema.adminUsers)
+    .orderBy(asc(schema.adminUsers.createdAt));
+};
+
+/** Outstanding (not yet accepted) admin invites, newest first, each tagged with
+ * whether its link has already expired (computed here so the UI stays pure). */
+export const listPendingAdminInvites = async () => {
+  const rows = await db
+    .select({
+      id: schema.adminInvites.id,
+      email: schema.adminInvites.email,
+      role: schema.adminInvites.role,
+      expiresAt: schema.adminInvites.expiresAt,
+      createdAt: schema.adminInvites.createdAt,
+    })
+    .from(schema.adminInvites)
+    .where(isNull(schema.adminInvites.acceptedAt))
+    .orderBy(desc(schema.adminInvites.createdAt));
+  const now = Date.now();
+  return rows.map((row) => ({ ...row, expired: row.expiresAt.getTime() < now }));
+};
+

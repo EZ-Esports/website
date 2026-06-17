@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
+import { getAdmin } from '@/app/lib/auth';
 
 const BUCKET = 'admin-uploads';
 // Authenticated admins uploading images: 30 uploads per minute is a generous cap
@@ -11,29 +10,9 @@ const UPLOAD_LIMIT = 30;
 const UPLOAD_WINDOW_MS = 60_000;
 
 export async function POST(req: NextRequest) {
-  // Use publishable key + cookies to verify the user's session
-  const cookieStore = await cookies();
-  const supabaseAuth = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll(); },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch { /* server component context */ }
-        },
-      },
-    }
-  );
-
-  // getClaims() verifies the session JWT locally (no Auth API round-trip) when
-  // signing keys are enabled; the truthiness of claims is all this route needs.
-  const { data: claimsData, error: authError } = await supabaseAuth.auth.getClaims();
-  if (authError || !claimsData?.claims) {
+  // Enforce admin authorization: session must exist AND be on the admin allowlist.
+  const admin = await getAdmin();
+  if (!admin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
