@@ -75,6 +75,17 @@ export async function inviteAdmin(formData: FormData): Promise<{
         throw new Error('SUPERSEDE_FORBIDDEN');
       }
 
+      // Re-check inside the transaction: if the email was accepted and provisioned
+      // as an admin between the pre-check above and now, abort to avoid a dangling invite.
+      const [nowAdmin] = await tx
+        .select({ userId: schema.adminUsers.userId })
+        .from(schema.adminUsers)
+        .where(eq(schema.adminUsers.email, email))
+        .limit(1);
+      if (nowAdmin) {
+        throw new Error('ALREADY_ADMIN');
+      }
+
       await tx.insert(schema.adminInvites).values({
         email,
         tokenHash,
@@ -86,6 +97,9 @@ export async function inviteAdmin(formData: FormData): Promise<{
   } catch (error) {
     if ((error as Error).message === 'SUPERSEDE_FORBIDDEN') {
       return { success: false, error: 'Only super-admins can replace a pending super-admin invite.' };
+    }
+    if ((error as Error).message === 'ALREADY_ADMIN') {
+      return { success: false, error: 'That email already belongs to an admin.' };
     }
     console.error('Failed to create admin invite', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -161,11 +175,12 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
   // concurrent revokes of different admins can't both see count=2 and both
   // proceed, zeroing the allowlist.
   let deleted: { userId: string }[] = [];
+  let wasLastAdmin = false;
   try {
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(8765001)`);
       const [{ c }] = await tx.select({ c: sql<number>`count(*)::int` }).from(schema.adminUsers);
-      if (c <= 1) return; // leave deleted empty -> last-admin error below
+      if (c <= 1) { wasLastAdmin = true; return; }
       deleted = await tx
         .delete(schema.adminUsers)
         .where(eq(schema.adminUsers.userId, userId))
@@ -177,7 +192,12 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
   }
 
   if (deleted.length === 0) {
-    return { success: false, error: 'Cannot remove the last remaining admin.' };
+    if (wasLastAdmin) {
+      return { success: false, error: 'Cannot remove the last remaining admin.' };
+    }
+    // Row was already gone (e.g. concurrent revoke) — treat as success; nothing to delete.
+    revalidatePath('/admin/team');
+    return { success: true };
   }
 
   // Best-effort: delete the auth account so the session is invalidated. The

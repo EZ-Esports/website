@@ -13,6 +13,7 @@
  *
  * Idempotent: re-running for the same email updates the role to super_admin.
  */
+import { eq } from 'drizzle-orm';
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { createServiceClient } from '../app/lib/supabase/service';
@@ -42,6 +43,23 @@ async function main() {
     console.error(
       `No Supabase Auth user found for "${email}". Create the account first ` +
         `(Supabase dashboard → Authentication → Add user), then re-run.`,
+    );
+    process.exit(1);
+  }
+
+  // Guard against the "same email, different user_id" case (e.g. auth account was
+  // recreated). The onConflictDoUpdate below targets userId, so a stale row keyed
+  // to an old user_id would trigger the email unique constraint instead — giving a
+  // cryptic error. Detect and explain it upfront.
+  const [existingByEmail] = await db
+    .select({ userId: schema.adminUsers.userId })
+    .from(schema.adminUsers)
+    .where(eq(schema.adminUsers.email, email))
+    .limit(1);
+  if (existingByEmail && existingByEmail.userId !== userId) {
+    console.error(
+      `An admin row already exists for "${email}" under a different user id (${existingByEmail.userId}). ` +
+        `The auth account may have been recreated. Remove the stale admin_users row or reconcile the user id, then re-run.`,
     );
     process.exit(1);
   }
