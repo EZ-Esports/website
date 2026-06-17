@@ -18,8 +18,16 @@ const MIN_PASSWORD_LENGTH = 8;
 export async function findValidInvite(token: string) {
   if (!token) return null;
   const tokenHash = hashInviteToken(token);
+  // Project only the columns callers need — never return tokenHash from this
+  // 'use server' endpoint (least privilege; the hash has no use to a client).
   const [invite] = await db
-    .select()
+    .select({
+      id: schema.adminInvites.id,
+      email: schema.adminInvites.email,
+      role: schema.adminInvites.role,
+      invitedBy: schema.adminInvites.invitedBy,
+      expiresAt: schema.adminInvites.expiresAt,
+    })
     .from(schema.adminInvites)
     .where(
       and(
