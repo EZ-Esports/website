@@ -265,4 +265,3 @@ export const listPendingAdminInvites = async () => {
   const now = Date.now();
   return rows.map((row) => ({ ...row, expired: row.expiresAt.getTime() < now }));
 };
-
