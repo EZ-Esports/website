@@ -7,6 +7,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import Link from 'next/link';
+import CalendarSchedule from './CalendarSchedule';
 
 interface SchedulePageProps {
   params: Promise<{ game: string }>;
@@ -34,14 +35,18 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
   const gameConfig = GAMES[game as GameSlug];
 
   interface ScheduleItem {
+    id: string;
     ts: number;
     date: string;
     time: string;
+    scheduledAt: string;
     team1: string;
     team2: string;
     division: string;
     status: string;
     result?: string;
+    homeScore: number | null;
+    awayScore: number | null;
   }
 
   let schedule: ScheduleItem[] = [];
@@ -93,6 +98,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
           const team1 = homeRoster ? teamMap.get(homeRoster.teamId) : null;
           const team2 = awayRoster ? teamMap.get(awayRoster.teamId) : null;
           return {
+            id: m.id,
             ts: new Date(m.scheduledAt).getTime(),
             date: new Date(m.scheduledAt).toLocaleDateString('en-US', {
               timeZone: 'America/New_York',
@@ -105,6 +111,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
               hour: 'numeric',
               minute: '2-digit',
             }),
+            scheduledAt: m.scheduledAt.toISOString(),
             team1: team1?.name || 'Home Team',
             team2: team2?.name || 'Away Team',
             division: homeRoster?.division || 'Varsity',
@@ -112,6 +119,8 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             result: m.status === 'completed' && m.homeScore !== null && m.awayScore !== null
               ? `${m.homeScore > m.awayScore ? 'W' : 'L'} ${m.homeScore}-${m.awayScore}`
               : undefined,
+            homeScore: m.homeScore,
+            awayScore: m.awayScore,
           };
         });
 
@@ -155,73 +164,16 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             </Link>
           </div>
 
-          {/* Schedule List — split into Upcoming (chronological) and Results (most recent first) */}
-          {(() => {
-            const upcoming = schedule
-              .filter((m) => m.status !== 'Completed')
-              .sort((a, b) => a.ts - b.ts);
-            const results = schedule
-              .filter((m) => m.status === 'Completed')
-              .sort((a, b) => b.ts - a.ts);
-
-            const renderCard = (match: ScheduleItem, index: number) => (
-              <div
-                key={index}
-                className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-5 flex items-center justify-between hover:border-slate-700 transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="text-xs text-slate-400 font-semibold mb-1">
-                    {match.date} • {match.time} • {match.division} Division
-                  </div>
-                  <div className="text-lg font-bold text-white tracking-tight">
-                    {match.team1} <span className="text-slate-500 font-medium px-1">vs</span> {match.team2}
-                  </div>
-                </div>
-                <div className="text-right">
-                  {match.status === 'Completed' ? (
-                    <span className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-sm font-extrabold">
-                      {match.result}
-                    </span>
-                  ) : match.status === 'Live' ? (
-                    <span className="inline-block px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-extrabold animate-pulse motion-reduce:animate-none">
-                      Live
-                    </span>
-                  ) : (
-                    <span className="inline-block px-3 py-1 rounded-full bg-slate-900 border border-slate-800/60 text-slate-400 text-xs font-semibold">
-                      Upcoming
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-
-            if (schedule.length === 0) {
-              return (
-                <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/30 border border-slate-800/60 rounded-xl">
-                  No scheduled match fixtures for this season and division yet.
-                </div>
-              );
-            }
-
-            return (
-              <div className="space-y-10">
-                {upcoming.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Upcoming</h3>
-                    <div className="space-y-4">{upcoming.map(renderCard)}</div>
-                  </section>
-                )}
-                {results.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Results</h3>
-                    <div className="space-y-4">{results.map(renderCard)}</div>
-                  </section>
-                )}
-              </div>
-            );
-          })()}
+          {/* Interactive Calendar Component */}
+          <CalendarSchedule
+            key={`${game}-${division}`}
+            matches={schedule}
+            gameSlug={game}
+            division={division}
+          />
         </div>
       </ContentSection>
     </main>
   );
 }
+
