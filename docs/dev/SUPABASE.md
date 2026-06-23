@@ -52,5 +52,17 @@ import { createServiceClient } from '@/app/lib/supabase/service'
 
 A valid Supabase Auth session alone is **not sufficient** for admin access. The user must also have a row in the `admin_users` allowlist table. `requireAdmin()` and `getAdmin()` in `app/lib/auth.ts` are the single authorization gate for all admin panel routes and server actions — they verify the session **and** check the allowlist on every call.
 
+## Row Level Security (RLS)
+
+RLS is enabled for every application-owned table in `public` by migration `0012_icy_molten_man.sql`. The `roster_standings` view is marked `security_invoker = true` so base-table RLS still applies when the view is queried through Supabase APIs.
+
+Policy contract:
+
+- Public `anon`/`authenticated` reads are limited to non-sensitive, publishable rows: active games/league data, active non-deleted schools, published non-deleted news, active non-deleted gallery images/sponsors, non-deleted leadership rows, and page content.
+- Sensitive rows such as `members`, `school_applications`, `page_content_history`, `admin_users`, and `admin_invites` are not publicly readable.
+- Authenticated admin writes are gated by the `admin_users` allowlist via `public.is_admin()`.
+- Admin team management on `admin_users` and `admin_invites` is gated by `public.is_super_admin()`.
+- Public application submission still goes through `app/api/apply/route.ts`; the database table itself is not directly insertable by anonymous Supabase clients.
+
 ### READ
-`docs/dev/SUPABASE.md` for information on the database schema and TODOs.
+`docs/dev/DATABASE.md` for the database schema overview and migration notes.

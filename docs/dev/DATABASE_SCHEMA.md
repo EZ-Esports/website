@@ -320,14 +320,10 @@ FROM people p
 LEFT JOIN schools s ON p.school_id = s.school_id;
 
 -- ============================================================
--- TODO: ROW LEVEL SECURITY
--- RLS is not enabled yet. Before exposing this database through
--- a frontend or the Supabase client API, enable RLS on all tables
--- and add policies for:
---   - Public read access on non-sensitive tables (schools, matches,
---     standings, players, etc.)
---   - Authenticated-only read on sensitive tables (people, team_staff, org_staff)
---   - Authenticated-only write on all tables
---   - Optional: admin-only write using an admins table + auth.uid()
--- Until then, use the Supabase Dashboard or service_role key for access.
+-- ROW LEVEL SECURITY
+-- RLS is enabled for every application-owned public table by the
+-- 0012_icy_molten_man.sql migration. Public Supabase clients may read only
+-- publishable rows; sensitive tables are admin-only; content writes require
+-- public.is_admin(); admin-team writes require public.is_super_admin().
+-- The roster_standings view is security_invoker so base-table RLS applies.
 -- ============================================================

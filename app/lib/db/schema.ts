@@ -29,7 +29,7 @@ export const games = pgTable('games', {
   imageUrl: text('image_url'),
   storageKey: text('storage_key'),
   ...auditColumns,
-});
+}).enableRLS();
 
 // Schools in the league
 export const schools = pgTable('schools', {
@@ -45,7 +45,7 @@ export const schools = pgTable('schools', {
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),
   ...auditColumns,
-});
+}).enableRLS();
 
 // Central repository for people (students, coaches, etc.)
 export const members = pgTable('members', {
@@ -61,7 +61,7 @@ export const members = pgTable('members', {
   ...auditColumns,
 }, (table) => [
   index('members_school_id_idx').on(table.schoolId),
-]);
+]).enableRLS();
 
 // Seasons config
 export const seasons = pgTable('seasons', {
@@ -75,7 +75,7 @@ export const seasons = pgTable('seasons', {
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),
   uniqueIndex('seasons_game_id_name_unique_idx').on(table.gameId, table.name),
-]);
+]).enableRLS();
 
 // --- TEAMS & ROSTERS ---
 
@@ -97,7 +97,7 @@ export const teams = pgTable('teams', {
   index('teams_game_id_idx').on(table.gameId),
   index('teams_season_id_idx').on(table.seasonId),
   uniqueIndex('teams_school_game_season_unique_idx').on(table.schoolId, table.gameId, table.seasonId),
-]);
+]).enableRLS();
 
 // Specific rosters under a team (e.g. "Varsity", "JV")
 export const rosters = pgTable('rosters', {
@@ -111,7 +111,7 @@ export const rosters = pgTable('rosters', {
 }, (table) => [
   index('rosters_team_id_idx').on(table.teamId),
   uniqueIndex('rosters_team_name_unique_idx').on(table.teamId, table.name),
-]);
+]).enableRLS();
 
 // Mapping members to specific rosters
 export const players = pgTable('players', {
@@ -137,7 +137,7 @@ export const players = pgTable('players', {
   uniqueIndex('players_roster_one_captain_idx')
     .on(table.rosterId)
     .where(sql`is_captain = true`),
-]);
+]).enableRLS();
 
 // --- MATCHES ---
 
@@ -163,7 +163,7 @@ export const matches = pgTable('matches', {
   index('matches_season_id_idx').on(table.seasonId),
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
-]);
+]).enableRLS();
 
 // --- CMS & LEADERSHIP ---
 
@@ -182,7 +182,7 @@ export const newsPosts = pgTable('news_posts', {
   ...auditColumns,
 }, (table) => [
   index('news_posts_published_at_idx').on(table.publishedAt),
-]);
+]).enableRLS();
 
 // Leadership team members
 export const leadership = pgTable('leadership', {
@@ -198,7 +198,7 @@ export const leadership = pgTable('leadership', {
   ...auditColumns,
 }, (table) => [
   index('leadership_year_idx').on(table.year),
-]);
+]).enableRLS();
 
 // View for rosters with dynamically computed standings (wins and losses)
 export const rosterStandings = pgView('roster_standings', {
@@ -210,7 +210,7 @@ export const rosterStandings = pgView('roster_standings', {
   updatedAt: timestamp('updated_at'),
   wins: integer('wins'),
   losses: integer('losses'),
-}).as(sql`
+}).with({ securityInvoker: true }).as(sql`
   SELECT
     r.id, r.team_id, r.name, r.division, r.created_at, r.updated_at,
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score > m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score > m.home_score AND m.status IN ('completed', 'forfeit')))::int as wins,
@@ -237,7 +237,7 @@ export const galleryImages = pgTable('gallery_images', {
 }, (table) => [
   index('gallery_images_set_id_idx').on(table.setId),
   index('gallery_images_display_order_idx').on(table.displayOrder),
-]);
+]).enableRLS();
 
 export const sponsors = pgTable('sponsors', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -254,7 +254,7 @@ export const sponsors = pgTable('sponsors', {
 }, (table) => [
   index('sponsors_tier_idx').on(table.tier),
   index('sponsors_display_order_idx').on(table.displayOrder),
-]);
+]).enableRLS();
 
 export const schoolApplications = pgTable('school_applications', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -269,7 +269,7 @@ export const schoolApplications = pgTable('school_applications', {
 }, (table) => [
   index('school_applications_status_idx').on(table.status),
   index('school_applications_submitted_at_idx').on(table.submittedAt),
-]);
+]).enableRLS();
 
 // CMS key-value content blocks for editable page text
 export const pageContent = pgTable('page_content', {
@@ -278,7 +278,7 @@ export const pageContent = pgTable('page_content', {
   label: text('label').notNull(),
   content: text('content').notNull().default(''),
   ...auditColumns,
-});
+}).enableRLS();
 
 // Audit trail for page content edits
 export const pageContentHistory = pgTable('page_content_history', {
@@ -288,7 +288,7 @@ export const pageContentHistory = pgTable('page_content_history', {
   savedAt: timestamp('saved_at').defaultNow().notNull(),
 }, (table) => [
   index('page_content_history_key_idx').on(table.contentKey),
-]);
+]).enableRLS();
 
 // --- ADMIN ACCESS CONTROL ---
 
@@ -306,7 +306,7 @@ export const adminUsers = pgTable('admin_users', {
   ...auditColumns,
 }, (table) => [
   index('admin_users_email_idx').on(table.email),
-]);
+]).enableRLS();
 
 // Pending, single-use admin invitations. We store only the SHA-256 hash of the
 // invite token (never the raw token), so a DB leak cannot be used to accept an
@@ -324,5 +324,4 @@ export const adminInvites = pgTable('admin_invites', {
 }, (table) => [
   index('admin_invites_email_idx').on(table.email),
   uniqueIndex('admin_invites_email_pending_unique').on(table.email).where(sql`${table.acceptedAt} is null`),
-]);
-
+]).enableRLS();

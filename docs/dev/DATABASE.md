@@ -474,13 +474,13 @@ Trades always-live data for faster reads at scale.
 
 ---
 
-## TODO: Row Level Security (RLS)
+## Row Level Security (RLS)
 
-RLS is **not enabled**. Before exposing through a frontend or Supabase client API, enable RLS on all tables and add policies:
+RLS is enabled for every application-owned `public` table by migration `0012_icy_molten_man.sql`. The `roster_standings` view is `security_invoker`, so the base-table policies apply to view reads.
 
-- **Public read** on non-sensitive tables: `games`, `schools`, `seasons`, `teams`, `players`, `matches`.
-- **Authenticated-only read** on sensitive tables: `people` (emails, discord), `team_staff`, `org_staff`.
-- **Authenticated-only write** on all tables.
-- **Optional: admin-only write** using the `admin_users` allowlist table (implemented) and `auth.uid()` checks.
+- **Public read** on publishable rows only: active/non-deleted schools and league data, published/non-deleted news, active/non-deleted gallery images and sponsors, non-deleted leadership rows, page content, and the standings view.
+- **Admin-only read** on sensitive tables: `members`, `school_applications`, `page_content_history`, `admin_users`, and `admin_invites`.
+- **Admin-only write** on content and league tables via `public.is_admin()`.
+- **Super-admin-only team management** on `admin_users` and `admin_invites` via `public.is_super_admin()`.
 
-Until then, use the **Supabase Dashboard** or **service_role key** for all access.
+Server actions and route handlers still perform app-level authorization (`requireAdmin()` / `requireSuperAdmin()`) before writing. The service-role client bypasses RLS and must stay confined to trusted server code.
