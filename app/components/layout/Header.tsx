@@ -7,7 +7,8 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import FocusTrap from 'focus-trap-react';
 import { SiTwitch } from 'react-icons/si';
-import { SITE_CONFIG } from '@/app/lib/constants';
+import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
+import Button from '@/app/components/ui/Button';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
 
@@ -17,12 +18,33 @@ export default function Header() {
   const pathname = usePathname();
   const toggleRef = useRef<HTMLButtonElement>(null);
 
+  // Check if current page features a dark hero banner at the top
+  const hasHero = pathname === '/' ||
+                  pathname === '/about' ||
+                  pathname === '/news' ||
+                  pathname.startsWith('/news/') ||
+                  pathname === '/valorant' ||
+                  pathname === '/league-of-legends' ||
+                  pathname === '/team-fight-tactics' ||
+                  pathname === '/apply' ||
+                  pathname === '/sponsors' ||
+                  pathname === '/privacy';
+
   const { scrollY } = useScroll();
-  const headerBg = useTransform(scrollY, [0, 80], ['rgba(17,17,17,0)', 'rgba(17,17,17,0.92)']);
+  const bgTransform = useTransform(scrollY, [0, 120], ['rgba(17,17,17,0)', 'rgba(17,17,17,0.95)']);
+  const headerBg = hasHero ? bgTransform : 'rgba(17,17,17,0.95)';
+
+  // Scroll-linked backdrop filter blur transition
+  const blurTransform = useTransform(scrollY, [0, 120], ['blur(0px)', 'blur(16px)']);
+  const headerBlur = hasHero ? blurTransform : 'blur(16px)';
+
+  // Scroll-linked border bottom color transition
+  const borderTransform = useTransform(scrollY, [0, 120], ['rgba(39,39,42,0)', 'rgba(39,39,42,0.6)']);
+  const headerBorderColor = hasHero ? borderTransform : 'rgba(39,39,42,0.6)';
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      setIsScrolled(window.scrollY > 60);
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll);
@@ -53,18 +75,6 @@ export default function Header() {
     toggleRef.current?.focus();
   };
 
-  // Check if current page features a dark hero banner at the top
-  const hasHero = pathname === '/' ||
-                  pathname === '/about' ||
-                  pathname === '/news' ||
-                  pathname === '/valorant' ||
-                  pathname === '/league-of-legends' ||
-                  pathname === '/team-fight-tactics' ||
-                  pathname === '/apply' ||
-                  pathname === '/sponsors';
-
-  const isDarkText = isScrolled || !hasHero;
-
   return (
     <>
     <a
@@ -74,11 +84,20 @@ export default function Header() {
       Skip to main content
     </a>
     <motion.header
-      style={{ backgroundColor: headerBg }}
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ease-in-out backdrop-blur-md ${
+      style={{ 
+        backgroundColor: headerBg, 
+        backdropFilter: headerBlur, 
+        WebkitBackdropFilter: headerBlur,
+        borderBottomColor: headerBorderColor
+      }}
+      className={`z-50 w-full border-b transition-all duration-500 ease-out ${
+        hasHero
+          ? 'fixed top-0'
+          : 'sticky top-0'
+      } ${
         isScrolled
-          ? 'border-b border-custom-border/60 py-1 sm:py-2'
-          : 'border-b-0 py-4 sm:py-6'
+          ? 'py-1.5 sm:py-2'
+          : 'py-2.5 sm:py-3.5'
       }`}
     >
       <nav className="container mx-auto px-4">
@@ -94,43 +113,46 @@ export default function Header() {
                 priority
               />
             </Link>
-            <Link
+             <Link
               href="https://www.twitch.tv/ezesportsNYC"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Watch EZ Esports live on Twitch (opens in new tab)"
-              className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 hover:bg-ez-pink/20 transition-colors"
+              className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 bg-ez-pink/10 border-ez-pink/20 hover:bg-ez-pink/20 shadow-sm active:scale-[0.98]"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse motion-reduce:animate-none" aria-hidden="true" />
               <SiTwitch className="w-3 h-3 text-ez-pink" aria-hidden="true" />
-              <span className="text-xs font-bold text-ez-pink uppercase tracking-widest" aria-hidden="true">Watch Live</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ez-pink" aria-hidden="true">Watch Live</span>
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-6">
-            <Navigation isDarkText={isDarkText} />
+          <div className="hidden md:flex items-center gap-4 lg:gap-6">
+            <Navigation />
+            <Button 
+              href={ROUTES.apply} 
+              variant="primary" 
+              className="py-1.5 px-4 text-xs font-black uppercase tracking-widest shadow-md shadow-ez-pink/5 hover:shadow-ez-pink/20 transition-all duration-300 shrink-0"
+            >
+              Apply Now
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
           <button
             ref={toggleRef}
             onClick={() => setIsOpen(!isOpen)}
-            className={`md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${
-              isDarkText
-                ? 'text-foreground-secondary hover:text-foreground border-custom-border bg-background-secondary/40'
-                : 'text-white/95 hover:text-ez-pink border-white/20 bg-white/10'
-            }`}
+            className="md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-all duration-300 min-h-[44px] min-w-[44px] flex items-center justify-center text-white/90 hover:text-ez-pink border-white/15 bg-white/5 hover:bg-white/10 backdrop-blur-sm"
             aria-expanded={isOpen}
             aria-controls="mobile-nav"
             aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
           >
             {isOpen ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             )}
@@ -154,11 +176,19 @@ export default function Header() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className={`md:hidden py-4 border-t border-custom-border/40 rounded-b-xl px-2 ${
-                  isDarkText ? 'bg-background/95' : 'bg-zinc-950/95'
-                }`}
+                className="md:hidden py-4 border-t border-custom-border/40 rounded-b-xl px-4 bg-background-secondary/95 backdrop-blur-md"
               >
-                <Navigation isDarkText={isDarkText} onNavigate={handleCloseMenu} />
+                <Navigation onNavigate={handleCloseMenu} />
+                <div className="mt-4 pt-4 border-t border-custom-border/30">
+                  <Button 
+                    href={ROUTES.apply} 
+                    variant="primary" 
+                    className="w-full text-center py-2.5 font-bold uppercase tracking-wider"
+                    onClick={handleCloseMenu}
+                  >
+                    Apply Now
+                  </Button>
+                </div>
               </motion.div>
             </FocusTrap>
           )}

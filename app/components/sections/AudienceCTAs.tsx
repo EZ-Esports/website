@@ -8,9 +8,9 @@ export default function AudienceCTAs() {
           {/* Students & Fans */}
           <Link
             href="/valorant"
-            className="flex-1 flex items-center gap-4 p-6 rounded-xl border border-ez-pink/25 hover:border-ez-pink/60 hover:bg-ez-pink/8 active:scale-[0.98] active:bg-ez-pink/12 transition-all duration-200 group cursor-pointer"
+            className="flex-1 flex items-center gap-4 p-5 rounded-2xl border border-white/8 bg-black/20 hover:bg-black/35 backdrop-blur-md hover:border-ez-pink/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 group cursor-pointer shadow-lg"
           >
-            <div className="w-10 h-10 rounded-lg bg-ez-pink/20 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-ez-pink/15 flex items-center justify-center shrink-0 border border-ez-pink/20">
               {/* Game controller icon */}
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-ez-pink">
                 <rect x="2" y="6" width="20" height="12" rx="3" />
@@ -21,8 +21,8 @@ export default function AudienceCTAs() {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-foreground text-sm tracking-wide">Students &amp; Fans</div>
-              <div className="text-foreground-secondary text-sm mt-0.5">View Valorant league &amp; schedule</div>
+              <div className="font-bold text-white text-sm tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">Students &amp; Fans</div>
+              <div className="text-slate-200/90 text-sm mt-0.5 drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.4)]">View Valorant league &amp; schedule</div>
             </div>
             <span className="text-ez-pink text-lg opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" aria-hidden="true">→</span>
           </Link>
@@ -30,9 +30,9 @@ export default function AudienceCTAs() {
           {/* School Admins & Parents */}
           <Link
             href="/apply"
-            className="flex-1 flex items-center gap-4 p-6 rounded-xl border border-ez-pink/25 hover:border-ez-pink/60 hover:bg-ez-pink/8 active:scale-[0.98] active:bg-ez-pink/12 transition-all duration-200 group cursor-pointer"
+            className="flex-1 flex items-center gap-4 p-5 rounded-2xl border border-white/8 bg-black/20 hover:bg-black/35 backdrop-blur-md hover:border-ez-pink/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 group cursor-pointer shadow-lg"
           >
-            <div className="w-10 h-10 rounded-lg bg-ez-pink/20 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-ez-pink/15 flex items-center justify-center shrink-0 border border-ez-pink/20">
               {/* School building icon */}
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-ez-pink">
                 <path d="M3 21V9l9-6 9 6v12" />
@@ -43,8 +43,8 @@ export default function AudienceCTAs() {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-foreground text-sm tracking-wide">School Admins &amp; Parents</div>
-              <div className="text-foreground-secondary text-sm mt-0.5">Bring EZ to your school</div>
+              <div className="font-bold text-white text-sm tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">School Admins &amp; Parents</div>
+              <div className="text-slate-200/90 text-sm mt-0.5 drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.4)]">Bring EZ to your school</div>
             </div>
             <span className="text-ez-pink text-lg opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" aria-hidden="true">→</span>
           </Link>
@@ -52,9 +52,9 @@ export default function AudienceCTAs() {
           {/* Sponsors & Partners */}
           <Link
             href="/sponsors"
-            className="flex-1 flex items-center gap-4 p-6 rounded-xl border border-ez-pink/25 hover:border-ez-pink/60 hover:bg-ez-pink/8 active:scale-[0.98] active:bg-ez-pink/12 transition-all duration-200 group cursor-pointer"
+            className="flex-1 flex items-center gap-4 p-5 rounded-2xl border border-white/8 bg-black/20 hover:bg-black/35 backdrop-blur-md hover:border-ez-pink/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 group cursor-pointer shadow-lg"
           >
-            <div className="w-10 h-10 rounded-lg bg-ez-pink/20 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-ez-pink/15 flex items-center justify-center shrink-0 border border-ez-pink/20">
               {/* Handshake icon */}
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-ez-pink">
                 <path d="M2 12l5-3 4 2 4-2 5 3" />
@@ -64,8 +64,8 @@ export default function AudienceCTAs() {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-foreground text-sm tracking-wide">Sponsors &amp; Partners</div>
-              <div className="text-foreground-secondary text-sm mt-0.5">Work with us</div>
+              <div className="font-bold text-white text-sm tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">Sponsors &amp; Partners</div>
+              <div className="text-slate-200/90 text-sm mt-0.5 drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.4)]">Work with us</div>
             </div>
             <span className="text-ez-pink text-lg opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" aria-hidden="true">→</span>
           </Link>
