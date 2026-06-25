@@ -13,12 +13,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import type { Viewport } from "next";
+
+export const viewport: Viewport = {
+  themeColor: '#09090b',
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: {
     default: METADATA.defaultTitle,
     template: `%s | ${SITE_CONFIG.company}`,
   },
   description: METADATA.defaultDescription,
+  keywords: [
+    "NYC High School Esports League",
+    "EZ Esports",
+    "EZ Staff",
+    "High School Esports",
+    "NYC League",
+    "Esports Rosters",
+    "Valorant High School League",
+    "League of Legends High School League",
+    "TFT High School League",
+    "High School Gaming"
+  ],
   metadataBase: new URL('https://ezesports.org'),
   openGraph: {
     type: 'website',
@@ -34,6 +54,7 @@ export const metadata: Metadata = {
     description: METADATA.defaultDescription,
   },
 };
+
 
 export default function RootLayout({
   children,
