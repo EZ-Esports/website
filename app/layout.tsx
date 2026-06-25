@@ -39,7 +39,10 @@ export const metadata: Metadata = {
     "TFT High School League",
     "High School Gaming"
   ],
-  metadataBase: new URL('https://ezesports.org'),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ezesports.org')
+  ),
   openGraph: {
     type: 'website',
     locale: 'en_US',
