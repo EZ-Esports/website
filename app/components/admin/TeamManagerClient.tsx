@@ -682,7 +682,7 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
                   disabled={role?.isSystem}
                   defaultValue={role?.name}
                   placeholder="e.g. Moderator"
-                  className="w-full px-4 py-2.5 bg-background border border-zinc-800 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2.5 bg-background border border-zinc-800 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed font-sans"
                 />
               </div>
 
@@ -691,13 +691,22 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
                   Badge Color
                 </label>
                 <div className="flex gap-2">
-                  <input
-                    type="color"
-                    name="color"
-                    value={selectedColor}
-                    onChange={(e) => setSelectedColor(e.target.value)}
-                    className="w-12 h-[42px] bg-background border border-zinc-800 rounded-lg cursor-pointer p-1"
-                  />
+                  <div className="flex items-center gap-1.5 shrink-0 bg-background border border-zinc-850 rounded-lg px-2 py-1">
+                    <input
+                      type="color"
+                      name="color"
+                      value={selectedColor}
+                      onChange={(e) => setSelectedColor(e.target.value)}
+                      className="w-8 h-8 bg-transparent cursor-pointer border-0 p-0"
+                    />
+                    <input
+                      type="text"
+                      value={selectedColor}
+                      onChange={(e) => setSelectedColor(e.target.value)}
+                      placeholder="#94a3b8"
+                      className="w-20 px-1 py-1 text-[11px] font-mono bg-zinc-950/40 border border-zinc-800 rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ez-pink transition-all uppercase text-center"
+                    />
+                  </div>
                   <div className="flex-1 flex flex-wrap gap-1.5 items-center bg-zinc-950/20 px-2.5 py-1.5 border border-zinc-850 rounded-lg">
                     {PRESET_COLORS.map((c) => {
                       const isActive = selectedColor.toLowerCase() === c.toLowerCase();
@@ -747,7 +756,7 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
                           const isActorMissing = !isOwner && (actorPermissions & label.bit) === BigInt(0);
 
                           return (
-                            <div
+                            <label
                               key={label.bit.toString()}
                               className={`flex items-start gap-3 p-3 bg-zinc-950/30 border rounded-lg transition-all select-none ${
                                 isActorMissing
@@ -756,7 +765,6 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
                               }`}
                             >
                               <input
-                                id={`perm_${label.bit.toString()}`}
                                 name={`perm_${label.bit.toString()}`}
                                 type="checkbox"
                                 value="true"
@@ -765,17 +773,16 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
                                 className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
                               />
                               <div className="flex flex-col">
-                                <label
-                                  htmlFor={`perm_${label.bit.toString()}`}
-                                  className={`text-xs font-extrabold uppercase tracking-wide cursor-pointer ${
-                                    isActorMissing ? 'text-slate-500 cursor-not-allowed' : 'text-slate-200'
+                                <span
+                                  className={`text-xs font-extrabold uppercase tracking-wide ${
+                                    isActorMissing ? 'text-slate-500' : 'text-slate-200'
                                   }`}
                                 >
                                   {label.name}
-                                </label>
+                                </span>
                                 <span className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">{label.desc}</span>
                               </div>
-                            </div>
+                            </label>
                           );
                         })}
                       </div>
