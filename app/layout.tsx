@@ -41,12 +41,12 @@ export const metadata: Metadata = {
   ],
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ezesports.org')
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ez-esports.vercel.app')
   ),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://ezesports.org',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'https://ez-esports.vercel.app',
     siteName: METADATA.siteName,
     title: METADATA.defaultTitle,
     description: METADATA.defaultDescription,
