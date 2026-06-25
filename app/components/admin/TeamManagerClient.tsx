@@ -321,7 +321,11 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               <span className="ml-2 text-slate-500 font-normal text-sm">({admins.length})</span>
             </h2>
             {admins.length === 0 ? (
-              <p className="text-slate-500 text-sm italic">No staff members found.</p>
+              <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
+                <HiOutlineUsers className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
+                <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No staff members found</p>
+                <p className="text-zinc-500 text-xs font-medium">Use the form above to invite your first league moderator or administrator.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -363,7 +367,11 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               <span className="ml-2 text-slate-500 font-normal text-sm">({invites.length})</span>
             </h2>
             {invites.length === 0 ? (
-              <p className="text-slate-500 text-sm italic">No pending invitations.</p>
+              <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
+                <HiOutlineShieldCheck className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
+                <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No pending onboardings</p>
+                <p className="text-zinc-500 text-xs font-medium">All sent invitations have been successfully claimed or expired.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -442,7 +450,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                           {isReorderable ? (
                             <div className="flex items-center gap-1">
                               <button
-                                disabled={idx === 0 || isPending || roles[idx - 1].isOwner}
+                                disabled={idx === 0 || isPending || !roles[idx - 1] || roles[idx - 1].isOwner || !canActorManageRole(roles[idx - 1].position)}
                                 onClick={() => handleMoveRole(idx, 'up')}
                                 className="p-1 hover:bg-zinc-800 rounded text-slate-400 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                 title="Move Up"
@@ -450,7 +458,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                                 <HiOutlineChevronUp className="w-4 h-4" />
                               </button>
                               <button
-                                disabled={idx === roles.length - 1 || isPending || roles[idx + 1].name === '@everyone'}
+                                disabled={idx === roles.length - 1 || isPending || !roles[idx + 1] || roles[idx + 1].name === '@everyone' || !canActorManageRole(roles[idx + 1].position)}
                                 onClick={() => handleMoveRole(idx, 'down')}
                                 className="p-1 hover:bg-zinc-800 rounded text-slate-400 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                 title="Move Down"
@@ -463,16 +471,28 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                           )}
                         </td>
                         <td className="py-4 pr-4 font-semibold whitespace-nowrap">
-                          <span
-                            className="px-2.5 py-1 rounded text-xs font-extrabold uppercase tracking-wider"
-                            style={{
-                              backgroundColor: `${parsedColor}12`,
-                              color: parsedColor,
-                              border: `1px solid ${parsedColor}25`,
-                            }}
-                          >
-                            {role.name}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="px-2.5 py-1 rounded text-xs font-extrabold uppercase tracking-wider"
+                              style={{
+                                backgroundColor: `${parsedColor}12`,
+                                color: parsedColor,
+                                border: `1px solid ${parsedColor}25`,
+                              }}
+                            >
+                              {role.name}
+                            </span>
+                            {role.isOwner && (
+                              <span className="text-[9px] bg-red-500/10 text-red-400 border border-red-500/25 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider select-none">
+                                System Owner
+                              </span>
+                            )}
+                            {role.name === '@everyone' && (
+                              <span className="text-[9px] bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider select-none">
+                                Everyone
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-4 pr-4 text-slate-400 text-xs">
                           {role.isOwner ? (
@@ -563,7 +583,10 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                     );
                   })}
                   {assignableRoles.length === 0 && (
-                    <p className="text-xs text-zinc-500 italic text-center py-4">No assignable roles available.</p>
+                    <div className="text-center py-6 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
+                      <HiOutlineShieldCheck className="w-6 h-6 text-slate-500 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs text-zinc-500 italic">No assignable roles available below your hierarchy rank.</p>
+                    </div>
                   )}
                 </div>
               </div>
