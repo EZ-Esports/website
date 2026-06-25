@@ -48,7 +48,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
     { label: 'Schools', href: '/admin/schools', icon: HiOutlineAcademicCap },
     { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
     { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
-    { label: 'EZ Staff', href: '/admin/team', icon: HiOutlineShieldCheck },
+    { label: 'Roles & Staff', href: '/admin/team', icon: HiOutlineShieldCheck },
   ].filter(item => allowedHrefs.includes(item.href));
 
   // Helper to determine the current page title, including nested routes
@@ -78,7 +78,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
         <div className="h-16 px-6 border-b border-zinc-800 flex items-center">
           <Link href="/admin" className="font-extrabold text-xl tracking-tight flex items-center gap-2 cursor-pointer hover:opacity-90">
             <span className="text-ez-pink font-extrabold">EZ</span>
-            <span className="text-white font-extrabold">Admin</span>
+            <span className="text-white font-extrabold">Staff</span>
           </Link>
         </div>
 

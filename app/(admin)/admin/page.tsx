@@ -65,7 +65,7 @@ export default async function AdminDashboardPage() {
       {/* Welcome Banner */}
       <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-none duration-300">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to <span className="text-ez-pink">EZ</span> CMS</h1>
+          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to <span className="text-ez-pink">EZ</span> Staff</h1>
           <p className="text-slate-400 text-sm mt-1.5 leading-relaxed max-w-xl">
             Manage public competition schedules, teams, roster lists, and news announcements from a single, unified database dashboard.
           </p>
