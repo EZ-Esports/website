@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from 'react';
 import { revokeInvite } from '@/app/(admin)/admin/team/actions';
-import type { AdminRole } from '@/app/lib/roles';
 
 interface InviteRowProps {
   invite: {
     id: string;
     email: string;
-    role: AdminRole;
+    roles: {
+      id: string;
+      name: string;
+      color: string;
+    }[];
     expiresAt: Date;
   };
   expired: boolean;
@@ -41,7 +44,26 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
   return (
     <tr className="hover:bg-zinc-900/40 transition-colors">
       <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">{invite.email}</td>
-      <td className="py-3 pr-4 text-slate-300 capitalize">{invite.role.replace('_', '-')}</td>
+      <td className="py-3 pr-4">
+        <div className="flex flex-wrap gap-1.5">
+          {invite.roles.map((role) => (
+            <span
+              key={role.id}
+              className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
+              style={{
+                backgroundColor: `${role.color}12`,
+                color: role.color,
+                border: `1px solid ${role.color}25`
+              }}
+            >
+              {role.name}
+            </span>
+          ))}
+          {invite.roles.length === 0 && (
+            <span className="text-zinc-600 italic text-xs">No Roles</span>
+          )}
+        </div>
+      </td>
       <td className="py-3 pr-4 whitespace-nowrap">
         {expired ? (
           <span className="text-amber-400 text-xs font-semibold">Expired</span>

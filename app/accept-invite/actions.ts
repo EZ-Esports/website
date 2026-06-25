@@ -24,7 +24,6 @@ export async function findValidInvite(token: string) {
     .select({
       id: schema.adminInvites.id,
       email: schema.adminInvites.email,
-      role: schema.adminInvites.role,
       invitedBy: schema.adminInvites.invitedBy,
       expiresAt: schema.adminInvites.expiresAt,
     })
@@ -94,12 +93,25 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
         throw new ActionError('INVITE_UNAVAILABLE', 'This invite link has already been used or has expired. Ask an admin for a new one.');
       }
 
+      const inviteRoles = await tx
+        .select({ roleId: schema.adminInviteRoles.roleId })
+        .from(schema.adminInviteRoles)
+        .where(eq(schema.adminInviteRoles.inviteId, invite.id));
+
       await tx.insert(schema.adminUsers).values({
         userId: created.user.id,
         email: invite.email,
-        role: invite.role,
         invitedBy: invite.invitedBy,
       });
+
+      if (inviteRoles.length > 0) {
+        await tx.insert(schema.userRoles).values(
+          inviteRoles.map((ir) => ({
+            userId: created.user.id,
+            roleId: ir.roleId,
+          }))
+        );
+      }
     });
   } catch (error) {
     console.error('Failed to finalize admin invite; rolling back auth user', error);

@@ -1,5 +1,7 @@
 'use server';
-import { requireAdmin } from '@/app/lib/auth';
+
+import { requirePermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -14,7 +16,7 @@ function revalidateAll() {
 }
 
 export async function createNewsPost(formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_NEWS);
   const title = formData.get('title') as string;
   const excerpt = formData.get('excerpt') as string;
   const content = formData.get('content') as string;
@@ -47,7 +49,7 @@ export async function createNewsPost(formData: FormData) {
 }
 
 export async function updateNewsPost(id: string, formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_NEWS);
   const title = formData.get('title') as string;
   const excerpt = formData.get('excerpt') as string;
   const content = formData.get('content') as string;
@@ -76,7 +78,6 @@ export async function updateNewsPost(id: string, formData: FormData) {
         publishedAt = new Date();
       }
     } else {
-      // intent === 'draft': downgrade to draft regardless of current status
       status = 'draft';
     }
 
@@ -103,7 +104,7 @@ export async function updateNewsPost(id: string, formData: FormData) {
 }
 
 export async function publishNewsPost(id: string) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_NEWS);
   const [existing] = await db
     .select({ publishedAt: schema.newsPosts.publishedAt })
     .from(schema.newsPosts)
@@ -112,14 +113,13 @@ export async function publishNewsPost(id: string) {
 
   await db
     .update(schema.newsPosts)
-    // Preserve the original publish date if the post was published before; only stamp on first publish.
     .set({ status: 'published', publishedAt: existing?.publishedAt ?? new Date() })
     .where(eq(schema.newsPosts.id, id));
   revalidateAll();
 }
 
 export async function unpublishNewsPost(id: string) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_NEWS);
   await db
     .update(schema.newsPosts)
     .set({ status: 'draft' })
@@ -128,7 +128,7 @@ export async function unpublishNewsPost(id: string) {
 }
 
 export async function archiveNewsPost(id: string) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_NEWS);
   await db
     .update(schema.newsPosts)
     .set({ status: 'archived' })
@@ -137,7 +137,7 @@ export async function archiveNewsPost(id: string) {
 }
 
 export async function deleteNewsPost(id: string) {
-  const user = await requireAdmin();
+  const user = await requirePermission(Permissions.MANAGE_NEWS);
   await db
     .update(schema.newsPosts)
     .set({ deletedAt: new Date(), deletedBy: user.id })

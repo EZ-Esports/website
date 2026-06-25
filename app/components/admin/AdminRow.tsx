@@ -2,26 +2,25 @@
 
 import { useState, useTransition } from 'react';
 import { revokeAdmin } from '@/app/(admin)/admin/team/actions';
-import type { AdminRole } from '@/app/lib/roles';
 
 interface AdminRowProps {
   admin: {
     userId: string;
     email: string;
-    role: AdminRole;
+    roles: {
+      id: string;
+      name: string;
+      color: string;
+    }[];
     createdAt: Date;
   };
   isSelf: boolean;
-  /** Whether the current actor is allowed to remove this admin (server still enforces). */
+  /** Whether the current actor is allowed to manage this admin user (hierarchy check passed). */
   canRevoke: boolean;
+  onEditRoles: (userId: string, currentRoleIds: string[]) => void;
 }
 
-const roleBadge: Record<AdminRole, string> = {
-  admin: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-  super_admin: 'bg-ez-pink/10 text-ez-pink border border-ez-pink/30',
-};
-
-export default function AdminRow({ admin, isSelf, canRevoke }: AdminRowProps) {
+export default function AdminRow({ admin, isSelf, canRevoke, onEditRoles }: AdminRowProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
@@ -47,9 +46,24 @@ export default function AdminRow({ admin, isSelf, canRevoke }: AdminRowProps) {
     <tr className="hover:bg-zinc-900/40 transition-colors">
       <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">{admin.email}</td>
       <td className="py-3 pr-4">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${roleBadge[admin.role]}`}>
-          {admin.role.replace('_', '-')}
-        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {admin.roles.map((role) => (
+            <span
+              key={role.id}
+              className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
+              style={{
+                backgroundColor: `${role.color}12`,
+                color: role.color,
+                border: `1px solid ${role.color}25`
+              }}
+            >
+              {role.name}
+            </span>
+          ))}
+          {admin.roles.length === 0 && (
+            <span className="text-zinc-600 italic text-xs">No Roles</span>
+          )}
+        </div>
       </td>
       <td className="py-3 pr-4 text-slate-400 whitespace-nowrap">
         {new Date(admin.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -61,6 +75,12 @@ export default function AdminRow({ admin, isSelf, canRevoke }: AdminRowProps) {
           <span className="text-xs text-zinc-600 italic">—</span>
         ) : (
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => onEditRoles(admin.userId, admin.roles.map((r) => r.id))}
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all cursor-pointer whitespace-nowrap"
+            >
+              Edit Roles
+            </button>
             <button
               onClick={handleRevoke}
               disabled={isPending}

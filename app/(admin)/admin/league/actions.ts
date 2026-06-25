@@ -1,5 +1,7 @@
 'use server';
-import { requireAdmin } from '@/app/lib/auth';
+
+import { requirePermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -27,7 +29,7 @@ function revalidateLeague() {
 // --- GAME ACTIONS ---
 
 export async function createGame(formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
     const displayName = (formData.get('displayName') as string)?.trim();
     const shortName = (formData.get('shortName') as string)?.trim();
@@ -52,7 +54,7 @@ export async function createGame(formData: FormData) {
 }
 
 export async function updateGame(id: string, formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
     const displayName = (formData.get('displayName') as string)?.trim();
     const shortName = (formData.get('shortName') as string)?.trim();
@@ -77,7 +79,7 @@ export async function updateGame(id: string, formData: FormData) {
 }
 
 export async function deleteGame(id: string) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
     await db.delete(schema.games).where(eq(schema.games.id, id));
     revalidateLeague();
@@ -91,7 +93,7 @@ export async function deleteGame(id: string) {
 // --- SEASON ACTIONS ---
 
 export async function createSeason(formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
     const gameId = (formData.get('gameId') as string)?.trim();
     const name = (formData.get('name') as string)?.trim();
@@ -115,7 +117,7 @@ export async function createSeason(formData: FormData) {
 }
 
 export async function updateSeason(id: string, formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
     const name = (formData.get('name') as string)?.trim();
     const isActive = formData.get('isActive') === 'true';
@@ -139,7 +141,7 @@ export async function updateSeason(id: string, formData: FormData) {
 }
 
 export async function deleteSeason(id: string) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
     await db.delete(schema.seasons).where(eq(schema.seasons.id, id));
     revalidateLeague();

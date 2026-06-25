@@ -1,11 +1,16 @@
 'use server';
-import { requireAdmin } from '@/app/lib/auth';
+import { requirePermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { safeUrl, sanitizeDbError } from '@/app/lib/text-utils';
+
+async function requireAdmin() {
+  return requirePermission(Permissions.MANAGE_SPONSORS);
+}
 
 const BUCKET = 'admin-uploads';
 

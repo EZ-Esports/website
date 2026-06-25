@@ -2,34 +2,27 @@ import { cache } from 'react';
 import { eq } from 'drizzle-orm';
 import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
-import { adminUsers } from '@/app/lib/db/schema';
-import { isSuperAdmin } from '@/app/lib/roles';
-import type { AdminRole } from '@/app/lib/roles';
-
-export type { AdminRole } from '@/app/lib/roles';
-export { isSuperAdmin, canActOnRole } from '@/app/lib/roles';
+import { adminUsers, userRoles, roles } from '@/app/lib/db/schema';
+import { hasPermission } from '@/app/lib/roles';
 
 export interface AdminIdentity {
   id: string;
   email: string | undefined;
-  role: AdminRole;
+  permissions: bigint;
+  isOwner: boolean;
+  highestRolePosition: number;
 }
 
 /**
  * Resolve the current request's admin identity, or null if the caller is not a
  * provisioned admin. Authentication alone is NOT enough: a valid Supabase Auth
- * session must also have a matching row in `admin_users` (the allowlist). This
- * is the single authorization gate for the whole admin panel.
+ * session must also have a matching row in `admin_users` (the allowlist).
  *
- * Uses getClaims() rather than getUser(): when the project has JWT signing keys
- * enabled it verifies the token locally (no round-trip to the Supabase Auth
- * API), and transparently falls back to a network call otherwise. The user id
- * lives in the standard `sub` claim. The role is read from the DB on every call
- * (no JWT role claim), so invites/revocations take effect immediately.
+ * It queries the user's assigned roles (plus the `@everyone` role) and combines
+ * their permissions using bitwise OR, along with determining the owner status
+ * and highest role position in the hierarchy.
  *
- * Wrapped in React.cache() so repeated calls within a single request render
- * (e.g. the (admin) layout's gate plus a page reading the current role)
- * collapse to one JWT verify + DB lookup.
+ * Wrapped in React.cache() so repeated calls within a single request collapse.
  */
 export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
   const supabase = await createClient();
@@ -41,7 +34,7 @@ export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
 
   const userId = claims.sub as string;
   const [row] = await db
-    .select({ email: adminUsers.email, role: adminUsers.role })
+    .select({ email: adminUsers.email })
     .from(adminUsers)
     .where(eq(adminUsers.userId, userId))
     .limit(1);
@@ -50,21 +43,48 @@ export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
     return null;
   }
 
+  // Fetch explicitly assigned roles
+  const userRolesRows = await db
+    .select({
+      permissions: roles.permissions,
+      position: roles.position,
+      isOwner: roles.isOwner,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(eq(userRoles.userId, userId));
+
+  // Also fetch @everyone role (baseline fallback)
+  const [everyoneRole] = await db
+    .select({
+      permissions: roles.permissions,
+      position: roles.position,
+      isOwner: roles.isOwner,
+    })
+    .from(roles)
+    .where(eq(roles.name, '@everyone'))
+    .limit(1);
+
+  const allRoles = [...userRolesRows];
+  if (everyoneRole) {
+    allRoles.push(everyoneRole);
+  }
+
+  const isOwner = allRoles.some((r) => r.isOwner);
+  const permissions = allRoles.reduce((acc, r) => acc | BigInt(r.permissions), BigInt(0));
+  const highestRolePosition = allRoles.reduce((max, r) => (r.position > max ? r.position : max), 0);
+
   return {
     id: userId,
     email: (claims.email as string | undefined) ?? row.email,
-    role: row.role,
+    permissions,
+    isOwner,
+    highestRolePosition,
   };
 });
 
 /**
- * Guard for admin server actions and protected API routes.
- *
- * Path-based middleware does NOT protect Next.js server actions: an action can
- * be dispatched (by its action id) against any route, including public ones,
- * which bypasses the `/admin` pathname check. Every admin mutation must call
- * this at the top so authorization is enforced in the data layer itself.
- *
+ * Guard for general admin access.
  * Throws when the caller is not an authenticated, allowlisted admin.
  */
 export async function requireAdmin(): Promise<AdminIdentity> {
@@ -76,16 +96,15 @@ export async function requireAdmin(): Promise<AdminIdentity> {
 }
 
 /**
- * Stricter guard for admin-team management (invite/revoke). Per the role model,
- * only `super_admin`s manage the allowlist; a plain `admin` manages content
- * only. Use this — not requireAdmin() — at the top of every team server action
- * and team page.
- *
- * Throws when the caller is not an authenticated super_admin.
+ * Guard for specific permission gates.
+ * Throws when the caller does not have the required permission.
  */
-export async function requireSuperAdmin(): Promise<AdminIdentity> {
-  const admin = await requireAdmin();
-  if (!isSuperAdmin(admin.role)) {
+export async function requirePermission(permission: bigint): Promise<AdminIdentity> {
+  const admin = await getAdmin();
+  if (!admin) {
+    throw new Error('Unauthorized');
+  }
+  if (!hasPermission(admin.permissions, admin.isOwner, permission)) {
     throw new Error('Forbidden');
   }
   return admin;

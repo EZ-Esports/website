@@ -1,5 +1,7 @@
 'use server';
-import { requireAdmin } from '@/app/lib/auth';
+
+import { requirePermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
@@ -8,7 +10,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 export type MatchActionResult = { success: boolean; error?: string };
 
 export async function createMatch(formData: FormData): Promise<MatchActionResult> {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_MATCHES);
   const seasonId = formData.get('seasonId') as string;
   const homeRosterId = formData.get('homeRosterId') as string;
   const awayRosterId = formData.get('awayRosterId') as string;
@@ -64,7 +66,7 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
 }
 
 export async function updateMatchScore(id: string, formData: FormData): Promise<MatchActionResult> {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_MATCHES);
   const homeScoreStr = formData.get('homeScore') as string;
   const awayScoreStr = formData.get('awayScore') as string;
   const status = formData.get('status') as 'scheduled' | 'live' | 'completed' | 'forfeit' | 'cancelled';
@@ -107,7 +109,7 @@ export async function updateMatchScore(id: string, formData: FormData): Promise<
 }
 
 export async function deleteMatch(id: string) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_MATCHES);
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
 
   revalidateTag('matches', {});

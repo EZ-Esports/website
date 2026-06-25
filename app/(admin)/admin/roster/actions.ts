@@ -1,10 +1,15 @@
 'use server';
-import { requireAdmin } from '@/app/lib/auth';
+import { requirePermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
+
+async function requireAdmin() {
+  return requirePermission(Permissions.MANAGE_ROSTERS);
+}
 
 // Safe wrapper for cache revalidations to support testing/scripts outside Next.js runtime
 function safeRevalidateTag(tag: string) {

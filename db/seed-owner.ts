@@ -1,27 +1,29 @@
 /**
- * Bootstrap the first admin.
+ * Bootstrap the first owner.
  *
  * Authorization is now an allowlist: a valid Supabase Auth session is only
  * granted admin access if it has a matching row in `admin_users`. That table
- * starts empty, so after deploying this feature NOBODY can reach the panel —
- * including you. This one-off script promotes an EXISTING Supabase Auth user
- * (create it first in the Supabase dashboard, or it may already exist from
- * before this change) to `super_admin`, so they can invite everyone else.
+ * starts empty, so after deploying this feature NOBODY can reach the panel.
+ * This script promotes an EXISTING Supabase Auth user to the Owner role,
+ * allowing them to access the staff panel, create roles, and invite others.
  *
  * Usage:
- *   npm run db:seed-admin -- you@example.com
+ *   npm run db:seed-owner -- you@example.com
  *
- * Idempotent: re-running for the same email updates the role to super_admin.
+ * Idempotent: re-running for the same email ensures the Owner role exists and
+ * links the user to it.
  */
 import { eq } from 'drizzle-orm';
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { createServiceClient } from '../app/lib/supabase/service';
 
+const ADMINISTRATOR = BigInt(1) << BigInt(0);
+
 async function main() {
   const email = process.argv[2]?.trim().toLowerCase();
   if (!email) {
-    console.error('Usage: npm run db:seed-admin -- <email>');
+    console.error('Usage: npm run db:seed-owner -- <email>');
     process.exit(1);
   }
 
@@ -64,15 +66,66 @@ async function main() {
     process.exit(1);
   }
 
+  // 1. Ensure the system Owner role exists
+  let [ownerRole] = await db
+    .select()
+    .from(schema.roles)
+    .where(eq(schema.roles.name, 'Owner'))
+    .limit(1);
+
+  if (!ownerRole) {
+    console.log('Creating "Owner" system role...');
+    [ownerRole] = await db
+      .insert(schema.roles)
+      .values({
+        name: 'Owner',
+        color: '#ef4444', // Red
+        permissions: ADMINISTRATOR,
+        position: 9999, // Absolute top
+        isOwner: true,
+        isSystem: true,
+      })
+      .returning();
+  }
+
+  // 2. Ensure the system @everyone role exists
+  let [everyoneRole] = await db
+    .select()
+    .from(schema.roles)
+    .where(eq(schema.roles.name, '@everyone'))
+    .limit(1);
+
+  if (!everyoneRole) {
+    console.log('Creating "@everyone" system role...');
+    [everyoneRole] = await db
+      .insert(schema.roles)
+      .values({
+        name: '@everyone',
+        color: '#94a3b8', // Slate/gray
+        permissions: BigInt(0), // baseline is read-only / no permissions
+        position: 0, // Absolute bottom
+        isOwner: false,
+        isSystem: true,
+      })
+      .returning();
+  }
+
+  // 3. Upsert admin user entry
   await db
     .insert(schema.adminUsers)
-    .values({ userId, email, role: 'super_admin' })
+    .values({ userId, email })
     .onConflictDoUpdate({
       target: schema.adminUsers.userId,
-      set: { role: 'super_admin', email },
+      set: { email },
     });
 
-  console.log(`✓ ${email} is now a super_admin (user_id ${userId}).`);
+  // 4. Associate user with Owner role
+  await db
+    .insert(schema.userRoles)
+    .values({ userId, roleId: ownerRole.id })
+    .onConflictDoNothing();
+
+  console.log(`✓ ${email} is now an Owner (user_id ${userId}).`);
   process.exit(0);
 }
 

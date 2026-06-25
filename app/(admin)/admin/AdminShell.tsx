@@ -24,8 +24,7 @@ import type { IconType } from 'react-icons';
 
 interface AdminShellProps {
   children: React.ReactNode;
-  /** Whether the current admin may manage the team (super_admin only). */
-  canManageTeam: boolean;
+  allowedHrefs: string[];
 }
 
 interface SidebarItem {
@@ -34,7 +33,7 @@ interface SidebarItem {
   icon: IconType;
 }
 
-export default function AdminShell({ children, canManageTeam }: AdminShellProps) {
+export default function AdminShell({ children, allowedHrefs }: AdminShellProps) {
   const pathname = usePathname();
 
   const sidebarItems: SidebarItem[] = [
@@ -49,11 +48,8 @@ export default function AdminShell({ children, canManageTeam }: AdminShellProps)
     { label: 'Schools', href: '/admin/schools', icon: HiOutlineAcademicCap },
     { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
     { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
-    // Team management is super_admin-only; hide it for plain admins.
-    ...(canManageTeam
-      ? [{ label: 'Admins', href: '/admin/team', icon: HiOutlineShieldCheck }]
-      : []),
-  ];
+    { label: 'Roles & Staff', href: '/admin/team', icon: HiOutlineShieldCheck },
+  ].filter(item => allowedHrefs.includes(item.href));
 
   // Helper to determine the current page title, including nested routes
   const getPageTitle = () => {

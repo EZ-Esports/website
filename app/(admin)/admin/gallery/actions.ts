@@ -1,5 +1,7 @@
 'use server';
-import { requireAdmin } from '@/app/lib/auth';
+
+import { requirePermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -10,7 +12,7 @@ import { sanitizeDbError } from '@/app/lib/text-utils';
 const BUCKET = 'admin-uploads';
 
 export async function addGalleryImage(formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_GALLERY);
   const src = formData.get('src') as string;
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
@@ -35,7 +37,7 @@ export async function addGalleryImage(formData: FormData) {
 }
 
 export async function updateGalleryImage(id: string, formData: FormData) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_GALLERY);
   const src = formData.get('src') as string;
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
@@ -77,7 +79,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
 }
 
 export async function toggleGalleryImageActive(id: string, isActive: boolean) {
-  await requireAdmin();
+  await requirePermission(Permissions.MANAGE_GALLERY);
   try {
     await db
       .update(schema.galleryImages)
@@ -95,7 +97,7 @@ export async function toggleGalleryImageActive(id: string, isActive: boolean) {
 }
 
 export async function deleteGalleryImage(id: string) {
-  const user = await requireAdmin();
+  const user = await requirePermission(Permissions.MANAGE_GALLERY);
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.galleryImages.storageKey })

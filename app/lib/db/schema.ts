@@ -1,4 +1,4 @@
-import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Shared audit columns
@@ -13,10 +13,6 @@ export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
 export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
-// Admin access tiers. 'super_admin' may invite/revoke other admins and grant
-// the super_admin role; 'admin' manages content only. Tier gating is enforced
-// in the team server actions, not in the schema.
-export const adminRoleEnum = pgEnum('admin_role', ['admin', 'super_admin']);
 
 // --- CORE ENTITIES ---
 
@@ -300,7 +296,6 @@ export const pageContentHistory = pgTable('page_content_history', {
 export const adminUsers = pgTable('admin_users', {
   userId: uuid('user_id').primaryKey(),
   email: text('email').notNull().unique(),
-  role: adminRoleEnum('role').default('admin').notNull(),
   // user_id of the admin who invited this one; null for the bootstrapped first admin.
   invitedBy: uuid('invited_by'),
   ...auditColumns,
@@ -316,7 +311,6 @@ export const adminInvites = pgTable('admin_invites', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: text('email').notNull(),
   tokenHash: text('token_hash').notNull().unique(),
-  role: adminRoleEnum('role').default('admin').notNull(),
   invitedBy: uuid('invited_by').notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   acceptedAt: timestamp('accepted_at'),
@@ -324,4 +318,41 @@ export const adminInvites = pgTable('admin_invites', {
 }, (table) => [
   index('admin_invites_email_idx').on(table.email),
   uniqueIndex('admin_invites_email_pending_unique').on(table.email).where(sql`${table.acceptedAt} is null`),
+]).enableRLS();
+
+// --- ROLE PERMISSIONS SYSTEM ---
+
+export const roles = pgTable('roles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull().unique(),
+  color: text('color').default('#94a3b8').notNull(),
+  permissions: bigint('permissions', { mode: 'bigint' }).default(sql`0`).notNull(),
+  position: integer('position').notNull(),
+  isOwner: boolean('is_owner').default(false).notNull(),
+  isSystem: boolean('is_system').default(false).notNull(),
+  ...auditColumns,
+}).enableRLS();
+
+export const userRoles = pgTable('user_roles', {
+  userId: uuid('user_id')
+    .references(() => adminUsers.userId, { onDelete: 'cascade' })
+    .notNull(),
+  roleId: uuid('role_id')
+    .references(() => roles.id, { onDelete: 'cascade' })
+    .notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.roleId] }),
+  index('user_roles_user_id_idx').on(table.userId),
+]).enableRLS();
+
+export const adminInviteRoles = pgTable('admin_invite_roles', {
+  inviteId: uuid('invite_id')
+    .references(() => adminInvites.id, { onDelete: 'cascade' })
+    .notNull(),
+  roleId: uuid('role_id')
+    .references(() => roles.id, { onDelete: 'cascade' })
+    .notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.inviteId, table.roleId] }),
 ]).enableRLS();

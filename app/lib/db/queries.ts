@@ -237,15 +237,50 @@ export const countTeamsWithoutRoster = async (): Promise<number> => {
 
 /** All provisioned admins, oldest first (the bootstrapped admin leads). */
 export const listAdminUsers = async () => {
-  return db
+  const users = await db
     .select({
       userId: schema.adminUsers.userId,
       email: schema.adminUsers.email,
-      role: schema.adminUsers.role,
       createdAt: schema.adminUsers.createdAt,
     })
     .from(schema.adminUsers)
     .orderBy(asc(schema.adminUsers.createdAt));
+
+  if (users.length === 0) return [];
+
+  const userRolesRows = await db
+    .select({
+      userId: schema.userRoles.userId,
+      role: {
+        id: schema.roles.id,
+        name: schema.roles.name,
+        color: schema.roles.color,
+        isOwner: schema.roles.isOwner,
+        position: schema.roles.position,
+        permissions: schema.roles.permissions,
+      },
+    })
+    .from(schema.userRoles)
+    .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id));
+
+  // Group by userId
+  const rolesByUserId = new Map<string, typeof userRolesRows[0]['role'][]>();
+  for (const row of userRolesRows) {
+    if (!rolesByUserId.has(row.userId)) {
+      rolesByUserId.set(row.userId, []);
+    }
+    rolesByUserId.get(row.userId)!.push(row.role);
+  }
+
+  return users.map((u) => {
+    const roles = rolesByUserId.get(u.userId) || [];
+    // Sort roles by position descending (highest first)
+    roles.sort((a, b) => b.position - a.position);
+    return {
+      ...u,
+      roles,
+    };
+  });
 };
 
 /** Outstanding (not yet accepted) admin invites, newest first, each tagged with
@@ -255,13 +290,47 @@ export const listPendingAdminInvites = async () => {
     .select({
       id: schema.adminInvites.id,
       email: schema.adminInvites.email,
-      role: schema.adminInvites.role,
       expiresAt: schema.adminInvites.expiresAt,
       createdAt: schema.adminInvites.createdAt,
     })
     .from(schema.adminInvites)
     .where(isNull(schema.adminInvites.acceptedAt))
     .orderBy(desc(schema.adminInvites.createdAt));
+
+  if (rows.length === 0) return [];
+
+  const inviteRolesRows = await db
+    .select({
+      inviteId: schema.adminInviteRoles.inviteId,
+      role: {
+        id: schema.roles.id,
+        name: schema.roles.name,
+        color: schema.roles.color,
+        position: schema.roles.position,
+        isOwner: schema.roles.isOwner,
+      },
+    })
+    .from(schema.adminInviteRoles)
+    .innerJoin(schema.roles, eq(schema.adminInviteRoles.roleId, schema.roles.id));
+
+  // Group by inviteId
+  const rolesByInviteId = new Map<string, typeof inviteRolesRows[0]['role'][]>();
+  for (const row of inviteRolesRows) {
+    if (!rolesByInviteId.has(row.inviteId)) {
+      rolesByInviteId.set(row.inviteId, []);
+    }
+    rolesByInviteId.get(row.inviteId)!.push(row.role);
+  }
+
   const now = Date.now();
-  return rows.map((row) => ({ ...row, expired: row.expiresAt.getTime() < now }));
+  return rows.map((row) => {
+    const roles = rolesByInviteId.get(row.id) || [];
+    // Sort roles by position descending (highest first)
+    roles.sort((a, b) => b.position - a.position);
+    return {
+      ...row,
+      roles,
+      expired: row.expiresAt.getTime() < now,
+    };
+  });
 };
