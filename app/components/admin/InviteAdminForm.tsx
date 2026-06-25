@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { inviteAdmin } from '@/app/(admin)/admin/team/actions';
+import { parseHexColor } from '@/app/lib/roles';
 
 interface InviteAdminFormProps {
   assignableRoles: {
@@ -81,33 +82,37 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
             <p className="text-xs text-zinc-500 italic">No roles are assignable by you.</p>
           ) : (
             <div className="flex flex-wrap gap-2.5">
-              {assignableRoles.map((role) => (
-                <label
-                  key={role.id}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-zinc-950/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700/80 rounded-lg cursor-pointer transition-all select-none"
-                >
-                  <input
-                    type="checkbox"
-                    name="roleIds"
-                    value={role.id}
-                    className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer w-4 h-4"
-                  />
-                  <span
-                    className="text-xs font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
-                    style={{
-                      backgroundColor: `${role.color}12`,
-                      color: role.color,
-                      border: `1px solid ${role.color}20`
-                    }}
+              {assignableRoles.map((role) => {
+                const parsedColor = parseHexColor(role.color);
+                return (
+                  <label
+                    key={role.id}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-zinc-950/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700/80 rounded-lg cursor-pointer transition-all select-none"
                   >
-                    {role.name}
-                  </span>
-                </label>
-              ))}
+                    <input
+                      type="checkbox"
+                      name="roleIds"
+                      value={role.id}
+                      className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer w-4 h-4"
+                    />
+                    <span
+                      className="text-xs font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
+                      style={{
+                        backgroundColor: `${parsedColor}12`,
+                        color: parsedColor,
+                        border: `1px solid ${parsedColor}20`
+                      }}
+                    >
+                      {role.name}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           )}
         </div>
       </form>
+
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-lg" role="alert">

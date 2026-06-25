@@ -72,3 +72,28 @@ export function canGrantPermissions(
   // targetPermissions & ~actorPermissions evaluates to all bits set in target but not in actor
   return (targetPermissions & ~actorPermissions) === BigInt(0);
 }
+
+/**
+ * Safely normalizes any color input (expanding 3-char hexes to 6-char,
+ * handling missing `#` tags) to guarantee background opacity (`hex + "12"`)
+ * and border opacity (`hex + "25"`) inline styles render cleanly.
+ */
+export function parseHexColor(color: string): string {
+  let clean = (color || '').trim().replace(/^#/, '');
+
+  if (clean.length === 3) {
+    clean = clean.split('').map((char) => char + char).join('');
+  }
+
+  if (clean.length === 8) {
+    clean = clean.slice(0, 6);
+  }
+
+  const hexRegex = /^[0-9a-fA-F]{6}$/;
+  if (!hexRegex.test(clean)) {
+    clean = '94a3b8'; // fallback Slate 400
+  }
+
+  return `#${clean}`;
+}
+

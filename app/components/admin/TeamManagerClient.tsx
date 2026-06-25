@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Card from '@/app/components/ui/Card';
 import InviteAdminForm from '@/app/components/admin/InviteAdminForm';
-import { canActOnMember, Permissions } from '@/app/lib/roles';
+import { canActOnMember, Permissions, parseHexColor } from '@/app/lib/roles';
 import AdminRow from '@/app/components/admin/AdminRow';
 import InviteRow from '@/app/components/admin/InviteRow';
 import {
@@ -89,20 +89,37 @@ const PRESET_COLORS = [
   '#94a3b8', // Slate
 ];
 
-const PERMISSION_LABELS = [
-  { bit: Permissions.ADMINISTRATOR, name: 'Administrator', desc: 'Grants all permissions and bypasses all validation checks.' },
-  { bit: Permissions.MANAGE_ROLES, name: 'Manage Roles & Staff', desc: 'Create, edit, delete, and reorder roles, and assign roles to staff.' },
-  { bit: Permissions.MANAGE_LEAGUE, name: 'Manage League Config', desc: 'Create, edit, and delete games, seasons, and school teams.' },
-  { bit: Permissions.MANAGE_ROSTERS, name: 'Manage Rosters', desc: 'Manage game rosters and assign student players to them.' },
-  { bit: Permissions.MANAGE_MATCHES, name: 'Manage Matches', desc: 'Schedule matches, enter/report match scores, and change match status.' },
-  { bit: Permissions.MANAGE_NEWS, name: 'Manage News', desc: 'Create, edit, publish, and delete news posts and articles.' },
-  { bit: Permissions.MANAGE_LEADERSHIP, name: 'Manage Leadership', desc: 'Manage leadership board listings and details.' },
-  { bit: Permissions.MANAGE_GALLERY, name: 'Manage Gallery', desc: 'Upload, arrange, caption, and delete public gallery images.' },
-  { bit: Permissions.MANAGE_SPONSORS, name: 'Manage Sponsors', desc: 'Create, edit, arrange, and delete sponsors and sponsorship tiers.' },
-  { bit: Permissions.MANAGE_APPLICATIONS, name: 'Manage Applications', desc: 'Review, accept, or reject new school league applications.' },
-  { bit: Permissions.MANAGE_SCHOOLS, name: 'Manage Schools', desc: 'Register and update active schools within the league.' },
-  { bit: Permissions.MANAGE_CONTENT, name: 'Manage CMS Content', desc: 'Modify editable text blocks across public pages.' },
+const PERMISSION_GROUPS = [
+  {
+    title: 'General Administration',
+    permissions: [
+      { bit: Permissions.ADMINISTRATOR, name: 'Administrator', desc: 'Grants all permissions and bypasses all validation checks.' },
+      { bit: Permissions.MANAGE_ROLES, name: 'Manage Roles & Staff', desc: 'Create, edit, delete, and reorder roles, and assign roles to staff.' },
+      { bit: Permissions.MANAGE_APPLICATIONS, name: 'Manage Applications', desc: 'Review, accept, or reject new school league applications.' },
+      { bit: Permissions.MANAGE_SCHOOLS, name: 'Manage Schools', desc: 'Register and update active schools within the league.' },
+    ],
+  },
+  {
+    title: 'League & Match Configuration',
+    permissions: [
+      { bit: Permissions.MANAGE_LEAGUE, name: 'Manage League Config', desc: 'Create, edit, and delete games, seasons, and school teams.' },
+      { bit: Permissions.MANAGE_ROSTERS, name: 'Manage Rosters', desc: 'Manage game rosters and assign student players to them.' },
+      { bit: Permissions.MANAGE_MATCHES, name: 'Manage Matches', desc: 'Schedule matches, enter/report match scores, and change match status.' },
+    ],
+  },
+  {
+    title: 'CMS & Content Management',
+    permissions: [
+      { bit: Permissions.MANAGE_NEWS, name: 'Manage News', desc: 'Create, edit, publish, and delete news posts and articles.' },
+      { bit: Permissions.MANAGE_LEADERSHIP, name: 'Manage Leadership', desc: 'Manage leadership board listings and details.' },
+      { bit: Permissions.MANAGE_GALLERY, name: 'Manage Gallery', desc: 'Upload, arrange, caption, and delete public gallery images.' },
+      { bit: Permissions.MANAGE_SPONSORS, name: 'Manage Sponsors', desc: 'Create, edit, arrange, and delete sponsors and sponsorship tiers.' },
+      { bit: Permissions.MANAGE_CONTENT, name: 'Manage CMS Content', desc: 'Modify editable text blocks across public pages.' },
+    ],
+  },
 ];
+
+const PERMISSION_LABELS = PERMISSION_GROUPS.flatMap((g) => g.permissions);
 
 export default function TeamManagerClient({ current, admins, invites, roles }: TeamManagerClientProps) {
   const [activeTab, setActiveTab] = useState<'staff' | 'roles'>('staff');
@@ -110,7 +127,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
   const [error, setError] = useState<string | null>(null);
 
   // Modals state
-  const [editingUser, setEditingUser] = useState<{ userId: string; currentRoleIds: string[] } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ userId: string; email: string; currentRoleIds: string[] } | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [isCreatingRole, setIsCreatingRole] = useState(false);
 
@@ -329,7 +346,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                           admin={{ userId: a.userId, email: a.email, roles: a.roles, createdAt: a.createdAt }}
                           isSelf={a.userId === current.id}
                           canRevoke={canManage}
-                          onEditRoles={(userId, currentRoleIds) => setEditingUser({ userId, currentRoleIds })}
+                          onEditRoles={(userId, email, currentRoleIds) => setEditingUser({ userId, email, currentRoleIds })}
                         />
                       );
                     })}
@@ -417,6 +434,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
 
                     // Filter reorderability: cannot move Owner, @everyone, or any role equal to/higher than actor position
                     const isReorderable = !role.isOwner && role.name !== '@everyone' && canActorManageRole(role.position);
+                    const parsedColor = parseHexColor(role.color);
 
                     return (
                       <tr key={role.id} className="hover:bg-zinc-900/20 transition-colors">
@@ -448,9 +466,9 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                           <span
                             className="px-2.5 py-1 rounded text-xs font-extrabold uppercase tracking-wider"
                             style={{
-                              backgroundColor: `${role.color}12`,
-                              color: role.color,
-                              border: `1px solid ${role.color}25`,
+                              backgroundColor: `${parsedColor}12`,
+                              color: parsedColor,
+                              border: `1px solid ${parsedColor}25`,
                             }}
                           >
                             {role.name}
@@ -504,7 +522,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-zinc-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
-              <h3 className="text-base font-black text-white uppercase tracking-wider">Edit Staff Roles</h3>
+              <h3 className="text-base font-black text-white uppercase tracking-wider">Edit Roles for {editingUser.email}</h3>
               <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-white cursor-pointer">
                 <HiOutlineXMark className="w-5 h-5" />
               </button>
@@ -518,6 +536,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                 <div className="space-y-3">
                   {assignableRoles.map((role) => {
                     const isChecked = editingUser.currentRoleIds.includes(role.id);
+                    const parsedColor = parseHexColor(role.color);
                     return (
                       <label
                         key={role.id}
@@ -526,9 +545,9 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                         <span
                           className="text-xs font-extrabold px-2.5 py-1 rounded uppercase tracking-wider"
                           style={{
-                            backgroundColor: `${role.color}12`,
-                            color: role.color,
-                            border: `1px solid ${role.color}25`,
+                            backgroundColor: `${parsedColor}12`,
+                            color: parsedColor,
+                            border: `1px solid ${parsedColor}25`,
                           }}
                         >
                           {role.name}
@@ -612,7 +631,7 @@ interface RoleMutateModalProps {
 }
 
 function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSave, onDelete, isPending }: RoleMutateModalProps) {
-  const [selectedColor, setSelectedColor] = useState(role?.color ?? '#94a3b8');
+  const [selectedColor, setSelectedColor] = useState(parseHexColor(role?.color ?? '#94a3b8'));
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -656,71 +675,89 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
                     onChange={(e) => setSelectedColor(e.target.value)}
                     className="w-12 h-[42px] bg-background border border-zinc-800 rounded-lg cursor-pointer p-1"
                   />
-                  <div className="flex-1 flex flex-wrap gap-1 items-center bg-zinc-950/20 px-2.5 border border-zinc-850 rounded-lg">
-                    {PRESET_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setSelectedColor(c)}
-                        className="w-4 h-4 rounded-full border border-black/30 hover:scale-125 transition-transform cursor-pointer"
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
+                  <div className="flex-1 flex flex-wrap gap-1.5 items-center bg-zinc-950/20 px-2.5 py-1.5 border border-zinc-850 rounded-lg">
+                    {PRESET_COLORS.map((c) => {
+                      const isActive = selectedColor.toLowerCase() === c.toLowerCase();
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSelectedColor(c)}
+                          className={`w-4 h-4 rounded-full transition-all cursor-pointer hover:scale-125 ${
+                            isActive
+                              ? 'ring-2 ring-white ring-offset-2 ring-offset-[#18181b] scale-110'
+                              : 'border border-black/30 hover:border-white/50'
+                          }`}
+                          style={{ backgroundColor: c }}
+                          title={c}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Row 2: Permissions Toggles */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Role Permissions
               </label>
 
               {role?.isOwner ? (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-xs px-4 py-3 rounded-lg">
+                <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-xs px-4 py-3 rounded-lg font-sans">
                   This is the system Owner role. It automatically grants all permissions and bypasses all constraints. Its permissions cannot be modified.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {PERMISSION_LABELS.map((label) => {
-                    const hasPerm = role ? (BigInt(role.permissions) & label.bit) !== BigInt(0) : false;
-                    
-                    // Disable checkbox if the current actor does not possess this permission (preventing escalation)
-                    const isActorMissing = !isOwner && (actorPermissions & label.bit) === BigInt(0);
+                <div className="space-y-6">
+                  {PERMISSION_GROUPS.map((group) => (
+                    <div key={group.title} className="space-y-3 p-4 bg-zinc-950/20 border border-zinc-900 rounded-xl">
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-zinc-800 pb-1.5 flex items-center gap-2 select-none">
+                        <span className="w-1 h-3.5 bg-ez-pink rounded" />
+                        <span>{group.title}</span>
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {group.permissions.map((label) => {
+                          const hasPerm = role ? (BigInt(role.permissions) & label.bit) !== BigInt(0) : false;
+                          
+                          // Disable checkbox if the current actor does not possess this permission (preventing escalation)
+                          const isActorMissing = !isOwner && (actorPermissions & label.bit) === BigInt(0);
 
-                    return (
-                      <div
-                        key={label.bit.toString()}
-                        className={`flex items-start gap-3 p-3 bg-zinc-950/30 border rounded-lg transition-all select-none ${
-                          isActorMissing
-                            ? 'opacity-40 border-zinc-800 cursor-not-allowed'
-                            : 'border-zinc-800 hover:border-zinc-700/80 cursor-pointer'
-                        }`}
-                      >
-                        <input
-                          id={`perm_${label.bit.toString()}`}
-                          name={`perm_${label.bit.toString()}`}
-                          type="checkbox"
-                          value="true"
-                          defaultChecked={hasPerm}
-                          disabled={isActorMissing}
-                          className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
-                        />
-                        <div className="flex flex-col">
-                          <label
-                            htmlFor={`perm_${label.bit.toString()}`}
-                            className={`text-xs font-extrabold uppercase tracking-wide cursor-pointer ${
-                              isActorMissing ? 'text-slate-500 cursor-not-allowed' : 'text-slate-200'
-                            }`}
-                          >
-                            {label.name}
-                          </label>
-                          <span className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">{label.desc}</span>
-                        </div>
+                          return (
+                            <div
+                              key={label.bit.toString()}
+                              className={`flex items-start gap-3 p-3 bg-zinc-950/30 border rounded-lg transition-all select-none ${
+                                isActorMissing
+                                  ? 'opacity-40 border-zinc-850 cursor-not-allowed'
+                                  : 'border-zinc-800 hover:border-zinc-700/80 cursor-pointer'
+                              }`}
+                            >
+                              <input
+                                id={`perm_${label.bit.toString()}`}
+                                name={`perm_${label.bit.toString()}`}
+                                type="checkbox"
+                                value="true"
+                                defaultChecked={hasPerm}
+                                disabled={isActorMissing}
+                                className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
+                              />
+                              <div className="flex flex-col">
+                                <label
+                                  htmlFor={`perm_${label.bit.toString()}`}
+                                  className={`text-xs font-extrabold uppercase tracking-wide cursor-pointer ${
+                                    isActorMissing ? 'text-slate-500 cursor-not-allowed' : 'text-slate-200'
+                                  }`}
+                                >
+                                  {label.name}
+                                </label>
+                                <span className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">{label.desc}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -760,3 +797,4 @@ function RoleMutateModal({ title, role, isOwner, actorPermissions, onClose, onSa
     </div>
   );
 }
+

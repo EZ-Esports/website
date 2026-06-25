@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { revokeAdmin } from '@/app/(admin)/admin/team/actions';
+import { parseHexColor } from '@/app/lib/roles';
 
 interface AdminRowProps {
   admin: {
@@ -17,7 +18,7 @@ interface AdminRowProps {
   isSelf: boolean;
   /** Whether the current actor is allowed to manage this admin user (hierarchy check passed). */
   canRevoke: boolean;
-  onEditRoles: (userId: string, currentRoleIds: string[]) => void;
+  onEditRoles: (userId: string, email: string, currentRoleIds: string[]) => void;
 }
 
 export default function AdminRow({ admin, isSelf, canRevoke, onEditRoles }: AdminRowProps) {
@@ -47,19 +48,22 @@ export default function AdminRow({ admin, isSelf, canRevoke, onEditRoles }: Admi
       <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">{admin.email}</td>
       <td className="py-3 pr-4">
         <div className="flex flex-wrap gap-1.5">
-          {admin.roles.map((role) => (
-            <span
-              key={role.id}
-              className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
-              style={{
-                backgroundColor: `${role.color}12`,
-                color: role.color,
-                border: `1px solid ${role.color}25`
-              }}
-            >
-              {role.name}
-            </span>
-          ))}
+          {admin.roles.map((role) => {
+            const parsedColor = parseHexColor(role.color);
+            return (
+              <span
+                key={role.id}
+                className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
+                style={{
+                  backgroundColor: `${parsedColor}12`,
+                  color: parsedColor,
+                  border: `1px solid ${parsedColor}25`
+                }}
+              >
+                {role.name}
+              </span>
+            );
+          })}
           {admin.roles.length === 0 && (
             <span className="text-zinc-600 italic text-xs">No Roles</span>
           )}
@@ -76,7 +80,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, onEditRoles }: Admi
         ) : (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onEditRoles(admin.userId, admin.roles.map((r) => r.id))}
+              onClick={() => onEditRoles(admin.userId, admin.email, admin.roles.map((r) => r.id))}
               className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all cursor-pointer whitespace-nowrap"
             >
               Edit Roles
@@ -95,3 +99,4 @@ export default function AdminRow({ admin, isSelf, canRevoke, onEditRoles }: Admi
     </tr>
   );
 }
+
