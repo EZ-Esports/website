@@ -126,8 +126,10 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  // Modals state
-  const [editingUser, setEditingUser] = useState<{ userId: string; email: string; currentRoleIds: string[] } | null>(null);
+  // Sub-tabs and filter state for Staff Members
+  const [staffSubTab, setStaffSubTab] = useState<'members' | 'invites'>('members');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRoleId, setFilterRoleId] = useState('');
   
   // Discord Roles split-pane workspace state
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null);
@@ -155,21 +157,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
     return current.highestRolePosition > rolePosition;
   }
 
-  // Handle User Roles edit
-  function handleSaveUserRoles(formData: FormData) {
-    if (!editingUser) return;
-    setError(null);
-    const selectedRoleIds = formData.getAll('userRoleIds') as string[];
 
-    startTransition(async () => {
-      const result = await updateUserRoles(editingUser.userId, selectedRoleIds);
-      if (!result.success) {
-        setError(result.error ?? 'Could not update user roles.');
-        return;
-      }
-      setEditingUser(null);
-    });
-  }
 
   // Handle Create Role
   function handleCreateRoleSubmit(formData: FormData) {
@@ -312,104 +300,152 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
       )}
 
       {activeTab === 'staff' && (
-        <div className="space-y-8">
-          {/* Invite staff */}
-          <Card className="bg-slate-900/10 border border-zinc-800 border-l-4 border-l-ez-pink p-6">
-            <h2 className="text-lg font-black text-white uppercase tracking-wider mb-1">Invite Staff Member</h2>
-            <p className="text-xs text-slate-400 mb-5">
-              Generates a single-use onboarding invitation link. Copy and send it to the new staff member manually.
-            </p>
-            <InviteAdminForm assignableRoles={assignableRoles} />
-          </Card>
+        <div className="space-y-6">
+          {/* Sub-tabs menu */}
+          <div className="flex gap-4 border-b border-zinc-800/60 pb-px mb-2">
+            <button
+              onClick={() => { setStaffSubTab('members'); setError(null); }}
+              className={`text-xs font-bold uppercase tracking-wider pb-2 border-b-2 transition-all cursor-pointer ${
+                staffSubTab === 'members'
+                  ? 'border-ez-pink text-white font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Active Members ({admins.length})
+            </button>
+            <button
+              onClick={() => { setStaffSubTab('invites'); setError(null); }}
+              className={`text-xs font-bold uppercase tracking-wider pb-2 border-b-2 transition-all cursor-pointer ${
+                staffSubTab === 'invites'
+                  ? 'border-ez-pink text-white font-extrabold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Invites & Onboarding ({invites.length})
+            </button>
+          </div>
 
-          {/* Active staff */}
-          <Card className="bg-slate-900/10 border border-zinc-800 p-6">
-            <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">
-              Staff Directory
-              <span className="ml-2 text-slate-500 font-normal text-sm">({admins.length})</span>
-            </h2>
-            {admins.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
-                <HiOutlineUsers className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
-                <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No staff members found</p>
-                <p className="text-zinc-500 text-xs font-medium">Use the form above to invite your first league moderator or administrator.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-800/80">
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Email</th>
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Roles</th>
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Added</th>
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-850">
-                    {admins.map((a) => {
-                      // Determine if actor can manage target based on highest position
-                      const targetHighestPos = a.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
-                      const targetIsOwner = a.roles.some((r) => r.isOwner);
-                      const canManage = canActOnMember(current.highestRolePosition, currentIsOwner, targetHighestPos, targetIsOwner);
+          {/* Sub-tab 1: Members Directory */}
+          {staffSubTab === 'members' && (
+            <div className="space-y-6">
+              {/* Search & Filter Header */}
+              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                {/* Search input */}
+                <div className="w-full sm:w-72 relative">
+                  <input
+                    type="text"
+                    placeholder="Search by email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all placeholder-zinc-650"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300"
+                    >
+                      <HiOutlineXMark className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
 
-                      return (
-                        <AdminRow
-                          key={a.userId}
-                          admin={{ userId: a.userId, email: a.email, roles: a.roles, createdAt: a.createdAt }}
-                          isSelf={a.userId === current.id}
-                          canRevoke={canManage}
-                          onEditRoles={(userId, email, currentRoleIds) => setEditingUser({ userId, email, currentRoleIds })}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
+                {/* Role filter dropdown */}
+                <div className="w-full sm:w-56">
+                  <select
+                    value={filterRoleId}
+                    onChange={(e) => setFilterRoleId(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all cursor-pointer"
+                  >
+                    <option value="">All Roles</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            )}
-          </Card>
 
-          {/* Pending invites */}
-          <Card className="bg-slate-900/10 border border-zinc-800 p-6">
-            <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">
-              Pending Onboardings
-              <span className="ml-2 text-slate-500 font-normal text-sm">({invites.length})</span>
-            </h2>
-            {invites.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
-                <HiOutlineShieldCheck className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
-                <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No pending onboardings</p>
-                <p className="text-zinc-500 text-xs font-medium">All sent invitations have been successfully claimed or expired.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-800/80">
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Email</th>
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Pre-assigned Roles</th>
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Expires</th>
-                      <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-850">
-                    {invites.map((inv) => {
-                      const targetHighestPos = inv.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
-                      const canManage = canActorManageRole(targetHighestPos);
+              {/* Members List */}
+              <div className="space-y-3">
+                {(() => {
+                  const filteredAdmins = admins.filter((admin) => {
+                    const matchesSearch = admin.email.toLowerCase().includes(searchQuery.toLowerCase());
+                    const matchesRole = filterRoleId ? admin.roles.some((r) => r.id === filterRoleId) : true;
+                    return matchesSearch && matchesRole;
+                  });
 
-                      return (
-                        <InviteRow
-                          key={inv.id}
-                          invite={{ id: inv.id, email: inv.email, roles: inv.roles, expiresAt: inv.expiresAt }}
-                          expired={inv.expired}
-                          canRevoke={canManage}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
+                  if (filteredAdmins.length === 0) {
+                    return (
+                      <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
+                        <HiOutlineUsers className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
+                        <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No staff members found</p>
+                        <p className="text-zinc-500 text-xs font-medium">Try clearing your filters or search terms.</p>
+                      </div>
+                    );
+                  }
+
+                  return filteredAdmins.map((a) => {
+                    const targetHighestPos = a.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
+                    const targetIsOwner = a.roles.some((r) => r.isOwner);
+                    const canManage = canActOnMember(current.highestRolePosition, currentIsOwner, targetHighestPos, targetIsOwner);
+
+                    return (
+                      <AdminRow
+                        key={a.userId}
+                        admin={{ userId: a.userId, email: a.email, roles: a.roles, createdAt: a.createdAt }}
+                        isSelf={a.userId === current.id}
+                        canRevoke={canManage}
+                        assignableRoles={assignableRoles}
+                      />
+                    );
+                  });
+                })()}
               </div>
-            )}
-          </Card>
+            </div>
+          )}
+
+          {/* Sub-tab 2: Invites & Onboarding */}
+          {staffSubTab === 'invites' && (
+            <div className="space-y-6">
+              {/* Action Card for new invite */}
+              <Card className="bg-slate-900/10 border border-zinc-800 border-l-4 border-l-ez-pink p-6">
+                <h2 className="text-base font-black text-white uppercase tracking-wider mb-1">Invite Staff Member</h2>
+                <p className="text-xs text-slate-400 mb-5">
+                  Generates a single-use onboarding invitation link. Copy and send it to the new staff member manually.
+                </p>
+                <InviteAdminForm assignableRoles={assignableRoles} />
+              </Card>
+
+              {/* Pending Invites List */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider px-1">
+                  Pending Onboardings ({invites.length})
+                </h3>
+                {invites.length === 0 ? (
+                  <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
+                    <HiOutlineShieldCheck className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
+                    <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No pending onboardings</p>
+                    <p className="text-zinc-500 text-xs font-medium">All sent invitations have been successfully claimed or expired.</p>
+                  </div>
+                ) : (
+                  invites.map((inv) => {
+                    const targetHighestPos = inv.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
+                    const canManage = canActorManageRole(targetHighestPos);
+
+                    return (
+                      <InviteRow
+                        key={inv.id}
+                        invite={{ id: inv.id, email: inv.email, roles: inv.roles, expiresAt: inv.expiresAt }}
+                        expired={inv.expired}
+                        canRevoke={canManage}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
