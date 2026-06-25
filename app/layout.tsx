@@ -40,8 +40,7 @@ export const metadata: Metadata = {
     "High School Gaming"
   ],
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ez-esports.vercel.app')
+    process.env.NEXT_PUBLIC_APP_URL || 'https://ez-esports.vercel.app'
   ),
   openGraph: {
     type: 'website',
