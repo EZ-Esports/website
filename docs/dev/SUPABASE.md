@@ -64,5 +64,5 @@ Policy contract:
 - Admin team management on `admin_users` and `admin_invites` is gated by `public.is_super_admin()`.
 - Public application submission still goes through `app/api/apply/route.ts`; the database table itself is not directly insertable by anonymous Supabase clients.
 
-### READ
-`docs/dev/DATABASE.md` for the database schema overview and migration notes.
+### Database Schema
+See [schema.ts](file:///Users/shangminchen/website/app/lib/db/schema.ts) for the database schema definition and migration files under [db/migrations](file:///Users/shangminchen/website/db/migrations) for migration history.
