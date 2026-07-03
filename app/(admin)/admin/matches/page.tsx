@@ -1,28 +1,29 @@
-import { getAdminMatches, getCachedTeams, getCachedRosters, getCachedSeasons, getAdminSeasons, getCachedGames } from '@/app/lib/db/queries';
+import { getCachedTeams, getCachedRosters, getCachedSeasons, getAdminSeasons, getCachedGames, getMatchesPage } from '@/app/lib/db/queries';
 import Card from '@/app/components/ui/Card';
 import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
-import MatchList from '@/app/components/admin/MatchList';
+import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
 
 export default async function AdminMatchesPage() {
-  let matches: Awaited<ReturnType<typeof getAdminMatches>> = [];
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
   let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
   let activeSeasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
   let allSeasons: Awaited<ReturnType<typeof getAdminSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
+  let initialPage: MatchPageResponse = { items: [], nextCursor: null };
   let dbError = false;
 
   try {
-    const [matchesRes, teamsRes, rostersRes, activeSeasonsRes, allSeasonsRes, gamesRes] = await Promise.all([
-      getAdminMatches(),
+    const [firstPage, teamsRes, rostersRes, activeSeasonsRes, allSeasonsRes, gamesRes] = await Promise.all([
+      getMatchesPage({ sort: 'desc', limit: 25 }),
       getCachedTeams(),
       getCachedRosters(),
       getCachedSeasons(),
       getAdminSeasons(),
       getCachedGames(),
     ]);
-    matches = matchesRes;
+    initialPage = toMatchesPageDto(firstPage);
     teams = teamsRes;
     rosters = rostersRes;
     activeSeasons = activeSeasonsRes;
@@ -43,7 +44,7 @@ export default async function AdminMatchesPage() {
 
       {!dbError && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Scheduling Column */}
           <Card className="lg:col-span-1 h-fit space-y-5">
             <div>
@@ -61,15 +62,13 @@ export default async function AdminMatchesPage() {
 
           {/* Matches List Column */}
           <div className="lg:col-span-2">
-            <MatchList
-              initialMatches={matches}
+            <AdminMatchExplorer
               seasons={allSeasons}
-              rosters={rosters as any}
-              teams={teams}
               games={games}
+              initialPage={initialPage}
             />
           </div>
-          
+
         </div>
       )}
     </div>

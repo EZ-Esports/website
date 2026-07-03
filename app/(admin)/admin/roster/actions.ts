@@ -3,7 +3,7 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 
@@ -152,6 +152,7 @@ export async function createTeam(formData: FormData) {
 
     safeRevalidateTag('teams');
     safeRevalidatePath('/admin/roster');
+    safeRevalidatePath('/');
     return { success: true, team: res[0] };
   } catch (error: unknown) {
     console.error(error);
@@ -167,6 +168,7 @@ export async function deleteTeam(id: string) {
     safeRevalidateTag('rosters');
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
+    safeRevalidatePath('/');
     return { success: true };
   } catch (error: unknown) {
     console.error(error);
@@ -195,6 +197,7 @@ export async function createRoster(formData: FormData) {
 
     safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
+    safeRevalidatePath('/');
     return { success: true, roster: res[0] };
   } catch (error: unknown) {
     console.error(error);
@@ -219,6 +222,7 @@ export async function updateRoster(id: string, formData: FormData) {
 
     safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
+    safeRevalidatePath('/');
     return { success: true, roster: res[0] };
   } catch (error: unknown) {
     console.error(error);
@@ -233,6 +237,7 @@ export async function deleteRoster(id: string) {
     safeRevalidateTag('rosters');
     safeRevalidateTag('players');
     safeRevalidatePath('/admin/roster');
+    safeRevalidatePath('/');
     return { success: true };
   } catch (error: unknown) {
     console.error(error);
@@ -321,4 +326,51 @@ export async function deleteRosterMember(id: string) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
   }
+}
+
+// --- ON-DEMAND READS (RosterExplorer fetches these per school/roster instead
+// of the page shipping every member and player to the client up front) ---
+
+export async function listSchoolMembers(schoolId: string) {
+  await requireAdmin();
+  return db
+    .select()
+    .from(schema.members)
+    .where(eq(schema.members.schoolId, schoolId))
+    .orderBy(asc(schema.members.firstName), asc(schema.members.lastName));
+}
+
+/**
+ * Everything the roster view needs in one round trip: the roster's players
+ * (with member names joined) plus the school's full member pool for the
+ * add-player picker. Server actions from one client are queued serially, so
+ * two separate actions would double the latency.
+ */
+export async function listRosterView(rosterId: string, schoolId: string) {
+  const [players, members] = await Promise.all([
+    listRosterPlayers(rosterId),
+    listSchoolMembers(schoolId),
+  ]);
+  return { players, members };
+}
+
+/** Players on one roster with their member's display fields joined in. */
+export async function listRosterPlayers(rosterId: string) {
+  await requireAdmin();
+  return db
+    .select({
+      id: schema.players.id,
+      rosterId: schema.players.rosterId,
+      memberId: schema.players.memberId,
+      role: schema.players.role,
+      ign: schema.players.ign,
+      bio: schema.players.bio,
+      isCaptain: schema.players.isCaptain,
+      firstName: schema.members.firstName,
+      lastName: schema.members.lastName,
+    })
+    .from(schema.players)
+    .innerJoin(schema.members, eq(schema.players.memberId, schema.members.id))
+    .where(eq(schema.players.rosterId, rosterId))
+    .orderBy(asc(schema.members.firstName), asc(schema.members.lastName));
 }

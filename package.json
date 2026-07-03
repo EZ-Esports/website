@@ -14,6 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate",
     "db:seed": "npx tsx --env-file-if-exists=.env db/seed.ts",
+    "db:seed:gold": "npx tsx --env-file-if-exists=.env db/seed-gold.ts",
     "db:seed-owner": "npx tsx --env-file-if-exists=.env db/seed-owner.ts"
   },
   "dependencies": {

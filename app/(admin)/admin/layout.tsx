@@ -25,6 +25,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   }
   if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_MATCHES)) {
     allowedHrefs.push('/admin/matches');
+    allowedHrefs.push('/admin/standings');
   }
   if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_ROSTERS)) {
     allowedHrefs.push('/admin/roster');

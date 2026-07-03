@@ -1,45 +1,43 @@
 import {
-  getCachedPlayers,
   getCachedRosters,
   getCachedTeams,
   getCachedGames,
   getCachedSchools,
-  getCachedMembers,
-  getCachedSeasons
+  getAdminSeasons,
+  getRosterPlayerCounts,
 } from '@/app/lib/db/queries';
 import { Suspense } from 'react';
 import RosterExplorer from '@/app/components/admin/RosterExplorer';
 import Card from '@/app/components/ui/Card';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
-import { DBGame, DBTeam, DBRoster, DBPlayer, DBSchool, DBMember, DBSeason } from '@/app/types';
+import { DBGame, DBTeam, DBRoster, DBSchool, DBSeason } from '@/app/types';
 
 export default async function AdminRosterPage() {
-  let playersList: DBPlayer[] = [];
   let rosters: DBRoster[] = [];
   let teams: DBTeam[] = [];
   let games: DBGame[] = [];
   let schools: DBSchool[] = [];
-  let members: DBMember[] = [];
   let seasons: DBSeason[] = [];
+  let playerCounts: Record<string, number> = {};
   let dbError = false;
 
   try {
-    const [playersRes, rostersRes, teamsRes, gamesRes, schoolsRes, membersRes, seasonsRes] = await Promise.all([
-      getCachedPlayers(),
+    // Members and players are intentionally NOT loaded here: RosterExplorer
+    // fetches them on demand per school/roster (they are the two big tables).
+    const [rostersRes, teamsRes, gamesRes, schoolsRes, seasonsRes, countsRes] = await Promise.all([
       getCachedRosters(),
       getCachedTeams(),
       getCachedGames(),
       getCachedSchools(),
-      getCachedMembers(),
-      getCachedSeasons(),
+      getAdminSeasons(),
+      getRosterPlayerCounts(),
     ]);
-    playersList = playersRes;
     rosters = rostersRes as any;
     teams = teamsRes;
     games = gamesRes;
     schools = schoolsRes;
-    members = membersRes;
     seasons = seasonsRes as any;
+    playerCounts = countsRes;
   } catch (error) {
     console.error('Error fetching league configuration data:', error);
     dbError = true;
@@ -61,10 +59,9 @@ export default async function AdminRosterPage() {
             games={games}
             teams={teams}
             rosters={rosters}
-            players={playersList}
             schools={schools}
-            members={members}
             seasons={seasons}
+            playerCounts={playerCounts}
           />
         </Suspense>
       )}

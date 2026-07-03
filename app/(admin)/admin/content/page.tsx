@@ -9,10 +9,10 @@ const keyPageMap: Record<string, string> = {
   'hero.title': 'Homepage → Hero',
   'hero.subtitle': 'Homepage → Hero',
   'hero.cta': 'Homepage → Hero',
-  'about.mission': 'About Page → Mission',
-  'about.story': 'About Page → Story',
-  'apply.intro': 'Apply Page → Intro',
-  'sponsors.intro': 'Sponsors Page → Intro',
+  home_about_blurb: 'Homepage → Our Story',
+  about_mission: 'About Page → Mission',
+  apply_hero: 'Apply Page → Intro',
+  sponsors_intro: 'Sponsors Page → Intro',
 };
 
 async function getAllPageContent() {

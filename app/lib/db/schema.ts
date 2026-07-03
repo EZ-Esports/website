@@ -1,4 +1,4 @@
-import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Shared audit columns
@@ -213,6 +213,36 @@ export const rosterStandings = pgView('roster_standings', {
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit')))::int as losses
   FROM rosters r
 `);
+
+// Historical standings snapshots imported from archived spreadsheets.
+// The roster_standings view computes W/L from match rows, but most archived
+// seasons have final standings without per-match scores, so those seasons are
+// served from this table instead. playerName/playerIgn are set for individual
+// (per-player) competitions like TFT, where a row ranks a player, not a school
+// team; wins/losses stay null there and the points total lives in notes.
+export const seasonStandings = pgTable('season_standings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  seasonId: uuid('season_id')
+    .references(() => seasons.id, { onDelete: 'cascade' })
+    .notNull(),
+  schoolId: uuid('school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
+    .notNull(),
+  division: text('division').notNull(), // "Varsity" | "JV" | "All"
+  rank: integer('rank'),
+  wins: integer('wins'),
+  losses: integer('losses'),
+  gamesPlayed: integer('games_played'),
+  winPct: real('win_pct'), // 0..1
+  playerName: text('player_name'),
+  playerIgn: text('player_ign'),
+  notes: text('notes'),
+  ...auditColumns,
+}, (table) => [
+  index('season_standings_season_id_idx').on(table.seasonId),
+  index('season_standings_school_id_idx').on(table.schoolId),
+  index('season_standings_division_idx').on(table.division),
+]).enableRLS();
 
 // --- PHASE 2 CMS TABLES ---
 

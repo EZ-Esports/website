@@ -31,6 +31,7 @@ export async function updatePageContent(id: string, formData: FormData) {
 
   revalidateTag('page-content', {});
   revalidatePath('/admin/content');
+  revalidatePath('/');
 }
 
 export async function restorePageContent(id: string, historyId: string) {
@@ -42,7 +43,7 @@ export async function restorePageContent(id: string, historyId: string) {
     .where(eq(schema.pageContentHistory.id, historyId))
     .limit(1);
 
-  if (!entry) return;
+  if (!entry) throw new Error('History entry not found.');
 
   // Snapshot current then restore atomically (so the restore is itself undoable and consistent).
   await db.transaction(async (tx) => {
@@ -52,12 +53,15 @@ export async function restorePageContent(id: string, historyId: string) {
       .where(eq(schema.pageContent.id, id))
       .limit(1);
 
-    if (current) {
-      await tx.insert(schema.pageContentHistory).values({
-        contentKey: current.key,
-        previousContent: current.content,
-      });
+    if (!current) throw new Error('Content block not found.');
+    if (current.key !== entry.contentKey) {
+      throw new Error('History entry does not belong to this content block.');
     }
+
+    await tx.insert(schema.pageContentHistory).values({
+      contentKey: current.key,
+      previousContent: current.content,
+    });
 
     await tx
       .update(schema.pageContent)
@@ -67,4 +71,5 @@ export async function restorePageContent(id: string, historyId: string) {
 
   revalidateTag('page-content', {});
   revalidatePath('/admin/content');
+  revalidatePath('/');
 }

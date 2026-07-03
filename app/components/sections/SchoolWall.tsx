@@ -1,7 +1,12 @@
 import { getCachedSchools } from '@/app/lib/db/queries';
 
 export default async function SchoolWall() {
-  const schools = await getCachedSchools();
+  let schools: Awaited<ReturnType<typeof getCachedSchools>> = [];
+  try {
+    schools = await getCachedSchools();
+  } catch (error) {
+    console.error('Failed to load schools for homepage', error);
+  }
 
   if (!schools || schools.length === 0) return null;
 

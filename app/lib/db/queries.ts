@@ -1,7 +1,17 @@
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, count, desc, eq, isNull, lt, notExists, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notExists, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import {
+  DIVISIONS,
+  clampPageLimit,
+  normalizeSort,
+  rankComputedStandings,
+  type MatchesPage,
+  type MatchesPageParams,
+  type SeasonStandingsResult,
+} from './match-page';
 
 /** Default page size for public-facing paginated lists. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -86,6 +96,220 @@ export const getCachedMatches = unstable_cache(
 export const getAdminMatches = () =>
   db.select().from(schema.matches).orderBy(desc(schema.matches.scheduledAt));
 
+// --- SEASON BROWSING & PAGINATED MATCHES ---
+
+/** Seasons joined with their game, newest season first within each game. */
+export const getSeasonsWithGames = unstable_cache(
+  async () =>
+    db
+      .select({
+        id: schema.seasons.id,
+        name: schema.seasons.name,
+        isActive: schema.seasons.isActive,
+        gameId: schema.games.id,
+        gameSlug: schema.games.slug,
+        gameName: schema.games.displayName,
+      })
+      .from(schema.seasons)
+      .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+      .orderBy(asc(schema.games.slug), desc(schema.seasons.name)),
+  ['seasons-with-games'],
+  { tags: ['seasons', 'games'] }
+);
+
+const homeRoster = alias(schema.rosters, 'home_roster');
+const awayRoster = alias(schema.rosters, 'away_roster');
+const homeTeam = alias(schema.teams, 'home_team');
+const awayTeam = alias(schema.teams, 'away_team');
+const homeSchool = alias(schema.schools, 'home_school');
+const awaySchool = alias(schema.schools, 'away_school');
+
+/**
+ * Keyset-paginated match list with division + school names joined in.
+ * Sorted by (scheduledAt, id); `cursor` is the sort key of the last row of
+ * the previous page. Fetches one extra row to detect whether more remain.
+ * Uncached: filter permutations are unbounded and admin edits must be fresh.
+ */
+export async function getMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+  const sort = normalizeSort(params.sort);
+  const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
+
+  const conditions = [];
+  if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
+  if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
+  if (params.division) conditions.push(eq(homeRoster.division, params.division));
+  if (params.status) conditions.push(eq(schema.matches.status, params.status));
+  if (params.from) conditions.push(gte(schema.matches.scheduledAt, params.from));
+  if (params.to) conditions.push(lte(schema.matches.scheduledAt, params.to));
+  if (params.search) {
+    const pattern = `%${params.search.replace(/[%_\\]/g, '\\$&')}%`;
+    conditions.push(or(ilike(homeSchool.name, pattern), ilike(awaySchool.name, pattern)));
+  }
+  if (params.cursor) {
+    const ts = new Date(params.cursor.scheduledAt);
+    const { id } = params.cursor;
+    conditions.push(
+      sort === 'desc'
+        ? or(
+            lt(schema.matches.scheduledAt, ts),
+            and(eq(schema.matches.scheduledAt, ts), lt(schema.matches.id, id))
+          )
+        : or(
+            gt(schema.matches.scheduledAt, ts),
+            and(eq(schema.matches.scheduledAt, ts), gt(schema.matches.id, id))
+          )
+    );
+  }
+
+  const direction = sort === 'desc' ? desc : asc;
+  const rows = await db
+    .select({
+      id: schema.matches.id,
+      seasonId: schema.matches.seasonId,
+      scheduledAt: schema.matches.scheduledAt,
+      status: schema.matches.status,
+      homeScore: schema.matches.homeScore,
+      awayScore: schema.matches.awayScore,
+      division: homeRoster.division,
+      homeTeam: homeSchool.name,
+      awayTeam: awaySchool.name,
+    })
+    .from(schema.matches)
+    .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(direction(schema.matches.scheduledAt), direction(schema.matches.id))
+    .limit(limit + 1);
+
+  const items = rows.slice(0, limit);
+  const last = items[items.length - 1];
+  return {
+    items,
+    nextCursor:
+      rows.length > limit && last
+        ? { scheduledAt: last.scheduledAt.toISOString(), id: last.id }
+        : null,
+  };
+}
+
+/**
+ * All matches of a season (optionally one division) with names joined in,
+ * oldest first. Used by the calendar view, which needs the whole season.
+ */
+export async function getSeasonMatches(seasonId: string, division?: string) {
+  const conditions = [eq(schema.matches.seasonId, seasonId)];
+  if (division) conditions.push(eq(homeRoster.division, division));
+  return db
+    .select({
+      id: schema.matches.id,
+      seasonId: schema.matches.seasonId,
+      scheduledAt: schema.matches.scheduledAt,
+      status: schema.matches.status,
+      homeScore: schema.matches.homeScore,
+      awayScore: schema.matches.awayScore,
+      division: homeRoster.division,
+      homeTeam: homeSchool.name,
+      awayTeam: awaySchool.name,
+    })
+    .from(schema.matches)
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .where(and(...conditions))
+    .orderBy(asc(schema.matches.scheduledAt), asc(schema.matches.id));
+}
+
+/**
+ * Divisions that actually exist for a season, ordered Varsity, JV, All.
+ * Union of snapshot standings divisions and live roster divisions, since a
+ * season may have either (TFT 2022-23 is only an "All" individual snapshot).
+ */
+export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
+  const [snapshotRows, rosterRows] = await Promise.all([
+    db
+      .selectDistinct({ division: schema.seasonStandings.division })
+      .from(schema.seasonStandings)
+      .where(eq(schema.seasonStandings.seasonId, seasonId)),
+    db
+      .selectDistinct({ division: schema.rosters.division })
+      .from(schema.rosters)
+      .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
+      .where(eq(schema.teams.seasonId, seasonId)),
+  ]);
+  const found = new Set([...snapshotRows, ...rosterRows].map((r) => r.division));
+  const ordered = DIVISIONS.filter((d) => found.has(d));
+  return ordered.length > 0 ? ordered : ['Varsity'];
+}
+
+/**
+ * Standings for a season+division: archived seasons are served from the
+ * season_standings snapshot table (imported from spreadsheets, since most
+ * archived seasons lack per-match scores); seasons without a snapshot fall
+ * back to the live roster_standings view computed from match results.
+ */
+export async function getSeasonStandingsFor(
+  seasonId: string,
+  division: string
+): Promise<SeasonStandingsResult> {
+  const snapshot = await db
+    .select({
+      schoolName: schema.schools.name,
+      division: schema.seasonStandings.division,
+      rank: schema.seasonStandings.rank,
+      wins: schema.seasonStandings.wins,
+      losses: schema.seasonStandings.losses,
+      gamesPlayed: schema.seasonStandings.gamesPlayed,
+      winPct: schema.seasonStandings.winPct,
+      playerName: schema.seasonStandings.playerName,
+      playerIgn: schema.seasonStandings.playerIgn,
+      notes: schema.seasonStandings.notes,
+    })
+    .from(schema.seasonStandings)
+    .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+    .where(
+      and(
+        eq(schema.seasonStandings.seasonId, seasonId),
+        eq(schema.seasonStandings.division, division)
+      )
+    )
+    .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
+
+  if (snapshot.length > 0) return { source: 'snapshot', rows: snapshot };
+
+  const computed = await db
+    .select({
+      schoolName: schema.schools.name,
+      division: schema.rosterStandings.division,
+      wins: schema.rosterStandings.wins,
+      losses: schema.rosterStandings.losses,
+    })
+    .from(schema.rosterStandings)
+    .innerJoin(schema.teams, eq(schema.rosterStandings.teamId, schema.teams.id))
+    .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+    .where(
+      and(
+        eq(schema.teams.seasonId, seasonId),
+        eq(schema.rosterStandings.division, division),
+        isNull(schema.schools.deletedAt)
+      )
+    );
+
+  return {
+    source: 'computed',
+    // the view's columns are nullable in the type system; division is
+    // constrained to the requested one by the WHERE clause above
+    rows: rankComputedStandings(computed.map((r) => ({ ...r, division: r.division ?? division }))),
+  };
+}
+
 export const getCachedRosters = unstable_cache(
   async () => {
     return db.select().from(schema.rosterStandings);
@@ -164,6 +388,66 @@ export const getCachedPageContent = unstable_cache(
   { tags: ['page-content'] }
 );
 
+export const getCachedHomepageContent = unstable_cache(
+  async () => {
+    const keys = ['hero.title', 'hero.subtitle', 'hero.cta', 'home_about_blurb'];
+    const rows = await db
+      .select({
+        key: schema.pageContent.key,
+        content: schema.pageContent.content,
+      })
+      .from(schema.pageContent)
+      .where(inArray(schema.pageContent.key, keys));
+
+    return Object.fromEntries(rows.map((row) => [row.key, row.content]));
+  },
+  ['homepage-content'],
+  { tags: ['page-content'] }
+);
+
+export const getCachedHomepageGallery = unstable_cache(
+  async () => {
+    const rows = await db
+      .select({
+        id: schema.galleryImages.id,
+        src: schema.galleryImages.src,
+        caption: schema.galleryImages.caption,
+        setId: schema.galleryImages.setId,
+      })
+      .from(schema.galleryImages)
+      .where(
+        and(
+          eq(schema.galleryImages.isActive, true),
+          isNull(schema.galleryImages.deletedAt)
+        )
+      )
+      .orderBy(
+        asc(schema.galleryImages.setId),
+        asc(schema.galleryImages.displayOrder),
+        asc(schema.galleryImages.createdAt)
+      );
+
+    return {
+      set1: rows
+        .filter((row) => row.setId === 1)
+        .map((row) => ({
+          id: row.id,
+          src: row.src,
+          alt: row.caption || 'EZ Esports gallery photo',
+        })),
+      set2: rows
+        .filter((row) => row.setId === 2)
+        .map((row) => ({
+          id: row.id,
+          src: row.src,
+          alt: row.caption || 'EZ Esports gallery photo',
+        })),
+    };
+  },
+  ['homepage-gallery'],
+  { tags: ['gallery-images'] }
+);
+
 export const getSchoolApplications = async (status?: 'pending' | 'reviewed' | 'accepted') => {
   const conditions = status ? [eq(schema.schoolApplications.status, status)] : [];
   return db
@@ -232,6 +516,160 @@ export const countTeamsWithoutRoster = async (): Promise<number> => {
     );
   return row?.value ?? 0;
 };
+
+/** Player headcount per roster (admin explorer tiles), one GROUP BY instead
+ * of shipping every player row to the client. */
+export async function getRosterPlayerCounts(): Promise<Record<string, number>> {
+  const rows = await db
+    .select({ rosterId: schema.players.rosterId, value: count() })
+    .from(schema.players)
+    .groupBy(schema.players.rosterId);
+  return Object.fromEntries(rows.map((r) => [r.rosterId, r.value]));
+}
+
+/** Latest matches with recorded results across all games (homepage pulse).
+ * scheduledAt is serialized to an ISO string: unstable_cache JSON-serializes
+ * its payload, so a Date would silently become a string on cache hits. */
+export const getCachedRecentResults = unstable_cache(
+  async () => {
+    const rows = await db
+      .select({
+        id: schema.matches.id,
+        scheduledAt: schema.matches.scheduledAt,
+        status: schema.matches.status,
+        homeScore: schema.matches.homeScore,
+        awayScore: schema.matches.awayScore,
+        division: homeRoster.division,
+        homeTeam: homeSchool.name,
+        awayTeam: awaySchool.name,
+        gameSlug: schema.games.slug,
+        gameShortName: schema.games.shortName,
+        seasonName: schema.seasons.name,
+      })
+      .from(schema.matches)
+      .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+      .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+      .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+      .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+      .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+      .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+      .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+      .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+      .where(
+        and(
+          inArray(schema.matches.status, ['completed', 'forfeit']),
+          isNotNull(schema.matches.homeScore),
+          isNotNull(schema.matches.awayScore),
+          eq(homeSchool.isActive, true),
+          eq(awaySchool.isActive, true),
+          isNull(homeSchool.deletedAt),
+          isNull(awaySchool.deletedAt)
+        )
+      )
+      .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
+      .limit(3);
+    return rows.map((r) => ({ ...r, scheduledAt: r.scheduledAt.toISOString() }));
+  },
+  ['recent-results'],
+  { tags: ['matches', 'schools', 'rosters', 'teams', 'games', 'seasons'] }
+);
+
+/**
+ * Archive index: every season with its match count and champion (rank-1
+ * snapshot row, preferring team standings over individual leaderboards).
+ */
+export async function getArchiveIndex() {
+  const [seasons, counts, champions] = await Promise.all([
+    getSeasonsWithGames(),
+    db
+      .select({ seasonId: schema.matches.seasonId, matchCount: count() })
+      .from(schema.matches)
+      .groupBy(schema.matches.seasonId),
+    db
+      .select({
+        seasonId: schema.seasonStandings.seasonId,
+        division: schema.seasonStandings.division,
+        schoolName: schema.schools.name,
+        playerName: schema.seasonStandings.playerName,
+      })
+      .from(schema.seasonStandings)
+      .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+      .where(eq(schema.seasonStandings.rank, 1)),
+  ]);
+
+  const countBySeason = new Map(counts.map((c) => [c.seasonId, c.matchCount]));
+  // Prefer the team champion (Varsity) over individual leaderboards, JV last.
+  const championBySeason = new Map<string, string>();
+  for (const division of ['Varsity', 'All', 'JV']) {
+    for (const champ of champions) {
+      if (champ.division === division && !championBySeason.has(champ.seasonId)) {
+        championBySeason.set(champ.seasonId, champ.playerName ?? champ.schoolName);
+      }
+    }
+  }
+
+  return seasons.map((s) => ({
+    ...s,
+    matchCount: countBySeason.get(s.id) ?? 0,
+    champion: championBySeason.get(s.id) ?? null,
+  }));
+}
+
+/**
+ * Game landing page summary for one season: top-5 varsity teams plus
+ * aggregate Varsity/JV W-L records, snapshot-aware via getSeasonStandingsFor.
+ * Individual (per-player) standings rows are excluded from team summaries.
+ */
+export async function getGameSeasonSummary(seasonId: string) {
+  // One snapshot query covers both divisions; only divisions without
+  // snapshot rows pay for the computed fallback.
+  const snapshot = await db
+    .select({
+      schoolName: schema.schools.name,
+      division: schema.seasonStandings.division,
+      rank: schema.seasonStandings.rank,
+      wins: schema.seasonStandings.wins,
+      losses: schema.seasonStandings.losses,
+      winPct: schema.seasonStandings.winPct,
+      playerName: schema.seasonStandings.playerName,
+    })
+    .from(schema.seasonStandings)
+    .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+    .where(
+      and(
+        eq(schema.seasonStandings.seasonId, seasonId),
+        inArray(schema.seasonStandings.division, ['Varsity', 'JV'])
+      )
+    )
+    .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
+
+  const divisionRows = async (division: 'Varsity' | 'JV') => {
+    const rows = snapshot.filter((r) => r.division === division);
+    if (rows.length > 0) return rows;
+    return (await getSeasonStandingsFor(seasonId, division)).rows;
+  };
+  const [varsityRows, jvRows] = await Promise.all([divisionRows('Varsity'), divisionRows('JV')]);
+  const varsityTeams = varsityRows.filter((r) => r.playerName === null);
+  const jvTeams = jvRows.filter((r) => r.playerName === null);
+  const totals = (rows: typeof varsityTeams) =>
+    rows.reduce(
+      (acc, r) => ({ wins: acc.wins + (r.wins ?? 0), losses: acc.losses + (r.losses ?? 0) }),
+      { wins: 0, losses: 0 }
+    );
+  const v = totals(varsityTeams);
+  const j = totals(jvTeams);
+  return {
+    topTeams: varsityTeams.slice(0, 5).map((r, i) => ({
+      rank: r.rank ?? i + 1,
+      team: r.schoolName,
+      wins: r.wins ?? 0,
+      losses: r.losses ?? 0,
+      winPct: r.winPct ?? 0,
+    })),
+    record: varsityTeams.length > 0 ? `${v.wins}-${v.losses}` : null,
+    jvRecord: jvTeams.length > 0 ? `${j.wins}-${j.losses}` : null,
+  };
+}
 
 // --- ADMIN ACCESS CONTROL ---
 

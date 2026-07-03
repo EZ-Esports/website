@@ -1,35 +1,19 @@
 'use client';
 
-import { useState, useMemo, useEffect, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import { fetchMatchesPage } from '@/app/lib/match-actions';
+import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
+import { selectClass } from '@/app/components/admin/styles';
 
-interface Match {
-  id: string;
-  seasonId: string;
-  homeRosterId: string;
-  awayRosterId: string;
-  homeScore: number | null;
-  awayScore: number | null;
-  status: string;
-  scheduledAt: Date;
-}
+const PAGE_SIZE = 25;
 
 interface Season {
   id: string;
   name: string;
   gameId: string;
-}
-
-interface Roster {
-  id: string;
-  teamId: string;
-  division: string;
-}
-
-interface Team {
-  id: string;
-  name: string;
+  isActive: boolean;
 }
 
 interface Game {
@@ -37,20 +21,73 @@ interface Game {
   shortName: string;
 }
 
-interface MatchListProps {
-  initialMatches: Match[];
+interface AdminMatchExplorerProps {
   seasons: Season[];
-  rosters: Roster[];
-  teams: Team[];
   games: Game[];
+  initialPage: MatchPageResponse;
 }
 
-export default function MatchList({ initialMatches, seasons, rosters, teams, games }: MatchListProps) {
-  const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+/**
+ * Server-driven match manager: facet changes and pagination go through the
+ * fetchMatchesPage action instead of shipping every match to the client.
+ * Inline score/status editing and deletion are preserved per row.
+ */
+export default function AdminMatchExplorer({ seasons, games, initialPage }: AdminMatchExplorerProps) {
+  const [gameId, setGameId] = useState('');
+  const [seasonId, setSeasonId] = useState('');
+  const [division, setDivision] = useState('');
+  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<'asc' | 'desc'>('desc');
+
+  const [items, setItems] = useState<MatchPageItemDto[]>(initialPage.items);
+  const [cursor, setCursor] = useState<MatchCursor | null>(initialPage.nextCursor);
+  const [isLoading, startLoading] = useTransition();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [, startTransition] = useTransition();
+
+  const seasonMap = useMemo(() => new Map(seasons.map((s) => [s.id, s])), [seasons]);
+  const gameMap = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
+  const seasonOptions = gameId ? seasons.filter((s) => s.gameId === gameId) : seasons;
+
+  const request = useMemo(
+    () => ({
+      gameId: gameId || undefined,
+      seasonId: seasonId || undefined,
+      division: division || undefined,
+      status: status || undefined,
+      search: search || undefined,
+      sort,
+      limit: PAGE_SIZE,
+    }),
+    [gameId, seasonId, division, status, search, sort]
+  );
+
+  // Reload page 1 whenever facets change (debounced for the search box).
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      startLoading(async () => {
+        const page = await fetchMatchesPage(request);
+        setItems(page.items);
+        setCursor(page.nextCursor);
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [request]);
+
+  const loadMore = () => {
+    if (!cursor) return;
+    startLoading(async () => {
+      const page = await fetchMatchesPage({ ...request, cursor });
+      setItems((prev) => [...prev, ...page.items]);
+      setCursor(page.nextCursor);
+    });
+  };
 
   useEffect(() => {
     if (!toast || toast.type === 'error') return; // errors linger until next action
@@ -60,18 +97,17 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
 
   const handleSave = (matchId: string) => (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = e.currentTarget;
-    const fd = new FormData(form);
+    const fd = new FormData(e.currentTarget);
     // Client-side mirror of the server guard for instant feedback.
-    const status = fd.get('status') as string;
+    const newStatus = fd.get('status') as string;
     const home = (fd.get('homeScore') as string)?.trim();
     const away = (fd.get('awayScore') as string)?.trim();
-    if ((status === 'completed' || status === 'forfeit') && (!home || !away)) {
+    if ((newStatus === 'completed' || newStatus === 'forfeit') && (!home || !away)) {
       setToast({ message: 'Enter both scores before marking a match completed or forfeit.', type: 'error' });
       return;
     }
     setSavingId(matchId);
-    startTransition(async () => {
+    startLoading(async () => {
       const res = await updateMatchScore(matchId, fd);
       setSavingId(null);
       setToast(res?.success
@@ -80,26 +116,11 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
     });
   };
 
-  const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
-  const rosterMap = useMemo(() => new Map(rosters.map(r => [r.id, r])), [rosters]);
-  const seasonMap = useMemo(() => new Map(seasons.map(s => [s.id, s])), [seasons]);
-  const gameMap = useMemo(() => new Map(games.map(g => [g.id, g])), [games]);
-
-  const filteredMatches = useMemo(() => {
-    return initialMatches.filter(match => {
-      const homeRoster = rosterMap.get(match.homeRosterId);
-      const awayRoster = rosterMap.get(match.awayRosterId);
-      const homeTeam = homeRoster ? teamMap.get(homeRoster.teamId) : null;
-      const awayTeam = awayRoster ? teamMap.get(awayRoster.teamId) : null;
-      const season = seasonMap.get(match.seasonId);
-      const game = season ? gameMap.get(season.gameId) : null;
-
-      const searchStr = `${homeTeam?.name} ${awayTeam?.name} ${game?.shortName} ${season?.name}`.toLowerCase();
-      const matchesSearch = filter === '' || searchStr.includes(filter.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || match.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [initialMatches, filter, statusFilter, rosterMap, teamMap, seasonMap, gameMap]);
+  const handleGameChange = (id: string) => {
+    setGameId(id);
+    // Reset the season facet if it belongs to a different game.
+    if (id && seasonId && seasonMap.get(seasonId)?.gameId !== id) setSeasonId('');
+  };
 
   return (
     <>
@@ -117,35 +138,64 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
       </div>
     )}
     <div className="bg-[#1c1c1c]/60 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
-      <div className="px-6 py-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-base font-bold text-white uppercase tracking-wider">Match Fixtures</h2>
-        
-        <div className="flex items-center gap-3">
-          <input 
-            type="text" 
-            placeholder="Search teams or games..." 
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+      <div className="px-6 py-5 border-b border-zinc-800 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-base font-bold text-white uppercase tracking-wider">Match Fixtures</h2>
+          <input
+            type="text"
+            placeholder="Search schools..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 w-full sm:w-48"
           />
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 cursor-pointer"
-          >
-            <option value="all">All Status</option>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={gameId} onChange={(e) => handleGameChange(e.target.value)} className={selectClass}>
+            <option value="">All Games</option>
+            {games.map((g) => (
+              <option key={g.id} value={g.id}>{g.shortName}</option>
+            ))}
+          </select>
+
+          <select value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={selectClass}>
+            <option value="">All Seasons</option>
+            {seasonOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {gameId ? '' : `${gameMap.get(s.gameId)?.shortName} `}{s.name}{s.isActive ? ' (current)' : ''}
+              </option>
+            ))}
+          </select>
+
+          <select value={division} onChange={(e) => setDivision(e.target.value)} className={selectClass}>
+            <option value="">All Divisions</option>
+            <option value="Varsity">Varsity</option>
+            <option value="JV">JV</option>
+            <option value="All">All (individual)</option>
+          </select>
+
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
+            <option value="">All Status</option>
             <option value="scheduled">Scheduled</option>
             <option value="live">Live</option>
             <option value="completed">Completed</option>
             <option value="forfeit">Forfeit</option>
             <option value="cancelled">Cancelled</option>
           </select>
+
+          <button
+            onClick={() => setSort(sort === 'desc' ? 'asc' : 'desc')}
+            className={`${selectClass} font-bold`}
+            title="Toggle date sort"
+          >
+            {sort === 'desc' ? 'Newest ↓' : 'Oldest ↑'}
+          </button>
         </div>
       </div>
 
-      {filteredMatches.length === 0 ? (
+      {items.length === 0 ? (
         <div className="text-center p-12 text-slate-500 text-sm">
-          {initialMatches.length === 0 ? 'No match fixtures scheduled yet.' : 'No matches match your filters.'}
+          {isLoading ? 'Loading…' : 'No matches found for these filters.'}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -159,40 +209,34 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 text-sm">
-              {filteredMatches.map((match) => {
-                const homeRoster = rosterMap.get(match.homeRosterId);
-                const awayRoster = rosterMap.get(match.awayRosterId);
-                const homeTeam = homeRoster ? teamMap.get(homeRoster.teamId) : null;
-                const awayTeam = awayRoster ? teamMap.get(awayRoster.teamId) : null;
+              {items.map((match) => {
                 const season = seasonMap.get(match.seasonId);
                 const game = season ? gameMap.get(season.gameId) : null;
-                
                 const deleteActionWithId = deleteMatch.bind(null, match.id);
                 const isSaving = savingId === match.id;
 
                 return (
                   <tr key={match.id} className="hover:bg-slate-800/10 transition-colors">
-                    {/* Season & Date */}
                     <td className="px-6 py-4">
                       <div className="font-bold text-slate-200 text-xs uppercase tracking-wider">
                         {game?.shortName} • {season?.name}
                       </div>
                       <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                         {new Date(match.scheduledAt).toLocaleDateString('en-US', {
-                           month: 'short',
-                           day: 'numeric',
-                           hour: 'numeric',
-                           minute: '2-digit',
-                         })}
+                        {new Date(match.scheduledAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
                       </div>
                     </td>
 
-                    {/* Matchup & Score Inputs */}
                     <td className="px-6 py-4">
                       <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-3">
                         <div className="text-right w-28 truncate">
-                          <span className="block font-semibold text-white text-sm truncate" title={homeTeam?.name || 'Home'}>{homeTeam?.name || 'Home'}</span>
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{homeRoster?.division}</span>
+                          <span className="block font-semibold text-white text-sm truncate" title={match.homeTeam}>{match.homeTeam}</span>
+                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{match.division}</span>
                         </div>
 
                         <div className="flex items-center gap-1">
@@ -218,13 +262,12 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                         </div>
 
                         <div className="text-left w-28 truncate">
-                          <span className="block font-semibold text-white text-sm truncate" title={awayTeam?.name || 'Away'}>{awayTeam?.name || 'Away'}</span>
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{awayRoster?.division}</span>
+                          <span className="block font-semibold text-white text-sm truncate" title={match.awayTeam}>{match.awayTeam}</span>
+                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{match.division}</span>
                         </div>
                       </form>
                     </td>
 
-                    {/* Status dropdown */}
                     <td className="px-6 py-4">
                       <select
                         name="status"
@@ -240,7 +283,6 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                       </select>
                     </td>
 
-                    {/* Action Buttons */}
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -252,8 +294,11 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
                           {isSaving ? 'Saving…' : 'Save'}
                         </button>
                         <ConfirmDeleteButton
-                          action={deleteActionWithId}
-                          message={`Permanently delete this match (${homeTeam?.name ?? 'Home'} vs ${awayTeam?.name ?? 'Away'})? This cannot be undone.`}
+                          action={async () => {
+                            await deleteActionWithId();
+                            setItems((prev) => prev.filter((m) => m.id !== match.id));
+                          }}
+                          message={`Permanently delete this match (${match.homeTeam} vs ${match.awayTeam})? This cannot be undone.`}
                           label="Delete"
                           className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
                         />
@@ -266,6 +311,22 @@ export default function MatchList({ initialMatches, seasons, rosters, teams, gam
           </table>
         </div>
       )}
+
+      <div className="px-6 py-4 border-t border-zinc-800 text-center">
+        {cursor ? (
+          <button
+            onClick={loadMore}
+            disabled={isLoading}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isLoading ? 'Loading…' : `Load ${PAGE_SIZE} more`}
+          </button>
+        ) : (
+          <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider">
+            {items.length > 0 ? 'All matching fixtures loaded' : ''}
+          </span>
+        )}
+      </div>
     </div>
     </>
   );

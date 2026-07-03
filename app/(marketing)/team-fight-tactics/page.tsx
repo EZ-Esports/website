@@ -7,6 +7,7 @@ import ContentSection from '@/app/components/sections/ContentSection';
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { getGameSeasonSummary } from '@/app/lib/db/queries';
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 
 export const metadata: Metadata = {
@@ -61,17 +62,36 @@ export default async function TFTHubPage() {
         .limit(1);
 
       if (activeSeason[0]) {
-        const nextMatchRow = await db
-          .select()
-          .from(schema.matches)
-          .where(
-            and(
-              eq(schema.matches.seasonId, activeSeason[0].id),
-              eq(schema.matches.status, 'scheduled')
+        // Fetch the next match, recent results, and season summary in
+        // parallel — they only depend on the active season.
+        const [nextMatchRow, recentRows, summary] = await Promise.all([
+          db
+            .select()
+            .from(schema.matches)
+            .where(
+              and(
+                eq(schema.matches.seasonId, activeSeason[0].id),
+                eq(schema.matches.status, 'scheduled')
+              )
             )
-          )
-          .orderBy(schema.matches.scheduledAt)
-          .limit(1);
+            .orderBy(schema.matches.scheduledAt)
+            .limit(1),
+          db
+            .select()
+            .from(schema.matches)
+            .where(
+              and(
+                eq(schema.matches.seasonId, activeSeason[0].id),
+                eq(schema.matches.status, 'completed')
+              )
+            )
+            .orderBy(desc(schema.matches.scheduledAt))
+            .limit(3),
+          getGameSeasonSummary(activeSeason[0].id),
+        ]);
+        topTeams = summary.topTeams;
+        record = summary.record;
+        jvRecord = summary.jvRecord;
 
         if (nextMatchRow[0]) {
           const homeRoster = rosterMap.get(nextMatchRow[0].homeRosterId);
@@ -91,17 +111,6 @@ export default async function TFTHubPage() {
           };
         }
 
-        const recentRows = await db
-          .select()
-          .from(schema.matches)
-          .where(
-            and(
-              eq(schema.matches.seasonId, activeSeason[0].id),
-              eq(schema.matches.status, 'completed')
-            )
-          )
-          .orderBy(desc(schema.matches.scheduledAt))
-          .limit(3);
 
         recentResults = recentRows.map((r) => {
           const homeRoster = rosterMap.get(r.homeRosterId);
@@ -123,49 +132,6 @@ export default async function TFTHubPage() {
         });
       }
 
-      const topRows = teamIds.length > 0
-        ? await db
-            .select()
-            .from(schema.rosterStandings)
-            .where(
-              and(
-                inArray(schema.rosterStandings.teamId, teamIds),
-                eq(schema.rosterStandings.division, 'Varsity')
-              )
-            )
-            .orderBy(desc(schema.rosterStandings.wins), schema.rosterStandings.losses)
-            .limit(5)
-        : [];
-
-      topTeams = topRows.map((r, idx) => {
-        const team = teamMap.get(r.teamId!);
-        const wins = r.wins || 0;
-        const losses = r.losses || 0;
-        const played = wins + losses;
-        const winPct = played > 0 ? wins / played : 0;
-        return { rank: idx + 1, team: team?.name || 'Unknown', wins, losses, winPct };
-      });
-
-      if (topRows.length > 0) {
-        const totalVarsityW = topRows.reduce((acc, r) => acc + (r.wins || 0), 0);
-        const totalVarsityL = topRows.reduce((acc, r) => acc + (r.losses || 0), 0);
-        record = `${totalVarsityW}-${totalVarsityL}`;
-
-        const jvRows = teamIds.length > 0
-          ? await db
-              .select()
-              .from(schema.rosterStandings)
-              .where(
-                and(
-                  inArray(schema.rosterStandings.teamId, teamIds),
-                  eq(schema.rosterStandings.division, 'JV')
-                )
-              )
-          : [];
-        if (jvRows.length > 0) {
-          jvRecord = `${jvRows.reduce((a, r) => a + (r.wins || 0), 0)}-${jvRows.reduce((a, r) => a + (r.losses || 0), 0)}`;
-        }
-      }
     }
   } catch (error) {
     console.error('Failed to load dynamic data for TFT', error);

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { FiChevronLeft, FiChevronRight, FiCalendar, FiClock, FiX, FiInfo } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatNY } from '@/app/lib/dates';
 
 interface ScheduleItem {
   id: string;
@@ -32,36 +33,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Helper to format in NY timezone and avoid local browser time shifts
-function formatInNYTimezone(date: Date, formatType: 'ymd' | 'date-str' | 'time-str') {
-  if (formatType === 'ymd') {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const parts = formatter.formatToParts(date);
-    const year = parts.find(p => p.type === 'year')?.value;
-    const month = parts.find(p => p.type === 'month')?.value;
-    const day = parts.find(p => p.type === 'day')?.value;
-    return `${year}-${month}-${day}`;
-  } else if (formatType === 'date-str') {
-    return date.toLocaleDateString('en-US', {
-      timeZone: 'America/New_York',
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } else {
-    return date.toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  }
-}
+// NY-timezone formatting is shared league-wide; see app/lib/dates.ts.
 
 // Helper to determine initial calendar focus based on matches list
 function getInitialDate(matches: ScheduleItem[]) {
@@ -82,12 +54,12 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
   const processedMatches = useMemo(() => {
     return matches.map(m => {
       const dateObj = new Date(m.scheduledAt);
-      const ymd = formatInNYTimezone(dateObj, 'ymd');
+      const ymd = formatNY(dateObj, 'ymd');
       return {
         ...m,
         ymd,
-        formattedDate: formatInNYTimezone(dateObj, 'date-str'),
-        formattedTime: formatInNYTimezone(dateObj, 'time-str'),
+        formattedDate: formatNY(dateObj, 'date-long'),
+        formattedTime: formatNY(dateObj, 'time'),
       };
     });
   }, [matches]);
@@ -206,7 +178,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
   };
 
   const todayYmd = useMemo(() => {
-    return formatInNYTimezone(new Date(), 'ymd');
+    return formatNY(new Date(), 'ymd');
   }, []);
 
   return (

@@ -40,6 +40,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
     { label: 'Overview', href: '/admin', icon: HiOutlineChartBar },
     { label: 'League Setup', href: '/admin/league', icon: HiOutlineCog6Tooth },
     { label: 'Matches & Standings', href: '/admin/matches', icon: HiOutlineTrophy },
+    { label: 'Standings Archive', href: '/admin/standings', icon: HiOutlineChartBar },
     { label: 'Teams & Rosters', href: '/admin/roster', icon: HiOutlineUsers },
     { label: 'News & Announcements', href: '/admin/news', icon: HiOutlineNewspaper },
     { label: 'Leadership Manager', href: '/admin/leadership', icon: HiOutlineUserGroup },

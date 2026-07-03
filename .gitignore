@@ -37,6 +37,9 @@ yarn-error.log*
 # Archived seed source data — contains member PII (emails, Discord, etc.).
 # Keep local; do NOT commit to this public repo. Required by `npm run db:seed`.
 /*.csv
+/sharepoint/bronze_data/
+/sharepoint/silver_data/
+/sharepoint/gold_data/
 
 # vercel
 .vercel

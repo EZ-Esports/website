@@ -5,6 +5,7 @@ async function seedPhase2() {
   // Dynamic imports ensure DATABASE_URL is set before the postgres client initializes
   const { db } = await import('./index');
   const schema = await import('./schema');
+  const { inArray } = await import('drizzle-orm');
   // Gallery images — descriptive captions for the 11 existing images
   const gallerySet1 = [
     { src: '/images/gallery/gallery-1.png', caption: 'Stuyvesant vs Bronx Science match — Spring 2022', schoolName: 'Stuyvesant High School', eventName: 'Spring 2022 Championship', setId: 1, displayOrder: 1 },
@@ -23,18 +24,39 @@ async function seedPhase2() {
     { src: '/images/gallery/gallery-11.png', caption: 'Opening ceremony — Fall 2022 season kickoff', schoolName: '', eventName: 'Fall 2022 Kickoff', setId: 2, displayOrder: 2 },
   ];
 
-  await db.insert(schema.galleryImages).values([...gallerySet1, ...gallerySet2]).onConflictDoNothing();
+  const galleryRows = [...gallerySet1, ...gallerySet2];
+  const existingGallery = await db
+    .select({ src: schema.galleryImages.src })
+    .from(schema.galleryImages)
+    .where(inArray(schema.galleryImages.src, galleryRows.map((row) => row.src)));
+  const existingGallerySrcs = new Set(existingGallery.map((row) => row.src));
+  const missingGalleryRows = galleryRows.filter((row) => !existingGallerySrcs.has(row.src));
+  if (missingGalleryRows.length > 0) {
+    await db.insert(schema.galleryImages).values(missingGalleryRows);
+  }
 
   // Sponsors
-  await db.insert(schema.sponsors).values([
+  const sponsorRows = [
     { name: 'Nike', logoUrl: '', tier: 'platinum', websiteUrl: 'https://nike.com', displayOrder: 1 },
     { name: 'Roc Nation', logoUrl: '', tier: 'gold', websiteUrl: 'https://rocnation.com', displayOrder: 2 },
     { name: 'Gen.G', logoUrl: '', tier: 'gold', websiteUrl: 'https://geng.gg', displayOrder: 3 },
     { name: 'ByteDance', logoUrl: '', tier: 'community', websiteUrl: 'https://bytedance.com', displayOrder: 4 },
-  ]).onConflictDoNothing();
+  ] as const;
+  const existingSponsors = await db
+    .select({ name: schema.sponsors.name })
+    .from(schema.sponsors)
+    .where(inArray(schema.sponsors.name, sponsorRows.map((row) => row.name)));
+  const existingSponsorNames = new Set(existingSponsors.map((row) => row.name));
+  const missingSponsorRows = sponsorRows.filter((row) => !existingSponsorNames.has(row.name));
+  if (missingSponsorRows.length > 0) {
+    await db.insert(schema.sponsors).values(missingSponsorRows);
+  }
 
   // Page content
   await db.insert(schema.pageContent).values([
+    { key: 'hero.title', label: 'Homepage — Hero Title', content: 'New York City High School Esports League' },
+    { key: 'hero.subtitle', label: 'Homepage — Hero Subtitle', content: 'Shaping the leaders of tomorrow through their passion for esports today.' },
+    { key: 'hero.cta', label: 'Homepage — Hero CTA', content: 'Join Discord' },
     { key: 'about_mission', label: 'About — Mission Statement', content: 'EZ Esports was founded in November 2021 to provide NYC high school students competitive esports opportunities, building community and pathways to careers in gaming and technology.' },
     { key: 'apply_hero', label: 'Apply — Hero Subtitle', content: 'Join the NYC High School Esports League and give your students a competitive edge through organized play, live broadcasts, and community.' },
     { key: 'sponsors_intro', label: 'Sponsors — Intro Text', content: "Partner with NYC's premier high school esports league and connect your brand with the next generation of gamers, creators, and tech leaders." },

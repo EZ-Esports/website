@@ -3,15 +3,16 @@ import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import ContentSection from '@/app/components/sections/ContentSection';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
+import { getMatchesPage, getSeasonMatches, getSeasonsWithGames } from '@/app/lib/db/queries';
+import { normalizeSort, resolveSelectedSeason, toMatchesPageDto } from '@/app/lib/db/match-page';
 import Link from 'next/link';
 import CalendarSchedule from './CalendarSchedule';
+import ArchiveMatchList from './ArchiveMatchList';
+import SeasonSelect from '@/app/components/ui/SeasonSelect';
 
 interface SchedulePageProps {
   params: Promise<{ game: string }>;
-  searchParams: Promise<{ division?: string }>;
+  searchParams: Promise<{ division?: string; season?: string; sort?: string }>;
 }
 
 export async function generateMetadata({ params }: SchedulePageProps): Promise<Metadata> {
@@ -26,7 +27,8 @@ export async function generateMetadata({ params }: SchedulePageProps): Promise<M
 
 export default async function SchedulePage({ params, searchParams }: SchedulePageProps) {
   const { game } = await params;
-  const { division = 'Varsity' } = await searchParams;
+  const { division = 'Varsity', season: seasonParam, sort: sortParam } = await searchParams;
+  const sort = normalizeSort(sortParam);
 
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();
@@ -34,146 +36,137 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
 
   const gameConfig = GAMES[game as GameSlug];
 
-  interface ScheduleItem {
-    id: string;
-    ts: number;
-    date: string;
-    time: string;
-    scheduledAt: string;
-    team1: string;
-    team2: string;
-    division: string;
-    status: string;
-    result?: string;
-    homeScore: number | null;
-    awayScore: number | null;
+  let seasons: Awaited<ReturnType<typeof getSeasonsWithGames>> = [];
+  try {
+    seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
+  } catch (error) {
+    console.error('Failed to load seasons from database', error);
   }
 
-  let schedule: ScheduleItem[] = [];
+  const selectedSeason = resolveSelectedSeason(seasons, seasonParam);
+  const isArchived = Boolean(selectedSeason && !selectedSeason.isActive);
+
+  // Active season -> full-season calendar; archived -> lazy-loaded list.
+  let calendarMatches: Awaited<ReturnType<typeof getSeasonMatches>> = [];
+  let archivePage: Awaited<ReturnType<typeof getMatchesPage>> = { items: [], nextCursor: null };
   try {
-    const gameRow = await db
-      .select()
-      .from(schema.games)
-      .where(eq(schema.games.slug, game))
-      .limit(1);
-
-    if (gameRow[0]) {
-      const activeSeason = await db
-        .select()
-        .from(schema.seasons)
-        .where(and(eq(schema.seasons.gameId, gameRow[0].id), eq(schema.seasons.isActive, true)))
-        .limit(1);
-
-      if (activeSeason[0]) {
-        const matchesList = await db
-          .select()
-          .from(schema.matches)
-          .where(eq(schema.matches.seasonId, activeSeason[0].id))
-          .orderBy(desc(schema.matches.scheduledAt));
-
-        const teamsList = await db
-          .select({
-            id: schema.teams.id,
-            schoolId: schema.teams.schoolId,
-            gameId: schema.teams.gameId,
-            seasonId: schema.teams.seasonId,
-            name: schema.schools.name,
-          })
-          .from(schema.teams)
-          .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-          .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)));
-
-        const teamMap = new Map(teamsList.map((t) => [t.id, t]));
-        const teamIds = teamsList.map((t) => t.id);
-
-        const rostersList = teamIds.length > 0
-          ? await db.select().from(schema.rosters).where(inArray(schema.rosters.teamId, teamIds))
-          : [];
-
-        const rosterMap = new Map(rostersList.map((r) => [r.id, r]));
-
-        const allMapped = matchesList.map((m) => {
-          const homeRoster = rosterMap.get(m.homeRosterId);
-          const awayRoster = rosterMap.get(m.awayRosterId);
-          const team1 = homeRoster ? teamMap.get(homeRoster.teamId) : null;
-          const team2 = awayRoster ? teamMap.get(awayRoster.teamId) : null;
-          return {
-            id: m.id,
-            ts: new Date(m.scheduledAt).getTime(),
-            date: new Date(m.scheduledAt).toLocaleDateString('en-US', {
-              timeZone: 'America/New_York',
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            }),
-            time: new Date(m.scheduledAt).toLocaleTimeString('en-US', {
-              timeZone: 'America/New_York',
-              hour: 'numeric',
-              minute: '2-digit',
-            }),
-            scheduledAt: m.scheduledAt.toISOString(),
-            team1: team1?.name || 'Home Team',
-            team2: team2?.name || 'Away Team',
-            division: homeRoster?.division || 'Varsity',
-            status: m.status === 'completed' ? 'Completed' : m.status === 'live' ? 'Live' : 'Upcoming',
-            result: m.status === 'completed' && m.homeScore !== null && m.awayScore !== null
-              ? `${m.homeScore > m.awayScore ? 'W' : 'L'} ${m.homeScore}-${m.awayScore}`
-              : undefined,
-            homeScore: m.homeScore,
-            awayScore: m.awayScore,
-          };
-        });
-
-        schedule = allMapped.filter((item) => item.division.toLowerCase() === division.toLowerCase());
-      }
+    if (selectedSeason && !isArchived) {
+      calendarMatches = await getSeasonMatches(selectedSeason.id, division);
+    } else if (selectedSeason) {
+      archivePage = await getMatchesPage({
+        seasonId: selectedSeason.id,
+        division,
+        sort,
+        limit: 20,
+      });
     }
   } catch (error) {
     console.error('Failed to load schedule from database', error);
   }
+
+  const schedule = calendarMatches.map((m) => ({
+    id: m.id,
+    ts: m.scheduledAt.getTime(),
+    date: m.scheduledAt.toLocaleDateString('en-US', {
+      timeZone: 'America/New_York',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    time: m.scheduledAt.toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+    scheduledAt: m.scheduledAt.toISOString(),
+    team1: m.homeTeam,
+    team2: m.awayTeam,
+    division: m.division,
+    status: m.status === 'completed' ? 'Completed' : m.status === 'live' ? 'Live' : 'Upcoming',
+    result:
+      m.status === 'completed' && m.homeScore !== null && m.awayScore !== null
+        ? `${m.homeScore > m.awayScore ? 'W' : 'L'} ${m.homeScore}-${m.awayScore}`
+        : undefined,
+    homeScore: m.homeScore,
+    awayScore: m.awayScore,
+  }));
+
+  const filterHref = (d: string, s: string) =>
+    `/${game}/schedule?division=${d}${selectedSeason ? `&season=${encodeURIComponent(selectedSeason.name)}` : ''}&sort=${s}`;
 
   return (
     <main>
       <h1 className="sr-only">{gameConfig.displayName} Schedule — EZ Esports</h1>
       <ContentSection
         heading={`${gameConfig.displayName} Schedule`}
-        description="View all scheduled matches for the current season"
+        description={
+          isArchived
+            ? `Archived results from the ${selectedSeason?.name} season`
+            : 'View all scheduled matches for the current season'
+        }
         theme="dark"
       >
         <div className="max-w-6xl mx-auto">
-          {/* Division Filter */}
-          <div className="mb-8 flex gap-2">
-            <Link
-              href={`/${game}/schedule?division=Varsity`}
-              className={`px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all ${
-                division === 'Varsity'
-                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
-                  : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700'
-              }`}
-            >
-              Varsity
-            </Link>
-            <Link
-              href={`/${game}/schedule?division=JV`}
-              className={`px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all ${
-                division === 'JV'
-                  ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
-                  : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700'
-              }`}
-            >
-              JV
-            </Link>
+          {/* Filters: division tabs, season picker, sort (archive only) */}
+          <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+            <div className="flex gap-2">
+              {['Varsity', 'JV'].map((d) => (
+                <Link
+                  key={d}
+                  href={filterHref(d, sort)}
+                  className={`px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all ${
+                    division === d
+                      ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
+                      : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  {d}
+                </Link>
+              ))}
+            </div>
+
+            {seasons.length > 1 && selectedSeason && (
+              <SeasonSelect
+                basePath={`/${game}/schedule`}
+                seasons={seasons.map((s) => ({ name: s.name, isActive: s.isActive }))}
+                selected={selectedSeason.name}
+                extraParams={{ division, sort }}
+              />
+            )}
+
+            {isArchived && (
+              <Link
+                href={filterHref(division, sort === 'desc' ? 'asc' : 'desc')}
+                className="px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
+              >
+                {sort === 'desc' ? 'Newest first ↓' : 'Oldest first ↑'}
+              </Link>
+            )}
           </div>
 
-          {/* Interactive Calendar Component */}
-          <CalendarSchedule
-            key={`${game}-${division}`}
-            matches={schedule}
-            gameSlug={game}
-            division={division}
-          />
+          {!selectedSeason ? (
+            <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/20 border border-slate-800/40 rounded-2xl">
+              No seasons found for {gameConfig.displayName} yet.
+            </div>
+          ) : isArchived ? (
+            <ArchiveMatchList
+              key={`${selectedSeason.id}-${division}-${sort}`}
+              seasonId={selectedSeason.id}
+              division={division}
+              sort={sort}
+              initialItems={toMatchesPageDto(archivePage).items}
+              initialCursor={archivePage.nextCursor}
+            />
+          ) : (
+            <CalendarSchedule
+              key={`${game}-${division}`}
+              matches={schedule}
+              gameSlug={game}
+              division={division}
+            />
+          )}
         </div>
       </ContentSection>
     </main>
   );
 }
-
