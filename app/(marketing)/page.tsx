@@ -5,7 +5,7 @@ import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SocialBar from '@/app/components/sections/SocialBar';
-import AudienceCTAs from '@/app/components/sections/AudienceCTAs';
+
 import SchoolWall from '@/app/components/sections/SchoolWall';
 import LeaguePulse from '@/app/components/sections/LeaguePulse';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
@@ -70,8 +70,7 @@ export default async function HomePage() {
         primaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
 
-      {/* 2. Audience CTAs */}
-      <AudienceCTAs />
+
 
       {/* 3. Competition Games */}
       <ScrollReveal>

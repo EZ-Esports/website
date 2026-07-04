@@ -26,7 +26,6 @@ export default function Header() {
                   pathname === '/valorant' ||
                   pathname === '/league-of-legends' ||
                   pathname === '/team-fight-tactics' ||
-                  pathname === '/apply' ||
                   pathname === '/sponsors' ||
                   pathname === '/privacy';
 

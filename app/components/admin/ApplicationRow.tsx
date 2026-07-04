@@ -51,7 +51,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
           {app.email}
         </a>
       </td>
-      <td className="py-3 pr-4 text-slate-400 max-w-[240px]">
+      <td className="py-3 pr-4 text-slate-400 max-w-[240px] whitespace-pre-line">
         {message ? (
           <>
             {expanded ? message : (isLong ? `${message.slice(0, 80)}` : message)}

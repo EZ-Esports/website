@@ -45,6 +45,9 @@ export default function Hero({
 
   // Helper to dynamically color brand words "EZ" and "Esports" pink
   const renderTitle = (text: string) => {
+    if (text.trim().toLowerCase() === 'new york city high school esports league') {
+      return text;
+    }
     const parts = text.split(/(Esports|EZ)/g);
     return parts.map((part, i) => {
       if (part === 'Esports' || part === 'EZ') {
@@ -94,11 +97,7 @@ export default function Hero({
             <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-ez-purple/12 rounded-full blur-[80px] pointer-events-none z-0" />
             
             <div className="relative z-10 flex flex-col items-center">
-              {/* Division Badge */}
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-ez-pink/12 to-ez-purple/12 border border-ez-pink/25 text-ez-pink text-xs font-bold uppercase tracking-widest mb-6 select-none shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-ez-pink animate-pulse motion-reduce:animate-none" />
-                NYC Division
-              </span>
+
 
               {/* Heading */}
               <motion.h1
