@@ -11,13 +11,10 @@ import {
   updateRole,
   deleteRole,
   reorderRoles,
-  updateUserRoles,
 } from '@/app/(admin)/admin/team/actions';
 import {
   HiOutlineChevronUp,
   HiOutlineChevronDown,
-  HiOutlineTrash,
-  HiOutlinePencilSquare,
   HiOutlinePlus,
   HiOutlineShieldCheck,
   HiOutlineUsers,

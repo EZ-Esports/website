@@ -64,7 +64,10 @@ export default function Hero({
   return (
     <section className={`relative overflow-hidden w-full ${isLarge ? 'h-screen' : 'h-[35vh]'} flex items-center`}>
       {/* Background Image */}
-      <div className="absolute inset-0 select-none pointer-events-none z-0">
+      <motion.div
+        style={{ y: backgroundY }}
+        className="absolute inset-0 h-[120%] -top-[10%] select-none pointer-events-none z-0"
+      >
         <Image
           src={backgroundImage}
           alt=""
@@ -77,11 +80,11 @@ export default function Hero({
         <div 
           className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.3)_0%,rgba(0,0,0,0.05)_20%,transparent_100%)]" 
         />
-      </div>
+      </motion.div>
 
       {/* Hero Content Container */}
       <motion.div 
-        style={{ y: contentY }}
+        style={{ y: contentY, opacity: contentOpacity }}
         className="relative z-10 w-full flex items-center justify-center px-4"
       >
         {isLarge ? (
