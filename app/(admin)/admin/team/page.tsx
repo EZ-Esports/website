@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getAdmin, requirePermission } from '@/app/lib/auth';
+import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { listAdminUsers, listPendingAdminInvites } from '@/app/lib/db/queries';
 import { db } from '@/app/lib/db';

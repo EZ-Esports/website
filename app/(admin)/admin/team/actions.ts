@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { requirePermission, getAdmin } from '@/app/lib/auth';
+import { requirePermission } from '@/app/lib/auth';
 import { Permissions, canActOnMember, canManageRole, canGrantPermissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';

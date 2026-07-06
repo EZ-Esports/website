@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import ContentSection from '@/app/components/sections/ContentSection';
 import Hero from '@/app/components/sections/Hero';
+import Markdown from '@/app/components/ui/Markdown';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -93,10 +94,8 @@ export default async function NewsArticlePage({ params }: NewsArticlePageProps) 
           </div>
 
           {/* Article body */}
-          <div className="prose prose-invert prose-sm sm:prose-base max-w-none text-slate-300 leading-relaxed space-y-6">
-            {post.content.split('\n\n').map((paragraph, i) => (
-              <p key={i}>{paragraph}</p>
-            ))}
+          <div className="prose prose-invert prose-sm sm:prose-base max-w-none text-slate-300 leading-relaxed">
+            <Markdown content={post.content} />
           </div>
 
           {/* Back link */}
