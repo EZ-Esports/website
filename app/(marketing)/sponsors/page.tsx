@@ -22,6 +22,60 @@ export default async function SponsorsPage() {
     console.error('Failed to load sponsors', err);
   }
 
+  const sponsorsByTier = {
+    platinum: sponsors.filter((s) => s.tier === 'platinum'),
+    gold: sponsors.filter((s) => s.tier === 'gold'),
+    community: sponsors.filter((s) => s.tier === 'community'),
+  };
+
+  const renderSponsorCard = (sponsor: typeof sponsors[0], tier: 'platinum' | 'gold' | 'community') => {
+    const cardContent = sponsor.logoUrl ? (
+      <Image
+        src={sponsor.logoUrl}
+        alt={`${sponsor.name} logo`}
+        width={140}
+        height={70}
+        className="object-contain max-h-16 w-auto transition-transform duration-300 group-hover:scale-105"
+      />
+    ) : (
+      <div className="flex items-center justify-center h-12">
+        <span className="text-lg md:text-xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-ez-pink via-ez-pink to-ez-purple drop-shadow-[0_2px_10px_rgba(244,204,204,0.35)]">
+          {sponsor.name}
+        </span>
+      </div>
+    );
+
+    // Platinum cards are larger, Community cards are smaller
+    const sizeClasses =
+      tier === 'platinum'
+        ? "w-[calc(100%_-_0.75rem)] sm:w-[calc(50%_-_1rem)] md:w-[calc(33.333%_-_1.333rem)] p-8 border-2 border-ez-pink/20 hover:border-ez-pink/60 bg-background-secondary/50"
+        : tier === 'gold'
+        ? "w-[calc(50%_-_0.75rem)] md:w-[calc(25%_-_1.125rem)] p-6 border border-custom-border/60 hover:border-ez-pink/40 bg-background-secondary/40"
+        : "w-[calc(50%_-_0.75rem)] sm:w-[calc(33.333%_-_1rem)] md:w-[calc(20%_-_1.2rem)] p-4 border border-custom-border/40 hover:border-ez-pink/30 bg-background-secondary/30";
+
+    const wrapperClass = `${sizeClasses} rounded-2xl aspect-video flex items-center justify-center hover:bg-background-secondary/60 hover:scale-[1.03] transition-all duration-300 group shadow-lg cursor-pointer`;
+
+    if (sponsor.websiteUrl) {
+      return (
+        <a
+          key={sponsor.id}
+          href={sponsor.websiteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={wrapperClass}
+        >
+          {cardContent}
+        </a>
+      );
+    }
+
+    return (
+      <div key={sponsor.id} className={wrapperClass}>
+        {cardContent}
+      </div>
+    );
+  };
+
   return (
     <>
       <Hero
@@ -45,29 +99,37 @@ export default async function SponsorsPage() {
             </p>
           </div>
         ) : (
-          <>
-            <div className="flex flex-wrap justify-center gap-6">
-              {sponsors.map((sponsor) => (
-                <div
-                  key={sponsor.id}
-                  className="w-[calc(50%_-_0.75rem)] md:w-[calc(25%_-_1.125rem)] rounded-xl border border-custom-border/60 bg-background-secondary/40 aspect-video flex flex-col items-center justify-center gap-2 p-4"
-                >
-                  {sponsor.logoUrl ? (
-                    <Image
-                      src={sponsor.logoUrl}
-                      alt={`${sponsor.name} logo`}
-                      width={120}
-                      height={60}
-                      className="object-contain max-h-16 w-auto"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg bg-foreground-secondary/20" aria-hidden="true" />
-                  )}
-                  <span className="text-foreground-secondary text-sm font-semibold text-center">{sponsor.name}</span>
+          <div className="space-y-12">
+            {/* Platinum Partners */}
+            {sponsorsByTier.platinum.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-ez-pink">Platinum Partners</h3>
+                <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
+                  {sponsorsByTier.platinum.map((sponsor) => renderSponsorCard(sponsor, "platinum"))}
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            )}
+
+            {/* Gold Partners */}
+            {sponsorsByTier.gold.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Gold Partners</h3>
+                <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
+                  {sponsorsByTier.gold.map((sponsor) => renderSponsorCard(sponsor, "gold"))}
+                </div>
+              </div>
+            )}
+
+            {/* Community Partners */}
+            {sponsorsByTier.community.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Community Partners</h3>
+                <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
+                  {sponsorsByTier.community.map((sponsor) => renderSponsorCard(sponsor, "community"))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </ContentSection>
 
