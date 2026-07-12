@@ -414,6 +414,7 @@ export const getCachedHomepageGallery = unstable_cache(
         src: schema.galleryImages.src,
         caption: schema.galleryImages.caption,
         setId: schema.galleryImages.setId,
+        displayOrder: schema.galleryImages.displayOrder,
       })
       .from(schema.galleryImages)
       .where(
@@ -428,15 +429,32 @@ export const getCachedHomepageGallery = unstable_cache(
         asc(schema.galleryImages.createdAt)
       );
 
+    // Defensive de-dupe: bad data entry has occasionally produced two active rows
+    // for the same set that either occupy the same display_order slot or point at
+    // the same underlying image file (by basename). Silently drop the later
+    // duplicate so the homepage doesn't render the same photo twice. The real
+    // fix is cleaning up the gallery_images table; this just guards presentation.
+    const seenSlot = new Set<string>();
+    const seenSrc = new Set<string>();
+    const dedupedRows = rows.filter((row) => {
+      const basename = row.src.split('/').pop() ?? row.src;
+      const slotKey = `${row.setId}:${row.displayOrder}`;
+      const srcKey = `${row.setId}:${basename}`;
+      if (seenSlot.has(slotKey) || seenSrc.has(srcKey)) return false;
+      seenSlot.add(slotKey);
+      seenSrc.add(srcKey);
+      return true;
+    });
+
     return {
-      set1: rows
+      set1: dedupedRows
         .filter((row) => row.setId === 1)
         .map((row) => ({
           id: row.id,
           src: row.src,
           alt: row.caption || 'EZ Esports gallery photo',
         })),
-      set2: rows
+      set2: dedupedRows
         .filter((row) => row.setId === 2)
         .map((row) => ({
           id: row.id,

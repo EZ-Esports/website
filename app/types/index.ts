@@ -31,7 +31,9 @@ export interface VideoItem {
 
 export type Theme = 'dark' | 'light';
 
-export type ButtonVariant = 'primary' | 'secondary';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
+
+export type ButtonSize = 'sm' | 'md';
 
 export type ImagePosition = 'left' | 'right';
 

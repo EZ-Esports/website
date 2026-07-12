@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FocusTrap from 'focus-trap-react';
 import type { Image as ImageType, Theme, GridColumns } from '@/app/types';
 import { THEME_CLASSES, GALLERY_ITEM_WIDTHS } from '@/app/lib/constants';
+import { SectionHeader } from '@/app/components/ui/SectionHeader';
 
 function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; index: number; widthClass: string; onOpen: (i: number) => void }) {
   const [errored, setErrored] = useState(false);
@@ -15,7 +16,7 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
       type="button"
       onClick={() => onOpen(index)}
       aria-label={`View photo: ${item.alt}`}
-      className={`${widthClass} shrink-0 aspect-square rounded-xl overflow-hidden relative border border-custom-border/80 hover:border-ez-pink/50 cursor-pointer transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ez-pink/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
+      className={`${widthClass} shrink-0 aspect-square rounded-xl overflow-hidden relative border border-line/80 hover:border-accent/50 cursor-pointer transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface`}
     >
       <Image
         src={item.src}
@@ -26,7 +27,7 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
         onError={() => setErrored(true)}
       />
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-        <span className="text-ez-black bg-ez-pink px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <span className="text-on-accent bg-accent px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
           View Photo
         </span>
       </div>
@@ -38,9 +39,12 @@ interface MediaGridProps {
   items: ImageType[];
   columns?: GridColumns;
   theme?: Theme;
+  /** Optional heading rendered above the grid via the shared SectionHeader primitive. */
+  eyebrow?: string;
+  heading?: string;
 }
 
-export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaGridProps) {
+export default function MediaGrid({ items, columns = 3, theme = 'dark', eyebrow, heading }: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -89,8 +93,9 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
   };
 
   return (
-    <section className={`${themeClasses} py-16 md:py-24 border-t border-custom-border/30`}>
+    <section className={`${themeClasses} py-16 md:py-24 border-t border-line/30`}>
       <div className="container mx-auto px-4">
+        {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
         <div className="flex flex-wrap justify-center gap-6">
           {items.map((item, index) => (
             <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={openLightbox} />
@@ -118,7 +123,7 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
           {/* Close Button */}
           <button
             onClick={closeLightbox}
-            className="absolute top-6 right-6 text-white hover:text-ez-pink p-2 bg-slate-950/40 rounded-full border border-slate-800/60 transition-colors cursor-pointer z-50"
+            className="absolute top-6 right-6 text-foreground hover:text-accent p-2 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
             aria-label="Close photo viewer"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,9 +132,9 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
           </button>
 
           {/* Navigation Controls */}
-          <button 
+          <button
             onClick={(e) => navigateLightbox('prev', e)}
-            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-white hover:text-ez-pink p-3 bg-slate-950/40 rounded-full border border-slate-800/60 transition-colors cursor-pointer z-50"
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
             aria-label="Previous photo"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,9 +142,9 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
             </svg>
           </button>
 
-          <button 
+          <button
             onClick={(e) => navigateLightbox('next', e)}
-            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-white hover:text-ez-pink p-3 bg-slate-950/40 rounded-full border border-slate-800/60 transition-colors cursor-pointer z-50"
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
             aria-label="Next photo"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,7 +161,7 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark' }: MediaG
               height={800}
               className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
             />
-            <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-slate-300 text-sm">
+            <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-foreground-secondary text-sm">
               {selectedImageIndex + 1} / {items.length} • {items[selectedImageIndex].alt}
             </div>
           </div>
