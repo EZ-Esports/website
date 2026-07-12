@@ -188,16 +188,19 @@ async function main() {
   })));
   console.log(`  players:          ${playerRows.length}`);
 
-  // 9. Matches.
+  // 9. Matches. Each side resolves its own roster — cross-division matches
+  //    exist (e.g. 2023-24 LoL ran Midwood Varsity vs Midwood JV).
   const matchRows = gold('gold_matches.csv');
   await db.insert(schema.matches).values(matchRows.map((m) => ({
     seasonId: seasonByKey.get(`${m.game_slug}|${m.season}`)!.id,
-    homeRosterId: rosterByKey.get(rosterKey(m.season, m.game_slug, m.home_school_slug, m.division))!.id,
-    awayRosterId: rosterByKey.get(rosterKey(m.season, m.game_slug, m.away_school_slug, m.division))!.id,
+    homeRosterId: rosterByKey.get(rosterKey(m.season, m.game_slug, m.home_school_slug, m.home_division))!.id,
+    awayRosterId: rosterByKey.get(rosterKey(m.season, m.game_slug, m.away_school_slug, m.away_division))!.id,
     scheduledAt: parseEastern(m.scheduled_at),
     homeScore: intOrNull(m.home_score),
     awayScore: intOrNull(m.away_score),
     status: m.status as (typeof schema.matchStatusEnum.enumValues)[number],
+    mvp: orNull(m.mvp),
+    notes: orNull(m.notes),
   })));
   console.log(`  matches:          ${matchRows.length}`);
 
@@ -212,6 +215,7 @@ async function main() {
     losses: intOrNull(s.losses),
     gamesPlayed: intOrNull(s.games_played),
     winPct: floatOrNull(s.win_pct),
+    points: floatOrNull(s.points),
     playerName: orNull(s.player_name),
     playerIgn: orNull(s.player_ign),
     notes: orNull(s.notes),

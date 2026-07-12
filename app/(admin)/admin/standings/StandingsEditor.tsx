@@ -60,6 +60,10 @@ function StandingFields({ row, division }: { row?: StandingRow; division: string
         />
       </label>
       <label className="block space-y-1">
+        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Points</span>
+        <input name="points" type="number" min="0" step="0.5" defaultValue={row?.points ?? ''} className={numInput} />
+      </label>
+      <label className="block space-y-1">
         <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Player (individual)</span>
         <input name="playerName" defaultValue={row?.playerName ?? ''} placeholder="Leave blank for team rows" className={`${input} w-44`} />
       </label>
@@ -225,6 +229,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                   <th className="px-4 py-3">W-L</th>
                   <th className="px-4 py-3">Games</th>
                   <th className="px-4 py-3">Win %</th>
+                  <th className="px-4 py-3">Points</th>
                   <th className="px-4 py-3">Notes</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -234,7 +239,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                   if (editingId === row.id) {
                     return (
                       <tr key={row.id} className="bg-slate-900/40">
-                        <td colSpan={7} className="px-4 py-3">
+                        <td colSpan={8} className="px-4 py-3">
                           <form
                             onSubmit={(e) => runForm(e, (fd) => updateStanding(row.id, fd), 'Standing updated.', () => setEditingId(null))}
                             className="flex flex-wrap items-end gap-3"
@@ -271,6 +276,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                       <td className="px-4 py-3 text-slate-300 font-bold">
                         {row.winPct !== null ? `${(row.winPct * 100).toFixed(1)}%` : '—'}
                       </td>
+                      <td className="px-4 py-3 text-slate-400">{row.points ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-500 text-xs max-w-[220px] truncate" title={row.notes ?? ''}>
                         {row.notes ?? ''}
                       </td>

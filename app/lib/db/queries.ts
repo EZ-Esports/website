@@ -268,6 +268,7 @@ export async function getSeasonStandingsFor(
       losses: schema.seasonStandings.losses,
       gamesPlayed: schema.seasonStandings.gamesPlayed,
       winPct: schema.seasonStandings.winPct,
+      points: schema.seasonStandings.points,
       playerName: schema.seasonStandings.playerName,
       playerIgn: schema.seasonStandings.playerIgn,
       notes: schema.seasonStandings.notes,
