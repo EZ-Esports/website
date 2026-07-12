@@ -15,8 +15,12 @@ loader:
   - one captain per (season, game, school, division); extras noted as
     co-captains in the player bio
   - match status inference: forfeit flag -> forfeit, scores -> completed,
-    otherwise completed with null scores (all matches are historical; the
-    roster_standings view ignores null-score rows)
+    otherwise completed with null scores for past matches (the
+    roster_standings view ignores null-score rows); unscored matches dated
+    today or later are upcoming fixtures -> 'scheduled'
+  - standings derived from completed matches for seasons that have matches
+    but no standings sheet (2023-24 LoL); skipped while a season still has
+    scheduled fixtures
 
 Run: python3 normalize_gold.py  (from sharepoint/; stdlib only)
 """
@@ -24,6 +28,7 @@ import csv
 import os
 import re
 from collections import defaultdict
+from datetime import date
 
 GAME_SLUGS = {
     'valorant': 'valorant',
@@ -62,6 +67,10 @@ SCHOOL_NAMES = {
     'aviation': 'Aviation Career & Technical Education High School',
     'urbanassemblymaker': 'Urban Assembly Maker Academy',
     'jamesmadison': 'James Madison High School',
+    'tottenville': 'Tottenville High School',
+    'laguardia': 'Fiorello H. LaGuardia High School',
+    'brooklynlatin': 'The Brooklyn Latin School',
+    'saintedmund': 'Saint Edmund Preparatory High School',
 }
 
 # Stray school ids that slipped through silver's clean_school_id.
@@ -158,9 +167,9 @@ def main():
     # --- blank-division resolution: which divisions a school played, per season/game
     school_match_divisions = defaultdict(set)
     for m in silver_matches:
-        for side in ('home_team_id', 'away_team_id'):
+        for side, div_col in (('home_team_id', 'home_division'), ('away_team_id', 'away_division')):
             slug, _ = canonical_school(m[side])
-            school_match_divisions[(m['season_id'], m['game_id'], slug)].add(m['division'])
+            school_match_divisions[(m['season_id'], m['game_id'], slug)].add(m[div_col])
 
     def division_label(raw, season_id, game_id, school_slug):
         raw = (raw or '').strip()
@@ -238,8 +247,10 @@ def main():
         if player_key in players:
             continue  # duplicate entry for the same person in the same roster
 
-        role = ROLE_MAP.get((r['role'] or '').strip().lower(), 'player')
-        is_captain = extra.get('is_captain', False)
+        raw_role = (r['role'] or '').strip().lower()
+        role = ROLE_MAP.get(raw_role, 'player')
+        is_captain = extra.get('is_captain', False) or raw_role == 'captain'
+        is_co_captain = extra.get('is_co_captain', False) or raw_role == 'co-captain'
         bio_parts = []
         if is_captain and roster_key in captain_taken:
             is_captain = False
@@ -247,7 +258,7 @@ def main():
         elif is_captain:
             captain_taken.add(roster_key)
             role = 'captain'
-        elif extra.get('is_co_captain'):
+        elif is_co_captain:
             bio_parts.append('Co-captain')
 
         pronouns = (r['pronouns'] or '').strip()
@@ -276,7 +287,8 @@ def main():
         home_slug, _ = canonical_school(m['home_team_id'])
         away_slug, _ = canonical_school(m['away_team_id'])
         season, game_id = m['season_id'], m['game_id']
-        division = DIVISION_LABELS[m['division']]
+        home_division = DIVISION_LABELS[m['home_division']]
+        away_division = DIVISION_LABELS[m['away_division']]
 
         def score(v):
             v = (v or '').strip()
@@ -287,21 +299,25 @@ def main():
             status = 'forfeit'
         elif home_score != '' or away_score != '':
             status = 'completed'
+        elif m['match_date'] >= date.today().isoformat():
+            status = 'scheduled'  # unscored and not yet played
         else:
             status = 'completed'  # historical, result unrecorded
 
         matches.append({
-            'season': season, 'game_slug': GAME_SLUGS[game_id], 'division': division,
+            'season': season, 'game_slug': GAME_SLUGS[game_id],
+            'home_division': home_division, 'away_division': away_division,
             'scheduled_at': f"{m['match_date']} {m['match_time'] or '19:00:00'}",
             'home_school_slug': home_slug, 'away_school_slug': away_slug,
             'home_score': home_score, 'away_score': away_score, 'status': status,
+            'mvp': (m['mvp'] or '').strip(), 'notes': (m['notes'] or '').strip(),
         })
 
     # --- rosters (only matches + players need roster rows)
     roster_keys = {k[:4] for k in players}
     for m in matches:
-        for side in ('home_school_slug', 'away_school_slug'):
-            roster_keys.add((m['season'], m['game_slug'], m[side], m['division']))
+        for side, div in (('home_school_slug', 'home_division'), ('away_school_slug', 'away_division')):
+            roster_keys.add((m['season'], m['game_slug'], m[side], m[div]))
     rosters = sorted(roster_keys)
 
     # --- standings
@@ -319,10 +335,55 @@ def main():
             'rank': num(s['rank']), 'wins': num(s['wins']), 'losses': num(s['losses']),
             'games_played': num(s['games_played']),
             'win_pct': num(s['win_pct'], float),
+            'points': num(s['points'], float),
             'player_name': (s['player_name'] or '').strip(),
             'player_ign': (s['player_ign'] or '').strip(),
             'notes': (s['notes'] or '').strip(),
         })
+
+    # --- derived standings: finished seasons with matches but no standings
+    # sheet (2023-24 LoL). Computed from completed/forfeit match results so
+    # the archive pages can show final ranks and a champion. A season with
+    # scheduled fixtures or unrecorded results gets no snapshot — ranking
+    # partial data would publish a wrong champion; the live roster_standings
+    # view serves those seasons from whatever scores exist.
+    covered = {(s['season'], s['game_slug']) for s in standings}
+    incomplete = {
+        (m['season'], m['game_slug']) for m in matches
+        if m['status'] == 'scheduled'
+        or (m['status'] == 'completed' and (m['home_score'] == '' or m['away_score'] == ''))
+    }
+    derived = defaultdict(lambda: {'wins': 0, 'losses': 0})
+    for m in matches:
+        key = (m['season'], m['game_slug'])
+        if key in covered or key in incomplete or (m['status'] not in ('completed', 'forfeit')):
+            continue
+        if m['home_score'] == '' or m['away_score'] == '':
+            continue
+        home = key + (m['home_division'], m['home_school_slug'])
+        away = key + (m['away_division'], m['away_school_slug'])
+        if m['home_score'] > m['away_score']:
+            derived[home]['wins'] += 1
+            derived[away]['losses'] += 1
+        elif m['away_score'] > m['home_score']:
+            derived[away]['wins'] += 1
+            derived[home]['losses'] += 1
+
+    by_group = defaultdict(list)
+    for (season, game_slug, division, school_slug), rec in derived.items():
+        by_group[(season, game_slug, division)].append((school_slug, rec['wins'], rec['losses']))
+    for (season, game_slug, division), teams in sorted(by_group.items()):
+        teams.sort(key=lambda t: (-t[1], t[2], t[0]))
+        for rank, (school_slug, wins, losses) in enumerate(teams, start=1):
+            games = wins + losses
+            standings.append({
+                'season': season, 'game_slug': game_slug, 'division': division,
+                'school_slug': school_slug, 'rank': rank, 'wins': wins,
+                'losses': losses, 'games_played': games,
+                'win_pct': round(wins / games, 3) if games else '',
+                'points': '', 'player_name': '', 'player_ign': '',
+                'notes': 'Derived from match results',
+            })
 
     # --- write everything
     def write(name, fieldnames, rows):
@@ -344,9 +405,9 @@ def main():
           sorted(members.values(), key=lambda m: m['member_key']))
     write('gold_players.csv', ['season', 'game_slug', 'school_slug', 'division', 'member_key', 'role', 'is_captain', 'ign', 'bio'],
           sorted(players.values(), key=lambda p: (p['season'], p['game_slug'], p['school_slug'], p['division'], p['member_key'])))
-    write('gold_matches.csv', ['season', 'game_slug', 'division', 'scheduled_at', 'home_school_slug', 'away_school_slug', 'home_score', 'away_score', 'status'],
+    write('gold_matches.csv', ['season', 'game_slug', 'home_division', 'away_division', 'scheduled_at', 'home_school_slug', 'away_school_slug', 'home_score', 'away_score', 'status', 'mvp', 'notes'],
           matches)
-    write('gold_standings.csv', ['season', 'game_slug', 'division', 'school_slug', 'rank', 'wins', 'losses', 'games_played', 'win_pct', 'player_name', 'player_ign', 'notes'],
+    write('gold_standings.csv', ['season', 'game_slug', 'division', 'school_slug', 'rank', 'wins', 'losses', 'games_played', 'win_pct', 'points', 'player_name', 'player_ign', 'notes'],
           standings)
 
     captains = sum(1 for p in players.values() if p['is_captain'])

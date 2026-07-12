@@ -3,6 +3,7 @@ import re
 import shutil
 import pandas as pd
 import requests
+from openpyxl import load_workbook
 
 MASTER_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1qEzCT6bvpGEm2bjf0TR0WK-iJ2yMyiE_Ol7BuLID1Gs/export?format=xlsx"
 OUTPUT_DIR = "./bronze_data"
@@ -82,28 +83,23 @@ def main():
             print(f"❌ Missing required column '{col}' in MAIN sheet.")
             return
 
-    # Keep track of already processed Spreadsheet IDs to avoid duplicate work
-    processed_ids = set()
     scratchpad = "raw_download.xlsx"
 
     print(f"🚀 Starting dynamic bronze data extraction...")
 
+    # Pass 1: resolve every unique spreadsheet to a directory name up front.
+    # Distinct spreadsheets can share a title (e.g. two "TFT Scoreboard"
+    # sheets); every member of a colliding title group gets a short-id
+    # suffix, so the name mapping is stable regardless of ledger row order.
+    sheets = {}  # spreadsheet_id -> {'url': ..., 'dir_name': ...}
     for idx, row in df.iterrows():
         url = row['access']
         spreadsheet_id = get_spreadsheet_id(url)
 
-        # Skip if no valid spreadsheet ID found
-        if not spreadsheet_id:
+        # Skip if no valid spreadsheet ID found; de-duplicate repeat URLs
+        if not spreadsheet_id or spreadsheet_id in sheets:
             continue
 
-        # De-duplicate URLs
-        if spreadsheet_id in processed_ids:
-            print(f"⏩ Row {idx+1}: Spreadsheet {spreadsheet_id} already processed. Skipping.")
-            continue
-
-        print(f"\n📂 Row {idx+1}: Processing spreadsheet ID {spreadsheet_id}...")
-
-        # 1. Fetch title of the spreadsheet
         # Fallback name constructed from metadata: season_id, game_id, division, data_type
         meta_parts = []
         for key in ['season_id', 'game_id', 'division', 'data_type']:
@@ -114,11 +110,24 @@ def main():
 
         title = fetch_spreadsheet_title(url)
         if title:
-            dir_name = sanitize_filename(title)
-            print(f"   🏷️ Fetched title: '{title}'")
+            print(f"   🏷️ Row {idx+1}: '{title}'")
         else:
-            dir_name = sanitize_filename(fallback_name)
-            print(f"   ⚠️ Using fallback directory name: '{dir_name}'")
+            print(f"   ⚠️ Row {idx+1}: using fallback name '{fallback_name}'")
+        sheets[spreadsheet_id] = {'url': url, 'dir_name': sanitize_filename(title or fallback_name)}
+
+    ids_by_name = {}
+    for spreadsheet_id, info in sheets.items():
+        ids_by_name.setdefault(info['dir_name'], []).append(spreadsheet_id)
+    for dir_name, ids in ids_by_name.items():
+        if len(ids) > 1:
+            print(f"⚠️ Title '{dir_name}' is shared by {len(ids)} spreadsheets; suffixing each with its id.")
+            for spreadsheet_id in ids:
+                sheets[spreadsheet_id]['dir_name'] = f"{dir_name}_{spreadsheet_id[:6]}"
+
+    # Pass 2: download and dump every spreadsheet.
+    for spreadsheet_id, info in sheets.items():
+        url, dir_name = info['url'], info['dir_name']
+        print(f"\n📂 Processing spreadsheet ID {spreadsheet_id} -> '{dir_name}'...")
 
         sub_dir_path = os.path.join(OUTPUT_DIR, dir_name)
         os.makedirs(sub_dir_path, exist_ok=True)
@@ -146,7 +155,16 @@ def main():
                 df_sheet.to_csv(csv_path, index=False, header=False)
                 print(f"   💾 Saved sheet '{sheet_name}' to: {csv_path}")
 
-            processed_ids.add(spreadsheet_id)
+            # 4. Export a bold mask per sheet — some schedules mark the match
+            # winner only via bold formatting, which the CSV dump loses.
+            wb = load_workbook(scratchpad)
+            for ws in wb.worksheets:
+                mask = [['1' if (c.font and c.font.bold) else '0' for c in row] for row in ws.iter_rows()]
+                if not mask:
+                    continue
+                bold_path = os.path.join(sub_dir_path, f"{sanitize_filename(ws.title)}__bold.csv")
+                with open(bold_path, 'w') as f:
+                    f.write('\n'.join(','.join(r) for r in mask))
 
         except Exception as e:
             print(f"   ❌ Error extracting spreadsheet: {e}")

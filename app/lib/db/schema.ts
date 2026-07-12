@@ -153,6 +153,8 @@ export const matches = pgTable('matches', {
   homeScore: integer('home_score'),
   awayScore: integer('away_score'),
   status: matchStatusEnum('status').default('scheduled').notNull(),
+  mvp: text('mvp'), // match MVP as recorded in season sheets, e.g. 'Kyle "Kuli" Ng'
+  notes: text('notes'), // reschedules, DQs, data-quality caveats
   ...auditColumns,
 }, (table) => [
   index('matches_scheduled_at_idx').on(table.scheduledAt),
@@ -219,7 +221,7 @@ export const rosterStandings = pgView('roster_standings', {
 // seasons have final standings without per-match scores, so those seasons are
 // served from this table instead. playerName/playerIgn are set for individual
 // (per-player) competitions like TFT, where a row ranks a player, not a school
-// team; wins/losses stay null there and the points total lives in notes.
+// team; wins/losses stay null there and the season total lives in points.
 export const seasonStandings = pgTable('season_standings', {
   id: uuid('id').defaultRandom().primaryKey(),
   seasonId: uuid('season_id')
@@ -234,6 +236,7 @@ export const seasonStandings = pgTable('season_standings', {
   losses: integer('losses'),
   gamesPlayed: integer('games_played'),
   winPct: real('win_pct'), // 0..1
+  points: real('points'), // point-based competitions (TFT totals, regular-season points)
   playerName: text('player_name'),
   playerIgn: text('player_ign'),
   notes: text('notes'),

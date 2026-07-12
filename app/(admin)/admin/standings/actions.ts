@@ -26,6 +26,13 @@ const pctOrNull = (v: FormDataEntryValue | null) => {
   return Number.isNaN(n) ? null : Math.min(Math.max(n, 0), 100) / 100;
 };
 
+const floatOrNull = (v: FormDataEntryValue | null) => {
+  const s = (v as string | null)?.trim();
+  if (!s) return null;
+  const n = parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+};
+
 const textOrNull = (v: FormDataEntryValue | null) => {
   const s = (v as string | null)?.trim();
   return s || null;
@@ -39,6 +46,7 @@ function standingValues(formData: FormData) {
     losses: intOrNull(formData.get('losses')),
     gamesPlayed: intOrNull(formData.get('gamesPlayed')),
     winPct: pctOrNull(formData.get('winPct')),
+    points: floatOrNull(formData.get('points')),
     playerName: textOrNull(formData.get('playerName')),
     playerIgn: textOrNull(formData.get('playerIgn')),
     notes: textOrNull(formData.get('notes')),
@@ -60,6 +68,7 @@ export async function listSeasonStandings(seasonId: string) {
       losses: schema.seasonStandings.losses,
       gamesPlayed: schema.seasonStandings.gamesPlayed,
       winPct: schema.seasonStandings.winPct,
+      points: schema.seasonStandings.points,
       playerName: schema.seasonStandings.playerName,
       playerIgn: schema.seasonStandings.playerIgn,
       notes: schema.seasonStandings.notes,

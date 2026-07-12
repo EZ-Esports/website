@@ -98,7 +98,7 @@ function PlayerStandingsTable({ rows }: { rows: StandingRow[] }) {
               {entry.playerIgn && <span className="text-slate-500 font-medium ml-2">{entry.playerIgn}</span>}
             </td>
             <td className="px-6 py-4 text-sm font-medium text-slate-400">{entry.schoolName}</td>
-            <td className="px-6 py-4 text-sm font-bold text-white">{pointsFromNotes(entry.notes) ?? '—'}</td>
+            <td className="px-6 py-4 text-sm font-bold text-white">{entry.points ?? pointsFromNotes(entry.notes) ?? '—'}</td>
           </tr>
         ))}
       </tbody>

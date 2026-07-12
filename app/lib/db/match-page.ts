@@ -102,6 +102,8 @@ export interface StandingRow {
   losses: number | null;
   gamesPlayed: number | null;
   winPct: number | null;
+  /** Season total for point-based competitions (TFT, regular-season points). */
+  points: number | null;
   /** Set on individual (per-player) standings such as TFT. */
   playerName: string | null;
   playerIgn: string | null;
@@ -140,6 +142,7 @@ export function rankComputedStandings(
       losses,
       gamesPlayed: played,
       winPct: played > 0 ? wins / played : null,
+      points: null,
       playerName: null,
       playerIgn: null,
       notes: null,
