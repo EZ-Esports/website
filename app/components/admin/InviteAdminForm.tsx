@@ -50,7 +50,7 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
       <form action={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1 font-sans">
-            <label htmlFor="invite-email" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+            <label htmlFor="invite-email" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
               Email
             </label>
             <input
@@ -59,7 +59,7 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
               type="email"
               required
               placeholder="new.admin@ezesports.org"
-              className="w-full px-4 py-2.5 bg-background border border-zinc-800 rounded-lg text-foreground placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-surface border border-line rounded-lg text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
             />
           </div>
 
@@ -67,7 +67,7 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
             type="submit"
             disabled={isPending}
             aria-busy={isPending}
-            className="px-6 py-2.5 bg-ez-pink hover:bg-ez-pink/80 text-ez-black font-semibold rounded-lg shadow-lg hover:shadow-ez-pink/20 focus:outline-none focus:ring-2 focus:ring-ez-pink transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap h-[46px]"
+            className="px-6 py-2.5 bg-accent hover:bg-accent/80 text-on-accent font-semibold rounded-lg shadow-lg hover:shadow-accent/20 focus:outline-none focus:ring-2 focus:ring-accent transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap h-[46px]"
           >
             {isPending ? 'Generating…' : 'Generate invite link'}
           </button>
@@ -75,11 +75,11 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
 
         {/* Roles Selection */}
         <div className="space-y-2">
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
             Assign Roles (Select all that apply)
           </label>
           {assignableRoles.length === 0 ? (
-            <p className="text-xs text-zinc-500 italic">No roles are assignable by you.</p>
+            <p className="text-xs text-foreground-muted italic">No roles are assignable by you.</p>
           ) : (
             <div className="flex flex-wrap gap-2.5">
               {assignableRoles.map((role) => {
@@ -87,13 +87,13 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
                 return (
                   <label
                     key={role.id}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-zinc-950/40 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700/80 rounded-lg cursor-pointer transition-all select-none"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-surface-sunken/40 hover:bg-surface-raised border border-line/80 hover:border-line/80 rounded-lg cursor-pointer transition-all select-none"
                   >
                     <input
                       type="checkbox"
                       name="roleIds"
                       value={role.id}
-                      className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer w-4 h-4"
+                      className="rounded text-accent focus:ring-accent focus:ring-offset-0 bg-surface-sunken border-line cursor-pointer w-4 h-4"
                     />
                     <span
                       className="text-xs font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
@@ -131,12 +131,12 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
               readOnly
               value={link}
               onFocus={(e) => e.currentTarget.select()}
-              className="flex-1 px-3 py-2 bg-background border border-zinc-800 rounded-lg text-foreground text-xs font-mono"
+              className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg text-foreground text-xs font-mono"
             />
             <button
               type="button"
               onClick={copyLink}
-              className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-bold text-xs uppercase tracking-wider rounded-lg border border-zinc-800 transition-all cursor-pointer whitespace-nowrap"
+              className="px-4 py-2 bg-surface-raised hover:bg-line text-foreground font-bold text-xs uppercase tracking-wider rounded-lg border border-line transition-all cursor-pointer whitespace-nowrap"
             >
               {copied ? 'Copied!' : 'Copy'}
             </button>

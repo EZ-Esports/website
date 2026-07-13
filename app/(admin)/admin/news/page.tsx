@@ -26,7 +26,7 @@ function StatusBadge({ status }: { status: NewsPost['status'] }) {
     );
   }
   return (
-    <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-zinc-800 text-zinc-500 border border-zinc-700">
+    <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-line text-foreground-muted border border-line">
       Archived
     </span>
   );
@@ -83,10 +83,10 @@ export default async function AdminNewsPage({
   return (
     <div className="space-y-6">
       {/* Header Panel */}
-      <Card className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-l-4 border-l-ez-pink hover:shadow-none duration-300">
+      <Card className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-l-4 border-l-accent hover:shadow-none duration-300">
         <div>
           <h1 className="text-2xl font-black text-white uppercase tracking-wider">News & Announcements</h1>
-          <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+          <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
             Write articles, publish announcements, and edit blog posts displayed on the homepage.
           </p>
         </div>
@@ -114,8 +114,8 @@ export default async function AdminNewsPage({
                   scroll={false}
                   className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border transition-all ${
                     isActive
-                      ? 'bg-ez-pink/10 text-ez-pink border-ez-pink/30'
-                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                      ? 'bg-accent/10 text-accent border-accent/30'
+                      : 'bg-surface-raised text-foreground-secondary border-line hover:border-line hover:text-foreground'
                   }`}
                 >
                   {tab.label}
@@ -132,18 +132,18 @@ export default async function AdminNewsPage({
               name="q"
               defaultValue={q}
               placeholder="Search by title or category…"
-              className="flex-1 px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+              className="flex-1 px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-lg text-sm font-bold transition-all cursor-pointer"
+              className="px-4 py-2 bg-surface-raised hover:bg-line text-foreground border border-line rounded-lg text-sm font-bold transition-all cursor-pointer"
             >
               Search
             </button>
             {q && (
               <a
                 href={status ? `/admin/news?status=${status}` : '/admin/news'}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 rounded-lg text-sm font-bold transition-all"
+                className="px-4 py-2 bg-surface-raised hover:bg-line text-foreground-secondary border border-line rounded-lg text-sm font-bold transition-all"
               >
                 Clear
               </a>
@@ -151,14 +151,14 @@ export default async function AdminNewsPage({
           </form>
 
           {(q || status) && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-foreground-muted">
               Showing {filtered.length} of {posts.length} articles
             </p>
           )}
 
-          <div className="bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
+          <div className="bg-surface-raised/30 border border-line/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
             {filtered.length === 0 ? (
-              <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl">
+              <div className="p-16 text-center text-foreground-muted text-sm bg-surface-sunken/20 rounded-2xl">
                 {q
                   ? `No articles match "${q}".`
                   : 'No news articles found. Click "+ Write Article" to create your first announcement!'}
@@ -166,8 +166,8 @@ export default async function AdminNewsPage({
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#0b101d] border-b border-ez-pink/20">
-                    <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                  <thead className="bg-[#0b101d] border-b border-accent/20">
+                    <tr className="text-foreground-secondary text-xs font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Title</th>
                       <th className="px-6 py-4">Category</th>
                       <th className="px-6 py-4">Status</th>
@@ -175,7 +175,7 @@ export default async function AdminNewsPage({
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 text-sm">
+                  <tbody className="divide-y divide-line text-sm">
                     {filtered.map((post) => {
                       const deleteActionWithId = deleteNewsPost.bind(null, post.id);
                       const publishActionWithId = publishNewsPost.bind(null, post.id);
@@ -183,22 +183,22 @@ export default async function AdminNewsPage({
                       const archiveActionWithId = archiveNewsPost.bind(null, post.id);
 
                       return (
-                        <tr key={post.id} className="hover:bg-slate-800/10 transition-colors">
+                        <tr key={post.id} className="hover:bg-line/10 transition-colors">
                           <td className="px-6 py-4">
                             <div className="font-bold text-white text-base tracking-tight">{post.title}</div>
-                            <div className="text-xs text-slate-400 max-w-md truncate mt-1 leading-relaxed">
+                            <div className="text-xs text-foreground-secondary max-w-md truncate mt-1 leading-relaxed">
                               {post.excerpt || 'No excerpt provided.'}
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-slate-900 text-slate-300 border border-slate-800">
+                            <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-surface-raised text-foreground-secondary border border-line">
                               {post.category}
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <StatusBadge status={post.status} />
                           </td>
-                          <td className="px-6 py-4 text-slate-300 font-medium">
+                          <td className="px-6 py-4 text-foreground-secondary font-medium">
                             {post.publishedAt ? (
                               new Date(post.publishedAt).toLocaleDateString('en-US', {
                                 timeZone: 'America/New_York',
@@ -207,7 +207,7 @@ export default async function AdminNewsPage({
                                 day: 'numeric',
                               })
                             ) : (
-                              <span className="text-zinc-600 italic">Not published</span>
+                              <span className="text-foreground-muted italic">Not published</span>
                             )}
                           </td>
                           <td className="px-6 py-4 text-right">
@@ -235,7 +235,7 @@ export default async function AdminNewsPage({
                                   <form action={archiveActionWithId}>
                                     <button
                                       type="submit"
-                                      className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700/60 font-bold text-xs uppercase tracking-wider rounded-lg text-zinc-400 border border-zinc-700 hover:border-zinc-600 transition-all cursor-pointer"
+                                      className="px-3 py-1.5 bg-line hover:bg-line/60 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary border border-line hover:border-foreground-muted transition-all cursor-pointer"
                                     >
                                       Archive
                                     </button>
@@ -244,7 +244,7 @@ export default async function AdminNewsPage({
                                     href={`/news/${post.slug}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                                    className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
                                   >
                                     View Live ↗
                                   </a>
@@ -254,7 +254,7 @@ export default async function AdminNewsPage({
                                 <form action={unpublishActionWithId}>
                                   <button
                                     type="submit"
-                                    className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                                    className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer"
                                   >
                                     Restore
                                   </button>
@@ -262,14 +262,14 @@ export default async function AdminNewsPage({
                               )}
                               <Link
                                 href={`/admin/news/${post.id}`}
-                                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
                               >
                                 Edit
                               </Link>
                               <ConfirmDeleteButton
                                 action={deleteActionWithId}
                                 message={`Delete "${post.title}"? This permanently removes the article from the public site.`}
-                                className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
                               />
                             </div>
                           </td>

@@ -41,19 +41,19 @@ export default async function ContentAdminPage() {
     <div className="space-y-8">
       {!dbConfigured && <DbErrorNotice variant="not-configured" />}
 
-      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
+      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-black text-white uppercase tracking-wider">Page Content Blocks</h2>
-            <p className="text-xs text-slate-500 mt-1">These blocks are managed by the system. Contact a developer to add or remove content keys.</p>
+            <p className="text-xs text-foreground-muted mt-1">These blocks are managed by the system. Contact a developer to add or remove content keys.</p>
           </div>
           {dbConfigured && (
-            <span className="text-slate-400 text-sm">{rows.length} block{rows.length !== 1 ? 's' : ''}</span>
+            <span className="text-foreground-secondary text-sm">{rows.length} block{rows.length !== 1 ? 's' : ''}</span>
           )}
         </div>
 
         {rows.length === 0 ? (
-          <p className="text-slate-500 text-sm">
+          <p className="text-foreground-muted text-sm">
             {dbConfigured
               ? 'No content blocks yet. Run the Phase 2 seed to populate defaults.'
               : 'Connect the database to manage content.'}
@@ -62,8 +62,8 @@ export default async function ContentAdminPage() {
           <div className="space-y-4">
             {rows.map((row) => (
               <div key={row.id} className="space-y-1">
-                <p className="text-xs text-slate-500 font-mono">
-                  <span className="text-slate-600">Appears on:</span> {keyPageMap[row.key] ?? row.key}
+                <p className="text-xs text-foreground-muted font-mono">
+                  <span className="text-foreground-muted">Appears on:</span> {keyPageMap[row.key] ?? row.key}
                 </p>
                 <ContentEditor
                   id={row.id}

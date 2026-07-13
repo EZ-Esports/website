@@ -25,9 +25,9 @@ export default async function AdminStandingsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Standings Archive</h1>
-        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
           Record or correct final standings for seasons whose per-match scores were never captured.
           Active seasons with live results usually don&apos;t need snapshot rows.
         </p>

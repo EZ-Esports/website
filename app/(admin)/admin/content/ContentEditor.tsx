@@ -62,10 +62,10 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
   const hasMore = sortedHistory.length > 10;
 
   return (
-    <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 rounded-2xl p-5 space-y-3 hover:border-zinc-700 transition-all duration-300">
+    <div className="bg-[#1a1a1a]/80 border border-line/80 rounded-2xl p-5 space-y-3 hover:border-line transition-all duration-300">
       <div>
         <h3 className="font-bold text-white text-sm">{label}</h3>
-        <p className="text-zinc-500 text-xs mt-0.5 font-mono">{contentKey}</p>
+        <p className="text-foreground-muted text-xs mt-0.5 font-mono">{contentKey}</p>
       </div>
       <form action={handleSubmit}>
         <textarea
@@ -73,13 +73,13 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
           value={currentContent}
           onChange={(e) => setCurrentContent(e.target.value)}
           rows={4}
-          className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all resize-y font-sans leading-relaxed"
+          className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all resize-y font-sans leading-relaxed"
         />
         <div className="flex items-center gap-3 mt-3">
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 bg-ez-pink text-ez-black rounded-lg font-bold text-xs hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2 bg-accent text-on-accent rounded-lg font-bold text-xs hover:bg-accent/80 transition-all duration-300 cursor-pointer disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -96,7 +96,7 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
             <button
               type="button"
               onClick={() => setShowHistory((v) => !v)}
-              className="ml-auto text-xs text-slate-500 hover:text-slate-300 transition-colors underline-offset-2 hover:underline"
+              className="ml-auto text-xs text-foreground-muted hover:text-foreground-secondary transition-colors underline-offset-2 hover:underline"
             >
               {showHistory ? 'Hide' : 'History'} ({history.length})
             </button>
@@ -107,7 +107,7 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
       {showHistory && displayedHistory.length > 0 && (
         <div className="space-y-2 pt-1">
           {hasMore && (
-            <p className="text-xs text-zinc-600 text-right">Showing 10 most recent</p>
+            <p className="text-xs text-foreground-muted text-right">Showing 10 most recent</p>
           )}
           {displayedHistory.map((entry) => {
             const preview =
@@ -132,15 +132,15 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
             return (
               <div
                 key={entry.id}
-                className="bg-[#111111] border border-zinc-800/60 rounded-lg p-3 text-xs space-y-2"
+                className="bg-[#111111] border border-line/60 rounded-lg p-3 text-xs space-y-2"
               >
-                <p className="text-zinc-400 font-mono leading-relaxed line-clamp-2">{preview}</p>
+                <p className="text-foreground-secondary font-mono leading-relaxed line-clamp-2">{preview}</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-600">{formatDate(entry.savedAt)}</span>
+                  <span className="text-foreground-muted">{formatDate(entry.savedAt)}</span>
                   <button
                     type="button"
                     onClick={handleRestore}
-                    className="px-2.5 py-1 bg-slate-900 border border-slate-800 hover:border-ez-pink/40 hover:text-ez-pink text-zinc-400 rounded text-xs font-bold transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-surface-raised border border-line hover:border-accent/40 hover:text-accent text-foreground-secondary rounded text-xs font-bold transition-all cursor-pointer"
                   >
                     Restore
                   </button>

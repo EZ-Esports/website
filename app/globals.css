@@ -70,21 +70,6 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-
-  /* deprecated: remove in PR3 */
-  --color-background: var(--surface);
-  /* deprecated: remove in PR3 */
-  --color-background-secondary: var(--surface-raised);
-  /* deprecated: remove in PR3 */
-  --color-custom-border: var(--line);
-  /* deprecated: remove in PR3 */
-  --color-ez-pink: var(--accent);
-  /* deprecated: remove in PR3 */
-  --color-ez-purple: var(--accent-secondary);
-  /* deprecated: remove in PR3 */
-  --color-ez-black: var(--surface-raised);
-  /* deprecated: remove in PR3 */
-  --color-ez-white: #ffffff;
 }
 
 body {

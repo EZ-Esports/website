@@ -35,9 +35,9 @@ export default async function AdminMatchesPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Matches & Standings</h1>
-        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">Schedule matches and input scores to recalculate team standings and seasonal records.</p>
+        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">Schedule matches and input scores to recalculate team standings and seasonal records.</p>
       </Card>
 
       {dbError && <DbErrorNotice variant="error" />}
@@ -49,7 +49,7 @@ export default async function AdminMatchesPage() {
           <Card className="lg:col-span-1 h-fit space-y-5">
             <div>
               <h2 className="text-base font-bold text-white uppercase tracking-wider">Schedule Match</h2>
-              <p className="text-slate-400 text-xs mt-0.5">Register a new scheduled event.</p>
+              <p className="text-foreground-secondary text-xs mt-0.5">Register a new scheduled event.</p>
             </div>
 
             <MatchScheduleForm

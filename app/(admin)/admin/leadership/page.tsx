@@ -16,14 +16,14 @@ export default async function AdminLeadershipPage() {
     dbError = true;
   }
 
-  const inputClass = "w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all text-sm";
+  const inputClass = "w-full px-3.5 py-2.5 bg-surface-sunken border border-line/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all text-sm";
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Leadership Manager</h1>
-        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
           Manage the student officers, roles, and bios displayed on the public leadership pages.
         </p>
       </Card>
@@ -37,12 +37,12 @@ export default async function AdminLeadershipPage() {
           <Card className="lg:col-span-1 h-fit space-y-6">
             <div>
               <h2 className="text-lg font-black text-white uppercase tracking-wider">Add Officer</h2>
-              <p className="text-slate-400 text-xs mt-1 leading-relaxed">Register a new officer for a specific year.</p>
+              <p className="text-foreground-secondary text-xs mt-1 leading-relaxed">Register a new officer for a specific year.</p>
             </div>
 
             <AddEntityForm action={createLeader} className="space-y-5">
               <div>
-                <label htmlFor="name" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <label htmlFor="name" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
                   Officer Name
                 </label>
                 <input
@@ -56,7 +56,7 @@ export default async function AdminLeadershipPage() {
               </div>
 
               <div>
-                <label htmlFor="role" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <label htmlFor="role" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
                   Role Title
                 </label>
                 <input
@@ -70,7 +70,7 @@ export default async function AdminLeadershipPage() {
               </div>
 
               <div>
-                <label htmlFor="year" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <label htmlFor="year" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
                   Academic Year
                 </label>
                 <input
@@ -87,7 +87,7 @@ export default async function AdminLeadershipPage() {
               </div>
 
               <div>
-                <label htmlFor="bio" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <label htmlFor="bio" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
                   Short Bio
                 </label>
                 <textarea
@@ -95,36 +95,36 @@ export default async function AdminLeadershipPage() {
                   name="bio"
                   rows={4}
                   placeholder="e.g. Leading student initiatives and community events..."
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800/80 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all text-sm leading-relaxed"
+                  className="w-full px-4 py-3 bg-surface-sunken border border-line/80 rounded-lg text-white placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all text-sm leading-relaxed"
                 />
               </div>
 
               <SubmitButton
                 label="Add Officer"
                 pendingLabel="Adding…"
-                className="w-full py-3 bg-white hover:bg-slate-200 text-slate-950 text-sm font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-white hover:bg-foreground text-surface-sunken text-sm font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </AddEntityForm>
           </Card>
 
           {/* Officers List Column */}
-          <div className="lg:col-span-2 bg-slate-900/30 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
+          <div className="lg:col-span-2 bg-surface-raised/30 border border-line/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
             {leadershipList.length === 0 ? (
-              <div className="p-16 text-center text-slate-500 text-sm bg-slate-950/20 rounded-2xl">
+              <div className="p-16 text-center text-foreground-muted text-sm bg-surface-sunken/20 rounded-2xl">
                 No leadership members found. Add officers using the left form panel!
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#0b101d] border-b border-ez-pink/20">
-                    <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                  <thead className="bg-[#0b101d] border-b border-accent/20">
+                    <tr className="text-foreground-secondary text-xs font-bold uppercase tracking-widest">
                       <th className="px-6 py-4">Name / Bio</th>
                       <th className="px-6 py-4">Role</th>
                       <th className="px-6 py-4">Year</th>
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 text-sm">
+                  <tbody className="divide-y divide-line text-sm">
                     {leadershipList.map((leader) => (
                       <LeadershipRow key={leader.id} leader={leader} />
                     ))}

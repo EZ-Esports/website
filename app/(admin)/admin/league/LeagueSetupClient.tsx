@@ -25,18 +25,18 @@ interface DBSeason {
 type ActionResult = { success: boolean; error?: string };
 
 const input =
-  'w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all';
+  'w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 transition-all';
 const primaryBtn =
-  'px-4 py-2 bg-white hover:bg-slate-200 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
+  'px-4 py-2 bg-white hover:bg-foreground text-surface-sunken text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
 const secondaryBtn =
-  'px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 cursor-pointer';
+  'px-3.5 py-2 bg-surface-raised hover:bg-line border border-line text-foreground-secondary text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 cursor-pointer';
 const iconBtn =
-  'p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-100 transition-all cursor-pointer';
+  'p-1.5 hover:bg-line rounded-lg text-foreground-secondary hover:text-foreground transition-all cursor-pointer';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+      <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">{label}</span>
       {children}
     </label>
   );
@@ -104,11 +104,11 @@ export default function LeagueSetupClient({
           className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-between ${
             toast.type === 'error'
               ? 'bg-red-950/30 border-red-900/50 text-red-300'
-              : 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
+              : 'bg-success/30 border-success/50 text-success'
           }`}
         >
           <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-200" aria-label="Dismiss">
+          <button onClick={() => setToast(null)} className="text-foreground-secondary hover:text-foreground" aria-label="Dismiss">
             <FiX />
           </button>
         </div>
@@ -116,13 +116,13 @@ export default function LeagueSetupClient({
 
       {/* ============ GAMES ============ */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-line pb-3">
           <h2 className="text-base font-black text-white uppercase tracking-wider">Games</h2>
         </div>
 
         {/* Add game form */}
-        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Add Game</span>
+        <div className="bg-surface-sunken/60 border border-line rounded-xl p-4 space-y-3">
+          <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">Add Game</span>
           <form
             onSubmit={(e) => runForm(e, createGame, 'Game created.', { reset: true })}
             className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end"
@@ -144,11 +144,11 @@ export default function LeagueSetupClient({
 
         {/* Games list */}
         {games.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 text-xs border border-dashed border-slate-900 rounded-xl">
+          <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">
             No games yet. Add one above to get started.
           </div>
         ) : (
-          <div className="border border-slate-900 rounded-xl divide-y divide-slate-900">
+          <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised">
             {games.map((g) => (
               <GameRow
                 key={g.id}
@@ -170,19 +170,19 @@ export default function LeagueSetupClient({
 
       {/* ============ SEASONS ============ */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-line pb-3">
           <h2 className="text-base font-black text-white uppercase tracking-wider">Seasons</h2>
         </div>
 
         {games.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 text-xs border border-dashed border-slate-900 rounded-xl">
+          <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">
             Create a game first before adding seasons.
           </div>
         ) : (
           <>
             {/* Add season form */}
-            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Add Season</span>
+            <div className="bg-surface-sunken/60 border border-line rounded-xl p-4 space-y-3">
+              <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">Add Season</span>
               <form
                 onSubmit={(e) => runForm(e, createSeason, 'Season created.', { reset: true })}
                 className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_auto] gap-3 items-end"
@@ -212,11 +212,11 @@ export default function LeagueSetupClient({
 
             {/* Seasons list */}
             {seasons.length === 0 ? (
-              <div className="text-center py-10 text-slate-500 text-xs border border-dashed border-slate-900 rounded-xl">
+              <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">
                 No seasons yet. Add one above.
               </div>
             ) : (
-              <div className="border border-slate-900 rounded-xl divide-y divide-slate-900">
+              <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised">
                 {seasons.map((s) => {
                   const game = games.find((g) => g.id === s.gameId);
                   return (
@@ -287,8 +287,8 @@ function GameRow({
         <div className="flex items-center justify-between gap-3">
           <div>
             <span className="text-sm font-bold text-white">{game.displayName}</span>
-            <span className="ml-2 text-[10px] bg-slate-900 border border-slate-800 text-slate-400 font-mono px-1.5 py-0.5 rounded uppercase">{game.shortName}</span>
-            <div className="text-[11px] text-slate-500 font-mono mt-0.5">/games/{game.slug}</div>
+            <span className="ml-2 text-[10px] bg-surface-raised border border-line text-foreground-secondary font-mono px-1.5 py-0.5 rounded uppercase">{game.shortName}</span>
+            <div className="text-[11px] text-foreground-muted font-mono mt-0.5">/games/{game.slug}</div>
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
             <button onClick={() => setEditing(true)} className={iconBtn} aria-label="Edit game"><FiEdit2 className="w-3.5 h-3.5" /></button>
@@ -327,10 +327,10 @@ function SeasonRow({
           className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_auto] gap-3 items-end"
         >
           <Field label="Game">
-            <div className={`${input} flex items-center text-slate-300`} aria-readonly="true">
+            <div className={`${input} flex items-center text-foreground-secondary`} aria-readonly="true">
               {gameName}
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Game can&apos;t be changed after creation.</p>
+            <p className="text-[10px] text-foreground-muted mt-1">Game can&apos;t be changed after creation.</p>
             {/* Game is fixed for a season; submit it unchanged so the server action still receives it */}
             <input type="hidden" name="gameId" value={season.gameId} />
           </Field>
@@ -352,8 +352,8 @@ function SeasonRow({
         <div className="flex items-center justify-between gap-3">
           <div>
             <span className="text-sm font-bold text-white">{season.name}</span>
-            <span className="ml-2 text-[10px] text-slate-500">· {gameName}</span>
-            <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${season.isActive ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-slate-900 text-slate-500 border-slate-800'}`}>
+            <span className="ml-2 text-[10px] text-foreground-muted">· {gameName}</span>
+            <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${season.isActive ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-surface-raised text-foreground-muted border-line'}`}>
               {season.isActive ? 'Active' : 'Inactive'}
             </span>
           </div>

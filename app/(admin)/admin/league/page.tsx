@@ -30,9 +30,9 @@ export default async function LeagueSetupPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink rounded-2xl p-6">
+      <div className="bg-surface-raised/30 border border-line border-l-4 border-l-accent rounded-2xl p-6">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">League Setup</h1>
-        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
           Create games and seasons before scheduling matches or registering teams. Every match and team registration depends on at least one game and one active season.
         </p>
       </div>

@@ -43,7 +43,7 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
         Draft
       </span>
     ) : (
-      <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-zinc-800 text-zinc-500 border border-zinc-700">
+      <span className="inline-block px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider rounded bg-line text-foreground-muted border border-line">
         Archived
       </span>
     );
@@ -52,16 +52,16 @@ export default async function AdminEditNewsPostPage({ params }: EditNewsPageProp
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center">
-        <Link href="/admin/news" className="text-xs font-bold text-slate-400 hover:text-ez-pink uppercase tracking-widest transition-colors">
+        <Link href="/admin/news" className="text-xs font-bold text-foreground-secondary hover:text-accent uppercase tracking-widest transition-colors">
           ← Back to News list
         </Link>
       </div>
 
-      <Card className="p-8 space-y-6 hover:shadow-none hover:border-slate-800/80 duration-300">
+      <Card className="p-8 space-y-6 hover:shadow-none hover:border-line/80 duration-300">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
           <div>
             <h1 className="text-2xl font-black text-white uppercase tracking-wider">Edit Announcement</h1>
-            <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">Modify properties and updates for your post.</p>
+            <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">Modify properties and updates for your post.</p>
           </div>
           <div className="shrink-0 mt-1">{statusBadge}</div>
         </div>

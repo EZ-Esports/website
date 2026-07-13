@@ -262,13 +262,13 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
   return (
     <div className="space-y-6">
       {/* Tabs Menu */}
-      <div className="flex border-b border-zinc-800 pb-px">
+      <div className="flex border-b border-line pb-px">
         <button
           onClick={() => { setActiveTab('staff'); setError(null); }}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm tracking-wide border-b-2 cursor-pointer transition-all duration-300 ${
             activeTab === 'staff'
-              ? 'border-ez-pink text-white font-extrabold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent text-white font-extrabold'
+              : 'border-transparent text-foreground-secondary hover:text-foreground'
           }`}
         >
           <HiOutlineUsers className="w-4 h-4" />
@@ -278,8 +278,8 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
           onClick={() => { setActiveTab('roles'); setError(null); }}
           className={`flex items-center gap-2 px-6 py-3 font-bold text-sm tracking-wide border-b-2 cursor-pointer transition-all duration-300 ${
             activeTab === 'roles'
-              ? 'border-ez-pink text-white font-extrabold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent text-white font-extrabold'
+              : 'border-transparent text-foreground-secondary hover:text-foreground'
           }`}
         >
           <HiOutlineShieldCheck className="w-4 h-4" />
@@ -299,13 +299,13 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
       {activeTab === 'staff' && (
         <div className="space-y-6">
           {/* Sub-tabs menu */}
-          <div className="flex gap-4 border-b border-zinc-800/60 pb-px mb-2">
+          <div className="flex gap-4 border-b border-line/60 pb-px mb-2">
             <button
               onClick={() => { setStaffSubTab('members'); setError(null); }}
               className={`text-xs font-bold uppercase tracking-wider pb-2 border-b-2 transition-all cursor-pointer ${
                 staffSubTab === 'members'
-                  ? 'border-ez-pink text-white font-extrabold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-accent text-white font-extrabold'
+                  : 'border-transparent text-foreground-secondary hover:text-foreground'
               }`}
             >
               Active Members ({admins.length})
@@ -314,8 +314,8 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               onClick={() => { setStaffSubTab('invites'); setError(null); }}
               className={`text-xs font-bold uppercase tracking-wider pb-2 border-b-2 transition-all cursor-pointer ${
                 staffSubTab === 'invites'
-                  ? 'border-ez-pink text-white font-extrabold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-accent text-white font-extrabold'
+                  : 'border-transparent text-foreground-secondary hover:text-foreground'
               }`}
             >
               Invites & Onboarding ({invites.length})
@@ -334,12 +334,12 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                     placeholder="Search by email..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-3 pr-8 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all placeholder-zinc-650"
+                    className="w-full pl-3 pr-8 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all placeholder-foreground-muted"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300"
+                      className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-foreground-secondary"
                     >
                       <HiOutlineXMark className="w-4 h-4" />
                     </button>
@@ -351,7 +351,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                   <select
                     value={filterRoleId}
                     onChange={(e) => setFilterRoleId(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all cursor-pointer"
+                    className="w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all cursor-pointer"
                   >
                     <option value="">All Roles</option>
                     {roles.map((role) => (
@@ -374,10 +374,10 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
 
                   if (filteredAdmins.length === 0) {
                     return (
-                      <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
-                        <HiOutlineUsers className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
-                        <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No staff members found</p>
-                        <p className="text-zinc-500 text-xs font-medium">Try clearing your filters or search terms.</p>
+                      <div className="text-center py-10 border border-dashed border-line rounded-xl bg-surface-sunken/10">
+                        <HiOutlineUsers className="w-8 h-8 text-foreground-muted mx-auto mb-2.5 opacity-60" />
+                        <p className="text-foreground-secondary text-sm font-semibold uppercase tracking-wider mb-1">No staff members found</p>
+                        <p className="text-foreground-muted text-xs font-medium">Try clearing your filters or search terms.</p>
                       </div>
                     );
                   }
@@ -406,9 +406,9 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
           {staffSubTab === 'invites' && (
             <div className="space-y-6">
               {/* Action Card for new invite */}
-              <Card className="bg-slate-900/10 border border-zinc-800 border-l-4 border-l-ez-pink p-6">
+              <Card className="bg-surface-raised/10 border border-line border-l-4 border-l-accent p-6">
                 <h2 className="text-base font-black text-white uppercase tracking-wider mb-1">Invite Staff Member</h2>
-                <p className="text-xs text-slate-400 mb-5">
+                <p className="text-xs text-foreground-secondary mb-5">
                   Generates a single-use onboarding invitation link. Copy and send it to the new staff member manually.
                 </p>
                 <InviteAdminForm assignableRoles={assignableRoles} />
@@ -416,14 +416,14 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
 
               {/* Pending Invites List */}
               <div className="space-y-3">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider px-1">
+                <h3 className="text-xs font-black text-foreground-secondary uppercase tracking-wider px-1">
                   Pending Onboardings ({invites.length})
                 </h3>
                 {invites.length === 0 ? (
-                  <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl bg-zinc-950/10">
-                    <HiOutlineShieldCheck className="w-8 h-8 text-slate-500 mx-auto mb-2.5 opacity-60" />
-                    <p className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-1">No pending onboardings</p>
-                    <p className="text-zinc-500 text-xs font-medium">All sent invitations have been successfully claimed or expired.</p>
+                  <div className="text-center py-10 border border-dashed border-line rounded-xl bg-surface-sunken/10">
+                    <HiOutlineShieldCheck className="w-8 h-8 text-foreground-muted mx-auto mb-2.5 opacity-60" />
+                    <p className="text-foreground-secondary text-sm font-semibold uppercase tracking-wider mb-1">No pending onboardings</p>
+                    <p className="text-foreground-muted text-xs font-medium">All sent invitations have been successfully claimed or expired.</p>
                   </div>
                 ) : (
                   invites.map((inv) => {
@@ -447,12 +447,12 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
       )}
 
       {activeTab === 'roles' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-zinc-950/20 border border-zinc-800 rounded-xl min-h-[600px] overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-surface-sunken/20 border border-line rounded-xl min-h-[600px] overflow-hidden">
           {/* Left Pane: Role Directory Sidebar */}
-          <div className="col-span-1 border-r border-zinc-800 p-4 space-y-4 bg-zinc-900/10 flex flex-col justify-between">
+          <div className="col-span-1 border-r border-line p-4 space-y-4 bg-surface-raised/10 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-4 px-2">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Roles</span>
+                <span className="text-xs font-black text-foreground-secondary uppercase tracking-wider">Roles</span>
                 {(currentIsOwner || hasPermission(currentPermissions, currentIsOwner, Permissions.MANAGE_ROLES)) && (
                   <button
                     onClick={() => {
@@ -461,7 +461,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                       setRoleTab('display');
                       setSelectedColor('#94a3b8');
                     }}
-                    className="p-1 hover:bg-zinc-850 border border-transparent hover:border-zinc-800 rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
+                    className="p-1 hover:bg-line border border-transparent hover:border-line rounded-lg text-foreground-secondary hover:text-white transition-all cursor-pointer"
                     title="Create Role"
                   >
                     <HiOutlinePlus className="w-4 h-4" />
@@ -486,8 +486,8 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                       }}
                       className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all select-none ${
                         isActive
-                          ? 'bg-zinc-800/80 text-white shadow border border-zinc-700/50'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-zinc-900/30 border border-transparent'
+                          ? 'bg-line/80 text-white shadow border border-line/50'
+                          : 'text-foreground-secondary hover:text-foreground hover:bg-surface-raised/30 border border-transparent'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -510,7 +510,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                               e.stopPropagation();
                               handleMoveRole(idx, 'up');
                             }}
-                            className="p-0.5 hover:bg-zinc-700 rounded text-slate-400 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="p-0.5 hover:bg-line rounded text-foreground-secondary hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                             title="Move Up"
                           >
                             <HiOutlineChevronUp className="w-3.5 h-3.5" />
@@ -521,14 +521,14 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                               e.stopPropagation();
                               handleMoveRole(idx, 'down');
                             }}
-                            className="p-0.5 hover:bg-zinc-700 rounded text-slate-400 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="p-0.5 hover:bg-line rounded text-foreground-secondary hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                             title="Move Down"
                           >
                             <HiOutlineChevronDown className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-zinc-650 italic shrink-0 select-none">Locked</span>
+                        <span className="text-[10px] text-foreground-muted italic shrink-0 select-none">Locked</span>
                       )}
                     </div>
                   );
@@ -536,18 +536,18 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               </div>
             </div>
 
-            <div className="pt-2 border-t border-zinc-800/60 text-[10px] text-slate-500 leading-relaxed font-medium">
+            <div className="pt-2 border-t border-line/60 text-[10px] text-foreground-muted leading-relaxed font-medium">
               Roles are listed in rank hierarchy order. Higher roles override and manage roles beneath them.
             </div>
           </div>
 
           {/* Right Pane: Configuration Workspace */}
-          <div className="col-span-3 p-6 bg-zinc-900/5 min-h-[500px] flex flex-col">
+          <div className="col-span-3 p-6 bg-surface-raised/5 min-h-[500px] flex flex-col">
             {!activeRoleId && !isCreatingRole ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-zinc-800/80 rounded-xl my-auto bg-zinc-950/10">
-                <HiOutlineShieldCheck className="w-12 h-12 text-slate-600 mb-4 opacity-50" />
-                <h3 className="text-sm font-black text-slate-350 uppercase tracking-widest mb-1.5">No Role Selected</h3>
-                <p className="text-zinc-500 text-xs max-w-sm leading-relaxed">
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-line/80 rounded-xl my-auto bg-surface-sunken/10">
+                <HiOutlineShieldCheck className="w-12 h-12 text-foreground-muted mb-4 opacity-50" />
+                <h3 className="text-sm font-black text-foreground-secondary uppercase tracking-widest mb-1.5">No Role Selected</h3>
+                <p className="text-foreground-muted text-xs max-w-sm leading-relaxed">
                   Select a role from the list on the left to customize its name, hex badge color, hierarchy position, and granular staff permissions.
                 </p>
               </div>
@@ -559,7 +559,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               >
                 <div className="space-y-6">
                   {/* Title and Action Header */}
-                  <div className="border-b border-zinc-800 pb-4">
+                  <div className="border-b border-line pb-4">
                     <div className="flex justify-between items-start gap-4 mb-3">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -579,7 +579,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-foreground-secondary">
                           {isCreatingRole
                             ? 'Configure role styling and assign initial staff permissions.'
                             : `Update styling and permission policies for this role.`}
@@ -604,8 +604,8 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                           onClick={() => setRoleTab('display')}
                           className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
                             roleTab === 'display'
-                              ? 'border-ez-pink text-white font-extrabold'
-                              : 'border-transparent text-slate-400 hover:text-slate-200'
+                              ? 'border-accent text-white font-extrabold'
+                              : 'border-transparent text-foreground-secondary hover:text-foreground'
                           }`}
                         >
                           Display
@@ -615,8 +615,8 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                           onClick={() => setRoleTab('permissions')}
                           className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
                             roleTab === 'permissions'
-                              ? 'border-ez-pink text-white font-extrabold'
-                              : 'border-transparent text-slate-400 hover:text-slate-200'
+                              ? 'border-accent text-white font-extrabold'
+                              : 'border-transparent text-foreground-secondary hover:text-foreground'
                           }`}
                         >
                           Permissions
@@ -630,7 +630,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                     <div className="space-y-6 animate-in fade-in duration-200">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="role-name" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          <label htmlFor="role-name" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                             Role Name
                           </label>
                           <input
@@ -641,16 +641,16 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                             disabled={!isCreatingRole && activeRole?.isSystem}
                             defaultValue={isCreatingRole ? '' : activeRole?.name}
                             placeholder="e.g. Moderator"
-                            className="w-full px-4 py-2.5 bg-background border border-zinc-800 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed font-sans text-sm"
+                            className="w-full px-4 py-2.5 bg-surface border border-line rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed font-sans text-sm"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                             Badge Color
                           </label>
                           <div className="flex gap-2">
-                            <div className="flex items-center gap-1.5 shrink-0 bg-background border border-zinc-850 rounded-lg px-2 py-1">
+                            <div className="flex items-center gap-1.5 shrink-0 bg-surface border border-line rounded-lg px-2 py-1">
                               <input
                                 type="color"
                                 name="color"
@@ -663,10 +663,10 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                                 value={selectedColor}
                                 onChange={(e) => setSelectedColor(e.target.value)}
                                 placeholder="#94a3b8"
-                                className="w-20 px-1 py-1 text-[11px] font-mono bg-zinc-950/40 border border-zinc-800 rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ez-pink transition-all uppercase text-center"
+                                className="w-20 px-1 py-1 text-[11px] font-mono bg-surface-sunken/40 border border-line rounded text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all uppercase text-center"
                               />
                             </div>
-                            <div className="flex-1 flex flex-wrap gap-1.5 items-center bg-zinc-950/20 px-2.5 py-1.5 border border-zinc-850 rounded-lg">
+                            <div className="flex-1 flex flex-wrap gap-1.5 items-center bg-surface-sunken/20 px-2.5 py-1.5 border border-line rounded-lg">
                               {PRESET_COLORS.map((c) => {
                                 const isActive = selectedColor.toLowerCase() === c.toLowerCase();
                                 return (
@@ -702,9 +702,9 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                     <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 animate-in fade-in duration-200">
                       <div className="space-y-6">
                         {PERMISSION_GROUPS.map((group) => (
-                          <div key={group.title} className="space-y-3 p-4 bg-zinc-950/20 border border-zinc-900 rounded-xl">
-                            <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-zinc-800 pb-1.5 flex items-center gap-2 select-none">
-                              <span className="w-1 h-3.5 bg-ez-pink rounded" />
+                          <div key={group.title} className="space-y-3 p-4 bg-surface-sunken/20 border border-surface-raised rounded-xl">
+                            <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-line pb-1.5 flex items-center gap-2 select-none">
+                              <span className="w-1 h-3.5 bg-accent rounded" />
                               <span>{group.title}</span>
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -715,10 +715,10 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                                 return (
                                   <label
                                     key={label.bit.toString()}
-                                    className={`flex items-start gap-3 p-3 bg-zinc-950/30 border rounded-lg transition-all select-none ${
+                                    className={`flex items-start gap-3 p-3 bg-surface-sunken/30 border rounded-lg transition-all select-none ${
                                       isActorMissing
-                                        ? 'opacity-45 border-zinc-850 cursor-not-allowed'
-                                        : 'border-zinc-800 hover:border-zinc-700/60 cursor-pointer hover:bg-zinc-900/10'
+                                        ? 'opacity-45 border-line cursor-not-allowed'
+                                        : 'border-line hover:border-line/60 cursor-pointer hover:bg-surface-raised/10'
                                     }`}
                                   >
                                     <input
@@ -727,17 +727,17 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                                       value="true"
                                       defaultChecked={hasPerm}
                                       disabled={isActorMissing}
-                                      className="rounded text-ez-pink focus:ring-ez-pink focus:ring-offset-0 bg-zinc-950 border-zinc-800 cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
+                                      className="rounded text-accent focus:ring-accent focus:ring-offset-0 bg-surface-sunken border-line cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
                                     />
                                     <div className="flex flex-col">
                                       <span
                                         className={`text-xs font-extrabold uppercase tracking-wide ${
-                                          isActorMissing ? 'text-slate-500' : 'text-slate-200'
+                                          isActorMissing ? 'text-foreground-muted' : 'text-foreground'
                                         }`}
                                       >
                                         {label.name}
                                       </span>
-                                      <span className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">{label.desc}</span>
+                                      <span className="text-[10px] text-foreground-muted font-medium leading-relaxed mt-0.5">{label.desc}</span>
                                     </div>
                                   </label>
                                 );
@@ -751,21 +751,21 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                 </div>
 
                 {/* Footer Save & Cancel Buttons */}
-                <div className="mt-6 border-t border-zinc-800 pt-4 flex justify-end gap-3 bg-zinc-950/5">
+                <div className="mt-6 border-t border-line pt-4 flex justify-end gap-3 bg-surface-sunken/5">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveRoleId(null);
                       setIsCreatingRole(false);
                     }}
-                    className="px-4 py-2 border border-zinc-850 hover:border-zinc-750 text-slate-400 hover:text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                    className="px-4 py-2 border border-line hover:border-line text-foreground-secondary hover:text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="px-5 py-2 bg-ez-pink hover:bg-ez-pink/80 text-ez-black font-extrabold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    className="px-5 py-2 bg-accent hover:bg-accent/80 text-on-accent font-extrabold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                   >
                     {isPending ? 'Saving…' : 'Save Changes'}
                   </button>

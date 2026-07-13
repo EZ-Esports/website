@@ -23,11 +23,11 @@ interface GalleryImageCardProps {
 }
 
 const inputClass =
-  'w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all';
+  'w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all';
 const editBtnClass =
-  'px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer';
+  'px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer';
 const deleteBtnClass =
-  'px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer';
+  'px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer';
 
 export default function GalleryImageCard({ img }: GalleryImageCardProps) {
   const [editOpen, setEditOpen] = useState(false);
@@ -66,8 +66,8 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-zinc-800 rounded-xl overflow-hidden group hover:border-zinc-700 transition-all duration-300">
-      <div className="relative w-full aspect-square bg-zinc-900">
+    <div className="bg-[#1a1a1a] border border-line rounded-xl overflow-hidden group hover:border-line transition-all duration-300">
+      <div className="relative w-full aspect-square bg-surface-raised">
         <Image
           src={img.src}
           alt={img.caption ?? ''}
@@ -79,10 +79,10 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
       </div>
       <div className="p-3 space-y-1.5">
         <p className="text-white text-xs font-semibold leading-tight truncate">
-          {img.caption || <span className="text-zinc-500 italic">No caption</span>}
+          {img.caption || <span className="text-foreground-muted italic">No caption</span>}
         </p>
-        {img.schoolName && <p className="text-zinc-400 text-xs truncate">{img.schoolName}</p>}
-        {img.eventName && <p className="text-zinc-500 text-xs truncate">{img.eventName}</p>}
+        {img.schoolName && <p className="text-foreground-secondary text-xs truncate">{img.schoolName}</p>}
+        {img.eventName && <p className="text-foreground-muted text-xs truncate">{img.eventName}</p>}
         <div className="flex items-center justify-between pt-1 gap-1 flex-wrap">
           <button
             type="button"
@@ -91,7 +91,7 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer border transition-all disabled:opacity-50 ${
               img.isActive
                 ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20'
-                : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:bg-zinc-700'
+                : 'bg-line text-foreground-muted border-line hover:bg-line'
             }`}
           >
             {img.isActive ? 'Active' : 'Inactive'}
@@ -127,7 +127,7 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
               setEditOpen(false);
               setTimeout(() => editBtnRef.current?.focus(), 0);
             }}
-            className="mt-3 space-y-2 border-t border-zinc-800 pt-3"
+            className="mt-3 space-y-2 border-t border-line pt-3"
           >
             <div>
               <ImageUpload
@@ -140,29 +140,29 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
             </div>
             <div>
               {/* Caption is required — also serves as image alt text (WCAG) */}
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Caption / Alt Text <span className="text-ez-pink">*</span>
+              <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                Caption / Alt Text <span className="text-accent">*</span>
               </label>
               <input ref={firstFieldRef} name="caption" type="text" required defaultValue={img.caption ?? ''} className={inputClass} />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">School</label>
+              <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">School</label>
               <input name="schoolName" type="text" defaultValue={img.schoolName ?? ''} className={inputClass} />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Event</label>
+              <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Event</label>
               <input name="eventName" type="text" defaultValue={img.eventName ?? ''} className={inputClass} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Set</label>
+                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Set</label>
                 <select name="setId" defaultValue={img.setId ?? 1} className={inputClass}>
                   <option value="1">Set 1</option>
                   <option value="2">Set 2</option>
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Order</label>
+                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Order</label>
                 <input
                   name="displayOrder"
                   type="number"
@@ -171,7 +171,7 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
                 />
               </div>
             </div>
-            <button type="submit" disabled={pending} className="w-full px-3 py-1.5 bg-ez-pink hover:bg-ez-pink/80 font-bold text-xs uppercase tracking-wider rounded-lg text-ez-black transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={pending} className="w-full px-3 py-1.5 bg-accent hover:bg-accent/80 font-bold text-xs uppercase tracking-wider rounded-lg text-on-accent transition-all cursor-pointer disabled:opacity-50">
               {pending ? 'Saving…' : 'Save Changes'}
             </button>
             {editError && (

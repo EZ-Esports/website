@@ -63,10 +63,10 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-none duration-300">
+      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-none duration-300">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to <span className="text-ez-pink">EZ</span> Staff</h1>
-          <p className="text-slate-400 text-sm mt-1.5 leading-relaxed max-w-xl">
+          <h1 className="text-3xl font-black text-white tracking-tight">Welcome to <span className="text-accent">EZ</span> Staff</h1>
+          <p className="text-foreground-secondary text-sm mt-1.5 leading-relaxed max-w-xl">
             Manage public competition schedules, teams, roster lists, and news announcements from a single, unified database dashboard.
           </p>
         </div>
@@ -93,7 +93,7 @@ export default async function AdminDashboardPage() {
                 </div>
                 <div>
                   <h4 className="font-bold text-white text-sm">{alert.label} ({alert.count})</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">{alert.message}</p>
+                  <p className="text-foreground-secondary text-xs mt-0.5">{alert.message}</p>
                 </div>
               </div>
               <Button href={alert.link} variant="secondary" className="py-1 px-3 text-[10px] h-auto shrink-0">
@@ -111,7 +111,7 @@ export default async function AdminDashboardPage() {
             <HiExclamationTriangle className="w-7 h-7 mt-0.5 text-amber-400 shrink-0 animate-pulse" />
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-amber-400 tracking-tight">Database Connection Required</h3>
-              <p className="text-slate-300 text-sm leading-relaxed max-w-2xl">
+              <p className="text-foreground-secondary text-sm leading-relaxed max-w-2xl">
                 To start registering teams and managing match scores, please update your database connection credentials. Configure your <code>DATABASE_URL</code> in your local <code>.env</code> file.
               </p>
               {connectionError && (
@@ -123,12 +123,12 @@ export default async function AdminDashboardPage() {
           </div>
 
           <div className="pl-11 space-y-3">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Execute setup commands in your project shell:</h4>
-            <div className="bg-[#04060a]/90 p-4 rounded-xl text-sm text-slate-300 font-mono space-y-2 border border-slate-900 shadow-inner">
-              <p className="text-slate-500 text-xs"># 1. Push schema migrations to your Supabase Postgres database</p>
-              <p><span className="text-slate-100 font-semibold">npm run</span> db:push</p>
-              <p className="text-slate-500 text-xs"># 2. Seed with games, seasons, schools, and sample data</p>
-              <p><span className="text-slate-100 font-semibold">npm run</span> db:seed</p>
+            <h4 className="text-xs font-bold text-foreground-secondary uppercase tracking-widest">Execute setup commands in your project shell:</h4>
+            <div className="bg-[#04060a]/90 p-4 rounded-xl text-sm text-foreground-secondary font-mono space-y-2 border border-surface-raised shadow-inner">
+              <p className="text-foreground-muted text-xs"># 1. Push schema migrations to your Supabase Postgres database</p>
+              <p><span className="text-foreground font-semibold">npm run</span> db:push</p>
+              <p className="text-foreground-muted text-xs"># 2. Seed with games, seasons, schools, and sample data</p>
+              <p><span className="text-foreground font-semibold">npm run</span> db:seed</p>
             </div>
           </div>
         </div>
@@ -138,9 +138,9 @@ export default async function AdminDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Link href="/admin/league">
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
-            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+            <div className="flex justify-between items-center text-foreground-secondary text-sm font-bold uppercase tracking-wider">
               <span>Competition Games</span>
-              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineTrophy className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-accent/10 rounded-lg border border-accent/20 text-accent"><HiOutlineTrophy className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.games : 'N/A'}</p>
           </Card>
@@ -148,9 +148,9 @@ export default async function AdminDashboardPage() {
 
         <Link href="/admin/roster">
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
-            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+            <div className="flex justify-between items-center text-foreground-secondary text-sm font-bold uppercase tracking-wider">
               <span>Registered Teams</span>
-              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineUsers className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-accent/10 rounded-lg border border-accent/20 text-accent"><HiOutlineUsers className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.teams : 'N/A'}</p>
           </Card>
@@ -158,9 +158,9 @@ export default async function AdminDashboardPage() {
 
         <Link href="/admin/matches">
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
-            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+            <div className="flex justify-between items-center text-foreground-secondary text-sm font-bold uppercase tracking-wider">
               <span>Scheduled Matches</span>
-              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineCalendarDays className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-accent/10 rounded-lg border border-accent/20 text-accent"><HiOutlineCalendarDays className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.scheduledMatches : 'N/A'}</p>
           </Card>
@@ -168,9 +168,9 @@ export default async function AdminDashboardPage() {
 
         <Link href="/admin/news">
           <Card className="hover:scale-[1.03] duration-300 flex flex-col justify-between h-36 cursor-pointer">
-            <div className="flex justify-between items-center text-slate-400 text-sm font-bold uppercase tracking-wider">
+            <div className="flex justify-between items-center text-foreground-secondary text-sm font-bold uppercase tracking-wider">
               <span>Published Articles</span>
-              <span className="p-1.5 bg-ez-pink/10 rounded-lg border border-ez-pink/20 text-ez-pink"><HiOutlineNewspaper className="w-6 h-6" /></span>
+              <span className="p-1.5 bg-accent/10 rounded-lg border border-accent/20 text-accent"><HiOutlineNewspaper className="w-6 h-6" /></span>
             </div>
             <p className="text-4xl font-black text-white">{dbConfigured ? stats.publishedNews : 'N/A'}</p>
           </Card>
@@ -178,43 +178,43 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* Quick Action Tasks */}
-      <Card className="hover:border-slate-800/80 hover:shadow-none duration-300">
+      <Card className="hover:border-line/80 hover:shadow-none duration-300">
         <h3 className="text-lg font-black text-white mb-6 uppercase tracking-wider">Quick Administration Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-zinc-700 transition-all duration-300 group">
+          <div className="bg-[#1a1a1a]/80 border border-line/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-line transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-zinc-300 transition-colors">Create Match Event</h4>
-              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Schedule new matches, input results, and manage varsity matchups.</p>
+              <h4 className="font-extrabold text-white group-hover:text-foreground-secondary transition-colors">Create Match Event</h4>
+              <p className="text-xs text-foreground-secondary mt-2 leading-relaxed">Schedule new matches, input results, and manage varsity matchups.</p>
             </div>
             <Link
               href="/admin/matches"
-              className="text-xs font-bold text-zinc-400 hover:text-ez-pink transition-colors uppercase tracking-wider"
+              className="text-xs font-bold text-foreground-secondary hover:text-accent transition-colors uppercase tracking-wider"
             >
               Go to Match Manager →
             </Link>
           </div>
 
-          <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-zinc-700 transition-all duration-300 group">
+          <div className="bg-[#1a1a1a]/80 border border-line/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-line transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-zinc-300 transition-colors">Write Announcement</h4>
-              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Publish new blog posts, tournament notifications, and updates for clubs.</p>
+              <h4 className="font-extrabold text-white group-hover:text-foreground-secondary transition-colors">Write Announcement</h4>
+              <p className="text-xs text-foreground-secondary mt-2 leading-relaxed">Publish new blog posts, tournament notifications, and updates for clubs.</p>
             </div>
             <Link
               href="/admin/news"
-              className="text-xs font-bold text-zinc-400 hover:text-ez-pink transition-colors uppercase tracking-wider"
+              className="text-xs font-bold text-foreground-secondary hover:text-accent transition-colors uppercase tracking-wider"
             >
               Create News Article →
             </Link>
           </div>
 
-          <div className="bg-[#1a1a1a]/80 border border-zinc-800/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-zinc-700 transition-all duration-300 group">
+          <div className="bg-[#1a1a1a]/80 border border-line/80 p-6 rounded-2xl flex flex-col justify-between items-start gap-4 hover:border-line transition-all duration-300 group">
             <div>
-              <h4 className="font-extrabold text-white group-hover:text-zinc-300 transition-colors">Roster Management</h4>
-              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">Assign student captain roles, register roster lists, and edit player profiles.</p>
+              <h4 className="font-extrabold text-white group-hover:text-foreground-secondary transition-colors">Roster Management</h4>
+              <p className="text-xs text-foreground-secondary mt-2 leading-relaxed">Assign student captain roles, register roster lists, and edit player profiles.</p>
             </div>
             <Link
               href="/admin/roster"
-              className="text-xs font-bold text-zinc-400 hover:text-ez-pink transition-colors uppercase tracking-wider"
+              className="text-xs font-bold text-foreground-secondary hover:text-accent transition-colors uppercase tracking-wider"
             >
               Manage Roster Lists →
             </Link>
