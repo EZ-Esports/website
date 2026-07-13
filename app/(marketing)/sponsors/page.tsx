@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Hero from '@/app/components/sections/Hero';
-import ContentSection from '@/app/components/sections/ContentSection';
+import Section from '@/app/components/ui/Section';
+import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import { getCachedSponsors } from '@/app/lib/db/queries';
@@ -39,7 +40,7 @@ export default async function SponsorsPage() {
       />
     ) : (
       <div className="flex items-center justify-center h-12">
-        <span className="text-lg md:text-xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-ez-pink via-ez-pink to-ez-purple drop-shadow-[0_2px_10px_rgba(244,204,204,0.35)]">
+        <span className="text-lg md:text-xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-accent via-accent to-accent-secondary drop-shadow-[0_2px_10px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]">
           {sponsor.name}
         </span>
       </div>
@@ -48,12 +49,12 @@ export default async function SponsorsPage() {
     // Platinum cards are larger, Community cards are smaller
     const sizeClasses =
       tier === 'platinum'
-        ? "w-[calc(100%_-_0.75rem)] sm:w-[calc(50%_-_1rem)] md:w-[calc(33.333%_-_1.333rem)] p-8 border-2 border-ez-pink/20 hover:border-ez-pink/60 bg-background-secondary/50"
+        ? "w-[calc(100%_-_0.75rem)] sm:w-[calc(50%_-_1rem)] md:w-[calc(33.333%_-_1.333rem)] p-8 border-2 border-accent/20 hover:border-accent/60 bg-surface-raised/50"
         : tier === 'gold'
-        ? "w-[calc(50%_-_0.75rem)] md:w-[calc(25%_-_1.125rem)] p-6 border border-custom-border/60 hover:border-ez-pink/40 bg-background-secondary/40"
-        : "w-[calc(50%_-_0.75rem)] sm:w-[calc(33.333%_-_1rem)] md:w-[calc(20%_-_1.2rem)] p-4 border border-custom-border/40 hover:border-ez-pink/30 bg-background-secondary/30";
+        ? "w-[calc(50%_-_0.75rem)] md:w-[calc(25%_-_1.125rem)] p-6 border border-line/60 hover:border-accent/40 bg-surface-raised/40"
+        : "w-[calc(50%_-_0.75rem)] sm:w-[calc(33.333%_-_1rem)] md:w-[calc(20%_-_1.2rem)] p-4 border border-line/40 hover:border-accent/30 bg-surface-raised/30";
 
-    const wrapperClass = `${sizeClasses} rounded-2xl aspect-video flex items-center justify-center hover:bg-background-secondary/60 hover:scale-[1.03] transition-all duration-300 group shadow-lg cursor-pointer`;
+    const wrapperClass = `${sizeClasses} rounded-2xl aspect-video flex items-center justify-center hover:bg-surface-raised/60 hover:scale-[1.03] transition-all duration-300 group shadow-lg cursor-pointer`;
 
     if (sponsor.websiteUrl) {
       return (
@@ -84,18 +85,19 @@ export default async function SponsorsPage() {
         size="medium"
       />
 
-      <ContentSection heading="OUR PARTNERS" description="" theme="dark">
+      <Section>
+        <SectionHeader title="Our Partners" />
         {sponsors.length === 0 ? (
           <div className="text-center py-12 text-foreground-secondary">
-            <div className="w-16 h-16 rounded-full bg-background-secondary border border-custom-border/60 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-foreground-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <div className="w-16 h-16 rounded-full bg-surface-raised border border-line/60 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
             <p className="text-base font-medium">Partner announcements coming soon.</p>
-            <p className="text-sm mt-2 text-foreground-secondary/70">
+            <p className="text-sm mt-2 text-foreground-muted">
               Interested in supporting NYC&apos;s high-school esports scene?{' '}
-              <a href={CONTACT_EMAIL} className="text-ez-pink hover:underline">Get in touch.</a>
+              <a href={CONTACT_EMAIL} className="text-accent hover:underline">Get in touch.</a>
             </p>
           </div>
         ) : (
@@ -103,7 +105,7 @@ export default async function SponsorsPage() {
             {/* Platinum Partners */}
             {sponsorsByTier.platinum.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-ez-pink">Platinum Partners</h3>
+                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-accent">Platinum Partners</h3>
                 <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
                   {sponsorsByTier.platinum.map((sponsor) => renderSponsorCard(sponsor, "platinum"))}
                 </div>
@@ -113,7 +115,7 @@ export default async function SponsorsPage() {
             {/* Gold Partners */}
             {sponsorsByTier.gold.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Gold Partners</h3>
+                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-foreground-secondary">Gold Partners</h3>
                 <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
                   {sponsorsByTier.gold.map((sponsor) => renderSponsorCard(sponsor, "gold"))}
                 </div>
@@ -123,7 +125,7 @@ export default async function SponsorsPage() {
             {/* Community Partners */}
             {sponsorsByTier.community.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Community Partners</h3>
+                <h3 className="text-center text-xs font-bold uppercase tracking-[0.2em] text-foreground-muted">Community Partners</h3>
                 <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
                   {sponsorsByTier.community.map((sponsor) => renderSponsorCard(sponsor, "community"))}
                 </div>
@@ -131,12 +133,13 @@ export default async function SponsorsPage() {
             )}
           </div>
         )}
-      </ContentSection>
+      </Section>
 
-      <ContentSection heading="SPONSORSHIP TIERS" description="" theme="light">
+      <Section tone="raised">
+        <SectionHeader title="Sponsorship Tiers" />
         <div className="grid md:grid-cols-3 gap-6">
           {/* Platinum */}
-          <Card className="border-2 border-ez-pink/60 flex flex-col gap-4">
+          <Card variant="tinted" className="flex flex-col gap-4">
             <h3 className="text-foreground font-bold text-xl">Platinum</h3>
             <ul className="space-y-2 flex-1">
               {[
@@ -146,7 +149,7 @@ export default async function SponsorsPage() {
                 'Naming rights for a tournament',
               ].map((benefit) => (
                 <li key={benefit} className="flex items-start gap-2 text-foreground-secondary text-sm">
-                  <span className="text-ez-pink mt-0.5 shrink-0" aria-hidden="true">✓</span>
+                  <span className="text-accent mt-0.5 shrink-0" aria-hidden="true">✓</span>
                   {benefit}
                 </li>
               ))}
@@ -166,7 +169,7 @@ export default async function SponsorsPage() {
                 'Social media mention package',
               ].map((benefit) => (
                 <li key={benefit} className="flex items-start gap-2 text-foreground-secondary text-sm">
-                  <span className="text-ez-pink mt-0.5 shrink-0" aria-hidden="true">✓</span>
+                  <span className="text-accent mt-0.5 shrink-0" aria-hidden="true">✓</span>
                   {benefit}
                 </li>
               ))}
@@ -186,7 +189,7 @@ export default async function SponsorsPage() {
                 'Newsletter feature',
               ].map((benefit) => (
                 <li key={benefit} className="flex items-start gap-2 text-foreground-secondary text-sm">
-                  <span className="text-ez-pink mt-0.5 shrink-0" aria-hidden="true">✓</span>
+                  <span className="text-accent mt-0.5 shrink-0" aria-hidden="true">✓</span>
                   {benefit}
                 </li>
               ))}
@@ -196,9 +199,10 @@ export default async function SponsorsPage() {
             </Button>
           </Card>
         </div>
-      </ContentSection>
+      </Section>
 
-      <ContentSection heading="GET IN TOUCH" description="" theme="dark">
+      <Section>
+        <SectionHeader title="Get in Touch" />
         <div className="flex flex-col items-center gap-6 text-center max-w-2xl mx-auto">
           <p className="text-foreground-secondary text-lg leading-relaxed">
             Interested in partnering with NYC&apos;s premier high school esports league? Reach out and let&apos;s build something together.
@@ -207,7 +211,7 @@ export default async function SponsorsPage() {
             Contact Us
           </Button>
         </div>
-      </ContentSection>
+      </Section>
     </>
   );
 }

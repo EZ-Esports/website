@@ -29,20 +29,11 @@ export interface VideoItem {
   videoUrl?: string;
 }
 
-export type Theme = 'dark' | 'light';
-
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
 
 export type ButtonSize = 'sm' | 'md';
 
-export type ImagePosition = 'left' | 'right';
-
 export type GridColumns = 2 | 3 | 4 | 5;
-
-export interface SectionProps {
-  theme?: Theme;
-  className?: string;
-}
 
 export interface RouteParams {
   [key: string]: string | string[] | undefined;

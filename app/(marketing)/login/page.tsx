@@ -1,3 +1,5 @@
+import Card from '@/app/components/ui/Card';
+import { Field, Input } from '@/app/components/ui/form';
 import { login } from './actions';
 import SubmitButton from './SubmitButton';
 
@@ -16,8 +18,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const displayMessage = message ? (MESSAGE_MAP[message] ?? null) : null;
 
   return (
-    <main className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-md bg-background-secondary border border-custom-border/80 rounded-2xl p-8 shadow-2xl space-y-6">
+    <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
+      <Card padding="lg" className="w-full max-w-md space-y-6">
 
         {/* Header */}
         <div className="text-center space-y-2">
@@ -31,16 +33,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {/* Success Alert (e.g. after accepting an invite) */}
         {displayMessage && !error && (
-          <div className="bg-green-500/10 border border-green-500/30 text-green-300 text-sm px-4 py-3 rounded-lg" role="status">
+          <div className="bg-success/10 border border-success/30 text-success text-sm px-4 py-3 rounded-lg" role="status">
             {displayMessage}
           </div>
         )}
 
         {/* Error Alert */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-lg flex items-start gap-2" role="alert">
+          <div className="bg-danger/10 border border-danger/30 text-danger text-sm px-4 py-3 rounded-lg flex items-start gap-2" role="alert">
             <svg
-              className="w-5 h-5 text-red-400 shrink-0 mt-0.5"
+              className="w-5 h-5 text-danger shrink-0 mt-0.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -59,38 +61,30 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {/* Login Form */}
         <form action={login} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground-secondary mb-1">
-              Email Address
-            </label>
-            <input
+          <Field label="Email Address" htmlFor="email">
+            <Input
               id="email"
               name="email"
               type="email"
               required
               placeholder="admin@ezesports.org"
-              className="w-full px-4 py-3 bg-background border border-custom-border/80 rounded-lg text-foreground placeholder-foreground-secondary/40 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-foreground-secondary mb-1">
-              Password
-            </label>
-            <input
+          <Field label="Password" htmlFor="password">
+            <Input
               id="password"
               name="password"
               type="password"
               required
               placeholder="••••••••"
-              className="w-full px-4 py-3 bg-background border border-custom-border/80 rounded-lg text-foreground placeholder-foreground-secondary/40 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
             />
-          </div>
+          </Field>
 
           <SubmitButton />
         </form>
 
-      </div>
+      </Card>
     </main>
   );
 }

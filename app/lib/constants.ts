@@ -1,4 +1,4 @@
-import type { NavigationItem, SocialLink, Theme, GameSlug, GameConfig, NavigationStateResult, Game } from '@/app/types';
+import type { NavigationItem, SocialLink, GameSlug, GameConfig, NavigationStateResult, Game } from '@/app/types';
 
 // ============================================================================
 // Site Configuration
@@ -109,26 +109,6 @@ export const getGamesForShowcase = (): Game[] => {
     };
   });
 };
-
-// ============================================================================
-// Theme Constants
-// ============================================================================
-
-export const THEMES: Record<Theme, Theme> = {
-  dark: 'dark',
-  light: 'light',
-} as const;
-
-export const THEME_CLASSES: Record<Theme, { bg: string; text: string }> = {
-  dark: {
-    bg: 'bg-background',
-    text: 'text-foreground',
-  },
-  light: {
-    bg: 'bg-background-secondary border-y border-custom-border/30',
-    text: 'text-foreground',
-  },
-} as const;
 
 // ============================================================================
 // API/URL Constants
