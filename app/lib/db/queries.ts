@@ -428,15 +428,31 @@ export const getCachedHomepageGallery = unstable_cache(
         asc(schema.galleryImages.createdAt)
       );
 
+    // Defensive de-dupe: bad data entry has occasionally produced two active rows
+    // for the same set pointing at the same underlying image file (by basename).
+    // Silently drop the later duplicate so the homepage doesn't render the same
+    // photo twice. Deliberately NOT keyed on display_order: it defaults to 0 in
+    // both the schema and the admin upload form, so distinct images routinely
+    // share a slot. The real fix is cleaning up the gallery_images table; this
+    // just guards presentation.
+    const seenSrc = new Set<string>();
+    const dedupedRows = rows.filter((row) => {
+      const basename = row.src.split('/').pop() ?? row.src;
+      const srcKey = `${row.setId}:${basename}`;
+      if (seenSrc.has(srcKey)) return false;
+      seenSrc.add(srcKey);
+      return true;
+    });
+
     return {
-      set1: rows
+      set1: dedupedRows
         .filter((row) => row.setId === 1)
         .map((row) => ({
           id: row.id,
           src: row.src,
           alt: row.caption || 'EZ Esports gallery photo',
         })),
-      set2: rows
+      set2: dedupedRows
         .filter((row) => row.setId === 2)
         .map((row) => ({
           id: row.id,

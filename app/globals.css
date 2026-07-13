@@ -1,43 +1,94 @@
 @import "tailwindcss";
 
 :root {
-  --background: #111111; /* Midnight graphite dark background */
-  --background-secondary: #1c1c1c; /* Elevated graphite, matching v1 background */
+  /* Surfaces */
+  --surface: #111111; /* Midnight graphite dark background */
+  --surface-raised: #1c1c1c; /* Elevated graphite, matching v1 background */
+  --surface-sunken: #0a0a0c;
+
+  /* Text */
   --foreground: #f8fafc; /* Soft white foreground */
   --foreground-secondary: #b8b8c0; /* zinc-400 improved contrast */
-  --border-color: #27272a; /* zinc-800 */
+  --foreground-muted: #71717a;
+
+  /* Lines */
+  --line: #27272a; /* zinc-800 */
+
+  /* Accents */
+  --accent: #f4cccc; /* Light pink — use on dark surfaces only */
+  --accent-secondary: #4f46e5;
+  --on-accent: #1c1c1c;
+
+  /* Status */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #ef4444;
+
   --hero-overlay-from: rgba(10, 10, 10, 0.45); /* Darker at top for excellent navigation contrast */
   --hero-overlay-via: rgba(10, 10, 10, 0.15); /* Light in the middle so image remains vibrant */
 }
 
-.theme-graphite {
-  --background: #111111;
-  --background-secondary: #1c1c1c;
-  --foreground: #f8fafc;
-  --foreground-secondary: #b8b8c0;
-  --border-color: #27272a;
-  --hero-overlay-from: rgba(10, 10, 10, 0.45);
-  --hero-overlay-via: rgba(10, 10, 10, 0.15);
+/* Re-scopes the raw vars for the apply form subtree (light, brand-pink-as-accent look). */
+.theme-light {
+  --surface: #ffffff;
+  --surface-raised: #fdf5f5;
+  --surface-sunken: #f7eded;
+
+  --foreground: #2d0015;
+  --foreground-secondary: #4a2e3b;
+  --foreground-muted: #6b5560;
+
+  --line: #f4cccc; /* brand pink demoted to borders on light */
+
+  --accent: #b5005a;
+  --accent-secondary: #4f46e5;
+  --on-accent: #ffffff;
+
+  --success: #047857;
+  --warning: #b45309;
+  --danger: #dc2626;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-background-secondary: var(--background-secondary);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
-  --color-custom-border: var(--border-color);
+  --color-foreground-muted: var(--foreground-muted);
+
+  --color-line: var(--line);
+
+  --color-accent: var(--accent);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-on-accent: var(--on-accent);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Brand colors */
-  --color-ez-pink: #f4cccc;        /* Light pink — use on dark surfaces only */
-  --color-ez-purple: #4f46e5;
-  --color-ez-black: #1c1c1c;
+  /* deprecated: remove in PR3 */
+  --color-background: var(--surface);
+  /* deprecated: remove in PR3 */
+  --color-background-secondary: var(--surface-raised);
+  /* deprecated: remove in PR3 */
+  --color-custom-border: var(--line);
+  /* deprecated: remove in PR3 */
+  --color-ez-pink: var(--accent);
+  /* deprecated: remove in PR3 */
+  --color-ez-purple: var(--accent-secondary);
+  /* deprecated: remove in PR3 */
+  --color-ez-black: var(--surface-raised);
+  /* deprecated: remove in PR3 */
   --color-ez-white: #ffffff;
 }
 
 body {
-  background: var(--background);
+  background: var(--surface);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
@@ -63,16 +114,16 @@ body::before {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--background);
+  background: var(--surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--line);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-ez-pink);
+  background: var(--accent);
 }
 
 /* Hide number input spinner buttons (incremental arrows) */
@@ -88,14 +139,6 @@ input[type="number"] {
 
 /* Glassmorphism utility */
 .glass-panel {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(244, 204, 204, 0.05) 50%, rgba(79, 70, 229, 0.03) 100%);
-  backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.25),
-              inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
-}
-
-.theme-graphite .glass-panel {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(244, 204, 204, 0.05) 50%, rgba(79, 70, 229, 0.03) 100%);
   backdrop-filter: blur(28px);
   border: 1px solid rgba(255, 255, 255, 0.14);

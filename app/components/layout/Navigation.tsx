@@ -56,10 +56,10 @@ export default function Navigation({ onNavigate }: NavigationProps) {
   };
 
   const getButtonClass = (isActive: boolean) =>
-    `transition-all focus:outline-none focus:ring-2 focus:ring-ez-pink/50 rounded-md py-2.5 md:py-1 px-3 flex items-center justify-between md:justify-start gap-1.5 w-full text-left font-bold uppercase tracking-widest border md:border-0 md:bg-transparent cursor-pointer border-white/15 bg-white/5 text-[11px] md:text-xs min-h-[44px] ${
+    `transition-all focus:outline-none focus:ring-2 focus:ring-accent/50 rounded-md py-2.5 md:py-1 px-3 flex items-center justify-between md:justify-start gap-1.5 w-full text-left font-bold uppercase tracking-widest border md:border-0 md:bg-transparent cursor-pointer border-white/15 bg-white/5 text-[11px] md:text-xs min-h-[44px] ${
       isActive
-        ? 'text-ez-pink bg-ez-pink/5 md:bg-transparent border-ez-pink/30 md:px-0'
-        : 'text-white/80 hover:text-white md:hover:text-ez-pink border-white/15 hover:translate-x-1 md:hover:translate-x-0'
+        ? 'text-accent bg-accent/5 md:bg-transparent border-accent/30 md:px-0'
+        : 'text-foreground/80 hover:text-foreground md:hover:text-accent border-white/15 hover:translate-x-1 md:hover:translate-x-0'
     }`;
 
   const leagueNavItems = [
@@ -124,7 +124,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute top-full left-0 mt-2 w-full md:w-60 bg-background-secondary/95 backdrop-blur-md rounded-xl shadow-2xl border border-custom-border/80 z-50 p-1"
+                  className="absolute top-full left-0 mt-2 w-full md:w-60 bg-surface-raised/95 backdrop-blur-md rounded-xl shadow-2xl border border-line/80 z-50 p-1"
                 >
                   <div className="py-1 space-y-1">
                     {item.items.map((subItem) => {
@@ -135,12 +135,12 @@ export default function Navigation({ onNavigate }: NavigationProps) {
                           href={subItem.href}
                           className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
                             isSubActive
-                              ? 'bg-ez-pink/10 text-ez-pink font-bold'
-                              : 'text-foreground-secondary hover:bg-background-secondary/60 hover:text-foreground'
+                              ? 'bg-accent/10 text-accent font-bold'
+                              : 'text-foreground-secondary hover:bg-surface-raised/60 hover:text-foreground'
                           }`}
                           onClick={handleLinkClick}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isSubActive ? 'bg-ez-pink animate-pulse motion-reduce:animate-none' : 'bg-transparent'}`} />
+                          <span className={`w-1.5 h-1.5 rounded-full ${isSubActive ? 'bg-accent animate-pulse motion-reduce:animate-none' : 'bg-transparent'}`} />
                           <span>{subItem.label}</span>
                         </Link>
                       );
