@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { useState, useTransition } from 'react';
+import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-components';
+import type { Selection } from 'react-aria-components';
 import { revokeAdmin, updateUserRoles } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
 import {
@@ -36,29 +38,6 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
 
-  // Popover state managers
-  const [rolesMenuOpen, setRolesMenuOpen] = useState(false);
-  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
-
-  const rolesRef = useRef<HTMLDivElement>(null);
-  const actionsRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdowns on clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (rolesRef.current && !rolesRef.current.contains(event.target as Node)) {
-        setRolesMenuOpen(false);
-      }
-      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
-        setActionsMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
   if (removed) return null;
 
   // Revoke member access
@@ -66,7 +45,6 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
     if (!window.confirm(`Remove admin access for ${admin.email}? They will be signed out immediately.`)) {
       return;
     }
-    setActionsMenuOpen(false);
     setError(null);
     startTransition(async () => {
       const result = await revokeAdmin(admin.userId);
@@ -78,16 +56,12 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
     });
   }
 
-  // Toggle role assignment inline
-  function handleToggleRole(roleId: string, hasRole: boolean) {
+  // Sync role assignment from the menu's full selection (RAC reports the resulting
+  // set on every toggle, not just the changed key, so no manual add/remove diffing).
+  function handleRolesChange(keys: Selection) {
+    if (keys === 'all') return;
     setError(null);
-    let newRoleIds: string[];
-    if (hasRole) {
-      newRoleIds = admin.roles.filter((r) => r.id !== roleId).map((r) => r.id);
-    } else {
-      newRoleIds = [...admin.roles.map((r) => r.id), roleId];
-    }
-
+    const newRoleIds = Array.from(keys, String);
     startTransition(async () => {
       const result = await updateUserRoles(admin.userId, newRoleIds);
       if (!result.success) {
@@ -109,6 +83,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
   }, null as typeof admin.roles[number] | null);
 
   const highestRoleColor = highestRole ? parseHexColor(highestRole.color) : '#94a3b8';
+  const selectedRoleIds = new Set(admin.roles.map((r) => r.id));
 
   return (
     <div
@@ -167,47 +142,52 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
 
         {/* Inline Role Assignment Popover, matching Discord */}
         {canRevoke && (
-          <div className="relative inline-block" ref={rolesRef}>
-            <button
-              onClick={() => setRolesMenuOpen(!rolesMenuOpen)}
+          <MenuTrigger>
+            <Button
               className="p-1 hover:bg-line rounded text-foreground-secondary hover:text-white transition-all cursor-pointer border border-transparent hover:border-line ml-1"
-              title="Add / Remove Roles"
+              aria-label="Add / Remove Roles"
             >
               <HiOutlinePlus className="w-3.5 h-3.5" />
-            </button>
+            </Button>
 
-            {rolesMenuOpen && (
-              <div className="absolute left-0 mt-2 w-56 rounded-xl bg-surface-sunken border border-line p-2 shadow-2xl z-50 space-y-1">
+            <Popover className="w-56">
+              <div className="rounded-xl bg-surface-sunken border border-line p-2 shadow-2xl space-y-1">
                 <div className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest px-2 py-1 border-b border-surface-raised mb-1 select-none">
                   Assign Roles
                 </div>
-                <div className="max-h-48 overflow-y-auto space-y-0.5 pr-1">
+                <Menu
+                  className="max-h-48 overflow-y-auto space-y-0.5 pr-1 outline-none"
+                  selectionMode="multiple"
+                  shouldCloseOnSelect={false}
+                  selectedKeys={selectedRoleIds}
+                  onSelectionChange={handleRolesChange}
+                  disabledKeys={isPending ? assignableRoles.map((r) => r.id) : []}
+                  renderEmptyState={() => (
+                    <div className="text-center py-2 text-[10px] text-foreground-muted italic">No roles assignable</div>
+                  )}
+                >
                   {assignableRoles.map((role) => {
-                    const hasRole = admin.roles.some((r) => r.id === role.id);
+                    const hasRole = selectedRoleIds.has(role.id);
                     const parsedColor = parseHexColor(role.color);
                     return (
-                      <button
+                      <MenuItem
                         key={role.id}
-                        disabled={isPending}
-                        type="button"
-                        onClick={() => handleToggleRole(role.id, hasRole)}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-white hover:bg-surface-raised transition-all cursor-pointer disabled:opacity-50 select-none"
+                        id={role.id}
+                        textValue={role.name}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-white hover:bg-surface-raised data-[focused]:text-white data-[focused]:bg-surface-raised transition-all cursor-pointer data-[disabled]:opacity-50 select-none"
                       >
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/30" style={{ backgroundColor: parsedColor }} />
                           <span>{role.name}</span>
                         </div>
                         {hasRole && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
-                      </button>
+                      </MenuItem>
                     );
                   })}
-                  {assignableRoles.length === 0 && (
-                    <div className="text-center py-2 text-[10px] text-foreground-muted italic">No roles assignable</div>
-                  )}
-                </div>
+                </Menu>
               </div>
-            )}
-          </div>
+            </Popover>
+          </MenuTrigger>
         )}
       </div>
 
@@ -218,29 +198,29 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
         ) : !canRevoke ? (
           <span className="text-xs text-foreground-muted italic px-3 select-none">—</span>
         ) : (
-          <div className="relative" ref={actionsRef}>
-            <button
-              onClick={() => setActionsMenuOpen(!actionsMenuOpen)}
+          <MenuTrigger>
+            <Button
               className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
-              title="More Actions"
+              aria-label="More Actions"
             >
               <HiOutlineEllipsisVertical className="w-4 h-4" />
-            </button>
+            </Button>
 
-            {actionsMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl z-50">
-                <button
-                  type="button"
-                  onClick={handleRevoke}
-                  disabled={isPending}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer disabled:opacity-50"
+            <Popover className="w-48">
+              <Menu className="rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl outline-none">
+                <MenuItem
+                  id="remove"
+                  textValue="Remove Access"
+                  isDisabled={isPending}
+                  onAction={handleRevoke}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 data-[focused]:text-red-400 data-[focused]:bg-red-950/20 transition-all cursor-pointer data-[disabled]:opacity-50"
                 >
                   <HiOutlineTrash className="w-4 h-4" />
                   <span>Remove Access</span>
-                </button>
-              </div>
-            )}
-          </div>
+                </MenuItem>
+              </Menu>
+            </Popover>
+          </MenuTrigger>
         )}
       </div>
     </div>
