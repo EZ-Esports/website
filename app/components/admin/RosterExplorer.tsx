@@ -140,35 +140,35 @@ export default function RosterExplorer({
 
   // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-5 text-slate-200">
+    <div className="space-y-5 text-foreground">
       {toast && (
         <div
           className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-between ${
             toast.type === 'error'
               ? 'bg-red-950/30 border-red-900/50 text-red-300'
-              : 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
+              : 'bg-success/30 border-success/50 text-success'
           }`}
         >
           <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-200" aria-label="Dismiss"><FiX /></button>
+          <button onClick={() => setToast(null)} className="text-foreground-secondary hover:text-foreground" aria-label="Dismiss"><FiX /></button>
         </div>
       )}
 
       {/* Breadcrumb + season scope */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <nav className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 flex-wrap">
+        <nav className="flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary flex-wrap">
           <Crumb onClick={goToSchools} active={!school}><FiHome className="w-3.5 h-3.5" /> Schools</Crumb>
-          {school && (<><FiChevronRight className="w-3 h-3 text-slate-700" /><Crumb onClick={() => goToSchool(school.id)} active={!team}>{school.name}</Crumb></>)}
-          {team && (<><FiChevronRight className="w-3 h-3 text-slate-700" /><Crumb onClick={() => goToTeam(team.id)} active={!roster}>{teamLabel(team).short} · {teamLabel(team).season}</Crumb></>)}
-          {roster && (<><FiChevronRight className="w-3 h-3 text-slate-700" /><Crumb active>{roster.name}</Crumb></>)}
+          {school && (<><FiChevronRight className="w-3 h-3 text-line" /><Crumb onClick={() => goToSchool(school.id)} active={!team}>{school.name}</Crumb></>)}
+          {team && (<><FiChevronRight className="w-3 h-3 text-line" /><Crumb onClick={() => goToTeam(team.id)} active={!roster}>{teamLabel(team).short} · {teamLabel(team).season}</Crumb></>)}
+          {roster && (<><FiChevronRight className="w-3 h-3 text-line" /><Crumb active>{roster.name}</Crumb></>)}
         </nav>
 
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <label className="flex items-center gap-2 text-xs font-semibold text-foreground-muted">
           Season
           <select
             value={seasonScope ?? ''}
             onChange={(e) => setParams({ season: e.target.value || null })}
-            className="px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-ez-pink/50 cursor-pointer"
+            className="px-2.5 py-1.5 bg-surface-sunken border border-line rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
           >
             <option value="">All seasons</option>
             {seasons.map(s => (
@@ -206,9 +206,9 @@ export default function RosterExplorer({
 
           {openForm === 'school-edit' && (
             <Panel title="School Settings" onClose={() => setOpenForm(null)}>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-foreground-secondary leading-relaxed">
                 School details (name, logo, website, display order, active status) are managed in the{' '}
-                <Link href="/admin/schools" className="text-ez-pink hover:underline font-semibold inline-flex items-center gap-1">
+                <Link href="/admin/schools" className="text-accent hover:underline font-semibold inline-flex items-center gap-1">
                   Schools page <FiExternalLink className="w-3 h-3" />
                 </Link>
                 . Navigate there to edit or delete this school.
@@ -258,8 +258,8 @@ export default function RosterExplorer({
                       deleteLabel="Unregister team"
                     >
                       <div className="text-sm font-bold text-white">{l.title}</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">{l.season}</div>
-                      <div className="text-[11px] text-slate-400 mt-3 flex gap-3">
+                      <div className="text-[11px] text-foreground-muted font-mono mt-0.5">{l.season}</div>
+                      <div className="text-[11px] text-foreground-secondary mt-3 flex gap-3">
                         <span>{teamRosters.length} roster{teamRosters.length === 1 ? '' : 's'}</span>
                         <span>{playerCount} player{playerCount === 1 ? '' : 's'}</span>
                       </div>
@@ -331,9 +331,9 @@ export default function RosterExplorer({
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-white">{r.name}</span>
-                        <span className="text-[9px] bg-slate-900 border border-slate-800 text-slate-400 font-mono px-1.5 py-0.5 rounded font-bold uppercase">Div {r.division}</span>
+                        <span className="text-[9px] bg-surface-raised border border-line text-foreground-secondary font-mono px-1.5 py-0.5 rounded font-bold uppercase">Div {r.division}</span>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-3 flex gap-3">
+                      <div className="text-[11px] text-foreground-secondary mt-3 flex gap-3">
                         <span>{playerCount} player{playerCount === 1 ? '' : 's'}</span>
                         {record && <span>Record {record}</span>}
                       </div>
@@ -383,7 +383,7 @@ function SchoolsView({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-black text-white uppercase tracking-wider">Schools</h1>
-          <p className="text-xs text-slate-400 mt-1">Select a school to manage its teams, rosters, and members.</p>
+          <p className="text-xs text-foreground-secondary mt-1">Select a school to manage its teams, rosters, and members.</p>
         </div>
         <Link href="/admin/schools" className={secondaryBtn}>
           <FiExternalLink className="w-3.5 h-3.5" /> Manage Schools
@@ -391,7 +391,7 @@ function SchoolsView({
       </div>
 
       <div className="relative max-w-sm">
-        <FiSearch className="absolute left-3 top-2.5 text-slate-600 w-4 h-4" />
+        <FiSearch className="absolute left-3 top-2.5 text-foreground-muted w-4 h-4" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search schools…" className={`${input} pl-9`} />
       </div>
 
@@ -403,12 +403,12 @@ function SchoolsView({
             const teamCount = teams.filter(t => t.schoolId === s.id).length;
             return (
               <button key={s.id} onClick={() => onOpen(s.id)}
-                className="text-left bg-slate-950/40 border border-slate-900 hover:border-slate-700 rounded-xl p-4 transition-all group cursor-pointer">
+                className="text-left bg-surface-sunken/40 border border-surface-raised hover:border-line rounded-xl p-4 transition-all group cursor-pointer">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-white truncate">{s.name}</span>
-                  <FiChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                  <FiChevronRight className="w-4 h-4 text-foreground-muted group-hover:text-foreground-secondary group-hover:translate-x-0.5 transition-all" />
                 </div>
-                <div className="text-[11px] text-slate-500 mt-2">{teamCount} team{teamCount === 1 ? '' : 's'}</div>
+                <div className="text-[11px] text-foreground-muted mt-2">{teamCount} team{teamCount === 1 ? '' : 's'}</div>
               </button>
             );
           })}
@@ -488,14 +488,14 @@ function RosterView({
       {openForm === 'player-add' && (
         <Panel title="Add Player" onClose={() => setOpenForm(null)}>
           {eligible.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">Every school member is already on this roster. Add more members from the school page first.</p>
+            <p className="text-xs text-foreground-muted italic">Every school member is already on this roster. Add more members from the school page first.</p>
           ) : (
             <form
               onSubmit={(e) => runForm(e, createRosterMember, 'Player added.', { reset: true, onSuccess: () => { setOpenForm(null); refresh(); } })}
               className="space-y-3"
             >
               <div className="relative max-w-sm">
-                <FiSearch className="absolute left-3 top-2.5 text-slate-600 w-4 h-4" />
+                <FiSearch className="absolute left-3 top-2.5 text-foreground-muted w-4 h-4" />
                 <input
                   value={memberQuery}
                   onChange={(e) => setMemberQuery(e.target.value)}
@@ -532,9 +532,9 @@ function RosterView({
         ) : players.length === 0 ? (
           <Empty>No players on this roster yet.</Empty>
         ) : (
-          <div className="overflow-x-auto border border-slate-900 rounded-xl">
+          <div className="overflow-x-auto border border-surface-raised rounded-xl">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950/60 text-[10px] text-slate-500 uppercase tracking-wider">
+              <thead className="bg-surface-sunken/60 text-[10px] text-foreground-muted uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-2.5 font-semibold">Player</th>
                   <th className="px-4 py-2.5 font-semibold">In-game name</th>
@@ -542,18 +542,18 @@ function RosterView({
                   <th className="px-4 py-2.5 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900">
+              <tbody className="divide-y divide-surface-raised">
                 {players.map(p => {
                   const editing = editingId === p.id;
                   if (editing) {
                     return (
-                      <tr key={p.id} className="bg-slate-900/40">
+                      <tr key={p.id} className="bg-surface-raised/40">
                         <td colSpan={4} className="px-4 py-3">
                           <form
                             onSubmit={(e) => runForm(e, (fd) => updateRosterMember(p.id, fd), 'Player updated.', { onSuccess: () => { setEditingId(null); refresh(); } })}
                             className="flex flex-wrap items-end gap-3"
                           >
-                            <div className="text-xs font-bold text-slate-300 pb-2">{p.firstName} {p.lastName}</div>
+                            <div className="text-xs font-bold text-foreground-secondary pb-2">{p.firstName} {p.lastName}</div>
                             <Field label="In-game name">
                               <input name="ign" defaultValue={p.ign ?? ''} placeholder="IGN" className={`${input} w-40`} />
                             </Field>
@@ -572,15 +572,15 @@ function RosterView({
                     );
                   }
                   return (
-                    <tr key={p.id} className="hover:bg-slate-900/20 group">
-                      <td className="px-4 py-2.5 font-semibold text-slate-200">
+                    <tr key={p.id} className="hover:bg-surface-raised/20 group">
+                      <td className="px-4 py-2.5 font-semibold text-foreground">
                         <span className="flex items-center gap-1.5">
                           {p.firstName} {p.lastName}
                           {p.role === 'captain' && <span className="text-amber-400" title="Captain">★</span>}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-slate-400 font-mono italic">{p.ign || '—'}</td>
-                      <td className="px-4 py-2.5 text-slate-400 capitalize">{p.role}</td>
+                      <td className="px-4 py-2.5 text-foreground-secondary font-mono italic">{p.ign || '—'}</td>
+                      <td className="px-4 py-2.5 text-foreground-secondary capitalize">{p.role}</td>
                       <td className="px-4 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                           <button onClick={() => setEditingId(p.id)} className={iconBtn} aria-label="Edit player"><FiEdit2 className="w-3.5 h-3.5" /></button>
@@ -635,12 +635,12 @@ function MemberManager({
     <Section
       title={loading ? 'School Members' : `School Members (${members.length})`}
       icon={<FiUsers />}
-      action={<button className="text-[11px] font-bold text-slate-400 hover:text-white uppercase" onClick={() => setOpenForm(adding ? null : 'member-add')}>{adding ? 'Cancel' : '+ Add member'}</button>}
+      action={<button className="text-[11px] font-bold text-foreground-secondary hover:text-white uppercase" onClick={() => setOpenForm(adding ? null : 'member-add')}>{adding ? 'Cancel' : '+ Add member'}</button>}
     >
       {adding && (
         <form
           onSubmit={(e) => runForm(e, createMember, 'Member added.', { reset: true, onSuccess: () => { setOpenForm(null); refresh(); } })}
-          className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2 mb-3"
+          className="bg-surface-sunken/60 border border-line rounded-xl p-3 space-y-2 mb-3"
         >
           <MemberFields schoolId={schoolId} />
           <button type="submit" disabled={isPending} className={`${primaryBtn} w-full`}>Add member</button>
@@ -648,7 +648,7 @@ function MemberManager({
       )}
 
       <div className="relative mb-3 max-w-sm">
-        <FiSearch className="absolute left-3 top-2.5 text-slate-600 w-4 h-4" />
+        <FiSearch className="absolute left-3 top-2.5 text-foreground-muted w-4 h-4" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter members…" className={`${input} pl-9`} />
       </div>
 
@@ -657,7 +657,7 @@ function MemberManager({
       ) : filtered.length === 0 ? (
         <Empty>{members.length === 0 ? 'No members yet. Add students to build the roster pool.' : 'No members match your filter.'}</Empty>
       ) : (
-        <div className="border border-slate-900 rounded-xl divide-y divide-slate-900 max-h-[420px] overflow-y-auto">
+        <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised max-h-[420px] overflow-y-auto">
           {filtered.map(m => (
             <div key={m.id} className="p-3 text-sm group">
               {editingId === m.id ? (
@@ -674,8 +674,8 @@ function MemberManager({
               ) : (
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-200 truncate">{m.firstName} {m.lastName}</div>
-                    <div className="text-[11px] text-slate-500 font-mono truncate">
+                    <div className="font-semibold text-foreground truncate">{m.firstName} {m.lastName}</div>
+                    <div className="text-[11px] text-foreground-muted font-mono truncate">
                       {m.graduationYear ? `'${m.graduationYear.toString().slice(-2)}` : ''}
                       {m.discord ? ` · @${m.discord}` : ''}
                       {m.email ? ` · ${m.email}` : ''}
@@ -703,18 +703,18 @@ function MemberManager({
  * SMALL PRESENTATIONAL HELPERS
  * ========================================================================== */
 function Crumb({ children, onClick, active }: { children: React.ReactNode; onClick?: () => void; active?: boolean }) {
-  if (active || !onClick) return <span className="text-slate-200 font-bold flex items-center gap-1.5">{children}</span>;
+  if (active || !onClick) return <span className="text-foreground font-bold flex items-center gap-1.5">{children}</span>;
   return <button onClick={onClick} className="hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer">{children}</button>;
 }
 
 function Header({ title, subtitle, onBack, actions }: { title: string; subtitle?: string; onBack: () => void; actions?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 flex-wrap border-b border-slate-900 pb-4">
+    <div className="flex items-start justify-between gap-3 flex-wrap border-b border-surface-raised pb-4">
       <div className="flex items-center gap-3">
         <button onClick={onBack} className={iconBtn} aria-label="Back"><FiArrowLeft className="w-4 h-4" /></button>
         <div>
           <h1 className="text-lg font-black text-white uppercase tracking-wider">{title}</h1>
-          {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] text-foreground-muted mt-0.5">{subtitle}</p>}
         </div>
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -726,7 +726,7 @@ function Section({ title, icon, action, children }: { title: string; icon?: Reac
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">{icon}{title}</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">{icon}{title}</h3>
         {action}
       </div>
       {children}
@@ -810,10 +810,10 @@ function TeamCreateForm({
 
 function Panel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-900 pb-2">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</span>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-200" aria-label="Close"><FiX /></button>
+    <div className="bg-surface-sunken/60 border border-line rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between border-b border-surface-raised pb-2">
+        <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">{title}</span>
+        <button onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close"><FiX /></button>
       </div>
       {children}
     </div>
@@ -852,7 +852,7 @@ function MemberFields({ schoolId, m }: { schoolId: string; m?: DBMember }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+      <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">{label}</span>
       {children}
     </label>
   );
@@ -860,11 +860,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Tile({ children, onClick, onDelete, deleteLabel }: { children: React.ReactNode; onClick: () => void; onDelete: () => void; deleteLabel: string }) {
   return (
-    <div className="relative bg-slate-950/40 border border-slate-900 hover:border-slate-700 rounded-xl p-4 transition-all group">
+    <div className="relative bg-surface-sunken/40 border border-surface-raised hover:border-line rounded-xl p-4 transition-all group">
       <button onClick={onClick} className="text-left w-full cursor-pointer">{children}</button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="absolute top-3 right-3 p-1 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-all cursor-pointer"
+        className="absolute top-3 right-3 p-1 rounded text-foreground-muted hover:text-red-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-all cursor-pointer"
         aria-label={deleteLabel} title={deleteLabel}
       ><FiTrash2 className="w-3.5 h-3.5" /></button>
     </div>
@@ -872,5 +872,5 @@ function Tile({ children, onClick, onDelete, deleteLabel }: { children: React.Re
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-center py-10 text-slate-500 text-xs border border-dashed border-slate-900 rounded-xl">{children}</div>;
+  return <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">{children}</div>;
 }

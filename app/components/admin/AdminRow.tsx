@@ -112,7 +112,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-zinc-950/20 hover:bg-zinc-900/30 border border-zinc-800/80 rounded-xl transition-all gap-4 select-none ${
+      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-surface-sunken/20 hover:bg-surface-raised/30 border border-line/80 rounded-xl transition-all gap-4 select-none ${
         isPending ? 'opacity-70' : ''
       }`}
     >
@@ -135,7 +135,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
           >
             {admin.email}
           </span>
-          <span className="text-[10px] text-slate-500 font-medium">
+          <span className="text-[10px] text-foreground-muted font-medium">
             Joined {new Date(admin.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
           {error && <p className="text-[10px] text-red-400 mt-1">{error}</p>}
@@ -162,7 +162,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
         })}
 
         {admin.roles.length === 0 && (
-          <span className="text-zinc-600 italic text-xs px-1">No Roles</span>
+          <span className="text-foreground-muted italic text-xs px-1">No Roles</span>
         )}
 
         {/* Inline Role Assignment Popover, matching Discord */}
@@ -170,15 +170,15 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
           <div className="relative inline-block" ref={rolesRef}>
             <button
               onClick={() => setRolesMenuOpen(!rolesMenuOpen)}
-              className="p-1 hover:bg-zinc-800 rounded text-slate-400 hover:text-white transition-all cursor-pointer border border-transparent hover:border-zinc-800 ml-1"
+              className="p-1 hover:bg-line rounded text-foreground-secondary hover:text-white transition-all cursor-pointer border border-transparent hover:border-line ml-1"
               title="Add / Remove Roles"
             >
               <HiOutlinePlus className="w-3.5 h-3.5" />
             </button>
 
             {rolesMenuOpen && (
-              <div className="absolute left-0 mt-2 w-56 rounded-xl bg-zinc-950 border border-zinc-800 p-2 shadow-2xl z-50 space-y-1">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 py-1 border-b border-zinc-900 mb-1 select-none">
+              <div className="absolute left-0 mt-2 w-56 rounded-xl bg-surface-sunken border border-line p-2 shadow-2xl z-50 space-y-1">
+                <div className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest px-2 py-1 border-b border-surface-raised mb-1 select-none">
                   Assign Roles
                 </div>
                 <div className="max-h-48 overflow-y-auto space-y-0.5 pr-1">
@@ -191,18 +191,18 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
                         disabled={isPending}
                         type="button"
                         onClick={() => handleToggleRole(role.id, hasRole)}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs font-semibold text-slate-350 hover:text-white hover:bg-zinc-900 transition-all cursor-pointer disabled:opacity-50 select-none"
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-white hover:bg-surface-raised transition-all cursor-pointer disabled:opacity-50 select-none"
                       >
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/30" style={{ backgroundColor: parsedColor }} />
                           <span>{role.name}</span>
                         </div>
-                        {hasRole && <span className="w-1.5 h-1.5 rounded-full bg-ez-pink" />}
+                        {hasRole && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
                       </button>
                     );
                   })}
                   {assignableRoles.length === 0 && (
-                    <div className="text-center py-2 text-[10px] text-zinc-600 italic">No roles assignable</div>
+                    <div className="text-center py-2 text-[10px] text-foreground-muted italic">No roles assignable</div>
                   )}
                 </div>
               </div>
@@ -214,26 +214,26 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
       {/* Right Column: Actions Dropdown Menu */}
       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
         {isSelf ? (
-          <span className="text-xs text-zinc-600 italic px-3 select-none">You</span>
+          <span className="text-xs text-foreground-muted italic px-3 select-none">You</span>
         ) : !canRevoke ? (
-          <span className="text-xs text-zinc-600 italic px-3 select-none">—</span>
+          <span className="text-xs text-foreground-muted italic px-3 select-none">—</span>
         ) : (
           <div className="relative" ref={actionsRef}>
             <button
               onClick={() => setActionsMenuOpen(!actionsMenuOpen)}
-              className="p-2 bg-zinc-900/50 hover:bg-zinc-800 text-slate-400 hover:text-white rounded-lg border border-zinc-850 hover:border-zinc-700 transition-all cursor-pointer"
+              className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
               title="More Actions"
             >
               <HiOutlineEllipsisVertical className="w-4 h-4" />
             </button>
 
             {actionsMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-zinc-950 border border-zinc-800 p-1.5 shadow-2xl z-50">
+              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl z-50">
                 <button
                   type="button"
                   onClick={handleRevoke}
                   disabled={isPending}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-slate-400 hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer disabled:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer disabled:opacity-50"
                 >
                   <HiOutlineTrash className="w-4 h-4" />
                   <span>Remove Access</span>

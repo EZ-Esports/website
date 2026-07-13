@@ -130,15 +130,15 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
         aria-live="polite"
         className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-semibold shadow-lg border ${
           toast.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            ? 'bg-success/10 border-success/30 text-success'
             : 'bg-red-500/10 border-red-500/30 text-red-300'
         }`}
       >
         {toast.message}
       </div>
     )}
-    <div className="bg-[#1c1c1c]/60 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
-      <div className="px-6 py-5 border-b border-zinc-800 space-y-3">
+    <div className="bg-[#1c1c1c]/60 border border-line rounded-2xl overflow-hidden shadow-xl shadow-black/20">
+      <div className="px-6 py-5 border-b border-line space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-base font-bold text-white uppercase tracking-wider">Match Fixtures</h2>
           <input
@@ -146,7 +146,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
             placeholder="Search schools..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 w-full sm:w-48"
+            className="px-3 py-1.5 bg-surface-sunken border border-line rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent/50 w-full sm:w-48"
           />
         </div>
 
@@ -194,13 +194,13 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
       </div>
 
       {items.length === 0 ? (
-        <div className="text-center p-12 text-slate-500 text-sm">
+        <div className="text-center p-12 text-foreground-muted text-sm">
           {isLoading ? 'Loading…' : 'No matches found for these filters.'}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[#0b101d] border-b border-slate-900 text-xs font-bold text-slate-400 uppercase tracking-widest">
+            <thead className="bg-[#0b101d] border-b border-surface-raised text-xs font-bold text-foreground-secondary uppercase tracking-widest">
               <tr>
                 <th className="px-6 py-4">Season / Date</th>
                 <th className="px-6 py-4 text-center">Matchup & Scores</th>
@@ -208,7 +208,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-sm">
+            <tbody className="divide-y divide-line text-sm">
               {items.map((match) => {
                 const season = seasonMap.get(match.seasonId);
                 const game = season ? gameMap.get(season.gameId) : null;
@@ -216,12 +216,12 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                 const isSaving = savingId === match.id;
 
                 return (
-                  <tr key={match.id} className="hover:bg-slate-800/10 transition-colors">
+                  <tr key={match.id} className="hover:bg-line/10 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-200 text-xs uppercase tracking-wider">
+                      <div className="font-bold text-foreground text-xs uppercase tracking-wider">
                         {game?.shortName} • {season?.name}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                      <div className="text-[11px] text-foreground-muted font-semibold mt-0.5">
                         {new Date(match.scheduledAt).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -236,7 +236,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                       <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-3">
                         <div className="text-right w-28 truncate">
                           <span className="block font-semibold text-white text-sm truncate" title={match.homeTeam}>{match.homeTeam}</span>
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{match.division}</span>
+                          <span className="text-[10px] text-foreground-muted font-semibold uppercase tracking-wider">{match.division}</span>
                         </div>
 
                         <div className="flex items-center gap-1">
@@ -246,24 +246,24 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                             inputMode="numeric"
                             pattern="[0-9]*"
                             defaultValue={match.homeScore ?? ''}
-                            className="w-10 h-8 bg-slate-950 border border-slate-800 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 text-xs font-bold"
+                            className="w-10 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
                             placeholder="-"
                           />
-                          <span className="text-slate-600 text-[10px] font-bold uppercase select-none">vs</span>
+                          <span className="text-foreground-muted text-[10px] font-bold uppercase select-none">vs</span>
                           <input
                             name="awayScore"
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
                             defaultValue={match.awayScore ?? ''}
-                            className="w-10 h-8 bg-slate-950 border border-slate-800 rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 text-xs font-bold"
+                            className="w-10 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
                             placeholder="-"
                           />
                         </div>
 
                         <div className="text-left w-28 truncate">
                           <span className="block font-semibold text-white text-sm truncate" title={match.awayTeam}>{match.awayTeam}</span>
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{match.division}</span>
+                          <span className="text-[10px] text-foreground-muted font-semibold uppercase tracking-wider">{match.division}</span>
                         </div>
                       </form>
                     </td>
@@ -273,13 +273,13 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                         name="status"
                         form={`form-${match.id}`}
                         defaultValue={match.status}
-                        className="px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-ez-pink/50 cursor-pointer font-medium"
+                        className="px-2 py-1 bg-surface-sunken border border-line rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer font-medium"
                       >
-                        <option value="scheduled" className="bg-slate-900 text-white">Scheduled</option>
-                        <option value="live" className="bg-slate-900 text-white">Live</option>
-                        <option value="completed" className="bg-slate-900 text-white">Completed</option>
-                        <option value="forfeit" className="bg-slate-900 text-white">Forfeit</option>
-                        <option value="cancelled" className="bg-slate-900 text-white">Cancelled</option>
+                        <option value="scheduled" className="bg-surface-raised text-white">Scheduled</option>
+                        <option value="live" className="bg-surface-raised text-white">Live</option>
+                        <option value="completed" className="bg-surface-raised text-white">Completed</option>
+                        <option value="forfeit" className="bg-surface-raised text-white">Forfeit</option>
+                        <option value="cancelled" className="bg-surface-raised text-white">Cancelled</option>
                       </select>
                     </td>
 
@@ -289,7 +289,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                           type="submit"
                           form={`form-${match.id}`}
                           disabled={isSaving}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSaving ? 'Saving…' : 'Save'}
                         </button>
@@ -300,7 +300,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                           }}
                           message={`Permanently delete this match (${match.homeTeam} vs ${match.awayTeam})? This cannot be undone.`}
                           label="Delete"
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+                          className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
                         />
                       </div>
                     </td>
@@ -312,17 +312,17 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
         </div>
       )}
 
-      <div className="px-6 py-4 border-t border-zinc-800 text-center">
+      <div className="px-6 py-4 border-t border-line text-center">
         {cursor ? (
           <button
             onClick={loadMore}
             disabled={isLoading}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded text-slate-300 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer disabled:opacity-50"
           >
             {isLoading ? 'Loading…' : `Load ${PAGE_SIZE} more`}
           </button>
         ) : (
-          <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider">
+          <span className="text-[11px] text-foreground-muted font-bold uppercase tracking-wider">
             {items.length > 0 ? 'All matching fixtures loaded' : ''}
           </span>
         )}

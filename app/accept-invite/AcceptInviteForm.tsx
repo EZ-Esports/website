@@ -39,7 +39,7 @@ export default function AcceptInviteForm({ token, email }: { token: string; emai
           type="email"
           value={email}
           readOnly
-          className="w-full px-4 py-3 bg-background/60 border border-custom-border/80 rounded-lg text-foreground-secondary cursor-not-allowed"
+          className="w-full px-4 py-3 bg-surface/60 border border-line/80 rounded-lg text-foreground-secondary cursor-not-allowed"
         />
       </div>
 
@@ -54,7 +54,7 @@ export default function AcceptInviteForm({ token, email }: { token: string; emai
           required
           minLength={MIN_PASSWORD_LENGTH}
           placeholder="••••••••"
-          className="w-full px-4 py-3 bg-background border border-custom-border/80 rounded-lg text-foreground placeholder-foreground-secondary/40 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
+          className="w-full px-4 py-3 bg-surface border border-line/80 rounded-lg text-foreground placeholder-foreground-secondary/40 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
 
@@ -69,7 +69,7 @@ export default function AcceptInviteForm({ token, email }: { token: string; emai
           required
           minLength={MIN_PASSWORD_LENGTH}
           placeholder="••••••••"
-          className="w-full px-4 py-3 bg-background border border-custom-border/80 rounded-lg text-foreground placeholder-foreground-secondary/40 focus:outline-none focus:ring-2 focus:ring-ez-pink focus:border-transparent transition-all"
+          className="w-full px-4 py-3 bg-surface border border-line/80 rounded-lg text-foreground placeholder-foreground-secondary/40 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
         />
       </div>
 
@@ -83,7 +83,7 @@ export default function AcceptInviteForm({ token, email }: { token: string; emai
         type="submit"
         disabled={isPending}
         aria-busy={isPending}
-        className="w-full py-3 bg-ez-pink hover:bg-ez-pink/80 text-ez-black font-semibold rounded-lg shadow-lg hover:shadow-ez-pink/20 focus:outline-none focus:ring-2 focus:ring-ez-pink transition-all cursor-pointer mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full py-3 bg-accent hover:bg-accent/80 text-on-accent font-semibold rounded-lg shadow-lg hover:shadow-accent/20 focus:outline-none focus:ring-2 focus:ring-accent transition-all cursor-pointer mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isPending ? 'Creating account…' : 'Create account'}
       </button>

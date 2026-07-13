@@ -91,9 +91,9 @@ export default function ImageUpload({
 
   return (
     <div ref={rootRef}>
-      <label className="block text-sm text-zinc-400 mb-1">
+      <label className="block text-sm text-foreground-secondary mb-1">
         {label}
-        {required && <span className="text-ez-pink ml-1">*</span>}
+        {required && <span className="text-accent ml-1">*</span>}
       </label>
 
       {/* Hidden inputs that submit to parent form */}
@@ -114,15 +114,15 @@ export default function ImageUpload({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="bg-ez-pink text-black px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-ez-pink/90 transition-all disabled:opacity-50 cursor-pointer"
+          className="bg-accent text-black px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-accent/90 transition-all disabled:opacity-50 cursor-pointer"
         >
           {uploading ? 'Uploading…' : 'Choose File'}
         </button>
         {uploading && (
-          <span className="text-zinc-400 text-sm">Uploading…</span>
+          <span className="text-foreground-secondary text-sm">Uploading…</span>
         )}
         {!uploading && !previewUrl && (
-          <span className="text-zinc-600 text-sm">No file chosen</span>
+          <span className="text-foreground-muted text-sm">No file chosen</span>
         )}
       </div>
 

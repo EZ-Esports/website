@@ -84,12 +84,12 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
     });
   }, [rosters, selectedGameId, teamMap]);
 
-  const inputClass = "w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-ez-pink/50 transition-all";
+  const inputClass = "w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent/50 transition-all";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="seasonId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+        <label htmlFor="seasonId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
           Active Season
         </label>
         <select
@@ -103,7 +103,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
           {seasons.map((s) => {
             const game = gameMap.get(s.gameId);
             return (
-              <option key={s.id} value={s.id} className="bg-slate-900 text-white">
+              <option key={s.id} value={s.id} className="bg-surface-raised text-white">
                 {game?.displayName || 'Game'} - {s.name}
               </option>
             );
@@ -113,7 +113,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="homeRosterId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+          <label htmlFor="homeRosterId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
             Home Roster
           </label>
           <select
@@ -124,11 +124,11 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
             onChange={(e) => setHomeRosterId(e.target.value)}
             className={inputClass}
           >
-            <option value="" className="bg-slate-900 text-slate-500">Select Team</option>
+            <option value="" className="bg-surface-raised text-foreground-muted">Select Team</option>
             {filteredRosters.map((r) => {
               const team = teamMap.get(r.teamId);
               return (
-                <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                <option key={r.id} value={r.id} className="bg-surface-raised text-white">
                   {team?.name} ({r.division})
                 </option>
               );
@@ -137,7 +137,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
         </div>
 
         <div>
-          <label htmlFor="awayRosterId" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+          <label htmlFor="awayRosterId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
             Away Roster
           </label>
           <select
@@ -148,11 +148,11 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
             onChange={(e) => setAwayRosterId(e.target.value)}
             className={inputClass}
           >
-            <option value="" className="bg-slate-900 text-slate-500">Select Team</option>
+            <option value="" className="bg-surface-raised text-foreground-muted">Select Team</option>
             {filteredRosters.map((r) => {
               const team = teamMap.get(r.teamId);
               return (
-                <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                <option key={r.id} value={r.id} className="bg-surface-raised text-white">
                   {team?.name} ({r.division})
                 </option>
               );
@@ -162,7 +162,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
       </div>
 
       <div>
-        <label htmlFor="scheduledAt" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+        <label htmlFor="scheduledAt" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
           Date & Time
         </label>
         <input
@@ -177,7 +177,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
       <button
         type="submit"
         disabled={sameRoster || isPending || seasons.length === 0}
-        className="w-full py-2.5 bg-white hover:bg-slate-200 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full py-2.5 bg-white hover:bg-foreground text-surface-sunken text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {isPending ? 'Scheduling…' : 'Schedule Match'}
       </button>
@@ -207,7 +207,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
           role="status"
           aria-live="polite"
           className={`text-[11px] mt-2 font-semibold ${
-            feedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'
+            feedback.type === 'success' ? 'text-success' : 'text-red-400'
           }`}
         >
           {feedback.message}

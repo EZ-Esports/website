@@ -13,8 +13,8 @@ export default async function AcceptInvitePage({
   const invite = token ? await findValidInvite(token) : null;
 
   return (
-    <main className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-md bg-background-secondary border border-custom-border/80 rounded-2xl p-8 shadow-2xl space-y-6">
+    <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
+      <div className="w-full max-w-md bg-surface-raised border border-line/80 rounded-2xl p-8 shadow-2xl space-y-6">
         {!invite ? (
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Invite not valid</h1>
@@ -22,7 +22,7 @@ export default async function AcceptInvitePage({
               This invite link is invalid, has already been used, or has expired. Ask an existing admin
               to send you a new one.
             </p>
-            <Link href="/login" className="inline-block text-sm text-ez-pink hover:underline">
+            <Link href="/login" className="inline-block text-sm text-accent hover:underline">
               Go to sign in
             </Link>
           </div>

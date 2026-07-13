@@ -45,16 +45,16 @@ export default async function AdminRosterPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-l-4 border-l-ez-pink hover:shadow-none duration-300">
+      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
         <h1 className="text-2xl font-black text-white uppercase tracking-wider">Teams & Roster Manager</h1>
-        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
           Manage competitive rosters, assign players to teams, and configure game-specific lineups for each season.
         </p>
       </Card>
       {dbError ? (
         <DbErrorNotice variant="error" />
       ) : (
-        <Suspense fallback={<div className="text-slate-500 text-sm">Loading…</div>}>
+        <Suspense fallback={<div className="text-foreground-muted text-sm">Loading…</div>}>
           <RosterExplorer
             games={games}
             teams={teams}

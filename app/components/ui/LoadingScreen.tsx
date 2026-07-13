@@ -62,7 +62,7 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
           role="status"
           aria-live="polite"
           aria-label="Loading EZ"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-surface"
           initial={{ opacity: 1 }}
           exit={{
             /* Phase 3: overlay fade out */
@@ -77,7 +77,7 @@ export default function LoadingScreen({ onComplete, reducedMotion }: LoadingScre
           {/* Phase 0 & 2: E bar - extends when phase === 2 */}
           <AnimatedBar
             letter="E"
-            backgroundColor="bg-ez-pink"
+            backgroundColor="bg-accent"
             offsetX="calc(-6vw - 52px)"
             phase={phase}
           />

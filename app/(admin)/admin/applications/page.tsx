@@ -41,12 +41,12 @@ export default async function ApplicationsAdminPage({
     <div className="space-y-8">
       {!dbConfigured && <DbErrorNotice />}
 
-      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
+      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <h2 className="text-lg font-black text-white uppercase tracking-wider">
             School Applications
             {dbConfigured && (
-              <span className="ml-2 text-slate-400 font-normal text-sm">({applications.length})</span>
+              <span className="ml-2 text-foreground-secondary font-normal text-sm">({applications.length})</span>
             )}
           </h2>
 
@@ -59,8 +59,8 @@ export default async function ApplicationsAdminPage({
                 scroll={false}
                 className={`text-[10px] font-bold px-3 py-1.5 rounded-lg capitalize transition-all border ${
                   statusFilter === s
-                    ? 'bg-ez-pink/10 text-white border-ez-pink/40'
-                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                    ? 'bg-accent/10 text-white border-accent/40'
+                    : 'bg-surface-raised text-foreground-secondary border-line hover:text-white hover:border-line'
                 }`}
               >
                 {STATUS_LABELS[s]}
@@ -70,25 +70,25 @@ export default async function ApplicationsAdminPage({
         </div>
 
         {applications.length === 0 ? (
-          <p className="text-slate-400 text-sm">
+          <p className="text-foreground-secondary text-sm">
             {statusFilter === 'all' ? 'No applications yet.' : `No ${statusFilter} applications.`}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-ez-pink/20">
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Applicant</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">School</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Role</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Email</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Message</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3 pr-4">Status</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3">Submitted</th>
-                  <th className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider pb-3"></th>
+                <tr className="border-b border-accent/20">
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Applicant</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">School</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Role</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Email</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3">Submitted</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-line/60">
                 {applications.map((app) => (
                   <ApplicationRow key={app.id} app={app} activeFilter={statusFilter} />
                 ))}

@@ -22,8 +22,8 @@ export default async function AdminGroupLayout({
 
   if (!admin) {
     return (
-      <main className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
-        <div className="w-full max-w-md bg-background-secondary border border-custom-border/80 rounded-2xl p-8 shadow-2xl space-y-6 text-center">
+      <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
+        <div className="w-full max-w-md bg-surface-raised border border-line/80 rounded-2xl p-8 shadow-2xl space-y-6 text-center">
           <div className="space-y-2">
             <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
               Access denied
@@ -36,7 +36,7 @@ export default async function AdminGroupLayout({
           <form action={logout}>
             <button
               type="submit"
-              className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-semibold rounded-lg border border-custom-border/80 transition-all cursor-pointer"
+              className="w-full py-3 bg-surface-raised hover:bg-line text-foreground font-semibold rounded-lg border border-line/80 transition-all cursor-pointer"
             >
               Sign out
             </button>

@@ -20,15 +20,15 @@ export default function AdminError({ error, reset }: ErrorProps) {
           <HiExclamationTriangle className="w-7 h-7 text-red-400 shrink-0 mt-0.5" />
           <div className="space-y-2">
             <h2 className="text-lg font-black text-red-400 tracking-tight">Something went wrong</h2>
-            <p className="text-slate-300 text-sm leading-relaxed">
+            <p className="text-foreground-secondary text-sm leading-relaxed">
               {error.message || 'An unexpected error occurred loading this page.'}
             </p>
             {error.digest && (
-              <p className="text-xs text-slate-600 font-mono">Error ID: {error.digest}</p>
+              <p className="text-xs text-foreground-muted font-mono">Error ID: {error.digest}</p>
             )}
             <button
               onClick={reset}
-              className="mt-4 px-5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+              className="mt-4 px-5 py-2 bg-surface-raised hover:bg-line border border-line hover:border-line text-foreground font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
             >
               Try again
             </button>

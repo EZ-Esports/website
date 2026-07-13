@@ -32,7 +32,7 @@ export default async function GalleryAdminPage() {
   return (
     <div className="space-y-8">
       {/* Add Image Form */}
-      <Card className="bg-slate-900/30 border border-slate-800 border-l-4 border-l-ez-pink">
+      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
         <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add Gallery Image</h2>
         <AddEntityForm action={addGalleryImage} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
@@ -40,60 +40,60 @@ export default async function GalleryAdminPage() {
           </div>
           <div>
             {/* Caption is required — it also serves as the image alt text (WCAG) */}
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-              Caption / Alt Text <span className="text-ez-pink">*</span>
+            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+              Caption / Alt Text <span className="text-accent">*</span>
             </label>
             <input
               name="caption"
               type="text"
               required
               placeholder="Spring 2022 Championship (used as image alt text)"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">School Name</label>
+            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">School Name</label>
             <input
               name="schoolName"
               type="text"
               placeholder="Stuyvesant High School"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Event Name</label>
+            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Event Name</label>
             <input
               name="eventName"
               type="text"
               placeholder="Spring 2022 Finals"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gallery Set</label>
+            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Gallery Set</label>
             <select
               name="setId"
               defaultValue="1"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             >
               <option value="1">Set 1 (Primary)</option>
               <option value="2">Set 2 (Secondary)</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Display Order</label>
+            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
             <input
               name="displayOrder"
               type="number"
               defaultValue="0"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-zinc-800 text-white text-sm focus:outline-none focus:ring-2 focus:ring-ez-pink/40 focus:border-ez-pink/60 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
           <div className="sm:col-span-2">
             <SubmitButton
               label="Add Image"
               pendingLabel="Adding…"
-              className="px-6 py-2.5 bg-ez-pink text-ez-black rounded-lg font-bold text-sm hover:bg-ez-pink/80 transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-accent text-on-accent rounded-lg font-bold text-sm hover:bg-accent/80 transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </AddEntityForm>
@@ -105,7 +105,7 @@ export default async function GalleryAdminPage() {
       <div className="space-y-4">
         <h2 className="text-xl font-black text-white uppercase tracking-wider">Gallery Set 1</h2>
         {set1.length === 0 ? (
-          <p className="text-slate-500 text-sm">No images in Set 1 yet.</p>
+          <p className="text-foreground-muted text-sm">No images in Set 1 yet.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
             {set1.map((img) => (
@@ -119,7 +119,7 @@ export default async function GalleryAdminPage() {
       <div className="space-y-4">
         <h2 className="text-xl font-black text-white uppercase tracking-wider">Gallery Set 2</h2>
         {set2.length === 0 ? (
-          <p className="text-slate-500 text-sm">No images in Set 2 yet.</p>
+          <p className="text-foreground-muted text-sm">No images in Set 2 yet.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
             {set2.map((img) => (

@@ -8,15 +8,15 @@ export default function AdminNewNewsPostPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center">
-        <Link href="/admin/news" className="text-xs font-bold text-slate-400 hover:text-ez-pink uppercase tracking-widest transition-colors">
+        <Link href="/admin/news" className="text-xs font-bold text-foreground-secondary hover:text-accent uppercase tracking-widest transition-colors">
           ← Back to News list
         </Link>
       </div>
 
-      <Card className="p-8 space-y-6 hover:shadow-none hover:border-slate-800/80 duration-300">
+      <Card className="p-8 space-y-6 hover:shadow-none hover:border-line/80 duration-300">
         <div>
           <h1 className="text-2xl font-black text-white uppercase tracking-wider">Write Announcement</h1>
-          <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">Publish news updates to the public league portal.</p>
+          <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">Publish news updates to the public league portal.</p>
         </div>
 
         <NewsPostForm action={createNewsPost} status="new" />

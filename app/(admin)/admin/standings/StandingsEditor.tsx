@@ -31,23 +31,23 @@ function StandingFields({ row, division }: { row?: StandingRow; division: string
     <>
       <input type="hidden" name="division" value={division} />
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rank</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Rank</span>
         <input name="rank" type="number" min="1" defaultValue={row?.rank ?? ''} className={numInput} />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Wins</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Wins</span>
         <input name="wins" type="number" min="0" defaultValue={row?.wins ?? ''} className={numInput} />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Losses</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Losses</span>
         <input name="losses" type="number" min="0" defaultValue={row?.losses ?? ''} className={numInput} />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Games</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Games</span>
         <input name="gamesPlayed" type="number" min="0" defaultValue={row?.gamesPlayed ?? ''} className={numInput} />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Win %</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Win %</span>
         <input
           name="winPct"
           type="number"
@@ -60,19 +60,19 @@ function StandingFields({ row, division }: { row?: StandingRow; division: string
         />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Points</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Points</span>
         <input name="points" type="number" min="0" step="0.5" defaultValue={row?.points ?? ''} className={numInput} />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Player (individual)</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Player (individual)</span>
         <input name="playerName" defaultValue={row?.playerName ?? ''} placeholder="Leave blank for team rows" className={`${input} w-44`} />
       </label>
       <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Player IGN</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Player IGN</span>
         <input name="playerIgn" defaultValue={row?.playerIgn ?? ''} className={`${input} w-36`} />
       </label>
       <label className="block space-y-1 grow min-w-[180px]">
-        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Notes</span>
+        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Notes</span>
         <input name="notes" defaultValue={row?.notes ?? ''} placeholder="e.g. Total Points: 120" className={input} />
       </label>
     </>
@@ -140,11 +140,11 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
           className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-between ${
             toast.type === 'error'
               ? 'bg-red-950/30 border-red-900/50 text-red-300'
-              : 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
+              : 'bg-success/30 border-success/50 text-success'
           }`}
         >
           <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-200" aria-label="Dismiss">
+          <button onClick={() => setToast(null)} className="text-foreground-secondary hover:text-foreground" aria-label="Dismiss">
             <FiX />
           </button>
         </div>
@@ -172,8 +172,8 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
               onClick={() => setDivision(d)}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 division === d
-                  ? 'bg-ez-pink text-ez-black'
-                  : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-surface-raised border border-line/80 text-foreground-secondary hover:text-white'
               }`}
             >
               {d}{usedDivisions.has(d) ? '' : ' (empty)'}
@@ -194,11 +194,11 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
       {adding && seasonId && (
         <form
           onSubmit={(e) => runForm(e, createStanding, 'Standing added.', () => setAdding(false))}
-          className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 flex flex-wrap items-end gap-3"
+          className="bg-surface-sunken/60 border border-line rounded-xl p-4 flex flex-wrap items-end gap-3"
         >
           <input type="hidden" name="seasonId" value={seasonId} />
           <label className="block space-y-1">
-            <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">School *</span>
+            <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">School *</span>
             <select name="schoolId" required defaultValue="" className={`${input} w-56`}>
               <option value="" disabled>Select school…</option>
               {schools.map((s) => (
@@ -212,17 +212,17 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
       )}
 
       {/* Standings table */}
-      <div className="bg-[#1c1c1c]/60 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
+      <div className="bg-[#1c1c1c]/60 border border-line rounded-2xl overflow-hidden shadow-xl shadow-black/20">
         {rows === null ? (
-          <div className="text-center p-12 text-slate-500 text-sm">Loading standings…</div>
+          <div className="text-center p-12 text-foreground-muted text-sm">Loading standings…</div>
         ) : divisionRows.length === 0 ? (
-          <div className="text-center p-12 text-slate-500 text-sm">
+          <div className="text-center p-12 text-foreground-muted text-sm">
             No {division} snapshot rows for this season. Use “Add row” to record final standings.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-[#0b101d] border-b border-slate-900 text-xs font-bold text-slate-400 uppercase tracking-widest">
+              <thead className="bg-[#0b101d] border-b border-surface-raised text-xs font-bold text-foreground-secondary uppercase tracking-widest">
                 <tr>
                   <th className="px-4 py-3">Rank</th>
                   <th className="px-4 py-3">School / Player</th>
@@ -234,17 +234,17 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-line">
                 {divisionRows.map((row) => {
                   if (editingId === row.id) {
                     return (
-                      <tr key={row.id} className="bg-slate-900/40">
+                      <tr key={row.id} className="bg-surface-raised/40">
                         <td colSpan={8} className="px-4 py-3">
                           <form
                             onSubmit={(e) => runForm(e, (fd) => updateStanding(row.id, fd), 'Standing updated.', () => setEditingId(null))}
                             className="flex flex-wrap items-end gap-3"
                           >
-                            <div className="text-xs font-bold text-slate-300 pb-2 w-full">{row.schoolName}</div>
+                            <div className="text-xs font-bold text-foreground-secondary pb-2 w-full">{row.schoolName}</div>
                             <StandingFields row={row} division={division} />
                             <div className="flex gap-2 pb-0.5">
                               <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
@@ -258,26 +258,26 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                     );
                   }
                   return (
-                    <tr key={row.id} className="hover:bg-slate-800/10 transition-colors group">
-                      <td className="px-4 py-3 font-bold text-slate-300">{row.rank ?? '—'}</td>
+                    <tr key={row.id} className="hover:bg-line/10 transition-colors group">
+                      <td className="px-4 py-3 font-bold text-foreground-secondary">{row.rank ?? '—'}</td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-white">{row.playerName ?? row.schoolName}</div>
                         {row.playerName && (
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-[11px] text-foreground-muted">
                             {row.schoolName}
                             {row.playerIgn ? ` · ${row.playerIgn}` : ''}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-400 font-medium">
+                      <td className="px-4 py-3 text-foreground-secondary font-medium">
                         {row.wins !== null || row.losses !== null ? `${row.wins ?? 0}-${row.losses ?? 0}` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-slate-400">{row.gamesPlayed ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-300 font-bold">
+                      <td className="px-4 py-3 text-foreground-secondary">{row.gamesPlayed ?? '—'}</td>
+                      <td className="px-4 py-3 text-foreground-secondary font-bold">
                         {row.winPct !== null ? `${(row.winPct * 100).toFixed(1)}%` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-slate-400">{row.points ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 text-xs max-w-[220px] truncate" title={row.notes ?? ''}>
+                      <td className="px-4 py-3 text-foreground-secondary">{row.points ?? '—'}</td>
+                      <td className="px-4 py-3 text-foreground-muted text-xs max-w-[220px] truncate" title={row.notes ?? ''}>
                         {row.notes ?? ''}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -293,7 +293,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                             }}
                             message={`Delete the ${row.playerName ?? row.schoolName} row from these standings? This cannot be undone.`}
                             label="Delete"
-                            className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-[10px] uppercase tracking-wider rounded text-slate-300 hover:text-red-400 border border-slate-800 transition-all cursor-pointer"
+                            className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-[10px] uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line transition-all cursor-pointer"
                           />
                         </div>
                       </td>
@@ -306,7 +306,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
         )}
       </div>
 
-      <p className="text-[11px] text-slate-600 leading-relaxed">
+      <p className="text-[11px] text-foreground-muted leading-relaxed">
         These snapshots power the public standings pages for seasons whose match scores were never recorded.
         Seasons without snapshot rows fall back to standings computed live from match results.
         For individual competitions (e.g. TFT), set the player name and keep W-L blank.

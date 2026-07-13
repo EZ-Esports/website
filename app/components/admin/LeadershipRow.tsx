@@ -14,7 +14,7 @@ interface Leader {
 }
 
 const inputClass =
-  'w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-ez-pink/50 focus:border-ez-pink/30 transition-all';
+  'w-full px-3.5 py-2.5 bg-surface-sunken border border-line/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all';
 
 export default function LeadershipRow({ leader }: { leader: Leader }) {
   const [editing, setEditing] = useState(false);
@@ -36,7 +36,7 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
 
   if (editing) {
     return (
-      <tr className="bg-slate-800/20 transition-colors">
+      <tr className="bg-line/20 transition-colors">
         <td colSpan={4} className="px-6 py-4">
           <form
             action={async (formData) => {
@@ -51,33 +51,33 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
           >
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Name</label>
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Name</label>
               <input ref={firstFieldRef} name="name" type="text" required defaultValue={leader.name} className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Role</label>
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Role</label>
               <input name="role" type="text" required defaultValue={leader.role} className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Year</label>
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Year</label>
               <input name="year" type="text" required pattern="[0-9]{4}" title="Four-digit year, e.g. 2026" defaultValue={leader.year} className={inputClass} />
             </div>
             <div className="sm:col-span-2 lg:col-span-4">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bio</label>
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Bio</label>
               <textarea name="bio" rows={3} defaultValue={leader.bio ?? ''} className={`${inputClass} resize-none`} />
             </div>
             <div className="sm:col-span-2 lg:col-span-4 flex gap-2 justify-end pt-1">
               <button
                 type="button"
                 onClick={closeEditing}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-400 border border-slate-800 transition-all cursor-pointer"
+                className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary border border-line transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <SubmitButton
                 label="Save"
                 pendingLabel="Saving…"
-                className="px-3 py-1.5 bg-ez-pink hover:bg-ez-pink/80 font-bold text-xs uppercase tracking-wider rounded-lg text-ez-black transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-accent hover:bg-accent/80 font-bold text-xs uppercase tracking-wider rounded-lg text-on-accent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             {saveError && (
@@ -90,22 +90,22 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
   }
 
   return (
-    <tr className="hover:bg-slate-800/10 transition-colors">
+    <tr className="hover:bg-line/10 transition-colors">
       <td className="px-6 py-4">
         <div className="font-bold text-white text-base tracking-tight">{leader.name}</div>
-        <div className="text-xs text-slate-400 max-w-xs truncate mt-1 leading-relaxed">
+        <div className="text-xs text-foreground-secondary max-w-xs truncate mt-1 leading-relaxed">
           {leader.bio || 'No bio provided.'}
         </div>
       </td>
-      <td className="px-6 py-4 font-bold text-slate-200">{leader.role}</td>
-      <td className="px-6 py-4 text-slate-300 font-semibold">{leader.year}</td>
+      <td className="px-6 py-4 font-bold text-foreground">{leader.role}</td>
+      <td className="px-6 py-4 text-foreground-secondary font-semibold">{leader.year}</td>
       <td className="px-6 py-4 text-right">
         <div className="flex gap-2 justify-end">
           <button
             ref={editBtnRef}
             type="button"
             onClick={() => setEditing(true)}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-200 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+            className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
           >
             Edit
           </button>
@@ -113,7 +113,7 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
             action={deleteAction}
             label="Remove"
             message={`Remove ${leader.name} (${leader.role}, ${leader.year}) from the public leadership page?`}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer"
+            className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
           />
         </div>
       </td>

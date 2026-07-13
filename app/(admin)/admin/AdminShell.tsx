@@ -72,13 +72,13 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
   };
 
   return (
-    <div className="min-h-screen bg-[#111111] flex text-zinc-100 font-sans">
+    <div className="min-h-screen bg-[#111111] flex text-foreground font-sans">
       {/* Left Sidebar */}
-      <aside className="w-64 bg-[#1a1a1a] border-r border-zinc-800 flex flex-col shrink-0 z-20">
+      <aside className="w-64 bg-[#1a1a1a] border-r border-line flex flex-col shrink-0 z-20">
         {/* Sidebar Header */}
-        <div className="h-16 px-6 border-b border-zinc-800 flex items-center">
+        <div className="h-16 px-6 border-b border-line flex items-center">
           <Link href="/admin" className="font-extrabold text-xl tracking-tight flex items-center gap-2 cursor-pointer hover:opacity-90">
-            <span className="text-ez-pink font-extrabold">EZ</span>
+            <span className="text-accent font-extrabold">EZ</span>
             <span className="text-white font-extrabold">Staff</span>
           </Link>
         </div>
@@ -97,11 +97,11 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
                 href={item.href}
                 className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-300 group cursor-pointer border-l-2 pl-3 px-4 ${
                   isActive
-                    ? 'bg-ez-pink/5 text-white border-ez-pink font-bold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50 border-transparent'
+                    ? 'bg-accent/5 text-white border-accent font-bold'
+                    : 'text-foreground-secondary hover:text-white hover:bg-surface-raised/50 border-transparent'
                 }`}
               >
-                <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'text-ez-pink scale-110' : 'group-hover:scale-110'}`} />
+                <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'text-accent scale-110' : 'group-hover:scale-110'}`} />
                 <span className="text-sm tracking-wide">{item.label}</span>
               </Link>
             );
@@ -109,10 +109,10 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
         </nav>
 
         {/* Public Site link — separated from admin nav */}
-        <div className="px-3 pb-3 border-b border-zinc-800">
+        <div className="px-3 pb-3 border-b border-line">
           <Link
             href="/"
-            className="flex items-center gap-3 py-2.5 border-l-2 border-transparent pl-3 px-4 text-slate-400 hover:text-white hover:bg-slate-900/50 rounded-xl transition-all duration-300 text-sm tracking-wide"
+            className="flex items-center gap-3 py-2.5 border-l-2 border-transparent pl-3 px-4 text-foreground-secondary hover:text-white hover:bg-surface-raised/50 rounded-xl transition-all duration-300 text-sm tracking-wide"
           >
             <HiOutlineGlobeAlt className="w-5 h-5" />
             <span>Public Site</span>
@@ -120,11 +120,11 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-950/20">
+        <div className="p-4 border-t border-line bg-surface-sunken/20">
           <form action={logout}>
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 hover:text-white border border-zinc-800/80 hover:border-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-surface-raised hover:bg-line hover:text-white border border-line/80 hover:border-line text-foreground-secondary font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
             >
               <HiArrowRightOnRectangle className="w-4 h-4" />
               <span>Sign Out</span>
@@ -136,9 +136,9 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
       {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-zinc-800 bg-[#111111]/40 backdrop-blur-md flex items-center px-8 justify-between z-10">
+        <header className="h-16 border-b border-line bg-[#111111]/40 backdrop-blur-md flex items-center px-8 justify-between z-10">
           <div className="flex items-center gap-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-ez-pink" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
             <h2 className="text-base font-bold text-white uppercase tracking-wider">{getPageTitle()}</h2>
           </div>
         </header>

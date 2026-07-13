@@ -39,33 +39,33 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
   if (removed) return null;
 
   return (
-    <tr className="hover:bg-zinc-900/40 transition-colors">
+    <tr className="hover:bg-surface-raised/40 transition-colors">
       <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">{app.applicantName}</td>
-      <td className="py-3 pr-4 text-slate-300">{app.schoolName}</td>
-      <td className="py-3 pr-4 text-slate-300 capitalize">{app.role}</td>
+      <td className="py-3 pr-4 text-foreground-secondary">{app.schoolName}</td>
+      <td className="py-3 pr-4 text-foreground-secondary capitalize">{app.role}</td>
       <td className="py-3 pr-4">
         <a
           href={`mailto:${app.email}`}
-          className="text-slate-400 hover:text-white transition-colors"
+          className="text-foreground-secondary hover:text-white transition-colors"
         >
           {app.email}
         </a>
       </td>
-      <td className="py-3 pr-4 text-slate-400 max-w-[240px] whitespace-pre-line">
+      <td className="py-3 pr-4 text-foreground-secondary max-w-[240px] whitespace-pre-line">
         {message ? (
           <>
             {expanded ? message : (isLong ? `${message.slice(0, 80)}` : message)}
             {isLong && (
               <button
                 onClick={() => setExpanded(v => !v)}
-                className="ml-1 text-slate-500 hover:text-slate-300 transition-colors text-xs cursor-pointer"
+                className="ml-1 text-foreground-muted hover:text-foreground-secondary transition-colors text-xs cursor-pointer"
               >
                 {expanded ? '…less' : '…more'}
               </button>
             )}
           </>
         ) : (
-          <span className="text-zinc-600 italic">—</span>
+          <span className="text-foreground-muted italic">—</span>
         )}
       </td>
       <td className="py-3 pr-4">
@@ -91,7 +91,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-default ${
                 status === s
                   ? activeBadgeClass[s]
-                  : 'bg-zinc-800/50 text-zinc-500 border border-zinc-800 hover:bg-zinc-700/50'
+                  : 'bg-line/50 text-foreground-muted border border-line hover:bg-line/50'
               }`}
             >
               {s}
@@ -102,7 +102,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
           )}
         </div>
       </td>
-      <td className="py-3 text-slate-400 whitespace-nowrap">
+      <td className="py-3 text-foreground-secondary whitespace-nowrap">
         {new Date(app.submittedAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -114,7 +114,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
           action={deleteApplication.bind(null, app.id)}
           message={`Delete application from ${app.applicantName} (${app.schoolName})? This cannot be undone.`}
           label="Delete"
-          className="px-3 py-1.5 bg-slate-900 hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/40 transition-all cursor-pointer whitespace-nowrap"
+          className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer whitespace-nowrap"
         />
       </td>
     </tr>
