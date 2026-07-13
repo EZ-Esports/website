@@ -92,12 +92,16 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
           {/* Dialog must stay a real (focusable) box, not display:contents — RAC's
               Escape-to-close and initial focus both depend on being able to focus
               this element; a `contents` box can never receive focus. */}
-          <Dialog
-            className="outline-none"
-            aria-label={selectedImageIndex !== null ? items[selectedImageIndex]?.alt : 'Photo viewer'}
-          >
-            {/* Keyboard nav needs a real DOM element to attach to (Dialog/Modal don't expose onKeyDown). */}
-            <div className="contents" onKeyDown={handleKeyDown}>
+          {/* Arrow-key nav listens on a PARENT of the Dialog: RAC focuses the Dialog
+              node itself on mount, so keydowns bubble up from it — a handler on an
+              inner element would never fire until focus moved deeper. (Dialog's own
+              props don't accept onKeyDown.) */}
+          <div className="contents" onKeyDown={handleKeyDown}>
+            <Dialog
+              className="outline-none"
+              aria-label={selectedImageIndex !== null ? items[selectedImageIndex]?.alt : 'Photo viewer'}
+              aria-describedby="lightbox-caption"
+            >
               {selectedImageIndex !== null && (
                 <>
                   {/* Close Button */}
@@ -147,8 +151,8 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
                   </div>
                 </>
               )}
-            </div>
-          </Dialog>
+            </Dialog>
+          </div>
         </Modal>
       </Overlay>
     </section>

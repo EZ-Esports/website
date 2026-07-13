@@ -27,6 +27,9 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  // Controlled so a cancelled confirm keeps the menu open (RAC otherwise closes
+  // the menu unconditionally after onAction runs).
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   if (removed) return null;
 
@@ -34,6 +37,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
     if (!window.confirm(`Cancel the pending invite for ${invite.email}? The link will stop working.`)) {
       return;
     }
+    setActionsOpen(false);
     setError(null);
     startTransition(async () => {
       const result = await revokeInvite(invite.id);
@@ -130,7 +134,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
         {!canRevoke ? (
           <span className="text-xs text-foreground-muted italic px-3 select-none">—</span>
         ) : (
-          <MenuTrigger>
+          <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
               className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
               aria-label="More Actions"
@@ -144,6 +148,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
                   id="cancel"
                   textValue="Cancel Invite"
                   isDisabled={isPending}
+                  shouldCloseOnSelect={false}
                   onAction={handleRevoke}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 data-[focused]:text-red-400 data-[focused]:bg-red-950/20 transition-all cursor-pointer data-[disabled]:opacity-50"
                 >

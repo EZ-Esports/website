@@ -42,7 +42,7 @@ export default function SeasonSelect({ basePath, seasons, selected, extraParams 
         <SelectValue />
         <FiChevronDown className="w-3.5 h-3.5 text-foreground-muted" aria-hidden="true" />
       </Button>
-      <Popover className="bg-surface-sunken border border-line rounded-xl p-1.5 shadow-2xl">
+      <Popover className="min-w-[var(--trigger-width)] bg-surface-sunken border border-line rounded-xl p-1.5 shadow-2xl">
         <ListBox className="outline-none">
           {seasons.map((s) => (
             <ListBoxItem
