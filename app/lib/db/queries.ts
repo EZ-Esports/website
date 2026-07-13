@@ -414,7 +414,6 @@ export const getCachedHomepageGallery = unstable_cache(
         src: schema.galleryImages.src,
         caption: schema.galleryImages.caption,
         setId: schema.galleryImages.setId,
-        displayOrder: schema.galleryImages.displayOrder,
       })
       .from(schema.galleryImages)
       .where(
@@ -430,18 +429,17 @@ export const getCachedHomepageGallery = unstable_cache(
       );
 
     // Defensive de-dupe: bad data entry has occasionally produced two active rows
-    // for the same set that either occupy the same display_order slot or point at
-    // the same underlying image file (by basename). Silently drop the later
-    // duplicate so the homepage doesn't render the same photo twice. The real
-    // fix is cleaning up the gallery_images table; this just guards presentation.
-    const seenSlot = new Set<string>();
+    // for the same set pointing at the same underlying image file (by basename).
+    // Silently drop the later duplicate so the homepage doesn't render the same
+    // photo twice. Deliberately NOT keyed on display_order: it defaults to 0 in
+    // both the schema and the admin upload form, so distinct images routinely
+    // share a slot. The real fix is cleaning up the gallery_images table; this
+    // just guards presentation.
     const seenSrc = new Set<string>();
     const dedupedRows = rows.filter((row) => {
       const basename = row.src.split('/').pop() ?? row.src;
-      const slotKey = `${row.setId}:${row.displayOrder}`;
       const srcKey = `${row.setId}:${basename}`;
-      if (seenSlot.has(slotKey) || seenSrc.has(srcKey)) return false;
-      seenSlot.add(slotKey);
+      if (seenSrc.has(srcKey)) return false;
       seenSrc.add(srcKey);
       return true;
     });
