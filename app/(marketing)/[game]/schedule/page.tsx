@@ -2,10 +2,12 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
-import ContentSection from '@/app/components/sections/ContentSection';
+import Section from '@/app/components/ui/Section';
+import { SectionHeader } from '@/app/components/ui/SectionHeader';
+import FilterTabs from '@/app/components/ui/FilterTabs';
+import Button from '@/app/components/ui/Button';
 import { getMatchesPage, getSeasonMatches, getSeasonsWithGames } from '@/app/lib/db/queries';
 import { normalizeSort, resolveSelectedSeason, toMatchesPageDto } from '@/app/lib/db/match-page';
-import Link from 'next/link';
 import CalendarSchedule from './CalendarSchedule';
 import ArchiveMatchList from './ArchiveMatchList';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
@@ -96,77 +98,66 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
 
   return (
     <main>
-      <h1 className="sr-only">{gameConfig.displayName} Schedule — EZ Esports</h1>
-      <ContentSection
-        heading={`${gameConfig.displayName} Schedule`}
-        description={
-          isArchived
-            ? `Archived results from the ${selectedSeason?.name} season`
-            : 'View all scheduled matches for the current season'
-        }
-        theme="dark"
-      >
-        <div className="max-w-6xl mx-auto">
-          {/* Filters: division tabs, season picker, sort (archive only) */}
-          <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
-            <div className="flex gap-2">
-              {['Varsity', 'JV'].map((d) => (
-                <Link
-                  key={d}
-                  href={filterHref(d, sort)}
-                  className={`px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all ${
-                    division === d
-                      ? 'bg-ez-pink text-ez-black hover:bg-ez-pink/80'
-                      : 'bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700'
-                  }`}
-                >
-                  {d}
-                </Link>
-              ))}
-            </div>
+      <Section>
+        <SectionHeader
+          as="h1"
+          title={`${gameConfig.displayName} Schedule`}
+          lead={
+            isArchived
+              ? `Archived results from the ${selectedSeason?.name} season`
+              : 'View all scheduled matches for the current season'
+          }
+        />
 
-            {seasons.length > 1 && selectedSeason && (
-              <SeasonSelect
-                basePath={`/${game}/schedule`}
-                seasons={seasons.map((s) => ({ name: s.name, isActive: s.isActive }))}
-                selected={selectedSeason.name}
-                extraParams={{ division, sort }}
-              />
-            )}
+        {/* Filters: division tabs, season picker, sort (archive only) */}
+        <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+          <FilterTabs
+            tabs={['Varsity', 'JV'].map((d) => ({
+              label: d,
+              value: d,
+              href: filterHref(d, sort),
+            }))}
+            active={division}
+          />
 
-            {isArchived && (
-              <Link
-                href={filterHref(division, sort === 'desc' ? 'asc' : 'desc')}
-                className="px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
-              >
-                {sort === 'desc' ? 'Newest first ↓' : 'Oldest first ↑'}
-              </Link>
-            )}
-          </div>
-
-          {!selectedSeason ? (
-            <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/20 border border-slate-800/40 rounded-2xl">
-              No seasons found for {gameConfig.displayName} yet.
-            </div>
-          ) : isArchived ? (
-            <ArchiveMatchList
-              key={`${selectedSeason.id}-${division}-${sort}`}
-              seasonId={selectedSeason.id}
-              division={division}
-              sort={sort}
-              initialItems={toMatchesPageDto(archivePage).items}
-              initialCursor={archivePage.nextCursor}
-            />
-          ) : (
-            <CalendarSchedule
-              key={`${game}-${division}`}
-              matches={schedule}
-              gameSlug={game}
-              division={division}
+          {seasons.length > 1 && selectedSeason && (
+            <SeasonSelect
+              basePath={`/${game}/schedule`}
+              seasons={seasons.map((s) => ({ name: s.name, isActive: s.isActive }))}
+              selected={selectedSeason.name}
+              extraParams={{ division, sort }}
             />
           )}
+
+          {isArchived && (
+            <Button href={filterHref(division, sort === 'desc' ? 'asc' : 'desc')} variant="outline">
+              {sort === 'desc' ? 'Newest first ↓' : 'Oldest first ↑'}
+            </Button>
+          )}
         </div>
-      </ContentSection>
+
+        {!selectedSeason ? (
+          <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 border border-line rounded-2xl">
+            No seasons found for {gameConfig.displayName} yet.
+          </div>
+        ) : isArchived ? (
+          <ArchiveMatchList
+            key={`${selectedSeason.id}-${division}-${sort}`}
+            seasonId={selectedSeason.id}
+            division={division}
+            sort={sort}
+            initialItems={toMatchesPageDto(archivePage).items}
+            initialCursor={archivePage.nextCursor}
+          />
+        ) : (
+          <CalendarSchedule
+            key={`${game}-${division}`}
+            matches={schedule}
+            gameSlug={game}
+            division={division}
+          />
+        )}
+      </Section>
     </main>
   );
 }

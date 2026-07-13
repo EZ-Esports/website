@@ -30,12 +30,12 @@ export default function SeasonSelect({ basePath, seasons, selected, extraParams 
 
   return (
     <label className="flex items-center gap-2">
-      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Season</span>
+      <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Season</span>
       <select
         value={selected}
         onChange={(e) => navigate(e.target.value)}
         disabled={isPending}
-        className="px-3 py-2.5 min-h-[44px] text-sm font-bold rounded-lg bg-slate-900 border border-slate-800/80 text-slate-200 hover:border-slate-700 focus:border-ez-pink/60 focus:outline-none transition-all cursor-pointer disabled:opacity-60"
+        className="px-3 py-2.5 min-h-[44px] text-sm font-bold rounded-lg bg-surface border border-line text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50 transition-all cursor-pointer disabled:opacity-60"
       >
         {seasons.map((s) => (
           <option key={s.name} value={s.name}>

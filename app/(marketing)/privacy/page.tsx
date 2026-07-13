@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import ContentSection from '@/app/components/sections/ContentSection';
 import Hero from '@/app/components/sections/Hero';
+import Section from '@/app/components/ui/Section';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | EZ Esports',
@@ -19,9 +19,9 @@ export default function PrivacyPage() {
         size="medium"
       />
 
-      <ContentSection heading="" description="" theme="dark">
+      <Section width="narrow">
         <div className="max-w-3xl mx-auto space-y-10 text-foreground-secondary text-sm sm:text-base leading-relaxed">
-          <p className="text-xs text-foreground-secondary/60 uppercase tracking-wider">
+          <p className="text-xs text-foreground-muted uppercase tracking-wider">
             Last updated: {lastUpdated}
           </p>
 
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
               please contact us at{' '}
               <a
                 href="mailto:info@ezesports.org"
-                className="text-ez-pink hover:underline"
+                className="text-accent hover:underline"
               >
                 info@ezesports.org
               </a>{' '}
@@ -171,7 +171,7 @@ export default function PrivacyPage() {
             <p>
               <a
                 href="mailto:info@ezesports.org"
-                className="text-ez-pink hover:underline font-medium"
+                className="text-accent hover:underline font-medium"
               >
                 info@ezesports.org
               </a>
@@ -205,7 +205,7 @@ export default function PrivacyPage() {
                 Email:{' '}
                 <a
                   href="mailto:info@ezesports.org"
-                  className="text-ez-pink hover:underline"
+                  className="text-accent hover:underline"
                 >
                   info@ezesports.org
                 </a>
@@ -214,7 +214,7 @@ export default function PrivacyPage() {
             </address>
           </div>
         </div>
-      </ContentSection>
+      </Section>
     </main>
   );
 }

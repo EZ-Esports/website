@@ -690,6 +690,147 @@ export async function getGameSeasonSummary(seasonId: string) {
   };
 }
 
+export interface GameHubData {
+  record: string | null;
+  jvRecord: string | null;
+  nextMatch: { date: string; teams: string; division: string } | null;
+  recentResults: { date: string; teams: string; result: string; division: string }[];
+  topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[];
+}
+
+/**
+ * Everything the game hub landing page (/[game]) needs for its active season:
+ * aggregate records, the next scheduled match, the latest results, and the
+ * top-5 varsity teams. Lifted verbatim from the former static hub pages.
+ * Uncached, like its season-summary neighbors: schedule edits must be fresh.
+ */
+export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
+  // Empty-state defaults — no fabricated data
+  let record: string | null = null;
+  let jvRecord: string | null = null;
+  let nextMatch: { date: string; teams: string; division: string } | null = null;
+  let recentResults: { date: string; teams: string; result: string; division: string }[] = [];
+  let topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[] = [];
+
+  try {
+    const gameRow = await db
+      .select()
+      .from(schema.games)
+      .where(eq(schema.games.slug, gameSlug))
+      .limit(1);
+
+    if (gameRow[0]) {
+      const gameId = gameRow[0].id;
+
+      // Get team rows
+      const teamRows = await db
+        .select({
+          id: schema.teams.id,
+          schoolId: schema.teams.schoolId,
+          gameId: schema.teams.gameId,
+          seasonId: schema.teams.seasonId,
+          name: schema.schools.name,
+        })
+        .from(schema.teams)
+        .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+        .where(and(eq(schema.teams.gameId, gameId), isNull(schema.schools.deletedAt)));
+      const teamMap = new Map(teamRows.map((t) => [t.id, t]));
+      const teamIds = teamRows.map((t) => t.id);
+
+      const rosterRows = teamIds.length > 0
+        ? await db.select().from(schema.rosters).where(inArray(schema.rosters.teamId, teamIds))
+        : [];
+      const rosterMap = new Map(rosterRows.map((r) => [r.id, r]));
+
+      // Next Match
+      const activeSeason = await db
+        .select()
+        .from(schema.seasons)
+        .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
+        .limit(1);
+
+      if (activeSeason[0]) {
+        // Fetch the next match, recent results, and season summary in
+        // parallel — they only depend on the active season.
+        const [nextMatchRow, recentRows, summary] = await Promise.all([
+          db
+            .select()
+            .from(schema.matches)
+            .where(
+              and(
+                eq(schema.matches.seasonId, activeSeason[0].id),
+                eq(schema.matches.status, 'scheduled')
+              )
+            )
+            .orderBy(schema.matches.scheduledAt)
+            .limit(1),
+          db
+            .select()
+            .from(schema.matches)
+            .where(
+              and(
+                eq(schema.matches.seasonId, activeSeason[0].id),
+                eq(schema.matches.status, 'completed'),
+                // Unrecorded results (null scores) would otherwise render "L 0-0".
+                isNotNull(schema.matches.homeScore),
+                isNotNull(schema.matches.awayScore)
+              )
+            )
+            .orderBy(desc(schema.matches.scheduledAt))
+            .limit(3),
+          getGameSeasonSummary(activeSeason[0].id),
+        ]);
+        topTeams = summary.topTeams;
+        record = summary.record;
+        jvRecord = summary.jvRecord;
+
+        if (nextMatchRow[0]) {
+          const homeRoster = rosterMap.get(nextMatchRow[0].homeRosterId);
+          const awayRoster = rosterMap.get(nextMatchRow[0].awayRosterId);
+          const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+          const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
+          nextMatch = {
+            date: new Date(nextMatchRow[0].scheduledAt).toLocaleDateString('en-US', {
+              timeZone: 'America/New_York',
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            teams: `${home?.name || 'Home'} vs. ${away?.name || 'Away'}`,
+            division: homeRoster?.division || 'Varsity',
+          };
+        }
+
+
+        recentResults = recentRows.map((r) => {
+          const homeRoster = rosterMap.get(r.homeRosterId);
+          const awayRoster = rosterMap.get(r.awayRosterId);
+          const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
+          const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
+          const homeWon = (r.homeScore ?? 0) > (r.awayScore ?? 0);
+          return {
+            date: new Date(r.scheduledAt).toLocaleDateString('en-US', {
+              timeZone: 'America/New_York',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            teams: `${home?.name ?? 'Home'} vs. ${away?.name ?? 'Away'}`,
+            result: `${homeWon ? 'W' : 'L'} ${r.homeScore ?? 0}-${r.awayScore ?? 0}`,
+            division: homeRoster?.division || 'Varsity',
+          };
+        });
+      }
+
+    }
+  } catch (error) {
+    console.error(`Failed to load dynamic data for ${gameSlug}`, error);
+  }
+
+  return { record, jvRecord, nextMatch, recentResults, topTeams };
+}
+
 // --- ADMIN ACCESS CONTROL ---
 
 /** All provisioned admins, oldest first (the bootstrapped admin leads). */

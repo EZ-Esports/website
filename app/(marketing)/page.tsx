@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Hero from '@/app/components/sections/Hero';
-import ContentSection from '@/app/components/sections/ContentSection';
 import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
@@ -10,7 +9,7 @@ import LeaguePulse from '@/app/components/sections/LeaguePulse';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import Button from '@/app/components/ui/Button';
 import Section from '@/app/components/ui/Section';
-import { Eyebrow } from '@/app/components/ui/SectionHeader';
+import { Eyebrow, SectionHeader } from '@/app/components/ui/SectionHeader';
 import GradientRule from '@/app/components/ui/GradientRule';
 import Image from 'next/image';
 import {
@@ -111,7 +110,6 @@ export default async function HomePage() {
           <MediaGrid
             items={primaryGallery}
             columns={3}
-            theme="dark"
             eyebrow="Gallery"
             heading="Community in Action"
           />
@@ -132,7 +130,6 @@ export default async function HomePage() {
           <MediaGrid
             items={secondaryGallery}
             columns={2}
-            theme="dark"
             eyebrow="Gallery"
             heading="Event Highlights"
           />
@@ -141,12 +138,8 @@ export default async function HomePage() {
 
       {/* 9. Our Story */}
       <ScrollReveal>
-        <ContentSection
-          eyebrow="About Us"
-          heading="Our Story"
-          description=""
-          theme="dark"
-        >
+        <Section>
+          <SectionHeader eyebrow="About Us" title="Our Story" align="center" />
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
             <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
               {storyParagraphs.map((paragraph, index) => (
@@ -169,7 +162,7 @@ export default async function HomePage() {
               />
             </div>
           </div>
-        </ContentSection>
+        </Section>
       </ScrollReveal>
     </main>
     </>

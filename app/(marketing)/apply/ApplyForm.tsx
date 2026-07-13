@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Button from '@/app/components/ui/Button';
+import { Input, Textarea } from '@/app/components/ui/form';
 
 const initialForm = {
   name: '',
@@ -240,101 +241,97 @@ ${form.additionalShare || 'N/A'}
     }
   };
 
+  // Mirrors the base Input/Textarea primitive (form.tsx) but adds the error-state
+  // branch inline, since these five fields need a validation-driven border color
+  // that the shared primitive doesn't support out of the box.
   const textInputClass = (hasError: boolean) =>
-    `w-full px-4 py-3 bg-white border rounded-xl text-[#2d0015] placeholder-slate-400 focus:outline-none focus:ring-2 transition-all text-sm shadow-sm ${
+    `w-full px-4 py-3 bg-surface border rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 transition-all text-sm shadow-sm ${
       hasError
-        ? 'border-red-500 focus:ring-red-500/20'
-        : 'border-[#f4cccc] focus:ring-[#b5005a]/20 focus:border-[#b5005a]/50'
-    }`;
-
-  const textareaClass = (hasError: boolean) =>
-    `w-full p-3 bg-white border rounded-xl text-[#2d0015] placeholder-slate-400 focus:outline-none focus:ring-2 transition-all text-sm resize-y shadow-sm ${
-      hasError
-        ? 'border-red-500 focus:ring-red-500/20'
-        : 'border-[#f4cccc] focus:ring-[#b5005a]/20 focus:border-[#b5005a]/50'
+        ? 'border-danger focus:ring-danger/20'
+        : 'border-line focus:ring-accent/20 focus:border-accent/50'
     }`;
 
   const fieldWrapperClass = (fieldId: string, hasError: boolean) => {
     const isFocused = focusedField === fieldId;
     return `transition-all duration-300 border-l-2 pl-3 w-full ${
       hasError
-        ? 'border-red-500'
+        ? 'border-danger'
         : isFocused
-        ? 'border-[#b5005a]'
+        ? 'border-accent'
         : 'border-transparent'
     }`;
   };
 
-  const labelClass = 'block text-xs sm:text-sm font-bold text-[#2d0015] mb-2 tracking-wide uppercase';
-  const requiredMark = <span className="text-[#b5005a] ml-1" aria-hidden="true">*</span>;
+  const labelClass = 'block text-xs sm:text-sm font-bold text-foreground mb-2 tracking-wide uppercase';
+  const requiredMark = <span className="text-accent ml-1" aria-hidden="true">*</span>;
 
   const sectionCardClass =
-    'bg-white/90 backdrop-blur-md rounded-2xl border border-[#f4cccc]/75 p-6 sm:p-8 shadow-sm space-y-5 scroll-mt-28';
+    'bg-surface/90 backdrop-blur-md rounded-2xl border border-line/75 p-6 sm:p-8 shadow-sm space-y-5 scroll-mt-28';
 
   const sectionHeader = (id: SectionId) => {
     const section = SECTIONS.find((s) => s.id === id)!;
     return (
-      <div className="border-b border-[#f4cccc]/50 pb-4 mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b5005a] mb-1">
+      <div className="border-b border-line/50 pb-4 mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent mb-1">
           Step {section.num} of {SECTIONS.length}
         </p>
-        <h3 className="text-lg sm:text-xl font-black text-[#2d0015] tracking-tight">{section.title}</h3>
-        <p className="text-xs text-[#5e404e] mt-1">{section.desc}</p>
+        <h3 className="text-lg sm:text-xl font-black text-foreground tracking-tight">{section.title}</h3>
+        <p className="text-xs text-foreground-secondary mt-1">{section.desc}</p>
       </div>
     );
   };
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-[#fff0f5] via-[#ffeef6] to-[#ffdceb] pt-12 md:pt-16 pb-16 md:pb-24 relative z-10">
+    <section className="theme-light min-h-screen bg-gradient-to-br from-[#fff0f5] via-[#ffeef6] to-[#ffdceb] pt-12 md:pt-16 pb-16 md:pb-24 relative z-10">
       <div className="container mx-auto px-4 max-w-6xl">
 
         {/* Careers-style header: title, meta, description, benefits */}
         <div className="mb-10 md:mb-14 max-w-3xl">
-          <span className="inline-block text-[#b5005a] uppercase tracking-widest text-xs font-bold mb-3">
+          <span className="inline-block text-accent uppercase tracking-widest text-xs font-bold mb-3">
             Registration Portal
           </span>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-zinc-900 to-[#b5005a] bg-clip-text text-transparent uppercase">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-foreground to-accent bg-clip-text text-transparent uppercase">
             School Application
           </h1>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-xs font-semibold text-[#5e404e]">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-xs font-semibold text-foreground-secondary">
             <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-[#b5005a]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               New York City
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-[#b5005a]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               ~5 min to complete
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-[#b5005a]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               {SECTIONS.length} sections
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-[#b5005a]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Free for schools
             </span>
           </div>
-          <p className="text-[#5e404e] text-sm md:text-base mt-5 font-medium leading-relaxed">
+          <p className="text-foreground-secondary text-sm md:text-base mt-5 font-medium leading-relaxed">
             Bring competitive high-school esports to your campus. Any teacher, faculty advisor, administrator, or
             student club officer can apply on behalf of their school. Joining gets your students:
           </p>
-          <ul className="mt-3 space-y-1.5 text-sm font-medium text-[#5e404e]">
+          <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
             {[
               'Organized leagues in Valorant, League of Legends, TFT, and Tetris with real standings',
               'Live-streamed matches broadcast to audiences across NYC',
               'Community and pathways into gaming and technology careers',
             ].map((benefit) => (
               <li key={benefit} className="flex items-start gap-2.5">
-                <svg className="w-4 h-4 mt-0.5 shrink-0 text-[#b5005a]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                <svg className="w-4 h-4 mt-0.5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
                 <span>{benefit}</span>
@@ -344,16 +341,16 @@ ${form.additionalShare || 'N/A'}
         </div>
 
         {submitted ? (
-          <div className="max-w-2xl mx-auto bg-white/95 border border-[#f4cccc] rounded-2xl p-8 text-center space-y-6 shadow-xl backdrop-blur-md">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto animate-bounce">
-              <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <div className="max-w-2xl mx-auto bg-surface/95 border border-line rounded-2xl p-8 text-center space-y-6 shadow-xl backdrop-blur-md">
+            <div className="w-16 h-16 rounded-full bg-success/10 border border-success/20 flex items-center justify-center mx-auto animate-bounce">
+              <svg className="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <div>
-              <h2 className="text-2xl font-black text-[#2d0015]">Application Received!</h2>
-              <p className="text-[#5e404e] text-sm mt-3 leading-relaxed">
-                Thank you for applying. We have registered your response. We will review your application and contact you at <strong className="text-zinc-900">{form.email}</strong> soon.
+              <h2 className="text-2xl font-black text-foreground">Application Received!</h2>
+              <p className="text-foreground-secondary text-sm mt-3 leading-relaxed">
+                Thank you for applying. We have registered your response. We will review your application and contact you at <strong className="text-foreground">{form.email}</strong> soon.
               </p>
             </div>
             <button
@@ -361,7 +358,7 @@ ${form.additionalShare || 'N/A'}
                 setSubmitted(false);
                 setForm(initialForm);
               }}
-              className="text-[#b5005a] hover:underline text-sm font-semibold focus:outline-none cursor-pointer"
+              className="text-accent hover:underline text-sm font-semibold focus:outline-none cursor-pointer"
             >
               Submit another application
             </button>
@@ -373,14 +370,14 @@ ${form.additionalShare || 'N/A'}
             <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
               <nav
                 aria-label="Application sections"
-                className="bg-white/85 backdrop-blur-md rounded-2xl border border-[#f4cccc] p-6 shadow-sm"
+                className="bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-[#2d0015] uppercase tracking-wider">Application</h3>
-                  <span className="text-xs font-bold text-[#b5005a] tabular-nums">{progress}%</span>
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Application</h3>
+                  <span className="text-xs font-bold text-accent tabular-nums">{progress}%</span>
                 </div>
                 <div
-                  className="h-1.5 rounded-full bg-[#ffeef6] overflow-hidden mb-5"
+                  className="h-1.5 rounded-full bg-accent/10 overflow-hidden mb-5"
                   role="progressbar"
                   aria-valuenow={progress}
                   aria-valuemin={0}
@@ -388,7 +385,7 @@ ${form.additionalShare || 'N/A'}
                   aria-label="Required fields completed"
                 >
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#b5005a] to-ez-purple transition-all duration-500"
+                    className="h-full rounded-full bg-gradient-to-r from-accent to-accent-secondary transition-all duration-500"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -405,17 +402,17 @@ ${form.additionalShare || 'N/A'}
                           aria-current={isActive ? 'true' : undefined}
                           className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all cursor-pointer ${
                             isActive
-                              ? 'bg-[#ffeef6] text-[#2d0015] font-bold'
-                              : 'text-[#5e404e] font-semibold hover:bg-[#fff5fa] hover:text-[#2d0015]'
+                              ? 'bg-accent/10 text-foreground font-bold'
+                              : 'text-foreground-secondary font-semibold hover:bg-accent/5 hover:text-foreground'
                           }`}
                         >
                           <span
                             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
                               isComplete
-                                ? 'bg-emerald-500 text-white'
+                                ? 'bg-success text-white'
                                 : isActive
-                                ? 'bg-[#b5005a] text-white'
-                                : 'bg-[#ffeef6] text-[#b5005a] border border-[#f4cccc]'
+                                ? 'bg-accent text-white'
+                                : 'bg-accent/10 text-accent border border-line'
                             }`}
                           >
                             {isComplete ? (
@@ -435,34 +432,34 @@ ${form.additionalShare || 'N/A'}
               </nav>
 
               {/* What happens next */}
-              <div className="hidden lg:block bg-white/85 backdrop-blur-md rounded-2xl border border-[#f4cccc] p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-[#2d0015] mb-4 uppercase tracking-wider">After You Apply</h3>
-                <ol className="relative border-l-2 border-[#f4cccc] ml-2.5 pl-5 space-y-5 text-sm">
+              <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-foreground mb-4 uppercase tracking-wider">After You Apply</h3>
+                <ol className="relative border-l-2 border-line ml-2.5 pl-5 space-y-5 text-sm">
                   <li className="relative">
-                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-[#b5005a] ring-4 ring-[#fff0f5]" />
-                    <p className="font-bold text-[#2d0015]">Consultation call</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Short meeting to review league rules &amp; format.</p>
+                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-surface" />
+                    <p className="font-bold text-foreground">Consultation call</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Short meeting to review league rules &amp; format.</p>
                   </li>
                   <li className="relative">
-                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-[#f4cccc] ring-4 ring-[#fff0f5]" />
-                    <p className="font-bold text-[#2d0015]">Roster registration</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Register players and assign coaches/captains.</p>
+                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-line ring-4 ring-surface" />
+                    <p className="font-bold text-foreground">Roster registration</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Register players and assign coaches/captains.</p>
                   </li>
                   <li className="relative">
-                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-[#f4cccc] ring-4 ring-[#fff0f5]" />
-                    <p className="font-bold text-[#2d0015]">Season kickoff</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Match schedules are generated &amp; games start!</p>
+                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-line ring-4 ring-surface" />
+                    <p className="font-bold text-foreground">Season kickoff</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Match schedules are generated &amp; games start!</p>
                   </li>
                 </ol>
               </div>
 
               {/* Assistance */}
-              <div className="hidden lg:block bg-white/85 backdrop-blur-md rounded-2xl border border-[#f4cccc] p-6 shadow-sm">
-                <h3 className="text-xs font-bold text-[#2d0015] mb-2 uppercase tracking-wider">Need Assistance?</h3>
-                <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+              <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
+                <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">Need Assistance?</h3>
+                <p className="text-xs text-foreground-muted mb-3 leading-relaxed">
                   Have questions about DBN codes, student eligibility, or system specs? We are here to help.
                 </p>
-                <a href="mailto:info@ezesports.org" className="text-xs text-[#b5005a] hover:underline font-bold transition-all">
+                <a href="mailto:info@ezesports.org" className="text-xs text-accent hover:underline font-bold transition-all">
                   info@ezesports.org
                 </a>
               </div>
@@ -492,14 +489,14 @@ ${form.additionalShare || 'N/A'}
                       required
                     />
                     {fieldErrors.name && (
-                      <p className="mt-1.5 text-xs text-red-600 font-semibold">{fieldErrors.name}</p>
+                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.name}</p>
                     )}
                   </div>
 
                   {/* Preferred first name */}
                   <div id="field-preferredFirstName" className={fieldWrapperClass('preferredFirstName', false)}>
                     <label htmlFor="preferredFirstName" className={labelClass}>Preferred first name</label>
-                    <input
+                    <Input
                       id="preferredFirstName"
                       name="preferredFirstName"
                       type="text"
@@ -508,7 +505,6 @@ ${form.additionalShare || 'N/A'}
                       onChange={handleTextChange}
                       onFocus={() => setFocusedField('preferredFirstName')}
                       onBlur={() => setFocusedField(null)}
-                      className={textInputClass(false)}
                     />
                   </div>
                 </div>
@@ -530,7 +526,7 @@ ${form.additionalShare || 'N/A'}
                       required
                     />
                     {fieldErrors.email && (
-                      <p className="mt-1.5 text-xs text-red-600 font-semibold">{fieldErrors.email}</p>
+                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.email}</p>
                     )}
                   </div>
 
@@ -550,7 +546,7 @@ ${form.additionalShare || 'N/A'}
                       required
                     />
                     {fieldErrors.phone && (
-                      <p className="mt-1.5 text-xs text-red-600 font-semibold">{fieldErrors.phone}</p>
+                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.phone}</p>
                     )}
                   </div>
                 </div>
@@ -559,7 +555,7 @@ ${form.additionalShare || 'N/A'}
                   {/* Discord tag */}
                   <div id="field-discordTag" className={fieldWrapperClass('discordTag', false)}>
                     <label htmlFor="discordTag" className={labelClass}>Discord username</label>
-                    <input
+                    <Input
                       id="discordTag"
                       name="discordTag"
                       type="text"
@@ -568,14 +564,13 @@ ${form.additionalShare || 'N/A'}
                       onChange={handleTextChange}
                       onFocus={() => setFocusedField('discordTag')}
                       onBlur={() => setFocusedField(null)}
-                      className={textInputClass(false)}
                     />
                   </div>
 
                   {/* LinkedIn Profile */}
                   <div id="field-linkedin" className={fieldWrapperClass('linkedin', false)}>
                     <label htmlFor="linkedin" className={labelClass}>LinkedIn profile link</label>
-                    <input
+                    <Input
                       id="linkedin"
                       name="linkedin"
                       type="text"
@@ -584,7 +579,6 @@ ${form.additionalShare || 'N/A'}
                       onChange={handleTextChange}
                       onFocus={() => setFocusedField('linkedin')}
                       onBlur={() => setFocusedField(null)}
-                      className={textInputClass(false)}
                     />
                   </div>
                 </div>
@@ -611,14 +605,14 @@ ${form.additionalShare || 'N/A'}
                       required
                     />
                     {fieldErrors.school && (
-                      <p className="mt-1.5 text-xs text-red-600 font-semibold">{fieldErrors.school}</p>
+                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.school}</p>
                     )}
                   </div>
 
                   {/* School code */}
                   <div id="field-schoolCode" className={fieldWrapperClass('schoolCode', false)}>
                     <label htmlFor="schoolCode" className={labelClass}>School Code / DBN</label>
-                    <input
+                    <Input
                       id="schoolCode"
                       name="schoolCode"
                       type="text"
@@ -627,7 +621,6 @@ ${form.additionalShare || 'N/A'}
                       onChange={handleTextChange}
                       onFocus={() => setFocusedField('schoolCode')}
                       onBlur={() => setFocusedField(null)}
-                      className={textInputClass(false)}
                     />
                   </div>
                 </div>
@@ -650,7 +643,7 @@ ${form.additionalShare || 'N/A'}
                     required
                   />
                   {fieldErrors.role && (
-                    <p className="mt-1.5 text-xs text-red-600 font-semibold">{fieldErrors.role}</p>
+                    <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.role}</p>
                   )}
                 </div>
 
@@ -659,14 +652,14 @@ ${form.additionalShare || 'N/A'}
                   <span className={labelClass}>Where is your school located? {requiredMark}</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {['Bronx', 'Queens', 'Manhattan', 'Brooklyn', 'Staten Island'].map((borough) => (
-                      <label key={borough} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors">
+                      <label key={borough} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
                           name="location"
                           value={borough}
                           checked={form.location === borough}
                           onChange={() => handleSelectChange('location', borough)}
-                          className="w-4.5 h-4.5 accent-[#b5005a] cursor-pointer"
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
                         <span>{borough}</span>
                       </label>
@@ -674,14 +667,14 @@ ${form.additionalShare || 'N/A'}
 
                     {/* Other option inline */}
                     <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors shrink-0">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
                         <input
                           type="radio"
                           name="location"
                           value="Other"
                           checked={form.location === 'Other'}
                           onChange={() => handleSelectChange('location', 'Other')}
-                          className="w-4.5 h-4.5 accent-[#b5005a] cursor-pointer"
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
                         <span>Other:</span>
                       </label>
@@ -692,13 +685,13 @@ ${form.additionalShare || 'N/A'}
                           value={form.locationOther}
                           onChange={(e) => handleTextChange(e)}
                           name="locationOther"
-                          className="border-b border-[#f4cccc] focus:border-b-2 focus:border-[#b5005a] focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-[#2d0015]"
+                          className="border-b border-line focus:border-b-2 focus:border-accent focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-foreground"
                         />
                       )}
                     </div>
                   </div>
                   {fieldErrors.location && (
-                    <p className="mt-2 text-xs text-red-600 font-semibold">{fieldErrors.location}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.location}</p>
                   )}
                 </div>
               </div>
@@ -711,11 +704,11 @@ ${form.additionalShare || 'N/A'}
                 <div id="field-captainsCoaches" className={fieldWrapperClass('captainsCoaches', false)}>
                   <label htmlFor="captainsCoaches" className={labelClass}>
                     Intended Captains and/or Coaches List
-                    <span className="text-xs text-[#5e404e] font-normal leading-relaxed block mt-1 lowercase first-letter:uppercase">
+                    <span className="text-xs text-foreground-secondary font-normal leading-relaxed block mt-1 lowercase first-letter:uppercase">
                       Please list in format: [Game name] Name, Email, Phone number
                     </span>
                   </label>
-                  <textarea
+                  <Textarea
                     id="captainsCoaches"
                     name="captainsCoaches"
                     rows={3}
@@ -724,14 +717,13 @@ ${form.additionalShare || 'N/A'}
                     onChange={handleTextChange}
                     onFocus={() => setFocusedField('captainsCoaches')}
                     onBlur={() => setFocusedField(null)}
-                    className={textareaClass(false)}
                   />
                 </div>
 
                 {/* Anything we should know about your team? */}
                 <div id="field-teamInfo" className={fieldWrapperClass('teamInfo', false)}>
                   <label htmlFor="teamInfo" className={labelClass}>Anything we should know about your team?</label>
-                  <textarea
+                  <Textarea
                     id="teamInfo"
                     name="teamInfo"
                     rows={3}
@@ -740,7 +732,6 @@ ${form.additionalShare || 'N/A'}
                     onChange={handleTextChange}
                     onFocus={() => setFocusedField('teamInfo')}
                     onBlur={() => setFocusedField(null)}
-                    className={textareaClass(false)}
                   />
                 </div>
 
@@ -749,21 +740,21 @@ ${form.additionalShare || 'N/A'}
                   <span className={labelClass}>Do you need help finding extra players or forming a full team? {requiredMark}</span>
                   <div className="flex gap-6 mt-2">
                     {['Yes', 'No'].map((opt) => (
-                      <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors">
+                      <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
                           name="needPlayerHelp"
                           value={opt}
                           checked={form.needPlayerHelp === opt}
                           onChange={() => handleSelectChange('needPlayerHelp', opt)}
-                          className="w-4.5 h-4.5 accent-[#b5005a] cursor-pointer"
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
                         <span>{opt}</span>
                       </label>
                     ))}
                   </div>
                   {fieldErrors.needPlayerHelp && (
-                    <p className="mt-2 text-xs text-red-600 font-semibold">{fieldErrors.needPlayerHelp}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.needPlayerHelp}</p>
                   )}
                 </div>
               </div>
@@ -777,14 +768,14 @@ ${form.additionalShare || 'N/A'}
                   <span className={labelClass}>How did you first learn about EZ Esports? {requiredMark}</span>
                   <div className="grid grid-cols-2 gap-3">
                     {['LinkedIn', 'Instagram', 'Twitch', 'Youtube', 'Web search', 'Friend/teacher/parent'].map((src) => (
-                      <label key={src} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors">
+                      <label key={src} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
                           name="learnSource"
                           value={src}
                           checked={form.learnSource === src}
                           onChange={() => handleSelectChange('learnSource', src)}
-                          className="w-4.5 h-4.5 accent-[#b5005a] cursor-pointer"
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
                         <span>{src}</span>
                       </label>
@@ -792,14 +783,14 @@ ${form.additionalShare || 'N/A'}
 
                     {/* Other option inline */}
                     <div className="col-span-2 flex items-center gap-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors shrink-0">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
                         <input
                           type="radio"
                           name="learnSource"
                           value="Other"
                           checked={form.learnSource === 'Other'}
                           onChange={() => handleSelectChange('learnSource', 'Other')}
-                          className="w-4.5 h-4.5 accent-[#b5005a] cursor-pointer"
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
                         <span>Other:</span>
                       </label>
@@ -810,13 +801,13 @@ ${form.additionalShare || 'N/A'}
                           value={form.learnSourceOther}
                           onChange={(e) => handleTextChange(e)}
                           name="learnSourceOther"
-                          className="border-b border-[#f4cccc] focus:border-b-2 focus:border-[#b5005a] focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-[#2d0015]"
+                          className="border-b border-line focus:border-b-2 focus:border-accent focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-foreground"
                         />
                       )}
                     </div>
                   </div>
                   {fieldErrors.learnSource && (
-                    <p className="mt-2 text-xs text-red-600 font-semibold">{fieldErrors.learnSource}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.learnSource}</p>
                   )}
                 </div>
 
@@ -830,19 +821,19 @@ ${form.additionalShare || 'N/A'}
                         { id: 'discord', label: 'Discord Server' },
                         { id: 'text', label: 'SMS Texting' }
                       ].map((plat) => (
-                        <label key={plat.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors">
+                        <label key={plat.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                           <input
                             type="checkbox"
                             checked={form.commPlatforms[plat.id as keyof typeof form.commPlatforms]}
                             onChange={(e) => handleCheckboxChange('commPlatforms', plat.id, e.target.checked)}
-                            className="w-4.5 h-4.5 rounded border-[#f4cccc] accent-[#b5005a] cursor-pointer"
+                            className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
                           />
                           <span>{plat.label}</span>
                         </label>
                       ))}
                     </div>
                     {fieldErrors.commPlatforms && (
-                      <p className="mt-2 text-xs text-red-600 font-semibold">{fieldErrors.commPlatforms}</p>
+                      <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.commPlatforms}</p>
                     )}
                   </div>
 
@@ -856,19 +847,19 @@ ${form.additionalShare || 'N/A'}
                         { id: 'lol', label: 'LoL (League of Legends)' },
                         { id: 'valorant', label: 'VALORANT' }
                       ].map((div) => (
-                        <label key={div.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors">
+                        <label key={div.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                           <input
                             type="checkbox"
                             checked={form.divisions[div.id as keyof typeof form.divisions]}
                             onChange={(e) => handleCheckboxChange('divisions', div.id, e.target.checked)}
-                            className="w-4.5 h-4.5 rounded border-[#f4cccc] accent-[#b5005a] cursor-pointer"
+                            className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
                           />
                           <span>{div.label}</span>
                         </label>
                       ))}
                     </div>
                     {fieldErrors.divisions && (
-                      <p className="mt-2 text-xs text-red-600 font-semibold">{fieldErrors.divisions}</p>
+                      <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.divisions}</p>
                     )}
                   </div>
                 </div>
@@ -883,7 +874,7 @@ ${form.additionalShare || 'N/A'}
                   <label htmlFor="additionalShare" className={labelClass}>
                     Anything else you want to share?
                   </label>
-                  <textarea
+                  <Textarea
                     id="additionalShare"
                     name="additionalShare"
                     rows={3}
@@ -892,7 +883,6 @@ ${form.additionalShare || 'N/A'}
                     onChange={handleTextChange}
                     onFocus={() => setFocusedField('additionalShare')}
                     onBlur={() => setFocusedField(null)}
-                    className={textareaClass(false)}
                   />
                 </div>
 
@@ -900,7 +890,7 @@ ${form.additionalShare || 'N/A'}
                 <div
                   id="field-agreedRules"
                   className={`rounded-xl border p-4 sm:p-5 transition-colors ${
-                    fieldErrors.agreedRules ? 'border-red-500 bg-red-50/50' : 'border-[#f4cccc] bg-[#fff5fa]'
+                    fieldErrors.agreedRules ? 'border-danger bg-danger/5' : 'border-line bg-accent/5'
                   }`}
                 >
                   <span className={labelClass}>
@@ -910,31 +900,31 @@ ${form.additionalShare || 'N/A'}
                     href="https://www.ezesports.org/rules"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-[#b5005a] hover:underline font-bold inline-block mb-3.5 transition-colors"
+                    className="text-xs text-accent hover:underline font-bold inline-block mb-3.5 transition-colors"
                   >
                     Click to review rules and terms of service
                   </a>
-                  <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-[#4a2e3b] hover:text-[#2d0015] transition-colors">
+                  <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                     <input
                       type="checkbox"
                       checked={form.agreedRules}
                       onChange={(e) => handleRulesChange(e.target.checked)}
-                      className="w-4.5 h-4.5 rounded border-[#f4cccc] accent-[#b5005a] cursor-pointer"
+                      className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
                     />
                     <span>I understand and agree to all tournament rules.</span>
                   </label>
                   {fieldErrors.agreedRules && (
-                    <p className="mt-2 text-xs text-red-600 font-semibold">{fieldErrors.agreedRules}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
                   )}
                 </div>
 
                 {/* Action buttons & error feedback */}
-                <div className="flex flex-col gap-3 pt-2 border-t border-[#f4cccc]/50">
+                <div className="flex flex-col gap-3 pt-2 border-t border-line/50">
                   <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="w-full sm:w-auto min-h-[46px] shadow-lg shadow-ez-pink/5 hover:shadow-ez-pink/20 hover:scale-[1.02] transition-all"
+                      className="w-full sm:w-auto min-h-[46px] shadow-lg shadow-accent/5 hover:shadow-accent/20 hover:scale-[1.02] transition-all"
                     >
                       {loading ? 'Submitting…' : 'Submit Application'}
                     </Button>
@@ -945,14 +935,14 @@ ${form.additionalShare || 'N/A'}
                         setForm(initialForm);
                         setFieldErrors({});
                       }}
-                      className="text-xs text-slate-500 hover:text-[#2d0015] hover:underline font-semibold focus:outline-none transition-colors duration-200"
+                      className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200"
                     >
                       Clear Form Response
                     </button>
                   </div>
 
                   {error && (
-                    <p role="alert" className="text-red-600 text-sm font-semibold mt-2">{error}</p>
+                    <p role="alert" className="text-danger text-sm font-semibold mt-2">{error}</p>
                   )}
                 </div>
               </div>

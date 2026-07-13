@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import FocusTrap from 'focus-trap-react';
-import type { Image as ImageType, Theme, GridColumns } from '@/app/types';
-import { THEME_CLASSES, GALLERY_ITEM_WIDTHS } from '@/app/lib/constants';
+import type { Image as ImageType, GridColumns } from '@/app/types';
+import { GALLERY_ITEM_WIDTHS } from '@/app/lib/constants';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 
 function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; index: number; widthClass: string; onOpen: (i: number) => void }) {
@@ -38,13 +38,12 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
 interface MediaGridProps {
   items: ImageType[];
   columns?: GridColumns;
-  theme?: Theme;
   /** Optional heading rendered above the grid via the shared SectionHeader primitive. */
   eyebrow?: string;
   heading?: string;
 }
 
-export default function MediaGrid({ items, columns = 3, theme = 'dark', eyebrow, heading }: MediaGridProps) {
+export default function MediaGrid({ items, columns = 3, eyebrow, heading }: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -57,10 +56,6 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark', eyebrow,
       document.body.style.overflow = 'unset';
     };
   }, [selectedImageIndex]);
-
-  const themeClasses = theme === 'dark' 
-    ? `${THEME_CLASSES.dark.bg} ${THEME_CLASSES.dark.text}` 
-    : `${THEME_CLASSES.light.bg} ${THEME_CLASSES.light.text}`;
 
   const openLightbox = (index: number) => {
     setSelectedImageIndex(index);
@@ -93,7 +88,7 @@ export default function MediaGrid({ items, columns = 3, theme = 'dark', eyebrow,
   };
 
   return (
-    <section className={`${themeClasses} py-16 md:py-24 border-t border-line/30`}>
+    <section className="bg-surface text-foreground py-16 md:py-24 border-t border-line/30">
       <div className="container mx-auto px-4">
         {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
         <div className="flex flex-wrap justify-center gap-6">

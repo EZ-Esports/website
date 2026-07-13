@@ -3,8 +3,10 @@ import { getCachedLeadership } from '@/app/lib/db/queries';
 import { notFound } from 'next/navigation';
 import type { LeadershipParams } from '@/app/types';
 import { getLeadershipRoute } from '@/app/lib/constants';
-import Link from 'next/link';
+import Section from '@/app/components/ui/Section';
+import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Card from '@/app/components/ui/Card';
+import Button from '@/app/components/ui/Button';
 
 export default async function LeadershipPage({ params }: { params: Promise<LeadershipParams> }) {
   const { year } = await params;
@@ -17,73 +19,67 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
 
   const years = Array.from(new Set(allLeaders.map((l) => l.year))).sort().reverse();
   const leaders = allLeaders.filter((l) => l.year === year);
-  
+
   // If year doesn't exist in data and we have leadership records, show 404
   if (years.length > 0 && !years.includes(year)) {
     notFound();
   }
 
   return (
-    <main className="container mx-auto px-4 py-20">
-      {/* Page Header */}
-      <div className="mb-12 text-center">
-        <h1 className="text-4xl sm:text-5xl font-black mb-4 tracking-tight uppercase text-foreground">
-          {year} Leadership Team
-        </h1>
-        <div className="w-12 h-0.5 bg-custom-border mx-auto rounded-full mb-4" />
-        <p className="text-foreground-secondary font-medium">
-          Meet the leaders who guide our organization
-        </p>
-      </div>
+    <main>
+      <Section>
+        <SectionHeader
+          as="h1"
+          eyebrow="Leadership"
+          title={`${year} Leadership Team`}
+          lead="Meet the leaders who guide our organization"
+        />
 
-      {/* Year Selector */}
-      <div className="mb-12 flex justify-center gap-2">
-        {years.map((y) => {
-          const isActive = y === year;
-          return (
-            <Link
+        {/* Year Selector */}
+        <div className="mb-12 flex flex-wrap justify-center gap-2">
+          {years.map((y) => (
+            <Button
               key={y}
               href={getLeadershipRoute(y)}
-              className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all duration-300 ${
-                isActive
-                  ? 'bg-ez-pink text-ez-black font-bold scale-105 shadow-none'
-                  : 'bg-background-secondary border border-custom-border/80 text-foreground-secondary hover:text-foreground hover:bg-background'
-              }`}
+              variant={y === year ? 'primary' : 'outline'}
+              size="sm"
             >
               {y}
-            </Link>
-          );
-        })}
-      </div>
+            </Button>
+          ))}
+        </div>
 
-      {/* Leadership Grid */}
-      <div className="flex flex-wrap justify-center gap-8 max-w-6xl mx-auto">
-        {leaders.length === 0 ? (
-          <div className="p-16 text-center text-foreground-secondary text-sm bg-background-secondary/20 rounded-2xl w-full border border-custom-border">
-            No leadership members registered for {year} yet.
-          </div>
-        ) : (
-          leaders.map((leader) => (
-            <Card key={leader.name} className="w-full md:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)] hover:scale-[1.02] duration-300">
-              {/* Placeholder for image */}
-              <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-background border-2 border-custom-border flex items-center justify-center text-foreground">
-                <span className="text-3xl font-extrabold tracking-tight">
-                  {leader.name.split(' ').map((n: string) => n[0]).join('')}
-                </span>
-              </div>
-
-              <div className="text-center">
-                <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
-                <p className="text-ez-pink text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
-                
-                {leader.bio && (
-                  <p className="text-foreground-secondary text-sm leading-relaxed border-t border-custom-border/80 pt-3 mt-3">{leader.bio}</p>
-                )}
-              </div>
+        {/* Leadership Grid */}
+        <div className="flex flex-wrap justify-center gap-8">
+          {leaders.length === 0 ? (
+            <Card className="w-full text-center py-16">
+              <p className="text-foreground-secondary text-sm">
+                No leadership members registered for {year} yet.
+              </p>
             </Card>
-          ))
-        )}
-      </div>
+          ) : (
+            leaders.map((leader) => (
+              <Card key={leader.name} interactive className="w-full md:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
+                {/* Placeholder for image */}
+                <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-surface border-2 border-line flex items-center justify-center text-foreground">
+                  <span className="text-3xl font-extrabold tracking-tight">
+                    {leader.name.split(' ').map((n: string) => n[0]).join('')}
+                  </span>
+                </div>
+
+                <div className="text-center">
+                  <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
+                  <p className="text-accent text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
+
+                  {leader.bio && (
+                    <p className="text-foreground-secondary text-sm leading-relaxed border-t border-line pt-3 mt-3">{leader.bio}</p>
+                  )}
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </Section>
     </main>
   );
 }

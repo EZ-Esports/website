@@ -2,11 +2,13 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
-import ContentSection from '@/app/components/sections/ContentSection';
+import Section from '@/app/components/ui/Section';
+import { SectionHeader } from '@/app/components/ui/SectionHeader';
+import Badge from '@/app/components/ui/Badge';
+import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
-import Card from '@/app/components/ui/Card';
 
 interface TeamsPageProps {
   params: Promise<{ game: string }>;
@@ -157,57 +159,57 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
   return (
     <main>
-      <h1 className="sr-only">{gameConfig.displayName} Teams &amp; Rosters — EZ Esports</h1>
-      <ContentSection
-        heading={`${gameConfig.displayName} Teams & Rosters`}
-        description="View school teams, division squads, and registered player rosters"
-        theme="dark"
-      >
-        <div className="max-w-6xl mx-auto space-y-12">
+      <Section>
+        <SectionHeader
+          as="h1"
+          title={`${gameConfig.displayName} Teams & Rosters`}
+          lead="View school teams, division squads, and registered player rosters"
+        />
+
+        <div className="space-y-12">
           {teamGroups.length === 0 ? (
-            <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/20 rounded-2xl border border-slate-800/60">
+            <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line">
               No active teams or rosters registered for this game yet.
             </div>
           ) : (
             teamGroups.map((group, index) => (
-              <div key={index} className="space-y-6 bg-slate-950/20 p-6 sm:p-8 rounded-2xl border border-slate-900">
-                <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
-                  <div className="w-12 h-12 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center text-white shrink-0">
+              <Card key={index} as="section" padding="lg" className="space-y-6">
+                <div className="flex items-center gap-4 border-b border-line pb-4">
+                  <div className="w-12 h-12 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-foreground shrink-0">
                     <span className="text-lg font-black">{group.teamName.charAt(0)}</span>
                   </div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">{group.teamName}</h2>
+                  <h2 className="text-2xl font-black text-foreground tracking-tight">{group.teamName}</h2>
                 </div>
 
                 <div className="space-y-8">
                   {group.rosters.map((roster) => (
                     <div key={roster.id} className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary">
                           {roster.name} Division
                         </h3>
-                        <span className="px-2.5 py-0.5 text-xs font-bold bg-ez-pink/10 border border-ez-pink/25 text-ez-pink rounded-full">
-                          Record: {roster.record}
-                        </span>
+                        <Badge size="sm">Record: {roster.record}</Badge>
                       </div>
 
                       {roster.players.length === 0 ? (
-                        <p className="text-xs text-slate-500 italic pl-2">No players registered under this division roster.</p>
+                        <p className="text-xs text-foreground-muted italic pl-2">
+                          No players registered under this division roster.
+                        </p>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {roster.players.map((player, pIdx) => (
-                            <Card key={pIdx} className="hover:border-slate-700/60 transition-all text-white p-5 flex flex-col justify-between">
+                            <Card key={pIdx} interactive padding="sm" className="flex flex-col justify-between">
                               <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-bold text-base tracking-tight text-white">{player.name}</h4>
-                                  <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
-                                    player.role === 'Captain'
-                                      ? 'bg-ez-pink/15 text-ez-pink border-ez-pink/35'
-                                      : 'bg-slate-950/40 text-slate-400 border-slate-800/80'
-                                  }`}>
+                                <div className="flex items-center justify-between mb-2 gap-2">
+                                  <h4 className="font-bold text-base tracking-tight text-foreground">{player.name}</h4>
+                                  <Badge
+                                    size="sm"
+                                    variant={player.role === 'Captain' ? 'accent' : 'neutral'}
+                                  >
                                     {player.role}
-                                  </span>
+                                  </Badge>
                                 </div>
-                                <p className="text-xs text-slate-400 leading-relaxed mt-1.5">{player.bio}</p>
+                                <p className="text-xs text-foreground-secondary leading-relaxed mt-1.5">{player.bio}</p>
                               </div>
                             </Card>
                           ))}
@@ -216,11 +218,11 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             ))
           )}
         </div>
-      </ContentSection>
+      </Section>
     </main>
   );
 }

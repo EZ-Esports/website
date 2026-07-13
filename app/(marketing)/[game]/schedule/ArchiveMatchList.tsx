@@ -5,6 +5,9 @@ import { FiCalendar, FiClock } from 'react-icons/fi';
 import { fetchMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
+import Badge from '@/app/components/ui/Badge';
+import Button from '@/app/components/ui/Button';
+import Card from '@/app/components/ui/Card';
 
 interface ArchiveMatchListProps {
   seasonId: string;
@@ -17,22 +20,22 @@ interface ArchiveMatchListProps {
 function StatusBadge({ match }: { match: MatchPageItemDto }) {
   if (match.status === 'forfeit') {
     return (
-      <span className="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black">
+      <Badge variant="warning">
         Forfeit {match.homeScore !== null && match.awayScore !== null && `${match.homeScore}-${match.awayScore}`}
-      </span>
+      </Badge>
     );
   }
   if (match.homeScore !== null && match.awayScore !== null) {
     return (
-      <span className="inline-block px-3 py-1 rounded-full bg-ez-pink/10 border border-ez-pink/20 text-ez-pink text-xs font-black">
+      <Badge>
         {match.homeScore} - {match.awayScore}
-      </span>
+      </Badge>
     );
   }
   return (
-    <span className="inline-block px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-slate-500 text-[10px] uppercase font-black tracking-wider">
+    <Badge variant="neutral" size="sm">
       {match.status === 'completed' ? 'No result recorded' : match.status}
-    </span>
+    </Badge>
   );
 }
 
@@ -75,7 +78,7 @@ export default function ArchiveMatchList({
 
   if (items.length === 0) {
     return (
-      <div className="text-center p-12 text-slate-500 text-sm bg-slate-900/20 border border-slate-800/40 rounded-2xl">
+      <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 border border-line rounded-2xl">
         No matches recorded for this season and division.
       </div>
     );
@@ -85,41 +88,40 @@ export default function ArchiveMatchList({
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map((match) => (
-          <div
+          <Card
             key={match.id}
-            className="bg-slate-900/30 border border-slate-800/80 border-l-4 border-l-slate-700 rounded-xl p-5 flex items-center justify-between hover:border-slate-700/80 hover:bg-slate-900/40 transition-all duration-300 group"
+            accent
+            interactive
+            padding="sm"
+            className="flex items-center justify-between group"
           >
             <div className="flex-1 pr-4">
-              <div className="flex items-center gap-2 mb-1.5 text-xs font-bold text-slate-400 group-hover:text-slate-300 transition-colors">
-                <FiCalendar className="w-3.5 h-3.5 text-ez-pink/70" />
+              <div className="flex items-center gap-2 mb-1.5 text-xs font-bold text-foreground-secondary group-hover:text-foreground transition-colors">
+                <FiCalendar className="w-3.5 h-3.5 text-accent/70" />
                 <span>{formatNY(new Date(match.scheduledAt), 'date-short')}</span>
                 <span>•</span>
-                <FiClock className="w-3.5 h-3.5 text-ez-pink/70" />
+                <FiClock className="w-3.5 h-3.5 text-accent/70" />
                 <span>{formatNY(new Date(match.scheduledAt), 'time')}</span>
               </div>
-              <div className="text-base md:text-lg font-bold text-white tracking-tight">
-                {match.homeTeam} <span className="text-slate-500 font-medium px-0.5">vs</span> {match.awayTeam}
+              <div className="text-base md:text-lg font-bold text-foreground tracking-tight">
+                {match.homeTeam} <span className="text-foreground-muted font-medium px-0.5">vs</span> {match.awayTeam}
               </div>
             </div>
             <div className="text-right shrink-0">
               <StatusBadge match={match} />
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {/* Sentinel + manual fallback */}
       <div ref={sentinelRef} className="pt-6 text-center">
         {cursor ? (
-          <button
-            onClick={loadMore}
-            disabled={isPending}
-            className="px-5 py-2.5 min-h-[44px] text-sm font-bold rounded-lg bg-slate-900 border border-slate-800/80 text-slate-300 hover:text-white hover:border-slate-700 transition-all cursor-pointer disabled:opacity-60"
-          >
+          <Button variant="outline" onClick={loadMore} disabled={isPending}>
             {isPending ? 'Loading…' : 'Load more matches'}
-          </button>
+          </Button>
         ) : (
-          <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider">End of season</p>
+          <p className="text-xs text-foreground-muted font-semibold uppercase tracking-wider">End of season</p>
         )}
       </div>
     </div>

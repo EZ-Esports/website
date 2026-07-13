@@ -19,21 +19,21 @@ export default function Markdown({ content }: MarkdownProps) {
         // 1. Headers
         if (trimmed.startsWith('### ')) {
           return (
-            <h3 key={blockIdx} className="text-lg sm:text-xl font-bold text-white mt-6 mb-2">
+            <h3 key={blockIdx} className="text-lg sm:text-xl font-bold text-foreground mt-6 mb-2">
               {renderInline(trimmed.slice(4))}
             </h3>
           );
         }
         if (trimmed.startsWith('## ')) {
           return (
-            <h2 key={blockIdx} className="text-xl sm:text-2xl font-black text-white mt-8 mb-3">
+            <h2 key={blockIdx} className="text-xl sm:text-2xl font-black text-foreground mt-8 mb-3">
               {renderInline(trimmed.slice(3))}
             </h2>
           );
         }
         if (trimmed.startsWith('# ')) {
           return (
-            <h1 key={blockIdx} className="text-2xl sm:text-3xl font-black text-white mt-8 mb-4">
+            <h1 key={blockIdx} className="text-2xl sm:text-3xl font-black text-foreground mt-8 mb-4">
               {renderInline(trimmed.slice(2))}
             </h1>
           );
@@ -43,7 +43,7 @@ export default function Markdown({ content }: MarkdownProps) {
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           const items = trimmed.split(/\n[-*]\s+/);
           return (
-            <ul key={blockIdx} className="list-disc list-inside space-y-2 text-slate-300 pl-4 my-4">
+            <ul key={blockIdx} className="list-disc list-inside space-y-2 text-foreground-secondary pl-4 my-4">
               {items.map((item, itemIdx) => {
                 // Remove the prefix from the first item if needed
                 const cleanItem = itemIdx === 0 && (item.startsWith('- ') || item.startsWith('* '))
@@ -61,7 +61,7 @@ export default function Markdown({ content }: MarkdownProps) {
 
         // 3. Paragraphs
         return (
-          <p key={blockIdx} className="text-slate-300 leading-relaxed">
+          <p key={blockIdx} className="text-foreground-secondary leading-relaxed">
             {renderInline(trimmed)}
           </p>
         );
@@ -93,7 +93,7 @@ function renderInline(text: string) {
           <Link
             key={index}
             href={url}
-            className="text-ez-pink hover:underline font-semibold"
+            className="text-accent hover:underline font-semibold"
             {...linkProps}
           >
             {label}
@@ -105,7 +105,7 @@ function renderInline(text: string) {
     // Bold: **text**
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={index} className="font-bold text-white">
+        <strong key={index} className="font-bold text-foreground">
           {part.slice(2, -2)}
         </strong>
       );
@@ -114,7 +114,7 @@ function renderInline(text: string) {
     // Italic: *text*
     if (part.startsWith('*') && part.endsWith('*')) {
       return (
-        <em key={index} className="italic text-slate-200">
+        <em key={index} className="italic text-foreground">
           {part.slice(1, -1)}
         </em>
       );
@@ -125,7 +125,7 @@ function renderInline(text: string) {
       return (
         <code
           key={index}
-          className="bg-slate-900/60 border border-slate-800/80 px-1.5 py-0.5 rounded text-xs text-ez-pink font-mono"
+          className="bg-surface-sunken/60 border border-line/80 px-1.5 py-0.5 rounded text-xs text-accent font-mono"
         >
           {part.slice(1, -1)}
         </code>
