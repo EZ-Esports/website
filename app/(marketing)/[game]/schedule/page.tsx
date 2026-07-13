@@ -118,6 +118,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
               href: filterHref(d, sort),
             }))}
             active={division}
+            ariaLabel="Division"
           />
 
           {seasons.length > 1 && selectedSeason && (

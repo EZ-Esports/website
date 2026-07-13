@@ -176,6 +176,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               href: `/${game}/standings?division=${d}${selectedSeason ? `&season=${encodeURIComponent(selectedSeason.name)}` : ''}`,
             }))}
             active={division}
+            ariaLabel="Division"
           />
 
           {seasons.length > 1 && selectedSeason && (
