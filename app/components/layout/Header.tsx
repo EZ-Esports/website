@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import FocusTrap from 'focus-trap-react';
+import { FocusScope } from 'react-aria';
+import { Dialog } from 'react-aria-components';
 import { SiTwitch } from 'react-icons/si';
 import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
 import Button from '@/app/components/ui/Button';
@@ -56,7 +57,13 @@ export default function Header() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsOpen(false);
-        toggleRef.current?.focus();
+        // Deferred: FocusScope's containment reclaims focus synchronously (via a
+        // document 'focusin' listener) whenever focus moves outside the scope
+        // while `contain` is still true. Calling focus() in the same tick as
+        // setIsOpen(false) loses that race, since React hasn't re-rendered with
+        // contain={false} yet. Deferring one tick lets that render (and the
+        // effect teardown that follows) land first.
+        setTimeout(() => toggleRef.current?.focus(), 0);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -71,7 +78,8 @@ export default function Header() {
 
   const handleCloseMenu = () => {
     setIsOpen(false);
-    toggleRef.current?.focus();
+    // See the Escape handler above for why this is deferred a tick.
+    setTimeout(() => toggleRef.current?.focus(), 0);
   };
 
   return (
@@ -158,40 +166,44 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Mobile Navigation Drawer */}
-        <AnimatePresence>
-          {isOpen && (
-            <FocusTrap
-              focusTrapOptions={{
-                escapeDeactivates: false,
-                allowOutsideClick: true,
-                returnFocusOnDeactivate: false,
-              }}
-            >
-              <motion.div
-                id="mobile-nav"
-                key="mobile-nav"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="md:hidden py-4 border-t border-line/40 rounded-b-xl px-4 bg-surface-raised/95 backdrop-blur-md"
-              >
-                <Navigation onNavigate={handleCloseMenu} />
-                <div className="mt-4 pt-4 border-t border-line/30">
-                  <Button 
-                    href={ROUTES.apply} 
-                    variant="primary" 
-                    className="w-full text-center py-2.5 font-bold uppercase tracking-wider"
-                    onClick={handleCloseMenu}
-                  >
-                    Apply Now
-                  </Button>
-                </div>
-              </motion.div>
-            </FocusTrap>
-          )}
-        </AnimatePresence>
+        {/* Mobile Navigation Drawer. React Aria's FocusScope (contain, no restoreFocus)
+            traps Tab within the panel without blocking outside clicks, so the toggle
+            button below (outside the scope) still closes the menu on click.
+            FocusScope wraps AnimatePresence (rather than being wrapped by it) so
+            `contain` flips off the instant isOpen changes, instead of staying
+            mounted+active for the ~150ms exit animation and fighting the manual
+            focus-return below. Escape-to-close and focus-return to the toggle stay
+            on the app's own handlers above — RAC's Dialog only adds the dialog
+            role/label. */}
+        <FocusScope contain={isOpen} restoreFocus={false}>
+          <AnimatePresence>
+            {isOpen && (
+              <Dialog aria-label="Mobile navigation" className="outline-none">
+                <motion.div
+                  id="mobile-nav"
+                  key="mobile-nav"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="md:hidden py-4 border-t border-line/40 rounded-b-xl px-4 bg-surface-raised/95 backdrop-blur-md"
+                >
+                  <Navigation onNavigate={handleCloseMenu} />
+                  <div className="mt-4 pt-4 border-t border-line/30">
+                    <Button
+                      href={ROUTES.apply}
+                      variant="primary"
+                      className="w-full text-center py-2.5 font-bold uppercase tracking-wider"
+                      onClick={handleCloseMenu}
+                    >
+                      Apply Now
+                    </Button>
+                  </div>
+                </motion.div>
+              </Dialog>
+            )}
+          </AnimatePresence>
+        </FocusScope>
       </nav>
       <GameSubHeader />
     </motion.header>
