@@ -21,11 +21,12 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.93.3",
     "drizzle-orm": "^0.45.2",
-    "focus-trap-react": "^12.0.2",
     "framer-motion": "^12.33.0",
     "next": "^16.2.6",
     "postgres": "^3.4.9",
     "react": "19.2.3",
+    "react-aria": "^3.50.0",
+    "react-aria-components": "^1.19.0",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0"
   },
