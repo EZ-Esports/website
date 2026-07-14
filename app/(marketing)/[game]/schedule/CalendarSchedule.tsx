@@ -3,9 +3,9 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { FiChevronLeft, FiChevronRight, FiCalendar, FiClock, FiX, FiInfo } from 'react-icons/fi';
-import { motion, AnimatePresence } from 'framer-motion';
 import { formatNY } from '@/app/lib/dates';
 import Badge from '@/app/components/ui/Badge';
+import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 
 interface ScheduleItem {
   id: string;
@@ -454,28 +454,22 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
         })()}
       </div>
 
-      {/* Match Details Overlay Modal */}
-      <AnimatePresence>
-        {selectedMatch && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop Overlay */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedMatch(null)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-
-            {/* Modal Box */}
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: 'spring', duration: 0.4 }}
-              className="bg-surface-sunken border border-line rounded-2xl w-full max-w-xl overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10"
-            >
-              {/* Modal Header Cover */}
+      {/* Match Details Overlay Modal — RAC owns focus containment, Escape-to-close,
+          outside-press dismissal, and body scroll locking. */}
+      <Overlay
+        isOpen={selectedMatch !== null}
+        onOpenChange={(open) => !open && setSelectedMatch(null)}
+        isDismissable
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+      >
+        <Modal className="contents">
+          <Dialog
+            aria-label="Match details"
+            className="bg-surface-sunken border border-line rounded-2xl w-full max-w-xl overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none"
+          >
+            {selectedMatch && (
+              <>
+                {/* Modal Header Cover */}
               <div className="bg-gradient-to-r from-accent/15 to-transparent border-b border-line px-6 py-5 flex items-center justify-between">
                 <div>
                   <Badge size="sm">{selectedMatch.division} Division</Badge>
@@ -603,10 +597,11 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                   Explore Teams
                 </Link>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </>
+            )}
+          </Dialog>
+        </Modal>
+      </Overlay>
     </div>
   );
 }

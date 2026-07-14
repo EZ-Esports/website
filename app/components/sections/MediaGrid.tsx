@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
-import FocusTrap from 'focus-trap-react';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import { GALLERY_ITEM_WIDTHS } from '@/app/lib/constants';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
+import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 
 function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; index: number; widthClass: string; onOpen: (i: number) => void }) {
   const [errored, setErrored] = useState(false);
@@ -46,45 +45,25 @@ interface MediaGridProps {
 export default function MediaGrid({ items, columns = 3, eyebrow, heading }: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (selectedImageIndex !== null) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [selectedImageIndex]);
-
-  const openLightbox = (index: number) => {
-    setSelectedImageIndex(index);
-  };
 
   const closeLightbox = () => {
     setSelectedImageIndex(null);
   };
 
-  useEffect(() => {
-    if (selectedImageIndex === null) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowRight') setSelectedImageIndex(i => i === null ? null : (i + 1) % items.length);
-      if (e.key === 'ArrowLeft') setSelectedImageIndex(i => i === null ? null : (i - 1 + items.length) % items.length);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImageIndex, items.length]);
-
   const navigateLightbox = (direction: 'next' | 'prev', e: React.MouseEvent) => {
     e.stopPropagation();
     if (selectedImageIndex === null) return;
-    
+
     let newIndex = direction === 'next' ? selectedImageIndex + 1 : selectedImageIndex - 1;
     if (newIndex >= items.length) newIndex = 0;
     if (newIndex < 0) newIndex = items.length - 1;
-    
+
     setSelectedImageIndex(newIndex);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight') setSelectedImageIndex(i => i === null ? null : (i + 1) % items.length);
+    if (e.key === 'ArrowLeft') setSelectedImageIndex(i => i === null ? null : (i - 1 + items.length) % items.length);
   };
 
   return (
@@ -93,79 +72,86 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
         {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
         <div className="flex flex-wrap justify-center gap-6">
           {items.map((item, index) => (
-            <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={openLightbox} />
+            <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={setSelectedImageIndex} />
           ))}
         </div>
       </div>
 
-      {/* Lightbox Modal */}
-      <AnimatePresence>
-      {selectedImageIndex !== null && (
-        <FocusTrap focusTrapOptions={{ initialFocus: false, escapeDeactivates: false }}>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lightbox-title"
-          aria-describedby="lightbox-caption"
-          onClick={closeLightbox}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out animate-fade-in"
-        >
-          <span id="lightbox-title" className="sr-only">{items[selectedImageIndex]?.alt}</span>
-          {/* Close Button */}
-          <button
-            onClick={closeLightbox}
-            className="absolute top-6 right-6 text-foreground hover:text-accent p-2 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
-            aria-label="Close photo viewer"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      {/* Lightbox Modal — RAC ModalOverlay owns focus containment, Escape-to-close,
+          outside-press dismissal, and body scroll locking. */}
+      <Overlay
+        isOpen={selectedImageIndex !== null}
+        onOpenChange={(open) => !open && closeLightbox()}
+        isDismissable
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out animate-fade-in"
+      >
+        <Modal className="contents">
+          {/* Dialog must stay a real (focusable) box, not display:contents — RAC's
+              Escape-to-close and initial focus both depend on being able to focus
+              this element; a `contents` box can never receive focus. */}
+          {/* Arrow-key nav listens on a PARENT of the Dialog: RAC focuses the Dialog
+              node itself on mount, so keydowns bubble up from it — a handler on an
+              inner element would never fire until focus moved deeper. (Dialog's own
+              props don't accept onKeyDown.) */}
+          <div className="contents" onKeyDown={handleKeyDown}>
+            <Dialog
+              className="outline-none"
+              aria-label={selectedImageIndex !== null ? items[selectedImageIndex]?.alt : 'Photo viewer'}
+              aria-describedby={selectedImageIndex !== null ? 'lightbox-caption' : undefined}
+            >
+              {selectedImageIndex !== null && (
+                <>
+                  {/* Close Button */}
+                  <button
+                    onClick={closeLightbox}
+                    className="absolute top-6 right-6 text-foreground hover:text-accent p-2 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
+                    aria-label="Close photo viewer"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
 
-          {/* Navigation Controls */}
-          <button
-            onClick={(e) => navigateLightbox('prev', e)}
-            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
-            aria-label="Previous photo"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+                  {/* Navigation Controls */}
+                  <button
+                    onClick={(e) => navigateLightbox('prev', e)}
+                    className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
+                    aria-label="Previous photo"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
 
-          <button
-            onClick={(e) => navigateLightbox('next', e)}
-            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
-            aria-label="Next photo"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+                  <button
+                    onClick={(e) => navigateLightbox('next', e)}
+                    className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
+                    aria-label="Next photo"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
 
-          {/* Active Image */}
-          <div className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center cursor-default" onClick={(e) => e.stopPropagation()}>
-            <Image
-              src={items[selectedImageIndex].src}
-              alt={items[selectedImageIndex].alt}
-              width={1200}
-              height={800}
-              className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
-            />
-            <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-foreground-secondary text-sm">
-              {selectedImageIndex + 1} / {items.length} • {items[selectedImageIndex].alt}
-            </div>
+                  {/* Active Image */}
+                  <div className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center cursor-default" onClick={(e) => e.stopPropagation()}>
+                    <Image
+                      src={items[selectedImageIndex].src}
+                      alt={items[selectedImageIndex].alt}
+                      width={1200}
+                      height={800}
+                      className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
+                    />
+                    <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-foreground-secondary text-sm">
+                      {selectedImageIndex + 1} / {items.length} • {items[selectedImageIndex].alt}
+                    </div>
+                  </div>
+                </>
+              )}
+            </Dialog>
           </div>
-        </motion.div>
-        </FocusTrap>
-      )}
-      </AnimatePresence>
+        </Modal>
+      </Overlay>
     </section>
   );
 }
-
-

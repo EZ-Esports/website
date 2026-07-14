@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { useState, useTransition } from 'react';
+import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-components';
 import { revokeInvite } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
 import { HiOutlineTrash, HiOutlineEllipsisVertical } from 'react-icons/hi2';
@@ -26,22 +27,9 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
-  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
-
-  const actionsRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
-        setActionsMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  // Controlled so a cancelled confirm keeps the menu open (RAC otherwise closes
+  // the menu unconditionally after onAction runs).
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   if (removed) return null;
 
@@ -49,7 +37,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
     if (!window.confirm(`Cancel the pending invite for ${invite.email}? The link will stop working.`)) {
       return;
     }
-    setActionsMenuOpen(false);
+    setActionsOpen(false);
     setError(null);
     startTransition(async () => {
       const result = await revokeInvite(invite.id);
@@ -63,9 +51,8 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
 
   // Derive initials and colors
   const getInitials = (email: string) => {
-    const parts = email.split('@')[0] || '';
-    if (!parts) return 'S';
-    return parts.slice(0, 2).toUpperCase();
+    const local = email.split('@')[0] ?? '';
+    return local.slice(0, 2).toUpperCase() || '?';
   };
 
   const highestRole = invite.roles.reduce((highest, current) => {
@@ -146,29 +133,30 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
         {!canRevoke ? (
           <span className="text-xs text-foreground-muted italic px-3 select-none">—</span>
         ) : (
-          <div className="relative" ref={actionsRef}>
-            <button
-              onClick={() => setActionsMenuOpen(!actionsMenuOpen)}
+          <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
+            <Button
               className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
-              title="More Actions"
+              aria-label={`More actions for ${invite.email}`}
             >
               <HiOutlineEllipsisVertical className="w-4 h-4" />
-            </button>
+            </Button>
 
-            {actionsMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl z-50">
-                <button
-                  type="button"
-                  onClick={handleRevoke}
-                  disabled={isPending}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer disabled:opacity-50"
+            <Popover className="w-48">
+              <Menu className="rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl outline-none">
+                <MenuItem
+                  id="cancel"
+                  textValue="Cancel Invite"
+                  isDisabled={isPending}
+                  shouldCloseOnSelect={false}
+                  onAction={handleRevoke}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 data-[focused]:text-red-400 data-[focused]:bg-red-950/20 transition-all cursor-pointer data-[disabled]:opacity-50"
                 >
                   <HiOutlineTrash className="w-4 h-4" />
                   <span>Cancel Invite</span>
-                </button>
-              </div>
-            )}
-          </div>
+                </MenuItem>
+              </Menu>
+            </Popover>
+          </MenuTrigger>
         )}
       </div>
     </div>
