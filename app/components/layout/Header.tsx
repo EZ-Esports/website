@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { FocusScope } from 'react-aria';
@@ -51,24 +51,25 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Deferred focus return: FocusScope's containment reclaims focus synchronously (via
+  // a document 'focusin' listener) while `contain` is still true. Deferring one tick
+  // lets the re-render with contain={false} land before we attempt focus().
+  const returnFocusToToggle = useCallback(() => {
+    setTimeout(() => toggleRef.current?.focus(), 0);
+  }, []);
+
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsOpen(false);
-        // Deferred: FocusScope's containment reclaims focus synchronously (via a
-        // document 'focusin' listener) whenever focus moves outside the scope
-        // while `contain` is still true. Calling focus() in the same tick as
-        // setIsOpen(false) loses that race, since React hasn't re-rendered with
-        // contain={false} yet. Deferring one tick lets that render (and the
-        // effect teardown that follows) land first.
-        setTimeout(() => toggleRef.current?.focus(), 0);
+        returnFocusToToggle();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, returnFocusToToggle]);
 
   // Close when route changes (deferred to avoid synchronous setState in effect body)
   useEffect(() => {
@@ -78,8 +79,7 @@ export default function Header() {
 
   const handleCloseMenu = () => {
     setIsOpen(false);
-    // See the Escape handler above for why this is deferred a tick.
-    setTimeout(() => toggleRef.current?.focus(), 0);
+    returnFocusToToggle();
   };
 
   return (

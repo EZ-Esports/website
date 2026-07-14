@@ -34,7 +34,7 @@ export default function FilterTabs({ tabs, active, className = '', ariaLabel = '
             key={tab.value}
             href={tab.href}
             className={cx(tabBase, isActive ? tabActive : tabInactive)}
-            aria-current={isActive ? 'true' : undefined}
+            aria-current={isActive ? 'page' : undefined}
           >
             {tab.label}
           </Link>

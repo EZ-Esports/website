@@ -45,7 +45,13 @@ export function Select({ className = '', children, ...props }: SelectHTMLAttribu
 
 interface FieldProps {
   label: ReactNode;
-  htmlFor: string;
+  /**
+   * Associates the label with an input. Inside `Field` this is redundant — RAC's
+   * `TextField` context wires `Label` ↔ `Input` automatically via generated IDs.
+   * Accepted here so standalone `Label` usage outside a `Field` wrapper still works
+   * without a separate component.
+   */
+  htmlFor?: string;
   required?: boolean;
   error?: string;
   children: ReactNode;

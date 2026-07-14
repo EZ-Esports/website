@@ -51,9 +51,8 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
 
   // Derive initials and colors
   const getInitials = (email: string) => {
-    const parts = email.split('@')[0] || '';
-    if (!parts) return 'S';
-    return parts.slice(0, 2).toUpperCase();
+    const local = email.split('@')[0] ?? '';
+    return local.slice(0, 2).toUpperCase() || '?';
   };
 
   const highestRole = invite.roles.reduce((highest, current) => {
@@ -137,7 +136,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
               className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
-              aria-label="More Actions"
+              aria-label={`More actions for ${invite.email}`}
             >
               <HiOutlineEllipsisVertical className="w-4 h-4" />
             </Button>

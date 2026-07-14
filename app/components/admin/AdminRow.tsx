@@ -63,7 +63,12 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
   // Sync role assignment from the menu's full selection (RAC reports the resulting
   // set on every toggle, not just the changed key, so no manual add/remove diffing).
   function handleRolesChange(keys: Selection) {
-    if (keys === 'all') return;
+    // RAC emits 'all' only when a "select all" gesture fires. This menu has no such
+    // affordance, so this guard is purely defensive against unexpected RAC behavior changes.
+    if (keys === 'all') {
+      if (process.env.NODE_ENV !== 'production') throw new Error('Unexpected selectAll in roles menu');
+      return;
+    }
     setError(null);
     const newRoleIds = Array.from(keys, String);
     startTransition(async () => {
@@ -76,9 +81,8 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
 
   // Derive initials and colors
   const getInitials = (email: string) => {
-    const parts = email.split('@')[0] || '';
-    if (!parts) return 'S';
-    return parts.slice(0, 2).toUpperCase();
+    const local = email.split('@')[0] ?? '';
+    return local.slice(0, 2).toUpperCase() || '?';
   };
 
   const highestRole = admin.roles.reduce((highest, current) => {
@@ -148,6 +152,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
         {canRevoke && (
           <MenuTrigger>
             <Button
+              isDisabled={isPending}
               className="p-1 hover:bg-line rounded text-foreground-secondary hover:text-white transition-all cursor-pointer border border-transparent hover:border-line ml-1"
               aria-label="Add / Remove Roles"
             >
@@ -165,7 +170,6 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
                   shouldCloseOnSelect={false}
                   selectedKeys={selectedRoleIds}
                   onSelectionChange={handleRolesChange}
-                  disabledKeys={isPending ? assignableRoles.map((r) => r.id) : []}
                   renderEmptyState={() => (
                     <div className="text-center py-2 text-[10px] text-foreground-muted italic">No roles assignable</div>
                   )}
@@ -205,7 +209,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
               className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
-              aria-label="More Actions"
+              aria-label={`More actions for ${admin.email}`}
             >
               <HiOutlineEllipsisVertical className="w-4 h-4" />
             </Button>

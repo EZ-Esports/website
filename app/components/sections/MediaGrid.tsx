@@ -45,9 +45,6 @@ interface MediaGridProps {
 export default function MediaGrid({ items, columns = 3, eyebrow, heading }: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
-  const openLightbox = (index: number) => {
-    setSelectedImageIndex(index);
-  };
 
   const closeLightbox = () => {
     setSelectedImageIndex(null);
@@ -75,7 +72,7 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
         {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
         <div className="flex flex-wrap justify-center gap-6">
           {items.map((item, index) => (
-            <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={openLightbox} />
+            <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={setSelectedImageIndex} />
           ))}
         </div>
       </div>
@@ -100,7 +97,7 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
             <Dialog
               className="outline-none"
               aria-label={selectedImageIndex !== null ? items[selectedImageIndex]?.alt : 'Photo viewer'}
-              aria-describedby="lightbox-caption"
+              aria-describedby={selectedImageIndex !== null ? 'lightbox-caption' : undefined}
             >
               {selectedImageIndex !== null && (
                 <>

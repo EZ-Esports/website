@@ -41,6 +41,8 @@ interface DialogBoxProps extends Omit<DialogProps, 'className'> {
   className?: string;
 }
 
+/** Dialog box. Renders with role="dialog" by default; pass role="alertdialog" for
+ *  prompts that require an explicit user response (e.g. confirm-before-delete). */
 export function Dialog({ className, ...props }: DialogBoxProps) {
   return <RACDialog className={className} {...props} />;
 }
