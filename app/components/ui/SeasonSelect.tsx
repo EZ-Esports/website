@@ -20,12 +20,6 @@ interface SeasonSelectProps {
 }
 
 /** Season dropdown that navigates via the `season` query param. */
-
-// Converts a season name to a DOM-safe id slug (spaces / special chars → hyphens).
-// `key` stays as `s.name` (React-internal, never reflected to DOM); only `id` needs sanitizing.
-const toSlug = (s: string) =>
-  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-
 export default function SeasonSelect({ basePath, seasons, selected, extraParams = {} }: SeasonSelectProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -53,7 +47,7 @@ export default function SeasonSelect({ basePath, seasons, selected, extraParams 
           {seasons.map((s) => (
             <ListBoxItem
               key={s.name}
-              id={toSlug(s.name)}
+              id={s.name}
               textValue={s.name}
               className="px-3 py-2 rounded-lg text-sm font-bold text-foreground-secondary data-[focused]:bg-accent/10 data-[focused]:text-foreground cursor-pointer flex items-center justify-between gap-3 outline-none"
             >
