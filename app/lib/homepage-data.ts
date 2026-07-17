@@ -40,7 +40,7 @@ export const featuredVideos: VideoItem[] = [
 // Hero section content
 export const heroContent = {
   title: 'New York City High School Esports League',
-  backgroundImage: '/images/hero-background.png',
+  backgroundImage: '/images/hero-background.jpg',
 } as const;
 
 // Section content

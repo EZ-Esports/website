@@ -53,7 +53,7 @@ export default async function NewsPage() {
     <main>
       <Hero
         title="League News"
-        backgroundImage="/images/hero-background.png"
+        backgroundImage="/images/hero-background.jpg"
       />
 
       <Section>
