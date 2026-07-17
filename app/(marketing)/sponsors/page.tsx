@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Section from '@/app/components/ui/Section';
+import Image from 'next/image';
 import { Eyebrow, SectionHeader } from '@/app/components/ui/SectionHeader';
 import Button from '@/app/components/ui/Button';
 import { getCachedSponsors } from '@/app/lib/db/queries';
@@ -32,153 +32,148 @@ export default async function SponsorsPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(ellipse at 15% 10%, color-mix(in srgb, var(--color-accent) 9%, transparent), transparent 55%)',
-          }}
-          aria-hidden="true"
-        />
-        <div className="relative grid lg:grid-cols-2">
-          <div className="flex flex-col justify-center px-6 py-16 sm:px-10 md:py-20 lg:px-16">
-            <Eyebrow>Partner with EZ Esports</Eyebrow>
-            <h1 className="mt-4 text-4xl font-black uppercase leading-[0.98] tracking-tight text-foreground sm:text-5xl md:text-6xl">
-              Reach &amp; Inspire
-              <br />
-              <span className="text-accent drop-shadow-[0_4px_26px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]">
-                the Future
-              </span>
-            </h1>
-            <p className="mt-5 max-w-md text-[15.5px] leading-relaxed text-foreground-secondary">
-              EZ Esports is NYC&apos;s premier high-school esports league. Every match, broadcast, and
-              tournament puts your brand in front of the students, families, and schools shaping the
-              city&apos;s next generation of competitive gaming.
-            </p>
-            {sponsors.length > 0 && (
-              <p className="mt-6 text-xs font-extrabold uppercase tracking-widest text-foreground-muted">
-                — Join others in supporting EZ Esports
+      <div className="flex flex-col lg:min-h-screen">
+        <section className="relative overflow-hidden border-b border-line lg:flex lg:flex-1 lg:flex-col">
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse at 15% 10%, color-mix(in srgb, var(--color-accent) 9%, transparent), transparent 55%)',
+            }}
+            aria-hidden="true"
+          />
+          <div className="relative grid gap-10 pt-28 sm:pt-32 md:pt-36 lg:flex-1 lg:grid-cols-2 lg:gap-0">
+            <div className="flex flex-col justify-center pb-20 pl-8 pr-6 text-left sm:pb-24 sm:pl-12 sm:pr-10 md:pl-16 md:pr-12 lg:pl-24 lg:pr-16">
+              <Eyebrow>Partner with EZ Esports</Eyebrow>
+              <h1 className="mt-5 text-4xl font-black uppercase leading-[0.98] tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
+                Reach &amp; Inspire
+                <br />
+                <span className="text-accent drop-shadow-[0_4px_26px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]">
+                  the Future
+                </span>
+              </h1>
+              <p className="mt-8 max-w-lg text-lg leading-relaxed text-foreground-secondary sm:text-xl">
+                EZ Esports is NYC&apos;s premier high-school esports league. Every match, broadcast, and
+                tournament puts your brand in front of the students, families, and schools shaping the
+                city&apos;s next generation of competitive gaming.
               </p>
-            )}
-          </div>
+              {sponsors.length > 0 && (
+                <p className="mt-8 text-sm font-extrabold uppercase tracking-widest text-foreground-muted sm:text-base">
+                  — Join others in supporting EZ Esports
+                </p>
+              )}
+            </div>
 
-          <div className="min-h-[340px] lg:min-h-[440px]">
-            {sponsors.length > 0 ? (
-              <SponsorMarquee
-                sponsors={sponsors.map((s) => ({ id: s.id, name: s.name, logoUrl: s.logoUrl }))}
+            <div className="flex min-h-[160px] items-center justify-center px-6 pb-20 sm:min-h-[200px] sm:px-10 md:pb-24 lg:min-h-0 lg:px-16">
+              <Image
+                src="/images/logos/wordmark.png"
+                alt="EZ Esports"
+                width={747}
+                height={228}
+                className="h-auto w-full max-w-sm opacity-95 sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl"
               />
-            ) : (
-              <div className="flex h-full min-h-[340px] items-center justify-center border-l border-line bg-surface-raised p-8 text-center lg:min-h-[440px]">
-                <div>
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-line bg-surface">
-                    <svg
-                      className="h-8 w-8 text-foreground-muted"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-foreground-secondary">
-                    Partner announcements coming soon.
-                  </p>
-                  <p className="mt-2 text-xs text-foreground-muted">
-                    Interested in supporting NYC&apos;s high-school esports scene?{' '}
-                    <a href={CONTACT_EMAIL} className="text-accent hover:underline">
-                      Get in touch.
-                    </a>
-                  </p>
-                </div>
-              </div>
-            )}
+            </div>
+          </div>
+        </section>
+
+        {sponsors.length > 0 ? (
+          <SponsorMarquee
+            sponsors={sponsors.map((s) => ({ id: s.id, name: s.name, logoUrl: s.logoUrl }))}
+          />
+        ) : (
+          <div className="border-y border-line bg-surface-raised py-6 text-center">
+            <p className="text-sm font-medium text-foreground-secondary">
+              Partner announcements coming soon.
+            </p>
+            <p className="mt-1 text-xs text-foreground-muted">
+              Interested in supporting NYC&apos;s high-school esports scene?{' '}
+              <a href={CONTACT_EMAIL} className="text-accent hover:underline">
+                Get in touch.
+              </a>
+            </p>
+          </div>
+        )}
+      </div>
+
+      <section className="relative flex flex-col justify-center border-t border-line bg-surface-raised py-16 md:py-24 lg:min-h-screen lg:py-20">
+        <div className="container mx-auto max-w-6xl px-4">
+          <SectionHeader
+            title="Become a Sponsor"
+            lead="Interested in partnering with NYC's premier high school esports league? Compare tiers below and let's build something together."
+          />
+          <Eyebrow className="mb-4 block text-center">Sponsorship Tiers</Eyebrow>
+          <div className="overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/20">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] table-fixed border-collapse bg-surface-raised/60 text-sm">
+                <colgroup>
+                  <col className="w-[34%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[22%]" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-surface-raised px-4 py-6 text-left" scope="col">
+                      <span className="sr-only">Feature</span>
+                    </th>
+                    <th className="border-l border-accent/20 bg-accent/10 px-4 py-6 text-center" scope="col">
+                      <span className="block text-lg font-black text-accent">◆ Platinum</span>
+                    </th>
+                    <th className="px-4 py-6 text-center" scope="col">
+                      <span className="block text-lg font-black text-warning">● Gold</span>
+                    </th>
+                    <th className="px-4 py-6 text-center" scope="col">
+                      <span className="block text-lg font-black text-foreground-muted">▲ Community</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TIER_FEATURES.map((row) => (
+                    <tr key={row.label} className="border-t border-line">
+                      <th
+                        scope="row"
+                        className="sticky left-0 z-10 bg-surface-raised px-4 py-4 text-left font-semibold text-foreground-secondary"
+                      >
+                        {row.label}
+                      </th>
+                      <td className="border-l border-accent/20 bg-accent/10 px-4 py-4 text-center text-base font-black">
+                        {row.platinum ? (
+                          <span className="text-accent" aria-label="Included">✓</span>
+                        ) : (
+                          <span className="text-foreground-muted" aria-label="Not included">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center text-base font-black">
+                        {row.gold ? (
+                          <span className="text-accent" aria-label="Included">✓</span>
+                        ) : (
+                          <span className="text-foreground-muted" aria-label="Not included">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center text-base font-black">
+                        {row.community ? (
+                          <span className="text-accent" aria-label="Included">✓</span>
+                        ) : (
+                          <span className="text-foreground-muted" aria-label="Not included">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="mt-3 text-center text-xs text-foreground-muted lg:hidden">
+            ← Swipe to compare tiers →
+          </p>
+
+          <div className="mt-12 flex justify-center md:mt-16">
+            <Button href={CONTACT_EMAIL} variant="primary" size="md" className="lg:px-10 lg:py-3.5 lg:text-lg">
+              Get in Touch
+            </Button>
           </div>
         </div>
       </section>
-
-      <Section tone="raised">
-        <SectionHeader title="Sponsorship Tiers" />
-        <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/20">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] border-collapse bg-surface-raised/60 text-sm">
-              <thead>
-                <tr>
-                  <th className="sticky left-0 z-10 bg-surface-raised px-4 py-6 text-left" scope="col" />
-                  <th className="border-l border-accent/20 bg-accent/10 px-4 py-6 text-center" scope="col">
-                    <span className="block text-lg font-black text-accent">◆ Platinum</span>
-                  </th>
-                  <th className="px-4 py-6 text-center" scope="col">
-                    <span className="block text-lg font-black text-warning">● Gold</span>
-                  </th>
-                  <th className="px-4 py-6 text-center" scope="col">
-                    <span className="block text-lg font-black text-foreground-muted">▲ Community</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {TIER_FEATURES.map((row) => (
-                  <tr key={row.label} className="border-t border-line">
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 bg-surface-raised px-4 py-4 text-left font-semibold text-foreground-secondary"
-                    >
-                      {row.label}
-                    </th>
-                    <td className="border-l border-accent/20 bg-accent/10 px-4 py-4 text-center text-base font-black">
-                      {row.platinum ? (
-                        <span className="text-accent" aria-label="Included">✓</span>
-                      ) : (
-                        <span className="text-foreground-muted" aria-label="Not included">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-center text-base font-black">
-                      {row.gold ? (
-                        <span className="text-accent" aria-label="Included">✓</span>
-                      ) : (
-                        <span className="text-foreground-muted" aria-label="Not included">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-center text-base font-black">
-                      {row.community ? (
-                        <span className="text-accent" aria-label="Included">✓</span>
-                      ) : (
-                        <span className="text-foreground-muted" aria-label="Not included">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <p className="mt-3 text-center text-xs text-foreground-muted lg:hidden">
-          ← Swipe to compare tiers →
-        </p>
-        <div className="mt-8 flex justify-center">
-          <Button href={CONTACT_EMAIL} variant="primary">
-            Get in Touch
-          </Button>
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeader
-          title="Become a Sponsor"
-          lead="Interested in partnering with NYC's premier high school esports league? Reach out and let's build something together."
-        />
-        <div className="flex justify-center">
-          <Button href={CONTACT_EMAIL} variant="primary">
-            Contact Us
-          </Button>
-        </div>
-      </Section>
     </>
   );
 }

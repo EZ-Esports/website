@@ -76,7 +76,7 @@ export default async function NewsArticlePage({ params }: NewsArticlePageProps) 
     <main>
       <Hero
         title={post.title}
-        backgroundImage="/images/hero-background.png"
+        backgroundImage="/images/hero-background.jpg"
         size="medium"
       />
 

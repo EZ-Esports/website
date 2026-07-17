@@ -15,7 +15,7 @@ export default function PrivacyPage() {
     <main>
       <Hero
         title="Privacy Policy"
-        backgroundImage="/images/hero-background.png"
+        backgroundImage="/images/hero-background.jpg"
         size="medium"
       />
 

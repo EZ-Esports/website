@@ -33,7 +33,7 @@ export default async function AboutPage() {
     <main>
       <Hero
         title="About EZ Esports"
-        backgroundImage="/images/hero-background.png"
+        backgroundImage="/images/hero-background.jpg"
       />
 
       <Section>

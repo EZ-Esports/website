@@ -17,6 +17,8 @@ interface HeroProps {
   backgroundImage: string;
   size?: 'large' | 'medium';
   primaryCTA?: CTA;
+  /** Disables the scroll-linked background parallax and its overscan buffer, rendering the image at its natural cover-fit resolution. Defaults to true. */
+  parallax?: boolean;
 }
 
 export default function Hero({
@@ -25,12 +27,13 @@ export default function Hero({
   backgroundImage,
   size = 'medium',
   primaryCTA,
+  parallax = true,
 }: HeroProps) {
   const isLarge = size === 'large';
   const prefersReducedMotion = usePrefersReducedMotion();
 
   // Scroll-linked parallax (hooks must run unconditionally), but fall back to
-  // static values when the user prefers reduced motion.
+  // static values when the user prefers reduced motion or parallax is disabled.
   const { scrollY } = useScroll();
   const contentOpacityMV = useTransform(scrollY, [0, 300], [1, 0]);
   const contentYMV = useTransform(scrollY, [0, 300], [0, -40]);
@@ -38,7 +41,7 @@ export default function Hero({
 
   const contentOpacity = prefersReducedMotion ? 1 : contentOpacityMV;
   const contentY = prefersReducedMotion ? 0 : contentYMV;
-  const backgroundY = prefersReducedMotion ? '0%' : backgroundYMV;
+  const backgroundY = !parallax || prefersReducedMotion ? '0%' : backgroundYMV;
 
   // Scroll-linked opacity for card frosted glass background independent layer
   const cardBgOpacityMV = useTransform(scrollY, [0, 150], [1, 0]);
@@ -67,13 +70,14 @@ export default function Hero({
       {/* Background Image */}
       <motion.div
         style={{ y: backgroundY }}
-        className="absolute inset-0 h-[120%] -top-[10%] select-none pointer-events-none z-0"
+        className={`absolute inset-0 select-none pointer-events-none z-0 ${parallax ? 'h-[120%] -top-[10%]' : ''}`}
       >
         <Image
           src={backgroundImage}
           alt=""
           fill
           priority
+          quality={100}
           sizes="100vw"
           className="object-cover object-center"
         />
