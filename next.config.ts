@@ -13,10 +13,6 @@ const nextConfig: NextConfig = {
         hostname: 'fziqdmlymqtobxrngneh.supabase.co',
       },
     ],
-    // Next defaults to only allowing quality=75; the Hero background image
-    // requests quality=100 to avoid compression artifacts on its large,
-    // priority-loaded photo.
-    qualities: [75, 100],
   },
   experimental: {
     // Rewrite barrel imports to per-module paths so these packages don't pull
