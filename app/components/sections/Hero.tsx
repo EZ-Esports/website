@@ -35,17 +35,37 @@ export default function Hero({
   // Scroll-linked parallax (hooks must run unconditionally), but fall back to
   // static values when the user prefers reduced motion or parallax is disabled.
   const { scrollY } = useScroll();
-  const contentOpacityMV = useTransform(scrollY, [0, 300], [1, 0]);
-  const contentYMV = useTransform(scrollY, [0, 300], [0, -40]);
+  const contentOpacityMV = useTransform(scrollY, [0, 600], [1, 0]);
   const backgroundYMV = useTransform(scrollY, [0, 500], ['0%', '20%']);
 
   const contentOpacity = prefersReducedMotion ? 1 : contentOpacityMV;
-  const contentY = prefersReducedMotion ? 0 : contentYMV;
   const backgroundY = !parallax || prefersReducedMotion ? '0%' : backgroundYMV;
 
-  // Scroll-linked opacity for card frosted glass background independent layer
-  const cardBgOpacityMV = useTransform(scrollY, [0, 150], [1, 0]);
-  const cardBgOpacity = prefersReducedMotion ? 1 : cardBgOpacityMV;
+  // The frosted glass layer fades via its own background/border/shadow/blur
+  // values instead of the `opacity` property: an element (or ancestor) at
+  // opacity < 1 forces an isolated compositing layer, which cuts
+  // backdrop-filter off from sampling the live background image behind it.
+  // Interpolating these properties directly keeps the panel pinned in place
+  // while it dissolves, with no isolation and no pop.
+  const panelBackgroundMV = useTransform(contentOpacityMV, [1, 0], [
+    'linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(244, 204, 204, 0.05) 50%, rgba(79, 70, 229, 0.03) 100%)',
+    'linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(244, 204, 204, 0) 50%, rgba(79, 70, 229, 0) 100%)',
+  ]);
+  const panelBorderColorMV = useTransform(contentOpacityMV, [1, 0], ['rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0)']);
+  const panelShadowMV = useTransform(contentOpacityMV, [1, 0], [
+    '0 30px 60px -15px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
+    '0 30px 60px -15px rgba(0, 0, 0, 0), inset 0 1px 0 0 rgba(255, 255, 255, 0)',
+  ]);
+  const panelBlurMV = useTransform(contentOpacityMV, [1, 0], ['blur(28px)', 'blur(0px)']);
+
+  const panelBackground = prefersReducedMotion
+    ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(244, 204, 204, 0.05) 50%, rgba(79, 70, 229, 0.03) 100%)'
+    : panelBackgroundMV;
+  const panelBorderColor = prefersReducedMotion ? 'rgba(255, 255, 255, 0.14)' : panelBorderColorMV;
+  const panelShadow = prefersReducedMotion
+    ? '0 30px 60px -15px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)'
+    : panelShadowMV;
+  const panelBlur = prefersReducedMotion ? 'blur(28px)' : panelBlurMV;
 
   // Helper to dynamically color brand words "EZ" and "Esports" pink
   const renderTitle = (text: string) => {
@@ -77,7 +97,7 @@ export default function Hero({
           alt=""
           fill
           priority
-          quality={100}
+          quality={75}
           sizes="100vw"
           className="object-cover object-center"
         />
@@ -89,23 +109,34 @@ export default function Hero({
       </motion.div>
 
       {/* Hero Content Container */}
-      <motion.div 
-        style={{ y: contentY, opacity: contentOpacity }}
-        className="relative z-10 w-full flex items-center justify-center px-4"
-      >
+      <div className="relative z-10 w-full flex items-center justify-center px-4">
         {isLarge ? (
-          <div className="max-w-3xl mx-auto rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden text-center w-full">
-            {/* Animated Frosted Glass Background Layer */}
-            <motion.div 
-              style={{ opacity: cardBgOpacity }}
-              className="absolute inset-0 glass-panel pointer-events-none z-0"
+          <motion.div
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: DUR.base, ease: EASE_REVEAL }}
+            className="max-w-3xl mx-auto rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden text-center w-full"
+          >
+            {/* Frosted Glass Background Layer. Fades via its own background/
+                border/shadow/blur, never via `opacity` (that would force an
+                isolated compositing layer and cut backdrop-filter off from
+                the live background image behind it). */}
+            <motion.div
+              style={{
+                background: panelBackground,
+                backdropFilter: panelBlur,
+                WebkitBackdropFilter: panelBlur,
+                borderColor: panelBorderColor,
+                boxShadow: panelShadow,
+              }}
+              className="absolute inset-0 border pointer-events-none z-0"
             />
-            
+
             {/* Soft internal card glow */}
-            <div className="absolute -top-24 -left-24 w-60 h-60 bg-accent/12 rounded-full blur-[80px] pointer-events-none z-0" />
-            <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-accent-secondary/12 rounded-full blur-[80px] pointer-events-none z-0" />
-            
-            <div className="relative z-10 flex flex-col items-center">
+            <motion.div style={{ opacity: contentOpacity }} className="absolute -top-24 -left-24 w-60 h-60 bg-accent/12 rounded-full blur-[80px] pointer-events-none z-0" />
+            <motion.div style={{ opacity: contentOpacity }} className="absolute -bottom-24 -right-24 w-60 h-60 bg-accent-secondary/12 rounded-full blur-[80px] pointer-events-none z-0" />
+
+            <motion.div style={{ opacity: contentOpacity }} className="relative z-10 flex flex-col items-center">
 
 
               {/* Heading */}
@@ -152,10 +183,10 @@ export default function Hero({
                   </Button>
                 </motion.div>
               )}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         ) : (
-          <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
+          <motion.div style={{ opacity: contentOpacity }} className="max-w-4xl mx-auto flex flex-col items-center text-center">
             {/* Heading */}
             <motion.h1
               initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
@@ -177,9 +208,9 @@ export default function Hero({
                 {subtitle}
               </motion.p>
             )}
-          </div>
+          </motion.div>
         )}
-      </motion.div>
+      </div>
     </section>
   );
 }

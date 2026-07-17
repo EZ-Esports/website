@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  scrollbar-gutter: stable;
+}
+
 :root {
   /* Surfaces */
   --surface: #111111; /* Midnight graphite dark background */
