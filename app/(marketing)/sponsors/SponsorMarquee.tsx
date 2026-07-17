@@ -18,6 +18,13 @@ const NUDGE_PX = 260;
 const controlButtonClass =
   'flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-foreground-secondary transition-all duration-300 hover:border-accent/60 hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised';
 
+/** Normalizes any x offset into the steady-state loop range (-half, 0], regardless of how far it overshot. */
+function wrapX(value: number, half: number): number {
+  if (half <= 0) return value;
+  const wrapped = value % half;
+  return wrapped > 0 ? wrapped - half : wrapped;
+}
+
 export default function SponsorMarquee({ sponsors }: { sponsors: MarqueeSponsor[] }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [playing, setPlaying] = useState(!prefersReducedMotion);
@@ -27,28 +34,31 @@ export default function SponsorMarquee({ sponsors }: { sponsors: MarqueeSponsor[
   const doubled = [...sponsors, ...sponsors];
 
   useEffect(() => {
-    if (trackRef.current) {
-      halfWidthRef.current = trackRef.current.scrollWidth / 2;
-    }
+    const el = trackRef.current;
+    if (!el) return;
+    const measure = () => {
+      halfWidthRef.current = el.scrollWidth / 2;
+    };
+    measure();
+    // Keeps the loop's wrap point in sync with resize, zoom, orientation
+    // change, and webfont swaps — all of which can change the track's
+    // rendered width after mount.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [sponsors]);
 
   useAnimationFrame((_, delta) => {
     if (!playing || prefersReducedMotion) return;
     const half = halfWidthRef.current;
     if (!half) return;
-    let next = x.get() - (delta / 1000) * SPEED_PX_PER_SEC;
-    if (next <= -half) next += half;
-    x.set(next);
+    x.set(wrapX(x.get() - (delta / 1000) * SPEED_PX_PER_SEC, half));
   });
 
   const nudge = (direction: -1 | 1) => {
     setPlaying(false);
     const half = halfWidthRef.current;
-    let target = x.get() + direction * NUDGE_PX;
-    if (half) {
-      if (target > 0) target -= half;
-      if (target <= -half) target += half;
-    }
+    const target = wrapX(x.get() + direction * NUDGE_PX, half);
     animate(x, target, { duration: 0.4, ease: 'easeOut' });
   };
 

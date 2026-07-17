@@ -168,7 +168,7 @@ export default async function SponsorsPage() {
           </p>
 
           <div className="mt-12 flex justify-center md:mt-16">
-            <Button href={CONTACT_EMAIL} variant="primary" size="md" className="px-10 py-3.5 text-base">
+            <Button href={CONTACT_EMAIL} variant="primary" size="md" className="lg:px-10 lg:py-3.5 lg:text-lg">
               Get in Touch
             </Button>
           </div>
