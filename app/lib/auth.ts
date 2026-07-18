@@ -1,10 +1,11 @@
 import { cache } from 'react';
-import { eq } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
-import { staffAuditLogs, staffMembers, userRoles, roles } from '@/app/lib/db/schema';
+import { staffAuditLogs, staffMembers, staffRevocations, userRoles, roles } from '@/app/lib/db/schema';
 import { calculateEffectiveStaffAccess, hasPermission, Permissions } from '@/app/lib/roles';
 import { ADMIN_SECTION_PERMISSIONS, type AdminSectionHref } from '@/app/lib/staff-access';
+import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
 
 export interface StaffIdentity {
   id: string;
@@ -45,64 +46,92 @@ async function recordStaffAuditEvent(
  * invite/seed flow and can be repaired safely. We never transfer an existing
  * email's roles to a different auth user id automatically.
  */
-async function ensureStaffMember(userId: string, email: string | undefined): Promise<string> {
+export async function ensureStaffMember(userId: string, email: string | undefined): Promise<string> {
   if (!email) {
     throw new StaffSetupError('Your authenticated account has no email address. Ask an Owner to repair the account.');
   }
 
-  const [existingById] = await db
-    .select({ userId: staffMembers.userId, email: staffMembers.email })
-    .from(staffMembers)
-    .where(eq(staffMembers.userId, userId))
-    .limit(1);
+  const normalizedEmail = email.trim().toLowerCase();
 
-  if (existingById) {
-    if (existingById.email !== email) {
-      const [emailOwner] = await db
-        .select({ userId: staffMembers.userId })
-        .from(staffMembers)
-        .where(eq(staffMembers.email, email))
-        .limit(1);
+  return db.transaction(async (tx) => {
+    // Share a transaction lock with revokeStaff() so a self-heal cannot race
+    // between the tombstone check and membership insertion.
+    await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
-      if (emailOwner && emailOwner.userId !== userId) {
-        console.error('Staff account email conflict', { userId, email });
-        await recordStaffAuditEvent('identity_email_conflict', userId, email, `Email is owned by ${emailOwner.userId}`);
-        throw new StaffSetupError('This email is linked to another staff identity. Ask an Owner to reconcile the account.');
-      }
+    // Revocation is an explicit, durable state. Check it before looking for or
+    // repairing membership so an outstanding JWT cannot recreate a row deleted
+    // by revokeStaff(). Email matching also prevents a recreated auth identity
+    // from silently bypassing the original user-id tombstone.
+    const [revocation] = await tx
+      .select({ userId: staffRevocations.userId })
+      .from(staffRevocations)
+      .where(
+        or(
+          eq(staffRevocations.userId, userId),
+          eq(staffRevocations.email, normalizedEmail),
+        ),
+      )
+      .limit(1);
 
-      await db.update(staffMembers).set({ email }).where(eq(staffMembers.userId, userId));
+    if (revocation) {
+      console.warn('Revoked staff identity attempted to authenticate', { userId, email: normalizedEmail });
+      throw new StaffSetupError('Your staff access has been revoked. Ask an Owner to explicitly restore the account.');
     }
-    return email;
-  }
 
-  const [existingByEmail] = await db
-    .select({ userId: staffMembers.userId })
-    .from(staffMembers)
-    .where(eq(staffMembers.email, email))
-    .limit(1);
+    const [existingById] = await tx
+      .select({ userId: staffMembers.userId, email: staffMembers.email })
+      .from(staffMembers)
+      .where(eq(staffMembers.userId, userId))
+      .limit(1);
 
-  if (existingByEmail && existingByEmail.userId !== userId) {
-    console.error('Staff account identity conflict', { userId, email, existingUserId: existingByEmail.userId });
-    await recordStaffAuditEvent('identity_user_id_conflict', userId, email, `Existing user id: ${existingByEmail.userId}`);
-    throw new StaffSetupError('This staff email belongs to a different identity. Ask an Owner to reconcile the account.');
-  }
+    if (existingById) {
+      if (existingById.email !== normalizedEmail) {
+        const [emailOwner] = await tx
+          .select({ userId: staffMembers.userId })
+          .from(staffMembers)
+          .where(eq(staffMembers.email, normalizedEmail))
+          .limit(1);
 
-  await db
-    .insert(staffMembers)
-    .values({ userId, email, invitedBy: null })
-    .onConflictDoNothing({ target: staffMembers.userId });
+        if (emailOwner && emailOwner.userId !== userId) {
+          console.error('Staff account email conflict', { userId, email: normalizedEmail });
+          await recordStaffAuditEvent('identity_email_conflict', userId, normalizedEmail, `Email is owned by ${emailOwner.userId}`);
+          throw new StaffSetupError('This email is linked to another staff identity. Ask an Owner to reconcile the account.');
+        }
 
-  const [created] = await db
-    .select({ email: staffMembers.email })
-    .from(staffMembers)
-    .where(eq(staffMembers.userId, userId))
-    .limit(1);
+        await tx.update(staffMembers).set({ email: normalizedEmail }).where(eq(staffMembers.userId, userId));
+      }
+      return normalizedEmail;
+    }
 
-  if (!created) {
-    throw new StaffSetupError('Your staff membership could not be initialized. Ask an Owner to repair the account.');
-  }
+    const [existingByEmail] = await tx
+      .select({ userId: staffMembers.userId })
+      .from(staffMembers)
+      .where(eq(staffMembers.email, normalizedEmail))
+      .limit(1);
 
-  return created.email;
+    if (existingByEmail && existingByEmail.userId !== userId) {
+      console.error('Staff account identity conflict', { userId, email: normalizedEmail, existingUserId: existingByEmail.userId });
+      await recordStaffAuditEvent('identity_user_id_conflict', userId, normalizedEmail, `Existing user id: ${existingByEmail.userId}`);
+      throw new StaffSetupError('This staff email belongs to a different identity. Ask an Owner to reconcile the account.');
+    }
+
+    await tx
+      .insert(staffMembers)
+      .values({ userId, email: normalizedEmail, invitedBy: null })
+      .onConflictDoNothing({ target: staffMembers.userId });
+
+    const [created] = await tx
+      .select({ email: staffMembers.email })
+      .from(staffMembers)
+      .where(eq(staffMembers.userId, userId))
+      .limit(1);
+
+    if (!created) {
+      throw new StaffSetupError('Your staff membership could not be initialized. Ask an Owner to repair the account.');
+    }
+
+    return created.email;
+  });
 }
 
 /**

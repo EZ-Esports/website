@@ -61,15 +61,15 @@ RLS is enabled for every application-owned table in `public` by migration `0012_
 Policy contract:
 
 - Public `anon`/`authenticated` reads are limited to non-sensitive, publishable rows: active games/league data, active non-deleted schools, published non-deleted news, active non-deleted gallery images/sponsors, non-deleted leadership rows, and page content.
-- Sensitive rows such as `members`, `school_applications`, `page_content_history`, `staff_members`, and `staff_invites` are not publicly readable.
+- Sensitive rows such as `members`, `school_applications`, `page_content_history`, `staff_members`, `staff_invites`, and `staff_revocations` are not publicly readable.
 - `public.is_staff()` checks portal membership without granting management access.
 - `public.has_permission(bit)` includes implicit `@everyone`, assigned roles, Owner override, and `ADMINISTRATOR` override.
-- Each table has permission-specific mutation policies. Staff, roles, assignments, and invites require `MANAGE_ROLES`.
+- Management-content tables have permission-specific mutation policies. Membership-domain tables (`roles`, `user_roles`, `staff_members`, `staff_invites`, and `staff_invite_roles`) have no authenticated mutation policies: their writes must use the trusted `DATABASE_URL` connection after application-layer `MANAGE_ROLES` and role-hierarchy checks. This prevents direct Supabase REST/table DML from turning `MANAGE_ROLES` into Owner or `ADMINISTRATOR` access.
 - Public application submission still goes through `app/api/apply/route.ts`; the database table itself is not directly insertable by anonymous Supabase clients.
 
 ## Staff permission migration
 
-Migration `0019_staff-permissions.sql` renames the three staff-domain tables in place and replaces the old broad policies. Apply it in the same controlled maintenance window as the matching application release:
+Migrations `0019_staff-permissions.sql` and `0020_fine_cannonball.sql` rename the staff domain, replace the old broad policies, and add durable revocation tombstones. Apply them together in the same controlled maintenance window as the matching application release:
 
 1. Create and verify a restorable database backup.
 2. Pause administrative writes.

@@ -364,6 +364,21 @@ export const roles = pgTable('roles', {
   ...auditColumns,
 }).enableRLS();
 
+// Durable revocation tombstones. A row here prevents an old Supabase session
+// (or a recreated auth identity using the same email) from auto-provisioning a
+// deleted staff membership. Re-provisioning must explicitly clear the marker.
+export const staffRevocations = pgTable('staff_revocations', {
+  userId: uuid('user_id').primaryKey(),
+  email: text('email').notNull(),
+  revokedBy: uuid('revoked_by').notNull(),
+  reason: text('reason'),
+  revokedAt: timestamp('revoked_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('staff_revocations_email_unique_idx').on(table.email),
+  index('staff_revocations_revoked_by_idx').on(table.revokedBy),
+  index('staff_revocations_revoked_at_idx').on(table.revokedAt),
+]).enableRLS();
+
 export const userRoles = pgTable('user_roles', {
   userId: uuid('user_id')
     .references(() => staffMembers.userId, { onDelete: 'cascade' })

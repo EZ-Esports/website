@@ -24,6 +24,14 @@ npm run db:migrate
 npm run db:seed-owner -- you@example.com
 ```
 
+Revoked identities are protected by durable tombstones and are not restored by
+normal sign-in or by re-running the seed command. After an Owner deliberately
+approves restoration, clear the tombstone and restore ownership explicitly:
+
+```bash
+npm run db:seed-owner -- you@example.com --restore-revoked
+```
+
 ## Tech Stack
 
 | Layer | Technology |

@@ -262,6 +262,12 @@ GRANT SELECT ON "public"."staff_audit_logs" TO "authenticated", "service_role";
 
 -- Table-specific mutation capabilities. Multiple bits in a value mean any of
 -- those bits is accepted by has_permission().
+--
+-- Membership-domain writes (roles, user_roles, staff_members, staff_invites,
+-- and staff_invite_roles) intentionally have no authenticated mutation
+-- policies. Those writes must use the trusted DATABASE_URL connection so the
+-- application-layer role hierarchy and MANAGE_ROLES checks cannot be bypassed
+-- through direct Supabase REST/table DML.
 DO $$
 DECLARE
   permission_row record;
@@ -283,12 +289,7 @@ BEGIN
       ('school_applications', 512::bigint),
       ('schools', 1024::bigint),
       ('page_content', 2048::bigint),
-      ('page_content_history', 2048::bigint),
-      ('roles', 2::bigint),
-      ('user_roles', 2::bigint),
-      ('staff_members', 2::bigint),
-      ('staff_invites', 2::bigint),
-      ('staff_invite_roles', 2::bigint)
+      ('page_content_history', 2048::bigint)
     ) AS mappings(table_name, permission_mask)
   LOOP
     EXECUTE format(

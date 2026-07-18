@@ -6,7 +6,8 @@ INSERT INTO public.roles (id, name, color, permissions, position, is_owner, is_s
 VALUES
   ('10000000-0000-0000-0000-000000000001', '__rls_test_league', '#000000', 4, 10, false, false),
   ('10000000-0000-0000-0000-000000000002', '__rls_test_admin', '#000000', 1, 20, false, false),
-  ('10000000-0000-0000-0000-000000000003', '__rls_test_owner', '#000000', 0, 30, true, false)
+  ('10000000-0000-0000-0000-000000000003', '__rls_test_owner', '#000000', 0, 30, true, false),
+  ('10000000-0000-0000-0000-000000000004', '__rls_test_role_manager', '#000000', 2, 15, false, false)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.staff_members (user_id, email)
@@ -14,15 +15,37 @@ VALUES
   ('20000000-0000-0000-0000-000000000001', '__rls_zero@example.invalid'),
   ('20000000-0000-0000-0000-000000000002', '__rls_league@example.invalid'),
   ('20000000-0000-0000-0000-000000000003', '__rls_admin@example.invalid'),
-  ('20000000-0000-0000-0000-000000000004', '__rls_owner@example.invalid')
+  ('20000000-0000-0000-0000-000000000004', '__rls_owner@example.invalid'),
+  ('20000000-0000-0000-0000-000000000005', '__rls_role_manager@example.invalid')
 ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO public.user_roles (user_id, role_id)
 VALUES
   ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001'),
   ('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002'),
-  ('20000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000003')
+  ('20000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000003'),
+  ('20000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000004')
 ON CONFLICT DO NOTHING;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN (
+        'roles',
+        'user_roles',
+        'staff_members',
+        'staff_invites',
+        'staff_invite_roles',
+        'staff_revocations'
+      )
+      AND cmd <> 'SELECT'
+  ) THEN
+    RAISE EXCEPTION 'membership-domain authenticated mutation policy exists';
+  END IF;
+END $$;
 
 SET LOCAL ROLE authenticated;
 
@@ -81,6 +104,96 @@ DO $$ BEGIN
 END $$;
 INSERT INTO public.news_posts (id, title, slug, content, category)
 VALUES ('30000000-0000-0000-0000-000000000005', 'Owner', '__rls_owner_news', 'Allowed', 'Test');
+
+-- MANAGE_ROLES permits the membership-domain reads needed by the portal, but
+-- never direct mutations. The trusted application database connection is the
+-- only write path so its role hierarchy checks remain authoritative.
+SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000005', true);
+DO $$
+BEGIN
+  IF NOT public.has_permission(2) THEN
+    RAISE EXCEPTION 'MANAGE_ROLES permission assertion failed';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.staff_members
+    WHERE user_id = '20000000-0000-0000-0000-000000000001'
+  ) THEN
+    RAISE EXCEPTION 'MANAGE_ROLES staff read was denied';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = '20000000-0000-0000-0000-000000000003'
+      AND role_id = '10000000-0000-0000-0000-000000000002'
+  ) THEN
+    RAISE EXCEPTION 'MANAGE_ROLES assignment read was denied';
+  END IF;
+END $$;
+
+DO $$
+DECLARE
+  denied boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO public.roles (id, name, color, permissions, position, is_owner, is_system)
+    VALUES (
+      '10000000-0000-0000-0000-000000000005',
+      '__rls_escalated_admin',
+      '#000000',
+      1,
+      999,
+      false,
+      false
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    denied := true;
+  END;
+  IF NOT denied THEN
+    RAISE EXCEPTION 'MANAGE_ROLES direct privileged role creation was not denied';
+  END IF;
+END $$;
+
+DO $$
+DECLARE
+  affected integer;
+BEGIN
+  UPDATE public.roles
+  SET permissions = 1, is_owner = true
+  WHERE id = '10000000-0000-0000-0000-000000000004';
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  IF affected <> 0 THEN
+    RAISE EXCEPTION 'MANAGE_ROLES direct role escalation was not denied';
+  END IF;
+END $$;
+
+DO $$
+DECLARE
+  denied boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO public.user_roles (user_id, role_id)
+    VALUES (
+      '20000000-0000-0000-0000-000000000005',
+      '10000000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    denied := true;
+  END;
+  IF NOT denied THEN
+    RAISE EXCEPTION 'MANAGE_ROLES direct self-assignment was not denied';
+  END IF;
+END $$;
+
+DO $$
+DECLARE
+  affected integer;
+BEGIN
+  DELETE FROM public.staff_members
+  WHERE user_id = '20000000-0000-0000-0000-000000000003';
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  IF affected <> 0 THEN
+    RAISE EXCEPTION 'MANAGE_ROLES direct staff revocation was not denied';
+  END IF;
+END $$;
 
 RESET ROLE;
 ROLLBACK;

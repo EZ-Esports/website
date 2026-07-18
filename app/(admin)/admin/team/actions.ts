@@ -13,11 +13,11 @@ import { rateLimit } from '@/app/lib/rate-limit';
 import { generateInviteToken, hashInviteToken } from '@/app/lib/invite-token';
 import { INVITE_TTL_DAYS } from './constants';
 import { buildStaffInviteRoleRows } from '@/app/lib/staff-invites';
+import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
 
 const INVITE_TTL_MS = INVITE_TTL_DAYS * 24 * 60 * 60 * 1000;
 const INVITE_RATE_LIMIT = 10;
 const INVITE_RATE_WINDOW_MS = 60_000;
-const STAFF_REVOKE_LOCK_KEY = 8765001;
 const ROLE_MUTATE_LOCK_KEY = 8765002;
 
 /** Helper to fetch a user's roles from the database */
@@ -93,6 +93,18 @@ export async function inviteStaff(formData: FormData): Promise<{
     .limit(1);
   if (existingStaff) {
     return { success: false, error: 'That email already belongs to a staff member.' };
+  }
+
+  const [revokedIdentity] = await db
+    .select({ userId: schema.staffRevocations.userId })
+    .from(schema.staffRevocations)
+    .where(eq(schema.staffRevocations.email, email))
+    .limit(1);
+  if (revokedIdentity) {
+    return {
+      success: false,
+      error: 'That identity was explicitly revoked and must be restored through a trusted Owner workflow before it can be invited again.',
+    };
   }
 
   const token = generateInviteToken();
@@ -225,10 +237,36 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOKE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      // Re-read the target after acquiring the same lock used by role updates.
+      // Otherwise an Owner assignment racing this action could bypass the
+      // last-Owner invariant based on stale pre-lock role information.
+      const lockedTargetRoles = await tx
+        .select({ position: schema.roles.position, isOwner: schema.roles.isOwner })
+        .from(schema.userRoles)
+        .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+        .where(eq(schema.userRoles.userId, userId));
+      const lockedTargetIsOwner = lockedTargetRoles.some((role) => role.isOwner);
+      const lockedTargetHighestPosition = lockedTargetRoles.reduce(
+        (highest, role) => Math.max(highest, role.position),
+        0,
+      );
+
+      if (!canActOnMember(
+        staff.highestRolePosition,
+        staff.isOwner,
+        lockedTargetHighestPosition,
+        lockedTargetIsOwner,
+      )) {
+        throw new ActionError(
+          'STAFF_HIERARCHY_CHANGED',
+          'This staff member\'s role hierarchy changed. Refresh and try again.',
+        );
+      }
 
       // If target is an owner, verify there is at least one other owner in the database
-      if (targetInfo.isOwner) {
+      if (lockedTargetIsOwner) {
         const owners = await tx
           .select({ count: sql<number>`count(*)::int` })
           .from(schema.userRoles)
@@ -241,19 +279,26 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
         }
       }
 
-      // Revoke the auth identity before deleting membership. If Supabase
-      // rejects the revocation, the transaction rolls back and getStaff()
-      // cannot recreate a deleted row from a still-valid identity.
-      const supabase = createServiceClient();
-      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-      if (authDeleteError) {
-        throw new ActionError('AUTH_REVOKE_FAILED', 'Could not revoke the staff identity. No membership changes were made.');
-      }
+      // Persist the revocation before deleting membership. getStaff() checks
+      // this tombstone first, so a locally valid JWT cannot recreate access.
+      await tx.insert(schema.staffRevocations).values({
+        userId,
+        email: targetUserRow.email,
+        revokedBy: staff.id,
+        reason: 'Staff access revoked from the team manager',
+      });
 
       deleted = await tx
         .delete(schema.staffMembers)
         .where(eq(schema.staffMembers.userId, userId))
         .returning({ userId: schema.staffMembers.userId });
+
+      await tx.insert(schema.staffAuditLogs).values({
+        event: 'staff_access_revoked',
+        userId,
+        email: targetUserRow.email,
+        details: `Revoked by ${staff.id}`,
+      });
     });
   } catch (error) {
     console.error('Failed to revoke staff access', error);
@@ -269,6 +314,29 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
     }
     revalidatePath('/admin/team');
     return { success: true };
+  }
+
+  // Auth deletion is cleanup, not the authorization boundary. The database
+  // tombstone already blocks old sessions, so a Supabase failure is audited
+  // for follow-up without undoing a completed revocation.
+  try {
+    const supabase = createServiceClient();
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (authDeleteError) {
+      throw authDeleteError;
+    }
+  } catch (error) {
+    console.error('Staff access revoked, but auth identity deletion failed', { userId, error });
+    try {
+      await db.insert(schema.staffAuditLogs).values({
+        event: 'revoked_auth_identity_cleanup_failed',
+        userId,
+        email: targetUserRow.email,
+        details: error instanceof Error ? error.message : 'Unknown Supabase Auth deletion failure',
+      });
+    } catch (auditError) {
+      console.error('Failed to audit auth identity cleanup failure', { userId, auditError });
+    }
   }
 
   revalidatePath('/admin/team');
@@ -593,7 +661,7 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOKE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
       // If target currently has the Owner role but is being stripped of it, verify there's at least one other owner
       const isLosingOwner = targetInfo.roles.some((r) => r.isOwner) && !newRoles.some((r) => r.isOwner);
