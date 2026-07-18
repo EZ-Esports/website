@@ -119,6 +119,27 @@ describe('durable staff revocation', () => {
     expect(authDelete).toBeGreaterThan(membershipDelete);
   });
 
+  it('re-reads and normalizes membership under the lock before revoking it', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/(admin)/admin/team/actions.ts'),
+      'utf8',
+    );
+    const revokeStart = source.indexOf('export async function revokeStaff');
+    const revokeEnd = source.indexOf('/* --- ROLE MANAGEMENT ACTIONS --- */', revokeStart);
+    const revokeSource = source.slice(revokeStart, revokeEnd);
+    const lock = revokeSource.indexOf('pg_advisory_xact_lock');
+    const membershipRead = revokeSource.indexOf('.from(schema.staffMembers)', lock);
+    const normalization = revokeSource.indexOf('.trim().toLowerCase()', membershipRead);
+    const tombstone = revokeSource.indexOf('tx.insert(schema.staffRevocations)', normalization);
+    const inviteInvalidation = revokeSource.indexOf('.delete(schema.staffInvites)', tombstone);
+
+    expect(lock).toBeGreaterThan(-1);
+    expect(membershipRead).toBeGreaterThan(lock);
+    expect(normalization).toBeGreaterThan(membershipRead);
+    expect(tombstone).toBeGreaterThan(normalization);
+    expect(inviteInvalidation).toBeGreaterThan(tombstone);
+  });
+
   it('does not expose tombstone mutations through authenticated RLS policies', () => {
     const migration = readFileSync(
       resolve(process.cwd(), 'db/migrations/0020_fine_cannonball.sql'),
@@ -127,6 +148,47 @@ describe('durable staff revocation', () => {
 
     expect(migration).toContain('CREATE POLICY "staff_revocations_manage_select"');
     expect(migration).toContain('FOR SELECT TO "authenticated"');
+    expect(migration).toContain('USING btree (lower("email"))');
     expect(migration).not.toMatch(/staff_revocations[^;]*FOR (?:INSERT|UPDATE|DELETE)/s);
+  });
+
+  it('serializes invite creation and acceptance with durable revocations', () => {
+    const acceptSource = readFileSync(
+      resolve(process.cwd(), 'app/accept-invite/actions.ts'),
+      'utf8',
+    );
+    const teamSource = readFileSync(
+      resolve(process.cwd(), 'app/(admin)/admin/team/actions.ts'),
+      'utf8',
+    );
+    const inviteStart = teamSource.indexOf('export async function inviteStaff');
+    const inviteEnd = teamSource.indexOf('/** Cancel a pending', inviteStart);
+    const inviteSource = teamSource.slice(inviteStart, inviteEnd);
+
+    const acceptLock = acceptSource.indexOf('pg_advisory_xact_lock');
+    const acceptRevocationCheck = acceptSource.indexOf('.from(schema.staffRevocations)', acceptLock);
+    const acceptClaim = acceptSource.indexOf('.update(schema.staffInvites)', acceptRevocationCheck);
+    expect(acceptLock).toBeGreaterThan(-1);
+    expect(acceptRevocationCheck).toBeGreaterThan(acceptLock);
+    expect(acceptClaim).toBeGreaterThan(acceptRevocationCheck);
+
+    const inviteLock = inviteSource.indexOf('pg_advisory_xact_lock');
+    const inviteRevocationCheck = inviteSource.indexOf('.from(schema.staffRevocations)', inviteLock);
+    const inviteInsert = inviteSource.indexOf('.insert(schema.staffInvites)', inviteRevocationCheck);
+    expect(inviteLock).toBeGreaterThan(-1);
+    expect(inviteRevocationCheck).toBeGreaterThan(inviteLock);
+    expect(inviteInsert).toBeGreaterThan(inviteRevocationCheck);
+  });
+
+  it('makes the RLS membership helper reject tombstoned identities', () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), 'db/migrations/0020_fine_cannonball.sql'),
+      'utf8',
+    );
+
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION "public"."is_staff"()');
+    expect(migration).toContain('FROM "public"."staff_revocations" sr');
+    expect(migration).toContain('OR lower(sr."email") = lower(sm."email")');
+    expect(migration).toContain('"auth"."jwt"() ->> \'email\'');
   });
 });

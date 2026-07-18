@@ -68,7 +68,7 @@ export async function ensureStaffMember(userId: string, email: string | undefine
       .where(
         or(
           eq(staffRevocations.userId, userId),
-          eq(staffRevocations.email, normalizedEmail),
+          sql`lower(${staffRevocations.email}) = ${normalizedEmail}`,
         ),
       )
       .limit(1);
@@ -89,7 +89,7 @@ export async function ensureStaffMember(userId: string, email: string | undefine
         const [emailOwner] = await tx
           .select({ userId: staffMembers.userId })
           .from(staffMembers)
-          .where(eq(staffMembers.email, normalizedEmail))
+          .where(sql`lower(${staffMembers.email}) = ${normalizedEmail}`)
           .limit(1);
 
         if (emailOwner && emailOwner.userId !== userId) {
@@ -106,7 +106,7 @@ export async function ensureStaffMember(userId: string, email: string | undefine
     const [existingByEmail] = await tx
       .select({ userId: staffMembers.userId })
       .from(staffMembers)
-      .where(eq(staffMembers.email, normalizedEmail))
+      .where(sql`lower(${staffMembers.email}) = ${normalizedEmail}`)
       .limit(1);
 
     if (existingByEmail && existingByEmail.userId !== userId) {

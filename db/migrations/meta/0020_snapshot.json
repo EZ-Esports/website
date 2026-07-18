@@ -2183,8 +2183,8 @@
           "name": "staff_revocations_email_unique_idx",
           "columns": [
             {
-              "expression": "email",
-              "isExpression": false,
+              "expression": "lower(\"email\")",
+              "isExpression": true,
               "asc": true,
               "nulls": "last"
             }

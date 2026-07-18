@@ -374,7 +374,7 @@ export const staffRevocations = pgTable('staff_revocations', {
   reason: text('reason'),
   revokedAt: timestamp('revoked_at').defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex('staff_revocations_email_unique_idx').on(table.email),
+  uniqueIndex('staff_revocations_email_unique_idx').on(sql`lower(${table.email})`),
   index('staff_revocations_revoked_by_idx').on(table.revokedBy),
   index('staff_revocations_revoked_at_idx').on(table.revokedAt),
 ]).enableRLS();

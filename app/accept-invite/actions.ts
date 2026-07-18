@@ -1,13 +1,14 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { and, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { hashInviteToken } from '@/app/lib/invite-token';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { ActionError } from '@/app/lib/errors';
+import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
 import { MIN_PASSWORD_LENGTH } from './constants';
 
 /**
@@ -57,10 +58,11 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
   if (!invite) {
     return { error: 'This invite link is invalid or has expired. Ask a staff manager for a new one.' };
   }
+  const inviteEmail = invite.email.trim().toLowerCase();
 
   const supabase = createServiceClient();
   const { data: created, error: createError } = await supabase.auth.admin.createUser({
-    email: invite.email,
+    email: inviteEmail,
     password,
     email_confirm: true,
   });
@@ -77,6 +79,29 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
     // to atomically claim the invite — if another request already consumed it the
     // returning array will be empty and we abort.
     await db.transaction(async (tx) => {
+      // Serialize invite acceptance with revocation and restoration. A
+      // tombstoned email must never regain membership through an invite that
+      // was issued (or remained live) before access was revoked.
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const [revokedIdentity] = await tx
+        .select({ userId: schema.staffRevocations.userId })
+        .from(schema.staffRevocations)
+        .where(
+          or(
+            eq(schema.staffRevocations.userId, created.user.id),
+            sql`lower(${schema.staffRevocations.email}) = ${inviteEmail}`,
+          ),
+        )
+        .limit(1);
+
+      if (revokedIdentity) {
+        throw new ActionError(
+          'STAFF_REVOKED',
+          'This staff identity has been revoked. Ask an Owner to restore it before accepting an invite.',
+        );
+      }
+
       const claimed = await tx
         .update(schema.staffInvites)
         .set({ acceptedAt: sql`now()` })
@@ -100,7 +125,7 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
 
       await tx.insert(schema.staffMembers).values({
         userId: created.user.id,
-        email: invite.email,
+        email: inviteEmail,
         invitedBy: invite.invitedBy,
       });
 

@@ -57,7 +57,7 @@ async function main() {
   const [existingByEmail] = await db
     .select({ userId: schema.staffMembers.userId })
     .from(schema.staffMembers)
-    .where(eq(schema.staffMembers.email, email))
+    .where(sql`lower(${schema.staffMembers.email}) = ${email}`)
     .limit(1);
   if (existingByEmail && existingByEmail.userId !== userId) {
     console.error(
@@ -122,7 +122,7 @@ async function main() {
       .where(
         or(
           eq(schema.staffRevocations.userId, userId),
-          eq(schema.staffRevocations.email, email),
+          sql`lower(${schema.staffRevocations.email}) = ${email}`,
         ),
       )
       .limit(1);
@@ -140,7 +140,7 @@ async function main() {
         .where(
           or(
             eq(schema.staffRevocations.userId, userId),
-            eq(schema.staffRevocations.email, email),
+            sql`lower(${schema.staffRevocations.email}) = ${email}`,
           ),
         );
 

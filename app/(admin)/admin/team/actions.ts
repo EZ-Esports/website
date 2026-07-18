@@ -86,33 +86,37 @@ export async function inviteStaff(formData: FormData): Promise<{
     }
   }
 
-  const [existingStaff] = await db
-    .select({ userId: schema.staffMembers.userId })
-    .from(schema.staffMembers)
-    .where(eq(schema.staffMembers.email, email))
-    .limit(1);
-  if (existingStaff) {
-    return { success: false, error: 'That email already belongs to a staff member.' };
-  }
-
-  const [revokedIdentity] = await db
-    .select({ userId: schema.staffRevocations.userId })
-    .from(schema.staffRevocations)
-    .where(eq(schema.staffRevocations.email, email))
-    .limit(1);
-  if (revokedIdentity) {
-    return {
-      success: false,
-      error: 'That identity was explicitly revoked and must be restored through a trusted Owner workflow before it can be invited again.',
-    };
-  }
-
   const token = generateInviteToken();
   const tokenHash = hashInviteToken(token);
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
 
   try {
     await db.transaction(async (tx) => {
+      // Serialize invitation with acceptance, revocation, and restoration so
+      // a check cannot race a newly persisted revocation tombstone.
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const [existingStaff] = await tx
+        .select({ userId: schema.staffMembers.userId })
+        .from(schema.staffMembers)
+        .where(sql`lower(${schema.staffMembers.email}) = ${email}`)
+        .limit(1);
+      if (existingStaff) {
+        throw new ActionError('STAFF_EXISTS', 'That email already belongs to a staff member.');
+      }
+
+      const [revokedIdentity] = await tx
+        .select({ userId: schema.staffRevocations.userId })
+        .from(schema.staffRevocations)
+        .where(sql`lower(${schema.staffRevocations.email}) = ${email}`)
+        .limit(1);
+      if (revokedIdentity) {
+        throw new ActionError(
+          'STAFF_REVOKED',
+          'That identity was explicitly revoked and must be restored through a trusted Owner workflow before it can be invited again.',
+        );
+      }
+
       // Clear out previous pending invites for this email
       const supersededInvites = await tx
         .select({ id: schema.staffInvites.id })
@@ -234,14 +238,25 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
 
   let deleted: { userId: string }[] = [];
   let wasLastOwner = false;
+  let revokedEmail = '';
 
   try {
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
-      // Re-read the target after acquiring the same lock used by role updates.
-      // Otherwise an Owner assignment racing this action could bypass the
-      // last-Owner invariant based on stale pre-lock role information.
+      // Re-read membership and roles after acquiring the same lock used by
+      // identity reconciliation and role updates. This keeps both the email
+      // tombstone and hierarchy decision tied to the state being revoked.
+      const [lockedTargetMember] = await tx
+        .select({ email: schema.staffMembers.email })
+        .from(schema.staffMembers)
+        .where(eq(schema.staffMembers.userId, userId))
+        .limit(1);
+      if (!lockedTargetMember) {
+        throw new ActionError('STAFF_CHANGED', 'That user is no longer a staff member.');
+      }
+      revokedEmail = lockedTargetMember.email.trim().toLowerCase();
+
       const lockedTargetRoles = await tx
         .select({ position: schema.roles.position, isOwner: schema.roles.isOwner })
         .from(schema.userRoles)
@@ -283,10 +298,22 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
       // this tombstone first, so a locally valid JWT cannot recreate access.
       await tx.insert(schema.staffRevocations).values({
         userId,
-        email: targetUserRow.email,
+        email: revokedEmail,
         revokedBy: staff.id,
         reason: 'Staff access revoked from the team manager',
       });
+
+      // A previously issued invite must not survive revocation and recreate
+      // this identity. acceptInvite() shares this lock and also checks the
+      // tombstone, so either transaction ordering is safe.
+      await tx
+        .delete(schema.staffInvites)
+        .where(
+          and(
+            isNull(schema.staffInvites.acceptedAt),
+            sql`lower(${schema.staffInvites.email}) = ${revokedEmail}`,
+          ),
+        );
 
       deleted = await tx
         .delete(schema.staffMembers)
@@ -296,7 +323,7 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
       await tx.insert(schema.staffAuditLogs).values({
         event: 'staff_access_revoked',
         userId,
-        email: targetUserRow.email,
+        email: revokedEmail,
         details: `Revoked by ${staff.id}`,
       });
     });
@@ -331,7 +358,7 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
       await db.insert(schema.staffAuditLogs).values({
         event: 'revoked_auth_identity_cleanup_failed',
         userId,
-        email: targetUserRow.email,
+        email: revokedEmail,
         details: error instanceof Error ? error.message : 'Unknown Supabase Auth deletion failure',
       });
     } catch (auditError) {

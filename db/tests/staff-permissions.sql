@@ -16,7 +16,8 @@ VALUES
   ('20000000-0000-0000-0000-000000000002', '__rls_league@example.invalid'),
   ('20000000-0000-0000-0000-000000000003', '__rls_admin@example.invalid'),
   ('20000000-0000-0000-0000-000000000004', '__rls_owner@example.invalid'),
-  ('20000000-0000-0000-0000-000000000005', '__rls_role_manager@example.invalid')
+  ('20000000-0000-0000-0000-000000000005', '__rls_role_manager@example.invalid'),
+  ('20000000-0000-0000-0000-000000000006', '__rls_recreated-alias@example.invalid')
 ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO public.user_roles (user_id, role_id)
@@ -24,8 +25,18 @@ VALUES
   ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001'),
   ('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002'),
   ('20000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000003'),
-  ('20000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000004')
+  ('20000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000004'),
+  ('20000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000002')
 ON CONFLICT DO NOTHING;
+
+INSERT INTO public.staff_revocations (user_id, email, revoked_by, reason)
+VALUES (
+  '20000000-0000-0000-0000-000000000007',
+  '__rls_revoked@example.invalid',
+  '20000000-0000-0000-0000-000000000004',
+  'RLS regression fixture'
+)
+ON CONFLICT (user_id) DO NOTHING;
 
 DO $$
 BEGIN
@@ -96,7 +107,29 @@ END $$;
 INSERT INTO public.news_posts (id, title, slug, content, category)
 VALUES ('30000000-0000-0000-0000-000000000004', 'Admin', '__rls_admin_news', 'Allowed', 'Test');
 
+-- A durable revocation overrides both a remaining membership row and an
+-- ADMINISTRATOR role, preventing stale JWTs from retaining RLS access.
+SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000006', true);
+SELECT set_config('request.jwt.claim.email', '__RLS_REVOKED@EXAMPLE.INVALID', true);
+DO $$ BEGIN
+  IF public.is_staff() OR public.has_permission(2048) THEN
+    RAISE EXCEPTION 'revocation tombstone did not override staff permissions';
+  END IF;
+END $$;
+DO $$
+DECLARE denied boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO public.news_posts (id, title, slug, content, category)
+    VALUES ('30000000-0000-0000-0000-000000000006', 'Revoked', '__rls_revoked_news', 'Denied', 'Test');
+  EXCEPTION WHEN insufficient_privilege THEN
+    denied := true;
+  END;
+  IF NOT denied THEN RAISE EXCEPTION 'revoked ADMINISTRATOR write was not denied'; END IF;
+END $$;
+
 SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000004', true);
+SELECT set_config('request.jwt.claim.email', '__rls_owner@example.invalid', true);
 DO $$ BEGIN
   IF NOT public.has_permission(2048) THEN
     RAISE EXCEPTION 'Owner override assertion failed';
