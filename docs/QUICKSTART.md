@@ -17,11 +17,11 @@ The app uses Supabase. Create a `.env` file with the required variables — **pi
 
 ### First deploy / bootstrap
 
-After running migrations, seed the first admin account or the `admin_users` allowlist will be empty and everyone will be locked out of the admin panel:
+After running migrations, seed an existing Supabase Auth identity as the first Owner. Other staff identities are created through invite acceptance and may initially have no roles:
 
 ```bash
 npm run db:migrate
-npm run db:seed-admin -- you@example.com
+npm run db:seed-owner -- you@example.com
 ```
 
 ## Tech Stack

@@ -6,12 +6,16 @@ import { notFound } from 'next/navigation';
 import { updateNewsPost, unpublishNewsPost } from '../actions';
 import Card from '@/app/components/ui/Card';
 import NewsPostForm from '@/app/components/admin/NewsPostForm';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 interface EditNewsPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function AdminEditNewsPostPage({ params }: EditNewsPageProps) {
+  if (!(await getStaffForAdminSection('/admin/news'))) return <PermissionDenied />;
+
   const { id } = await params;
   
   let currentPost;

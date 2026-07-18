@@ -2,6 +2,8 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import LeagueSetupClient from './LeagueSetupClient';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getGamesAndSeasons() {
   const [games, seasons] = await Promise.all([
@@ -12,6 +14,8 @@ async function getGamesAndSeasons() {
 }
 
 export default async function LeagueSetupPage() {
+  if (!(await getStaffForAdminSection('/admin/league'))) return <PermissionDenied />;
+
   let games: Awaited<ReturnType<typeof getGamesAndSeasons>>['games'] = [];
   let seasons: Awaited<ReturnType<typeof getGamesAndSeasons>>['seasons'] = [];
   let dbError = false;

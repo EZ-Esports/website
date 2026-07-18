@@ -1,15 +1,19 @@
-import { getCachedTeams, getCachedRosters, getCachedSeasons, getAdminSeasons, getCachedGames, getMatchesPage } from '@/app/lib/db/queries';
+import { getCachedTeams, getCachedRosters, getCachedSeasons, getStaffSeasons, getCachedGames, getMatchesPage } from '@/app/lib/db/queries';
 import Card from '@/app/components/ui/Card';
 import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 export default async function AdminMatchesPage() {
+  if (!(await getStaffForAdminSection('/admin/matches'))) return <PermissionDenied />;
+
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
   let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
   let activeSeasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
-  let allSeasons: Awaited<ReturnType<typeof getAdminSeasons>> = [];
+  let allSeasons: Awaited<ReturnType<typeof getStaffSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let initialPage: MatchPageResponse = { items: [], nextCursor: null };
   let dbError = false;
@@ -20,7 +24,7 @@ export default async function AdminMatchesPage() {
       getCachedTeams(),
       getCachedRosters(),
       getCachedSeasons(),
-      getAdminSeasons(),
+      getStaffSeasons(),
       getCachedGames(),
     ]);
     initialPage = toMatchesPageDto(firstPage);

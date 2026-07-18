@@ -8,7 +8,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { safeUrl, sanitizeDbError } from '@/app/lib/text-utils';
 
-async function requireAdmin() {
+async function requireSponsorsPermission() {
   return requirePermission(Permissions.MANAGE_SPONSORS);
 }
 
@@ -21,7 +21,7 @@ function revalidateAll() {
 }
 
 export async function addSponsor(formData: FormData) {
-  await requireAdmin();
+  await requireSponsorsPermission();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const tier = formData.get('tier') as 'platinum' | 'gold' | 'community';
@@ -42,7 +42,7 @@ export async function addSponsor(formData: FormData) {
 }
 
 export async function updateSponsor(id: string, formData: FormData) {
-  await requireAdmin();
+  await requireSponsorsPermission();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const tier = formData.get('tier') as 'platinum' | 'gold' | 'community';
@@ -79,7 +79,7 @@ export async function updateSponsor(id: string, formData: FormData) {
 }
 
 export async function toggleSponsorActive(id: string, isActive: boolean) {
-  await requireAdmin();
+  await requireSponsorsPermission();
   try {
     await db
       .update(schema.sponsors)
@@ -94,7 +94,7 @@ export async function toggleSponsorActive(id: string, isActive: boolean) {
 }
 
 export async function deleteSponsor(id: string) {
-  const user = await requireAdmin();
+  const user = await requireSponsorsPermission();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.sponsors.storageKey })

@@ -8,12 +8,16 @@ import ImageUpload from '@/app/components/admin/ImageUpload';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getAllGalleryImages() {
   return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.setId, schema.galleryImages.displayOrder);
 }
 
 export default async function GalleryAdminPage() {
+  if (!(await getStaffForAdminSection('/admin/gallery'))) return <PermissionDenied />;
+
   let images: Awaited<ReturnType<typeof getAllGalleryImages>> = [];
   let dbConfigured = false;
 

@@ -4,6 +4,8 @@ import * as schema from '@/app/lib/db/schema';
 import { asc, desc } from 'drizzle-orm';
 import ContentEditor from './ContentEditor';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 const keyPageMap: Record<string, string> = {
   'hero.title': 'Homepage → Hero',
@@ -20,6 +22,8 @@ async function getAllPageContent() {
 }
 
 export default async function ContentAdminPage() {
+  if (!(await getStaffForAdminSection('/admin/content'))) return <PermissionDenied />;
+
   let rows: Awaited<ReturnType<typeof getAllPageContent>> = [];
   let historyRows: { id: string; contentKey: string; previousContent: string; savedAt: Date }[] = [];
   let dbConfigured = false;

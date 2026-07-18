@@ -3,7 +3,7 @@ import {
   getCachedTeams,
   getCachedGames,
   getCachedSchools,
-  getAdminSeasons,
+  getStaffSeasons,
   getRosterPlayerCounts,
 } from '@/app/lib/db/queries';
 import { Suspense } from 'react';
@@ -11,8 +11,12 @@ import RosterExplorer from '@/app/components/admin/RosterExplorer';
 import Card from '@/app/components/ui/Card';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { DBGame, DBTeam, DBRoster, DBSchool, DBSeason } from '@/app/types';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 export default async function AdminRosterPage() {
+  if (!(await getStaffForAdminSection('/admin/roster'))) return <PermissionDenied />;
+
   let rosters: DBRoster[] = [];
   let teams: DBTeam[] = [];
   let games: DBGame[] = [];
@@ -29,7 +33,7 @@ export default async function AdminRosterPage() {
       getCachedTeams(),
       getCachedGames(),
       getCachedSchools(),
-      getAdminSeasons(),
+      getStaffSeasons(),
       getRosterPlayerCounts(),
     ]);
     rosters = rostersRes as any;

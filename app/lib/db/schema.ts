@@ -319,28 +319,26 @@ export const pageContentHistory = pgTable('page_content_history', {
   index('page_content_history_key_idx').on(table.contentKey),
 ]).enableRLS();
 
-// --- ADMIN ACCESS CONTROL ---
+// --- STAFF ACCESS CONTROL ---
 
-// Allowlist of users permitted into the admin panel. This is the source of
-// truth for authorization: requireAdmin()/getAdmin() look up the session user
-// here, so a valid Supabase Auth session alone is NOT sufficient. userId equals
-// the auth.users.id; there is no cross-schema FK (Drizzle does not manage the
-// auth schema), so the link is maintained by the invite/revoke server actions.
-export const adminUsers = pgTable('admin_users', {
+// Every Supabase identity that can authenticate into the staff portal has one
+// row here. Capabilities come exclusively from @everyone plus assigned roles;
+// membership itself never implies a management permission.
+export const staffMembers = pgTable('staff_members', {
   userId: uuid('user_id').primaryKey(),
   email: text('email').notNull().unique(),
-  // user_id of the admin who invited this one; null for the bootstrapped first admin.
+  // user_id of the staff member who invited this one; null for the bootstrapped Owner.
   invitedBy: uuid('invited_by'),
   ...auditColumns,
 }, (table) => [
-  index('admin_users_email_idx').on(table.email),
+  index('staff_members_email_idx').on(table.email),
 ]).enableRLS();
 
-// Pending, single-use admin invitations. We store only the SHA-256 hash of the
+// Pending, single-use staff invitations. We store only the SHA-256 hash of the
 // invite token (never the raw token), so a DB leak cannot be used to accept an
 // invite. A row is consumed by setting acceptedAt; expired/accepted rows are
 // ignored by the accept flow.
-export const adminInvites = pgTable('admin_invites', {
+export const staffInvites = pgTable('staff_invites', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: text('email').notNull(),
   tokenHash: text('token_hash').notNull().unique(),
@@ -349,8 +347,8 @@ export const adminInvites = pgTable('admin_invites', {
   acceptedAt: timestamp('accepted_at'),
   ...auditColumns,
 }, (table) => [
-  index('admin_invites_email_idx').on(table.email),
-  uniqueIndex('admin_invites_email_pending_unique').on(table.email).where(sql`${table.acceptedAt} is null`),
+  index('staff_invites_email_idx').on(table.email),
+  uniqueIndex('staff_invites_email_pending_unique').on(table.email).where(sql`${table.acceptedAt} is null`),
 ]).enableRLS();
 
 // --- ROLE PERMISSIONS SYSTEM ---
@@ -368,7 +366,7 @@ export const roles = pgTable('roles', {
 
 export const userRoles = pgTable('user_roles', {
   userId: uuid('user_id')
-    .references(() => adminUsers.userId, { onDelete: 'cascade' })
+    .references(() => staffMembers.userId, { onDelete: 'cascade' })
     .notNull(),
   roleId: uuid('role_id')
     .references(() => roles.id, { onDelete: 'cascade' })
@@ -379,13 +377,27 @@ export const userRoles = pgTable('user_roles', {
   index('user_roles_user_id_idx').on(table.userId),
 ]).enableRLS();
 
-export const adminInviteRoles = pgTable('admin_invite_roles', {
+export const staffInviteRoles = pgTable('staff_invite_roles', {
   inviteId: uuid('invite_id')
-    .references(() => adminInvites.id, { onDelete: 'cascade' })
+    .references(() => staffInvites.id, { onDelete: 'cascade' })
     .notNull(),
   roleId: uuid('role_id')
     .references(() => roles.id, { onDelete: 'cascade' })
     .notNull(),
 }, (table) => [
   primaryKey({ columns: [table.inviteId, table.roleId] }),
+]).enableRLS();
+
+// Durable account-integrity events. Application code writes through the trusted
+// server database connection; portal reads require role-management permission.
+export const staffAuditLogs = pgTable('staff_audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  event: text('event').notNull(),
+  userId: uuid('user_id'),
+  email: text('email'),
+  details: text('details'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('staff_audit_logs_created_at_idx').on(table.createdAt),
+  index('staff_audit_logs_user_id_idx').on(table.userId),
 ]).enableRLS();

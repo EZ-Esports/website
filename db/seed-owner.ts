@@ -1,10 +1,8 @@
 /**
  * Bootstrap the first owner.
  *
- * Authorization is now an allowlist: a valid Supabase Auth session is only
- * granted admin access if it has a matching row in `admin_users`. That table
- * starts empty, so after deploying this feature NOBODY can reach the panel.
- * This script promotes an EXISTING Supabase Auth user to the Owner role,
+ * Every valid portal identity receives staff membership. This script promotes
+ * an EXISTING Supabase Auth user to the Owner role,
  * allowing them to access the staff panel, create roles, and invite others.
  *
  * Usage:
@@ -54,14 +52,14 @@ async function main() {
   // to an old user_id would trigger the email unique constraint instead — giving a
   // cryptic error. Detect and explain it upfront.
   const [existingByEmail] = await db
-    .select({ userId: schema.adminUsers.userId })
-    .from(schema.adminUsers)
-    .where(eq(schema.adminUsers.email, email))
+    .select({ userId: schema.staffMembers.userId })
+    .from(schema.staffMembers)
+    .where(eq(schema.staffMembers.email, email))
     .limit(1);
   if (existingByEmail && existingByEmail.userId !== userId) {
     console.error(
-      `An admin row already exists for "${email}" under a different user id (${existingByEmail.userId}). ` +
-        `The auth account may have been recreated. Remove the stale admin_users row or reconcile the user id, then re-run.`,
+      `A staff row already exists for "${email}" under a different user id (${existingByEmail.userId}). ` +
+        `The auth account may have been recreated. Reconcile the stale staff_members identity, then re-run.`,
     );
     process.exit(1);
   }
@@ -110,12 +108,12 @@ async function main() {
       .returning();
   }
 
-  // 3. Upsert admin user entry
+  // 3. Upsert staff membership
   await db
-    .insert(schema.adminUsers)
+    .insert(schema.staffMembers)
     .values({ userId, email })
     .onConflictDoUpdate({
-      target: schema.adminUsers.userId,
+      target: schema.staffMembers.userId,
       set: { email },
     });
 

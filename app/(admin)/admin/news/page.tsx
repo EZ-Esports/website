@@ -7,6 +7,8 @@ import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 type NewsPost = typeof schema.newsPosts.$inferSelect;
 
@@ -37,6 +39,8 @@ export default async function AdminNewsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
+  if (!(await getStaffForAdminSection('/admin/news'))) return <PermissionDenied />;
+
   const { q = '', status = '' } = await searchParams;
   let posts: NewsPost[] = [];
   let dbError = false;

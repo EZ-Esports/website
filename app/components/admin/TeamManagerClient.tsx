@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from 'react';
 import Card from '@/app/components/ui/Card';
-import InviteAdminForm from '@/app/components/admin/InviteAdminForm';
+import InviteStaffForm from '@/app/components/admin/InviteStaffForm';
 import { canActOnMember, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
-import AdminRow from '@/app/components/admin/AdminRow';
+import StaffRow from '@/app/components/admin/StaffRow';
 import InviteRow from '@/app/components/admin/InviteRow';
 import {
   createRole,
@@ -31,7 +31,7 @@ interface Role {
   isSystem: boolean;
 }
 
-interface AdminUser {
+interface StaffMember {
   userId: string;
   email: string;
   createdAt: Date;
@@ -66,7 +66,7 @@ interface TeamManagerClientProps {
     isOwner: boolean;
     highestRolePosition: number;
   };
-  admins: AdminUser[];
+  staffMembers: StaffMember[];
   invites: PendingInvite[];
   roles: Role[];
 }
@@ -118,7 +118,7 @@ const PERMISSION_GROUPS = [
 
 const PERMISSION_LABELS = PERMISSION_GROUPS.flatMap((g) => g.permissions);
 
-export default function TeamManagerClient({ current, admins, invites, roles }: TeamManagerClientProps) {
+export default function TeamManagerClient({ current, staffMembers, invites, roles }: TeamManagerClientProps) {
   const [activeTab, setActiveTab] = useState<'staff' | 'roles'>('staff');
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +142,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
 
   // Filter assignable roles: strictly lower than actor's highest role, and actor must possess their permissions
   const assignableRoles = roles.filter((role) => {
+    if (role.name === '@everyone') return false;
     if (currentIsOwner) return true;
     const isLower = current.highestRolePosition > role.position;
     const hasSubset = (BigInt(role.permissions) & ~currentPermissions) === BigInt(0);
@@ -308,7 +309,7 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                   : 'border-transparent text-foreground-secondary hover:text-foreground'
               }`}
             >
-              Active Members ({admins.length})
+              Active Members ({staffMembers.length})
             </button>
             <button
               onClick={() => { setStaffSubTab('invites'); setError(null); }}
@@ -366,13 +367,13 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               {/* Members List */}
               <div className="space-y-3">
                 {(() => {
-                  const filteredAdmins = admins.filter((admin) => {
-                    const matchesSearch = admin.email.toLowerCase().includes(searchQuery.toLowerCase());
-                    const matchesRole = filterRoleId ? admin.roles.some((r) => r.id === filterRoleId) : true;
+                  const filteredStaff = staffMembers.filter((member) => {
+                    const matchesSearch = member.email.toLowerCase().includes(searchQuery.toLowerCase());
+                    const matchesRole = filterRoleId ? member.roles.some((r) => r.id === filterRoleId) : true;
                     return matchesSearch && matchesRole;
                   });
 
-                  if (filteredAdmins.length === 0) {
+                  if (filteredStaff.length === 0) {
                     return (
                       <div className="text-center py-10 border border-dashed border-line rounded-xl bg-surface-sunken/10">
                         <HiOutlineUsers className="w-8 h-8 text-foreground-muted mx-auto mb-2.5 opacity-60" />
@@ -382,16 +383,16 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
                     );
                   }
 
-                  return filteredAdmins.map((a) => {
-                    const targetHighestPos = a.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
-                    const targetIsOwner = a.roles.some((r) => r.isOwner);
+                  return filteredStaff.map((member) => {
+                    const targetHighestPos = member.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
+                    const targetIsOwner = member.roles.some((r) => r.isOwner);
                     const canManage = canActOnMember(current.highestRolePosition, currentIsOwner, targetHighestPos, targetIsOwner);
 
                     return (
-                      <AdminRow
-                        key={a.userId}
-                        admin={{ userId: a.userId, email: a.email, roles: a.roles, createdAt: a.createdAt }}
-                        isSelf={a.userId === current.id}
+                      <StaffRow
+                        key={member.userId}
+                        member={{ userId: member.userId, email: member.email, roles: member.roles, createdAt: member.createdAt }}
+                        isSelf={member.userId === current.id}
                         canRevoke={canManage}
                         assignableRoles={assignableRoles}
                       />
@@ -409,9 +410,9 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
               <Card className="bg-surface-raised/10 border border-line border-l-4 border-l-accent p-6">
                 <h2 className="text-base font-black text-white uppercase tracking-wider mb-1">Invite Staff Member</h2>
                 <p className="text-xs text-foreground-secondary mb-5">
-                  Generates a single-use onboarding invitation link. Copy and send it to the new staff member manually.
+                  Generates a single-use onboarding link. Roles are optional; every accepted invite receives implicit @everyone membership.
                 </p>
-                <InviteAdminForm assignableRoles={assignableRoles} />
+                <InviteStaffForm assignableRoles={assignableRoles} />
               </Card>
 
               {/* Pending Invites List */}
@@ -778,4 +779,3 @@ export default function TeamManagerClient({ current, admins, invites, roles }: T
     </div>
   );
 }
-

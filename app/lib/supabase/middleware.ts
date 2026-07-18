@@ -40,16 +40,8 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims ?? null;
 
-  // Route protection for Admin Panel
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // Redirect logged-in admin away from Login page
+  // The /admin server layout is the sole portal access gate. Middleware only
+  // refreshes auth state and keeps authenticated staff off the login form.
   if (request.nextUrl.pathname.startsWith('/login')) {
     if (user) {
       const url = request.nextUrl.clone();

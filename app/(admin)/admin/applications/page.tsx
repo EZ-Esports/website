@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { getSchoolApplications } from '@/app/lib/db/queries';
 import ApplicationRow from '@/app/components/admin/ApplicationRow';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 type StatusFilter = 'all' | 'pending' | 'reviewed' | 'accepted';
 
@@ -18,6 +20,8 @@ export default async function ApplicationsAdminPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  if (!(await getStaffForAdminSection('/admin/applications'))) return <PermissionDenied />;
+
   const { status: rawStatus } = await searchParams;
   const validStatuses: StatusFilter[] = ['all', 'pending', 'reviewed', 'accepted'];
   const statusFilter: StatusFilter = validStatuses.includes(rawStatus as StatusFilter)

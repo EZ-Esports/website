@@ -72,12 +72,12 @@ export const getCachedSeasons = unstable_cache(
   { tags: ['seasons'] }
 );
 
-/** Uncached: all seasons (incl. inactive) for admin labels/lookups. */
-export const getAdminSeasons = () => db.select().from(schema.seasons);
+/** Uncached: all seasons (including inactive) for staff labels/lookups. */
+export const getStaffSeasons = () => db.select().from(schema.seasons);
 
 /**
  * Paginated match query for public-facing pages.
- * Use getAdminMatches() in admin views where you need all rows.
+ * Use getStaffMatches() in staff views where you need all rows.
  */
 export const getCachedMatches = unstable_cache(
   async (limit = DEFAULT_PAGE_SIZE, offset = 0) => {
@@ -92,8 +92,8 @@ export const getCachedMatches = unstable_cache(
   { tags: ['matches'] }
 );
 
-/** Uncached: returns all matches for admin views. */
-export const getAdminMatches = () =>
+/** Uncached: returns all matches for staff views. */
+export const getStaffMatches = () =>
   db.select().from(schema.matches).orderBy(desc(schema.matches.scheduledAt));
 
 // --- SEASON BROWSING & PAGINATED MATCHES ---
@@ -329,7 +329,7 @@ export const getCachedPlayers = unstable_cache(
 
 /**
  * Paginated published news for public pages.
- * Use getAdminNews() in admin views where you need all statuses.
+ * Use getStaffNews() in staff views where you need all statuses.
  */
 export const getCachedNews = unstable_cache(
   async (limit = DEFAULT_PAGE_SIZE, offset = 0) => {
@@ -345,8 +345,8 @@ export const getCachedNews = unstable_cache(
   { tags: ['news'] }
 );
 
-/** Uncached: returns all posts (all statuses) for admin views. */
-export const getAdminNews = () =>
+/** Uncached: returns all posts (all statuses) for staff views. */
+export const getStaffNews = () =>
   db
     .select()
     .from(schema.newsPosts)
@@ -829,18 +829,18 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
   return { record, jvRecord, nextMatch, recentResults, topTeams };
 }
 
-// --- ADMIN ACCESS CONTROL ---
+// --- STAFF ACCESS CONTROL ---
 
-/** All provisioned admins, oldest first (the bootstrapped admin leads). */
-export const listAdminUsers = async () => {
+/** All provisioned staff members, oldest first. */
+export const listStaffMembers = async () => {
   const users = await db
     .select({
-      userId: schema.adminUsers.userId,
-      email: schema.adminUsers.email,
-      createdAt: schema.adminUsers.createdAt,
+      userId: schema.staffMembers.userId,
+      email: schema.staffMembers.email,
+      createdAt: schema.staffMembers.createdAt,
     })
-    .from(schema.adminUsers)
-    .orderBy(asc(schema.adminUsers.createdAt));
+    .from(schema.staffMembers)
+    .orderBy(asc(schema.staffMembers.createdAt));
 
   if (users.length === 0) return [];
 
@@ -879,25 +879,25 @@ export const listAdminUsers = async () => {
   });
 };
 
-/** Outstanding (not yet accepted) admin invites, newest first, each tagged with
+/** Outstanding (not yet accepted) staff invites, newest first, each tagged with
  * whether its link has already expired (computed here so the UI stays pure). */
-export const listPendingAdminInvites = async () => {
+export const listPendingStaffInvites = async () => {
   const rows = await db
     .select({
-      id: schema.adminInvites.id,
-      email: schema.adminInvites.email,
-      expiresAt: schema.adminInvites.expiresAt,
-      createdAt: schema.adminInvites.createdAt,
+      id: schema.staffInvites.id,
+      email: schema.staffInvites.email,
+      expiresAt: schema.staffInvites.expiresAt,
+      createdAt: schema.staffInvites.createdAt,
     })
-    .from(schema.adminInvites)
-    .where(isNull(schema.adminInvites.acceptedAt))
-    .orderBy(desc(schema.adminInvites.createdAt));
+    .from(schema.staffInvites)
+    .where(isNull(schema.staffInvites.acceptedAt))
+    .orderBy(desc(schema.staffInvites.createdAt));
 
   if (rows.length === 0) return [];
 
   const inviteRolesRows = await db
     .select({
-      inviteId: schema.adminInviteRoles.inviteId,
+      inviteId: schema.staffInviteRoles.inviteId,
       role: {
         id: schema.roles.id,
         name: schema.roles.name,
@@ -906,8 +906,8 @@ export const listPendingAdminInvites = async () => {
         isOwner: schema.roles.isOwner,
       },
     })
-    .from(schema.adminInviteRoles)
-    .innerJoin(schema.roles, eq(schema.adminInviteRoles.roleId, schema.roles.id));
+    .from(schema.staffInviteRoles)
+    .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id));
 
   // Group by inviteId
   const rolesByInviteId = new Map<string, typeof inviteRolesRows[0]['role'][]>();

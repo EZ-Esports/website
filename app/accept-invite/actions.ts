@@ -22,17 +22,17 @@ export async function findValidInvite(token: string) {
   // 'use server' endpoint (least privilege; the hash has no use to a client).
   const [invite] = await db
     .select({
-      id: schema.adminInvites.id,
-      email: schema.adminInvites.email,
-      invitedBy: schema.adminInvites.invitedBy,
-      expiresAt: schema.adminInvites.expiresAt,
+      id: schema.staffInvites.id,
+      email: schema.staffInvites.email,
+      invitedBy: schema.staffInvites.invitedBy,
+      expiresAt: schema.staffInvites.expiresAt,
     })
-    .from(schema.adminInvites)
+    .from(schema.staffInvites)
     .where(
       and(
-        eq(schema.adminInvites.tokenHash, tokenHash),
-        isNull(schema.adminInvites.acceptedAt),
-        gt(schema.adminInvites.expiresAt, new Date()),
+        eq(schema.staffInvites.tokenHash, tokenHash),
+        isNull(schema.staffInvites.acceptedAt),
+        gt(schema.staffInvites.expiresAt, new Date()),
       ),
     )
     .limit(1);
@@ -40,10 +40,10 @@ export async function findValidInvite(token: string) {
 }
 
 /**
- * Consume an invite: create the Supabase Auth account, add the allowlist row,
+ * Consume an invite: create the Supabase Auth account, add staff membership,
  * and mark the invite accepted. Signups are disabled project-wide, so the
  * account is created with the service role here — this endpoint is the only
- * sanctioned path to a new admin account.
+ * sanctioned path to a new staff account. Initial roles are optional.
  */
 export async function acceptInvite(formData: FormData): Promise<{ error: string }> {
   const token = (formData.get('token') as string) ?? '';
@@ -55,7 +55,7 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
 
   const invite = await findValidInvite(token);
   if (!invite) {
-    return { error: 'This invite link is invalid or has expired. Ask an admin for a new one.' };
+    return { error: 'This invite link is invalid or has expired. Ask a staff manager for a new one.' };
   }
 
   const supabase = createServiceClient();
@@ -66,39 +66,39 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
   });
 
   if (createError || !created?.user) {
-    console.error('Failed to create admin auth user', createError);
+    console.error('Failed to create staff auth user', createError);
     // Most common cause: an account already exists for this email.
-    return { error: 'Could not create your account. An account may already exist for this email — contact an admin.' };
+    return { error: 'Could not create your account. An account may already exist for this email — contact a staff manager.' };
   }
 
   try {
     // Both writes happen in one transaction so partial failure can't orphan an
-    // admin_users row or wedge the invite. The UPDATE uses AND accepted_at IS NULL
+    // staff_members row or wedge the invite. The UPDATE uses AND accepted_at IS NULL
     // to atomically claim the invite — if another request already consumed it the
     // returning array will be empty and we abort.
     await db.transaction(async (tx) => {
       const claimed = await tx
-        .update(schema.adminInvites)
+        .update(schema.staffInvites)
         .set({ acceptedAt: sql`now()` })
         .where(
           and(
-            eq(schema.adminInvites.id, invite.id),
-            isNull(schema.adminInvites.acceptedAt),
-            gt(schema.adminInvites.expiresAt, sql`now()`),
+            eq(schema.staffInvites.id, invite.id),
+            isNull(schema.staffInvites.acceptedAt),
+            gt(schema.staffInvites.expiresAt, sql`now()`),
           ),
         )
-        .returning({ id: schema.adminInvites.id });
+        .returning({ id: schema.staffInvites.id });
 
       if (claimed.length === 0) {
-        throw new ActionError('INVITE_UNAVAILABLE', 'This invite link has already been used or has expired. Ask an admin for a new one.');
+        throw new ActionError('INVITE_UNAVAILABLE', 'This invite link has already been used or has expired. Ask a staff manager for a new one.');
       }
 
       const inviteRoles = await tx
-        .select({ roleId: schema.adminInviteRoles.roleId })
-        .from(schema.adminInviteRoles)
-        .where(eq(schema.adminInviteRoles.inviteId, invite.id));
+        .select({ roleId: schema.staffInviteRoles.roleId })
+        .from(schema.staffInviteRoles)
+        .where(eq(schema.staffInviteRoles.inviteId, invite.id));
 
-      await tx.insert(schema.adminUsers).values({
+      await tx.insert(schema.staffMembers).values({
         userId: created.user.id,
         email: invite.email,
         invitedBy: invite.invitedBy,
@@ -114,7 +114,7 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
       }
     });
   } catch (error) {
-    console.error('Failed to finalize admin invite; rolling back auth user', error);
+    console.error('Failed to finalize staff invite; rolling back auth user', error);
     // Undo the auth account so the invite can be retried cleanly.
     await supabase.auth.admin
       .deleteUser(created.user.id)
