@@ -60,7 +60,11 @@ END $$;
 
 SET LOCAL ROLE authenticated;
 
-SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000001', true);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000001","email":"__rls_zero@example.invalid"}',
+  true
+);
 DO $$ BEGIN
   IF NOT public.is_staff() OR public.has_permission(4) THEN
     RAISE EXCEPTION 'zero-permission membership assertion failed';
@@ -78,7 +82,11 @@ BEGIN
   IF NOT denied THEN RAISE EXCEPTION 'zero-permission write was not denied'; END IF;
 END $$;
 
-SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000002","email":"__rls_league@example.invalid"}',
+  true
+);
 DO $$ BEGIN
   IF NOT public.has_permission(4) OR public.has_permission(32) THEN
     RAISE EXCEPTION 'single-permission assertion failed';
@@ -98,7 +106,11 @@ BEGIN
   IF NOT denied THEN RAISE EXCEPTION 'cross-permission write was not denied'; END IF;
 END $$;
 
-SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000003', true);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000003","email":"__rls_admin@example.invalid"}',
+  true
+);
 DO $$ BEGIN
   IF NOT public.has_permission(2048) THEN
     RAISE EXCEPTION 'ADMINISTRATOR override assertion failed';
@@ -109,8 +121,11 @@ VALUES ('30000000-0000-0000-0000-000000000004', 'Admin', '__rls_admin_news', 'Al
 
 -- A durable revocation overrides both a remaining membership row and an
 -- ADMINISTRATOR role, preventing stale JWTs from retaining RLS access.
-SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000006', true);
-SELECT set_config('request.jwt.claim.email', '__RLS_REVOKED@EXAMPLE.INVALID', true);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000006","email":"__RLS_REVOKED@EXAMPLE.INVALID"}',
+  true
+);
 DO $$ BEGIN
   IF public.is_staff() OR public.has_permission(2048) THEN
     RAISE EXCEPTION 'revocation tombstone did not override staff permissions';
@@ -128,8 +143,11 @@ BEGIN
   IF NOT denied THEN RAISE EXCEPTION 'revoked ADMINISTRATOR write was not denied'; END IF;
 END $$;
 
-SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000004', true);
-SELECT set_config('request.jwt.claim.email', '__rls_owner@example.invalid', true);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000004","email":"__rls_owner@example.invalid"}',
+  true
+);
 DO $$ BEGIN
   IF NOT public.has_permission(2048) THEN
     RAISE EXCEPTION 'Owner override assertion failed';
@@ -141,7 +159,11 @@ VALUES ('30000000-0000-0000-0000-000000000005', 'Owner', '__rls_owner_news', 'Al
 -- MANAGE_ROLES permits the membership-domain reads needed by the portal, but
 -- never direct mutations. The trusted application database connection is the
 -- only write path so its role hierarchy checks remain authoritative.
-SELECT set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000005', true);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-0000-0000-000000000005","email":"__rls_role_manager@example.invalid"}',
+  true
+);
 DO $$
 BEGIN
   IF NOT public.has_permission(2) THEN
