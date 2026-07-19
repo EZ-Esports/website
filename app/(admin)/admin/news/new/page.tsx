@@ -2,8 +2,12 @@ import Link from 'next/link';
 import { createNewsPost } from '../actions';
 import Card from '@/app/components/ui/Card';
 import NewsPostForm from '@/app/components/admin/NewsPostForm';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
-export default function AdminNewNewsPostPage() {
+export default async function AdminNewNewsPostPage() {
+  if (!(await getStaffForAdminSection('/admin/news'))) return <PermissionDenied />;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}

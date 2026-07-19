@@ -1,30 +1,145 @@
 import { cache } from 'react';
-import { eq } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
-import { adminUsers, userRoles, roles } from '@/app/lib/db/schema';
-import { hasPermission } from '@/app/lib/roles';
+import { staffAuditLogs, staffMembers, staffRevocations, userRoles, roles } from '@/app/lib/db/schema';
+import { calculateEffectiveStaffAccess, hasPermission, Permissions } from '@/app/lib/roles';
+import { ADMIN_SECTION_PERMISSIONS, type AdminSectionHref } from '@/app/lib/staff-access';
+import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
 
-export interface AdminIdentity {
+export interface StaffIdentity {
   id: string;
-  email: string | undefined;
+  email: string;
   permissions: bigint;
   isOwner: boolean;
   highestRolePosition: number;
 }
 
 /**
- * Resolve the current request's admin identity, or null if the caller is not a
- * provisioned admin. Authentication alone is NOT enough: a valid Supabase Auth
- * session must also have a matching row in `admin_users` (the allowlist).
- *
- * It queries the user's assigned roles (plus the `@everyone` role) and combines
- * their permissions using bitwise OR, along with determining the owner status
- * and highest role position in the hierarchy.
- *
- * Wrapped in React.cache() so repeated calls within a single request collapse.
+ * Raised when Supabase has a valid identity but the local staff directory
+ * cannot be reconciled safely. This is an account-integrity error, not an
+ * authentication failure, so callers must not redirect to /login or sign out.
  */
-export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
+export class StaffSetupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StaffSetupError';
+  }
+}
+
+async function recordStaffAuditEvent(
+  event: string,
+  userId: string,
+  email: string | undefined,
+  details: string,
+) {
+  try {
+    await db.insert(staffAuditLogs).values({ event, userId, email, details });
+  } catch (auditError) {
+    console.error('Failed to persist staff audit event', { event, userId, email, auditError });
+  }
+}
+
+/**
+ * Ensure every authenticated portal identity has a staff directory row.
+ * Signups remain invite-only, so a missing row represents an interrupted old
+ * invite/seed flow and can be repaired safely. We never transfer an existing
+ * email's roles to a different auth user id automatically.
+ */
+export async function ensureStaffMember(userId: string, email: string | undefined): Promise<string> {
+  if (!email) {
+    throw new StaffSetupError('Your authenticated account has no email address. Ask an Owner to repair the account.');
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  return db.transaction(async (tx) => {
+    // Share a transaction lock with revokeStaff() so a self-heal cannot race
+    // between the tombstone check and membership insertion.
+    await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+    // Revocation is an explicit, durable state. Check it before looking for or
+    // repairing membership so an outstanding JWT cannot recreate a row deleted
+    // by revokeStaff(). Email matching also prevents a recreated auth identity
+    // from silently bypassing the original user-id tombstone.
+    const [revocation] = await tx
+      .select({ userId: staffRevocations.userId })
+      .from(staffRevocations)
+      .where(
+        or(
+          eq(staffRevocations.userId, userId),
+          sql`lower(${staffRevocations.email}) = ${normalizedEmail}`,
+        ),
+      )
+      .limit(1);
+
+    if (revocation) {
+      console.warn('Revoked staff identity attempted to authenticate', { userId, email: normalizedEmail });
+      throw new StaffSetupError('Your staff access has been revoked. Ask an Owner to explicitly restore the account.');
+    }
+
+    const [existingById] = await tx
+      .select({ userId: staffMembers.userId, email: staffMembers.email })
+      .from(staffMembers)
+      .where(eq(staffMembers.userId, userId))
+      .limit(1);
+
+    if (existingById) {
+      if (existingById.email !== normalizedEmail) {
+        const [emailOwner] = await tx
+          .select({ userId: staffMembers.userId })
+          .from(staffMembers)
+          .where(sql`lower(${staffMembers.email}) = ${normalizedEmail}`)
+          .limit(1);
+
+        if (emailOwner && emailOwner.userId !== userId) {
+          console.error('Staff account email conflict', { userId, email: normalizedEmail });
+          await recordStaffAuditEvent('identity_email_conflict', userId, normalizedEmail, `Email is owned by ${emailOwner.userId}`);
+          throw new StaffSetupError('This email is linked to another staff identity. Ask an Owner to reconcile the account.');
+        }
+
+        await tx.update(staffMembers).set({ email: normalizedEmail }).where(eq(staffMembers.userId, userId));
+      }
+      return normalizedEmail;
+    }
+
+    const [existingByEmail] = await tx
+      .select({ userId: staffMembers.userId })
+      .from(staffMembers)
+      .where(sql`lower(${staffMembers.email}) = ${normalizedEmail}`)
+      .limit(1);
+
+    if (existingByEmail && existingByEmail.userId !== userId) {
+      console.error('Staff account identity conflict', { userId, email: normalizedEmail, existingUserId: existingByEmail.userId });
+      await recordStaffAuditEvent('identity_user_id_conflict', userId, normalizedEmail, `Existing user id: ${existingByEmail.userId}`);
+      throw new StaffSetupError('This staff email belongs to a different identity. Ask an Owner to reconcile the account.');
+    }
+
+    await tx
+      .insert(staffMembers)
+      .values({ userId, email: normalizedEmail, invitedBy: null })
+      .onConflictDoNothing({ target: staffMembers.userId });
+
+    const [created] = await tx
+      .select({ email: staffMembers.email })
+      .from(staffMembers)
+      .where(eq(staffMembers.userId, userId))
+      .limit(1);
+
+    if (!created) {
+      throw new StaffSetupError('Your staff membership could not be initialized. Ask an Owner to repair the account.');
+    }
+
+    return created.email;
+  });
+}
+
+/**
+ * Resolve the authenticated staff identity and effective Discord-style
+ * permissions. @everyone is implicit; a staff member may validly have no
+ * explicit roles and an effective permission mask of zero.
+ */
+export const getStaff = cache(async (): Promise<StaffIdentity | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
@@ -33,18 +148,9 @@ export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
   }
 
   const userId = claims.sub as string;
-  const [row] = await db
-    .select({ email: adminUsers.email })
-    .from(adminUsers)
-    .where(eq(adminUsers.userId, userId))
-    .limit(1);
+  const email = await ensureStaffMember(userId, claims.email as string | undefined);
 
-  if (!row) {
-    return null;
-  }
-
-  // Fetch explicitly assigned roles
-  const userRolesRows = await db
+  const assignedRoles = await db
     .select({
       permissions: roles.permissions,
       position: roles.position,
@@ -54,7 +160,6 @@ export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
     .where(eq(userRoles.userId, userId));
 
-  // Also fetch @everyone role (baseline fallback)
   const [everyoneRole] = await db
     .select({
       permissions: roles.permissions,
@@ -65,47 +170,51 @@ export const getAdmin = cache(async (): Promise<AdminIdentity | null> => {
     .where(eq(roles.name, '@everyone'))
     .limit(1);
 
-  const allRoles = [...userRolesRows];
-  if (everyoneRole) {
-    allRoles.push(everyoneRole);
-  }
+  const { isOwner, permissions, highestRolePosition } = calculateEffectiveStaffAccess(
+    assignedRoles,
+    everyoneRole ?? null,
+  );
 
-  const isOwner = allRoles.some((r) => r.isOwner);
-  const permissions = allRoles.reduce((acc, r) => acc | BigInt(r.permissions), BigInt(0));
-  const highestRolePosition = allRoles.reduce((max, r) => (r.position > max ? r.position : max), 0);
-
-  return {
-    id: userId,
-    email: (claims.email as string | undefined) ?? row.email,
-    permissions,
-    isOwner,
-    highestRolePosition,
-  };
+  return { id: userId, email, permissions, isOwner, highestRolePosition };
 });
 
-/**
- * Guard for general admin access.
- * Throws when the caller is not an authenticated, allowlisted admin.
- */
-export async function requireAdmin(): Promise<AdminIdentity> {
-  const admin = await getAdmin();
-  if (!admin) {
-    throw new Error('Unauthorized');
-  }
-  return admin;
+/** Require an authenticated staff identity, regardless of assigned roles. */
+export async function requireStaff(): Promise<StaffIdentity> {
+  const staff = await getStaff();
+  if (!staff) throw new Error('Unauthorized');
+  return staff;
 }
 
-/**
- * Guard for specific permission gates.
- * Throws when the caller does not have the required permission.
- */
-export async function requirePermission(permission: bigint): Promise<AdminIdentity> {
-  const admin = await getAdmin();
-  if (!admin) {
-    throw new Error('Unauthorized');
-  }
-  if (!hasPermission(admin.permissions, admin.isOwner, permission)) {
+/** Require a specific effective permission for mutations and protected APIs. */
+export async function requirePermission(permission: bigint): Promise<StaffIdentity> {
+  const staff = await requireStaff();
+  if (!hasPermission(staff.permissions, staff.isOwner, permission)) {
     throw new Error('Forbidden');
   }
-  return admin;
+  return staff;
+}
+
+/** Resolve a page identity without throwing when the member lacks access. */
+export async function getStaffWithPermission(permission: bigint): Promise<StaffIdentity | null> {
+  const staff = await getStaff();
+  if (!staff || !hasPermission(staff.permissions, staff.isOwner, permission)) return null;
+  return staff;
+}
+
+/** Authorize a browser section from the navigation's canonical route map. */
+export function getStaffForAdminSection(section: AdminSectionHref) {
+  return getStaffWithPermission(ADMIN_SECTION_PERMISSIONS[section]);
+}
+
+/** Require at least one permission in a mask (used by shared-purpose APIs). */
+export async function requireAnyPermission(permissionMask: bigint): Promise<StaffIdentity> {
+  const staff = await requireStaff();
+  if (
+    !staff.isOwner &&
+    (staff.permissions & Permissions.ADMINISTRATOR) === BigInt(0) &&
+    (staff.permissions & permissionMask) === BigInt(0)
+  ) {
+    throw new Error('Forbidden');
+  }
+  return staff;
 }

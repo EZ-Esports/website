@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
-import { getAdmin } from '@/app/lib/auth';
+import { requireAnyPermission } from '@/app/lib/auth';
+import { Permissions } from '@/app/lib/roles';
 
 const BUCKET = 'admin-uploads';
-// Authenticated admins uploading images: 30 uploads per minute is a generous cap
+// Authorized staff uploading images: 30 uploads per minute is a generous cap
 // that prevents accidental runaway scripts from exhausting Supabase Storage.
 const UPLOAD_LIMIT = 30;
 const UPLOAD_WINDOW_MS = 60_000;
 
 export async function POST(req: NextRequest) {
-  // Enforce admin authorization: session must exist AND be on the admin allowlist.
-  const admin = await getAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    await requireAnyPermission(
+      Permissions.MANAGE_GALLERY | Permissions.MANAGE_SPONSORS | Permissions.MANAGE_SCHOOLS,
+    );
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const ip = getClientIp(req);

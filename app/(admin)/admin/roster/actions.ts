@@ -7,7 +7,7 @@ import { asc, eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 
-async function requireAdmin() {
+async function requireRosterPermission() {
   return requirePermission(Permissions.MANAGE_ROSTERS);
 }
 
@@ -34,7 +34,7 @@ function safeRevalidatePath(path: string) {
 // --- MEMBER ACTIONS ---
 
 export async function createMember(formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
@@ -66,7 +66,7 @@ export async function createMember(formData: FormData) {
 }
 
 export async function updateMember(id: string, formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
@@ -101,7 +101,7 @@ export async function updateMember(id: string, formData: FormData) {
 }
 
 export async function deleteMember(id: string) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     await db.delete(schema.members).where(eq(schema.members.id, id));
     safeRevalidateTag('members');
@@ -119,7 +119,7 @@ export async function deleteMember(id: string) {
 // --- TEAM ACTIONS ---
 
 export async function createTeam(formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const schoolId = formData.get('schoolId') as string;
     const gameId = formData.get('gameId') as string;
@@ -161,7 +161,7 @@ export async function createTeam(formData: FormData) {
 }
 
 export async function deleteTeam(id: string) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     await db.delete(schema.teams).where(eq(schema.teams.id, id));
     safeRevalidateTag('teams');
@@ -179,7 +179,7 @@ export async function deleteTeam(id: string) {
 // --- ROSTER ACTIONS ---
 
 export async function createRoster(formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const teamId = formData.get('teamId') as string;
     const name = formData.get('name') as string;
@@ -206,7 +206,7 @@ export async function createRoster(formData: FormData) {
 }
 
 export async function updateRoster(id: string, formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const name = formData.get('name') as string;
     const division = formData.get('division') as string;
@@ -231,7 +231,7 @@ export async function updateRoster(id: string, formData: FormData) {
 }
 
 export async function deleteRoster(id: string) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     await db.delete(schema.rosters).where(eq(schema.rosters.id, id));
     safeRevalidateTag('rosters');
@@ -257,7 +257,7 @@ function isCaptainConflict(error: unknown): boolean {
 const CAPTAIN_CONFLICT_MSG = 'This roster already has a captain. Demote the current captain before assigning a new one.';
 
 export async function createRosterMember(formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const rosterId = formData.get('rosterId') as string;
     const memberId = formData.get('memberId') as string;
@@ -291,7 +291,7 @@ export async function createRosterMember(formData: FormData) {
 }
 
 export async function updateRosterMember(id: string, formData: FormData) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     const role = formData.get('role') as any;
     const ign = formData.get('ign') as string;
@@ -316,7 +316,7 @@ export async function updateRosterMember(id: string, formData: FormData) {
 }
 
 export async function deleteRosterMember(id: string) {
-  await requireAdmin();
+  await requireRosterPermission();
   try {
     await db.delete(schema.players).where(eq(schema.players.id, id));
     safeRevalidateTag('players');
@@ -332,7 +332,7 @@ export async function deleteRosterMember(id: string) {
 // of the page shipping every member and player to the client up front) ---
 
 export async function listSchoolMembers(schoolId: string) {
-  await requireAdmin();
+  await requireRosterPermission();
   return db
     .select()
     .from(schema.members)
@@ -356,7 +356,7 @@ export async function listRosterView(rosterId: string, schoolId: string) {
 
 /** Players on one roster with their member's display fields joined in. */
 export async function listRosterPlayers(rosterId: string) {
-  await requireAdmin();
+  await requireRosterPermission();
   return db
     .select({
       id: schema.players.id,

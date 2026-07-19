@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { inviteAdmin } from '@/app/(admin)/admin/team/actions';
+import { inviteStaff } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
 
-interface InviteAdminFormProps {
+interface InviteStaffFormProps {
   assignableRoles: {
     id: string;
     name: string;
@@ -12,7 +12,7 @@ interface InviteAdminFormProps {
   }[];
 }
 
-export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProps) {
+export default function InviteStaffForm({ assignableRoles }: InviteStaffFormProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
     setLink(null);
     setCopied(false);
     startTransition(async () => {
-      const result = await inviteAdmin(formData);
+      const result = await inviteStaff(formData);
       if (!result.success || !result.token) {
         setError(result.error ?? 'Could not create invite. Please try again.');
         return;
@@ -58,7 +58,7 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
               name="email"
               type="email"
               required
-              placeholder="new.admin@ezesports.org"
+              placeholder="new.staff@ezesports.org"
               className="w-full px-4 py-2.5 bg-surface border border-line rounded-lg text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
             />
           </div>
@@ -76,10 +76,10 @@ export default function InviteAdminForm({ assignableRoles }: InviteAdminFormProp
         {/* Roles Selection */}
         <div className="space-y-2">
           <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-            Assign Roles (Select all that apply)
+            Initial roles (optional)
           </label>
           {assignableRoles.length === 0 ? (
-            <p className="text-xs text-foreground-muted italic">No roles are assignable by you.</p>
+            <p className="text-xs text-foreground-muted italic">No initial roles will be assigned. The member can still accept the invite.</p>
           ) : (
             <div className="flex flex-wrap gap-2.5">
               {assignableRoles.map((role) => {

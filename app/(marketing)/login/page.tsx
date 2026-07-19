@@ -24,7 +24,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
-            Admin Portal
+            Staff Portal
           </h1>
           <p className="text-sm text-foreground-secondary">
             Sign in to manage league configurations, news, and matches.
@@ -67,7 +67,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               name="email"
               type="email"
               required
-              placeholder="admin@ezesports.org"
+              placeholder="staff@ezesports.org"
             />
           </Field>
 

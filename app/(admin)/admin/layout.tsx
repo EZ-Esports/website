@@ -1,59 +1,33 @@
-import { getAdmin } from '@/app/lib/auth';
-import { hasPermission, Permissions } from '@/app/lib/roles';
+import { getStaff, StaffSetupError, type StaffIdentity } from '@/app/lib/auth';
+import { getAllowedAdminHrefs } from '@/app/lib/staff-access';
 import AdminShell from './AdminShell';
 import { redirect } from 'next/navigation';
+import StaffSetupProblem from '@/app/components/admin/StaffSetupProblem';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 /**
- * Server wrapper for the admin panel chrome. Resolves the current admin's permissions
- * on the server, filters out forbidden navigation paths, and passes the allowed
- * routes to the client shell.
+ * Sole browser access gate for the staff portal. Authentication decides whether
+ * to redirect; roles only shape the available portal capabilities.
  */
 export default async function AdminLayout({ children }: AdminLayoutProps) {
-  const admin = await getAdmin();
-  if (!admin) {
+  let staff: StaffIdentity | null;
+  try {
+    staff = await getStaff();
+  } catch (error) {
+    if (error instanceof StaffSetupError) {
+      return <StaffSetupProblem message={error.message} />;
+    }
+    throw error;
+  }
+
+  if (!staff) {
     redirect('/login');
   }
 
-  const allowedHrefs: string[] = ['/admin'];
-
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_LEAGUE)) {
-    allowedHrefs.push('/admin/league');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_MATCHES)) {
-    allowedHrefs.push('/admin/matches');
-    allowedHrefs.push('/admin/standings');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_ROSTERS)) {
-    allowedHrefs.push('/admin/roster');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_NEWS)) {
-    allowedHrefs.push('/admin/news');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_LEADERSHIP)) {
-    allowedHrefs.push('/admin/leadership');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_GALLERY)) {
-    allowedHrefs.push('/admin/gallery');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_SPONSORS)) {
-    allowedHrefs.push('/admin/sponsors');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_SCHOOLS)) {
-    allowedHrefs.push('/admin/schools');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_APPLICATIONS)) {
-    allowedHrefs.push('/admin/applications');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_CONTENT)) {
-    allowedHrefs.push('/admin/content');
-  }
-  if (hasPermission(admin.permissions, admin.isOwner, Permissions.MANAGE_ROLES)) {
-    allowedHrefs.push('/admin/team');
-  }
+  const allowedHrefs = getAllowedAdminHrefs(staff.permissions, staff.isOwner);
 
   return <AdminShell allowedHrefs={allowedHrefs}>{children}</AdminShell>;
 }

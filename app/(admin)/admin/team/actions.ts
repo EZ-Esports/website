@@ -12,11 +12,12 @@ import { ActionError } from '@/app/lib/errors';
 import { rateLimit } from '@/app/lib/rate-limit';
 import { generateInviteToken, hashInviteToken } from '@/app/lib/invite-token';
 import { INVITE_TTL_DAYS } from './constants';
+import { buildStaffInviteRoleRows } from '@/app/lib/staff-invites';
+import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
 
 const INVITE_TTL_MS = INVITE_TTL_DAYS * 24 * 60 * 60 * 1000;
 const INVITE_RATE_LIMIT = 10;
 const INVITE_RATE_WINDOW_MS = 60_000;
-const ADMIN_REVOKE_LOCK_KEY = 8765001;
 const ROLE_MUTATE_LOCK_KEY = 8765002;
 
 /** Helper to fetch a user's roles from the database */
@@ -37,16 +38,16 @@ async function getUserRolesInfo(userId: string) {
   return { roles: userRolesRows, isOwner, highestPosition };
 }
 
-/** Create a single-use admin invite mapping to multiple roles. */
-export async function inviteAdmin(formData: FormData): Promise<{
+/** Create a single-use staff invite, optionally mapping it to initial roles. */
+export async function inviteStaff(formData: FormData): Promise<{
   success: boolean;
   error?: string;
   token?: string;
   email?: string;
 }> {
-  const admin = await requirePermission(Permissions.MANAGE_ROLES);
+  const staff = await requirePermission(Permissions.MANAGE_ROLES);
 
-  const rl = rateLimit(`admin-invite:${admin.id}`, INVITE_RATE_LIMIT, INVITE_RATE_WINDOW_MS);
+  const rl = rateLimit(`staff-invite:${staff.id}`, INVITE_RATE_LIMIT, INVITE_RATE_WINDOW_MS);
   if (!rl.allowed) {
     return { success: false, error: 'Too many invites. Please slow down and try again shortly.' };
   }
@@ -58,44 +59,31 @@ export async function inviteAdmin(formData: FormData): Promise<{
     return { success: false, error: 'Please enter a valid email address.' };
   }
 
-  if (roleIds.length === 0) {
-    return { success: false, error: 'Please select at least one role for the invitation.' };
-  }
-
-  // Fetch the selected roles to validate them
-  const selectedRoles = await db
-    .select()
-    .from(schema.roles)
-    .where(inArray(schema.roles.id, roleIds));
+  const selectedRoles = roleIds.length > 0
+    ? await db.select().from(schema.roles).where(inArray(schema.roles.id, roleIds))
+    : [];
 
   if (selectedRoles.length !== roleIds.length) {
     return { success: false, error: 'One or more selected roles do not exist.' };
   }
+  if (selectedRoles.some((role) => role.name === '@everyone')) {
+    return { success: false, error: '@everyone is implicit and must not be assigned explicitly.' };
+  }
 
   // Verify that all requested roles are lower in hierarchy and within the inviter's permissions subset
   for (const role of selectedRoles) {
-    if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
+    if (!canManageRole(staff.highestRolePosition, staff.isOwner, role.position)) {
       return {
         success: false,
         error: `You cannot grant the role "${role.name}" because it is equal to or higher than your own highest role.`,
       };
     }
-    if (!canGrantPermissions(admin.permissions, admin.isOwner, BigInt(role.permissions))) {
+    if (!canGrantPermissions(staff.permissions, staff.isOwner, BigInt(role.permissions))) {
       return {
         success: false,
         error: `You cannot grant the role "${role.name}" because it contains permissions you do not possess.`,
       };
     }
-  }
-
-  // Already an admin?
-  const [existingAdmin] = await db
-    .select({ userId: schema.adminUsers.userId })
-    .from(schema.adminUsers)
-    .where(eq(schema.adminUsers.email, email))
-    .limit(1);
-  if (existingAdmin) {
-    return { success: false, error: 'That email already belongs to an admin.' };
   }
 
   const token = generateInviteToken();
@@ -104,11 +92,36 @@ export async function inviteAdmin(formData: FormData): Promise<{
 
   try {
     await db.transaction(async (tx) => {
+      // Serialize invitation with acceptance, revocation, and restoration so
+      // a check cannot race a newly persisted revocation tombstone.
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const [existingStaff] = await tx
+        .select({ userId: schema.staffMembers.userId })
+        .from(schema.staffMembers)
+        .where(sql`lower(${schema.staffMembers.email}) = ${email}`)
+        .limit(1);
+      if (existingStaff) {
+        throw new ActionError('STAFF_EXISTS', 'That email already belongs to a staff member.');
+      }
+
+      const [revokedIdentity] = await tx
+        .select({ userId: schema.staffRevocations.userId })
+        .from(schema.staffRevocations)
+        .where(sql`lower(${schema.staffRevocations.email}) = ${email}`)
+        .limit(1);
+      if (revokedIdentity) {
+        throw new ActionError(
+          'STAFF_REVOKED',
+          'That identity was explicitly revoked and must be restored through a trusted Owner workflow before it can be invited again.',
+        );
+      }
+
       // Clear out previous pending invites for this email
       const supersededInvites = await tx
-        .select({ id: schema.adminInvites.id })
-        .from(schema.adminInvites)
-        .where(and(eq(schema.adminInvites.email, email), isNull(schema.adminInvites.acceptedAt)));
+        .select({ id: schema.staffInvites.id })
+        .from(schema.staffInvites)
+        .where(and(eq(schema.staffInvites.email, email), isNull(schema.staffInvites.acceptedAt)));
 
       if (supersededInvites.length > 0) {
         const supersededInviteIds = supersededInvites.map((i) => i.id);
@@ -116,44 +129,43 @@ export async function inviteAdmin(formData: FormData): Promise<{
         // Verify the actor has permission to revoke the superseded invite roles
         const associatedRoles = await tx
           .select({ name: schema.roles.name, position: schema.roles.position })
-          .from(schema.adminInviteRoles)
-          .innerJoin(schema.roles, eq(schema.adminInviteRoles.roleId, schema.roles.id))
-          .where(inArray(schema.adminInviteRoles.inviteId, supersededInviteIds));
+          .from(schema.staffInviteRoles)
+          .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id))
+          .where(inArray(schema.staffInviteRoles.inviteId, supersededInviteIds));
 
         for (const role of associatedRoles) {
-          if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
+          if (!canManageRole(staff.highestRolePosition, staff.isOwner, role.position)) {
             throw new ActionError(
               'SUPERSEDE_FORBIDDEN',
-              `Only admins with a higher role rank can replace this pending invite containing the "${role.name}" role.`
+              `Only staff with a higher role rank can replace this pending invite containing the "${role.name}" role.`
             );
           }
         }
 
-        await tx.delete(schema.adminInvites).where(inArray(schema.adminInvites.id, supersededInviteIds));
+        await tx.delete(schema.staffInvites).where(inArray(schema.staffInvites.id, supersededInviteIds));
       }
 
       const [newInvite] = await tx
-        .insert(schema.adminInvites)
+        .insert(schema.staffInvites)
         .values({
           email,
           tokenHash,
-          invitedBy: admin.id,
+          invitedBy: staff.id,
           expiresAt,
         })
-        .returning({ id: schema.adminInvites.id });
+        .returning({ id: schema.staffInvites.id });
 
-      await tx.insert(schema.adminInviteRoles).values(
-        roleIds.map((roleId) => ({
-          inviteId: newInvite.id,
-          roleId,
-        }))
-      );
+      if (roleIds.length > 0) {
+        await tx.insert(schema.staffInviteRoles).values(
+          buildStaffInviteRoleRows(newInvite.id, roleIds),
+        );
+      }
     });
   } catch (error) {
     if (error instanceof ActionError) {
       return { success: false, error: error.message };
     }
-    console.error('Failed to create admin invite', error);
+    console.error('Failed to create staff invite', error);
     return { success: false, error: sanitizeDbError(error) };
   }
 
@@ -168,9 +180,9 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
   // Fetch roles attached to the invite first to run hierarchy check
   const inviteRoles = await db
     .select({ name: schema.roles.name, position: schema.roles.position })
-    .from(schema.adminInviteRoles)
-    .innerJoin(schema.roles, eq(schema.adminInviteRoles.roleId, schema.roles.id))
-    .where(eq(schema.adminInviteRoles.inviteId, inviteId));
+    .from(schema.staffInviteRoles)
+    .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id))
+    .where(eq(schema.staffInviteRoles.inviteId, inviteId));
 
   for (const role of inviteRoles) {
     if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
@@ -183,15 +195,15 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
 
   try {
     const deleted = await db
-      .delete(schema.adminInvites)
-      .where(and(eq(schema.adminInvites.id, inviteId), isNull(schema.adminInvites.acceptedAt)))
-      .returning({ id: schema.adminInvites.id });
+      .delete(schema.staffInvites)
+      .where(and(eq(schema.staffInvites.id, inviteId), isNull(schema.staffInvites.acceptedAt)))
+      .returning({ id: schema.staffInvites.id });
 
     if (deleted.length === 0) {
       return { success: false, error: 'Invite not found or already accepted.' };
     }
   } catch (error) {
-    console.error('Failed to revoke admin invite', error);
+    console.error('Failed to revoke staff invite', error);
     return { success: false, error: 'Could not revoke invite. Please try again.' };
   }
 
@@ -199,40 +211,77 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
   return { success: true };
 }
 
-/** Remove an admin user completely, checking hierarchy and owner counts. */
-export async function revokeAdmin(userId: string): Promise<{ success: boolean; error?: string }> {
-  const admin = await requirePermission(Permissions.MANAGE_ROLES);
+/** Explicitly revoke staff access, checking hierarchy and owner counts. */
+export async function revokeStaff(userId: string): Promise<{ success: boolean; error?: string }> {
+  const staff = await requirePermission(Permissions.MANAGE_ROLES);
 
-  if (userId === admin.id) {
-    return { success: false, error: 'You cannot remove your own admin access.' };
+  if (userId === staff.id) {
+    return { success: false, error: 'You cannot revoke your own staff access.' };
   }
 
   // Fetch the target user's role info
   const targetInfo = await getUserRolesInfo(userId);
   const [targetUserRow] = await db
     .select()
-    .from(schema.adminUsers)
-    .where(eq(schema.adminUsers.userId, userId))
+    .from(schema.staffMembers)
+    .where(eq(schema.staffMembers.userId, userId))
     .limit(1);
 
   if (!targetUserRow) {
-    return { success: false, error: 'That user is not an admin.' };
+    return { success: false, error: 'That user is not a staff member.' };
   }
 
   // Hierarchy check: Actor highest role position must be strictly greater than target's highest position
-  if (!canActOnMember(admin.highestRolePosition, admin.isOwner, targetInfo.highestPosition, targetInfo.isOwner)) {
+  if (!canActOnMember(staff.highestRolePosition, staff.isOwner, targetInfo.highestPosition, targetInfo.isOwner)) {
     return { success: false, error: 'You do not have permission to remove this staff member due to role hierarchy.' };
   }
 
   let deleted: { userId: string }[] = [];
   let wasLastOwner = false;
+  let revokedEmail = '';
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${ADMIN_REVOKE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      // Re-read membership and roles after acquiring the same lock used by
+      // identity reconciliation and role updates. This keeps both the email
+      // tombstone and hierarchy decision tied to the state being revoked.
+      const [lockedTargetMember] = await tx
+        .select({ email: schema.staffMembers.email })
+        .from(schema.staffMembers)
+        .where(eq(schema.staffMembers.userId, userId))
+        .limit(1);
+      if (!lockedTargetMember) {
+        throw new ActionError('STAFF_CHANGED', 'That user is no longer a staff member.');
+      }
+      revokedEmail = lockedTargetMember.email.trim().toLowerCase();
+
+      const lockedTargetRoles = await tx
+        .select({ position: schema.roles.position, isOwner: schema.roles.isOwner })
+        .from(schema.userRoles)
+        .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+        .where(eq(schema.userRoles.userId, userId));
+      const lockedTargetIsOwner = lockedTargetRoles.some((role) => role.isOwner);
+      const lockedTargetHighestPosition = lockedTargetRoles.reduce(
+        (highest, role) => Math.max(highest, role.position),
+        0,
+      );
+
+      if (!canActOnMember(
+        staff.highestRolePosition,
+        staff.isOwner,
+        lockedTargetHighestPosition,
+        lockedTargetIsOwner,
+      )) {
+        throw new ActionError(
+          'STAFF_HIERARCHY_CHANGED',
+          'This staff member\'s role hierarchy changed. Refresh and try again.',
+        );
+      }
 
       // If target is an owner, verify there is at least one other owner in the database
-      if (targetInfo.isOwner) {
+      if (lockedTargetIsOwner) {
         const owners = await tx
           .select({ count: sql<number>`count(*)::int` })
           .from(schema.userRoles)
@@ -245,14 +294,45 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
         }
       }
 
+      // Persist the revocation before deleting membership. getStaff() checks
+      // this tombstone first, so a locally valid JWT cannot recreate access.
+      await tx.insert(schema.staffRevocations).values({
+        userId,
+        email: revokedEmail,
+        revokedBy: staff.id,
+        reason: 'Staff access revoked from the team manager',
+      });
+
+      // A previously issued invite must not survive revocation and recreate
+      // this identity. acceptInvite() shares this lock and also checks the
+      // tombstone, so either transaction ordering is safe.
+      await tx
+        .delete(schema.staffInvites)
+        .where(
+          and(
+            isNull(schema.staffInvites.acceptedAt),
+            sql`lower(${schema.staffInvites.email}) = ${revokedEmail}`,
+          ),
+        );
+
       deleted = await tx
-        .delete(schema.adminUsers)
-        .where(eq(schema.adminUsers.userId, userId))
-        .returning({ userId: schema.adminUsers.userId });
+        .delete(schema.staffMembers)
+        .where(eq(schema.staffMembers.userId, userId))
+        .returning({ userId: schema.staffMembers.userId });
+
+      await tx.insert(schema.staffAuditLogs).values({
+        event: 'staff_access_revoked',
+        userId,
+        email: revokedEmail,
+        details: `Revoked by ${staff.id}`,
+      });
     });
   } catch (error) {
-    console.error('Failed to remove admin row', error);
-    return { success: false, error: 'Could not remove admin. Please try again.' };
+    console.error('Failed to revoke staff access', error);
+    return {
+      success: false,
+      error: error instanceof ActionError ? error.message : 'Could not revoke staff access. Please try again.',
+    };
   }
 
   if (deleted.length === 0) {
@@ -263,11 +343,27 @@ export async function revokeAdmin(userId: string): Promise<{ success: boolean; e
     return { success: true };
   }
 
+  // Auth deletion is cleanup, not the authorization boundary. The database
+  // tombstone already blocks old sessions, so a Supabase failure is audited
+  // for follow-up without undoing a completed revocation.
   try {
     const supabase = createServiceClient();
-    await supabase.auth.admin.deleteUser(userId);
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (authDeleteError) {
+      throw authDeleteError;
+    }
   } catch (error) {
-    console.error('Removed admin allowlist row but failed to delete auth user', userId, error);
+    console.error('Staff access revoked, but auth identity deletion failed', { userId, error });
+    try {
+      await db.insert(schema.staffAuditLogs).values({
+        event: 'revoked_auth_identity_cleanup_failed',
+        userId,
+        email: revokedEmail,
+        details: error instanceof Error ? error.message : 'Unknown Supabase Auth deletion failure',
+      });
+    } catch (auditError) {
+      console.error('Failed to audit auth identity cleanup failure', { userId, auditError });
+    }
   }
 
   revalidatePath('/admin/team');
@@ -538,12 +634,12 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
   const targetInfo = await getUserRolesInfo(targetUserId);
   const [targetUserRow] = await db
     .select()
-    .from(schema.adminUsers)
-    .where(eq(schema.adminUsers.userId, targetUserId))
+    .from(schema.staffMembers)
+    .where(eq(schema.staffMembers.userId, targetUserId))
     .limit(1);
 
   if (!targetUserRow) {
-    return { success: false, error: 'User not found in admin allowlist.' };
+    return { success: false, error: 'Staff member not found.' };
   }
 
   // Hierarchy rule: Actor highest role position must be strictly higher than target user's current highest position
@@ -558,6 +654,9 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
 
   if (newRoles.length !== roleIds.length) {
     return { success: false, error: 'One or more selected roles do not exist.' };
+  }
+  if (newRoles.some((role) => role.name === '@everyone')) {
+    return { success: false, error: '@everyone is implicit and must not be assigned explicitly.' };
   }
 
   // Determine what is being added and removed to enforce hierarchy checks on those specific roles
@@ -589,7 +688,7 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${ADMIN_REVOKE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
       // If target currently has the Owner role but is being stripped of it, verify there's at least one other owner
       const isLosingOwner = targetInfo.roles.some((r) => r.isOwner) && !newRoles.some((r) => r.isOwner);

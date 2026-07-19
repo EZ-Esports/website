@@ -134,6 +134,20 @@
       "when": 1783819262362,
       "tag": "0018_fantastic_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784409995529,
+      "tag": "0019_staff-permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784417200714,
+      "tag": "0020_fine_cannonball",
+      "breakpoints": true
     }
   ]
 }

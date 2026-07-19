@@ -1,10 +1,14 @@
-import { getCachedGames, getAdminSeasons, getCachedSchools } from '@/app/lib/db/queries';
+import { getCachedGames, getStaffSeasons, getCachedSchools } from '@/app/lib/db/queries';
 import Card from '@/app/components/ui/Card';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import StandingsEditor from './StandingsEditor';
 import type { DBGame, DBSchool, DBSeason } from '@/app/types';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 export default async function AdminStandingsPage() {
+  if (!(await getStaffForAdminSection('/admin/standings'))) return <PermissionDenied />;
+
   let games: DBGame[] = [];
   let seasons: DBSeason[] = [];
   let schools: DBSchool[] = [];
@@ -13,7 +17,7 @@ export default async function AdminStandingsPage() {
   try {
     const [gamesRes, seasonsRes, schoolsRes] = await Promise.all([
       getCachedGames(),
-      getAdminSeasons(),
+      getStaffSeasons(),
       getCachedSchools(),
     ]);
     games = gamesRes;

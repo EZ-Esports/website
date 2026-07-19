@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Permissions, hasPermission, canActOnMember, canManageRole, canGrantPermissions } from '../roles';
+import { Permissions, hasPermission, canActOnMember, canManageRole, canGrantPermissions, calculateEffectiveStaffAccess } from '../roles';
+import { getAllowedAdminHrefs, hasAnyManagementPermission } from '../staff-access';
+import { buildStaffInviteRoleRows } from '../staff-invites';
 
 describe('hasPermission', () => {
   it('identifies if a user has specific permission', () => {
@@ -14,6 +16,67 @@ describe('hasPermission', () => {
 
   it('allows administrator to bypass permission checks', () => {
     expect(hasPermission(Permissions.ADMINISTRATOR, false, Permissions.MANAGE_ROLES)).toBe(true);
+  });
+});
+
+describe('effective staff access', () => {
+  it('includes @everyone for a zero-role member', () => {
+    const access = calculateEffectiveStaffAccess([], {
+      permissions: Permissions.MANAGE_NEWS,
+      position: 0,
+      isOwner: false,
+    });
+    expect(access).toEqual({
+      permissions: Permissions.MANAGE_NEWS,
+      isOwner: false,
+      highestRolePosition: 0,
+    });
+  });
+
+  it('allows a valid member to have zero effective permissions', () => {
+    expect(calculateEffectiveStaffAccess([], null)).toEqual({
+      permissions: BigInt(0),
+      isOwner: false,
+      highestRolePosition: 0,
+    });
+  });
+
+  it('combines assigned role permissions and preserves Owner override state', () => {
+    const access = calculateEffectiveStaffAccess([
+      { permissions: Permissions.MANAGE_MATCHES, position: 4, isOwner: false },
+      { permissions: BigInt(0), position: 99, isOwner: true },
+    ], { permissions: Permissions.MANAGE_NEWS, position: 0, isOwner: false });
+    expect(access.permissions).toBe(Permissions.MANAGE_MATCHES | Permissions.MANAGE_NEWS);
+    expect(access.isOwner).toBe(true);
+    expect(access.highestRolePosition).toBe(99);
+  });
+});
+
+describe('staff route decisions', () => {
+  it('keeps zero-permission staff on overview only', () => {
+    expect(getAllowedAdminHrefs(BigInt(0), false)).toEqual(['/admin']);
+    expect(hasAnyManagementPermission(BigInt(0), false)).toBe(false);
+  });
+
+  it('maps one permission to the matching navigation and direct routes', () => {
+    expect(getAllowedAdminHrefs(Permissions.MANAGE_MATCHES, false)).toEqual([
+      '/admin',
+      '/admin/matches',
+      '/admin/standings',
+    ]);
+  });
+
+  it('grants all routes to Administrator and Owner', () => {
+    expect(getAllowedAdminHrefs(Permissions.ADMINISTRATOR, false).length).toBeGreaterThan(10);
+    expect(getAllowedAdminHrefs(BigInt(0), true)).toEqual(
+      getAllowedAdminHrefs(Permissions.ADMINISTRATOR, false),
+    );
+  });
+});
+
+describe('optional invite roles', () => {
+  it('creates a valid empty assignment set', () => {
+    expect(buildStaffInviteRoleRows('invite-id', [])).toEqual([]);
   });
 });
 

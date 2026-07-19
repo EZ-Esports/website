@@ -32,7 +32,7 @@ import { createClient } from '@/app/lib/supabase/server'
 
 ### `app/lib/supabase/service.ts` — Service role client
 
-Uses the `SUPABASE_SECRET_KEY` (service role). Bypasses RLS — use only for trusted server logic where elevated access is required (e.g. creating admin auth accounts).
+Uses the `SUPABASE_SECRET_KEY` (service role). Bypasses RLS — use only for trusted server logic where elevated access is required (for example creating or revoking staff auth identities).
 
 ```ts
 import { createServiceClient } from '@/app/lib/supabase/service'
@@ -46,11 +46,13 @@ import { createServiceClient } from '@/app/lib/supabase/service'
 | Server Components | `server.ts` |
 | Route Handlers / API routes | `server.ts` |
 | Server Actions | `server.ts` |
-| Privileged server actions (admin provisioning) | `service.ts` |
+| Privileged server actions (staff provisioning/revocation) | `service.ts` |
 
 ## Authorization
 
-A valid Supabase Auth session alone is **not sufficient** for admin access. The user must also have a row in the `admin_users` allowlist table. `requireAdmin()` and `getAdmin()` in `app/lib/auth.ts` are the single authorization gate for all admin panel routes and server actions — they verify the session **and** check the allowlist on every call.
+Supabase signups remain disabled and staff accounts originate from invites or Owner seeding. Every authenticated portal identity is a staff member, even when it has no assigned roles. `getStaff()` verifies the identity, idempotently repairs a missing `staff_members` row, and combines assigned roles with the implicit `@everyone` role. `requireStaff()` checks membership; `requirePermission()` and `requireAnyPermission()` protect capabilities.
+
+Anonymous `/admin` requests redirect once to `/login`. Permission failures never sign out a valid identity: browser pages render a denial inside the portal shell and APIs return `403`.
 
 ## Row Level Security (RLS)
 
@@ -59,10 +61,21 @@ RLS is enabled for every application-owned table in `public` by migration `0012_
 Policy contract:
 
 - Public `anon`/`authenticated` reads are limited to non-sensitive, publishable rows: active games/league data, active non-deleted schools, published non-deleted news, active non-deleted gallery images/sponsors, non-deleted leadership rows, and page content.
-- Sensitive rows such as `members`, `school_applications`, `page_content_history`, `admin_users`, and `admin_invites` are not publicly readable.
-- Authenticated admin writes are gated by the `admin_users` allowlist via `public.is_admin()`.
-- Admin team management on `admin_users` and `admin_invites` is gated by `public.is_super_admin()`.
+- Sensitive rows such as `members`, `school_applications`, `page_content_history`, `staff_members`, `staff_invites`, and `staff_revocations` are not publicly readable.
+- `public.is_staff()` checks portal membership without granting management access.
+- `public.has_permission(bit)` includes implicit `@everyone`, assigned roles, Owner override, and `ADMINISTRATOR` override.
+- Management-content tables have permission-specific mutation policies. Membership-domain tables (`roles`, `user_roles`, `staff_members`, `staff_invites`, and `staff_invite_roles`) have no authenticated mutation policies: their writes must use the trusted `DATABASE_URL` connection after application-layer `MANAGE_ROLES` and role-hierarchy checks. This prevents direct Supabase REST/table DML from turning `MANAGE_ROLES` into Owner or `ADMINISTRATOR` access.
 - Public application submission still goes through `app/api/apply/route.ts`; the database table itself is not directly insertable by anonymous Supabase clients.
 
+## Staff permission migration
+
+Migrations `0019_staff-permissions.sql` and `0020_fine_cannonball.sql` rename the staff domain, replace the old broad policies, and add durable revocation tombstones. Apply them together in the same controlled maintenance window as the matching application release:
+
+1. Create and verify a restorable database backup.
+2. Pause administrative writes.
+3. Run `npm run db:migrate` immediately before releasing the matching application build.
+4. On a non-production verification database, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/tests/staff-permissions.sql`.
+5. Verify anonymous, zero-permission, specific-permission, Administrator, and Owner browser sessions before resuming writes.
+
 ### Database Schema
-See [schema.ts](file:///Users/shangminchen/website/app/lib/db/schema.ts) for the database schema definition and migration files under [db/migrations](file:///Users/shangminchen/website/db/migrations) for migration history.
+See [`schema.ts`](../../app/lib/db/schema.ts) for the database schema definition and [`db/migrations`](../../db/migrations) for migration history.

@@ -5,8 +5,12 @@ import LeadershipRow from '@/app/components/admin/LeadershipRow';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
 import SubmitButton from '@/app/components/admin/SubmitButton';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 export default async function AdminLeadershipPage() {
+  if (!(await getStaffForAdminSection('/admin/leadership'))) return <PermissionDenied />;
+
   let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
   let dbError = false;
 

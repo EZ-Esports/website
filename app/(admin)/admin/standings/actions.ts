@@ -7,7 +7,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 
-async function requireAdmin() {
+async function requireMatchesPermission() {
   return requirePermission(Permissions.MANAGE_MATCHES);
 }
 
@@ -55,7 +55,7 @@ function standingValues(formData: FormData) {
 
 /** All snapshot rows of one season with school names, for the editor. */
 export async function listSeasonStandings(seasonId: string) {
-  await requireAdmin();
+  await requireMatchesPermission();
   return db
     .select({
       id: schema.seasonStandings.id,
@@ -84,7 +84,7 @@ export async function listSeasonStandings(seasonId: string) {
 }
 
 export async function createStanding(formData: FormData) {
-  await requireAdmin();
+  await requireMatchesPermission();
   try {
     const seasonId = formData.get('seasonId') as string;
     const schoolId = formData.get('schoolId') as string;
@@ -104,7 +104,7 @@ export async function createStanding(formData: FormData) {
 }
 
 export async function updateStanding(id: string, formData: FormData) {
-  await requireAdmin();
+  await requireMatchesPermission();
   try {
     const res = await db
       .update(schema.seasonStandings)
@@ -120,7 +120,7 @@ export async function updateStanding(id: string, formData: FormData) {
 }
 
 export async function deleteStanding(id: string) {
-  await requireAdmin();
+  await requireMatchesPermission();
   try {
     await db.delete(schema.seasonStandings).where(eq(schema.seasonStandings.id, id));
     revalidatePath('/admin/standings');
@@ -133,7 +133,7 @@ export async function deleteStanding(id: string) {
 
 /** Convenience: delete every row of a season+division in one shot. */
 export async function deleteDivisionStandings(seasonId: string, division: string) {
-  await requireAdmin();
+  await requireMatchesPermission();
   try {
     await db
       .delete(schema.seasonStandings)

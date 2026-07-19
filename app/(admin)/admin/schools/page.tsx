@@ -8,6 +8,8 @@ import ImageUpload from '@/app/components/admin/ImageUpload';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getAllSchools() {
   return db
@@ -18,6 +20,8 @@ async function getAllSchools() {
 }
 
 export default async function SchoolsAdminPage() {
+  if (!(await getStaffForAdminSection('/admin/schools'))) return <PermissionDenied />;
+
   let schools: Awaited<ReturnType<typeof getAllSchools>> = [];
   let dbConfigured = false;
 

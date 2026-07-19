@@ -8,7 +8,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { slugify, safeUrl, sanitizeDbError } from '@/app/lib/text-utils';
 
-async function requireAdmin() {
+async function requireSchoolsPermission() {
   return requirePermission(Permissions.MANAGE_SCHOOLS);
 }
 
@@ -21,7 +21,7 @@ function revalidateAll() {
 }
 
 export async function addSchool(formData: FormData) {
-  await requireAdmin();
+  await requireSchoolsPermission();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const storageKey = (formData.get('storageKey') as string) || null;
@@ -43,7 +43,7 @@ export async function addSchool(formData: FormData) {
 }
 
 export async function updateSchool(id: string, formData: FormData) {
-  await requireAdmin();
+  await requireSchoolsPermission();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
   const newStorageKey = (formData.get('storageKey') as string) || null;
@@ -81,7 +81,7 @@ export async function updateSchool(id: string, formData: FormData) {
 }
 
 export async function deleteSchool(id: string) {
-  const user = await requireAdmin();
+  const user = await requireSchoolsPermission();
   // Fetch the row first to get storageKey for cleanup
   const [row] = await db
     .select({ storageKey: schema.schools.storageKey })
@@ -101,7 +101,7 @@ export async function deleteSchool(id: string) {
 }
 
 export async function toggleSchoolActive(id: string, isActive: boolean) {
-  await requireAdmin();
+  await requireSchoolsPermission();
   try {
     await db
       .update(schema.schools)

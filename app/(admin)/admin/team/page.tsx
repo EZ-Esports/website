@@ -1,23 +1,24 @@
-import { requirePermission } from '@/app/lib/auth';
-import { Permissions } from '@/app/lib/roles';
-import { listAdminUsers, listPendingAdminInvites } from '@/app/lib/db/queries';
+import { getStaffForAdminSection } from '@/app/lib/auth';
+import { listStaffMembers, listPendingStaffInvites } from '@/app/lib/db/queries';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import TeamManagerClient from '@/app/components/admin/TeamManagerClient';
 import { desc } from 'drizzle-orm';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
 
 export default async function TeamAdminPage() {
-  const current = await requirePermission(Permissions.MANAGE_ROLES);
+  const current = await getStaffForAdminSection('/admin/team');
+  if (!current) return <PermissionDenied />;
 
-  let admins: Awaited<ReturnType<typeof listAdminUsers>> = [];
-  let invites: Awaited<ReturnType<typeof listPendingAdminInvites>> = [];
+  let staffMembers: Awaited<ReturnType<typeof listStaffMembers>> = [];
+  let invites: Awaited<ReturnType<typeof listPendingStaffInvites>> = [];
   let allRoles: (typeof schema.roles.$inferSelect)[] = [];
 
   try {
     if (process.env.DATABASE_URL) {
-      [admins, invites, allRoles] = await Promise.all([
-        listAdminUsers(),
-        listPendingAdminInvites(),
+      [staffMembers, invites, allRoles] = await Promise.all([
+        listStaffMembers(),
+        listPendingStaffInvites(),
         db
           .select()
           .from(schema.roles)
@@ -37,11 +38,11 @@ export default async function TeamAdminPage() {
     highestRolePosition: current.highestRolePosition,
   };
 
-  const serializedAdmins = admins.map((a) => ({
-    userId: a.userId,
-    email: a.email,
-    createdAt: a.createdAt,
-    roles: a.roles.map((r) => ({
+  const serializedStaffMembers = staffMembers.map((member) => ({
+    userId: member.userId,
+    email: member.email,
+    createdAt: member.createdAt,
+    roles: member.roles.map((r) => ({
       id: r.id,
       name: r.name,
       color: r.color,
@@ -78,7 +79,7 @@ export default async function TeamAdminPage() {
   return (
     <TeamManagerClient
       current={serializedCurrent}
-      admins={serializedAdmins}
+      staffMembers={serializedStaffMembers}
       invites={serializedInvites}
       roles={serializedRoles}
     />

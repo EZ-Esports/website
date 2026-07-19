@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-components';
 import type { Selection } from 'react-aria-components';
-import { revokeAdmin, updateUserRoles } from '@/app/(admin)/admin/team/actions';
+import { revokeStaff, updateUserRoles } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
 import {
   HiOutlinePlus,
@@ -11,8 +11,8 @@ import {
   HiOutlineEllipsisVertical,
 } from 'react-icons/hi2';
 
-interface AdminRowProps {
-  admin: {
+interface StaffRowProps {
+  member: {
     userId: string;
     email: string;
     roles: {
@@ -24,7 +24,7 @@ interface AdminRowProps {
     createdAt: Date;
   };
   isSelf: boolean;
-  /** Whether the current actor is allowed to manage this admin user (hierarchy check passed). */
+  /** Whether the current actor is allowed to manage this staff member (hierarchy check passed). */
   canRevoke: boolean;
   assignableRoles: {
     id: string;
@@ -33,7 +33,7 @@ interface AdminRowProps {
   }[];
 }
 
-export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: AdminRowProps) {
+export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }: StaffRowProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
@@ -45,15 +45,15 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
 
   // Revoke member access
   function handleRevoke() {
-    if (!window.confirm(`Remove admin access for ${admin.email}? They will be signed out immediately.`)) {
+    if (!window.confirm(`Revoke staff access for ${member.email}? Their portal identity will be removed.`)) {
       return;
     }
     setActionsOpen(false);
     setError(null);
     startTransition(async () => {
-      const result = await revokeAdmin(admin.userId);
+      const result = await revokeStaff(member.userId);
       if (!result.success) {
-        setError(result.error ?? 'Could not remove admin.');
+        setError(result.error ?? 'Could not revoke staff access.');
         return;
       }
       setRemoved(true);
@@ -72,7 +72,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
     setError(null);
     const newRoleIds = Array.from(keys, String);
     startTransition(async () => {
-      const result = await updateUserRoles(admin.userId, newRoleIds);
+      const result = await updateUserRoles(member.userId, newRoleIds);
       if (!result.success) {
         setError(result.error ?? 'Could not update roles.');
       }
@@ -85,13 +85,13 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
     return local.slice(0, 2).toUpperCase() || '?';
   };
 
-  const highestRole = admin.roles.reduce((highest, current) => {
+  const highestRole = member.roles.reduce((highest, current) => {
     if (!highest) return current;
     return current.position > highest.position ? current : highest;
-  }, null as typeof admin.roles[number] | null);
+  }, null as typeof member.roles[number] | null);
 
   const highestRoleColor = highestRole ? parseHexColor(highestRole.color) : '#94a3b8';
-  const selectedRoleIds = new Set(admin.roles.map((r) => r.id));
+  const selectedRoleIds = new Set(member.roles.map((r) => r.id));
 
   return (
     <div
@@ -109,17 +109,17 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
             borderColor: `${highestRoleColor}25`,
           }}
         >
-          {getInitials(admin.email)}
+          {getInitials(member.email)}
         </div>
         <div className="min-w-0">
           <span
             className="text-sm font-extrabold truncate block leading-snug"
             style={{ color: highestRoleColor }}
           >
-            {admin.email}
+            {member.email}
           </span>
           <span className="text-[10px] text-foreground-muted font-medium">
-            Joined {new Date(admin.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            Joined {new Date(member.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
           {error && <p className="text-[10px] text-red-400 mt-1">{error}</p>}
         </div>
@@ -127,7 +127,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
 
       {/* Center Column: Role Pill flex and inline role popover */}
       <div className="flex-1 flex flex-wrap items-center gap-1.5 min-w-0">
-        {admin.roles.map((role) => {
+        {member.roles.map((role) => {
           const parsedColor = parseHexColor(role.color);
           return (
             <span
@@ -144,7 +144,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
           );
         })}
 
-        {admin.roles.length === 0 && (
+        {member.roles.length === 0 && (
           <span className="text-foreground-muted italic text-xs px-1">No Roles</span>
         )}
 
@@ -209,7 +209,7 @@ export default function AdminRow({ admin, isSelf, canRevoke, assignableRoles }: 
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
               className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
-              aria-label={`More actions for ${admin.email}`}
+              aria-label={`More actions for ${member.email}`}
             >
               <HiOutlineEllipsisVertical className="w-4 h-4" />
             </Button>

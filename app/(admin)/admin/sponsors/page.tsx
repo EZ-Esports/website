@@ -8,6 +8,8 @@ import ImageUpload from '@/app/components/admin/ImageUpload';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
+import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getAllSponsors() {
   return db.select().from(schema.sponsors).where(isNull(schema.sponsors.deletedAt)).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
@@ -15,6 +17,8 @@ async function getAllSponsors() {
 
 
 export default async function SponsorsAdminPage() {
+  if (!(await getStaffForAdminSection('/admin/sponsors'))) return <PermissionDenied />;
+
   let sponsors: Awaited<ReturnType<typeof getAllSponsors>> = [];
   let dbConfigured = false;
 

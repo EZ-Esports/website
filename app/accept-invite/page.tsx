@@ -29,10 +29,10 @@ export default async function AcceptInvitePage({
         ) : (
           <>
             <div className="text-center space-y-2">
-              <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Accept admin invite</h1>
+              <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Accept staff invite</h1>
               <p className="text-sm text-foreground-secondary">
                 Set a password for <span className="font-semibold text-foreground">{invite.email}</span> to
-                activate your admin account.
+                activate your staff account.
               </p>
             </div>
             <AcceptInviteForm token={token!} email={invite.email} />

@@ -27,6 +27,28 @@ export function hasPermission(
   return (userPermissions & requiredPermission) !== BigInt(0);
 }
 
+export interface StaffRoleGrant {
+  permissions: bigint;
+  position: number;
+  isOwner: boolean;
+}
+
+/** Combine explicit roles with the implicit @everyone role. */
+export function calculateEffectiveStaffAccess(
+  assignedRoles: StaffRoleGrant[],
+  everyoneRole: StaffRoleGrant | null,
+) {
+  const effectiveRoles = everyoneRole ? [...assignedRoles, everyoneRole] : assignedRoles;
+  return {
+    permissions: effectiveRoles.reduce((mask, role) => mask | BigInt(role.permissions), BigInt(0)),
+    isOwner: effectiveRoles.some((role) => role.isOwner),
+    highestRolePosition: effectiveRoles.reduce(
+      (highest, role) => Math.max(highest, role.position),
+      0,
+    ),
+  };
+}
+
 /**
  * Discord-style hierarchy check for actions on other members:
  * - Owners can act on anyone.
@@ -96,4 +118,3 @@ export function parseHexColor(color: string): string {
 
   return `#${clean}`;
 }
-

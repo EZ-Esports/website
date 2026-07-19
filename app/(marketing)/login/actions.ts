@@ -26,7 +26,8 @@ export async function login(formData: FormData) {
     return redirect('/login?error=' + encodeURIComponent(msg));
   }
 
-  // Clear caches and redirect to admin dashboard
+  // Clear caches and enter the staff portal. Permission assignment is not a
+  // login prerequisite, so zero-permission members land on the waiting state.
   revalidatePath('/', 'layout');
   return redirect('/admin');
 }
