@@ -17,6 +17,13 @@ const gameIdToSlug: Record<string, GameSlug> = {
   'tft': 'team-fight-tactics',
 };
 
+// Map game IDs to their original banner dimensions
+const gameDimensions: Record<string, { width: number; height: number }> = {
+  'lol': { width: 850, height: 286 },
+  'val': { width: 814, height: 276 },
+  'tft': { width: 1080, height: 411 },
+};
+
 export default function GameShowcase({ title, games }: GameShowcaseProps) {
   return (
     <Section>
@@ -25,23 +32,25 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
         {games.map((game, index) => {
           const gameSlug = game.id ? gameIdToSlug[game.id] : null;
           const href = gameSlug ? getGameRoute(gameSlug) : '#';
+          const dims = game.id ? gameDimensions[game.id] : { width: 800, height: 270 };
 
           const content = (
             <div
-              className="aspect-video relative rounded-xl overflow-hidden group cursor-pointer border border-line/80 hover:border-accent/60 transition-all duration-200 active:scale-[0.98]"
+              className="relative rounded-xl overflow-hidden group cursor-pointer border border-line/80 hover:border-accent/60 transition-all duration-200 active:scale-[0.98]"
             >
               <Image
                 src={game.imageUrl}
                 alt={game.title}
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                width={dims.width}
+                height={dims.height}
+                unoptimized
+                className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
               />
               {/* Overlay Vignette Gradient */}
-              <div className="absolute inset-0 bg-gradient-to-t from-surface-sunken via-surface-sunken/20 to-transparent" aria-hidden="true" />
-              <div className="absolute bottom-0 left-0 right-0 p-5 flex flex-col justify-end h-1/2">
-                <h3 className="text-foreground text-lg font-bold mb-1 tracking-tight">{game.title}</h3>
-                <div aria-hidden="true" className="inline-flex items-center gap-1 text-accent text-xs font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-all duration-200">
+              <div className="absolute inset-0 bg-gradient-to-t from-surface-sunken/80 via-surface-sunken/40 to-transparent" aria-hidden="true" />
+              <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 flex flex-col items-end justify-end">
+                <h3 className="text-foreground text-base sm:text-lg font-bold tracking-tight text-right">{game.title}</h3>
+                <div aria-hidden="true" className="inline-flex items-center gap-1 text-accent text-xs font-bold uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-all duration-200 text-right mt-1">
                   Explore Game <span className="text-sm">→</span>
                 </div>
               </div>
@@ -66,4 +75,5 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
     </Section>
   );
 }
+
 
