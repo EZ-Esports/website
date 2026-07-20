@@ -49,7 +49,9 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   if (record !== null) seasonRecordParts.push(`Varsity ${record}`);
   if (jvRecord !== null) seasonRecordParts.push(`JV ${jvRecord}`);
   const seasonRecordCaption =
-    seasonRecordParts.length > 0 ? `${seasonRecordParts.join(' · ')} this season.` : undefined;
+    topTeams.length > 0 && seasonRecordParts.length > 0
+      ? `${seasonRecordParts.join(' · ')} this season.`
+      : undefined;
 
   return (
     <main>
