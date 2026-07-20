@@ -9,6 +9,8 @@ import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getSeasonDivisions, getSeasonStandingsFor, getSeasonsWithGames } from '@/app/lib/db/queries';
 import { pointsFromNotes, resolveSelectedSeason, type StandingRow } from '@/app/lib/db/match-page';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
+import MigrationNotice from '@/app/components/ui/MigrationNotice';
+
 
 interface StandingsPageProps {
   params: Promise<{ game: string }>;
@@ -166,6 +168,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               : 'Current season standings for all teams'
           }
         />
+        <MigrationNotice />
 
         {/* Filters: division tabs + season picker */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">

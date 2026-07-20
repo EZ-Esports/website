@@ -9,6 +9,8 @@ import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import MigrationNotice from '@/app/components/ui/MigrationNotice';
+
 
 interface TeamsPageProps {
   params: Promise<{ game: string }>;
@@ -165,6 +167,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
           title={`${gameConfig.displayName} Teams & Rosters`}
           lead="View school teams, division squads, and registered player rosters"
         />
+        <MigrationNotice />
 
         <div className="space-y-12">
           {teamGroups.length === 0 ? (

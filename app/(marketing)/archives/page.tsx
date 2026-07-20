@@ -5,6 +5,8 @@ import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 import Button from '@/app/components/ui/Button';
 import { getArchiveIndex } from '@/app/lib/db/queries';
+import MigrationNotice from '@/app/components/ui/MigrationNotice';
+
 
 export const metadata: Metadata = {
   title: 'Archives | EZ Esports',
@@ -36,6 +38,7 @@ export default async function ArchivesPage() {
           title="Archives"
           lead="Explore past matches, standings, and seasonal records"
         />
+        <MigrationNotice />
 
         {seasons.length === 0 ? (
           <Card className="max-w-2xl mx-auto text-center py-12">
