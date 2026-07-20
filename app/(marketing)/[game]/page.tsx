@@ -1,12 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { GAMES, GAME_SLUGS, getGameSubRoute } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Hero from '@/app/components/sections/Hero';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Card from '@/app/components/ui/Card';
-import StatTile from '@/app/components/ui/StatTile';
 import Badge, { resultVariant } from '@/app/components/ui/Badge';
 import Button from '@/app/components/ui/Button';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
@@ -47,82 +45,23 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
   const { record, jvRecord, nextMatch, recentResults, topTeams } = await getGameHubData(slug);
 
+  const seasonRecordParts: string[] = [];
+  if (record !== null) seasonRecordParts.push(`Varsity ${record}`);
+  if (jvRecord !== null) seasonRecordParts.push(`JV ${jvRecord}`);
+  const seasonRecordCaption =
+    seasonRecordParts.length > 0 ? `${seasonRecordParts.join(' · ')} this season.` : undefined;
+
   return (
     <main>
       <Hero title={gameConfig.displayName} backgroundImage={gameConfig.imageUrl} size="medium" />
 
-      {/* Season records */}
-      <Section>
-        <MigrationNotice />
-        <SectionHeader title="Current Season" />
-        {record === null && jvRecord === null ? (
-          <p className="text-center py-8 text-foreground-secondary text-sm">
-            Season stats will appear once the season is underway.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            {record !== null && <StatTile value={record} label="League Varsity Record" />}
-            {jvRecord !== null && <StatTile value={jvRecord} label="League Junior Varsity Record" />}
-          </div>
-        )}
-      </Section>
-
-      {/* Next match */}
-      <Section tone="raised">
-        <SectionHeader title="Next Match" />
-        {nextMatch === null ? (
-          <p className="text-center py-8 text-foreground-secondary text-sm">
-            No upcoming matches scheduled.{' '}
-            <Link href={getGameSubRoute(slug, 'schedule')} className="text-accent hover:underline">
-              View full schedule
-            </Link>
-          </p>
-        ) : (
-          <Card variant="tinted" interactive className="max-w-2xl mx-auto text-center">
-            <Badge className="mb-4">Upcoming Match</Badge>
-            <div className="text-xs text-foreground-secondary font-bold uppercase tracking-wider mb-2">
-              {nextMatch.date}
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">
-              {nextMatch.teams}
-            </div>
-            <div className="text-foreground-secondary text-sm font-medium">
-              {nextMatch.division === 'JV' ? 'Junior Varsity' : nextMatch.division} Division
-            </div>
-          </Card>
-        )}
-      </Section>
-
-      {/* Recent results */}
-      <Section width="narrow">
-        <SectionHeader title="Recent Results" />
-        {recentResults.length === 0 ? (
-          <p className="text-center py-8 text-foreground-secondary text-sm">
-            No completed matches yet. Check back after season play begins.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {recentResults.map((match, index) => (
-              <Card key={index} accent padding="sm" className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-foreground-secondary font-medium mb-1">
-                    {match.date} • {match.division === 'JV' ? 'Junior Varsity' : match.division} Division
-                  </div>
-                  <div className="text-foreground text-lg font-bold tracking-tight">{match.teams}</div>
-                </div>
-                <Badge variant={resultVariant(match.result.startsWith('W'))}>{match.result}</Badge>
-              </Card>
-            ))}
-          </div>
-        )}
-      </Section>
-
       {/* Standings preview */}
-      <Section tone="raised" width="narrow">
-        <SectionHeader title="Top Teams" />
+      <Section width="narrow">
+        <MigrationNotice />
+        <SectionHeader title="Standings" lead={seasonRecordCaption} />
         {topTeams.length === 0 ? (
           <p className="text-center py-8 text-foreground-secondary text-sm">
-            No standings yet. Check back once season play begins.
+            Standings will populate once the season begins.
           </p>
         ) : (
           <div className="bg-surface-raised/60 border border-line rounded-2xl overflow-hidden shadow-2xl shadow-black/20 mb-10">
@@ -154,10 +93,63 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
           </div>
         )}
 
-        {/* Jump-offs into the rest of the game's pages */}
+        <div className="flex flex-wrap justify-center gap-4 mt-6">
+          <Button href={getGameSubRoute(slug, 'standings')} variant="primary">View Full Standings</Button>
+        </div>
+      </Section>
+
+      {/* Next match */}
+      <Section tone="raised">
+        <SectionHeader title="Schedule" />
+        {nextMatch === null ? (
+          <p className="text-center py-8 text-foreground-secondary text-sm">
+            No upcoming matches scheduled.
+          </p>
+        ) : (
+          <Card variant="tinted" interactive className="max-w-2xl mx-auto text-center">
+            <Badge className="mb-4">Upcoming Match</Badge>
+            <div className="text-xs text-foreground-secondary font-bold uppercase tracking-wider mb-2">
+              {nextMatch.date}
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">
+              {nextMatch.teams}
+            </div>
+            <div className="text-foreground-secondary text-sm font-medium">
+              {nextMatch.division === 'JV' ? 'Junior Varsity' : nextMatch.division} Division
+            </div>
+          </Card>
+        )}
+
         <div className="flex flex-wrap justify-center gap-4 mt-6">
           <Button href={getGameSubRoute(slug, 'schedule')} variant="primary">View Full Schedule</Button>
-          <Button href={getGameSubRoute(slug, 'standings')} variant="secondary">View Full Standings</Button>
+        </div>
+      </Section>
+
+      {/* Recent results */}
+      <Section width="narrow">
+        <SectionHeader title="Recent Results" />
+        {recentResults.length === 0 ? (
+          <p className="text-center py-8 text-foreground-secondary text-sm">
+            No completed matches yet. Check back after season play begins.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {recentResults.map((match, index) => (
+              <Card key={index} accent padding="sm" className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-foreground-secondary font-medium mb-1">
+                    {match.date} • {match.division === 'JV' ? 'Junior Varsity' : match.division} Division
+                  </div>
+                  <div className="text-foreground text-lg font-bold tracking-tight">{match.teams}</div>
+                </div>
+                <Badge variant={resultVariant(match.result.startsWith('W'))}>{match.result}</Badge>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Jump-offs into the rest of the game's pages */}
+        <div className="flex flex-wrap justify-center gap-4 mt-10 pt-6 border-t border-line">
           <Button href={getGameSubRoute(slug, 'teams')} variant="outline">Teams &amp; Rosters</Button>
           <Button href="/archives" variant="outline">Season Archives</Button>
         </div>
