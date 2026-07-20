@@ -117,13 +117,28 @@ export default async function SponsorsPage() {
                       <span className="sr-only">Feature</span>
                     </th>
                     <th className="border-l border-accent/20 bg-accent/10 px-4 py-6 text-center" scope="col">
-                      <span className="block text-lg font-black text-accent">◆ Platinum</span>
+                      <span className="inline-flex items-center justify-center gap-1.5 text-lg font-black text-accent">
+                        <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 2L2 12l10 10 10-10L12 2z" />
+                        </svg>
+                        Platinum
+                      </span>
                     </th>
                     <th className="px-4 py-6 text-center" scope="col">
-                      <span className="block text-lg font-black text-warning">● Gold</span>
+                      <span className="inline-flex items-center justify-center gap-1.5 text-lg font-black text-warning">
+                        <svg className="h-3.5 w-3.5 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle cx="12" cy="12" r="10" />
+                        </svg>
+                        Gold
+                      </span>
                     </th>
                     <th className="px-4 py-6 text-center" scope="col">
-                      <span className="block text-lg font-black text-foreground-muted">▲ Community</span>
+                      <span className="inline-flex items-center justify-center gap-1.5 text-lg font-black text-foreground-muted">
+                        <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 3L2 21h20L12 3z" />
+                        </svg>
+                        Community
+                      </span>
                     </th>
                   </tr>
                 </thead>

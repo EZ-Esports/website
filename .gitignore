@@ -50,3 +50,6 @@ next-env.d.ts
 
 # claude code agent worktrees / local scratch
 .claude/
+
+# local assets directory
+/ez_esports_assets/
