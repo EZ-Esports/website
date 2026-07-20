@@ -9,8 +9,7 @@ import LeaguePulse from '@/app/components/sections/LeaguePulse';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import Button from '@/app/components/ui/Button';
 import Section from '@/app/components/ui/Section';
-import Card from '@/app/components/ui/Card';
-import { Eyebrow, SectionHeader } from '@/app/components/ui/SectionHeader';
+import { Eyebrow } from '@/app/components/ui/SectionHeader';
 import GradientRule from '@/app/components/ui/GradientRule';
 import Image from 'next/image';
 import {
@@ -129,45 +128,32 @@ export default async function HomePage() {
 
       {/* 9. Our Story */}
       <ScrollReveal>
-        <Section tone="raised" className="overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-          <div className="max-w-5xl mx-auto relative z-10">
-            <Card variant="raised" padding="lg" className="border border-line/50 bg-gradient-to-br from-surface-raised/80 via-surface/40 to-surface-raised/80 backdrop-blur-md relative overflow-hidden flex flex-col md:flex-row items-center gap-10 md:gap-16">
-              {/* Subtle light leak on the card corner */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-              
-              <div className="flex-1 space-y-6 text-left relative z-10">
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-accent/80 block">Our Roots</span>
-                  <h2 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">Our Story</h2>
-                </div>
-                
-                <p className="text-foreground-secondary text-base sm:text-lg font-medium leading-relaxed">
-                  {storyParagraphs[0]}
-                </p>
-                
-                <div className="pt-2">
-                  <Button href={ROUTES.about} variant="primary" className="group">
-                    Learn More 
-                    <span className="inline-block transition-transform duration-200 group-hover:translate-x-1 ml-1" aria-hidden="true">→</span>
-                  </Button>
-                </div>
-              </div>
+        <Section tone="sunken" className="overflow-hidden border-t border-b border-line">
+          {/* Single soft glow behind the watermark — intentionally not stacked with other blurs */}
+          <div className="absolute top-1/2 -right-[10%] -translate-y-1/2 w-[640px] h-[640px] rounded-full bg-accent/10 blur-[100px] pointer-events-none" />
 
-              <div className="w-full md:w-[320px] shrink-0 flex justify-center relative select-none">
-                {/* Glowing ring behind the submark */}
-                <div className="absolute inset-0 bg-accent/15 rounded-full blur-2xl scale-75 pointer-events-none" />
-                <div className="relative w-48 h-48 sm:w-56 sm:h-56 transition-transform duration-500 hover:scale-105">
-                  <Image
-                    src="/images/submark.png"
-                    alt="EZ Esports Submark"
-                    fill
-                    sizes="224px"
-                    className="object-contain opacity-90 drop-shadow-[0_0_20px_rgba(244,204,204,0.15)]"
-                  />
-                </div>
-              </div>
-            </Card>
+          {/* Oversized submark watermark bleeding off the section's edge */}
+          <div className="absolute top-1/2 -right-[6%] -translate-y-1/2 w-[340px] sm:w-[420px] md:w-[560px] aspect-square opacity-10 pointer-events-none select-none">
+            <Image
+              src="/images/submark.png"
+              alt=""
+              aria-hidden="true"
+              fill
+              sizes="560px"
+              className="object-contain"
+            />
+          </div>
+
+          <div className="max-w-xl relative z-10">
+            <Eyebrow className="mb-3 block">About Us</Eyebrow>
+            <h2 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight mb-6">Our Story</h2>
+            <p className="text-foreground-secondary text-lg leading-relaxed mb-8 max-w-prose">
+              {storyParagraphs[0]}
+            </p>
+            <Button href={ROUTES.about} variant="primary" className="group">
+              Learn More
+              <span className="inline-block transition-transform duration-200 group-hover:translate-x-1 ml-1" aria-hidden="true">→</span>
+            </Button>
           </div>
         </Section>
       </ScrollReveal>
