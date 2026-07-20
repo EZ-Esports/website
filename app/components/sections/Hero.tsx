@@ -27,7 +27,7 @@ export default function Hero({
   backgroundImage,
   size = 'medium',
   primaryCTA,
-  parallax = true,
+  parallax = false,
 }: HeroProps) {
   const isLarge = size === 'large';
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -97,8 +97,7 @@ export default function Hero({
           alt=""
           fill
           priority
-          quality={75}
-          sizes="100vw"
+          unoptimized
           className="object-cover object-center"
         />
         {/* Darkens the top of the image so the transparent header's white nav text
@@ -155,7 +154,7 @@ export default function Hero({
                   initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: DUR.base, delay: 0.1, ease: EASE_REVEAL }}
-                  className="text-foreground-secondary font-medium max-w-xl mx-auto leading-relaxed mt-6 text-sm sm:text-base md:text-lg drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.4)]"
+                  className="text-foreground-secondary font-medium max-w-3xl mx-auto leading-relaxed mt-6 text-sm sm:text-base md:text-lg drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.4)]"
                 >
                   {subtitle}
                 </motion.p>
@@ -203,7 +202,7 @@ export default function Hero({
                 initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: DUR.base, delay: 0.1, ease: EASE_REVEAL }}
-                className="text-foreground/90 font-medium max-w-xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm"
+                className="text-foreground/90 font-medium max-w-3xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm"
               >
                 {subtitle}
               </motion.p>
