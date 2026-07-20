@@ -12,7 +12,7 @@ import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getAllGalleryImages() {
-  return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.setId, schema.galleryImages.displayOrder);
+  return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.displayOrder);
 }
 
 export default async function GalleryAdminPage() {
@@ -72,7 +72,7 @@ export default async function GalleryAdminPage() {
               className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
-          <input type="hidden" name="setId" value="1" />
+
           <div>
             <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
             <input

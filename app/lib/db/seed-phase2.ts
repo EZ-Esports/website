@@ -6,25 +6,19 @@ async function seedPhase2() {
   const { db } = await import('./index');
   const schema = await import('./schema');
   const { inArray } = await import('drizzle-orm');
-  // Gallery images — descriptive captions for the 11 existing images
-  const gallerySet1 = [
-    { src: '/images/gallery/gallery-1.png', caption: 'Stuyvesant vs Bronx Science match — Spring 2022', schoolName: 'Stuyvesant High School', eventName: 'Spring 2022 Championship', setId: 1, displayOrder: 1 },
-    { src: '/images/gallery/gallery-2.png', caption: 'League of Legends finals — players in action', schoolName: '', eventName: 'Spring 2022 Finals', setId: 1, displayOrder: 2 },
-    { src: '/images/gallery/gallery-3.png', caption: 'Post-match celebration — team huddle', schoolName: '', eventName: 'Spring 2022', setId: 1, displayOrder: 3 },
-    { src: '/images/gallery/gallery-4.png', caption: 'Midline Event at LIU — August 2022', schoolName: '', eventName: 'Midline Event LIU', setId: 1, displayOrder: 4 },
-    { src: '/images/gallery/gallery-5.png', caption: 'On-site broadcast setup at tournament venue', schoolName: '', eventName: 'Midline Event LIU', setId: 1, displayOrder: 5 },
-    { src: '/images/gallery/gallery-6.png', caption: 'Students competing in Valorant qualifier', schoolName: '', eventName: 'Fall 2022 Qualifier', setId: 1, displayOrder: 6 },
-    { src: '/images/gallery/gallery-7.png', caption: 'Award ceremony — Spring 2022 season close', schoolName: '', eventName: 'Spring 2022 Awards', setId: 1, displayOrder: 7 },
-    { src: '/images/gallery/gallery-8.png', caption: 'Coach briefing players before match day', schoolName: '', eventName: 'Fall 2022', setId: 1, displayOrder: 8 },
-    { src: '/images/gallery/gallery-9.png', caption: 'Crowd watching live broadcast at venue', schoolName: '', eventName: 'Midline Event LIU', setId: 1, displayOrder: 9 },
+  const galleryRows = [
+    { src: '/images/gallery/gallery-1.png', caption: 'Stuyvesant vs Bronx Science match — Spring 2022', schoolName: 'Stuyvesant High School', eventName: 'Spring 2022 Championship', displayOrder: 1 },
+    { src: '/images/gallery/gallery-2.png', caption: 'League of Legends finals — players in action', schoolName: '', eventName: 'Spring 2022 Finals', displayOrder: 2 },
+    { src: '/images/gallery/gallery-3.png', caption: 'Post-match celebration — team huddle', schoolName: '', eventName: 'Spring 2022', displayOrder: 3 },
+    { src: '/images/gallery/gallery-4.png', caption: 'Midline Event at LIU — August 2022', schoolName: '', eventName: 'Midline Event LIU', displayOrder: 4 },
+    { src: '/images/gallery/gallery-5.png', caption: 'On-site broadcast setup at tournament venue', schoolName: '', eventName: 'Midline Event LIU', displayOrder: 5 },
+    { src: '/images/gallery/gallery-6.png', caption: 'Students competing in Valorant qualifier', schoolName: '', eventName: 'Fall 2022 Qualifier', displayOrder: 6 },
+    { src: '/images/gallery/gallery-7.png', caption: 'Award ceremony — Spring 2022 season close', schoolName: '', eventName: 'Spring 2022 Awards', displayOrder: 7 },
+    { src: '/images/gallery/gallery-8.png', caption: 'Coach briefing players before match day', schoolName: '', eventName: 'Fall 2022', displayOrder: 8 },
+    { src: '/images/gallery/gallery-9.png', caption: 'Crowd watching live broadcast at venue', schoolName: '', eventName: 'Midline Event LIU', displayOrder: 9 },
+    { src: '/images/gallery/gallery-10.png', caption: 'EZ Esports community meetup — student networking', schoolName: '', eventName: 'Community Meetup', displayOrder: 10 },
+    { src: '/images/gallery/gallery-11.png', caption: 'Opening ceremony — Fall 2022 season kickoff', schoolName: '', eventName: 'Fall 2022 Kickoff', displayOrder: 11 }
   ];
-
-  const gallerySet2 = [
-    { src: '/images/gallery/gallery-10.png', caption: 'EZ Esports community meetup — student networking', schoolName: '', eventName: 'Community Meetup', setId: 2, displayOrder: 1 },
-    { src: '/images/gallery/gallery-11.png', caption: 'Opening ceremony — Fall 2022 season kickoff', schoolName: '', eventName: 'Fall 2022 Kickoff', setId: 2, displayOrder: 2 },
-  ];
-
-  const galleryRows = [...gallerySet1, ...gallerySet2];
   const existingGallery = await db
     .select({ src: schema.galleryImages.src })
     .from(schema.galleryImages)

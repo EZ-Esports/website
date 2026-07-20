@@ -155,6 +155,13 @@
       "when": 1784563855941,
       "tag": "0021_consolidate_gallery_sets",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784564018537,
+      "tag": "0022_remove_gallery_set_id",
+      "breakpoints": true
     }
   ]
 }

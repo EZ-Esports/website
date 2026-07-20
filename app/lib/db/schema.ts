@@ -257,14 +257,12 @@ export const galleryImages = pgTable('gallery_images', {
   schoolName: text('school_name').default(''),
   eventName: text('event_name').default(''),
   displayOrder: integer('display_order').default(0).notNull(),
-  setId: integer('set_id').default(1).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   storageKey: text('storage_key'),
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
-  index('gallery_images_set_id_idx').on(table.setId),
   index('gallery_images_display_order_idx').on(table.displayOrder),
 ]).enableRLS();
 
