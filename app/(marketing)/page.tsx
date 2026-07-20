@@ -9,7 +9,7 @@ import LeaguePulse from '@/app/components/sections/LeaguePulse';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import Button from '@/app/components/ui/Button';
 import Section from '@/app/components/ui/Section';
-import { Eyebrow, SectionHeader } from '@/app/components/ui/SectionHeader';
+import { Eyebrow } from '@/app/components/ui/SectionHeader';
 import GradientRule from '@/app/components/ui/GradientRule';
 import Image from 'next/image';
 import {
@@ -128,27 +128,32 @@ export default async function HomePage() {
 
       {/* 9. Our Story */}
       <ScrollReveal>
-        <Section>
-          <SectionHeader eyebrow="About Us" title="Our Story" align="center" />
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
-            <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
-              <p className="text-foreground-secondary">{storyParagraphs[0]}</p>
-              <div className="pt-4">
-                <Button href={ROUTES.about} variant="primary">
-                  Learn More
-                </Button>
-              </div>
-            </div>
-            <div className="flex-1 relative w-full aspect-square max-w-md">
-              <div className="absolute inset-0 bg-accent/20 rounded-full blur-3xl" />
-              <Image
-                src="/images/submark.png"
-                alt="EZ Esports Submark"
-                fill
-                sizes="(max-width: 768px) 80vw, 448px"
-                className="object-contain relative z-10 opacity-80"
-              />
-            </div>
+        <Section tone="sunken" className="overflow-hidden border-t border-b border-line">
+          {/* Single soft glow behind the watermark — intentionally not stacked with other blurs */}
+          <div className="absolute top-1/2 -right-[10%] -translate-y-1/2 w-[640px] h-[640px] rounded-full bg-accent/10 blur-[100px] pointer-events-none" />
+
+          {/* Oversized submark watermark bleeding off the section's edge */}
+          <div className="absolute top-1/2 -right-[6%] -translate-y-1/2 w-[340px] sm:w-[420px] md:w-[560px] aspect-square opacity-10 pointer-events-none select-none">
+            <Image
+              src="/images/submark.png"
+              alt=""
+              aria-hidden="true"
+              fill
+              sizes="560px"
+              className="object-contain"
+            />
+          </div>
+
+          <div className="max-w-xl relative z-10">
+            <Eyebrow className="mb-3 block">About Us</Eyebrow>
+            <h2 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight mb-6">Our Story</h2>
+            <p className="text-foreground-secondary text-lg leading-relaxed mb-8 max-w-prose">
+              {storyParagraphs[0]}
+            </p>
+            <Button href={ROUTES.about} variant="primary" className="group">
+              Learn More
+              <span className="inline-block transition-transform duration-200 group-hover:translate-x-1 ml-1" aria-hidden="true">→</span>
+            </Button>
           </div>
         </Section>
       </ScrollReveal>
