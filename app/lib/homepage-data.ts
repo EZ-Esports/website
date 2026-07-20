@@ -4,7 +4,7 @@ import type { Image, VideoItem } from '@/app/types';
 // Homepage Data
 // ============================================================================
 
-// Gallery images - first set (9 images)
+// Gallery images - first set (11 images)
 export const galleryImages1: Image[] = [
   { id: 'gallery-1', src: '/images/gallery/gallery-1.png', alt: 'EZ Esports players competing at a NYC high school event' },
   { id: 'gallery-2', src: '/images/gallery/gallery-2.png', alt: 'Students gathered at an EZ Esports league match' },
@@ -15,13 +15,12 @@ export const galleryImages1: Image[] = [
   { id: 'gallery-7', src: '/images/gallery/gallery-7.png', alt: 'EZ Esports community meetup at a NYC venue' },
   { id: 'gallery-8', src: '/images/gallery/gallery-8.png', alt: 'Students competing in Valorant at EZ Esports' },
   { id: 'gallery-9', src: '/images/gallery/gallery-9.png', alt: 'EZ Esports broadcast team running a live stream' },
-];
-
-// Gallery images - second set (2 images)
-export const galleryImages2: Image[] = [
   { id: 'gallery-10', src: '/images/gallery/gallery-10.png', alt: 'EZ Esports end-of-season celebration' },
   { id: 'gallery-11', src: '/images/gallery/gallery-11.png', alt: 'NYC high school teams lined up before an EZ Esports finals match' },
 ];
+
+// Gallery images - second set (0 images)
+export const galleryImages2: Image[] = [];
 
 // Featured videos
 export const featuredVideos: VideoItem[] = [
