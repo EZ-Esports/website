@@ -472,7 +472,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                 {/* Modal Header Cover */}
               <div className="bg-gradient-to-r from-accent/15 to-transparent border-b border-line px-6 py-5 flex items-center justify-between">
                 <div>
-                  <Badge size="sm">{selectedMatch.division} Division</Badge>
+                  <Badge size="sm">{selectedMatch.division === 'JV' ? 'Junior Varsity' : selectedMatch.division} Division</Badge>
                   <h4 className="text-lg font-black text-foreground mt-1 uppercase tracking-tight">Match Details</h4>
                 </div>
                 <button

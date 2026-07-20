@@ -40,7 +40,15 @@ export default async function LeaguePulse() {
           >
             <Card accent interactive className="group">
               <div className="flex items-center justify-between mb-3">
-                <Badge size="sm">{match.gameShortName} · {match.division}</Badge>
+                <Badge size="sm">
+                  {match.gameShortName === 'VAL'
+                    ? 'Valorant'
+                    : match.gameShortName === 'LoL'
+                    ? 'League of Legends'
+                    : match.gameShortName === 'TFT'
+                    ? 'Teamfight Tactics'
+                    : match.gameShortName} · {match.division === 'JV' ? 'Junior Varsity' : match.division}
+                </Badge>
                 <span className="text-xs font-bold text-foreground-muted">
                   {new Date(match.scheduledAt).toLocaleDateString('en-US', {
                     timeZone: 'America/New_York',

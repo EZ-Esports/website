@@ -119,7 +119,7 @@ export default function OpengraphImage() {
           >
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b' }}>Games</span>
-              <span style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginTop: '4px' }}>VALORANT • LOL • TFT</span>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginTop: '4px' }}>VALORANT • LEAGUE OF LEGENDS • TEAMFIGHT TACTICS</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '32px' }}>
               <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b' }}>Community</span>

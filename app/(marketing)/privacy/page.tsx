@@ -52,7 +52,7 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong className="text-foreground">Player and roster information</strong> — in-game
-                usernames (IGNs), division placement (Varsity / JV), and performance records
+                usernames, division placement (Varsity / Junior Varsity), and performance records
                 entered by authorized school staff for league management purposes.
               </li>
               <li>

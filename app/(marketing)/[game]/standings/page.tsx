@@ -47,8 +47,8 @@ function TeamStandingsTable({ rows }: { rows: StandingRow[] }) {
         <tr>
           <Th>Rank</Th>
           <Th>Team</Th>
-          <Th>W-L</Th>
-          <Th>Win %</Th>
+          <Th>Record</Th>
+          <Th>Win Percentage</Th>
           <Th>Games</Th>
         </tr>
       </thead>
@@ -174,7 +174,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <FilterTabs
             tabs={divisions.map((d) => ({
-              label: d === 'All' ? 'Players' : d,
+              label: d === 'All' ? 'Players' : d === 'JV' ? 'Junior Varsity' : d,
               value: d,
               href: `/${game}/standings?division=${d}${selectedSeason ? `&season=${encodeURIComponent(selectedSeason.name)}` : ''}`,
             }))}
