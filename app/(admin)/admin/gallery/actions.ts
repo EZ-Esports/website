@@ -17,7 +17,6 @@ export async function addGalleryImage(formData: FormData) {
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
   const eventName = (formData.get('eventName') as string) ?? '';
-  const setId = parseInt(formData.get('setId') as string) || 1;
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
   const storageKey = (formData.get('storageKey') as string) || null;
 
@@ -25,7 +24,7 @@ export async function addGalleryImage(formData: FormData) {
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
 
   try {
-    await db.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, setId, displayOrder, storageKey });
+    await db.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, displayOrder, storageKey });
   } catch (error) {
     console.error('Failed to add gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -42,7 +41,6 @@ export async function updateGalleryImage(id: string, formData: FormData) {
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
   const eventName = (formData.get('eventName') as string) ?? '';
-  const setId = parseInt(formData.get('setId') as string) || 1;
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
   const storageKey = (formData.get('storageKey') as string) || null;
 
@@ -65,7 +63,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
 
     await db
       .update(schema.galleryImages)
-      .set({ src, caption, schoolName, eventName, setId, displayOrder, storageKey })
+      .set({ src, caption, schoolName, eventName, displayOrder, storageKey })
       .where(eq(schema.galleryImages.id, id));
   } catch (error) {
     console.error('Failed to update gallery image', error);

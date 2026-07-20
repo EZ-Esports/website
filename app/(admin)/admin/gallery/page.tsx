@@ -12,7 +12,7 @@ import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getAllGalleryImages() {
-  return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.setId, schema.galleryImages.displayOrder);
+  return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.displayOrder);
 }
 
 export default async function GalleryAdminPage() {
@@ -30,8 +30,7 @@ export default async function GalleryAdminPage() {
     // db not reachable
   }
 
-  const set1 = images.filter((img) => img.setId === 1);
-  const set2 = images.filter((img) => img.setId === 2);
+  const set1 = images;
 
   return (
     <div className="space-y-8">
@@ -73,17 +72,7 @@ export default async function GalleryAdminPage() {
               className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Gallery Set</label>
-            <select
-              name="setId"
-              defaultValue="1"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
-            >
-              <option value="1">Set 1 (Primary)</option>
-              <option value="2">Set 2 (Secondary)</option>
-            </select>
-          </div>
+
           <div>
             <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
             <input
@@ -105,28 +94,14 @@ export default async function GalleryAdminPage() {
 
       {!dbConfigured && <DbErrorNotice />}
 
-      {/* Gallery Set 1 */}
+      {/* Gallery Images */}
       <div className="space-y-4">
-        <h2 className="text-xl font-black text-white uppercase tracking-wider">Gallery Set 1</h2>
+        <h2 className="text-xl font-black text-white uppercase tracking-wider">Gallery Images</h2>
         {set1.length === 0 ? (
-          <p className="text-foreground-muted text-sm">No images in Set 1 yet.</p>
+          <p className="text-foreground-muted text-sm">No images in the gallery yet.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
             {set1.map((img) => (
-              <GalleryImageCard key={img.id} img={img} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Gallery Set 2 */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-black text-white uppercase tracking-wider">Gallery Set 2</h2>
-        {set2.length === 0 ? (
-          <p className="text-foreground-muted text-sm">No images in Set 2 yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
-            {set2.map((img) => (
               <GalleryImageCard key={img.id} img={img} />
             ))}
           </div>

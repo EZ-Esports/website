@@ -413,7 +413,6 @@ export const getCachedHomepageGallery = unstable_cache(
         id: schema.galleryImages.id,
         src: schema.galleryImages.src,
         caption: schema.galleryImages.caption,
-        setId: schema.galleryImages.setId,
       })
       .from(schema.galleryImages)
       .where(
@@ -423,7 +422,6 @@ export const getCachedHomepageGallery = unstable_cache(
         )
       )
       .orderBy(
-        asc(schema.galleryImages.setId),
         asc(schema.galleryImages.displayOrder),
         asc(schema.galleryImages.createdAt)
       );
@@ -438,27 +436,19 @@ export const getCachedHomepageGallery = unstable_cache(
     const seenSrc = new Set<string>();
     const dedupedRows = rows.filter((row) => {
       const basename = row.src.split('/').pop() ?? row.src;
-      const srcKey = `${row.setId}:${basename}`;
+      const srcKey = basename;
       if (seenSrc.has(srcKey)) return false;
       seenSrc.add(srcKey);
       return true;
     });
 
     return {
-      set1: dedupedRows
-        .filter((row) => row.setId === 1)
-        .map((row) => ({
-          id: row.id,
-          src: row.src,
-          alt: row.caption || 'EZ Esports gallery photo',
-        })),
-      set2: dedupedRows
-        .filter((row) => row.setId === 2)
-        .map((row) => ({
-          id: row.id,
-          src: row.src,
-          alt: row.caption || 'EZ Esports gallery photo',
-        })),
+      set1: dedupedRows.map((row) => ({
+        id: row.id,
+        src: row.src,
+        alt: row.caption || 'EZ Esports gallery photo',
+      })),
+      set2: [],
     };
   },
   ['homepage-gallery'],

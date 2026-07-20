@@ -14,7 +14,6 @@ interface GalleryImage {
   schoolName: string | null;
   eventName: string | null;
   displayOrder: number | null;
-  setId: number | null;
   isActive: boolean | null;
 }
 
@@ -153,23 +152,14 @@ export default function GalleryImageCard({ img }: GalleryImageCardProps) {
               <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Event</label>
               <input name="eventName" type="text" defaultValue={img.eventName ?? ''} className={inputClass} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Set</label>
-                <select name="setId" defaultValue={img.setId ?? 1} className={inputClass}>
-                  <option value="1">Set 1</option>
-                  <option value="2">Set 2</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Order</label>
-                <input
-                  name="displayOrder"
-                  type="number"
-                  defaultValue={img.displayOrder ?? 0}
-                  className={inputClass}
-                />
-              </div>
+            <div>
+              <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Order</label>
+              <input
+                name="displayOrder"
+                type="number"
+                defaultValue={img.displayOrder ?? 0}
+                className={inputClass}
+              />
             </div>
             <button type="submit" disabled={pending} className="w-full px-3 py-1.5 bg-accent hover:bg-accent/80 font-bold text-xs uppercase tracking-wider rounded-lg text-on-accent transition-all cursor-pointer disabled:opacity-50">
               {pending ? 'Saving…' : 'Save Changes'}

@@ -124,17 +124,7 @@ export default async function HomePage() {
         />
       </ScrollReveal>
 
-      {/* 8. Photo Gallery #2 */}
-      {secondaryGallery.length > 0 && (
-        <ScrollReveal>
-          <MediaGrid
-            items={secondaryGallery}
-            columns={2}
-            eyebrow="Gallery"
-            heading="Event Highlights"
-          />
-        </ScrollReveal>
-      )}
+
 
       {/* 9. Our Story */}
       <ScrollReveal>
