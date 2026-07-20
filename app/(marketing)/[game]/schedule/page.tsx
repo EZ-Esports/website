@@ -116,7 +116,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <FilterTabs
             tabs={['Varsity', 'JV'].map((d) => ({
-              label: d,
+              label: d === 'JV' ? 'Junior Varsity' : d,
               value: d,
               href: filterHref(d, sort),
             }))}

@@ -326,7 +326,7 @@ ${form.additionalShare || 'N/A'}
           </p>
           <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
             {[
-              'Organized leagues in Valorant, League of Legends, TFT, and Tetris with real standings',
+              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, and Tetris with real standings',
               'Live-streamed matches broadcast to audiences across NYC',
               'Community and pathways into gaming and technology careers',
             ].map((benefit) => (
@@ -842,10 +842,10 @@ ${form.additionalShare || 'N/A'}
                     <span className={labelClass}>Interested Divisions {requiredMark}</span>
                     <div className="space-y-2.5">
                       {[
-                        { id: 'tft', label: 'TFT (Teamfight Tactics)' },
+                        { id: 'tft', label: 'Teamfight Tactics' },
                         { id: 'tetris', label: 'Tetris' },
-                        { id: 'lol', label: 'LoL (League of Legends)' },
-                        { id: 'valorant', label: 'VALORANT' }
+                        { id: 'lol', label: 'League of Legends' },
+                        { id: 'valorant', label: 'Valorant' }
                       ].map((div) => (
                         <label key={div.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                           <input

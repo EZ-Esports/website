@@ -47,7 +47,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
   'team-fight-tactics': {
     slug: 'team-fight-tactics',
     displayName: 'Teamfight Tactics',
-    shortName: 'TFT',
+    shortName: 'Teamfight Tactics',
     imageUrl: '/images/games/tft-banner.png',
   },
 } as const;

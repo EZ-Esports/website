@@ -189,7 +189,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
                     <div key={roster.id} className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary">
-                          {roster.name} Division
+                          {roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division
                         </h3>
                         <Badge size="sm">Record: {roster.record}</Badge>
                       </div>

@@ -28,7 +28,7 @@ export default function NotFound() {
       <nav aria-label="Helpful links" className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-foreground-secondary">
         <Link href="/valorant" className="hover:text-accent transition-colors">Valorant</Link>
         <Link href="/league-of-legends" className="hover:text-accent transition-colors">League of Legends</Link>
-        <Link href="/team-fight-tactics" className="hover:text-accent transition-colors">TFT</Link>
+        <Link href="/team-fight-tactics" className="hover:text-accent transition-colors">Teamfight Tactics</Link>
         <Link href="/apply" className="hover:text-accent transition-colors">Apply</Link>
         <Link href="/about" className="hover:text-accent transition-colors">About</Link>
       </nav>

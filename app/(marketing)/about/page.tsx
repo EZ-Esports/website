@@ -54,7 +54,7 @@ export default async function AboutPage() {
       <Section tone="raised">
         <SectionHeader
           title="What We Do"
-          lead="High schools from across New York City competing in live-streamed leagues with varsity and JV divisions"
+          lead="High schools from across New York City competing in live-streamed leagues with varsity and junior varsity divisions"
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <StatTile value={schoolCount > 0 ? schoolCount : '—'} label="Participating Schools" />

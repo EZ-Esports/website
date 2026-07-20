@@ -18,9 +18,9 @@ const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
   valorant:
     'Follow the EZ Esports Valorant league — standings, schedules, match results, and school rosters for NYC high-school Valorant competition.',
   'league-of-legends':
-    'Follow the EZ Esports League of Legends division — standings, schedules, match results, and school rosters for NYC high-school LoL competition.',
+    'Follow the EZ Esports League of Legends division — standings, schedules, match results, and school rosters for NYC high-school League of Legends competition.',
   'team-fight-tactics':
-    'Follow the EZ Esports TFT league — standings, schedules, match results, and school rosters for NYC high-school Teamfight Tactics competition.',
+    'Follow the EZ Esports Teamfight Tactics league — standings, schedules, match results, and school rosters for NYC high-school Teamfight Tactics competition.',
 };
 
 const RANK_MEDALS: Record<number, string> = { 1: '🏆', 2: '🥈', 3: '🥉' };
@@ -62,7 +62,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
             {record !== null && <StatTile value={record} label="League Varsity Record" />}
-            {jvRecord !== null && <StatTile value={jvRecord} label="League JV Record" />}
+            {jvRecord !== null && <StatTile value={jvRecord} label="League Junior Varsity Record" />}
           </div>
         )}
       </Section>
@@ -87,7 +87,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               {nextMatch.teams}
             </div>
             <div className="text-foreground-secondary text-sm font-medium">
-              {nextMatch.division} Division
+              {nextMatch.division === 'JV' ? 'Junior Varsity' : nextMatch.division} Division
             </div>
           </Card>
         )}
@@ -106,7 +106,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               <Card key={index} accent padding="sm" className="flex items-center justify-between">
                 <div>
                   <div className="text-xs text-foreground-secondary font-medium mb-1">
-                    {match.date} • {match.division} Division
+                    {match.date} • {match.division === 'JV' ? 'Junior Varsity' : match.division} Division
                   </div>
                   <div className="text-foreground text-lg font-bold tracking-tight">{match.teams}</div>
                 </div>
@@ -131,8 +131,8 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                 <tr>
                   <Th>Rank</Th>
                   <Th>Team</Th>
-                  <Th>W-L</Th>
-                  <Th>Win %</Th>
+                  <Th>Record</Th>
+                  <Th>Win Percentage</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
