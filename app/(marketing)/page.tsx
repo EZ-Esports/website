@@ -132,12 +132,10 @@ export default async function HomePage() {
           <SectionHeader eyebrow="About Us" title="Our Story" align="center" />
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
             <div className="flex-1 space-y-6 text-lg leading-relaxed text-left">
-              {storyParagraphs.map((paragraph, index) => (
-                <p key={index} className="text-foreground-secondary">{paragraph}</p>
-              ))}
+              <p className="text-foreground-secondary">{storyParagraphs[0]}</p>
               <div className="pt-4">
                 <Button href={ROUTES.about} variant="primary">
-                  Read Full Story
+                  Learn More
                 </Button>
               </div>
             </div>
