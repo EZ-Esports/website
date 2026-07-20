@@ -11,6 +11,8 @@ import { normalizeSort, resolveSelectedSeason, toMatchesPageDto } from '@/app/li
 import CalendarSchedule from './CalendarSchedule';
 import ArchiveMatchList from './ArchiveMatchList';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
+import MigrationNotice from '@/app/components/ui/MigrationNotice';
+
 
 interface SchedulePageProps {
   params: Promise<{ game: string }>;
@@ -108,6 +110,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
               : 'View all scheduled matches for the current season'
           }
         />
+        <MigrationNotice />
 
         {/* Filters: division tabs, season picker, sort (archive only) */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">

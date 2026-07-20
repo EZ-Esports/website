@@ -11,6 +11,8 @@ import Badge, { resultVariant } from '@/app/components/ui/Badge';
 import Button from '@/app/components/ui/Button';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getGameHubData } from '@/app/lib/db/queries';
+import MigrationNotice from '@/app/components/ui/MigrationNotice';
+
 
 const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
   valorant:
@@ -51,6 +53,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
       {/* Season records */}
       <Section>
+        <MigrationNotice />
         <SectionHeader title="Current Season" />
         {record === null && jvRecord === null ? (
           <p className="text-center py-8 text-foreground-secondary text-sm">
