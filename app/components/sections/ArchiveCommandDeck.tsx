@@ -33,7 +33,6 @@ interface ArchiveCommandDeckProps {
 /** CSS custom properties threaded through as inline style so Tailwind arbitrary-value utilities (bg-[var(--game)], etc.) can consume them. */
 type GameThemeStyle = CSSProperties & {
   '--game': string;
-  '--game-dim': string;
   '--game-on': string;
 };
 
@@ -78,7 +77,6 @@ export default function ArchiveCommandDeck({ games }: ArchiveCommandDeckProps) {
 
   const themeStyle: GameThemeStyle = {
     '--game': active.accent.color,
-    '--game-dim': active.accent.dim,
     '--game-on': active.accent.on,
   };
 
@@ -166,6 +164,7 @@ export default function ArchiveCommandDeck({ games }: ArchiveCommandDeckProps) {
                         season.isActive ? 'text-foreground-secondary' : 'text-foreground-muted'
                       )}
                     >
+                      {/* Assumes season.name is "YYYY-YY" (e.g. "2024-25"); a non-standard name will produce a blank/wrong axis label. */}
                       {season.name.slice(2, 4)}
                     </span>
                   </div>

@@ -59,8 +59,6 @@ export type GameSlug = 'valorant' | 'league-of-legends' | 'team-fight-tactics';
 export interface GameAccent {
   /** Primary accent color (buttons, active states, chart bars). */
   color: string;
-  /** Dimmed/tinted variant of `color`, for subtle backgrounds. */
-  dim: string;
   /** Text/icon color that sits on top of an accent-filled surface. */
   on: string;
 }
