@@ -6,9 +6,8 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { FocusScope } from 'react-aria';
 import { Dialog } from 'react-aria-components';
-import { SiTwitch } from 'react-icons/si';
 import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
-import Button from '@/app/components/ui/Button';
+import CutCTA from '@/app/components/ui/CutCTA';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
 
@@ -78,29 +77,14 @@ export default function Header() {
                 priority
               />
             </Link>
-             <Link
-              href="https://www.twitch.tv/ezesportsNYC"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Watch EZ Esports live on Twitch (opens in new tab)"
-              className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 bg-accent/10 border-accent/20 hover:bg-accent/20 shadow-sm active:scale-[0.98]"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse motion-reduce:animate-none" aria-hidden="true" />
-              <SiTwitch className="w-3 h-3 text-accent" aria-hidden="true" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-accent" aria-hidden="true">Watch Live</span>
-            </Link>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Navigation />
-            <Button 
-              href={ROUTES.apply} 
-              variant="primary" 
-              className="py-1.5 px-4 text-xs font-black uppercase tracking-widest shadow-md shadow-accent/5 hover:shadow-accent/20 transition-all duration-300 shrink-0"
-            >
+            <CutCTA href={ROUTES.apply} variant="primary" size="sm" className="shrink-0">
               Apply Now
-            </Button>
+            </CutCTA>
           </div>
 
           {/* Mobile Menu Button */}
@@ -133,14 +117,14 @@ export default function Header() {
               >
                 <Navigation onNavigate={handleCloseMenu} />
                 <div className="mt-4 pt-4 border-t border-line/30">
-                  <Button
+                  <CutCTA
                     href={ROUTES.apply}
                     variant="primary"
-                    className="w-full text-center py-2.5 font-bold uppercase tracking-wider"
-                    onClick={handleCloseMenu}
+                    className="w-full"
+                    onPress={handleCloseMenu}
                   >
                     Apply Now
-                  </Button>
+                  </CutCTA>
                 </div>
               </div>
             </Dialog>

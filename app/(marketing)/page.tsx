@@ -33,6 +33,7 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const games = getGamesForShowcase();
   const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || 'https://discord.com/invite/RajSZqNyvu';
+  const twitchLink = SOCIAL_LINKS.find(link => link.platform === 'twitch')?.url || 'https://www.twitch.tv/ezesportsNYC';
   let homepageContent: Record<string, string> = {};
   let primaryGallery = galleryImages1;
   let secondaryGallery = galleryImages2;
@@ -67,7 +68,8 @@ export default async function HomePage() {
         title={heroTitle}
         subtitle={heroSubtitle}
         backgroundImage={heroContent.backgroundImage}
-        primaryCTA={{ label: heroCtaLabel, href: discordLink }}
+        primaryCTA={{ label: 'Watch Live', href: twitchLink, external: true }}
+        secondaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
 
 
