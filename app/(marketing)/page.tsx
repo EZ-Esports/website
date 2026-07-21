@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Hero from '@/app/components/sections/Hero';
+import HomeHero from '@/app/components/sections/HomeHero';
 import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
@@ -63,11 +63,10 @@ export default async function HomePage() {
     <>
       <main>
       {/* 1. Hero Section */}
-      <Hero
+      <HomeHero
         title={heroTitle}
         subtitle={heroSubtitle}
         backgroundImage={heroContent.backgroundImage}
-        size="large"
         primaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
 
