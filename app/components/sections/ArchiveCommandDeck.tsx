@@ -83,21 +83,21 @@ function championInitials(name: string): string {
 
 /** Circular initials badge (Leadership-page idiom, shrunk for an inline table cell) plus the champion name, with a muted school line when the champion is a player rather than the school itself (TFT-style individual divisions). */
 function ChampionCell({ season }: { season: ArchiveSeason }) {
-  const hasChampion = Boolean(season.champion);
-  const isIndividual = hasChampion && Boolean(season.championSchool) && season.champion !== season.championSchool;
+  const champion = season.champion;
+  const isIndividual = Boolean(champion) && Boolean(season.championSchool) && champion !== season.championSchool;
 
   return (
     <div role="cell" className="flex items-center gap-2.5 min-w-0">
       <div
         className={cx(
           'w-7 h-7 rounded-full shrink-0 flex items-center justify-center border-2 border-line',
-          hasChampion ? 'bg-surface' : 'bg-transparent border-dashed'
+          champion ? 'bg-surface' : 'bg-transparent border-dashed'
         )}
         aria-hidden="true"
       >
-        {hasChampion && (
+        {champion && (
           <span className="text-[9px] font-extrabold tracking-tight text-foreground">
-            {championInitials(season.champion as string)}
+            {championInitials(champion)}
           </span>
         )}
       </div>
