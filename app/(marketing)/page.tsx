@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Hero from '@/app/components/sections/Hero';
+import HomeHero from '@/app/components/sections/HomeHero';
 import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
@@ -33,6 +33,7 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const games = getGamesForShowcase();
   const discordLink = SOCIAL_LINKS.find(link => link.platform === 'discord')?.url || 'https://discord.com/invite/RajSZqNyvu';
+  const twitchLink = SOCIAL_LINKS.find(link => link.platform === 'twitch')?.url || 'https://www.twitch.tv/ezesportsNYC';
   let homepageContent: Record<string, string> = {};
   let primaryGallery = galleryImages1;
   let secondaryGallery = galleryImages2;
@@ -63,12 +64,12 @@ export default async function HomePage() {
     <>
       <main>
       {/* 1. Hero Section */}
-      <Hero
+      <HomeHero
         title={heroTitle}
         subtitle={heroSubtitle}
         backgroundImage={heroContent.backgroundImage}
-        size="large"
-        primaryCTA={{ label: heroCtaLabel, href: discordLink }}
+        primaryCTA={{ label: 'Watch Live', href: twitchLink, external: true }}
+        secondaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
 
 
