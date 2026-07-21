@@ -82,7 +82,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA 
           <div className="flex flex-wrap gap-3 mt-[26px]">
             <Link
               href={primaryCTA.href}
-              className="inline-flex items-center justify-center gap-2 [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)] bg-accent text-on-accent hover:bg-white px-6 py-[13px] text-sm font-extrabold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-surface"
+              className="inline-flex items-center justify-center gap-2 [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)] bg-accent text-on-accent hover:bg-white px-6 py-[13px] text-sm font-extrabold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-on-accent"
             >
               {primaryCTA.label.toLowerCase().includes('discord') && (
                 <svg className="w-5 h-5 -ml-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
