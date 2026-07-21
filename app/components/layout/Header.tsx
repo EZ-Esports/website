@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { FocusScope } from 'react-aria';
-import { Dialog } from 'react-aria-components';
+import { Dialog, Button, Link as AriaLink } from 'react-aria-components';
 import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
 import CutCTA from '@/app/components/ui/CutCTA';
 import Navigation from './Navigation';
@@ -67,7 +66,7 @@ export default function Header() {
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
-            <Link href="/" className="hover:opacity-85 transition-opacity flex items-center">
+            <AriaLink href="/" className="hover:opacity-85 transition-opacity flex items-center">
               <Image
                 src="/images/logos/wordmark.png"
                 alt={SITE_CONFIG.company}
@@ -76,7 +75,7 @@ export default function Header() {
                 className="h-10 w-auto transition-all duration-300"
                 priority
               />
-            </Link>
+            </AriaLink>
           </div>
 
           {/* Desktop Navigation */}
@@ -88,8 +87,8 @@ export default function Header() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
+          <Button
+            onPress={() => setIsOpen(!isOpen)}
             className="md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-all duration-300 min-h-[44px] min-w-[44px] flex items-center justify-center text-white/90 hover:text-accent border-white/15 bg-white/5 hover:bg-white/10 backdrop-blur-sm"
             aria-expanded={isOpen}
             aria-controls="mobile-nav"
@@ -104,7 +103,7 @@ export default function Header() {
                 <path strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             )}
-          </button>
+          </Button>
         </div>
 
         {/* Mobile Navigation Drawer. React Aria's FocusScope traps Tab within the panel and restores focus on close. */}
