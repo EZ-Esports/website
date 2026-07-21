@@ -14,7 +14,6 @@ import GradientRule from '@/app/components/ui/GradientRule';
 import Image from 'next/image';
 import {
   galleryImages1,
-  galleryImages2,
   featuredVideos,
   heroContent,
   sectionContent,
@@ -36,7 +35,6 @@ export default async function HomePage() {
   const twitchLink = SOCIAL_LINKS.find(link => link.platform === 'twitch')?.url || 'https://www.twitch.tv/ezesportsNYC';
   let homepageContent: Record<string, string> = {};
   let primaryGallery = galleryImages1;
-  let secondaryGallery = galleryImages2;
 
   try {
     homepageContent = await getCachedHomepageContent();
@@ -47,7 +45,6 @@ export default async function HomePage() {
   try {
     const gallery = await getCachedHomepageGallery();
     primaryGallery = gallery.set1;
-    secondaryGallery = gallery.set2;
   } catch (error) {
     console.error('Failed to load homepage gallery', error);
   }

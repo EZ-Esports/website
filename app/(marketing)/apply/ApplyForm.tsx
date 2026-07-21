@@ -487,9 +487,11 @@ ${form.additionalShare || 'N/A'}
                       onBlur={() => setFocusedField(null)}
                       className={textInputClass(!!fieldErrors.name)}
                       required
+                      aria-invalid={!!fieldErrors.name}
+                      aria-describedby={fieldErrors.name ? 'name-error' : undefined}
                     />
                     {fieldErrors.name && (
-                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.name}</p>
+                      <p id="name-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.name}</p>
                     )}
                   </div>
 
@@ -524,9 +526,11 @@ ${form.additionalShare || 'N/A'}
                       onBlur={() => setFocusedField(null)}
                       className={textInputClass(!!fieldErrors.email)}
                       required
+                      aria-invalid={!!fieldErrors.email}
+                      aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                     />
                     {fieldErrors.email && (
-                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.email}</p>
+                      <p id="email-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.email}</p>
                     )}
                   </div>
 
@@ -544,9 +548,11 @@ ${form.additionalShare || 'N/A'}
                       onBlur={() => setFocusedField(null)}
                       className={textInputClass(!!fieldErrors.phone)}
                       required
+                      aria-invalid={!!fieldErrors.phone}
+                      aria-describedby={fieldErrors.phone ? 'phone-error' : undefined}
                     />
                     {fieldErrors.phone && (
-                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.phone}</p>
+                      <p id="phone-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.phone}</p>
                     )}
                   </div>
                 </div>
@@ -603,9 +609,11 @@ ${form.additionalShare || 'N/A'}
                       onBlur={() => setFocusedField(null)}
                       className={textInputClass(!!fieldErrors.school)}
                       required
+                      aria-invalid={!!fieldErrors.school}
+                      aria-describedby={fieldErrors.school ? 'school-error' : undefined}
                     />
                     {fieldErrors.school && (
-                      <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.school}</p>
+                      <p id="school-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.school}</p>
                     )}
                   </div>
 
@@ -641,15 +649,23 @@ ${form.additionalShare || 'N/A'}
                     onBlur={() => setFocusedField(null)}
                     className={textInputClass(!!fieldErrors.role)}
                     required
+                    aria-invalid={!!fieldErrors.role}
+                    aria-describedby={fieldErrors.role ? 'role-error' : undefined}
                   />
                   {fieldErrors.role && (
-                    <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.role}</p>
+                    <p id="role-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.role}</p>
                   )}
                 </div>
 
                 {/* Where is your school located? */}
-                <div id="field-location" className={fieldWrapperClass('location', !!fieldErrors.location)}>
-                  <span className={labelClass}>Where is your school located? {requiredMark}</span>
+                <div
+                  id="field-location"
+                  className={fieldWrapperClass('location', !!fieldErrors.location)}
+                  role="group"
+                  aria-labelledby="location-label"
+                  aria-describedby={fieldErrors.location ? 'location-error' : undefined}
+                >
+                  <span id="location-label" className={labelClass}>Where is your school located? {requiredMark}</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {['Bronx', 'Queens', 'Manhattan', 'Brooklyn', 'Staten Island'].map((borough) => (
                       <label key={borough} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
@@ -691,7 +707,7 @@ ${form.additionalShare || 'N/A'}
                     </div>
                   </div>
                   {fieldErrors.location && (
-                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.location}</p>
+                    <p id="location-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.location}</p>
                   )}
                 </div>
               </div>
@@ -736,8 +752,14 @@ ${form.additionalShare || 'N/A'}
                 </div>
 
                 {/* Do you need help finding extra players or forming a full team? */}
-                <div id="field-needPlayerHelp" className={fieldWrapperClass('needPlayerHelp', !!fieldErrors.needPlayerHelp)}>
-                  <span className={labelClass}>Do you need help finding extra players or forming a full team? {requiredMark}</span>
+                <div
+                  id="field-needPlayerHelp"
+                  className={fieldWrapperClass('needPlayerHelp', !!fieldErrors.needPlayerHelp)}
+                  role="group"
+                  aria-labelledby="needPlayerHelp-label"
+                  aria-describedby={fieldErrors.needPlayerHelp ? 'needPlayerHelp-error' : undefined}
+                >
+                  <span id="needPlayerHelp-label" className={labelClass}>Do you need help finding extra players or forming a full team? {requiredMark}</span>
                   <div className="flex gap-6 mt-2">
                     {['Yes', 'No'].map((opt) => (
                       <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
@@ -754,7 +776,7 @@ ${form.additionalShare || 'N/A'}
                     ))}
                   </div>
                   {fieldErrors.needPlayerHelp && (
-                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.needPlayerHelp}</p>
+                    <p id="needPlayerHelp-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.needPlayerHelp}</p>
                   )}
                 </div>
               </div>
@@ -764,8 +786,14 @@ ${form.additionalShare || 'N/A'}
                 {sectionHeader('preferences')}
 
                 {/* How did you first learn about EZ Esports? */}
-                <div id="field-learnSource" className={fieldWrapperClass('learnSource', !!fieldErrors.learnSource)}>
-                  <span className={labelClass}>How did you first learn about EZ Esports? {requiredMark}</span>
+                <div
+                  id="field-learnSource"
+                  className={fieldWrapperClass('learnSource', !!fieldErrors.learnSource)}
+                  role="group"
+                  aria-labelledby="learnSource-label"
+                  aria-describedby={fieldErrors.learnSource ? 'learnSource-error' : undefined}
+                >
+                  <span id="learnSource-label" className={labelClass}>How did you first learn about EZ Esports? {requiredMark}</span>
                   <div className="grid grid-cols-2 gap-3">
                     {['LinkedIn', 'Instagram', 'Twitch', 'Youtube', 'Web search', 'Friend/teacher/parent'].map((src) => (
                       <label key={src} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
@@ -807,14 +835,20 @@ ${form.additionalShare || 'N/A'}
                     </div>
                   </div>
                   {fieldErrors.learnSource && (
-                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.learnSource}</p>
+                    <p id="learnSource-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.learnSource}</p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
                   {/* Preferred communication platform */}
-                  <div id="field-commPlatforms" className={fieldWrapperClass('commPlatforms', !!fieldErrors.commPlatforms)}>
-                    <span className={labelClass}>Preferred Communication platform {requiredMark}</span>
+                  <div
+                    id="field-commPlatforms"
+                    className={fieldWrapperClass('commPlatforms', !!fieldErrors.commPlatforms)}
+                    role="group"
+                    aria-labelledby="commPlatforms-label"
+                    aria-describedby={fieldErrors.commPlatforms ? 'commPlatforms-error' : undefined}
+                  >
+                    <span id="commPlatforms-label" className={labelClass}>Preferred Communication platform {requiredMark}</span>
                     <div className="space-y-2.5">
                       {[
                         { id: 'email', label: 'Email' },
@@ -833,13 +867,19 @@ ${form.additionalShare || 'N/A'}
                       ))}
                     </div>
                     {fieldErrors.commPlatforms && (
-                      <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.commPlatforms}</p>
+                      <p id="commPlatforms-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.commPlatforms}</p>
                     )}
                   </div>
 
                   {/* Interested divisions */}
-                  <div id="field-divisions" className={fieldWrapperClass('divisions', !!fieldErrors.divisions)}>
-                    <span className={labelClass}>Interested Divisions {requiredMark}</span>
+                  <div
+                    id="field-divisions"
+                    className={fieldWrapperClass('divisions', !!fieldErrors.divisions)}
+                    role="group"
+                    aria-labelledby="divisions-label"
+                    aria-describedby={fieldErrors.divisions ? 'divisions-error' : undefined}
+                  >
+                    <span id="divisions-label" className={labelClass}>Interested Divisions {requiredMark}</span>
                     <div className="space-y-2.5">
                       {[
                         { id: 'tft', label: 'Teamfight Tactics' },
@@ -859,7 +899,7 @@ ${form.additionalShare || 'N/A'}
                       ))}
                     </div>
                     {fieldErrors.divisions && (
-                      <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.divisions}</p>
+                      <p id="divisions-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.divisions}</p>
                     )}
                   </div>
                 </div>
@@ -892,8 +932,11 @@ ${form.additionalShare || 'N/A'}
                   className={`rounded-xl border p-4 sm:p-5 transition-colors ${
                     fieldErrors.agreedRules ? 'border-danger bg-danger/5' : 'border-line bg-accent/5'
                   }`}
+                  role="group"
+                  aria-labelledby="agreedRules-label"
+                  aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
                 >
-                  <span className={labelClass}>
+                  <span id="agreedRules-label" className={labelClass}>
                     Rulebooks &amp; Terms Agreement {requiredMark}
                   </span>
                   <a
@@ -910,11 +953,13 @@ ${form.additionalShare || 'N/A'}
                       checked={form.agreedRules}
                       onChange={(e) => handleRulesChange(e.target.checked)}
                       className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
+                      aria-invalid={!!fieldErrors.agreedRules}
+                      aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
                     />
                     <span>I understand and agree to all tournament rules.</span>
                   </label>
                   {fieldErrors.agreedRules && (
-                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
+                    <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
                   )}
                 </div>
 

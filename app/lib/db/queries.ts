@@ -448,7 +448,6 @@ export const getCachedHomepageGallery = unstable_cache(
         src: row.src,
         alt: row.caption || 'EZ Esports gallery photo',
       })),
-      set2: [],
     };
   },
   ['homepage-gallery'],

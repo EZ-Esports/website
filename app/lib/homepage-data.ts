@@ -19,9 +19,6 @@ export const galleryImages1: Image[] = [
   { id: 'gallery-11', src: '/images/gallery/gallery-11.png', alt: 'NYC high school teams lined up before an EZ Esports finals match' },
 ];
 
-// Gallery images - second set (0 images)
-export const galleryImages2: Image[] = [];
-
 // Featured videos
 export const featuredVideos: VideoItem[] = [
   {

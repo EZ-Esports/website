@@ -574,7 +574,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
 
                   {selectedMatch.status === 'Completed' && (
                     <span className="text-xs text-foreground-secondary font-bold bg-surface-raised border border-line rounded-lg px-3 py-1">
-                      Result: <span className="text-accent font-black">{selectedMatch.result?.split(' ')[0] === 'W' ? 'Completed' : 'Completed'}</span>
+                      Result: <span className="text-accent font-black">{selectedMatch.result}</span>
                     </span>
                   )}
                 </div>

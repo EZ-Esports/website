@@ -194,11 +194,3 @@ export interface DBSeason {
   updatedAt: Date;
 }
 
-// ============================================================================
-// Loading Screen Types
-// ============================================================================
-
-export interface LoadingScreenProps {
-  onComplete?: () => void;
-  reducedMotion?: boolean;
-}
