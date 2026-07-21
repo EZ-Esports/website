@@ -28,12 +28,10 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
   // Ported verbatim from Hero.tsx so CMS-edited titles stay consistent with
   // the rest of the site.
   const renderTitle = (text: string) => {
-    if (text.trim().toLowerCase() === 'new york city high school esports league') {
-      return text;
-    }
-    const parts = text.split(/(Esports|EZ)/g);
+    const parts = text.split(/(New York City|Esports|EZ)/gi);
     return parts.map((part, i) => {
-      if (part === 'Esports' || part === 'EZ') {
+      const lower = part.toLowerCase();
+      if (lower === 'new york city' || lower === 'esports' || lower === 'ez') {
         return (
           <span key={i} className="text-accent font-black drop-shadow-[0_2px_10px_color-mix(in_srgb,var(--color-accent)_45%,transparent)]">
             {part}
@@ -98,7 +96,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
           </h1>
 
           {subtitle && (
-            <p className="mt-4 text-base text-foreground-secondary max-w-[52ch] leading-[1.6]">
+            <p className="mt-4 text-base text-foreground-secondary max-w-[75ch] leading-[1.6]">
               {subtitle}
             </p>
           )}

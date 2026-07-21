@@ -29,12 +29,12 @@ const CLIP = '[clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14
 
 const edgeStyles: Record<'primary' | 'outline', string> = {
   primary: 'bg-accent group-hover:bg-white',
-  outline: 'bg-foreground/30 group-hover:bg-accent',
+  outline: 'bg-foreground/30 group-hover:bg-white',
 };
 
 const fillStyles: Record<'primary' | 'outline', string> = {
   primary: 'bg-accent group-hover:bg-white',
-  outline: 'bg-white/[0.04] group-hover:bg-white/[0.08]',
+  outline: 'bg-white/[0.04] group-hover:bg-black',
 };
 
 const textStyles: Record<'primary' | 'outline', string> = {

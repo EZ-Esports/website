@@ -42,8 +42,8 @@ export default function Navigation({ onNavigate }: NavigationProps) {
       id: 'competition',
       items: [
         { label: GAMES['valorant']?.displayName || 'Valorant', href: getGameRoute('valorant') },
-        { label: GAMES['league-of-legends']?.displayName || 'League of Legends', href: getGameRoute('league-of-legends') },
         { label: GAMES['team-fight-tactics']?.displayName || 'Teamfight Tactics', href: getGameRoute('team-fight-tactics') },
+        { label: GAMES['league-of-legends']?.displayName || 'League of Legends', href: getGameRoute('league-of-legends') },
         { label: 'Past Seasons', href: ROUTES.archives },
       ],
     },
