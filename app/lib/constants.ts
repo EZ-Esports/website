@@ -55,7 +55,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
   },
 } as const;
 
-export const GAME_SLUGS: GameSlug[] = ['valorant', 'league-of-legends', 'team-fight-tactics'];
+export const GAME_SLUGS: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends'];
 
 // ============================================================================
 // Game Route Helpers

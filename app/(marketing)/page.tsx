@@ -7,7 +7,7 @@ import VideoShowcase from '@/app/components/sections/VideoShowcase';
 import SchoolWall from '@/app/components/sections/SchoolWall';
 import LeaguePulse from '@/app/components/sections/LeaguePulse';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
-import Button from '@/app/components/ui/Button';
+import CutCTA from '@/app/components/ui/CutCTA';
 import Section from '@/app/components/ui/Section';
 import { Eyebrow } from '@/app/components/ui/SectionHeader';
 import GradientRule from '@/app/components/ui/GradientRule';
@@ -91,8 +91,8 @@ export default async function HomePage() {
           <GradientRule className="mb-1" />
           <p className="text-foreground font-semibold text-base">Ready to compete?</p>
           <div className="flex gap-4 flex-wrap justify-center">
-            <Button href={ROUTES.apply} variant="primary">Apply to Play</Button>
-            <Button href={ROUTES.about} variant="secondary">Learn More</Button>
+            <CutCTA href={ROUTES.apply} variant="primary">Apply to Play</CutCTA>
+            <CutCTA href={ROUTES.about} variant="outline">Learn More</CutCTA>
           </div>
         </div>
       </Section>
@@ -148,10 +148,10 @@ export default async function HomePage() {
             <p className="text-foreground-secondary text-lg leading-relaxed mb-8 max-w-prose">
               {storyParagraphs[0]}
             </p>
-            <Button href={ROUTES.about} variant="primary" className="group">
+            <CutCTA href={ROUTES.about} variant="primary" className="group">
               Learn More
               <span className="inline-block transition-transform duration-200 group-hover:translate-x-1 ml-1" aria-hidden="true">→</span>
-            </Button>
+            </CutCTA>
           </div>
         </Section>
       </ScrollReveal>

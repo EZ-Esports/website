@@ -67,14 +67,12 @@ export default function Hero({
     : panelShadowMV;
   const panelBlur = prefersReducedMotion ? 'blur(28px)' : panelBlurMV;
 
-  // Helper to dynamically color brand words "EZ" and "Esports" pink
+  // Helper to dynamically color brand words "EZ", "Esports", and "New York City" pink
   const renderTitle = (text: string) => {
-    if (text.trim().toLowerCase() === 'new york city high school esports league') {
-      return text;
-    }
-    const parts = text.split(/(Esports|EZ)/g);
+    const parts = text.split(/(New York City|Esports|EZ)/gi);
     return parts.map((part, i) => {
-      if (part === 'Esports' || part === 'EZ') {
+      const lower = part.toLowerCase();
+      if (lower === 'new york city' || lower === 'esports' || lower === 'ez') {
         return (
           <span key={i} className="text-accent font-black drop-shadow-[0_2px_10px_color-mix(in_srgb,var(--color-accent)_45%,transparent)]">
             {part}
