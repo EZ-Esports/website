@@ -37,18 +37,21 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     displayName: 'Valorant',
     shortName: 'Valorant',
     imageUrl: '/images/games/val-banner.png',
+    accent: { color: '#FF4655', dim: '#3A1418', on: '#FFFFFF' },
   },
   'league-of-legends': {
     slug: 'league-of-legends',
     displayName: 'League of Legends',
     shortName: 'League',
     imageUrl: '/images/games/lol-banner.png',
+    accent: { color: '#C8AA6E', dim: '#332A14', on: '#1C1508' },
   },
   'team-fight-tactics': {
     slug: 'team-fight-tactics',
     displayName: 'Teamfight Tactics',
     shortName: 'Teamfight Tactics',
     imageUrl: '/images/games/tft-banner.png',
+    accent: { color: '#9D7FE0', dim: '#241A3A', on: '#1A1330' },
   },
 } as const;
 

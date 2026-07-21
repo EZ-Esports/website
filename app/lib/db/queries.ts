@@ -585,6 +585,38 @@ export const getCachedRecentResults = unstable_cache(
  * Archive index: every season with its match count and champion (rank-1
  * snapshot row, preferring team standings over individual leaderboards).
  */
+interface ArchiveChampionRow {
+  seasonId: string;
+  division: string;
+  schoolName: string;
+  playerName: string | null;
+}
+
+/**
+ * Picks each season's rank-1 champion using division priority (Varsity > All > JV,
+ * so a team champion wins over an individual leaderboard, which wins over JV).
+ * Returns both the display `champion` (a player name for individual-format
+ * divisions like TFT, otherwise the school name) and `championSchool`, which is
+ * always the school name — callers that need to count distinct champion
+ * *schools* shouldn't have to special-case individual-format divisions.
+ */
+export function pickChampionsBySeason(
+  champions: ArchiveChampionRow[]
+): Map<string, { champion: string; championSchool: string }> {
+  const bySeason = new Map<string, { champion: string; championSchool: string }>();
+  for (const division of ['Varsity', 'All', 'JV']) {
+    for (const champ of champions) {
+      if (champ.division === division && !bySeason.has(champ.seasonId)) {
+        bySeason.set(champ.seasonId, {
+          champion: champ.playerName ?? champ.schoolName,
+          championSchool: champ.schoolName,
+        });
+      }
+    }
+  }
+  return bySeason;
+}
+
 export async function getArchiveIndex() {
   const [seasons, counts, champions] = await Promise.all([
     getSeasonsWithGames(),
@@ -605,21 +637,17 @@ export async function getArchiveIndex() {
   ]);
 
   const countBySeason = new Map(counts.map((c) => [c.seasonId, c.matchCount]));
-  // Prefer the team champion (Varsity) over individual leaderboards, JV last.
-  const championBySeason = new Map<string, string>();
-  for (const division of ['Varsity', 'All', 'JV']) {
-    for (const champ of champions) {
-      if (champ.division === division && !championBySeason.has(champ.seasonId)) {
-        championBySeason.set(champ.seasonId, champ.playerName ?? champ.schoolName);
-      }
-    }
-  }
+  const championBySeason = pickChampionsBySeason(champions);
 
-  return seasons.map((s) => ({
-    ...s,
-    matchCount: countBySeason.get(s.id) ?? 0,
-    champion: championBySeason.get(s.id) ?? null,
-  }));
+  return seasons.map((s) => {
+    const c = championBySeason.get(s.id);
+    return {
+      ...s,
+      matchCount: countBySeason.get(s.id) ?? 0,
+      champion: c?.champion ?? null,
+      championSchool: c?.championSchool ?? null,
+    };
+  });
 }
 
 /**
