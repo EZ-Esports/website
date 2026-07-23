@@ -84,7 +84,12 @@ export default async function HomePage() {
         <LeaguePulse />
       </ScrollReveal>
 
-      {/* 4. CTA Strip */}
+      {/* 4. School Wall */}
+      <ScrollReveal>
+        <SchoolWall />
+      </ScrollReveal>
+
+      {/* 5. CTA Strip */}
       <Section className="border-t border-b border-accent/15">
         <div className="flex flex-col items-center gap-3">
           <Eyebrow>Get Started</Eyebrow>
@@ -96,11 +101,6 @@ export default async function HomePage() {
           </div>
         </div>
       </Section>
-
-      {/* 5. School Wall */}
-      <ScrollReveal>
-        <SchoolWall />
-      </ScrollReveal>
 
       {/* 6. Photo Gallery #1 */}
       {primaryGallery.length > 0 && (
