@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { animate, motion, useAnimationFrame, useMotionValue } from 'framer-motion';
+import { animate, motion, useAnimationFrame, useMotionValue, useTransform } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Button, ToggleButton } from 'react-aria-components';
 import { usePrefersReducedMotion } from '@/app/lib/hooks/usePrefersReducedMotion';
@@ -28,16 +28,25 @@ function wrapX(value: number, half: number): number {
 export default function SponsorMarquee({ sponsors }: { sponsors: MarqueeSponsor[] }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [playing, setPlaying] = useState(!prefersReducedMotion);
-  const x = useMotionValue(0);
+  const rawX = useMotionValue(0);
   const trackRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const halfWidthRef = useRef(0);
   const doubled = [...sponsors, ...sponsors];
+
+  // We use useTransform to wrap rawX on every frame
+  const x = useTransform(rawX, (val) => {
+    const half = halfWidthRef.current;
+    return wrapX(val, half);
+  });
 
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
     const measure = () => {
-      halfWidthRef.current = el.scrollWidth / 2;
+      const half = el.scrollWidth / 2;
+      halfWidthRef.current = half;
+      rawX.set(wrapX(rawX.get(), half));
     };
     measure();
     // Keeps the loop's wrap point in sync with resize, zoom, orientation
@@ -48,22 +57,55 @@ export default function SponsorMarquee({ sponsors }: { sponsors: MarqueeSponsor[
     return () => observer.disconnect();
   }, [sponsors]);
 
+  // Handle horizontal mouse wheel and trackpad scroll events
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const half = halfWidthRef.current;
+      if (!half) return;
+
+      // Handle horizontal scrolling (trackpads/horizontal scroll wheels)
+      if (e.deltaX !== 0) {
+        e.preventDefault();
+        setPlaying(false);
+        rawX.set(wrapX(rawX.get() - e.deltaX, half));
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   useAnimationFrame((_, delta) => {
     if (!playing || prefersReducedMotion) return;
     const half = halfWidthRef.current;
     if (!half) return;
-    x.set(wrapX(x.get() - (delta / 1000) * SPEED_PX_PER_SEC, half));
+    rawX.set(wrapX(rawX.get() - (delta / 1000) * SPEED_PX_PER_SEC, half));
   });
 
   const nudge = (direction: -1 | 1) => {
     setPlaying(false);
     const half = halfWidthRef.current;
-    const target = wrapX(x.get() + direction * NUDGE_PX, half);
-    animate(x, target, { duration: 0.4, ease: 'easeOut' });
+    if (!half) return;
+
+    const start = rawX.get();
+    const target = start + direction * NUDGE_PX;
+
+    animate(rawX, target, {
+      duration: 0.4,
+      ease: 'easeOut',
+      onComplete: () => {
+        rawX.set(wrapX(target, half));
+      },
+    });
   };
 
   return (
-    <div className="border-y border-line bg-surface-raised py-6">
+    <div ref={containerRef} className="border-y border-line bg-surface-raised py-6">
       <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_3%,black_97%,transparent)]">
         <motion.div ref={trackRef} style={{ x }} className="flex w-max items-center gap-10 px-6">
           {doubled.map((item, i) => (
