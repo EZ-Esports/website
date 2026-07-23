@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { GAME_SLUGS, getGameRoute } from '@/app/lib/constants';
 
 export default function MainContentWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -8,9 +9,7 @@ export default function MainContentWrapper({ children }: { children: React.React
                   pathname === '/about' ||
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
-                  pathname === '/valorant' ||
-                  pathname === '/league-of-legends' ||
-                  pathname === '/team-fight-tactics' ||
+                  GAME_SLUGS.some((slug) => pathname === getGameRoute(slug)) ||
                   pathname === '/sponsors' ||
                   pathname === '/privacy';
 

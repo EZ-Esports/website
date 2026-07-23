@@ -6,6 +6,7 @@ import { Tabs, TabList, Tab, TabPanel } from 'react-aria-components';
 import { cx } from '@/app/lib/cx';
 import Card from '@/app/components/ui/Card';
 import type { GameAccent, GameSlug } from '@/app/types';
+import MigrationNotice from '@/app/components/ui/MigrationNotice';
 
 export interface ArchiveSeason {
   id: string;
@@ -54,6 +55,26 @@ const GAME_ICONS: Record<GameSlug, ReactNode> = {
   'team-fight-tactics': (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
       <path d="M9 4h6M10 4c0 2.5-2.5 3-2.5 5.5S9 13 9 13h6s1.5-1 1.5-3.5S14 6.5 14 4M7 20h10M8 20c.3-3 1.5-4.5 1.5-4.5S9 14 9 13h6s-.5 1-.5 2.5S16 17 16.5 20" />
+    </svg>
+  ),
+  osu: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <circle cx={12} cy={12} r={9} />
+      <text x="50%" y="58%" dominantBaseline="middle" textAnchor="middle" fontSize="10" fontWeight="black" fill="currentColor">o!</text>
+    </svg>
+  ),
+  minecraft: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  ),
+  tetris: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8h16v4H4z" />
+      <path d="M10 12h4v4h-4z" />
+      <path d="M4 12v-4m4 4V8m8 4V8m-4 8v-4" stroke="currentColor" strokeWidth={1} opacity={0.5} />
     </svg>
   ),
 };
@@ -278,7 +299,13 @@ export default function ArchiveCommandDeck({ games }: ArchiveCommandDeckProps) {
 
       {games.map((game) => (
         <TabPanel key={game.slug} id={game.slug} className="outline-none">
-          <GameDashboard game={game} />
+          {game.seasons.length === 0 ? (
+            <div className="py-6">
+              <MigrationNotice />
+            </div>
+          ) : (
+            <GameDashboard game={game} />
+          )}
         </TabPanel>
       ))}
     </Tabs>

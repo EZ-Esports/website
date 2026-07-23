@@ -54,9 +54,30 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/games/tft-banner.png',
     accent: { color: '#9D7FE0', on: '#1A1330' },
   },
+  osu: {
+    slug: 'osu',
+    displayName: 'osu!',
+    shortName: 'osu!',
+    imageUrl: '/images/hero-background.jpg',
+    accent: { color: '#FF66AA', on: '#FFFFFF' },
+  },
+  minecraft: {
+    slug: 'minecraft',
+    displayName: 'Minecraft',
+    shortName: 'Minecraft',
+    imageUrl: '/images/hero-background.jpg',
+    accent: { color: '#478A3A', on: '#FFFFFF' },
+  },
+  tetris: {
+    slug: 'tetris',
+    displayName: 'Tetris',
+    shortName: 'Tetris',
+    imageUrl: '/images/hero-background.jpg',
+    accent: { color: '#0099FF', on: '#FFFFFF' },
+  },
 } as const;
 
-export const GAME_SLUGS: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends'];
+export const GAME_SLUGS: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends', 'osu', 'minecraft', 'tetris'];
 
 // ============================================================================
 // Game Route Helpers
@@ -98,13 +119,17 @@ const gameSlugToId: Record<GameSlug, string> = {
   'league-of-legends': 'lol',
   'valorant': 'val',
   'team-fight-tactics': 'tft',
+  osu: 'osu',
+  minecraft: 'mc',
+  tetris: 'tetris',
 } as const;
 
 /**
  * Converts GAMES constant to Game[] format for use in GameShowcase component
  */
 export const getGamesForShowcase = (): Game[] => {
-  return GAME_SLUGS.map((slug) => {
+  const activeSlugs: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends'];
+  return activeSlugs.map((slug) => {
     const gameConfig = GAMES[slug];
     return {
       id: gameSlugToId[slug],

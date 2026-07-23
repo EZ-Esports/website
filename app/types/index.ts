@@ -53,7 +53,7 @@ export type Year = string;
 // Game Logic Types
 // ============================================================================
 
-export type GameSlug = 'valorant' | 'league-of-legends' | 'team-fight-tactics';
+export type GameSlug = 'valorant' | 'league-of-legends' | 'team-fight-tactics' | 'osu' | 'minecraft' | 'tetris';
 
 /** A game's per-brand accent theming, e.g. for the Archives Command Deck. */
 export interface GameAccent {
