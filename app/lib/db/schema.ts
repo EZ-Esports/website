@@ -315,7 +315,6 @@ export const staffApplications = pgTable('staff_applications', {
   index('staff_applications_submitted_at_idx').on(table.submittedAt),
 ]).enableRLS();
 
-
 // CMS key-value content blocks for editable page text
 export const pageContent = pgTable('page_content', {
   id: uuid('id').defaultRandom().primaryKey(),

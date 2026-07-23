@@ -463,6 +463,15 @@ export const getSchoolApplications = async (status?: 'pending' | 'reviewed' | 'a
     .orderBy(desc(schema.schoolApplications.submittedAt));
 };
 
+export const getStaffApplications = async (status?: 'pending' | 'reviewed' | 'accepted') => {
+  const conditions = status ? [eq(schema.staffApplications.status, status)] : [];
+  return db
+    .select()
+    .from(schema.staffApplications)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(schema.staffApplications.submittedAt));
+};
+
 /** Count of all scheduled matches (for dashboard). */
 export const countScheduledMatches = async (): Promise<number> => {
   const [row] = await db
