@@ -82,7 +82,7 @@ export default function Header() {
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Navigation />
             <CutCTA href={ROUTES.apply} variant="primary" size="sm" className="shrink-0">
-              Apply Now
+              Apply to Play
             </CutCTA>
           </div>
 
@@ -122,7 +122,7 @@ export default function Header() {
                     className="w-full"
                     onPress={handleCloseMenu}
                   >
-                    Apply Now
+                    Apply to Play
                   </CutCTA>
                 </div>
               </div>
