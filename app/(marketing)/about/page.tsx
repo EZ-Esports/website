@@ -13,7 +13,7 @@ import { ROUTES, SOCIAL_LINKS, GAMES, GAME_SLUGS } from '@/app/lib/constants';
 export const metadata: Metadata = {
   title: 'About EZ Esports | NYC High School Esports League',
   description:
-    'Learn about EZ Esports — founded in 2021 by NYC high school students, building community and competitive esports pathways across the five boroughs.',
+    'Learn about EZ Esports, founded in 2021 by NYC high school students, building community and competitive esports pathways across the five boroughs.',
 };
 
 const DIVISIONS = [
@@ -28,12 +28,12 @@ const HISTORY = [
   {
     tag: 'Nov 2021',
     title: 'Founded at Susan Wagner High School',
-    body: 'Edison Zhong wanted to play interschool esports. The Public Schools Athletic League had no support for it — so he built the league himself.',
+    body: 'Edison Zhong wanted to play interschool esports. The Public Schools Athletic League had no support for it, so he built the league himself.',
   },
   {
     tag: 'Week 1',
     title: '200+ sign-ups, one school',
-    body: "The response at Edison's own school made the unmet demand impossible to ignore — this needed to be bigger than one campus.",
+    body: "The response at Edison's own school made the unmet demand impossible to ignore. This needed to be bigger than one campus.",
   },
   {
     tag: '2022 →',
@@ -74,8 +74,7 @@ export default async function AboutPage() {
     <main>
       <AboutHero
         title="This Is EZ Esports"
-        liveLabel="Season Live — NYC"
-        subtitle="The NYC high school esports league — built by a student in one borough, now run by students across all five."
+        subtitle="The NYC high school esports league, built by a student in one borough, now run by students across all five."
         backgroundImage="/images/hero-background.jpg"
         primaryCTA={{ label: 'Apply Now', href: ROUTES.apply }}
         secondaryCTA={{ label: 'Join Discord', href: discordLink, external: true }}
@@ -174,7 +173,7 @@ export default async function AboutPage() {
             Ten Student-Run Divisions
           </h2>
           <p className="text-foreground-secondary text-lg leading-relaxed max-w-2xl mb-10">
-            The league mirrors a real company&apos;s org chart — ten divisions, led by alumni, run with zero operating budget.
+            The league mirrors a real company&apos;s org chart: ten divisions, led by alumni, run with zero operating budget.
           </p>
         </ScrollReveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-line border border-line rounded-2xl overflow-hidden">

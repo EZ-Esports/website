@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import CutCTA from '@/app/components/ui/CutCTA';
-import { GAMES } from '@/app/lib/constants';
 
 interface CTA {
   label: string;
@@ -10,7 +9,6 @@ interface CTA {
 
 interface AboutHeroProps {
   title: string;
-  liveLabel: string;
   subtitle?: string;
   backgroundImage: string;
   primaryCTA?: CTA;
@@ -18,12 +16,12 @@ interface AboutHeroProps {
 }
 
 /**
- * About-only "broadcast" hero: full-bleed photo, uppercase display type, and
- * a live-broadcast status tag. A dedicated component (not a variant of the
- * shared `Hero.tsx`, mirroring how `HomeHero.tsx` forks for the homepage)
- * because Hero.tsx stays centered/glass-panel for news/[game]/privacy.
+ * About-only "broadcast" hero: full-bleed photo, uppercase display type. A
+ * dedicated component (not a variant of the shared `Hero.tsx`, mirroring how
+ * `HomeHero.tsx` forks for the homepage) because Hero.tsx stays
+ * centered/glass-panel for news/[game]/privacy.
  */
-export default function AboutHero({ title, liveLabel, subtitle, backgroundImage, primaryCTA, secondaryCTA }: AboutHeroProps) {
+export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA, secondaryCTA }: AboutHeroProps) {
   // Helper to color the brand words "EZ" and "Esports" pink, ported from Hero.tsx/HomeHero.tsx.
   const renderTitle = (text: string) => {
     const parts = text.split(/(Esports|EZ)/gi);
@@ -61,7 +59,7 @@ export default function AboutHero({ title, liveLabel, subtitle, backgroundImage,
               'linear-gradient(180deg, rgba(10,10,10,.72) 0%, rgba(10,10,10,.22) 30%, rgba(10,10,10,.5) 72%, rgba(10,10,10,.95) 100%)',
           }}
         />
-        {/* Faint scanline texture — a light broadcast-overlay cue, not a load-bearing effect. */}
+        {/* Faint scanline texture: a light broadcast-overlay cue, not a load-bearing effect. */}
         <div
           className="absolute inset-0 opacity-40 mix-blend-overlay"
           style={{
@@ -75,16 +73,8 @@ export default function AboutHero({ title, liveLabel, subtitle, backgroundImage,
       {/* Content, bottom-anchored */}
       <div className="absolute inset-x-0 bottom-0 z-10 pb-14 sm:pb-16">
         <div className="container mx-auto px-6 sm:px-10 lg:px-16 xl:px-24">
-          <span
-            className="inline-flex items-center gap-2 rounded px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-widest"
-            style={{ backgroundColor: GAMES.valorant.accent.color, color: GAMES.valorant.accent.on }}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-pulse" aria-hidden="true" />
-            {liveLabel}
-          </span>
-
           <h1
-            className="mt-5 font-black uppercase tracking-tight leading-[0.94] text-foreground max-w-[16ch] drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+            className="font-black uppercase tracking-tight leading-[0.94] text-foreground max-w-[16ch] drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
             style={{ fontSize: 'clamp(38px, 8vw, 92px)' }}
           >
             {renderTitle(title)}
