@@ -3,7 +3,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { isNull } from 'drizzle-orm';
 import { addGalleryImage } from './actions';
-import GalleryImageCard from '@/app/components/admin/GalleryImageCard';
+import GalleryManagerClient from '@/app/components/admin/GalleryManagerClient';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
@@ -41,7 +41,7 @@ export default async function GalleryAdminPage() {
           <div className="sm:col-span-2">
             <ImageUpload name="src" storageKeyName="storageKey" label="Image" required />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             {/* Caption is required — it also serves as the image alt text (WCAG) */}
             <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
               Caption / Alt Text <span className="text-accent">*</span>
@@ -73,15 +73,6 @@ export default async function GalleryAdminPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
-            <input
-              name="displayOrder"
-              type="number"
-              defaultValue="0"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
-            />
-          </div>
           <div className="sm:col-span-2">
             <SubmitButton
               label="Add Image"
@@ -100,11 +91,7 @@ export default async function GalleryAdminPage() {
         {set1.length === 0 ? (
           <p className="text-foreground-muted text-sm">No images in the gallery yet.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
-            {set1.map((img) => (
-              <GalleryImageCard key={img.id} img={img} />
-            ))}
-          </div>
+          <GalleryManagerClient initialImages={set1} />
         )}
       </div>
     </div>
