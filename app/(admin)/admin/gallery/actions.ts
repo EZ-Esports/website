@@ -4,7 +4,7 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql, isNull } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { sanitizeDbError } from '@/app/lib/text-utils';
@@ -17,14 +17,28 @@ export async function addGalleryImage(formData: FormData) {
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
   const eventName = (formData.get('eventName') as string) ?? '';
-  const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
   const storageKey = (formData.get('storageKey') as string) || null;
 
   if (!src) return { success: false, error: 'Please upload an image first.' };
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
 
   try {
-    await db.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, displayOrder, storageKey });
+    // New images always go to the end of the list — display order is derived, never user-entered.
+    // The advisory lock serializes concurrent adds so two simultaneous submissions can't both
+    // read the same max() and insert duplicate displayOrder values (it's tied to the transaction,
+    // so it's safe under Supabase's transaction pooler, unlike a session-level advisory lock).
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('gallery_images_display_order'))`);
+
+      const [maxOrderResult] = await tx
+        .select({ maxOrder: sql<number>`max(${schema.galleryImages.displayOrder})` })
+        .from(schema.galleryImages)
+        .where(isNull(schema.galleryImages.deletedAt));
+
+      const displayOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
+
+      await tx.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, displayOrder, storageKey });
+    });
   } catch (error) {
     console.error('Failed to add gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -41,7 +55,6 @@ export async function updateGalleryImage(id: string, formData: FormData) {
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
   const eventName = (formData.get('eventName') as string) ?? '';
-  const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
   const storageKey = (formData.get('storageKey') as string) || null;
 
   if (!src) return { success: false, error: 'An image is required.' };
@@ -63,11 +76,41 @@ export async function updateGalleryImage(id: string, formData: FormData) {
 
     await db
       .update(schema.galleryImages)
-      .set({ src, caption, schoolName, eventName, displayOrder, storageKey })
+      .set({ src, caption, schoolName, eventName, storageKey })
       .where(eq(schema.galleryImages.id, id));
   } catch (error) {
     console.error('Failed to update gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
+  }
+
+  revalidateTag('gallery-images', {});
+  revalidatePath('/admin/gallery');
+  revalidatePath('/');
+  return { success: true };
+}
+
+/**
+ * Persists a full reorder in one shot: the incoming array is the complete,
+ * already-deduplicated ordering, so display order is just its index + 1.
+ * Rewriting every row in this list (rather than diffing) means the values
+ * within this reorder are always sequential and duplicate-free, regardless
+ * of what displayOrder those rows had before the call.
+ */
+export async function updateGalleryImagesOrder(orderedIds: string[]) {
+  await requirePermission(Permissions.MANAGE_GALLERY);
+
+  try {
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx
+          .update(schema.galleryImages)
+          .set({ displayOrder: i + 1 })
+          .where(eq(schema.galleryImages.id, orderedIds[i]));
+      }
+    });
+  } catch (error) {
+    console.error('Failed to reorder gallery images', error);
+    return { success: false, error: 'Could not update order. Please try again.' };
   }
 
   revalidateTag('gallery-images', {});
