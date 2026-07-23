@@ -72,15 +72,15 @@ export default async function AboutPage() {
           <StatTile value={gameCount > 0 ? gameCount : '—'} label="Competition Titles" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card interactive className="backdrop-blur-md bg-white/5 border-white/10 p-6 flex flex-col items-center justify-center text-center">
+          <Card interactive className="glass-panel p-6 flex flex-col items-center justify-center text-center">
             <h3 className="text-4xl font-black text-primary mb-2">47%</h3>
             <p className="text-foreground-secondary font-medium">First-generation college students</p>
           </Card>
-          <Card interactive className="backdrop-blur-md bg-white/5 border-white/10 p-6 flex flex-col items-center justify-center text-center">
+          <Card interactive className="glass-panel p-6 flex flex-col items-center justify-center text-center">
             <h3 className="text-4xl font-black text-primary mb-2">71%</h3>
             <p className="text-foreground-secondary font-medium">Enrolled in Honors, IB, or AP courses</p>
           </Card>
-          <Card interactive className="backdrop-blur-md bg-white/5 border-white/10 p-6 flex flex-col items-center justify-center text-center">
+          <Card interactive className="glass-panel p-6 flex flex-col items-center justify-center text-center">
             <h3 className="text-4xl font-black text-primary mb-2">85%</h3>
             <p className="text-foreground-secondary font-medium">Student-run operations (no paid staff)</p>
           </Card>
@@ -93,7 +93,7 @@ export default async function AboutPage() {
       <Section tone="raised">
         <SectionHeader title="Student-Run Operations" />
         <div className="max-w-4xl mx-auto space-y-6">
-          <Card interactive className="p-8 backdrop-blur-sm bg-background/50 border-primary/20">
+          <Card interactive className="p-8 glass-panel">
             <h3 className="text-2xl font-black text-foreground mb-4">Corporate Mimicry</h3>
             <p className="text-foreground-secondary leading-relaxed text-sm sm:text-base mb-4">
               Our league organizes its staff into 10 distinct divisions—including Marketing, Engineering, and Operations—led by our dedicated alumni. This unique structure provides real-world corporate experience without an operating budget.
