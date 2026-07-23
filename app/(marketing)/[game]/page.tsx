@@ -45,12 +45,12 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
   const { record, jvRecord, nextMatch, recentResults, topTeams } = await getGameHubData(slug);
 
-  const seasonRecordParts: string[] = [];
-  if (record !== null) seasonRecordParts.push(`Varsity ${record}`);
-  if (jvRecord !== null) seasonRecordParts.push(`JV ${jvRecord}`);
-  const seasonRecordCaption =
-    topTeams.length > 0 && seasonRecordParts.length > 0
-      ? `${seasonRecordParts.join(' · ')} this season.`
+  const divisionCaptionParts: string[] = [];
+  if (record !== null) divisionCaptionParts.push('Varsity');
+  if (jvRecord !== null) divisionCaptionParts.push('JV');
+  const divisionsCaption =
+    topTeams.length > 0 && divisionCaptionParts.length > 0
+      ? divisionCaptionParts.join(' · ')
       : undefined;
 
   return (
@@ -60,7 +60,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
       {/* Standings preview */}
       <Section width="narrow">
         <MigrationNotice />
-        <SectionHeader title="Standings" lead={seasonRecordCaption} />
+        <SectionHeader title="Standings" lead={divisionsCaption} />
         {topTeams.length === 0 ? (
           <p className="text-center py-8 text-foreground-secondary text-sm">
             Standings will populate once the season begins.
