@@ -61,6 +61,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
       id: 'get-involved',
       items: [
         { label: 'Apply to Play', href: ROUTES.apply },
+        { label: 'Staff App', href: ROUTES.staffApp },
         { label: 'Sponsorship Tiers', href: ROUTES.sponsors },
       ],
     },

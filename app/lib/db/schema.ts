@@ -298,6 +298,24 @@ export const schoolApplications = pgTable('school_applications', {
   index('school_applications_submitted_at_idx').on(table.submittedAt),
 ]).enableRLS();
 
+export const staffApplications = pgTable('staff_applications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  preferredFirstName: text('preferred_first_name'),
+  email: text('email').notNull(),
+  phone: text('phone').notNull(),
+  discordTag: text('discord_tag'),
+  role: text('role').notNull(),
+  message: text('message').default(''),
+  status: applicationStatusEnum('status').default('pending').notNull(),
+  submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+  ...auditColumns,
+}, (table) => [
+  index('staff_applications_status_idx').on(table.status),
+  index('staff_applications_submitted_at_idx').on(table.submittedAt),
+]).enableRLS();
+
+
 // CMS key-value content blocks for editable page text
 export const pageContent = pgTable('page_content', {
   id: uuid('id').defaultRandom().primaryKey(),
