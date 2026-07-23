@@ -30,6 +30,12 @@ from the user or another session at any time, and the two read paths above
 already cover everything a review or verify pass needs, with nothing to
 check out.
 
+If a check genuinely requires *running* something — tests, a build, a dev
+server — rather than just reading it, use the worktree handed to you for
+that too. If none was handed to you, create one with `EnterWorktree` before
+running anything, the same way the `implement` skill does. This keeps
+execution, like reading, entirely off the main checkout.
+
 ## Review pass
 
 Given a branch, worktree path, or diff to review:
