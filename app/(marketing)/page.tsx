@@ -10,7 +10,6 @@ import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import CutCTA from '@/app/components/ui/CutCTA';
 import Section from '@/app/components/ui/Section';
 import { Eyebrow } from '@/app/components/ui/SectionHeader';
-import GradientRule from '@/app/components/ui/GradientRule';
 import Image from 'next/image';
 import {
   galleryImages1,
@@ -88,19 +87,6 @@ export default async function HomePage() {
       <ScrollReveal>
         <SchoolWall />
       </ScrollReveal>
-
-      {/* 5. CTA Strip */}
-      <Section className="border-t border-b border-accent/15">
-        <div className="flex flex-col items-center gap-3">
-          <Eyebrow>Get Started</Eyebrow>
-          <GradientRule className="mb-1" />
-          <p className="text-foreground font-semibold text-base">Ready to compete?</p>
-          <div className="flex gap-4 flex-wrap justify-center">
-            <CutCTA href={ROUTES.apply} variant="primary">Apply to Play</CutCTA>
-            <CutCTA href={ROUTES.about} variant="outline">Learn More</CutCTA>
-          </div>
-        </div>
-      </Section>
 
       {/* 6. Photo Gallery #1 */}
       {primaryGallery.length > 0 && (
