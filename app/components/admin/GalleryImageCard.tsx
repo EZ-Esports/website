@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { HiChevronLeft, HiChevronRight } from 'react-icons/hi2';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import { updateGalleryImage, toggleGalleryImageActive, deleteGalleryImage } from '@/app/(admin)/admin/gallery/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
@@ -94,24 +95,30 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
         </div>
 
         {totalCount > 1 && (
-          <div className="space-y-1 bg-surface-raised/40 p-2 rounded-lg border border-line/30">
-            <label
-              htmlFor={`reorder-${img.id}`}
-              className="flex items-center justify-between text-[9px] font-bold text-foreground-secondary uppercase tracking-wider"
-            >
-              <span>Reorder</span>
-              <span className="text-accent">{index + 1} / {totalCount}</span>
-            </label>
-            <input
-              id={`reorder-${img.id}`}
-              type="range"
-              min="1"
-              max={totalCount}
-              value={index + 1}
-              onChange={(e) => onOrderChange(index, parseInt(e.target.value, 10) - 1)}
+          <div className="flex items-center justify-between gap-2 bg-surface-raised/40 p-2 rounded-lg border border-line/30">
+            <button
+              type="button"
+              onClick={() => onOrderChange(index, index - 1)}
+              disabled={index === 0}
+              aria-label="Move earlier in the gallery order"
               aria-describedby={`caption-${img.id}`}
-              className="w-full h-1 bg-line accent-accent rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/40"
-            />
+              className="p-1.5 rounded-md border border-line text-foreground-secondary hover:text-white hover:bg-line/60 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground-secondary"
+            >
+              <HiChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[9px] font-bold text-foreground-secondary uppercase tracking-wider">
+              Position <span className="text-accent">{index + 1} / {totalCount}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onOrderChange(index, index + 1)}
+              disabled={index === totalCount - 1}
+              aria-label="Move later in the gallery order"
+              aria-describedby={`caption-${img.id}`}
+              className="p-1.5 rounded-md border border-line text-foreground-secondary hover:text-white hover:bg-line/60 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground-secondary"
+            >
+              <HiChevronRight className="w-4 h-4" />
+            </button>
           </div>
         )}
 
