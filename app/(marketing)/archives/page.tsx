@@ -28,8 +28,8 @@ export default async function ArchivesPage() {
     byGame.set(season.gameSlug, entry);
   }
 
-  // Present games in the league's canonical order, skipping any with no archived seasons.
-  const games: ArchiveGameGroup[] = GAME_SLUGS.filter((slug) => byGame.has(slug)).map((slug) => {
+  // Present games in the league's canonical order, including games with no archived seasons yet.
+  const games: ArchiveGameGroup[] = GAME_SLUGS.map((slug) => {
     const gameSeasons = byGame.get(slug) ?? [];
     const gameConfig = GAMES[slug];
     return {
