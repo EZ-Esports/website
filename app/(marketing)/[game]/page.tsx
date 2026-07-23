@@ -46,11 +46,11 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   const { record, jvRecord, nextMatch, recentResults, topTeams } = await getGameHubData(slug);
 
   const seasonRecordParts: string[] = [];
-  if (record !== null) seasonRecordParts.push(`Varsity ${record}`);
-  if (jvRecord !== null) seasonRecordParts.push(`JV ${jvRecord}`);
+  if (record !== null) seasonRecordParts.push('Varsity');
+  if (jvRecord !== null) seasonRecordParts.push('JV');
   const seasonRecordCaption =
     topTeams.length > 0 && seasonRecordParts.length > 0
-      ? `${seasonRecordParts.join(' · ')} this season.`
+      ? seasonRecordParts.join(' · ')
       : undefined;
 
   return (
