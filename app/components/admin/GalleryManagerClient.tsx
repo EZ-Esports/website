@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import GalleryImageCard from '@/app/components/admin/GalleryImageCard';
 import { updateGalleryImagesOrder } from '@/app/(admin)/admin/gallery/actions';
 
@@ -34,10 +34,29 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
   const [success, setSuccess] = useState(false);
 
   const isDirty = images.map((img) => img.id).join(',') !== initialImages.map((img) => img.id).join(',');
+  const reduceMotion = useReducedMotion();
 
-  // Keep in sync with server-side changes (add/delete/edit) once there's no unsaved reorder pending.
+  // Keep in sync with server-side changes (new/deleted images, edited fields).
+  // If the set of ids hasn't changed, it's safe to just accept the latest data wholesale
+  // unless there's an unsaved reorder pending (then wait for save/discard so we don't
+  // clobber the in-progress drag). If the set of ids HAS changed — someone added or
+  // deleted an image while a reorder was pending — merge instead of ignoring it outright:
+  // keep the local order for images that still exist, refresh their fields, drop removed
+  // ones, and append newly added ones to the end.
   useEffect(() => {
-    if (!isDirty) setImages(initialImages);
+    const incomingIds = new Set(initialImages.map((img) => img.id));
+    const idsMatch = images.length === initialImages.length && images.every((img) => incomingIds.has(img.id));
+
+    if (idsMatch) {
+      if (!isDirty) setImages(initialImages);
+      return;
+    }
+
+    const byId = new Map(initialImages.map((img) => [img.id, img]));
+    const preserved = images.filter((img) => byId.has(img.id)).map((img) => byId.get(img.id)!);
+    const preservedIds = new Set(preserved.map((img) => img.id));
+    const added = initialImages.filter((img) => !preservedIds.has(img.id));
+    setImages([...preserved, ...added]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialImages]);
 
@@ -78,14 +97,19 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
       )}
 
       {success && (
-        <div className="p-4 bg-green-950/20 border border-green-900/40 rounded-xl text-green-400 text-sm">
+        <div role="status" className="p-4 bg-green-950/20 border border-green-900/40 rounded-xl text-green-400 text-sm">
           Gallery order saved successfully!
         </div>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
         {images.map((img, index) => (
-          <motion.div key={img.id} layout transition={{ type: 'spring', stiffness: 300, damping: 30 }} className="h-full">
+          <motion.div
+            key={img.id}
+            layout={reduceMotion ? false : 'position'}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="h-full"
+          >
             <GalleryImageCard img={img} index={index} totalCount={images.length} onOrderChange={handleSliderChange} />
           </motion.div>
         ))}

@@ -1,7 +1,7 @@
 import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { isNull } from 'drizzle-orm';
+import { asc, isNull } from 'drizzle-orm';
 import { addGalleryImage } from './actions';
 import GalleryManagerClient from '@/app/components/admin/GalleryManagerClient';
 import ImageUpload from '@/app/components/admin/ImageUpload';
@@ -12,7 +12,11 @@ import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 
 async function getAllGalleryImages() {
-  return db.select().from(schema.galleryImages).where(isNull(schema.galleryImages.deletedAt)).orderBy(schema.galleryImages.displayOrder);
+  return db
+    .select()
+    .from(schema.galleryImages)
+    .where(isNull(schema.galleryImages.deletedAt))
+    .orderBy(asc(schema.galleryImages.displayOrder), asc(schema.galleryImages.createdAt));
 }
 
 export default async function GalleryAdminPage() {

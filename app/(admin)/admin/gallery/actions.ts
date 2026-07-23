@@ -24,14 +24,21 @@ export async function addGalleryImage(formData: FormData) {
 
   try {
     // New images always go to the end of the list — display order is derived, never user-entered.
-    const [maxOrderResult] = await db
-      .select({ maxOrder: sql<number>`max(${schema.galleryImages.displayOrder})` })
-      .from(schema.galleryImages)
-      .where(isNull(schema.galleryImages.deletedAt));
+    // The advisory lock serializes concurrent adds so two simultaneous submissions can't both
+    // read the same max() and insert duplicate displayOrder values (it's tied to the transaction,
+    // so it's safe under Supabase's transaction pooler, unlike a session-level advisory lock).
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('gallery_images_display_order'))`);
 
-    const displayOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
+      const [maxOrderResult] = await tx
+        .select({ maxOrder: sql<number>`max(${schema.galleryImages.displayOrder})` })
+        .from(schema.galleryImages)
+        .where(isNull(schema.galleryImages.deletedAt));
 
-    await db.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, displayOrder, storageKey });
+      const displayOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
+
+      await tx.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, displayOrder, storageKey });
+    });
   } catch (error) {
     console.error('Failed to add gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -85,8 +92,9 @@ export async function updateGalleryImage(id: string, formData: FormData) {
 /**
  * Persists a full reorder in one shot: the incoming array is the complete,
  * already-deduplicated ordering, so display order is just its index + 1.
- * Rewriting every row (rather than diffing) is what guarantees no duplicate
- * or gapped values even if the client's local state ever drifts from the DB.
+ * Rewriting every row in this list (rather than diffing) means the values
+ * within this reorder are always sequential and duplicate-free, regardless
+ * of what displayOrder those rows had before the call.
  */
 export async function updateGalleryImagesOrder(orderedIds: string[]) {
   await requirePermission(Permissions.MANAGE_GALLERY);

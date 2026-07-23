@@ -82,7 +82,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
       <div className="p-3 flex flex-col flex-grow gap-3">
         <div className="space-y-1.5">
           <div className="flex items-start justify-between gap-1">
-            <p className="text-white text-xs font-semibold leading-tight line-clamp-2 flex-grow">
+            <p id={`caption-${img.id}`} className="text-white text-xs font-semibold leading-tight line-clamp-2 flex-grow">
               {img.caption || <span className="text-foreground-muted italic">No caption</span>}
             </p>
             <span className="text-[10px] font-black text-accent bg-accent/10 px-1.5 py-0.5 rounded shrink-0 self-start">
@@ -109,7 +109,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
               max={totalCount}
               value={index + 1}
               onChange={(e) => onOrderChange(index, parseInt(e.target.value, 10) - 1)}
-              aria-label={`Move "${img.caption || 'this image'}" to a new position in the gallery order`}
+              aria-describedby={`caption-${img.id}`}
               className="w-full h-1 bg-line accent-accent rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/40"
             />
           </div>
