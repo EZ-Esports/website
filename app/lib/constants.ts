@@ -21,6 +21,7 @@ export const ROUTES = {
   leadership: '/leadership',
   archives: '/archives',
   apply: '/apply',
+  staffApp: '/apply/staff',
   sponsors: '/sponsors',
   privacy: '/privacy',
 } as const;

@@ -8,7 +8,7 @@ export const Permissions = {
   MANAGE_LEADERSHIP: BigInt(1) << BigInt(6),   // Manage leadership team listings
   MANAGE_GALLERY: BigInt(1) << BigInt(7),      // Upload, arrange, and delete gallery images
   MANAGE_SPONSORS: BigInt(1) << BigInt(8),     // Manage sponsors and tiers
-  MANAGE_APPLICATIONS: BigInt(1) << BigInt(9), // View and accept school league applications
+  MANAGE_APPLICATIONS: BigInt(1) << BigInt(9), // View and accept school and staff applications
   MANAGE_SCHOOLS: BigInt(1) << BigInt(10),     // Manage registered schools
   MANAGE_CONTENT: BigInt(1) << BigInt(11),     // Edit public page CMS text blocks
 } as const;

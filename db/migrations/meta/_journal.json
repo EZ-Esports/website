@@ -162,6 +162,13 @@
       "when": 1784564018537,
       "tag": "0022_remove_gallery_set_id",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784771139281,
+      "tag": "0023_rich_logan",
+      "breakpoints": true
     }
   ]
 }
