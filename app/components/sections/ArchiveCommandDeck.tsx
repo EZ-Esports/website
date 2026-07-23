@@ -184,17 +184,15 @@ function GameDashboard({ game }: { game: ArchiveGameGroup }) {
       <div role="table" aria-label={`${game.displayName} seasons`} className="border border-line rounded-2xl overflow-hidden">
         <div
           role="row"
-          className="hidden sm:grid grid-cols-[84px_1fr_1fr_120px_192px] gap-3 px-5 py-2.5 bg-surface-sunken border-b border-line text-[10px] font-black uppercase tracking-wider text-foreground-muted"
+          className="hidden sm:grid grid-cols-[84px_1fr_120px_192px] gap-3 px-5 py-2.5 bg-surface-sunken border-b border-line text-[10px] font-black uppercase tracking-wider text-foreground-muted"
         >
           <span role="columnheader">Season</span>
           <span role="columnheader">Champion</span>
           <span role="columnheader">Matches</span>
-          <span role="columnheader">Volume</span>
           <span role="columnheader" aria-hidden="true" />
         </div>
 
         {seasons.map((season, index) => {
-          const pct = Math.round((season.matchCount / maxMatches) * 100);
           const scheduleHref = `/${season.gameSlug}/schedule?season=${encodeURIComponent(season.name)}`;
           const standingsHref = `/${season.gameSlug}/standings?season=${encodeURIComponent(season.name)}`;
           return (
@@ -202,7 +200,7 @@ function GameDashboard({ game }: { game: ArchiveGameGroup }) {
               key={season.id}
               role="row"
               className={cx(
-                'grid grid-cols-1 sm:grid-cols-[84px_1fr_1fr_120px_192px] gap-2 sm:gap-3 sm:items-center',
+                'grid grid-cols-1 sm:grid-cols-[84px_1fr_120px_192px] gap-2 sm:gap-3 sm:items-center',
                 'px-5 py-3.5 hover:bg-surface-raised transition-colors',
                 index < seasons.length - 1 && 'border-b border-line'
               )}
@@ -219,17 +217,6 @@ function GameDashboard({ game }: { game: ArchiveGameGroup }) {
               <span role="cell" className="text-[13px] tabular-nums text-foreground-muted">
                 {season.matchCount}
               </span>
-              <div role="cell" className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 rounded-full bg-surface-sunken overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[var(--game)]"
-                    style={{ width: `${pct}%`, minWidth: 3 }}
-                  />
-                </div>
-                <span className="text-[11.5px] font-bold tabular-nums text-foreground-muted w-[34px] text-right">
-                  {season.matchCount}
-                </span>
-              </div>
               <div role="cell" className="flex gap-1.5 justify-start sm:justify-end">
                 <Link
                   href={scheduleHref}
