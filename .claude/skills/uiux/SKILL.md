@@ -51,10 +51,10 @@ nav panels, products).
 
 **7. Contrast and color have contracts.**
 Text colors must meet contrast on the surface they actually sit on (a brand color
-designed for dark surfaces fails on light ones — swap to the accessible variant, don't
-reuse it). Interactive states (focus, error, active, complete) each get one consistent
-color across the page. Never invent utility classes that don't exist in the design
-system (`text-red-650`) — they silently render as nothing.
+designed for dark surfaces fails on light ones — swap in the accessible variant
+for that surface). Interactive states (focus, error, active, complete) each get
+one consistent color across the page. Use only utility classes that exist in the
+design system (`text-red-650`, for example, silently renders as nothing).
 
 **8. Transitions between surfaces must look intentional.**
 Adjacent sections with unrelated backgrounds (dark → light) read as a bug ("clipping")

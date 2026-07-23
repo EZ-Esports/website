@@ -29,5 +29,5 @@ review.
 5. **Verify before calling it done.** Run `npm run lint`, `npm run test`, and
    `npm run build`. For UI changes, follow the `uiux` skill's rule to
    screenshot the rendered page at desktop width and check it visually.
-6. **Hand off to review.** Once verification passes, load the `review` skill
+6. **Hand off to review.** Once verification passes, load the `review-loop` skill
    to get an independent pass on the diff before it's considered mergeable.

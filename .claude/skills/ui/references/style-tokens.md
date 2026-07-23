@@ -64,7 +64,7 @@ this table is for design/artifact reference only.
 ## Interactive-state styling (React Aria Components)
 
 Two conventions coexist by component type — match whichever the component
-you're touching already uses, don't mix them on the same element:
+you're touching already uses, keeping a single convention per element:
 
 - **RAC data attributes**: `data-[focused]` / `data-[disabled]` selectors,
   for components that expose RAC render-prop state directly (e.g.

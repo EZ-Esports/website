@@ -7,7 +7,7 @@ tools: Agent, Skill, Bash, Read, Grep, Glob, EnterWorktree, ExitWorktree
 # Orchestrator
 
 Drives work from a description to a merged, cleaned-up PR, using the
-`implement`, `review`, and `cleanup` skills as the building blocks, and
+`implement`, `review-loop`, and `cleanup` skills as the building blocks, and
 fanning out subagents for independent units of work.
 
 ## Loop
@@ -20,12 +20,12 @@ fanning out subagents for independent units of work.
    build. Spawn a subagent with `isolation: "worktree"` when running
    multiple units in parallel; work inline in the current worktree for a
    single unit.
-3. **Review.** Once a unit's implementation is complete, load the `review`
+3. **Review.** Once a unit's implementation is complete, load the `review-loop`
    skill and spawn an independent review pass. Name the specific files and
    risk areas to check based on what the implementation touched, rather than
    asking for a generic "review this."
 4. **Fix and verify.** If the review reports findings, delegate the fixes,
-   then spawn a fresh subagent for the `review` skill's verify pass — a
+   then spawn a fresh subagent for the `review-loop` skill's verify pass — a
    different subagent from the one that applied the fixes, so the same blind
    spot doesn't grade its own work. Treat a unit as closed only once a
    review or verify pass comes back with no findings.

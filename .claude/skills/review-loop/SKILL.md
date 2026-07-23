@@ -1,9 +1,9 @@
 ---
-name: review
-description: Independently review a branch, worktree, or diff for correctness and quality, or verify that a previous review's fixes actually resolved the reported issues. Load when asked to review a PR/branch, or to check a fix-up commit against earlier findings.
+name: review-loop
+description: Independently review a branch, worktree, or diff for correctness and quality as part of an implement/review/cleanup cycle, or verify that a previous review's fixes actually resolved the reported issues. Load when asked to review a PR/branch as part of a build-and-ship task, or to check a fix-up commit against earlier findings.
 ---
 
-# Review
+# Review loop
 
 Covers two distinct passes — pick the one that matches the request.
 
@@ -39,7 +39,7 @@ Given a review's findings plus a fix-up commit that claims to resolve them:
    matching IDs *and* a dirty flag rather than IDs alone).
 3. Set `verdict` to `CONFIRMED` for findings that are genuinely fixed, and
    report anything still open as a new finding with its own failure
-   scenario — don't silently mark a partial fix as done.
+   scenario, so a partial fix stays visible instead of reading as closed.
 4. Run this pass as a fresh review rather than trusting the fixer's own
    account of what changed, since the fixer's blind spot is usually the same
    one that produced the original bug.
