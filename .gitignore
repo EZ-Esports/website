@@ -48,8 +48,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# claude code agent worktrees / local scratch
-.claude/
+# claude code agent worktrees / local scratch (skills and agents are shared, see .claude/skills and .claude/agents)
+.claude/worktrees/
+.claude/*.local.json
 
 # local assets directory
 /ez_esports_assets/
