@@ -7,6 +7,29 @@ description: Independently review a branch, worktree, or diff for correctness an
 
 Covers two distinct passes — pick the one that matches the request.
 
+## Read the change without touching a shared working tree
+
+A review or verify pass only ever needs to *read* code — reach for one of
+these, in order of preference:
+
+1. If the caller hands you an existing worktree path for this branch (e.g.
+   `.claude/worktrees/<name>`), read files there directly, or run git
+   commands scoped to it with `git -C <worktree-path> ...`. That worktree
+   already holds exactly this branch's checked-out state.
+2. Otherwise, view the change through git's read-only plumbing:
+   `git diff <base>...<branch>`, `git show <branch>:<path>`, or
+   `gh pr diff <number>`. Every one of these prints content without writing
+   anything to disk.
+
+Treat the main checkout — the repo root the user works in directly, not a
+path under `.claude/worktrees/` — as reserved for the `cleanup` skill's
+deliberate, stash-protected merge step. Commands that change tracked-file
+contents (`checkout`, `reset`, `stash apply`/`pop`, `merge`, `rebase`) belong
+there and only there. The main checkout can hold unrelated uncommitted work
+from the user or another session at any time, and the two read paths above
+already cover everything a review or verify pass needs, with nothing to
+check out.
+
 ## Review pass
 
 Given a branch, worktree path, or diff to review:
