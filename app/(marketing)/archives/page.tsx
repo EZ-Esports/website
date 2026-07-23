@@ -47,7 +47,7 @@ export default async function ArchivesPage() {
           as="h1"
           eyebrow="League History"
           title="Archives"
-          lead="Every season at a glance: matches played, champion schools, and a shape of the league's history across all three games."
+          lead="Every season at a glance: matches played, champion schools, and a shape of the league's history across every game."
         />
         <MigrationNotice />
 

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { FocusScope } from 'react-aria';
 import { Dialog, Button, Link as AriaLink } from 'react-aria-components';
-import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
+import { SITE_CONFIG, ROUTES, GAME_SLUGS, getGameRoute } from '@/app/lib/constants';
 import CutCTA from '@/app/components/ui/CutCTA';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
@@ -20,9 +20,7 @@ export default function Header() {
                   pathname === '/about' ||
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
-                  pathname === '/valorant' ||
-                  pathname === '/league-of-legends' ||
-                  pathname === '/team-fight-tactics' ||
+                  GAME_SLUGS.some((slug) => pathname === getGameRoute(slug)) ||
                   pathname === '/sponsors' ||
                   pathname === '/privacy';
 
