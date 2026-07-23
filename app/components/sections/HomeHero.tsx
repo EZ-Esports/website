@@ -24,9 +24,7 @@ interface HomeHeroProps {
  * those pages.
  */
 export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA, secondaryCTA }: HomeHeroProps) {
-  // Helper to dynamically color brand words "EZ" and "Esports" pink.
-  // Ported verbatim from Hero.tsx so CMS-edited titles stay consistent with
-  // the rest of the site.
+  // Helper to dynamically inject a line break between "High" and "School" in the title.
   const renderTitle = (text: string) => {
     const parts = text.split(/(high\s+school)/i);
     return parts.map((part, i) => {
