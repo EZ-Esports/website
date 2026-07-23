@@ -98,11 +98,15 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
           <div className="flex items-center justify-between gap-2 bg-surface-raised/40 p-2 rounded-lg border border-line/30">
             <button
               type="button"
-              onClick={() => onOrderChange(index, index - 1)}
-              disabled={index === 0}
+              onClick={() => index > 0 && onOrderChange(index, index - 1)}
+              aria-disabled={index === 0}
               aria-label="Move earlier in the gallery order"
               aria-describedby={`caption-${img.id}`}
-              className="p-1.5 rounded-md border border-line text-foreground-secondary hover:text-white hover:bg-line/60 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground-secondary"
+              className={`p-1.5 rounded-md border border-line transition-all cursor-pointer ${
+                index === 0
+                  ? 'opacity-30 cursor-not-allowed text-foreground-secondary'
+                  : 'text-foreground-secondary hover:text-white hover:bg-line/60'
+              }`}
             >
               <HiChevronLeft className="w-4 h-4" />
             </button>
@@ -111,11 +115,15 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
             </span>
             <button
               type="button"
-              onClick={() => onOrderChange(index, index + 1)}
-              disabled={index === totalCount - 1}
+              onClick={() => index < totalCount - 1 && onOrderChange(index, index + 1)}
+              aria-disabled={index === totalCount - 1}
               aria-label="Move later in the gallery order"
               aria-describedby={`caption-${img.id}`}
-              className="p-1.5 rounded-md border border-line text-foreground-secondary hover:text-white hover:bg-line/60 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground-secondary"
+              className={`p-1.5 rounded-md border border-line transition-all cursor-pointer ${
+                index === totalCount - 1
+                  ? 'opacity-30 cursor-not-allowed text-foreground-secondary'
+                  : 'text-foreground-secondary hover:text-white hover:bg-line/60'
+              }`}
             >
               <HiChevronRight className="w-4 h-4" />
             </button>
