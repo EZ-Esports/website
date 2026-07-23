@@ -37,20 +37,21 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
   const reduceMotion = useReducedMotion();
 
   // Keep in sync with server-side changes (new/deleted images, edited fields).
-  // If the set of ids hasn't changed, it's safe to just accept the latest data wholesale
-  // unless there's an unsaved reorder pending (then wait for save/discard so we don't
-  // clobber the in-progress drag). If the set of ids HAS changed — someone added or
-  // deleted an image while a reorder was pending — merge instead of ignoring it outright:
-  // keep the local order for images that still exist, refresh their fields, drop removed
-  // ones, and append newly added ones to the end.
+  // With no unsaved reorder pending, there's nothing local to protect — always trust
+  // the latest server data and order outright. With a reorder pending, only step in if
+  // the id set actually changed (someone added or deleted an image mid-drag): merge by
+  // keeping the local order for images that still exist, refreshing their fields,
+  // dropping removed ones, and appending newly added ones to the end. If the id set is
+  // unchanged, leave the in-progress local reorder alone.
   useEffect(() => {
-    const incomingIds = new Set(initialImages.map((img) => img.id));
-    const idsMatch = images.length === initialImages.length && images.every((img) => incomingIds.has(img.id));
-
-    if (idsMatch) {
-      if (!isDirty) setImages(initialImages);
+    if (!isDirty) {
+      setImages(initialImages);
       return;
     }
+
+    const incomingIds = new Set(initialImages.map((img) => img.id));
+    const idsMatch = images.length === initialImages.length && images.every((img) => incomingIds.has(img.id));
+    if (idsMatch) return;
 
     const byId = new Map(initialImages.map((img) => [img.id, img]));
     const preserved = images.filter((img) => byId.has(img.id)).map((img) => byId.get(img.id)!);
