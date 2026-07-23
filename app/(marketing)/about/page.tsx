@@ -181,7 +181,7 @@ export default async function AboutPage() {
             <div key={division.name} className="bg-surface-raised p-6 min-h-[150px] flex flex-col justify-between">
               <span className="text-xs font-black text-foreground-muted tracking-wider">{String(i + 1).padStart(2, '0')}</span>
               <div>
-                <h4 className="font-extrabold uppercase tracking-wide text-foreground mb-1.5">{division.name}</h4>
+                <h3 className="font-extrabold uppercase tracking-wide text-foreground mb-1.5">{division.name}</h3>
                 <p className="text-sm text-foreground-secondary leading-relaxed">{division.description}</p>
               </div>
             </div>
