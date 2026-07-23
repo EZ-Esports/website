@@ -60,7 +60,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
       label: 'Get Involved',
       id: 'get-involved',
       items: [
-        { label: 'Apply to Join', href: ROUTES.apply },
+        { label: 'Apply to Play', href: ROUTES.apply },
         { label: 'Sponsorship Tiers', href: ROUTES.sponsors },
       ],
     },

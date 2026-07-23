@@ -17,7 +17,7 @@ interface CutCTAProps {
 
 /**
  * Shared clipped-corner CTA button (RAC Link) used by the hero and the nav's
- * Apply Now, so every "action" button on the site reads as one coherent
+ * Apply to Play, so every "action" button on the site reads as one coherent
  * shape/weight/casing. A plain CSS `border` only draws along an element's
  * rectangular box edges — once `clip-path` shaves off the diagonal corners,
  * the border has no edge left to follow there, leaving the cut looking
