@@ -28,13 +28,15 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
   // Ported verbatim from Hero.tsx so CMS-edited titles stay consistent with
   // the rest of the site.
   const renderTitle = (text: string) => {
-    const parts = text.split(/(New York City|Esports|EZ)/gi);
+    const parts = text.split(/(high\s+school)/i);
     return parts.map((part, i) => {
-      const lower = part.toLowerCase();
-      if (lower === 'new york city' || lower === 'esports' || lower === 'ez') {
+      if (/^high\s+school$/i.test(part)) {
+        const words = part.split(/\s+/);
         return (
-          <span key={i} className="text-accent font-black drop-shadow-[0_2px_10px_color-mix(in_srgb,var(--color-accent)_45%,transparent)]">
-            {part}
+          <span key={i}>
+            {words[0]}
+            <br />
+            {words[1]}
           </span>
         );
       }
