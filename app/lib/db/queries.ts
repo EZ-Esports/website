@@ -720,6 +720,8 @@ export interface GameHubData {
   nextMatch: { date: string; teams: string; division: string } | null;
   recentResults: { date: string; teams: string; result: string; division: string }[];
   topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[];
+  /** Name of the active season, for the hub's season-context meta pill. */
+  seasonName: string | null;
 }
 
 /**
@@ -735,6 +737,7 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
   let nextMatch: { date: string; teams: string; division: string } | null = null;
   let recentResults: { date: string; teams: string; result: string; division: string }[] = [];
   let topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[] = [];
+  let seasonName: string | null = null;
 
   try {
     const gameRow = await db
@@ -774,6 +777,9 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
         .limit(1);
 
       if (activeSeason[0]) {
+        // Already in memory from the query above — no extra DB work.
+        seasonName = activeSeason[0].name;
+
         // Fetch the next match, recent results, and season summary in
         // parallel — they only depend on the active season.
         const [nextMatchRow, recentRows, summary] = await Promise.all([
@@ -852,7 +858,7 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
     console.error(`Failed to load dynamic data for ${gameSlug}`, error);
   }
 
-  return { record, jvRecord, nextMatch, recentResults, topTeams };
+  return { record, jvRecord, nextMatch, recentResults, topTeams, seasonName };
 }
 
 // --- STAFF ACCESS CONTROL ---
