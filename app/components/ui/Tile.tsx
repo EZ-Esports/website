@@ -1,18 +1,34 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { cx } from '@/app/lib/cx';
+import { panelShell, panelSurfaces } from '@/app/components/ui/Card';
 
-export type TileTone = 'default' | 'accent';
+export type TileTone = 'default' | 'accent' | 'feature';
 
 /**
- * The `accent` tone reads the per-game CSS custom properties
- * (`--game-accent-soft` / `--game-accent-line`) that the game hub sets as an
- * inline style on its page container. Outside such a container it degrades to
- * a transparent panel, so only use it under a themed ancestor.
+ * The `accent` and `feature` tones read the per-game CSS custom properties
+ * (`--game-accent-soft` / `--game-accent-strong` / `--game-accent-line`) that
+ * the game hub sets as an inline style on its page container. Outside such a
+ * container they degrade to a transparent panel, so only use them under a
+ * themed ancestor. `feature` is the dominant tile of a grid: a stronger tint
+ * plus a solid accent edge.
  */
 const toneStyles: Record<TileTone, string> = {
-  default: 'bg-surface-raised/60 border-line hover:border-foreground-muted',
-  accent: 'bg-[var(--game-accent-soft)] border-[var(--game-accent-line)]',
+  default: panelSurfaces.raised,
+  accent: 'bg-[var(--game-accent-soft)] border border-[var(--game-accent-line)]',
+  feature:
+    'bg-[var(--game-accent-strong)] border border-[var(--game-accent-line)] border-l-4 border-l-[var(--game-accent)]',
+};
+
+/**
+ * `foreground-muted` is legible on the plain raised panel but drops to ~3:1 on
+ * an accent-tinted one, and the title is 11px — so tinted tones get the
+ * brighter secondary tone instead.
+ */
+const titleStyles: Record<TileTone, string> = {
+  default: 'text-foreground-muted',
+  accent: 'text-foreground-secondary',
+  feature: 'text-foreground-secondary',
 };
 
 interface TileProps {
@@ -48,13 +64,17 @@ export default function Tile({
   return (
     <article
       className={cx(
-        'flex flex-col rounded-2xl border shadow-2xl shadow-black/20 transition-colors duration-300',
+        'flex flex-col',
+        panelShell,
         toneStyles[tone],
+        // Only a tile that actually goes somewhere gets a hover affordance —
+        // a border that brightens on a tile with nothing to click is a lie.
+        href && tone === 'default' && 'hover:border-foreground-muted',
         className
       )}
     >
       <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-3">
-        <h2 className="text-[11px] font-black uppercase tracking-widest text-foreground-muted">
+        <h2 className={cx('text-[11px] font-black uppercase tracking-widest', titleStyles[tone])}>
           {title}
         </h2>
         {href && (

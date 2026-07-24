@@ -17,6 +17,7 @@ import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getGameHubData } from '@/app/lib/db/queries';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import { cx } from '@/app/lib/cx';
+import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
 
 
 const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
@@ -44,7 +45,27 @@ type GameThemeStyle = CSSProperties & {
   '--game-accent': string;
   '--game-accent-on': string;
   '--game-accent-soft': string;
+  '--game-accent-strong': string;
   '--game-accent-line': string;
+};
+
+/**
+ * Grid spans as literal classes — Tailwind only generates what it can see in
+ * the source, so these can never be assembled from a template string.
+ */
+const SM_COL_SPAN: Record<number, string> = {
+  1: 'sm:col-span-1',
+  2: 'sm:col-span-2',
+};
+const LG_COL_SPAN: Record<number, string> = {
+  1: 'lg:col-span-1',
+  2: 'lg:col-span-2',
+  3: 'lg:col-span-3',
+  4: 'lg:col-span-4',
+};
+const LG_ROW_SPAN: Record<number, string> = {
+  1: 'lg:row-span-1',
+  2: 'lg:row-span-2',
 };
 
 const divisionLabel = (division: string): string =>
@@ -82,7 +103,10 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   // topTeams rows join the school name, so they double as the roster shortlist.
   const rosterSchools = topTeams.map((entry) => entry.team);
 
-  const hasSeasonData = topTeams.length > 0 || nextMatch !== null || recentResults.length > 0;
+  const hasStandings = topTeams.length > 0;
+  const hasNextMatch = nextMatch !== null;
+  const hasRosters = rosterSchools.length > 0;
+  const hasSeasonData = hasStandings || hasNextMatch || recentResults.length > 0;
   // No data AND no season on the books at all: this division has never run, so the
   // page's job is recruitment. A division that has a season but nothing renderable
   // yet (e.g. one whose standings are per-player) keeps the grid and gets pointed
@@ -92,25 +116,28 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   const discordUrl = SOCIAL_LINKS.find((link) => link.platform === 'discord')?.url;
 
   /**
-   * Tiles are sized in grid cells (of a 4-column desktop row); the archives strip
-   * widens to absorb whatever the tiles above leave over, so the grid never ends
-   * on an empty cell.
+   * Tile spans are planned by simulating CSS grid's row-flow auto-placement
+   * (see `app/lib/game-hub-layout.ts`), because "cells consumed so far" says
+   * nothing about how many columns are contiguously free at the flow cursor.
+   * The planner guarantees every data state fills its grid completely.
    */
-  const filledCells =
-    (nextMatch ? 2 : 0) +
-    (topTeams.length > 0 ? 4 : 0) +
-    (lastResult ? 1 : 0) +
-    (rosterSchools.length > 0 ? 1 : 0) +
-    (olderResults.length > 0 ? 2 : 0) +
-    (hasSeasonData ? 0 : 2);
-  const archivesSpan = (['lg:col-span-4', 'lg:col-span-3', 'lg:col-span-2', 'lg:col-span-1'] as const)[
-    filledCells % 4
-  ];
+  const tileLayout = planGameHubLayout({
+    hasStandings,
+    hasNextMatch,
+    recentResultsCount: recentResults.length,
+    hasRosters,
+  });
+  const spanClass = (id: GameHubTileId): string => {
+    const tile = tileLayout.find((entry) => entry.id === id);
+    if (!tile) return '';
+    return cx(SM_COL_SPAN[tile.smColSpan], LG_COL_SPAN[tile.colSpan], LG_ROW_SPAN[tile.rowSpan]);
+  };
 
   const themeStyle: GameThemeStyle = {
     '--game-accent': gameConfig.accent.color,
     '--game-accent-on': gameConfig.accent.on,
     '--game-accent-soft': `color-mix(in srgb, ${gameConfig.accent.color} 12%, transparent)`,
+    '--game-accent-strong': `color-mix(in srgb, ${gameConfig.accent.color} 22%, transparent)`,
     '--game-accent-line': `color-mix(in srgb, ${gameConfig.accent.color} 40%, transparent)`,
   };
 
@@ -120,20 +147,20 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
   return (
     <div className="min-h-[60vh]" style={themeStyle}>
-      <Section width="wide">
-        <MigrationNotice />
-
-        {/* Identity row: accent rule + the page's only h1 + season context. */}
-        <div className="flex gap-4 sm:gap-5 mb-10 sm:mb-12">
+      <Section width="wide" className="pt-10 md:pt-14">
+        {/* Identity row: accent rule + the page's only h1 + season context. It
+            comes first so the game, not a system notice, is what a visitor reads
+            first on the page. */}
+        <div className="flex gap-4 sm:gap-5 mb-5">
           <span
             className="w-[3px] shrink-0 rounded-full bg-[var(--game-accent)]"
             aria-hidden="true"
           />
           <div className="min-w-0">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-foreground">
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-foreground">
               {gameConfig.displayName}
             </h1>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {metaPills
                 .filter((pill): pill is string => Boolean(pill))
                 .map((pill) => (
@@ -145,10 +172,12 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
           </div>
         </div>
 
+        <MigrationNotice />
+
         {!isNewDivision ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {!hasSeasonData && seasonName && (
-              <Tile title="This season" tone="accent" className="sm:col-span-2">
+              <Tile title="This season" tone="accent" className={spanClass('season-summary')}>
                 <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
                   {`The ${seasonName} season is under way.`}
                 </p>
@@ -176,20 +205,25 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             )}
 
             {nextMatch && (
-              <Tile
-                title="Next match"
-                tone="accent"
-                className="sm:col-span-2"
-              >
-                <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+              // The dominant tile of the grid: the planner gives it the full
+              // width, and the `feature` tone carries the game's accent as a
+              // stronger tint plus a solid edge.
+              <Tile title="Next match" tone="feature" className={spanClass('next-match')}>
+                <p className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] text-foreground">
                   {nextMatch.teams}
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-foreground-secondary">
                     {nextMatch.date}
                   </span>
-                  <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest bg-[var(--game-accent)] text-[var(--game-accent-on)]">
-                    {nextMatch.division}
+                  {/* Accent-tinted, not accent-filled: small text on a solid
+                      per-game accent fails contrast for several of the games. */}
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--game-accent-line)] bg-[var(--game-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-[var(--game-accent)]"
+                      aria-hidden="true"
+                    />
+                    {divisionLabel(nextMatch.division)}
                   </span>
                 </div>
                 <Button
@@ -208,7 +242,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                 href={getGameSubRoute(slug, 'standings')}
                 linkLabel="Full table"
                 flush
-                className="sm:col-span-2 lg:row-span-2"
+                className={spanClass('standings')}
               >
                 <Table>
                   <thead className="border-b border-line">
@@ -250,7 +284,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             )}
 
             {lastResult && (
-              <Tile title="Last result">
+              <Tile title="Last result" className={spanClass('last-result')}>
                 <p className="text-sm font-bold leading-snug text-foreground">
                   {lastResult.teams}
                 </p>
@@ -273,6 +307,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                 title="Rosters"
                 href={getGameSubRoute(slug, 'teams')}
                 linkLabel="All teams"
+                className={spanClass('rosters')}
               >
                 <ul className="space-y-2">
                   {rosterSchools.map((school) => (
@@ -292,7 +327,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                 title="Recent results"
                 href={getGameSubRoute(slug, 'schedule')}
                 linkLabel="All matches"
-                className="sm:col-span-2"
+                className={spanClass('recent-results')}
               >
                 <ul className="divide-y divide-line">
                   {olderResults.map((match, index) => (
@@ -319,7 +354,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               title="Season archives"
               href={ROUTES.archives}
               linkLabel="Archives"
-              className={cx('sm:col-span-2', archivesSpan)}
+              className={spanClass('archives')}
             >
               <p className="text-sm leading-relaxed text-foreground-secondary">
                 {`Every past ${gameConfig.displayName} season in one place — final standings, champion schools, and the full match history behind them.`}
@@ -340,7 +375,9 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               </Button>
             </Tile>
 
-            <Tile title="What to expect">
+            {/* Full width on the 2-column tablet grid so the row above it can't
+                strand an empty cell; one of three columns on desktop. */}
+            <Tile title="What to expect" className="sm:col-span-2 lg:col-span-1">
               <ul className="space-y-2 text-sm font-semibold text-foreground-secondary">
                 <li>Weekly scheduled matches</li>
                 <li>Varsity and JV divisions</li>
@@ -368,7 +405,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               </div>
             </Tile>
 
-            <Tile title="Questions">
+            <Tile title="Questions" className="sm:col-span-2 lg:col-span-1">
               <p className="text-sm leading-relaxed text-foreground-secondary">
                 Talk to the division leads directly.
               </p>
