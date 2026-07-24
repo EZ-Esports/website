@@ -40,10 +40,17 @@ const RANK_MEDALS: Record<number, string> = { 1: '🏆', 2: '🥈', 3: '🥉' };
 /** Established divisions pointed at from a new division's "while you wait" tile. */
 const ESTABLISHED_SLUGS: GameSlug[] = ['valorant', 'league-of-legends', 'team-fight-tactics'];
 
-/** Per-game CSS custom properties, consumed by `bg-[var(--game-accent)]` &co. */
+/**
+ * Per-game CSS custom properties, consumed by `bg-[var(--game-accent)]` &co.
+ *
+ * `gameConfig.accent.on` is deliberately *not* plumbed: solid accent on this
+ * page only ever carries non-text elements (the identity rule, the standings
+ * leader bar, the chip dot). Small text sits on accent *tints* instead, where
+ * the normal foreground tokens are what's legible — so a text-on-accent color
+ * would be declared and never read.
+ */
 type GameThemeStyle = CSSProperties & {
   '--game-accent': string;
-  '--game-accent-on': string;
   '--game-accent-soft': string;
   '--game-accent-strong': string;
   '--game-accent-line': string;
@@ -135,15 +142,18 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
   const themeStyle: GameThemeStyle = {
     '--game-accent': gameConfig.accent.color,
-    '--game-accent-on': gameConfig.accent.on,
     '--game-accent-soft': `color-mix(in srgb, ${gameConfig.accent.color} 12%, transparent)`,
     '--game-accent-strong': `color-mix(in srgb, ${gameConfig.accent.color} 22%, transparent)`,
     '--game-accent-line': `color-mix(in srgb, ${gameConfig.accent.color} 40%, transparent)`,
   };
 
+  // One pill per division, each carrying the same long-form label the match
+  // tiles use — a division must never appear under two names on one screen.
+  // Separate pills rather than one joined pill so "Junior Varsity" can wrap to
+  // its own line at 390px instead of blowing out a `whitespace-nowrap` badge.
   const metaPills = isNewDivision
     ? ['New division', 'Season not yet scheduled']
-    : [seasonName, divisions.length > 0 ? divisions.join(' · ') : null];
+    : [seasonName, ...divisions.map(divisionLabel)];
 
   return (
     <div className="min-h-[60vh]" style={themeStyle}>
@@ -301,7 +311,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                 >
                   {lastResult.result}
                 </p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
                   {lastResult.date} · {divisionLabel(lastResult.division)}
                 </p>
               </Tile>
@@ -341,7 +351,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                       className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                     >
                       <div className="min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
                           {match.date} · {divisionLabel(match.division)}
                         </p>
                         <p className="truncate text-sm font-bold text-foreground">{match.teams}</p>

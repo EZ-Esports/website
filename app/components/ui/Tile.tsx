@@ -21,12 +21,14 @@ const toneStyles: Record<TileTone, string> = {
 };
 
 /**
- * `foreground-muted` is legible on the plain raised panel but drops to ~3:1 on
- * an accent-tinted one, and the title is 11px — so tinted tones get the
- * brighter secondary tone instead.
+ * The title is 11px, which is never "large text" for WCAG, so it needs the
+ * full 4.5:1. `foreground-muted` measures 3.69:1 on the plain raised panel and
+ * worse on an accent-tinted one — it fails everywhere here. Every tone uses
+ * `foreground-secondary` (~7:1), which still reads a clear step below the tile
+ * content because the title is smaller and the body text is `foreground`.
  */
 const titleStyles: Record<TileTone, string> = {
-  default: 'text-foreground-muted',
+  default: 'text-foreground-secondary',
   accent: 'text-foreground-secondary',
   feature: 'text-foreground-secondary',
 };
