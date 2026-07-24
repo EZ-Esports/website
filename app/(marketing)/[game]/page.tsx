@@ -147,7 +147,12 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
   return (
     <div className="min-h-[60vh]" style={themeStyle}>
-      <Section width="wide" className="pt-10 md:pt-14">
+      {/* The fixed chrome on a game route is 138px tall, not the 88px that
+          MainContentWrapper's pt-[88px] offsets: the 88px nav plus the ~50px
+          GameSubHeader. This Section's top padding is what clears the rest, so
+          it must stay >= 74px (88 + 74 - 138 = 24px of breathing room) at every
+          breakpoint, or the accent rule and the h1 slide under the sub-header. */}
+      <Section width="wide" className="pt-20 md:pt-24">
         {/* Identity row: accent rule + the page's only h1 + season context. It
             comes first so the game, not a system notice, is what a visitor reads
             first on the page. */}
