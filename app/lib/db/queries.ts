@@ -356,8 +356,18 @@ export const getStaffNews = () =>
 export const getCachedLeadership = unstable_cache(
   async () => {
     return db
-      .select()
+      .select({
+        id: schema.leadership.id,
+        memberId: schema.leadership.memberId,
+        name: schema.leadership.name,
+        role: schema.leadership.role,
+        year: schema.leadership.year,
+        schoolName: schema.schools.name,
+        graduationYear: schema.members.graduationYear,
+      })
       .from(schema.leadership)
+      .leftJoin(schema.members, eq(schema.leadership.memberId, schema.members.id))
+      .leftJoin(schema.schools, eq(schema.members.schoolId, schema.schools.id))
       .where(isNull(schema.leadership.deletedAt))
       .orderBy(desc(schema.leadership.year));
   },

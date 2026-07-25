@@ -71,8 +71,12 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
                   <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
                   <p className="text-accent text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
 
-                  {leader.bio && (
-                    <p className="text-foreground-secondary text-sm leading-relaxed border-t border-line pt-3 mt-3">{leader.bio}</p>
+                  {(leader.schoolName || leader.graduationYear) && (
+                    <p className="text-foreground-secondary text-sm leading-relaxed border-t border-line pt-3 mt-3">
+                      {leader.schoolName || ''}
+                      {leader.schoolName && leader.graduationYear ? ' ' : ''}
+                      {leader.graduationYear ? `'${leader.graduationYear.toString().slice(-2)}` : ''}
+                    </p>
                   )}
                 </div>
               </Card>

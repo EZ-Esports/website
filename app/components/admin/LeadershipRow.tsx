@@ -5,18 +5,30 @@ import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import { updateLeader, deleteLeader } from '@/app/(admin)/admin/leadership/actions';
 
+import type { DBMember, School } from '@/app/types';
+
 interface Leader {
   id: string;
   name: string;
   role: string;
   year: string;
-  bio: string | null;
+  memberId: string | null;
+  schoolName: string | null;
+  graduationYear: number | null;
 }
 
 const inputClass =
   'w-full px-3.5 py-2.5 bg-surface-sunken border border-line/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all';
 
-export default function LeadershipRow({ leader }: { leader: Leader }) {
+export default function LeadershipRow({
+  leader,
+  members,
+  schools,
+}: {
+  leader: Leader;
+  members: DBMember[];
+  schools: School[];
+}) {
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const editBtnRef = useRef<HTMLButtonElement>(null);
@@ -30,6 +42,8 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
     setEditing(false);
     setTimeout(() => editBtnRef.current?.focus(), 0);
   };
+
+  const schoolMap = new Map(schools.map((s) => [s.id, s.name]));
 
   const deleteAction = deleteLeader.bind(null, leader.id, leader.year);
   const updateAction = updateLeader.bind(null, leader.id, leader.year);
@@ -63,8 +77,23 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
               <input name="year" type="text" required pattern="[0-9]{4}" title="Four-digit year, e.g. 2026" defaultValue={leader.year} className={inputClass} />
             </div>
             <div className="sm:col-span-2 lg:col-span-4">
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Bio</label>
-              <textarea name="bio" rows={3} defaultValue={leader.bio ?? ''} className={`${inputClass} resize-none`} />
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Associated Member</label>
+              <select
+                name="memberId"
+                className={inputClass}
+                defaultValue={leader.memberId ?? ''}
+              >
+                <option value="">None (Custom Name Only)</option>
+                {members.map((m) => {
+                  const schoolName = schoolMap.get(m.schoolId) || 'Unknown School';
+                  const gradSuffix = m.graduationYear ? ` '${m.graduationYear.toString().slice(-2)}` : '';
+                  return (
+                    <option key={m.id} value={m.id}>
+                      {m.firstName} {m.lastName} ({schoolName}{gradSuffix})
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div className="sm:col-span-2 lg:col-span-4 flex gap-2 justify-end pt-1">
               <button
@@ -94,7 +123,7 @@ export default function LeadershipRow({ leader }: { leader: Leader }) {
       <td className="px-6 py-4">
         <div className="font-bold text-white text-base tracking-tight">{leader.name}</div>
         <div className="text-xs text-foreground-secondary max-w-xs truncate mt-1 leading-relaxed">
-          {leader.bio || 'No bio provided.'}
+          {leader.schoolName ? `${leader.schoolName}${leader.graduationYear ? ` '${leader.graduationYear.toString().slice(-2)}` : ''}` : 'No member linked'}
         </div>
       </td>
       <td className="px-6 py-4 font-bold text-foreground">{leader.role}</td>
