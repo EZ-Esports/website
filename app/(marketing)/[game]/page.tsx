@@ -134,7 +134,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   // tiles use — a division must never appear under two names on one screen.
   // Separate pills rather than one joined pill so "Junior Varsity" can wrap to
   // its own line at 390px instead of blowing out a `whitespace-nowrap` badge.
-  const metaPills = [seasonName, ...divisions.map(divisionLabel)];
+  const divisionPills = divisions.map(divisionLabel);
 
   return (
     <div className="min-h-[60vh]" style={themeStyle}>
@@ -157,13 +157,20 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               {gameConfig.displayName}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {metaPills
-                .filter((pill): pill is string => Boolean(pill))
-                .map((pill) => (
-                  <Badge key={pill} variant="neutral">
-                    {pill}
-                  </Badge>
-                ))}
+              {/* The season the hub resolved is an active one by construction,
+                  so it carries the live marker — the same green "Active" signal
+                  SeasonSelect puts on this flag. Retiring a season in Admin →
+                  League Setup is what takes the marker down. */}
+              {seasonName && (
+                <Badge variant="success" dot>
+                  {seasonName} · In progress
+                </Badge>
+              )}
+              {divisionPills.map((pill) => (
+                <Badge key={pill} variant="neutral">
+                  {pill}
+                </Badge>
+              ))}
             </div>
           </div>
         </div>
@@ -171,16 +178,23 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
         <MigrationNotice />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* An empty result set has three causes here — data not yet ported
-              from the old site, a season with nothing renderable in it, or a
-              failed query — and this page can't tell them apart. So it reports
-              only the absence, never a conclusion about the league: no "new
-              division", and no present-tense claim that a season is under way
-              (the seasons still carrying `isActive` predate the migration). */}
+          {/* `getGameHubData` only ever resolves a season with `isActive` set,
+              so a season named here is in progress by construction — the same
+              claim SeasonSelect and ArchiveCommandDeck make from the same flag.
+              A season that has finished is retired in Admin → League Setup; the
+              page must not second-guess that flag with hedged copy.
+
+              What it must not do is infer anything the flag doesn't say. With
+              no active season there is no statement to make: data still being
+              ported from the old site, a division between seasons and a failed
+              query are indistinguishable from here, so it reports the absence
+              and nothing more. */}
           {!hasSeasonData && (
             <Tile title="This season" tone="accent" className={spanClass('season-summary')}>
               <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                {seasonName ? `Nothing to show for ${seasonName} yet.` : 'Nothing to show here yet.'}
+                {seasonName
+                  ? `The ${seasonName} season is in progress.`
+                  : 'Nothing to show here yet.'}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
                 Standings, schedules and rosters appear here as this division&rsquo;s data is
