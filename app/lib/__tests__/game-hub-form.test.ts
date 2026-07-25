@@ -110,6 +110,35 @@ describe('buildFormGuide', () => {
     ).toEqual(expected);
   });
 
+  it('orders matches that share a kickoff time by id, not by arrival order', () => {
+    // Bulk-imported seasons default every unknown kickoff to one timestamp —
+    // the active Valorant season has six matches sharing one. Sorting on the
+    // timestamp alone leaves those rows in whatever order the database
+    // happened to return them, so a school's chips could reorder between two
+    // identical requests. The id is the tiebreaker on both sides: SQL ranks
+    // the partition by (scheduled_at desc, id desc) and this does the same.
+    const sameDay = [
+      entry(1, 'Stuyvesant', 2, 0, 'match-a'),
+      entry(1, 'Stuyvesant', 0, 2, 'match-b'),
+      entry(1, 'Stuyvesant', 1, 1, 'match-c'),
+    ];
+    const expected = ['W', 'L', 'D'];
+    expect(guideFor(sameDay, 'Stuyvesant')).toEqual(expected);
+    expect(guideFor([...sameDay].reverse(), 'Stuyvesant')).toEqual(expected);
+    expect(guideFor([sameDay[2], sameDay[0], sameDay[1]], 'Stuyvesant')).toEqual(expected);
+  });
+
+  it('drops the lowest id when tied matches overflow the cap', () => {
+    // Six matches at one timestamp: the cap has to fall somewhere, and it has
+    // to fall in the same place every time.
+    const tied = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) =>
+      entry(1, 'Stuyvesant', i === 0 ? 0 : 2, i === 0 ? 2 : 0, `match-${id}`)
+    );
+    // `match-a` is the loss and the lowest id, so it is the one pushed out.
+    expect(guideFor(tied, 'Stuyvesant')).toEqual(['W', 'W', 'W', 'W', 'W']);
+    expect(guideFor([...tied].reverse(), 'Stuyvesant')).toEqual(['W', 'W', 'W', 'W', 'W']);
+  });
+
   it('caps by recency, not by input position', () => {
     const newestFirst = [
       entry(6, 'Stuyvesant', 2, 0),

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { eq, gte, isNotNull } from 'drizzle-orm';
-import { buildHubMatchQuery } from '@/app/lib/db/queries';
+import { eq, gte, inArray, isNotNull } from 'drizzle-orm';
+import { buildFormGuideQuery, buildHubMatchQuery } from '@/app/lib/db/queries';
 import * as schema from '@/app/lib/db/schema';
 import { HUB_DIVISIONS, toHubDivision } from '@/app/lib/db/match-page';
+import { FORM_LENGTH } from '@/app/lib/game-hub-form';
 
 /**
  * `buildHubMatchQuery` is the game hub's whole match story: which matches
@@ -22,10 +23,11 @@ const NEXT_MATCH = {
   limit: 1,
 };
 
+/** The conditions `getGameHubData` actually passes for the results tiles. */
 const RECENT_RESULTS = {
   seasonId: 'season-1',
   conditions: [
-    eq(schema.matches.status, 'completed'),
+    inArray(schema.matches.status, ['completed', 'forfeit'] as const),
     isNotNull(schema.matches.homeScore),
     isNotNull(schema.matches.awayScore),
   ],
@@ -125,5 +127,115 @@ describe('buildHubMatchQuery — the next match is in the future', () => {
     const { sql } = compile({ ...RECENT_RESULTS, division: 'Varsity' });
     expect(sql).toContain('"matches"."home_score" is not null');
     expect(sql).toContain('"matches"."away_score" is not null');
+  });
+});
+
+/**
+ * `buildFormGuideQuery` is the standings tile's form strip. Everything that
+ * decides *which* rows a chip can be built from — the division, the
+ * soft-delete exclusion, the per-school cap and the tie-break — lives in this
+ * one statement, so the same SQL-level assertions apply.
+ *
+ * The bound is the part worth guarding. The guides used to read a 500-row
+ * in-memory scan of the whole season; the failure mode to catch is not a wrong
+ * chip but a query that grows with the season, or one that fans out into a
+ * round trip per school.
+ */
+const FORM_GUIDE = {
+  seasonId: 'season-1',
+  schools: ['Stuyvesant', 'Bronx Science', 'Brooklyn Tech'],
+  perSchool: FORM_LENGTH,
+};
+
+const compileForm = (division: 'Varsity' | 'JV' = 'Varsity') =>
+  buildFormGuideQuery({ ...FORM_GUIDE, division }).toSQL();
+
+describe('buildFormGuideQuery — bounds', () => {
+  it('caps the rows per school instead of scanning the season', () => {
+    const { sql, params } = compileForm();
+    // row_number() partitioned by school, filtered to the newest N of each:
+    // at most schools x perSchool rows however long the season runs.
+    expect(sql).toContain('row_number() over (partition by "name"');
+    expect(sql).toMatch(/"recency" <= \$\d+/);
+    expect(params).toContain(FORM_LENGTH);
+    // No blanket row cap standing in for a real bound.
+    expect(sql).not.toContain('limit');
+  });
+
+  it('asks for every shown school in one statement, not one query per school', () => {
+    const { sql, params } = compileForm();
+    // Two `in (...)` lists — one per side of the union — and nothing else.
+    expect(sql.match(/"name" in \(/g)).toHaveLength(2);
+    for (const school of FORM_GUIDE.schools) {
+      expect(params.filter((p) => p === school)).toHaveLength(2);
+    }
+  });
+
+  it('scopes every branch of the union to one season', () => {
+    const { params } = compileForm();
+    expect(params.filter((p) => p === 'season-1')).toHaveLength(2);
+  });
+});
+
+describe('buildFormGuideQuery — attribution', () => {
+  it.each(HUB_DIVISIONS)('judges each side by its own roster (%s)', (division) => {
+    const { sql, params } = compileForm(division);
+
+    // The home branch reads the home roster's division, the away branch the
+    // away roster's. A cross-division fixture is therefore one school's chip
+    // on one tab and the other school's on the other — the attribution
+    // `roster_standings` uses for the W-L printed beside the strip.
+    expect(sql).toContain('case when "home_roster"."division"');
+    expect(sql).toContain('case when "away_roster"."division"');
+    expect(params.filter((p) => p === division)).toHaveLength(2);
+  });
+
+  it('normalizes the division in SQL, with the same JV set the TypeScript uses', () => {
+    const { sql } = compileForm('JV');
+    // Derived from `toHubDivision`, not hand-copied: the form guide and the
+    // match tiles must not disagree about which stored spellings mean JV, or a
+    // roster an admin wrote as `A` gets counted into one and not the other.
+    const jvSpellings = ['Varsity', 'JV', 'A', 'B', 'All', 'C', ''].filter(
+      (value) => toHubDivision(value) === 'JV'
+    );
+    expect(jvSpellings).toEqual(['JV', 'B']);
+    expect(sql).toContain(`in ('${jvSpellings.join("', '")}')`);
+    expect(sql).toContain("else 'Varsity' end");
+  });
+
+  it('excludes a match involving a soft-deleted school from both branches', () => {
+    // The tiles refuse to render these rows, so a chip for one would be a
+    // result the reader has no way to look up. Both schools are tested in both
+    // branches: the row is excluded, not re-attributed to the surviving side.
+    const { sql } = compileForm();
+    expect(sql.match(/"home_school"\."deleted_at" is null/g)).toHaveLength(2);
+    expect(sql.match(/"away_school"\."deleted_at" is null/g)).toHaveLength(2);
+  });
+
+  it('counts the same statuses the standings do, and does not filter draws out', () => {
+    const { sql, params } = compileForm();
+    // Forfeits count in `roster_standings`, so they count here.
+    expect(params.filter((p) => p === 'forfeit')).toHaveLength(2);
+    expect(params.filter((p) => p === 'completed')).toHaveLength(2);
+    expect(sql).toContain('"matches"."home_score" is not null');
+    // A draw is a chip, so nothing may require the two scores to differ.
+    expect(sql).not.toMatch(/"home_score" <> /);
+  });
+});
+
+describe('buildFormGuideQuery — deterministic ordering', () => {
+  it('breaks timestamp ties on id inside the partition', () => {
+    // Bulk-imported seasons default every unknown kickoff to one timestamp —
+    // the active Valorant season has six such matches. Ranking on the
+    // timestamp alone lets Postgres return a different five, in a different
+    // order, between two identical requests.
+    const { sql } = compileForm();
+    expect(sql).toContain(
+      'row_number() over (partition by "name" order by "scheduled_at" desc, "id" desc)'
+    );
+  });
+
+  it('compiles identically across calls with the same inputs', () => {
+    expect(compileForm('Varsity').sql).toBe(compileForm('Varsity').sql);
   });
 });
