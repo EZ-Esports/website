@@ -8,13 +8,29 @@ interface FormGuideProps {
 }
 
 /**
- * A school's recent results as W/L chips, oldest to newest left to right.
+ * The three chip styles, one per outcome.
  *
- * Win and loss are the two semantic status tokens rather than success/neutral
- * (the pairing `resultVariant` uses for a single result badge): in a strip of
- * five glyphs a neutral chip reads as "nothing here", and nothing-here already
- * means something specific — form is genuinely unavailable. A loss has to look
- * like a loss so that an absent chip can look absent.
+ * All three are semantic status tokens rather than the success/neutral pairing
+ * `resultVariant` uses for a single result badge: in a strip of five glyphs a
+ * neutral chip reads as "nothing here", and nothing-here already means
+ * something specific — form is genuinely unavailable. A loss has to look like a
+ * loss, and a draw like a third thing, so that an absent chip can look absent.
+ *
+ * `--warning` is the third status token the theme already defines, tuned for
+ * both themes the same way success and danger are (#fbbf24 on the dark surface,
+ * #b45309 on light), so the draw chip clears AA in both without a new colour
+ * entering the palette. Colour is never the only carrier anyway: the letter
+ * inside the chip is what states the outcome, and it is what the screen-reader
+ * sentence below reads out.
+ */
+const CHIP_STYLES: Record<FormOutcome, string> = {
+  W: 'border-success/30 bg-success/15 text-success',
+  L: 'border-danger/30 bg-danger/15 text-danger',
+  D: 'border-warning/30 bg-warning/15 text-warning',
+};
+
+/**
+ * A school's recent results as W/L/D chips, oldest to newest left to right.
  *
  * The chips are hidden from assistive tech and replaced by one sentence, the
  * same treatment `ArchiveCommandDeck` gives its bar chart: five bare letters
@@ -39,9 +55,7 @@ export default function FormGuide({ form, className }: FormGuideProps) {
           aria-hidden="true"
           className={cx(
             'inline-flex h-5 w-5 items-center justify-center rounded border text-[10px] font-black leading-none',
-            outcome === 'W'
-              ? 'border-success/30 bg-success/15 text-success'
-              : 'border-danger/30 bg-danger/15 text-danger'
+            CHIP_STYLES[outcome]
           )}
         >
           {outcome}

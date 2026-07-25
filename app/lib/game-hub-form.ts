@@ -19,8 +19,11 @@
  * five losses or five zeros.
  */
 
-/** A decided match outcome for one school. Draws are not represented — see `buildFormGuide`. */
-export type FormOutcome = 'W' | 'L';
+/**
+ * One match outcome for one school. A draw is an outcome like any other — see
+ * `buildFormGuide` for why it is not filtered out.
+ */
+export type FormOutcome = 'W' | 'L' | 'D';
 
 /**
  * One match as played by *one* school — the shape `buildFormGuideQuery` returns.
@@ -65,21 +68,26 @@ const byRecency = (a: FormEntry, b: FormEntry): number => {
 };
 
 /**
- * Last `length` decided matches per school, **oldest first** — the standard
- * form-guide reading order, most recent on the right.
+ * Last `length` matches per school, **oldest first** — the standard form-guide
+ * reading order, most recent on the right.
  *
  * Input order does not matter: the guide is ordered from `scheduledAt` and `id`
  * here, so callers cannot silently break it by changing a query's `ORDER BY`,
  * and two requests over the same rows produce the same strip even when every
  * kickoff time in the season is identical.
  *
- * Only schools with at least one decided match appear in the map at all. A
+ * Only schools with at least one played match appear in the map at all. A
  * caller reading a missing school gets "no form", which is exactly the truth
  * for snapshot-standings seasons.
  *
- * Drawn matches (equal scores) are skipped entirely rather than being counted
- * against one side: a tie is neither a W nor an L, and inventing one would be
- * the fabrication this module is here to prevent.
+ * A draw is a `D` that occupies one of the five slots. It used to be skipped,
+ * on the reasoning that a tie is neither a W nor an L — but "last five" then
+ * quietly meant "last five *decided*", and a school with five draws and one win
+ * showed a single chip beside a full-looking record. The cap is enforced in SQL
+ * as well, so a skipped draw no longer even leaves room for another chip: it
+ * shortens the strip. Neither the record nor the standings change — a draw is
+ * still not a win and not a loss in `roster_standings`, which counts strict
+ * `>`/`<` — the strip just stops hiding that the match happened.
  */
 export function buildFormGuide(
   entries: readonly FormEntry[],
@@ -90,18 +98,22 @@ export function buildFormGuide(
 
   for (const entry of [...entries].sort(byRecency)) {
     if (!entry.school) continue;
+    // A missing score is an unplayed match, not a nil-nil draw.
     if (entry.scored === null || entry.conceded === null) continue;
-    if (entry.scored === entry.conceded) continue;
     const outcomes = guides.get(entry.school) ?? [];
     // Newest-first while filling, so the cap keeps the most recent matches.
     if (outcomes.length >= length) continue;
-    outcomes.push(entry.scored > entry.conceded ? 'W' : 'L');
+    outcomes.push(
+      entry.scored > entry.conceded ? 'W' : entry.scored < entry.conceded ? 'L' : 'D'
+    );
     guides.set(entry.school, outcomes);
   }
 
   for (const outcomes of guides.values()) outcomes.reverse();
   return guides;
 }
+
+const OUTCOME_WORDS: Record<FormOutcome, string> = { W: 'won', L: 'lost', D: 'drew' };
 
 /**
  * Screen-reader sentence for a guide, e.g. "Form, oldest to newest: won, won,
@@ -111,6 +123,6 @@ export function buildFormGuide(
  */
 export function describeFormGuide(outcomes: readonly FormOutcome[]): string {
   if (outcomes.length === 0) return 'Recent form not available.';
-  const words = outcomes.map((outcome) => (outcome === 'W' ? 'won' : 'lost'));
+  const words = outcomes.map((outcome) => OUTCOME_WORDS[outcome]);
   return `Form, oldest to newest: ${words.join(', ')}.`;
 }

@@ -123,15 +123,45 @@ describe('buildFormGuide', () => {
     expect(guideFor([...newestFirst].reverse(), 'Stuyvesant')).toEqual(['W', 'W', 'W', 'W', 'W']);
   });
 
-  it('skips a drawn match rather than charging it to either side', () => {
+  it('gives a drawn match its own chip on both sides', () => {
     const guides = buildFormGuide([
       entry(1, 'Stuyvesant', 2, 0, 'match-a'),
       entry(1, 'Bronx Science', 0, 2, 'match-a'),
-      entry(2, 'Stuyvesant', 0, 0, 'match-b'),
-      entry(2, 'Bronx Science', 0, 0, 'match-b'),
+      entry(2, 'Stuyvesant', 1, 1, 'match-b'),
+      entry(2, 'Bronx Science', 1, 1, 'match-b'),
     ]);
-    expect(guides.get('Stuyvesant')).toEqual(['W']);
-    expect(guides.get('Bronx Science')).toEqual(['L']);
+    expect(guides.get('Stuyvesant')).toEqual(['W', 'D']);
+    expect(guides.get('Bronx Science')).toEqual(['L', 'D']);
+  });
+
+  it('lets a draw consume one of the five slots', () => {
+    // Six matches, the middle two drawn. If draws were skipped the strip would
+    // read the four decided results and reach back to day 1 for a fifth — so
+    // "last five" would mean "last five decided", and the day-1 win would be
+    // shown as more recent than two matches that were actually played after
+    // it. The cap also lives in SQL now, so a skipped draw does not even free
+    // a slot: it just shortens the strip.
+    const guides = buildFormGuide([
+      entry(1, 'Stuyvesant', 2, 0),
+      entry(2, 'Stuyvesant', 0, 2),
+      entry(3, 'Stuyvesant', 1, 1),
+      entry(4, 'Stuyvesant', 1, 1),
+      entry(5, 'Stuyvesant', 2, 0),
+      entry(6, 'Stuyvesant', 0, 2),
+    ]);
+    expect(guides.get('Stuyvesant')).toEqual(['L', 'D', 'D', 'W', 'L']);
+    expect(guides.get('Stuyvesant')).toHaveLength(FORM_LENGTH);
+  });
+
+  it('shows a school that has only ever drawn', () => {
+    // Previously this school was absent from the map entirely, which the page
+    // renders identically to "no form on record" — a school that had played
+    // six matches read as one that had played none.
+    const guides = buildFormGuide([
+      entry(1, 'Stuyvesant', 0, 0),
+      entry(2, 'Stuyvesant', 1, 1),
+    ]);
+    expect(guides.get('Stuyvesant')).toEqual(['D', 'D']);
   });
 
   it('drops a row it cannot attribute or score', () => {
@@ -171,6 +201,12 @@ describe('describeFormGuide', () => {
   it('names the outcomes and the direction they read in', () => {
     expect(describeFormGuide(['W', 'W', 'L', 'W', 'W'])).toBe(
       'Form, oldest to newest: won, won, lost, won, won.'
+    );
+  });
+
+  it('names a draw rather than leaving a gap in the sentence', () => {
+    expect(describeFormGuide(['W', 'D', 'L', 'D', 'W'])).toBe(
+      'Form, oldest to newest: won, drew, lost, drew, won.'
     );
   });
 
