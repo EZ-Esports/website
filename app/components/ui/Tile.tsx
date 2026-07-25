@@ -65,9 +65,16 @@ export default function Tile({
         'flex flex-col',
         panelShell,
         toneStyles[tone],
-        // Only a tile that actually goes somewhere gets a hover affordance —
-        // a border that brightens on a tile with nothing to click is a lie.
-        href && tone === 'default' && 'hover:border-foreground-muted',
+        // The affordance follows the only thing that navigates: the header
+        // link. Hovering anywhere else on the tile used to brighten the border
+        // — promising a click target across a whole panel whose body does
+        // nothing — and keyboard users got no border change at all, so hover
+        // and focus disagreed about what the tile was. `has-*` ties both to the
+        // link's own state without restructuring the DOM or swallowing the
+        // standings rows' own row-level interactivity.
+        href &&
+          tone === 'default' &&
+          'has-[a:hover]:border-foreground-muted has-[a:focus-visible]:border-foreground-muted',
         className
       )}
     >

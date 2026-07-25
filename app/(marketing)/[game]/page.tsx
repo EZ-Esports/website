@@ -208,9 +208,13 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
               and nothing more. */}
           {seasonSummarySpan && (
             <Tile title="This season" tone="accent" className={seasonSummarySpan}>
+              {/* The badge above already names the season and marks it live;
+                  repeating that here said the same thing twice on one screen.
+                  This line answers the question the badge leaves open — why
+                  the grid below is empty — without inferring a cause. */}
               <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
                 {seasonName
-                  ? `The ${seasonName} season is in progress.`
+                  ? `No ${divisionLabel(division)} data published yet.`
                   : 'Nothing to show here yet.'}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
@@ -357,7 +361,11 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
                       <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
                         {match.date} · {divisionLabel(match.division)}
                       </p>
-                      <p className="truncate text-sm font-bold text-foreground">{match.teams}</p>
+                      {/* Not `truncate`: `teams` reads "<home> vs. <away>", and
+                          at 390px the row leaves ~228px for it, so clipping
+                          took the opponent — the one name that makes the row
+                          worth reading — with no tooltip to recover it. */}
+                      <p className="text-sm font-bold leading-snug text-foreground">{match.teams}</p>
                     </div>
                     <Badge variant={resultVariant(match.result.startsWith('W'))} size="sm">
                       {match.result}

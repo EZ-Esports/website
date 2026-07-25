@@ -30,7 +30,7 @@ const alignStyles = {
 export function Th({ align = 'left', className = '', ...props }: ThProps) {
   return (
     <th
-      className={cx('px-6 py-4 text-xs font-bold text-foreground-muted uppercase tracking-widest', alignStyles[align], className)}
+      className={cx('px-6 py-4 text-xs font-bold text-foreground-secondary uppercase tracking-widest', alignStyles[align], className)}
       {...props}
     />
   );

@@ -727,6 +727,26 @@ export type HubDivision = 'Varsity' | 'JV';
 
 const HUB_DIVISIONS: HubDivision[] = ['Varsity', 'JV'];
 
+/**
+ * How many season matches each hub scan reads before filtering by division in
+ * memory. See the call site for why this is a heuristic rather than a bound.
+ */
+const MATCH_SCAN_LIMIT = 500;
+
+/**
+ * `rosters.division` carries two vocabularies: the archive importer writes
+ * `Varsity`/`JV` (`db/import-archive.ts` maps `A`->Varsity, `B`->JV), while
+ * Admin -> Roster still writes the raw `A`/`B` its select offers. Both name the
+ * same two divisions, so the hub reads them as one. Anything else — notably the
+ * `All` division that per-player games (TFT/osu!/Tetris) use — is not a hub
+ * division and returns null rather than being silently counted as Varsity.
+ */
+const normalizeDivision = (value: string | undefined): HubDivision | null => {
+  if (value === 'Varsity' || value === 'A') return 'Varsity';
+  if (value === 'JV' || value === 'B') return 'JV';
+  return null;
+};
+
 export interface GameHubData {
   record: string | null;
   jvRecord: string | null;
@@ -809,10 +829,21 @@ export async function getGameHubData(
 
         // Fetch the next match, recent results, and season summary in
         // parallel — they only depend on the active season.
+        //
         // Both match queries are division-blind and filtered in memory: the
         // division lives on the joined roster, not on the match row, so a WHERE
-        // clause would need the join anyway. The caps are generous enough that
-        // a division's next match and last three results are always inside them.
+        // clause would need the join anyway.
+        //
+        // The caps are a heuristic with headroom, not a guarantee. They bound
+        // the whole season across *both* divisions, so a division's next match
+        // or last three results fall outside the window only if that many
+        // fixtures belonging to the other division sort ahead of them. The
+        // largest season on record holds 156 decided matches, so MATCH_SCAN_LIMIT
+        // clears the worst case the archive has ever produced by ~3x. Both
+        // orderings carry `id` as a tiebreaker: bulk-imported seasons default
+        // every unknown kickoff to the same time, and without a second key the
+        // rows that land inside the cap — and so the divisions the tab bar
+        // offers — could differ between two identical requests.
         const [scheduledRows, completedRows, summary] = await Promise.all([
           db
             .select()
@@ -823,8 +854,8 @@ export async function getGameHubData(
                 eq(schema.matches.status, 'scheduled')
               )
             )
-            .orderBy(schema.matches.scheduledAt)
-            .limit(50),
+            .orderBy(schema.matches.scheduledAt, schema.matches.id)
+            .limit(MATCH_SCAN_LIMIT),
           db
             .select()
             .from(schema.matches)
@@ -837,21 +868,28 @@ export async function getGameHubData(
                 isNotNull(schema.matches.awayScore)
               )
             )
-            .orderBy(desc(schema.matches.scheduledAt))
-            .limit(50),
+            .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
+            .limit(MATCH_SCAN_LIMIT),
           getGameSeasonSummary(activeSeason[0].id),
         ]);
         record = summary.record;
         jvRecord = summary.jvRecord;
 
-        const divisionOf = (match: { homeRosterId: string }): string =>
-          rosterMap.get(match.homeRosterId)?.division || 'Varsity';
+        // Fails closed: a match whose home roster is missing from `rosterMap`
+        // — the map is built from rosters whose school is not soft-deleted —
+        // is unattributable, not Varsity. Defaulting it to Varsity invented a
+        // Varsity tab on a JV-only season out of one soft-deleted school, and
+        // made that phantom tab the landing default.
+        const divisionOf = (match: { homeRosterId: string }): HubDivision | null =>
+          normalizeDivision(rosterMap.get(match.homeRosterId)?.division);
 
         // A division counts as fielded if it has standings *or* matches — a
         // season can have JV fixtures before anyone has published a JV table,
         // and dropping those results because of a missing table would lose data
         // the old hub displayed.
-        const played = new Set([...scheduledRows, ...completedRows].map(divisionOf));
+        const played = new Set(
+          [...scheduledRows, ...completedRows].map(divisionOf).filter((d) => d !== null)
+        );
         divisions = HUB_DIVISIONS.filter(
           (d) => (d === 'Varsity' ? record !== null : jvRecord !== null) || played.has(d)
         );
