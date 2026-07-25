@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { buildFormGuideQuery, buildHubMatchQuery } from '@/app/lib/db/queries';
 import * as schema from '@/app/lib/db/schema';
-import { HUB_DIVISIONS, toHubDivision } from '@/app/lib/db/match-page';
+import { HUB_DIVISIONS, canonicalDivision, toHubDivision } from '@/app/lib/db/match-page';
 import { FORM_LENGTH } from '@/app/lib/game-hub-form';
 
 /**
@@ -192,15 +192,27 @@ describe('buildFormGuideQuery — attribution', () => {
 
   it('normalizes the division in SQL, with the same JV set the TypeScript uses', () => {
     const { sql } = compileForm('JV');
-    // Derived from `toHubDivision`, not hand-copied: the form guide and the
-    // match tiles must not disagree about which stored spellings mean JV, or a
-    // roster an admin wrote as `A` gets counted into one and not the other.
+    // Derived from `canonicalDivision`, not hand-copied: a roster an admin
+    // wrote as `A` or `B` has to be counted into the strip and the standings
+    // row beside it by the same rule, or the two disagree about which games
+    // the school played.
     const jvSpellings = ['Varsity', 'JV', 'A', 'B', 'All', 'C', ''].filter(
-      (value) => toHubDivision(value) === 'JV'
+      (value) => canonicalDivision(value) === 'JV'
     );
     expect(jvSpellings).toEqual(['JV', 'B']);
     expect(sql).toContain(`in ('${jvSpellings.join("', '")}')`);
-    expect(sql).toContain("else 'Varsity' end");
+  });
+
+  it('reads the division the way the standings do, not the way the tiles do', () => {
+    // The match tiles fold `All` onto Varsity so a per-player game's fixtures
+    // land on the tab a bare game URL opens. The strip must not: the W-L it
+    // sits beside comes from `getSeasonStandingsFor`, whose computed branch
+    // selects rosters by `canonicalDivision` and leaves `All` out of both
+    // tables. Chips built the tiles' way would explain a record that never
+    // counted those games.
+    expect(canonicalDivision('All')).toBe('All');
+    expect(toHubDivision('All')).toBe('Varsity');
+    expect(compileForm('Varsity').sql).toContain("when \"home_roster\".\"division\" = 'All' then 'All'");
   });
 
   it('excludes a match involving a soft-deleted school from both branches', () => {

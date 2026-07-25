@@ -924,7 +924,19 @@ export function buildFormGuideQuery(opts: {
       .where(
         and(
           eq(schema.matches.seasonId, opts.seasonId),
-          eq(hubDivisionSql(roster.division), opts.division),
+          // `canonicalDivision`, not `hubDivision` — the one place on this page
+          // where the two must differ.
+          //
+          // The tiles use the hub reading, which folds `All` onto Varsity so a
+          // per-player game's matches land on the tab a bare game URL opens.
+          // The strip is not listing matches, though; it is explaining the W-L
+          // printed beside it, and that number comes from
+          // `getSeasonStandingsFor`, whose computed branch selects rosters by
+          // `canonicalDivision` and so leaves `All` rosters out of both tables.
+          // Folding `All` in here would put chips on a Varsity row for games
+          // its record never counted. Matching the standings' own predicate is
+          // what keeps the two countable against each other.
+          eq(canonicalDivisionSql(roster.division), opts.division),
           inArray(school.name, opts.schools),
           // Forfeits count in `roster_standings`, so they count here — the
           // chips have to be countable against the W-L printed beside them.
