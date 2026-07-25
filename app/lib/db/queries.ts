@@ -1,8 +1,8 @@
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
   DIVISIONS,
   canonicalDivision,
@@ -16,6 +16,7 @@ import {
   type MatchesPageParams,
   type SeasonStandingsResult,
 } from './match-page';
+import { FORM_LENGTH, buildFormGuide, type FormOutcome } from '@/app/lib/game-hub-form';
 
 /** Default page size for public-facing paginated lists. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -698,9 +699,10 @@ export async function getArchiveIndex() {
 }
 
 /**
- * Game landing page summary for one season: top-5 varsity teams plus
- * aggregate Varsity/JV W-L records, snapshot-aware via getSeasonStandingsFor.
- * Individual (per-player) standings rows are excluded from team summaries.
+ * Game landing page summary for one season: the top five teams of each
+ * division, snapshot-aware via getSeasonStandingsFor, plus which of the two
+ * sources produced each table. Individual (per-player) standings rows are
+ * excluded from team summaries.
  */
 export async function getGameSeasonSummary(seasonId: string) {
   // One snapshot query covers both divisions; only divisions without
@@ -727,21 +729,25 @@ export async function getGameSeasonSummary(seasonId: string) {
     .where(eq(schema.seasonStandings.seasonId, seasonId))
     .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
 
+  // One predicate for both the rows and the reported source, so the two can
+  // never drift into disagreeing about which path a division came from.
+  //
+  // It buckets by `toHubDivision`, the same reading the rest of the hub uses:
+  // this column holds `Varsity`/`JV` from the importer, `A`/`B` from Admin and
+  // `All` from per-player games, so comparing the raw value would report
+  // "computed" for a division whose snapshot it had merely failed to recognise
+  // — and then show form chips beside an imported record.
+  const hasSnapshot = (division: HubDivision) =>
+    snapshot.some((r) => toHubDivision(r.division) === division);
   const divisionRows = async (division: HubDivision) => {
-    const rows = snapshot.filter((r) => toHubDivision(r.division) === division);
-    if (rows.length > 0) return rows;
+    if (hasSnapshot(division)) {
+      return snapshot.filter((r) => toHubDivision(r.division) === division);
+    }
     return (await getSeasonStandingsFor(seasonId, division)).rows;
   };
   const [varsityRows, jvRows] = await Promise.all([divisionRows('Varsity'), divisionRows('JV')]);
   const varsityTeams = varsityRows.filter((r) => r.playerName === null);
   const jvTeams = jvRows.filter((r) => r.playerName === null);
-  const totals = (rows: typeof varsityTeams) =>
-    rows.reduce(
-      (acc, r) => ({ wins: acc.wins + (r.wins ?? 0), losses: acc.losses + (r.losses ?? 0) }),
-      { wins: 0, losses: 0 }
-    );
-  const v = totals(varsityTeams);
-  const j = totals(jvTeams);
   const topFive = (rows: typeof varsityTeams) =>
     rows.slice(0, 5).map((r, i) => ({
       rank: r.rank ?? i + 1,
@@ -755,12 +761,20 @@ export async function getGameSeasonSummary(seasonId: string) {
     // Both divisions are already in memory from the queries above, so serving
     // JV costs nothing extra — it was previously computed and discarded.
     topTeams: topFive(varsityTeams),
+    /**
+     * Where each division's table came from. A `snapshot` table was imported
+     * whole from `season_standings`; its wins and losses are *not* a tally of
+     * this database's match rows, so nothing that reads match rows may be shown
+     * next to it as if it explained the record.
+     */
+    standingsSource: {
+      Varsity: hasSnapshot('Varsity') ? ('snapshot' as const) : ('computed' as const),
+      JV: hasSnapshot('JV') ? ('snapshot' as const) : ('computed' as const),
+    },
     topTeamsByDivision: {
       Varsity: topFive(varsityTeams),
       JV: topFive(jvTeams),
     },
-    record: varsityTeams.length > 0 ? `${v.wins}-${v.losses}` : null,
-    jvRecord: jvTeams.length > 0 ? `${j.wins}-${j.losses}` : null,
   };
 }
 
@@ -805,6 +819,7 @@ export function buildHubMatchQuery(opts: {
     .select({
       id: schema.matches.id,
       scheduledAt: schema.matches.scheduledAt,
+      status: schema.matches.status,
       homeScore: schema.matches.homeScore,
       awayScore: schema.matches.awayScore,
       homeTeam: homeSchool.name,
@@ -837,9 +852,124 @@ export function buildHubMatchQuery(opts: {
     .limit(opts.limit);
 }
 
+/**
+ * The standings tile's form guides, as one bounded query.
+ *
+ * A form guide is per *school*, not per match, which is why this cannot reuse
+ * `buildHubMatchQuery`: "the last five matches in the division" is not "the
+ * last five matches for each of these five schools", and a plain `LIMIT` over
+ * the season's matches can satisfy neither. The guides used to piggyback on a
+ * 500-row in-memory scan of the whole season; that scan is gone, and reviving
+ * it to feed a decoration on five table rows would be the worst read on the
+ * page.
+ *
+ * So the bound is expressed where it is actually true — per school. The match
+ * is split into its two sides, each side keyed by the school that played it and
+ * carrying that side's own score, and `row_number()` partitioned by school
+ * takes the newest `perSchool` of each. The result is at most
+ * `schools.length * perSchool` rows (25 as the hub calls it) no matter how long
+ * the season is, in one round trip rather than one query per school.
+ *
+ * Splitting by side is also what makes the division reading correct: a side
+ * counts only if *its own* roster is in the division on screen. A Varsity-home
+ * vs JV-away fixture is one row on the Varsity tab (the home side) and a
+ * different row on the JV tab (the away side) — the same attribution
+ * `buildHubMatchQuery` and `roster_standings` use, so the chips and the W-L
+ * column beside them are counting the same games.
+ *
+ * The partition orders by `scheduled_at desc, id desc`, the tiebreaker
+ * `buildHubMatchQuery` carries for the same reason: bulk-imported seasons give
+ * every unknown kickoff one timestamp, and without it a school's five chips
+ * could come back in a different order — or be a different five — between two
+ * identical requests.
+ *
+ * Exported for `queries-hub.test.ts`, which asserts the generated SQL rather
+ * than needing a live database.
+ */
+export function buildFormGuideQuery(opts: {
+  seasonId: string;
+  division: HubDivision;
+  /** School names as the standings tile prints them; the only key both sides share. */
+  schools: string[];
+  perSchool: number;
+}) {
+  /**
+   * One side of every decided match the given schools played in this division.
+   *
+   * `scored`/`conceded` are that side's own scores, so the caller reads an
+   * outcome without needing to know which end of the fixture it is looking at.
+   * What counts as a win, a loss or a draw stays in `game-hub-form.ts`, where
+   * it is unit-testable; SQL's job here is only to bound and to rank.
+   */
+  const side = (which: 'home' | 'away') => {
+    const school = which === 'home' ? homeSchool : awaySchool;
+    const roster = which === 'home' ? homeRoster : awayRoster;
+    const scored = which === 'home' ? schema.matches.homeScore : schema.matches.awayScore;
+    const conceded = which === 'home' ? schema.matches.awayScore : schema.matches.homeScore;
+    return db
+      .select({
+        id: schema.matches.id,
+        scheduledAt: schema.matches.scheduledAt,
+        school: school.name,
+        scored: sql<number>`${scored}`.as('scored'),
+        conceded: sql<number>`${conceded}`.as('conceded'),
+      })
+      .from(schema.matches)
+      .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+      .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+      .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+      .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+      .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+      .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+      .where(
+        and(
+          eq(schema.matches.seasonId, opts.seasonId),
+          eq(hubDivisionSql(roster.division), opts.division),
+          inArray(school.name, opts.schools),
+          // Forfeits count in `roster_standings`, so they count here — the
+          // chips have to be countable against the W-L printed beside them.
+          inArray(schema.matches.status, ['completed', 'forfeit']),
+          isNotNull(schema.matches.homeScore),
+          isNotNull(schema.matches.awayScore),
+          // A match involving a soft-deleted school is not rendered anywhere
+          // else on this page, and a chip for a game the tiles refuse to name
+          // would be a result the reader has no way to look up. Both sides are
+          // tested, not just this one: the row is excluded, not re-attributed.
+          isNull(homeSchool.deletedAt),
+          isNull(awaySchool.deletedAt)
+        )
+      );
+  };
+
+  const sides = unionAll(side('home'), side('away')).as('form_sides');
+  const ranked = db
+    .select({
+      id: sides.id,
+      scheduledAt: sides.scheduledAt,
+      school: sides.school,
+      scored: sides.scored,
+      conceded: sides.conceded,
+      recency:
+        sql<number>`row_number() over (partition by ${sides.school} order by ${sides.scheduledAt} desc, ${sides.id} desc)`.as(
+          'recency'
+        ),
+    })
+    .from(sides)
+    .as('ranked_sides');
+
+  return db
+    .select({
+      id: ranked.id,
+      scheduledAt: ranked.scheduledAt,
+      school: ranked.school,
+      scored: ranked.scored,
+      conceded: ranked.conceded,
+    })
+    .from(ranked)
+    .where(lte(ranked.recency, opts.perSchool));
+}
+
 export interface GameHubData {
-  record: string | null;
-  jvRecord: string | null;
   /**
    * Match tiles carry no division of their own. They are already scoped to
    * `division` below, and a cross-division match has two answers — one per
@@ -848,8 +978,29 @@ export interface GameHubData {
    * it.
    */
   nextMatch: { date: string; teams: string } | null;
-  recentResults: { date: string; teams: string; result: string }[];
-  topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[];
+  recentResults: {
+    date: string;
+    teams: string;
+    result: string;
+    /** A forfeit is a real result, but the rest of the site says so on its face. */
+    forfeit: boolean;
+  }[];
+  /**
+   * Top five schools in `division`. `form` is that school's last five decided
+   * matches, oldest first. It is empty whenever the division's standings were
+   * imported from the `season_standings` snapshot rather than tallied from
+   * match rows — an imported record is not something this database's matches
+   * can explain — and shorter than five when a school has played fewer. It is
+   * never padded.
+   */
+  topTeams: {
+    rank: number;
+    team: string;
+    wins: number;
+    losses: number;
+    winPct: number;
+    form: FormOutcome[];
+  }[];
   /** Name of the active season, for the hub's season-context meta pill. */
   seasonName: string | null;
   /** The division every other field on this object describes. */
@@ -874,8 +1025,6 @@ export async function getGameHubData(
   division: HubDivision
 ): Promise<GameHubData> {
   // Empty-state defaults — no fabricated data
-  let record: string | null = null;
-  let jvRecord: string | null = null;
   let nextMatch: GameHubData['nextMatch'] = null;
   let recentResults: GameHubData['recentResults'] = [];
   let topTeams: GameHubData['topTeams'] = [];
@@ -923,19 +1072,60 @@ export async function getGameHubData(
             seasonId: activeSeason[0].id,
             division,
             conditions: [
-              eq(schema.matches.status, 'completed'),
+              // Forfeits are decided results: `roster_standings` counts them
+              // in every W-L this page prints, and admin refuses to save one
+              // without both scores. Reading only 'completed' here would show
+              // a school 3-1 beside a three-chip strip whose newest chip is
+              // the win *before* the forfeit. `getCachedRecentResults` has
+              // always taken both statuses; the hub was the odd one out.
+              inArray(schema.matches.status, ['completed', 'forfeit']),
               // Unrecorded results (null scores) would otherwise render "L 0-0".
               isNotNull(schema.matches.homeScore),
               isNotNull(schema.matches.awayScore),
+              // Neither would a 0-0 forfeit, which is the same "L 0-0" by
+              // another route — and admin only requires that both scores be
+              // present, not that they differ, so the league has produced
+              // them. `roster_standings` counts an equal-score row as neither
+              // a win nor a loss; a page that prints those standings must not
+              // call it a loss one tile over.
+              ne(schema.matches.homeScore, schema.matches.awayScore),
             ],
             direction: 'desc',
             limit: RECENT_RESULTS_LIMIT,
           }),
           getGameSeasonSummary(activeSeason[0].id),
         ]);
-        record = summary.record;
-        jvRecord = summary.jvRecord;
-        topTeams = summary.topTeamsByDivision[division];
+
+        const shownTeams = summary.topTeamsByDivision[division];
+        /**
+         * Snapshot standings get no form at all, even when the season happens to
+         * carry some scored match rows. An imported table's 12-2 was never a
+         * tally of the rows in this database — the import brings whole standings
+         * and only the matches it has sheets for — so chips built from those
+         * rows would sit beside a record they do not explain: two real losses
+         * rendered as "lost its last two" next to 12-2. Reporting nothing is the
+         * only honest answer, and the same one an archived season with no match
+         * rows at all already gives.
+         *
+         * The query runs after the summary because it needs the names the tile
+         * is about to print, and it is skipped outright when there are none —
+         * `inArray` on an empty list is a query with no answer to give.
+         */
+        const formRows =
+          summary.standingsSource[division] === 'snapshot' || shownTeams.length === 0
+            ? []
+            : await buildFormGuideQuery({
+                seasonId: activeSeason[0].id,
+                division,
+                schools: shownTeams.map((entry) => entry.team),
+                perSchool: FORM_LENGTH,
+              });
+        const formGuides = buildFormGuide(formRows, FORM_LENGTH);
+        // A school with no matches in this division gets no chips at all.
+        topTeams = shownTeams.map((entry) => ({
+          ...entry,
+          form: formGuides.get(entry.team) ?? [],
+        }));
 
         if (scheduledRows[0]) {
           nextMatch = {
@@ -964,6 +1154,7 @@ export async function getGameHubData(
             }),
             teams: `${r.homeTeam} vs. ${r.awayTeam}`,
             result: `${homeWon ? 'W' : 'L'} ${r.homeScore ?? 0}-${r.awayScore ?? 0}`,
+            forfeit: r.status === 'forfeit',
           };
         });
       }
@@ -972,7 +1163,7 @@ export async function getGameHubData(
     console.error(`Failed to load dynamic data for ${gameSlug}`, error);
   }
 
-  return { record, jvRecord, nextMatch, recentResults, topTeams, seasonName, division };
+  return { nextMatch, recentResults, topTeams, seasonName, division };
 }
 
 // --- STAFF ACCESS CONTROL ---
