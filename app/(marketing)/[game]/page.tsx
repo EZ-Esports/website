@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import type { CSSProperties } from 'react';
-import { GAMES, GAME_SLUGS, ROUTES, getGameSubRoute } from '@/app/lib/constants';
+import { GAMES, GAME_SLUGS, ROUTES, getGameRoute, getGameSubRoute } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import Tile from '@/app/components/ui/Tile';
 import Badge, { resultVariant } from '@/app/components/ui/Badge';
+import FilterTabs from '@/app/components/ui/FilterTabs';
 import Button from '@/app/components/ui/Button';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getGameHubData } from '@/app/lib/db/queries';
@@ -70,6 +71,7 @@ const divisionLabel = (division: string): string =>
 
 interface GameHubPageProps {
   params: Promise<{ game: string }>;
+  searchParams?: Promise<{ division?: string }>;
 }
 
 export async function generateMetadata({ params }: GameHubPageProps): Promise<Metadata> {
@@ -83,27 +85,20 @@ export async function generateMetadata({ params }: GameHubPageProps): Promise<Me
 }
 
 // Bad slugs are already 404'd by app/(marketing)/[game]/layout.tsx.
-export default async function GameHubPage({ params }: GameHubPageProps) {
+export default async function GameHubPage({ params, searchParams }: GameHubPageProps) {
   const { game } = await params;
+  const { division: divisionParam } = (await searchParams) ?? {};
   const gameConfig = GAMES[game as GameSlug];
   const slug = game as GameSlug;
 
-  const { record, jvRecord, nextMatch, recentResults, topTeams, seasonName } =
-    await getGameHubData(slug);
-
-  const divisions: string[] = [];
-  if (record !== null) divisions.push('Varsity');
-  if (jvRecord !== null) divisions.push('JV');
+  // The query validates `divisionParam` against the divisions the season really
+  // fields and echoes back the one it served, so the tabs highlight what the
+  // page is showing rather than what the URL asked for.
+  const { nextMatch, recentResults, topTeams, seasonName, divisions, division } =
+    await getGameHubData(slug, divisionParam);
 
   const lastResult = recentResults[0] ?? null;
   const olderResults = recentResults.slice(1);
-  // topTeams rows join the school name, so they double as the roster shortlist.
-  const rosterSchools = topTeams.map((entry) => entry.team);
-
-  const hasStandings = topTeams.length > 0;
-  const hasNextMatch = nextMatch !== null;
-  const hasRosters = rosterSchools.length > 0;
-  const hasSeasonData = hasStandings || hasNextMatch || recentResults.length > 0;
 
   /**
    * Tile spans are planned by simulating CSS grid's row-flow auto-placement
@@ -112,16 +107,29 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
    * The planner guarantees every data state fills its grid completely.
    */
   const tileLayout = planGameHubLayout({
-    hasStandings,
-    hasNextMatch,
+    hasStandings: topTeams.length > 0,
+    hasNextMatch: nextMatch !== null,
     recentResultsCount: recentResults.length,
-    hasRosters,
   });
-  const spanClass = (id: GameHubTileId): string => {
+
+  /**
+   * Which tiles render is decided by the planner and read back here, never
+   * re-derived from the data — the planner's packing guarantee is only worth
+   * anything if the page renders exactly the set it planned. `spanClass`
+   * returns undefined for a tile that wasn't planned, so it doubles as the
+   * render gate.
+   */
+  const spanClass = (id: GameHubTileId): string | undefined => {
     const tile = tileLayout.find((entry) => entry.id === id);
-    if (!tile) return '';
+    if (!tile) return undefined;
     return cx(SM_COL_SPAN[tile.smColSpan], LG_COL_SPAN[tile.colSpan], LG_ROW_SPAN[tile.rowSpan]);
   };
+  const seasonSummarySpan = spanClass('season-summary');
+  const nextMatchSpan = spanClass('next-match');
+  const standingsSpan = spanClass('standings');
+  const lastResultSpan = spanClass('last-result');
+  const recentResultsSpan = spanClass('recent-results');
+  const archivesSpan = spanClass('archives');
 
   const themeStyle: GameThemeStyle = {
     '--game-accent': gameConfig.accent.color,
@@ -130,11 +138,15 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
     '--game-accent-line': `color-mix(in srgb, ${gameConfig.accent.color} 40%, transparent)`,
   };
 
-  // One pill per division, each carrying the same long-form label the match
-  // tiles use — a division must never appear under two names on one screen.
-  // Separate pills rather than one joined pill so "Junior Varsity" can wrap to
-  // its own line at 390px instead of blowing out a `whitespace-nowrap` badge.
-  const divisionPills = divisions.map(divisionLabel);
+  // Divisions are a switch, not a label: a hub that fields both shows one
+  // division at a time, so listing them as pills as well would say twice what
+  // the tabs already say once — and only the tabs say which one you're reading.
+  const divisionTabs = divisions.map((value) => ({
+    label: divisionLabel(value),
+    value,
+    // Varsity is the default the query falls back to, so it owns the bare URL.
+    href: value === 'Varsity' ? getGameRoute(slug) : `${getGameRoute(slug)}?division=${value}`,
+  }));
 
   return (
     <div className="min-h-[60vh]" style={themeStyle}>
@@ -166,14 +178,19 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                   {seasonName} · In progress
                 </Badge>
               )}
-              {divisionPills.map((pill) => (
-                <Badge key={pill} variant="neutral">
-                  {pill}
-                </Badge>
-              ))}
             </div>
           </div>
         </div>
+
+        {/* Only a season that actually fields both divisions gets a switch. */}
+        {divisionTabs.length > 1 && (
+          <FilterTabs
+            tabs={divisionTabs}
+            active={division}
+            ariaLabel="Division"
+            className="mb-5 flex-wrap"
+          />
+        )}
 
         <MigrationNotice />
 
@@ -189,8 +206,8 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
               ported from the old site, a division between seasons and a failed
               query are indistinguishable from here, so it reports the absence
               and nothing more. */}
-          {!hasSeasonData && (
-            <Tile title="This season" tone="accent" className={spanClass('season-summary')}>
+          {seasonSummarySpan && (
+            <Tile title="This season" tone="accent" className={seasonSummarySpan}>
               <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
                 {seasonName
                   ? `The ${seasonName} season is in progress.`
@@ -221,11 +238,13 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             </Tile>
           )}
 
-          {nextMatch && (
+          {/* `nextMatch &&` is TypeScript narrowing, not a second opinion on
+              whether the tile renders — `nextMatchSpan` already decided that. */}
+          {nextMatchSpan && nextMatch && (
             // The dominant tile of the grid: the planner gives it the full
             // width, and the `feature` tone carries the game's accent as a
             // stronger tint plus a solid edge.
-            <Tile title="Next match" tone="feature" className={spanClass('next-match')}>
+            <Tile title="Next match" tone="feature" className={nextMatchSpan}>
               <p className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] text-foreground">
                 {nextMatch.teams}
               </p>
@@ -253,13 +272,15 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             </Tile>
           )}
 
-          {topTeams.length > 0 && (
+          {standingsSpan && (
             <Tile
-              title="Standings"
-              href={getGameSubRoute(slug, 'standings')}
+              // Named for the division on screen: this table was always
+              // Varsity-only, while the page implied it covered both.
+              title={`${divisionLabel(division)} standings`}
+              href={`${getGameSubRoute(slug, 'standings')}?division=${division}`}
               linkLabel="Full table"
               flush
-              className={spanClass('standings')}
+              className={standingsSpan}
             >
               <Table>
                 <thead className="border-b border-line">
@@ -300,8 +321,8 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             </Tile>
           )}
 
-          {lastResult && (
-            <Tile title="Last result" className={spanClass('last-result')}>
+          {lastResultSpan && lastResult && (
+            <Tile title="Last result" className={lastResultSpan}>
               <p className="text-sm font-bold leading-snug text-foreground">
                 {lastResult.teams}
               </p>
@@ -319,32 +340,12 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             </Tile>
           )}
 
-          {rosterSchools.length > 0 && (
-            <Tile
-              title="Rosters"
-              href={getGameSubRoute(slug, 'teams')}
-              linkLabel="All teams"
-              className={spanClass('rosters')}
-            >
-              <ul className="space-y-2">
-                {rosterSchools.map((school) => (
-                  <li
-                    key={school}
-                    className="truncate text-sm font-semibold text-foreground-secondary"
-                  >
-                    {school}
-                  </li>
-                ))}
-              </ul>
-            </Tile>
-          )}
-
-          {olderResults.length > 0 && (
+          {recentResultsSpan && (
             <Tile
               title="Recent results"
               href={getGameSubRoute(slug, 'schedule')}
               linkLabel="All matches"
-              className={spanClass('recent-results')}
+              className={recentResultsSpan}
             >
               <ul className="divide-y divide-line">
                 {olderResults.map((match, index) => (
@@ -371,7 +372,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
             title="Season archives"
             href={ROUTES.archives}
             linkLabel="Archives"
-            className={spanClass('archives')}
+            className={archivesSpan}
           >
             <p className="text-sm leading-relaxed text-foreground-secondary">
               {`Every past ${gameConfig.displayName} season in one place — final standings, champion schools, and the full match history behind them.`}

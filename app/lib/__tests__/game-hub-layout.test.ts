@@ -49,7 +49,6 @@ const DOM_ORDER: GameHubTileId[] = [
   'next-match',
   'standings',
   'last-result',
-  'rosters',
   'recent-results',
   'archives',
 ];
@@ -61,7 +60,6 @@ function expectedTiles(input: GameHubLayoutInput): GameHubTileId[] {
   if (input.hasNextMatch) ids.push('next-match');
   if (input.hasStandings) ids.push('standings');
   if (input.recentResultsCount >= 1) ids.push('last-result');
-  if (input.hasRosters) ids.push('rosters');
   if (input.recentResultsCount >= 2) ids.push('recent-results');
   ids.push('archives');
   return ids;
@@ -71,9 +69,7 @@ const allInputs: GameHubLayoutInput[] = [];
 for (const hasStandings of [false, true]) {
   for (const hasNextMatch of [false, true]) {
     for (const recentResultsCount of [0, 1, 2, 3]) {
-      for (const hasRosters of [false, true]) {
-        allInputs.push({ hasStandings, hasNextMatch, recentResultsCount, hasRosters });
-      }
+      allInputs.push({ hasStandings, hasNextMatch, recentResultsCount });
     }
   }
 }
@@ -133,7 +129,7 @@ describe('packRowFlow', () => {
   });
 
   it('detects the two states the old modulo sizing broke (regression)', () => {
-    // State A: standings (2x2) + rosters (1) + archives sized by `filledCells % 4` = 3.
+    // State A: standings (2x2) + a 1-column tile + archives sized by `filledCells % 4` = 3.
     expect(
       packRowFlow(
         [
@@ -164,12 +160,12 @@ describe('packRowFlow', () => {
 // planGameHubLayout — every reachable data state
 // ---------------------------------------------------------------------------
 describe('planGameHubLayout', () => {
-  it('covers all 32 combinations of the input space', () => {
-    expect(allInputs).toHaveLength(32);
+  it('covers all 16 combinations of the input space', () => {
+    expect(allInputs).toHaveLength(16);
   });
 
   it.each(allInputs)(
-    'packs without holes: standings=$hasStandings nextMatch=$hasNextMatch results=$recentResultsCount rosters=$hasRosters',
+    'packs without holes: standings=$hasStandings nextMatch=$hasNextMatch results=$recentResultsCount',
     (input) => {
       const layout = planGameHubLayout(input);
 
@@ -213,7 +209,6 @@ describe('planGameHubLayout', () => {
       hasStandings: true,
       hasNextMatch: true,
       recentResultsCount: 3,
-      hasRosters: true,
     });
     const byId = Object.fromEntries(layout.map((tile) => [tile.id, tile]));
     expect(byId['standings'].rowSpan).toBe(2);
@@ -227,14 +222,15 @@ describe('planGameHubLayout', () => {
       hasStandings: true,
       hasNextMatch: false,
       recentResultsCount: 0,
-      hasRosters: true,
     });
+    // Standings gives up its double height here: at 2x2 it strands the two
+    // columns beside it, because archives is the only tile left to fill them
+    // and one tile cannot cover two rows of a 2-wide gap.
     expect(layout.map((tile) => [tile.id, tile.colSpan, tile.rowSpan])).toEqual([
-      ['standings', 2, 2],
-      ['rosters', 2, 1],
+      ['standings', 2, 1],
       ['archives', 2, 1],
     ]);
-    expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).rows).toBe(2);
+    expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).rows).toBe(1);
   });
 
   it('closes state B (per-player division with a scheduled match and results)', () => {
@@ -242,7 +238,6 @@ describe('planGameHubLayout', () => {
       hasStandings: false,
       hasNextMatch: true,
       recentResultsCount: 2,
-      hasRosters: false,
     });
     expect(layout.map((tile) => tile.id)).toEqual([
       'next-match',
@@ -258,7 +253,6 @@ describe('planGameHubLayout', () => {
       hasStandings: false,
       hasNextMatch: false,
       recentResultsCount: 0,
-      hasRosters: false,
     });
     expect(layout.map((tile) => tile.id)).toEqual(['season-summary', 'archives']);
     expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).empty).toBe(0);

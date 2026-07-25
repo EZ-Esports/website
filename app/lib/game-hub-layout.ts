@@ -19,7 +19,6 @@ export type GameHubTileId =
   | 'next-match'
   | 'standings'
   | 'last-result'
-  | 'rosters'
   | 'recent-results'
   | 'archives';
 
@@ -29,7 +28,6 @@ export interface GameHubLayoutInput {
   hasNextMatch: boolean;
   /** Completed matches available; the first becomes "last result", the rest "recent results". */
   recentResultsCount: number;
-  hasRosters: boolean;
 }
 
 export interface GameHubTileLayout {
@@ -140,7 +138,7 @@ interface TileCandidate {
  * whether or not a season is on record. There is one grid for every state.
  */
 function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
-  const { hasStandings, hasNextMatch, recentResultsCount, hasRosters } = input;
+  const { hasStandings, hasNextMatch, recentResultsCount } = input;
   const hasSeasonData = hasStandings || hasNextMatch || recentResultsCount > 0;
   const candidates: TileCandidate[] = [];
 
@@ -182,16 +180,6 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
   if (recentResultsCount >= 1) {
     candidates.push({
       id: 'last-result',
-      variants: [
-        { colSpan: 1, rowSpan: 1 },
-        { colSpan: 2, rowSpan: 1 },
-      ],
-      weight: 1,
-    });
-  }
-  if (hasRosters) {
-    candidates.push({
-      id: 'rosters',
       variants: [
         { colSpan: 1, rowSpan: 1 },
         { colSpan: 2, rowSpan: 1 },

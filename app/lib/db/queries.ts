@@ -701,18 +701,31 @@ export async function getGameSeasonSummary(seasonId: string) {
     );
   const v = totals(varsityTeams);
   const j = totals(jvTeams);
-  return {
-    topTeams: varsityTeams.slice(0, 5).map((r, i) => ({
+  const topFive = (rows: typeof varsityTeams) =>
+    rows.slice(0, 5).map((r, i) => ({
       rank: r.rank ?? i + 1,
       team: r.schoolName,
       wins: r.wins ?? 0,
       losses: r.losses ?? 0,
       winPct: r.winPct ?? 0,
-    })),
+    }));
+
+  return {
+    // Both divisions are already in memory from the queries above, so serving
+    // JV costs nothing extra — it was previously computed and discarded.
+    topTeams: topFive(varsityTeams),
+    topTeamsByDivision: {
+      Varsity: topFive(varsityTeams),
+      JV: topFive(jvTeams),
+    },
     record: varsityTeams.length > 0 ? `${v.wins}-${v.losses}` : null,
     jvRecord: jvTeams.length > 0 ? `${j.wins}-${j.losses}` : null,
   };
 }
+
+export type HubDivision = 'Varsity' | 'JV';
+
+const HUB_DIVISIONS: HubDivision[] = ['Varsity', 'JV'];
 
 export interface GameHubData {
   record: string | null;
@@ -722,15 +735,27 @@ export interface GameHubData {
   topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[];
   /** Name of the active season, for the hub's season-context meta pill. */
   seasonName: string | null;
+  /** Divisions this season actually fields — the hub only offers a switch when there are two. */
+  divisions: HubDivision[];
+  /** The division every other field on this object describes. */
+  division: HubDivision;
 }
 
 /**
- * Everything the game hub landing page (/[game]) needs for its active season:
- * aggregate records, the next scheduled match, the latest results, and the
- * top-5 varsity teams. Lifted verbatim from the former static hub pages.
+ * Everything the game hub landing page (/[game]) needs for its active season,
+ * scoped to one division: aggregate records, the next scheduled match, the
+ * latest results, and the top five teams.
+ *
+ * `requestedDivision` comes from the URL and is not trusted — an unknown or
+ * unfielded value falls back to the first division the season actually has,
+ * so a hand-typed `?division=` can never blank the page.
+ *
  * Uncached, like its season-summary neighbors: schedule edits must be fresh.
  */
-export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
+export async function getGameHubData(
+  gameSlug: string,
+  requestedDivision?: string
+): Promise<GameHubData> {
   // Empty-state defaults — no fabricated data
   let record: string | null = null;
   let jvRecord: string | null = null;
@@ -738,6 +763,8 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
   let recentResults: { date: string; teams: string; result: string; division: string }[] = [];
   let topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[] = [];
   let seasonName: string | null = null;
+  let divisions: HubDivision[] = [];
+  let division: HubDivision = 'Varsity';
 
   try {
     const gameRow = await db
@@ -782,7 +809,11 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
 
         // Fetch the next match, recent results, and season summary in
         // parallel — they only depend on the active season.
-        const [nextMatchRow, recentRows, summary] = await Promise.all([
+        // Both match queries are division-blind and filtered in memory: the
+        // division lives on the joined roster, not on the match row, so a WHERE
+        // clause would need the join anyway. The caps are generous enough that
+        // a division's next match and last three results are always inside them.
+        const [scheduledRows, completedRows, summary] = await Promise.all([
           db
             .select()
             .from(schema.matches)
@@ -793,7 +824,7 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
               )
             )
             .orderBy(schema.matches.scheduledAt)
-            .limit(1),
+            .limit(50),
           db
             .select()
             .from(schema.matches)
@@ -807,12 +838,32 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
               )
             )
             .orderBy(desc(schema.matches.scheduledAt))
-            .limit(3),
+            .limit(50),
           getGameSeasonSummary(activeSeason[0].id),
         ]);
-        topTeams = summary.topTeams;
         record = summary.record;
         jvRecord = summary.jvRecord;
+
+        const divisionOf = (match: { homeRosterId: string }): string =>
+          rosterMap.get(match.homeRosterId)?.division || 'Varsity';
+
+        // A division counts as fielded if it has standings *or* matches — a
+        // season can have JV fixtures before anyone has published a JV table,
+        // and dropping those results because of a missing table would lose data
+        // the old hub displayed.
+        const played = new Set([...scheduledRows, ...completedRows].map(divisionOf));
+        divisions = HUB_DIVISIONS.filter(
+          (d) => (d === 'Varsity' ? record !== null : jvRecord !== null) || played.has(d)
+        );
+        division =
+          requestedDivision && (divisions as string[]).includes(requestedDivision)
+            ? (requestedDivision as HubDivision)
+            : (divisions[0] ?? 'Varsity');
+
+        topTeams = summary.topTeamsByDivision[division];
+
+        const nextMatchRow = scheduledRows.filter((r) => divisionOf(r) === division);
+        const recentRows = completedRows.filter((r) => divisionOf(r) === division).slice(0, 3);
 
         if (nextMatchRow[0]) {
           const homeRoster = rosterMap.get(nextMatchRow[0].homeRosterId);
@@ -858,7 +909,7 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
     console.error(`Failed to load dynamic data for ${gameSlug}`, error);
   }
 
-  return { record, jvRecord, nextMatch, recentResults, topTeams, seasonName };
+  return { record, jvRecord, nextMatch, recentResults, topTeams, seasonName, divisions, division };
 }
 
 // --- STAFF ACCESS CONTROL ---

@@ -23,15 +23,13 @@ const toneStyles: Record<TileTone, string> = {
 /**
  * The title is 11px, which is never "large text" for WCAG, so it needs the
  * full 4.5:1. `foreground-muted` measures 3.69:1 on the plain raised panel and
- * worse on an accent-tinted one — it fails everywhere here. Every tone uses
- * `foreground-secondary` (~7:1), which still reads a clear step below the tile
- * content because the title is smaller and the body text is `foreground`.
+ * worse on an accent-tinted one — it fails everywhere here. Hence
+ * `foreground-secondary` (~7:1) on every tone, which still reads a clear step
+ * below the tile content because the title is smaller and the body is
+ * `foreground`. One value for all tones, deliberately: a per-tone record here
+ * would imply the tones may diverge, and contrast says they can't.
  */
-const titleStyles: Record<TileTone, string> = {
-  default: 'text-foreground-secondary',
-  accent: 'text-foreground-secondary',
-  feature: 'text-foreground-secondary',
-};
+const titleStyle = 'text-foreground-secondary';
 
 interface TileProps {
   /** The single question this tile answers, rendered as its heading. */
@@ -40,7 +38,6 @@ interface TileProps {
   href?: string;
   /** Label for that link — the arrow is appended automatically. */
   linkLabel?: string;
-  external?: boolean;
   tone?: TileTone;
   /** Drop the body padding for content that carries its own (e.g. a Table). */
   flush?: boolean;
@@ -57,7 +54,6 @@ export default function Tile({
   title,
   href,
   linkLabel = 'View',
-  external = false,
   tone = 'default',
   flush = false,
   className = '',
@@ -76,14 +72,17 @@ export default function Tile({
       )}
     >
       <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-3">
-        <h2 className={cx('text-[11px] font-black uppercase tracking-widest', titleStyles[tone])}>
+        <h2 className={cx('text-[11px] font-black uppercase tracking-widest', titleStyle)}>
           {title}
         </h2>
         {href && (
+          // The focus ring falls back to the global accent token: an undefined
+          // custom property invalidates the whole `box-shadow` declaration, so
+          // a bare `var(--game-accent)` means *no ring at all* — not a default
+          // colour — for any Tile rendered outside a themed ancestor.
           <Link
             href={href}
-            {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            className="-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-sm text-[11px] font-black uppercase tracking-widest text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            className="-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-sm text-[11px] font-black uppercase tracking-widest text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--game-accent,var(--accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
             {linkLabel}
             <span aria-hidden="true">&rarr;</span>
