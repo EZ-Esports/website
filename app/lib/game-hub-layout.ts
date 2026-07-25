@@ -129,6 +129,17 @@ interface TileCandidate {
   variants: Span[];
   /** How much this tile resists being reshaped: higher = deform something else. */
   weight: number;
+  /**
+   * Whether this tile reads acceptably at half the tablet width (~300px).
+   *
+   * A content judgement, deliberately independent of the desktop span: the
+   * tablet grid is two columns of its own, not a scaled-down desktop. Tiles
+   * carrying display-size type (`next-match`, `season-summary`), a four-column
+   * table (`standings`) or a list of rows with a trailing badge
+   * (`recent-results`) need both columns; a single score and a short blurb do
+   * not.
+   */
+  tabletHalf: boolean;
 }
 
 /**
@@ -151,6 +162,7 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
         { colSpan: 3, rowSpan: 1 },
       ],
       weight: 2,
+      tabletHalf: false,
     });
   }
   if (hasNextMatch) {
@@ -163,6 +175,7 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
         { colSpan: 3, rowSpan: 1 },
       ],
       weight: 3,
+      tabletHalf: false,
     });
   }
   if (hasStandings) {
@@ -175,6 +188,7 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
         { colSpan: 3, rowSpan: 1 },
       ],
       weight: 3,
+      tabletHalf: false,
     });
   }
   if (recentResultsCount >= 1) {
@@ -185,6 +199,7 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
         { colSpan: 2, rowSpan: 1 },
       ],
       weight: 1,
+      tabletHalf: true,
     });
   }
   if (recentResultsCount >= 2) {
@@ -196,6 +211,7 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
         { colSpan: 4, rowSpan: 1 },
       ],
       weight: 2,
+      tabletHalf: false,
     });
   }
   // Always present, and the most elastic tile: it closes the grid, so it takes
@@ -209,6 +225,7 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
       { colSpan: 1, rowSpan: 1 },
     ],
     weight: 1,
+    tabletHalf: true,
   });
 
   return candidates;
@@ -268,22 +285,28 @@ export function planGameHubLayout(input: GameHubLayoutInput): GameHubTileLayout[
   const desktop = chooseSpans(candidates, DESKTOP_COLUMNS);
 
   // The tablet grid never row-spans (the page applies `row-span` at `lg` only),
-  // so it is planned separately: start from the desktop width, clamped to two
-  // columns, and allow a one-column tile to widen if that is what closes a gap.
-  const tabletCandidates: TileCandidate[] = candidates.map((candidate, i) => {
-    const base = Math.min(desktop[i].colSpan, TABLET_COLUMNS);
-    return {
-      id: candidate.id,
-      variants:
-        base === 1
-          ? [
-              { colSpan: 1, rowSpan: 1 },
-              { colSpan: 2, rowSpan: 1 },
-            ]
-          : [{ colSpan: 2, rowSpan: 1 }],
-      weight: 1,
-    };
-  });
+  // so it is planned separately — and from the tiles' own content, not from the
+  // desktop plan. Deriving it from the desktop width was the bug: only
+  // `last-result` is ever one desktop column wide, so it was the only tile
+  // allowed to be half-width at tablet, and a lone half-width tile always
+  // leaves a hole beside it. Every tile therefore widened back to full width in
+  // all 16 states, `sm:grid-cols-2` quietly rendered as one column, and the
+  // one-column class was unreachable.
+  //
+  // With two tiles able to halve, the packer can pair them when they are
+  // adjacent in DOM order, and still falls back to full width when they are
+  // not — the hole-free guarantee is unchanged either way.
+  const tabletCandidates: TileCandidate[] = candidates.map((candidate) => ({
+    id: candidate.id,
+    variants: candidate.tabletHalf
+      ? [
+          { colSpan: 1, rowSpan: 1 },
+          { colSpan: 2, rowSpan: 1 },
+        ]
+      : [{ colSpan: 2, rowSpan: 1 }],
+    weight: 1,
+    tabletHalf: candidate.tabletHalf,
+  }));
   const tablet = chooseSpans(tabletCandidates, TABLET_COLUMNS);
 
   return candidates.map((candidate, i) => ({

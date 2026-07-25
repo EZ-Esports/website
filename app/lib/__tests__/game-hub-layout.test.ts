@@ -43,6 +43,16 @@ const desktopSpans = (layout: GameHubTileLayout[]) =>
 const tabletSpans = (layout: GameHubTileLayout[]) =>
   layout.map((tile) => ({ colSpan: tile.smColSpan, rowSpan: 1 }));
 
+/**
+ * Mobile is `grid-cols-1` with no span classes applied at all: none of the
+ * planned spans reach it. Modelling it as "the desktop spans in a 1-column
+ * grid" was vacuous — `packRowFlow` clamps any colSpan to the column count, so
+ * that assertion could not fail for any plan. What is actually worth pinning is
+ * that mobile is a plain stack: one tile per row, in DOM order.
+ */
+const mobileStack = (layout: GameHubTileLayout[]) =>
+  layout.map(() => ({ colSpan: 1, rowSpan: 1 }));
+
 /** DOM order the page renders tiles in; the plan must be a subsequence of it. */
 const DOM_ORDER: GameHubTileId[] = [
   'season-summary',
@@ -193,8 +203,11 @@ describe('planGameHubLayout', () => {
       expect(tablet.overlapping).toBe(0);
       expect(tablet.outOfBounds).toBe(0);
 
-      // Mobile is a single column: everything stacks, so it can never hole.
-      expect(coverage(desktopSpans(layout), 1).empty).toBe(0);
+      // Mobile: every tile gets its own row, in DOM order, with nothing left over.
+      const mobile = packRowFlow(mobileStack(layout), 1);
+      expect(mobile.holes).toBe(0);
+      expect(mobile.rows).toBe(layout.length);
+      expect(mobile.placements.map((p) => p.row)).toEqual(layout.map((_, i) => i));
     }
   );
 
@@ -256,5 +269,66 @@ describe('planGameHubLayout', () => {
     });
     expect(layout.map((tile) => tile.id)).toEqual(['season-summary', 'archives']);
     expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).empty).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The tablet (`sm`) grid — the breakpoint that used to be a no-op
+// ---------------------------------------------------------------------------
+describe('planGameHubLayout — tablet packing', () => {
+  it('uses both tablet columns somewhere in the input space', () => {
+    // Previously every tile was 2 columns wide in all 16 states, so
+    // `sm:grid-cols-2` rendered as one column and the page's `sm:col-span-1`
+    // class was unreachable. This is the assertion that would have caught it:
+    // the old planner fails it, the new one passes.
+    const halfWidth = allInputs.flatMap((input) =>
+      planGameHubLayout(input).filter((tile) => tile.smColSpan === 1)
+    );
+    expect(halfWidth.length).toBeGreaterThan(0);
+  });
+
+  it('pairs the two small tiles side by side when they are DOM-adjacent', () => {
+    // One completed result means no "recent results" list, so "last result"
+    // and "archives" — the two tiles that read fine at ~300px — sit next to
+    // each other and share a row instead of each taking the full width.
+    const layout = planGameHubLayout({
+      hasStandings: true,
+      hasNextMatch: true,
+      recentResultsCount: 1,
+    });
+    const byId = Object.fromEntries(layout.map((tile) => [tile.id, tile]));
+    expect(byId['last-result'].smColSpan).toBe(1);
+    expect(byId['archives'].smColSpan).toBe(1);
+
+    const { placements } = packRowFlow(tabletSpans(layout), TABLET_COLUMNS);
+    const last = placements[layout.findIndex((t) => t.id === 'last-result')];
+    const archives = placements[layout.findIndex((t) => t.id === 'archives')];
+    expect(last.row).toBe(archives.row);
+    expect(last.column).toBe(0);
+    expect(archives.column).toBe(1);
+  });
+
+  it('keeps the wide tiles full-width at tablet', () => {
+    // A four-column standings table and the display-type hero do not survive
+    // being halved, whatever the packer would prefer.
+    for (const input of allInputs) {
+      for (const tile of planGameHubLayout(input)) {
+        if (['standings', 'next-match', 'recent-results', 'season-summary'].includes(tile.id)) {
+          expect(tile.smColSpan).toBe(TABLET_COLUMNS);
+        }
+      }
+    }
+  });
+
+  it('falls back to full width when a small tile has no partner', () => {
+    // Three results puts "recent results" between "last result" and
+    // "archives", so neither can halve without stranding a column.
+    const layout = planGameHubLayout({
+      hasStandings: true,
+      hasNextMatch: true,
+      recentResultsCount: 3,
+    });
+    expect(layout.every((tile) => tile.smColSpan === TABLET_COLUMNS)).toBe(true);
+    expect(coverage(tabletSpans(layout), TABLET_COLUMNS).empty).toBe(0);
   });
 });
