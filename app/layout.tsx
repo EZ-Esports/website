@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { METADATA, SITE_CONFIG } from "@/app/lib/constants";
 import Providers from "@/app/components/ui/Providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>{children}</Providers>
+        {/* Renders nothing; injects the Vercel Analytics script. A sibling of
+            Providers rather than a child because it reads route state straight
+            from next/navigation and needs none of RAC's RouterProvider. */}
+        <Analytics />
       </body>
     </html>
   );
