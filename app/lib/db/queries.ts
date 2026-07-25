@@ -838,12 +838,15 @@ export async function getGameHubData(
         // the whole season across *both* divisions, so a division's next match
         // or last three results fall outside the window only if that many
         // fixtures belonging to the other division sort ahead of them. The
-        // largest season on record holds 156 decided matches, so MATCH_SCAN_LIMIT
-        // clears the worst case the archive has ever produced by ~3x. Both
-        // orderings carry `id` as a tiebreaker: bulk-imported seasons default
-        // every unknown kickoff to the same time, and without a second key the
-        // rows that land inside the cap — and so the divisions the tab bar
-        // offers — could differ between two identical requests.
+        // largest season on record holds 123 match rows, 79 of them decided, so
+        // MATCH_SCAN_LIMIT clears the worst case the archive has produced by ~4x.
+        //
+        // Both orderings carry `id` as a tiebreaker. That is not only a
+        // cap-boundary concern: bulk-imported seasons default every unknown
+        // kickoff to the same time — the active Valorant season has six matches
+        // sharing one timestamp — so `slice(0, 3)` over tied rows would pick a
+        // different three between two identical requests, at row counts nowhere
+        // near the cap.
         const [scheduledRows, completedRows, summary] = await Promise.all([
           db
             .select()
@@ -917,7 +920,11 @@ export async function getGameHubData(
               year: 'numeric',
             }),
             teams: `${home?.name || 'Home'} vs. ${away?.name || 'Away'}`,
-            division: homeRoster?.division || 'Varsity',
+            // `division`, not the raw roster column: these rows were already
+            // filtered to the served division, so reading the column again
+            // could only ever disagree with the tab above them (an admin-created
+            // roster spells it `A`, which would print "· A" under "Varsity").
+            division,
           };
         }
 
@@ -937,7 +944,11 @@ export async function getGameHubData(
             }),
             teams: `${home?.name ?? 'Home'} vs. ${away?.name ?? 'Away'}`,
             result: `${homeWon ? 'W' : 'L'} ${r.homeScore ?? 0}-${r.awayScore ?? 0}`,
-            division: homeRoster?.division || 'Varsity',
+            // `division`, not the raw roster column: these rows were already
+            // filtered to the served division, so reading the column again
+            // could only ever disagree with the tab above them (an admin-created
+            // roster spells it `A`, which would print "· A" under "Varsity").
+            division,
           };
         });
       }
