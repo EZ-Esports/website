@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
   DIVISIONS,
@@ -981,6 +981,12 @@ export interface GameHubData {
   recentResults: {
     date: string;
     teams: string;
+    /**
+     * The home side's verdict, as its own value rather than something the page
+     * has to recover from the first character of `result`. The same three
+     * letters the form chips use, so one match cannot read two ways.
+     */
+    outcome: FormOutcome;
     result: string;
     /** A forfeit is a real result, but the rest of the site says so on its face. */
     forfeit: boolean;
@@ -1082,13 +1088,6 @@ export async function getGameHubData(
               // Unrecorded results (null scores) would otherwise render "L 0-0".
               isNotNull(schema.matches.homeScore),
               isNotNull(schema.matches.awayScore),
-              // Neither would a 0-0 forfeit, which is the same "L 0-0" by
-              // another route — and admin only requires that both scores be
-              // present, not that they differ, so the league has produced
-              // them. `roster_standings` counts an equal-score row as neither
-              // a win nor a loss; a page that prints those standings must not
-              // call it a loss one tile over.
-              ne(schema.matches.homeScore, schema.matches.awayScore),
             ],
             direction: 'desc',
             limit: RECENT_RESULTS_LIMIT,
@@ -1141,10 +1140,21 @@ export async function getGameHubData(
         }
 
         recentResults = completedRows.map((r) => {
-          // W/L is stated from the home side, as it always has been: this is
-          // the league's results feed, not one school's, and the same row
-          // appears on both divisions' tabs when the fixture crossed them.
-          const homeWon = (r.homeScore ?? 0) > (r.awayScore ?? 0);
+          // The verdict is stated from the home side, as it always has been:
+          // this is the league's results feed, not one school's, and the same
+          // row appears on both divisions' tabs when the fixture crossed them.
+          //
+          // Drawn matches are listed rather than hidden, which is what the
+          // homepage feed has always done. The hub used to exclude equal
+          // scores, so a 1-1 was a match the site reported in one place and
+          // denied in another — and a 0-0 forfeit, which the league does
+          // produce, was the case that exclusion was really there to catch: it
+          // rendered as "L 0-0" beside standings that counted it as neither a
+          // win nor a loss. Naming it a draw says the true thing instead of
+          // saying nothing.
+          const home = r.homeScore ?? 0;
+          const away = r.awayScore ?? 0;
+          const outcome: FormOutcome = home > away ? 'W' : home < away ? 'L' : 'D';
           return {
             date: r.scheduledAt.toLocaleDateString('en-US', {
               timeZone: 'America/New_York',
@@ -1153,7 +1163,8 @@ export async function getGameHubData(
               year: 'numeric',
             }),
             teams: `${r.homeTeam} vs. ${r.awayTeam}`,
-            result: `${homeWon ? 'W' : 'L'} ${r.homeScore ?? 0}-${r.awayScore ?? 0}`,
+            outcome,
+            result: `${outcome} ${home}-${away}`,
             forfeit: r.status === 'forfeit',
           };
         });

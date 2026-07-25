@@ -384,7 +384,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               <p
                 className={cx(
                   'mt-2 text-2xl font-black tracking-tight',
-                  lastResult.result.startsWith('W') ? 'text-success' : 'text-foreground-secondary'
+                  lastResult.outcome === 'W' ? 'text-success' : 'text-foreground-secondary'
                 )}
               >
                 {lastResult.result}
@@ -423,7 +423,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                           worth reading — with no tooltip to recover it. */}
                       <p className="text-sm font-bold leading-snug text-foreground">{match.teams}</p>
                     </div>
-                    <Badge variant={resultVariant(match.result.startsWith('W'))} size="sm">
+                    <Badge variant={resultVariant(match.outcome)} size="sm">
                       {match.result}
                     </Badge>
                   </li>
