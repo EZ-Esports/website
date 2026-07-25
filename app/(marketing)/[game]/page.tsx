@@ -1,13 +1,6 @@
 import type { Metadata } from 'next';
 import type { CSSProperties } from 'react';
-import {
-  GAMES,
-  GAME_SLUGS,
-  ROUTES,
-  SOCIAL_LINKS,
-  getGameRoute,
-  getGameSubRoute,
-} from '@/app/lib/constants';
+import { GAMES, GAME_SLUGS, ROUTES, getGameSubRoute } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import Tile from '@/app/components/ui/Tile';
@@ -36,9 +29,6 @@ const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
 };
 
 const RANK_MEDALS: Record<number, string> = { 1: '🏆', 2: '🥈', 3: '🥉' };
-
-/** Established divisions pointed at from a new division's "while you wait" tile. */
-const ESTABLISHED_SLUGS: GameSlug[] = ['valorant', 'league-of-legends', 'team-fight-tactics'];
 
 /**
  * Per-game CSS custom properties, consumed by `bg-[var(--game-accent)]` &co.
@@ -114,13 +104,6 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   const hasNextMatch = nextMatch !== null;
   const hasRosters = rosterSchools.length > 0;
   const hasSeasonData = hasStandings || hasNextMatch || recentResults.length > 0;
-  // No data AND no season on the books at all: this division has never run, so the
-  // page's job is recruitment. A division that has a season but nothing renderable
-  // yet (e.g. one whose standings are per-player) keeps the grid and gets pointed
-  // at its sub-pages instead — calling it "new" would be a lie.
-  const isNewDivision = !hasSeasonData && seasonName === null;
-
-  const discordUrl = SOCIAL_LINKS.find((link) => link.platform === 'discord')?.url;
 
   /**
    * Tile spans are planned by simulating CSS grid's row-flow auto-placement
@@ -151,9 +134,7 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
   // tiles use — a division must never appear under two names on one screen.
   // Separate pills rather than one joined pill so "Junior Varsity" can wrap to
   // its own line at 390px instead of blowing out a `whitespace-nowrap` badge.
-  const metaPills = isNewDivision
-    ? ['New division', 'Season not yet scheduled']
-    : [seasonName, ...divisions.map(divisionLabel)];
+  const metaPills = [seasonName, ...divisions.map(divisionLabel)];
 
   return (
     <div className="min-h-[60vh]" style={themeStyle}>
@@ -189,17 +170,23 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
 
         <MigrationNotice />
 
-        {!isNewDivision ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {!hasSeasonData && seasonName && (
-              <Tile title="This season" tone="accent" className={spanClass('season-summary')}>
-                <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                  {`The ${seasonName} season is under way.`}
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
-                  This division&rsquo;s full standings, schedule and rosters live on their own
-                  pages.
-                </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* An empty result set has three causes here — data not yet ported
+              from the old site, a season with nothing renderable in it, or a
+              failed query — and this page can't tell them apart. So it reports
+              only the absence, never a conclusion about the league: no "new
+              division", and no present-tense claim that a season is under way
+              (the seasons still carrying `isActive` predate the migration). */}
+          {!hasSeasonData && (
+            <Tile title="This season" tone="accent" className={spanClass('season-summary')}>
+              <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                {seasonName ? `Nothing to show for ${seasonName} yet.` : 'Nothing to show here yet.'}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
+                Standings, schedules and rosters appear here as this division&rsquo;s data is
+                published.
+              </p>
+              {seasonName && (
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button
                     href={getGameSubRoute(slug, 'standings')}
@@ -216,228 +203,167 @@ export default async function GameHubPage({ params }: GameHubPageProps) {
                     Teams &amp; rosters
                   </Button>
                 </div>
-              </Tile>
-            )}
-
-            {nextMatch && (
-              // The dominant tile of the grid: the planner gives it the full
-              // width, and the `feature` tone carries the game's accent as a
-              // stronger tint plus a solid edge.
-              <Tile title="Next match" tone="feature" className={spanClass('next-match')}>
-                <p className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] text-foreground">
-                  {nextMatch.teams}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-foreground-secondary">
-                    {nextMatch.date}
-                  </span>
-                  {/* Accent-tinted, not accent-filled: small text on a solid
-                      per-game accent fails contrast for several of the games. */}
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--game-accent-line)] bg-[var(--game-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
-                    <span
-                      className="h-1.5 w-1.5 rounded-full bg-[var(--game-accent)]"
-                      aria-hidden="true"
-                    />
-                    {divisionLabel(nextMatch.division)}
-                  </span>
-                </div>
-                <Button
-                  href={getGameSubRoute(slug, 'schedule')}
-                  variant="outline"
-                  className="mt-5 min-h-[44px]"
-                >
-                  Full schedule
-                </Button>
-              </Tile>
-            )}
-
-            {topTeams.length > 0 && (
-              <Tile
-                title="Standings"
-                href={getGameSubRoute(slug, 'standings')}
-                linkLabel="Full table"
-                flush
-                className={spanClass('standings')}
-              >
-                <Table>
-                  <thead className="border-b border-line">
-                    <tr>
-                      <Th>Rank</Th>
-                      <Th>Team</Th>
-                      <Th className="whitespace-nowrap">W&ndash;L</Th>
-                      <Th align="right" className="hidden sm:table-cell">Win %</Th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {topTeams.map((entry, index) => (
-                      <Tr key={entry.rank} interactive>
-                        {/* The leader carries the game's accent — the one place
-                            the table earns colour. */}
-                        <Td
-                          className={cx(
-                            'font-bold whitespace-nowrap border-l-2',
-                            index === 0 ? 'border-l-[var(--game-accent)]' : 'border-l-transparent'
-                          )}
-                        >
-                          {RANK_MEDALS[entry.rank] && (
-                            <span aria-hidden="true">{RANK_MEDALS[entry.rank]} </span>
-                          )}
-                          {entry.rank}
-                        </Td>
-                        <Td className="font-bold text-foreground">{entry.team}</Td>
-                        <Td className="font-medium whitespace-nowrap">
-                          {entry.wins}&ndash;{entry.losses}
-                        </Td>
-                        <Td className="hidden sm:table-cell font-bold text-foreground text-right whitespace-nowrap">
-                          {(entry.winPct * 100).toFixed(1)}%
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Tile>
-            )}
-
-            {lastResult && (
-              <Tile title="Last result" className={spanClass('last-result')}>
-                <p className="text-sm font-bold leading-snug text-foreground">
-                  {lastResult.teams}
-                </p>
-                <p
-                  className={cx(
-                    'mt-2 text-2xl font-black tracking-tight',
-                    lastResult.result.startsWith('W') ? 'text-success' : 'text-foreground-secondary'
-                  )}
-                >
-                  {lastResult.result}
-                </p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
-                  {lastResult.date} · {divisionLabel(lastResult.division)}
-                </p>
-              </Tile>
-            )}
-
-            {rosterSchools.length > 0 && (
-              <Tile
-                title="Rosters"
-                href={getGameSubRoute(slug, 'teams')}
-                linkLabel="All teams"
-                className={spanClass('rosters')}
-              >
-                <ul className="space-y-2">
-                  {rosterSchools.map((school) => (
-                    <li
-                      key={school}
-                      className="truncate text-sm font-semibold text-foreground-secondary"
-                    >
-                      {school}
-                    </li>
-                  ))}
-                </ul>
-              </Tile>
-            )}
-
-            {olderResults.length > 0 && (
-              <Tile
-                title="Recent results"
-                href={getGameSubRoute(slug, 'schedule')}
-                linkLabel="All matches"
-                className={spanClass('recent-results')}
-              >
-                <ul className="divide-y divide-line">
-                  {olderResults.map((match, index) => (
-                    <li
-                      key={`${match.date}-${match.teams}-${index}`}
-                      className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
-                          {match.date} · {divisionLabel(match.division)}
-                        </p>
-                        <p className="truncate text-sm font-bold text-foreground">{match.teams}</p>
-                      </div>
-                      <Badge variant={resultVariant(match.result.startsWith('W'))} size="sm">
-                        {match.result}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </Tile>
-            )}
-
-            <Tile
-              title="Season archives"
-              href={ROUTES.archives}
-              linkLabel="Archives"
-              className={spanClass('archives')}
-            >
-              <p className="text-sm leading-relaxed text-foreground-secondary">
-                {`Every past ${gameConfig.displayName} season in one place — final standings, champion schools, and the full match history behind them.`}
-              </p>
-            </Tile>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Tile title="Founding season" tone="accent" className="sm:col-span-2">
-              <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                Be one of the first schools in.
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
-                {`${gameConfig.displayName} joins EZ Esports as a new division. Schools that sign up now help shape the format, the schedule, and the first season’s rules.`}
-              </p>
-              <Button href={ROUTES.apply} variant="primary" className="mt-5 min-h-[44px]">
-                Bring {gameConfig.shortName} to your school
-              </Button>
-            </Tile>
-
-            {/* Full width on the 2-column tablet grid so the row above it can't
-                strand an empty cell; one of three columns on desktop. */}
-            <Tile title="What to expect" className="sm:col-span-2 lg:col-span-1">
-              <ul className="space-y-2 text-sm font-semibold text-foreground-secondary">
-                <li>Weekly scheduled matches</li>
-                <li>Varsity and JV divisions</li>
-                <li>Standings, schedules and rosters on this page</li>
-              </ul>
-            </Tile>
-
-            <Tile title="While you wait" className="sm:col-span-2">
-              <p className="text-sm leading-relaxed text-foreground-secondary">
-                See how a season runs in an established division — standings, schedules and full
-                rosters are live today.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                {ESTABLISHED_SLUGS.filter((established) => established !== slug).map((established) => (
-                  <Button
-                    key={established}
-                    href={getGameRoute(established)}
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[44px]"
-                  >
-                    {GAMES[established].shortName}
-                  </Button>
-                ))}
-              </div>
-            </Tile>
-
-            <Tile title="Questions" className="sm:col-span-2 lg:col-span-1">
-              <p className="text-sm leading-relaxed text-foreground-secondary">
-                Talk to the division leads directly.
-              </p>
-              {discordUrl && (
-                <Button
-                  href={discordUrl}
-                  variant="outline"
-                  className="mt-5 min-h-[44px]"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Join our Discord
-                </Button>
               )}
             </Tile>
-          </div>
-        )}
+          )}
+
+          {nextMatch && (
+            // The dominant tile of the grid: the planner gives it the full
+            // width, and the `feature` tone carries the game's accent as a
+            // stronger tint plus a solid edge.
+            <Tile title="Next match" tone="feature" className={spanClass('next-match')}>
+              <p className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.1] text-foreground">
+                {nextMatch.teams}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground-secondary">
+                  {nextMatch.date}
+                </span>
+                {/* Accent-tinted, not accent-filled: small text on a solid
+                    per-game accent fails contrast for several of the games. */}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--game-accent-line)] bg-[var(--game-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-[var(--game-accent)]"
+                    aria-hidden="true"
+                  />
+                  {divisionLabel(nextMatch.division)}
+                </span>
+              </div>
+              <Button
+                href={getGameSubRoute(slug, 'schedule')}
+                variant="outline"
+                className="mt-5 min-h-[44px]"
+              >
+                Full schedule
+              </Button>
+            </Tile>
+          )}
+
+          {topTeams.length > 0 && (
+            <Tile
+              title="Standings"
+              href={getGameSubRoute(slug, 'standings')}
+              linkLabel="Full table"
+              flush
+              className={spanClass('standings')}
+            >
+              <Table>
+                <thead className="border-b border-line">
+                  <tr>
+                    <Th>Rank</Th>
+                    <Th>Team</Th>
+                    <Th className="whitespace-nowrap">W&ndash;L</Th>
+                    <Th align="right" className="hidden sm:table-cell">Win %</Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {topTeams.map((entry, index) => (
+                    <Tr key={entry.rank} interactive>
+                      {/* The leader carries the game's accent — the one place
+                          the table earns colour. */}
+                      <Td
+                        className={cx(
+                          'font-bold whitespace-nowrap border-l-2',
+                          index === 0 ? 'border-l-[var(--game-accent)]' : 'border-l-transparent'
+                        )}
+                      >
+                        {RANK_MEDALS[entry.rank] && (
+                          <span aria-hidden="true">{RANK_MEDALS[entry.rank]} </span>
+                        )}
+                        {entry.rank}
+                      </Td>
+                      <Td className="font-bold text-foreground">{entry.team}</Td>
+                      <Td className="font-medium whitespace-nowrap">
+                        {entry.wins}&ndash;{entry.losses}
+                      </Td>
+                      <Td className="hidden sm:table-cell font-bold text-foreground text-right whitespace-nowrap">
+                        {(entry.winPct * 100).toFixed(1)}%
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Tile>
+          )}
+
+          {lastResult && (
+            <Tile title="Last result" className={spanClass('last-result')}>
+              <p className="text-sm font-bold leading-snug text-foreground">
+                {lastResult.teams}
+              </p>
+              <p
+                className={cx(
+                  'mt-2 text-2xl font-black tracking-tight',
+                  lastResult.result.startsWith('W') ? 'text-success' : 'text-foreground-secondary'
+                )}
+              >
+                {lastResult.result}
+              </p>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
+                {lastResult.date} · {divisionLabel(lastResult.division)}
+              </p>
+            </Tile>
+          )}
+
+          {rosterSchools.length > 0 && (
+            <Tile
+              title="Rosters"
+              href={getGameSubRoute(slug, 'teams')}
+              linkLabel="All teams"
+              className={spanClass('rosters')}
+            >
+              <ul className="space-y-2">
+                {rosterSchools.map((school) => (
+                  <li
+                    key={school}
+                    className="truncate text-sm font-semibold text-foreground-secondary"
+                  >
+                    {school}
+                  </li>
+                ))}
+              </ul>
+            </Tile>
+          )}
+
+          {olderResults.length > 0 && (
+            <Tile
+              title="Recent results"
+              href={getGameSubRoute(slug, 'schedule')}
+              linkLabel="All matches"
+              className={spanClass('recent-results')}
+            >
+              <ul className="divide-y divide-line">
+                {olderResults.map((match, index) => (
+                  <li
+                    key={`${match.date}-${match.teams}-${index}`}
+                    className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
+                        {match.date} · {divisionLabel(match.division)}
+                      </p>
+                      <p className="truncate text-sm font-bold text-foreground">{match.teams}</p>
+                    </div>
+                    <Badge variant={resultVariant(match.result.startsWith('W'))} size="sm">
+                      {match.result}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </Tile>
+          )}
+
+          <Tile
+            title="Season archives"
+            href={ROUTES.archives}
+            linkLabel="Archives"
+            className={spanClass('archives')}
+          >
+            <p className="text-sm leading-relaxed text-foreground-secondary">
+              {`Every past ${gameConfig.displayName} season in one place — final standings, champion schools, and the full match history behind them.`}
+            </p>
+          </Tile>
+        </div>
       </Section>
     </div>
   );

@@ -136,9 +136,8 @@ interface TileCandidate {
 /**
  * Which tiles the page renders, in DOM order, for a given data state.
  *
- * `season-summary` appears exactly when the division has an active season but
- * nothing renderable in it — the page's other branch (a division that has never
- * run a season) uses a different grid entirely.
+ * `season-summary` appears exactly when the division has nothing renderable —
+ * whether or not a season is on record. There is one grid for every state.
  */
 function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
   const { hasStandings, hasNextMatch, recentResultsCount, hasRosters } = input;
