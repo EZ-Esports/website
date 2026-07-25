@@ -89,6 +89,30 @@ export const getGameSubRoute = (gameSlug: GameSlug, subRoute: 'schedule' | 'stan
   return `/${gameSlug}/${subRoute}`;
 };
 
+/**
+ * The game hub serves one division at a time, and which one is part of the
+ * page's identity, not a filter on it — so it lives in the path rather than a
+ * query string. These are real route segments under `app/(marketing)/[game]/`,
+ * siblings of `schedule`/`standings`/`teams`; `/[game]` itself redirects to the
+ * Varsity one.
+ */
+export const DIVISION_SEGMENTS = { Varsity: 'varsity', JV: 'junior-varsity' } as const;
+export type DivisionSegment = (typeof DIVISION_SEGMENTS)[keyof typeof DIVISION_SEGMENTS];
+
+export const getGameDivisionRoute = (
+  gameSlug: GameSlug,
+  division: keyof typeof DIVISION_SEGMENTS
+): string => `/${gameSlug}/${DIVISION_SEGMENTS[division]}`;
+
+/**
+ * Whether `pathname` is the hub overview for `gameSlug`. The bare `/[game]`
+ * only ever appears as a redirect source, so the sub-header's Overview tab has
+ * to recognise the division paths it lands on, or it highlights nothing.
+ */
+export const isGameOverviewPath = (pathname: string, gameSlug: GameSlug): boolean =>
+  pathname === `/${gameSlug}` ||
+  Object.values(DIVISION_SEGMENTS).some((segment) => pathname === `/${gameSlug}/${segment}`);
+
 export const isGameRoute = (pathname: string): boolean => {
   return GAME_SLUGS.some((slug) => pathname.startsWith(`/${slug}`));
 };

@@ -11,6 +11,53 @@ export type MatchSort = 'asc' | 'desc';
 /** Every roster division label in display order. */
 export const DIVISIONS = ['Varsity', 'JV', 'All'] as const;
 
+/** The division vocabulary the site displays, after normalization. */
+export type CanonicalDivision = (typeof DIVISIONS)[number];
+
+/**
+ * `rosters.division` and `season_standings.division` hold three spellings of
+ * two ideas, written by three different producers:
+ *
+ * - the archive importer writes `Varsity`/`JV` (`db/import-archive.ts` maps
+ *   the source spreadsheets' `A` -> Varsity and `B` -> JV);
+ * - Admin -> Roster writes the raw `A`/`B` its select offers;
+ * - per-player games (TFT, osu!, Tetris) run one undivided field and write
+ *   `All`, because there is no Varsity/JV split to record.
+ *
+ * Every consumer has to agree on that mapping or a season shows a division
+ * switch whose tabs are all empty — which is exactly what the game hub did to
+ * every admin-managed season. `canonicalDivision` is the single answer, and it
+ * is total: an unrecognised value is Varsity, never a fourth division and never
+ * null, so no row can fall out of every bucket and become invisible.
+ */
+export function canonicalDivision(value: string | null | undefined): CanonicalDivision {
+  if (value === 'JV' || value === 'B') return 'JV';
+  if (value === 'All') return 'All';
+  return 'Varsity';
+}
+
+/** The two divisions the game hub offers. Always both, in this order. */
+export const HUB_DIVISIONS = ['Varsity', 'JV'] as const;
+export type HubDivision = (typeof HUB_DIVISIONS)[number];
+
+/**
+ * `canonicalDivision` collapsed onto the hub's two tabs.
+ *
+ * The hub always offers both, so `All` has to land on one of them: it lands on
+ * Varsity, the tab a bare game URL resolves to. A per-player game therefore
+ * shows its season under Varsity and leaves JV genuinely empty, which is the
+ * truth about a game that never fielded a JV division — and is what the hub
+ * says instead of the blank page it used to serve when `All` mapped to nothing.
+ */
+export function toHubDivision(value: string | null | undefined): HubDivision {
+  return canonicalDivision(value) === 'JV' ? 'JV' : 'Varsity';
+}
+
+/** Display name for a division; only JV is spelled differently than stored. */
+export function divisionLabel(division: string): string {
+  return division === 'JV' ? 'Junior Varsity' : division;
+}
+
 /** Keyset cursor: the sort key of the last row already delivered. */
 export interface MatchCursor {
   scheduledAt: string; // ISO timestamp

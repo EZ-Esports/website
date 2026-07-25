@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { CSSProperties } from 'react';
-import { GAMES, GAME_SLUGS, ROUTES, getGameRoute, getGameSubRoute } from '@/app/lib/constants';
+import { GAMES, GAME_SLUGS, ROUTES, getGameDivisionRoute, getGameSubRoute } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import Tile from '@/app/components/ui/Tile';
@@ -9,6 +9,11 @@ import FilterTabs from '@/app/components/ui/FilterTabs';
 import Button from '@/app/components/ui/Button';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getGameHubData } from '@/app/lib/db/queries';
+import {
+  HUB_DIVISIONS,
+  divisionLabel,
+  type HubDivision,
+} from '@/app/lib/db/match-page';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import { cx } from '@/app/lib/cx';
 import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
@@ -66,36 +71,42 @@ const LG_ROW_SPAN: Record<number, string> = {
   2: 'lg:row-span-2',
 };
 
-const divisionLabel = (division: string): string =>
-  division === 'JV' ? 'Junior Varsity' : division;
-
-interface GameHubPageProps {
-  params: Promise<{ game: string }>;
-  searchParams?: Promise<{ division?: string }>;
-}
-
-export async function generateMetadata({ params }: GameHubPageProps): Promise<Metadata> {
+/**
+ * Metadata for one division's hub route.
+ *
+ * Varsity keeps the bare game title: `/[game]` redirects to it, so it is the
+ * canonical landing page for the game and the title search results already
+ * carry. JV names itself, or the two routes would ship identical titles.
+ */
+export async function generateGameHubMetadata(
+  params: Promise<{ game: string }>,
+  division: HubDivision
+): Promise<Metadata> {
   const { game } = await params;
   if (!GAME_SLUGS.includes(game as GameSlug)) return {};
   const gameConfig = GAMES[game as GameSlug];
+  const suffix = division === 'JV' ? ' Junior Varsity' : '';
   return {
-    title: `${gameConfig.displayName} | EZ Esports`,
+    title: `${gameConfig.displayName}${suffix} | EZ Esports`,
     description: HUB_DESCRIPTIONS[game as GameSlug],
   };
 }
 
+interface GameHubViewProps {
+  params: Promise<{ game: string }>;
+  /** Fixed by the route segment this view is rendered from. */
+  division: HubDivision;
+}
+
 // Bad slugs are already 404'd by app/(marketing)/[game]/layout.tsx.
-export default async function GameHubPage({ params, searchParams }: GameHubPageProps) {
+export default async function GameHubView({ params, division }: GameHubViewProps) {
   const { game } = await params;
-  const { division: divisionParam } = (await searchParams) ?? {};
   const gameConfig = GAMES[game as GameSlug];
   const slug = game as GameSlug;
 
-  // The query validates `divisionParam` against the divisions the season really
-  // fields and echoes back the one it served, so the tabs highlight what the
-  // page is showing rather than what the URL asked for.
-  const { nextMatch, recentResults, topTeams, seasonName, divisions, division } =
-    await getGameHubData(slug, divisionParam);
+  // The division is a route segment, so it is one of exactly two values and
+  // needs no validation — the router 404s anything else before this runs.
+  const { nextMatch, recentResults, topTeams, seasonName } = await getGameHubData(slug, division);
 
   const lastResult = recentResults[0] ?? null;
   const olderResults = recentResults.slice(1);
@@ -138,14 +149,18 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
     '--game-accent-line': `color-mix(in srgb, ${gameConfig.accent.color} 40%, transparent)`,
   };
 
-  // Divisions are a switch, not a label: a hub that fields both shows one
-  // division at a time, so listing them as pills as well would say twice what
-  // the tabs already say once — and only the tabs say which one you're reading.
-  const divisionTabs = divisions.map((value) => ({
+  // Divisions are a switch, not a label: the hub shows one division at a time,
+  // so listing them as pills as well would say twice what the tabs already say
+  // once — and only the tabs say which one you're reading.
+  //
+  // Both are always offered, including on games that have never fielded a JV
+  // division. A tab that opens onto an empty division states that plainly;
+  // hiding it left per-player games (TFT, osu!, Tetris) with no tabs at all
+  // and, until the division fallback was fixed, no page either.
+  const divisionTabs = HUB_DIVISIONS.map((value) => ({
     label: divisionLabel(value),
     value,
-    // Varsity is the default the query falls back to, so it owns the bare URL.
-    href: value === 'Varsity' ? getGameRoute(slug) : `${getGameRoute(slug)}?division=${value}`,
+    href: getGameDivisionRoute(slug, value),
   }));
 
   return (
@@ -182,15 +197,12 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
           </div>
         </div>
 
-        {/* Only a season that actually fields both divisions gets a switch. */}
-        {divisionTabs.length > 1 && (
-          <FilterTabs
-            tabs={divisionTabs}
-            active={division}
-            ariaLabel="Division"
-            className="mb-5 flex-wrap"
-          />
-        )}
+        <FilterTabs
+          tabs={divisionTabs}
+          active={division}
+          ariaLabel="Division"
+          className="mb-5 flex-wrap"
+        />
 
         <MigrationNotice />
 
@@ -263,7 +275,11 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
                     className="h-1.5 w-1.5 rounded-full bg-[var(--game-accent)]"
                     aria-hidden="true"
                   />
-                  {divisionLabel(nextMatch.division)}
+                  {/* The tab's division, not the match's. A cross-division
+                      fixture (2023-24 LoL ran Midwood Varsity vs Midwood JV)
+                      belongs to both tabs and has no single answer; what is
+                      true here is which tab you are reading. */}
+                  {divisionLabel(division)}
                 </span>
               </div>
               <Button
@@ -339,7 +355,7 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
                 {lastResult.result}
               </p>
               <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
-                {lastResult.date} · {divisionLabel(lastResult.division)}
+                {lastResult.date} · {divisionLabel(division)}
               </p>
             </Tile>
           )}
@@ -359,7 +375,7 @@ export default async function GameHubPage({ params, searchParams }: GameHubPageP
                   >
                     <div className="min-w-0">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
-                        {match.date} · {divisionLabel(match.division)}
+                        {match.date} · {divisionLabel(division)}
                       </p>
                       {/* Not `truncate`: `teams` reads "<home> vs. <away>", and
                           at 390px the row leaves ~228px for it, so clipping
