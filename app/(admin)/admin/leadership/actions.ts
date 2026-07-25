@@ -13,7 +13,7 @@ export async function createLeader(formData: FormData) {
   const name = formData.get('name') as string;
   const role = formData.get('role') as string;
   const year = formData.get('year') as string;
-  const bio = formData.get('bio') as string;
+  const memberId = (formData.get('memberId') as string) || null;
 
   if (!name || !role || !year) {
     return { success: false, error: 'Name, Role, and Year are required.' };
@@ -24,7 +24,7 @@ export async function createLeader(formData: FormData) {
       name,
       role,
       year,
-      bio,
+      memberId,
     });
   } catch (error) {
     console.error('Failed to create leader', error);
@@ -44,10 +44,10 @@ export async function updateLeader(id: string, year: string, formData: FormData)
   const name = formData.get('name') as string;
   const role = formData.get('role') as string;
   const newYear = formData.get('year') as string;
-  const bio = formData.get('bio') as string;
+  const memberId = (formData.get('memberId') as string) || null;
   if (!name || !role || !newYear) return { success: false, error: 'Name, Role, and Year are required.' };
   try {
-    await db.update(schema.leadership).set({ name, role, year: newYear, bio }).where(eq(schema.leadership.id, id));
+    await db.update(schema.leadership).set({ name, role, year: newYear, memberId }).where(eq(schema.leadership.id, id));
   } catch (error) {
     console.error('Failed to update leader', error);
     return { success: false, error: sanitizeDbError(error) };

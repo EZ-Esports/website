@@ -1,4 +1,4 @@
-import { getCachedLeadership } from '@/app/lib/db/queries';
+import { getCachedLeadership, getCachedMembers, getCachedSchools } from '@/app/lib/db/queries';
 import { createLeader } from './actions';
 import Card from '@/app/components/ui/Card';
 import LeadershipRow from '@/app/components/admin/LeadershipRow';
@@ -12,13 +12,31 @@ export default async function AdminLeadershipPage() {
   if (!(await getStaffForAdminSection('/admin/leadership'))) return <PermissionDenied />;
 
   let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
+  let membersList: Awaited<ReturnType<typeof getCachedMembers>> = [];
+  let schoolsList: Awaited<ReturnType<typeof getCachedSchools>> = [];
   let dbError = false;
 
   try {
-    leadershipList = await getCachedLeadership();
+    const [leadership, members, schools] = await Promise.all([
+      getCachedLeadership(),
+      getCachedMembers(),
+      getCachedSchools(),
+    ]);
+    leadershipList = leadership;
+    membersList = members;
+    schoolsList = schools;
   } catch {
     dbError = true;
   }
+
+  // Sort members by last name then first name
+  const sortedMembers = [...membersList].sort((a, b) => {
+    const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.toLowerCase();
+    const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  const schoolMap = new Map(schoolsList.map((s) => [s.id, s.name]));
 
   const inputClass = "w-full px-3.5 py-2.5 bg-surface-sunken border border-line/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all text-sm";
 
@@ -91,16 +109,26 @@ export default async function AdminLeadershipPage() {
               </div>
 
               <div>
-                <label htmlFor="bio" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
-                  Short Bio
+                <label htmlFor="memberId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+                  Associated Member
                 </label>
-                <textarea
-                  id="bio"
-                  name="bio"
-                  rows={4}
-                  placeholder="e.g. Leading student initiatives and community events..."
-                  className="w-full px-4 py-3 bg-surface-sunken border border-line/80 rounded-lg text-white placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all text-sm leading-relaxed"
-                />
+                <select
+                  id="memberId"
+                  name="memberId"
+                  className={inputClass}
+                  defaultValue=""
+                >
+                  <option value="">-- Select Member (Optional) --</option>
+                  {sortedMembers.map((m) => {
+                    const schoolName = schoolMap.get(m.schoolId) || 'Unknown School';
+                    const gradSuffix = m.graduationYear ? ` '${m.graduationYear.toString().slice(-2)}` : '';
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {m.firstName} {m.lastName} ({schoolName}{gradSuffix})
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               <SubmitButton
@@ -122,7 +150,7 @@ export default async function AdminLeadershipPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-[#0b101d] border-b border-accent/20">
                     <tr className="text-foreground-secondary text-xs font-bold uppercase tracking-widest">
-                      <th className="px-6 py-4">Name / Bio</th>
+                      <th className="px-6 py-4">Name / High School</th>
                       <th className="px-6 py-4">Role</th>
                       <th className="px-6 py-4">Year</th>
                       <th className="px-6 py-4 text-right">Actions</th>
@@ -130,7 +158,7 @@ export default async function AdminLeadershipPage() {
                   </thead>
                   <tbody className="divide-y divide-line text-sm">
                     {leadershipList.map((leader) => (
-                      <LeadershipRow key={leader.id} leader={leader} />
+                      <LeadershipRow key={leader.id} leader={leader} members={sortedMembers} schools={schoolsList} />
                     ))}
                   </tbody>
                 </table>
