@@ -47,7 +47,17 @@ export default function Badge({ children, variant = 'accent', dot = false, size 
   );
 }
 
-/** Match-result chip color: a win reads as success, a loss stays neutral (no longer accent-pink). */
-export function resultVariant(won: boolean): 'success' | 'neutral' {
-  return won ? 'success' : 'neutral';
+/**
+ * Match-result chip color: a win reads as success, anything else stays neutral
+ * (no longer accent-pink).
+ *
+ * A draw is neutral alongside a loss rather than earning a third colour. The
+ * results feed is a list of what happened, not a verdict on each row — the
+ * homepage prints the bare score with no colour at all — so the badge answers
+ * only "was this a win", and the label inside it ("D 1-1") carries the rest.
+ * The form strip is the opposite case and does distinguish all three: there the
+ * chip *is* the only thing on screen.
+ */
+export function resultVariant(outcome: 'W' | 'L' | 'D'): 'success' | 'neutral' {
+  return outcome === 'W' ? 'success' : 'neutral';
 }

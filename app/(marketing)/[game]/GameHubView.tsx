@@ -17,6 +17,7 @@ import {
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import { cx } from '@/app/lib/cx';
 import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
+import FormGuide from '@/app/components/ui/FormGuide';
 
 
 const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
@@ -107,6 +108,16 @@ export default async function GameHubView({ params, division }: GameHubViewProps
   // The division is a route segment, so it is one of exactly two values and
   // needs no validation — the router 404s anything else before this runs.
   const { nextMatch, recentResults, topTeams, seasonName } = await getGameHubData(slug, division);
+
+  /**
+   * A whole column of em dashes is a header promising data that does not exist
+   * — worse than no column. Form appears only when at least one school in the
+   * table has any, which is exactly the divisions whose standings were tallied
+   * from match rows. Within such a table an individual school can still be
+   * blank (it has played nothing yet), and there the dash is meaningful: the
+   * other rows prove form is on record and this one has none.
+   */
+  const showForm = topTeams.some((entry) => entry.form.length > 0);
 
   const lastResult = recentResults[0] ?? null;
   const olderResults = recentResults.slice(1);
@@ -308,7 +319,23 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                     <Th>Rank</Th>
                     <Th>Team</Th>
                     <Th className="whitespace-nowrap">W&ndash;L</Th>
-                    <Th align="right" className="hidden sm:table-cell">Win %</Th>
+                    <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
+                    {/* Form needs ~150px (five chips plus the cell's px-6) on
+                        top of the four columns
+                        already here, and the tile is half of a four-column grid
+                        — 486px at `lg`, of which five `px-6` cells already spend
+                        240px on padding alone. So `lg` is not enough: measured
+                        on real data the table overflowed its shell by 47px at
+                        1024 and 9px at 1100, scrolling sideways and wrapping
+                        school names to three lines, which is the outcome this
+                        comment set out to avoid. `xl` is where the fifth column
+                        fits. Nothing is lost below it: /[game]/standings carries
+                        the full table at every width. */}
+                    {showForm && (
+                      <Th align="right" className="hidden xl:table-cell">
+                        Form
+                      </Th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
@@ -334,6 +361,14 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                       <Td className="hidden sm:table-cell font-bold text-foreground text-right whitespace-nowrap">
                         {(entry.winPct * 100).toFixed(1)}%
                       </Td>
+                      {/* Blank for a school with no completed matches in this
+                          division — the tile says so by showing nothing rather
+                          than five losses. */}
+                      {showForm && (
+                        <Td className="hidden xl:table-cell text-right whitespace-nowrap">
+                          <FormGuide form={entry.form} />
+                        </Td>
+                      )}
                     </Tr>
                   ))}
                 </tbody>
@@ -349,13 +384,17 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               <p
                 className={cx(
                   'mt-2 text-2xl font-black tracking-tight',
-                  lastResult.result.startsWith('W') ? 'text-success' : 'text-foreground-secondary'
+                  lastResult.outcome === 'W' ? 'text-success' : 'text-foreground-secondary'
                 )}
               >
                 {lastResult.result}
               </p>
+              {/* A forfeit says so here rather than passing as a played
+                  result: LeaguePulse badges it and ArchiveMatchList prints
+                  "Forfeit 1-0", and one match must not read two ways. */}
               <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
                 {lastResult.date} · {divisionLabel(division)}
+                {lastResult.forfeit && ' · Forfeit'}
               </p>
             </Tile>
           )}
@@ -376,6 +415,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                     <div className="min-w-0">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-secondary">
                         {match.date} · {divisionLabel(division)}
+                        {match.forfeit && ' · Forfeit'}
                       </p>
                       {/* Not `truncate`: `teams` reads "<home> vs. <away>", and
                           at 390px the row leaves ~228px for it, so clipping
@@ -383,7 +423,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                           worth reading — with no tooltip to recover it. */}
                       <p className="text-sm font-bold leading-snug text-foreground">{match.teams}</p>
                     </div>
-                    <Badge variant={resultVariant(match.result.startsWith('W'))} size="sm">
+                    <Badge variant={resultVariant(match.outcome)} size="sm">
                       {match.result}
                     </Badge>
                   </li>
