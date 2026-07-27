@@ -66,7 +66,13 @@ export const seasons = pgTable('seasons', {
     .references(() => games.id, { onDelete: 'cascade' })
     .notNull(),
   name: text('name').notNull(), // e.g. "Spring 2025"
-  isActive: boolean('is_active').default(true).notNull(),
+  // Defaults false: `is_active` is not a "not archived yet" flag, it is what
+  // picks the one season the public site treats as current — the active-season
+  // lookup in queries.ts and resolveSelectedSeason's fallback both read it. A
+  // new row defaulting to true silently takes that spot from the season that
+  // held it. Turning a season on is a deliberate act, done in Admin -> League
+  // Setup, which has always sent this field explicitly.
+  isActive: boolean('is_active').default(false).notNull(),
   ...auditColumns,
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),

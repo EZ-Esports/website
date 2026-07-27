@@ -17,7 +17,10 @@ interface FilterTabsProps {
   ariaLabel?: string;
 }
 
-const tabBase = 'px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-all cursor-pointer';
+// `transition-colors`, not `transition-all`: the latter animates the focus
+// ring itself in engines that transition `outline`.
+const tabBase =
+  'px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
 const tabActive = 'bg-accent text-on-accent hover:bg-accent/80';
 const tabInactive = 'bg-surface-raised border border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40';
 

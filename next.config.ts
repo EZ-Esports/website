@@ -2,9 +2,31 @@ import type { NextConfig } from "next";
 
 import path from "path";
 
+import { GAME_SLUGS, getGameDivisionRoute } from "./app/lib/constants";
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
+  },
+  /**
+   * The bare game URL resolves to that game's Varsity hub.
+   *
+   * This lives in the config rather than in a `[game]/page.tsx` calling
+   * `redirect()`, because the game routes stream: by the time a page component
+   * runs, the shell is already on the wire, so Next can only finish the
+   * redirect with a `<meta http-equiv="refresh" content="1;...">` — a visible
+   * one-second stall on the URL the whole site's navigation points at. Here it
+   * is a real 308 with nothing rendered.
+   *
+   * Sources are enumerated from GAME_SLUGS instead of matched as `/:game`, so
+   * an unknown slug still falls through to the 404 it deserves.
+   */
+  async redirects() {
+    return GAME_SLUGS.map((slug) => ({
+      source: `/${slug}`,
+      destination: getGameDivisionRoute(slug, 'Varsity'),
+      permanent: true,
+    }));
   },
   images: {
     remotePatterns: [

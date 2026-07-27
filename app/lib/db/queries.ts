@@ -1,13 +1,17 @@
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   DIVISIONS,
+  canonicalDivision,
   clampPageLimit,
   normalizeSort,
   rankComputedStandings,
+  toHubDivision,
+  type CanonicalDivision,
+  type HubDivision,
   type MatchesPage,
   type MatchesPageParams,
   type SeasonStandingsResult,
@@ -228,9 +232,30 @@ export async function getSeasonMatches(seasonId: string, division?: string) {
 }
 
 /**
+ * `canonicalDivision` as a SQL expression, so a division filter can be pushed
+ * into the query instead of being applied to whatever rows came back.
+ *
+ * This must stay in step with the TypeScript version in `match-page.ts` — the
+ * table of spellings it implements is documented there, and
+ * `match-page.test.ts` pins it. Two implementations exist because both sides
+ * need it: the match scan filters in SQL so it can `LIMIT`, while
+ * `getGameSeasonSummary` buckets rows it already holds in memory.
+ */
+const canonicalDivisionSql = (column: SQLWrapper) =>
+  sql<CanonicalDivision>`case when ${column} in ('JV', 'B') then 'JV' when ${column} = 'All' then 'All' else 'Varsity' end`;
+
+/** The same expression, collapsed onto the hub's two tabs (`All` -> Varsity). */
+const hubDivisionSql = (column: SQLWrapper) =>
+  sql<HubDivision>`case when ${column} in ('JV', 'B') then 'JV' else 'Varsity' end`;
+
+/**
  * Divisions that actually exist for a season, ordered Varsity, JV, All.
  * Union of snapshot standings divisions and live roster divisions, since a
  * season may have either (TFT 2022-23 is only an "All" individual snapshot).
+ *
+ * Rows are canonicalized first: a season whose rosters were created in Admin
+ * spells its divisions `A`/`B`, which matched none of `DIVISIONS` and left the
+ * season claiming to have no divisions at all.
  */
 export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
   const [snapshotRows, rosterRows] = await Promise.all([
@@ -244,7 +269,7 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
       .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
       .where(eq(schema.teams.seasonId, seasonId)),
   ]);
-  const found = new Set([...snapshotRows, ...rosterRows].map((r) => r.division));
+  const found = new Set([...snapshotRows, ...rosterRows].map((r) => canonicalDivision(r.division)));
   const ordered = DIVISIONS.filter((d) => found.has(d));
   return ordered.length > 0 ? ordered : ['Varsity'];
 }
@@ -254,11 +279,20 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
  * season_standings snapshot table (imported from spreadsheets, since most
  * archived seasons lack per-match scores); seasons without a snapshot fall
  * back to the live roster_standings view computed from match results.
+ *
+ * Both sides compare *canonical* divisions, not raw column values. The stored
+ * spelling depends on who wrote the row — the archive importer writes
+ * `Varsity`/`JV`, Admin -> Roster writes `A`/`B` — so an exact match dropped
+ * every admin-managed season's standings on both the requested-division path
+ * and the computed fallback, which is what made the hub's standings tile
+ * unfillable on either tab. `division` is canonicalized once here, so callers
+ * may pass whichever spelling they hold.
  */
 export async function getSeasonStandingsFor(
   seasonId: string,
   division: string
 ): Promise<SeasonStandingsResult> {
+  const wanted = canonicalDivision(division);
   const snapshot = await db
     .select({
       schoolName: schema.schools.name,
@@ -278,12 +312,16 @@ export async function getSeasonStandingsFor(
     .where(
       and(
         eq(schema.seasonStandings.seasonId, seasonId),
-        eq(schema.seasonStandings.division, division)
+        eq(canonicalDivisionSql(schema.seasonStandings.division), wanted)
       )
     )
     .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
 
-  if (snapshot.length > 0) return { source: 'snapshot', rows: snapshot };
+  // Same reasoning as the computed branch below: report the division the
+  // caller asked for, not the spelling the importer happened to store.
+  if (snapshot.length > 0) {
+    return { source: 'snapshot', rows: snapshot.map((r) => ({ ...r, division: wanted })) };
+  }
 
   const computed = await db
     .select({
@@ -298,16 +336,17 @@ export async function getSeasonStandingsFor(
     .where(
       and(
         eq(schema.teams.seasonId, seasonId),
-        eq(schema.rosterStandings.division, division),
+        eq(canonicalDivisionSql(schema.rosterStandings.division), wanted),
         isNull(schema.schools.deletedAt)
       )
     );
 
   return {
     source: 'computed',
-    // the view's columns are nullable in the type system; division is
-    // constrained to the requested one by the WHERE clause above
-    rows: rankComputedStandings(computed.map((r) => ({ ...r, division: r.division ?? division }))),
+    // Report the canonical division, not the raw column: the WHERE clause
+    // above constrained the rows to `wanted`, and echoing `A` back from the
+    // column would contradict the tab that asked for Varsity.
+    rows: rankComputedStandings(computed.map((r) => ({ ...r, division: wanted }))),
   };
 }
 
@@ -676,6 +715,13 @@ export async function getArchiveIndex() {
 export async function getGameSeasonSummary(seasonId: string) {
   // One snapshot query covers both divisions; only divisions without
   // snapshot rows pay for the computed fallback.
+  //
+  // It reads the season's snapshot rows *whole* and buckets them here. The
+  // previous `division IN ('Varsity','JV')` filter looked like a narrowing but
+  // was a silent data loss: it dropped every row an admin had written as
+  // `A`/`B`, so a season managed entirely through Admin had a snapshot the hub
+  // could never read, and both of its division tabs fell back to a computed
+  // table that the same mismatch had already emptied.
   const snapshot = await db
     .select({
       schoolName: schema.schools.name,
@@ -688,16 +734,11 @@ export async function getGameSeasonSummary(seasonId: string) {
     })
     .from(schema.seasonStandings)
     .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-    .where(
-      and(
-        eq(schema.seasonStandings.seasonId, seasonId),
-        inArray(schema.seasonStandings.division, ['Varsity', 'JV'])
-      )
-    )
+    .where(eq(schema.seasonStandings.seasonId, seasonId))
     .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
 
-  const divisionRows = async (division: 'Varsity' | 'JV') => {
-    const rows = snapshot.filter((r) => r.division === division);
+  const divisionRows = async (division: HubDivision) => {
+    const rows = snapshot.filter((r) => toHubDivision(r.division) === division);
     if (rows.length > 0) return rows;
     return (await getSeasonStandingsFor(seasonId, division)).rows;
   };
@@ -711,40 +752,144 @@ export async function getGameSeasonSummary(seasonId: string) {
     );
   const v = totals(varsityTeams);
   const j = totals(jvTeams);
-  return {
-    topTeams: varsityTeams.slice(0, 5).map((r, i) => ({
+  const topFive = (rows: typeof varsityTeams) =>
+    rows.slice(0, 5).map((r, i) => ({
       rank: r.rank ?? i + 1,
       team: r.schoolName,
       wins: r.wins ?? 0,
       losses: r.losses ?? 0,
       winPct: r.winPct ?? 0,
-    })),
+    }));
+
+  return {
+    // Both divisions are already in memory from the queries above, so serving
+    // JV costs nothing extra — it was previously computed and discarded.
+    topTeams: topFive(varsityTeams),
+    topTeamsByDivision: {
+      Varsity: topFive(varsityTeams),
+      JV: topFive(jvTeams),
+    },
     record: varsityTeams.length > 0 ? `${v.wins}-${v.losses}` : null,
     jvRecord: jvTeams.length > 0 ? `${j.wins}-${j.losses}` : null,
   };
 }
 
+/** How many completed matches the hub's results tiles show, newest first. */
+const RECENT_RESULTS_LIMIT = 3;
+
+/**
+ * The hub's match scan, as one bounded query.
+ *
+ * Every part of the filter that used to run in memory now runs in SQL, which
+ * is what lets the caller ask for exactly the rows it renders. The old scan
+ * read 500 whole match rows per status and threw most of them away, and its
+ * cap was a heuristic rather than a bound: it covered the season across *both*
+ * divisions, so one division's next match could sit past the window purely
+ * because the other division had more fixtures ahead of it.
+ *
+ * A match belongs to a division if *either* roster is in it, and each side is
+ * judged by its own roster. Cross-division fixtures are real — 2023-24 LoL ran
+ * Midwood Varsity against Midwood JV — and attributing the match to the home
+ * roster alone made it invisible on the away side's tab, while
+ * `roster_standings` had already counted the away school's win. The two now
+ * agree.
+ *
+ * Both orderings carry `id` as a tiebreaker. Bulk-imported seasons default
+ * every unknown kickoff to the same timestamp — the active Valorant season has
+ * six matches sharing one — so without it, `LIMIT` would return a different
+ * row between two identical requests.
+ *
+ * Exported for `queries-hub.test.ts`, which asserts the generated SQL rather
+ * than needing a live database.
+ */
+export function buildHubMatchQuery(opts: {
+  seasonId: string;
+  division: HubDivision;
+  /** Status, score and time constraints layered on top of the division filter. */
+  conditions: (SQL | undefined)[];
+  direction: 'asc' | 'desc';
+  limit: number;
+}) {
+  const dir = opts.direction === 'desc' ? desc : asc;
+  return db
+    .select({
+      id: schema.matches.id,
+      scheduledAt: schema.matches.scheduledAt,
+      homeScore: schema.matches.homeScore,
+      awayScore: schema.matches.awayScore,
+      homeTeam: homeSchool.name,
+      awayTeam: awaySchool.name,
+    })
+    .from(schema.matches)
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .where(
+      and(
+        eq(schema.matches.seasonId, opts.seasonId),
+        or(
+          eq(hubDivisionSql(homeRoster.division), opts.division),
+          eq(hubDivisionSql(awayRoster.division), opts.division)
+        ),
+        // A soft-deleted school is not nameable on a public page, and the tile
+        // has no honest way to render a match it cannot name. The previous
+        // implementation dropped these rows too, as a side effect of building
+        // its lookup map from non-deleted schools only.
+        isNull(homeSchool.deletedAt),
+        isNull(awaySchool.deletedAt),
+        ...opts.conditions
+      )
+    )
+    .orderBy(dir(schema.matches.scheduledAt), dir(schema.matches.id))
+    .limit(opts.limit);
+}
+
 export interface GameHubData {
   record: string | null;
   jvRecord: string | null;
-  nextMatch: { date: string; teams: string; division: string } | null;
-  recentResults: { date: string; teams: string; result: string; division: string }[];
+  /**
+   * Match tiles carry no division of their own. They are already scoped to
+   * `division` below, and a cross-division match has two answers — one per
+   * roster — so the only label that is true on the tab you are reading is the
+   * tab's own division. The page renders that; nothing here can disagree with
+   * it.
+   */
+  nextMatch: { date: string; teams: string } | null;
+  recentResults: { date: string; teams: string; result: string }[];
   topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[];
+  /** Name of the active season, for the hub's season-context meta pill. */
+  seasonName: string | null;
+  /** The division every other field on this object describes. */
+  division: HubDivision;
 }
 
 /**
- * Everything the game hub landing page (/[game]) needs for its active season:
- * aggregate records, the next scheduled match, the latest results, and the
- * top-5 varsity teams. Lifted verbatim from the former static hub pages.
+ * Everything the game hub landing page (`/[game]/varsity`, `/[game]/junior-varsity`)
+ * needs for its active season, scoped to one division: aggregate records, the
+ * next scheduled match, the latest results, and the top five teams.
+ *
+ * `division` comes from the route segment, so it is one of two known values
+ * rather than user input — the page can no longer be handed a division that
+ * does not exist. Both divisions are always offered; a division with nothing
+ * in it renders its empty state, which for a per-player game (TFT, osu!,
+ * Tetris) is what JV honestly is.
+ *
  * Uncached, like its season-summary neighbors: schedule edits must be fresh.
  */
-export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
+export async function getGameHubData(
+  gameSlug: string,
+  division: HubDivision
+): Promise<GameHubData> {
   // Empty-state defaults — no fabricated data
   let record: string | null = null;
   let jvRecord: string | null = null;
-  let nextMatch: { date: string; teams: string; division: string } | null = null;
-  let recentResults: { date: string; teams: string; result: string; division: string }[] = [];
-  let topTeams: { rank: number; team: string; wins: number; losses: number; winPct: number }[] = [];
+  let nextMatch: GameHubData['nextMatch'] = null;
+  let recentResults: GameHubData['recentResults'] = [];
+  let topTeams: GameHubData['topTeams'] = [];
+  let seasonName: string | null = null;
 
   try {
     const gameRow = await db
@@ -756,27 +901,6 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
     if (gameRow[0]) {
       const gameId = gameRow[0].id;
 
-      // Get team rows
-      const teamRows = await db
-        .select({
-          id: schema.teams.id,
-          schoolId: schema.teams.schoolId,
-          gameId: schema.teams.gameId,
-          seasonId: schema.teams.seasonId,
-          name: schema.schools.name,
-        })
-        .from(schema.teams)
-        .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-        .where(and(eq(schema.teams.gameId, gameId), isNull(schema.schools.deletedAt)));
-      const teamMap = new Map(teamRows.map((t) => [t.id, t]));
-      const teamIds = teamRows.map((t) => t.id);
-
-      const rosterRows = teamIds.length > 0
-        ? await db.select().from(schema.rosters).where(inArray(schema.rosters.teamId, teamIds))
-        : [];
-      const rosterMap = new Map(rosterRows.map((r) => [r.id, r]));
-
-      // Next Match
       const activeSeason = await db
         .select()
         .from(schema.seasons)
@@ -784,85 +908,81 @@ export async function getGameHubData(gameSlug: string): Promise<GameHubData> {
         .limit(1);
 
       if (activeSeason[0]) {
+        // Already in memory from the query above — no extra DB work.
+        seasonName = activeSeason[0].name;
+
         // Fetch the next match, recent results, and season summary in
-        // parallel — they only depend on the active season.
-        const [nextMatchRow, recentRows, summary] = await Promise.all([
-          db
-            .select()
-            .from(schema.matches)
-            .where(
-              and(
-                eq(schema.matches.seasonId, activeSeason[0].id),
-                eq(schema.matches.status, 'scheduled')
-              )
-            )
-            .orderBy(schema.matches.scheduledAt)
-            .limit(1),
-          db
-            .select()
-            .from(schema.matches)
-            .where(
-              and(
-                eq(schema.matches.seasonId, activeSeason[0].id),
-                eq(schema.matches.status, 'completed'),
-                // Unrecorded results (null scores) would otherwise render "L 0-0".
-                isNotNull(schema.matches.homeScore),
-                isNotNull(schema.matches.awayScore)
-              )
-            )
-            .orderBy(desc(schema.matches.scheduledAt))
-            .limit(3),
+        // parallel — they only depend on the active season. Each match query
+        // is bounded to the rows its tile renders; both are filtered by
+        // division in SQL, so the bound is a real one.
+        const [scheduledRows, completedRows, summary] = await Promise.all([
+          buildHubMatchQuery({
+            seasonId: activeSeason[0].id,
+            division,
+            conditions: [
+              eq(schema.matches.status, 'scheduled'),
+              // A fixture is only "next" if it hasn't happened. Without this,
+              // a season whose schedule was never marked complete puts a
+              // months-old date in the page's largest, most prominent tile.
+              gte(schema.matches.scheduledAt, new Date()),
+            ],
+            direction: 'asc',
+            limit: 1,
+          }),
+          buildHubMatchQuery({
+            seasonId: activeSeason[0].id,
+            division,
+            conditions: [
+              eq(schema.matches.status, 'completed'),
+              // Unrecorded results (null scores) would otherwise render "L 0-0".
+              isNotNull(schema.matches.homeScore),
+              isNotNull(schema.matches.awayScore),
+            ],
+            direction: 'desc',
+            limit: RECENT_RESULTS_LIMIT,
+          }),
           getGameSeasonSummary(activeSeason[0].id),
         ]);
-        topTeams = summary.topTeams;
         record = summary.record;
         jvRecord = summary.jvRecord;
+        topTeams = summary.topTeamsByDivision[division];
 
-        if (nextMatchRow[0]) {
-          const homeRoster = rosterMap.get(nextMatchRow[0].homeRosterId);
-          const awayRoster = rosterMap.get(nextMatchRow[0].awayRosterId);
-          const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
-          const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
+        if (scheduledRows[0]) {
           nextMatch = {
-            date: new Date(nextMatchRow[0].scheduledAt).toLocaleDateString('en-US', {
+            date: scheduledRows[0].scheduledAt.toLocaleDateString('en-US', {
               timeZone: 'America/New_York',
               weekday: 'long',
               month: 'long',
               day: 'numeric',
               year: 'numeric',
             }),
-            teams: `${home?.name || 'Home'} vs. ${away?.name || 'Away'}`,
-            division: homeRoster?.division || 'Varsity',
+            teams: `${scheduledRows[0].homeTeam} vs. ${scheduledRows[0].awayTeam}`,
           };
         }
 
-
-        recentResults = recentRows.map((r) => {
-          const homeRoster = rosterMap.get(r.homeRosterId);
-          const awayRoster = rosterMap.get(r.awayRosterId);
-          const home = homeRoster ? teamMap.get(homeRoster.teamId) : null;
-          const away = awayRoster ? teamMap.get(awayRoster.teamId) : null;
+        recentResults = completedRows.map((r) => {
+          // W/L is stated from the home side, as it always has been: this is
+          // the league's results feed, not one school's, and the same row
+          // appears on both divisions' tabs when the fixture crossed them.
           const homeWon = (r.homeScore ?? 0) > (r.awayScore ?? 0);
           return {
-            date: new Date(r.scheduledAt).toLocaleDateString('en-US', {
+            date: r.scheduledAt.toLocaleDateString('en-US', {
               timeZone: 'America/New_York',
               month: 'long',
               day: 'numeric',
               year: 'numeric',
             }),
-            teams: `${home?.name ?? 'Home'} vs. ${away?.name ?? 'Away'}`,
+            teams: `${r.homeTeam} vs. ${r.awayTeam}`,
             result: `${homeWon ? 'W' : 'L'} ${r.homeScore ?? 0}-${r.awayScore ?? 0}`,
-            division: homeRoster?.division || 'Varsity',
           };
         });
       }
-
     }
   } catch (error) {
     console.error(`Failed to load dynamic data for ${gameSlug}`, error);
   }
 
-  return { record, jvRecord, nextMatch, recentResults, topTeams };
+  return { record, jvRecord, nextMatch, recentResults, topTeams, seasonName, division };
 }
 
 // --- STAFF ACCESS CONTROL ---

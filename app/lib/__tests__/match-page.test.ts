@@ -4,7 +4,13 @@ import {
   normalizeSort,
   rankComputedStandings,
   pointsFromNotes,
+  canonicalDivision,
+  divisionLabel,
+  toHubDivision,
+  HUB_DIVISIONS,
   MAX_PAGE_SIZE,
+  type CanonicalDivision,
+  type HubDivision,
 } from '../db/match-page';
 
 describe('clampPageLimit', () => {
@@ -79,5 +85,80 @@ describe('pointsFromNotes', () => {
     expect(pointsFromNotes(null)).toBeNull();
     expect(pointsFromNotes('Round Diff: +12')).toBeNull();
     expect(pointsFromNotes('Total Points: n/a')).toBeNull();
+  });
+});
+
+/**
+ * The whole point of these two functions is that every producer's spelling
+ * lands somewhere. The table is exhaustive over the values the database
+ * actually holds — the archive importer's `Varsity`/`JV`, Admin -> Roster's
+ * `A`/`B`, per-player seasons' `All` — plus the values that are not supposed
+ * to exist and did the most damage when they did.
+ */
+const DIVISION_TABLE: {
+  stored: string | null | undefined;
+  canonical: CanonicalDivision;
+  hub: HubDivision;
+  why: string;
+}[] = [
+  { stored: 'Varsity', canonical: 'Varsity', hub: 'Varsity', why: 'archive importer' },
+  { stored: 'JV', canonical: 'JV', hub: 'JV', why: 'archive importer' },
+  { stored: 'A', canonical: 'Varsity', hub: 'Varsity', why: 'Admin -> Roster' },
+  { stored: 'B', canonical: 'JV', hub: 'JV', why: 'Admin -> Roster' },
+  { stored: 'All', canonical: 'All', hub: 'Varsity', why: 'per-player season (TFT/osu!/Tetris)' },
+  { stored: null, canonical: 'Varsity', hub: 'Varsity', why: 'nullable view column' },
+  { stored: undefined, canonical: 'Varsity', hub: 'Varsity', why: 'missing row' },
+  { stored: '', canonical: 'Varsity', hub: 'Varsity', why: 'blank' },
+  { stored: 'varsity', canonical: 'Varsity', hub: 'Varsity', why: 'wrong case' },
+  { stored: 'jv', canonical: 'Varsity', hub: 'Varsity', why: 'wrong case, not special-cased' },
+  { stored: 'C', canonical: 'Varsity', hub: 'Varsity', why: 'a division nobody fields' },
+];
+
+describe('canonicalDivision', () => {
+  it.each(DIVISION_TABLE)('maps $stored -> $canonical ($why)', ({ stored, canonical }) => {
+    expect(canonicalDivision(stored)).toBe(canonical);
+  });
+
+  it('is total: no input produces null, undefined or a fourth division', () => {
+    // The old hub normalizer returned null here, which collapsed the division
+    // list to empty and blanked every tile on the page for TFT, osu! and
+    // Tetris — the games whose only division is `All`.
+    for (const { stored } of DIVISION_TABLE) {
+      expect(['Varsity', 'JV', 'All']).toContain(canonicalDivision(stored));
+    }
+  });
+});
+
+describe('toHubDivision', () => {
+  it.each(DIVISION_TABLE)('maps $stored -> $hub ($why)', ({ stored, hub }) => {
+    expect(toHubDivision(stored)).toBe(hub);
+  });
+
+  it('sends everything that is not JV to Varsity, so no row is unreachable', () => {
+    for (const { stored } of DIVISION_TABLE) {
+      expect(HUB_DIVISIONS).toContain(toHubDivision(stored));
+    }
+  });
+
+  it('agrees with canonicalDivision except that All folds into Varsity', () => {
+    for (const { stored } of DIVISION_TABLE) {
+      const canonical = canonicalDivision(stored);
+      expect(toHubDivision(stored)).toBe(canonical === 'All' ? 'Varsity' : canonical);
+    }
+  });
+
+  it('is idempotent: normalizing an already-normalized value is a no-op', () => {
+    for (const division of HUB_DIVISIONS) {
+      expect(toHubDivision(division)).toBe(division);
+      expect(canonicalDivision(division)).toBe(division);
+    }
+  });
+});
+
+describe('divisionLabel', () => {
+  it('spells out JV and leaves the others alone', () => {
+    expect(divisionLabel('JV')).toBe('Junior Varsity');
+    expect(divisionLabel('Varsity')).toBe('Varsity');
+    expect(divisionLabel('All')).toBe('All');
   });
 });

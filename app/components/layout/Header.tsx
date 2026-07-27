@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { FocusScope } from 'react-aria';
 import { Dialog, Button, Link as AriaLink } from 'react-aria-components';
-import { SITE_CONFIG, ROUTES, GAME_SLUGS, getGameRoute } from '@/app/lib/constants';
+import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
 import CutCTA from '@/app/components/ui/CutCTA';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
@@ -15,12 +15,13 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
 
-  // Check if current page features a dark hero banner at the top
+  // Check if current page features a dark hero banner at the top. Game hub
+  // routes (/[game]) no longer do — they open on a compact identity row, so the
+  // header must stay solid over them from scroll position 0.
   const hasHero = pathname === '/' ||
                   pathname === '/about' ||
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
-                  GAME_SLUGS.some((slug) => pathname === getGameRoute(slug)) ||
                   pathname === '/sponsors' ||
                   pathname === '/privacy';
 

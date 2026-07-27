@@ -17,7 +17,15 @@ interface CardProps extends HTMLAttributes<HTMLElement> {
   className?: string;
 }
 
-const variantStyles: Record<CardVariant, string> = {
+/**
+ * The shell every panel on the site shares: radius, elevation, transition.
+ * `Tile` reuses it so a change to the site's panel look lands in one place
+ * instead of letting cards and tiles drift apart.
+ */
+export const panelShell = 'rounded-2xl shadow-2xl shadow-black/20 transition-all duration-300';
+
+/** Panel surface + border pairs, shared with `Tile`'s default tone. */
+export const panelSurfaces: Record<CardVariant, string> = {
   raised: 'bg-surface-raised/60 border border-line',
   tinted: 'bg-accent/10 border border-accent/20',
 };
@@ -41,8 +49,8 @@ export default function Card({
   return (
     <Component
       className={cx(
-        'rounded-2xl shadow-2xl shadow-black/20 transition-all duration-300',
-        variantStyles[variant],
+        panelShell,
+        panelSurfaces[variant],
         paddingStyles[padding],
         accent && 'border-l-4 border-l-accent',
         interactive && 'hover:border-accent/50 hover:-translate-y-0.5 cursor-pointer',

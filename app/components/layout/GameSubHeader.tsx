@@ -2,7 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GAMES, getGameFromPath, getGameSubRoute, getGameRoute } from '@/app/lib/constants';
+import {
+  GAMES,
+  getGameFromPath,
+  getGameSubRoute,
+  getGameRoute,
+  isGameOverviewPath,
+} from '@/app/lib/constants';
 
 export default function GameSubHeader() {
   const pathname = usePathname();
@@ -12,8 +18,15 @@ export default function GameSubHeader() {
 
   const gameConfig = GAMES[gameSlug];
 
+  // Overview owns three paths, not one: the bare game URL redirects to a
+  // division route, so an exact-path check would leave the tab unhighlighted
+  // on every page it actually links to.
   const navItems = [
-    { label: 'Overview', href: getGameRoute(gameSlug) },
+    {
+      label: 'Overview',
+      href: getGameRoute(gameSlug),
+      isActive: isGameOverviewPath(pathname, gameSlug),
+    },
     { label: 'Schedule', href: getGameSubRoute(gameSlug, 'schedule') },
     { label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') },
     { label: 'Teams & Rosters', href: getGameSubRoute(gameSlug, 'teams') },
@@ -34,7 +47,7 @@ export default function GameSubHeader() {
           {/* Sub nav links */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = item.isActive ?? pathname === item.href;
               return (
                 <Link
                   key={item.href}
