@@ -22,10 +22,17 @@ interface FormGuideProps {
  * entering the palette. Colour is never the only carrier anyway: the letter
  * inside the chip is what states the outcome, and it is what the screen-reader
  * sentence below reads out.
+ *
+ * The loss chip reads `--danger-on-tint`, not `--danger`. Every other
+ * `text-danger` on this site sits on a plain surface; these chips are the one
+ * place a status colour is read against a tint of itself, and danger is the one
+ * of the three too dark to survive that — #ef4444 on `bg-danger/15` over a
+ * raised panel measures 4.03:1, under the 4.5:1 floor for 10px text. Success
+ * (6.9:1) and warning (7.7:1) clear it unaided, so only danger is restated.
  */
 const CHIP_STYLES: Record<FormOutcome, string> = {
   W: 'border-success/30 bg-success/15 text-success',
-  L: 'border-danger/30 bg-danger/15 text-danger',
+  L: 'border-danger/30 bg-danger/15 text-danger-on-tint',
   D: 'border-warning/30 bg-warning/15 text-warning',
 };
 

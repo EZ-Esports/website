@@ -28,6 +28,13 @@ html {
   --warning: #fbbf24;
   --danger: #ef4444;
 
+  /* `--danger` read on a `bg-danger/15` tint rather than a plain surface.
+     Success and warning are light enough to clear AA on their own tints
+     (6.9:1 and 7.7:1); danger is not — #ef4444 on its own tint over a raised
+     panel measures 4.03:1, under the 4.5:1 small-text floor. This is the same
+     hue lightened until it clears. */
+  --danger-on-tint: #f87171;
+
   --hero-overlay-from: rgba(10, 10, 10, 0.45); /* Darker at top for excellent navigation contrast */
   --hero-overlay-via: rgba(10, 10, 10, 0.15); /* Light in the middle so image remains vibrant */
 }
@@ -51,6 +58,9 @@ html {
   --success: #047857;
   --warning: #b45309;
   --danger: #dc2626;
+  /* Darkened rather than lightened here: #dc2626 on its own tint over a light
+     panel measures 3.67:1. */
+  --danger-on-tint: #b91c1c;
 }
 
 @theme inline {
@@ -71,6 +81,7 @@ html {
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-danger-on-tint: var(--danger-on-tint);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
