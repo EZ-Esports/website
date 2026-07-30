@@ -7,9 +7,18 @@ import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import FilterTabs from '@/app/components/ui/FilterTabs';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getSeasonDivisions, getSeasonStandingsFor, getSeasonsWithGames } from '@/app/lib/db/queries';
-import { pointsFromNotes, resolveSelectedSeason, type StandingRow } from '@/app/lib/db/match-page';
+import {
+  COMBINED_DIVISION,
+  isDerivedStandings,
+  pointsFromNotes,
+  resolveSelectedSeason,
+  standingsTeamLabel,
+  type StandingRow,
+  type StandingsFormat,
+} from '@/app/lib/db/match-page';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
+import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
 
 
 interface StandingsPageProps {
@@ -40,7 +49,22 @@ function RankCell({ rank }: { rank: number | null }) {
   );
 }
 
-function TeamStandingsTable({ rows }: { rows: StandingRow[] }) {
+function TeamStandingsTable({
+  rows,
+  standingsFormat,
+}: {
+  rows: StandingRow[];
+  standingsFormat: StandingsFormat;
+}) {
+  /*
+   * Only a combined table names the squad on each row (`standingsTeamLabel`
+   * decides, for this page and the game hub alike). In a divided season the
+   * division is the active tab directly above this table, so repeating it on
+   * every row would say once more what the heading already says — the tautology
+   * PR #46 took off the match tiles. Here it is the opposite: three schools
+   * entered two squads, so without it three names appear twice, identically, at
+   * two different ranks.
+   */
   return (
     <Table>
       <thead className="bg-surface-sunken/60 border-b border-line">
@@ -54,11 +78,15 @@ function TeamStandingsTable({ rows }: { rows: StandingRow[] }) {
       </thead>
       <tbody className="divide-y divide-line">
         {rows.map((entry) => (
-          <Tr key={`${entry.rank}-${entry.schoolName}`} interactive>
+          // The division is part of the key: in a combined table one school is
+          // two rows, and rank can be null on an unranked snapshot.
+          <Tr key={`${entry.rank}-${entry.division}-${entry.schoolName}`} interactive>
             <Td className="font-bold">
               <RankCell rank={entry.rank} />
             </Td>
-            <Td className="font-bold text-foreground">{entry.schoolName}</Td>
+            <Td className="font-bold text-foreground">
+              {standingsTeamLabel(entry, standingsFormat)}
+            </Td>
             <Td className="font-medium">
               {entry.wins ?? 0}-{entry.losses ?? 0}
             </Td>
@@ -122,6 +150,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
   let divisions: string[] = ['Varsity', 'JV'];
   let standings: StandingRow[] = [];
   let source: 'snapshot' | 'computed' = 'computed';
+  let standingsFormat: StandingsFormat = 'divided';
   let division = divisionParam ?? 'Varsity';
 
   try {
@@ -142,12 +171,20 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
       ]);
       divisions = divisionList;
       let effective = result;
-      if (!divisions.includes(division)) {
+      if (result.standingsFormat === 'combined') {
+        // A combined season offers exactly one tab, and the fetch above already
+        // returned the whole table — it ignores the requested division entirely
+        // — so the tab moves onto `Combined` with no second query. Without this
+        // the default `?division=Varsity` would refetch the identical rows just
+        // to arrive at the same place.
+        division = COMBINED_DIVISION;
+      } else if (!divisions.includes(division)) {
         division = divisions[0];
         effective = await getSeasonStandingsFor(selectedSeason.id, division);
       }
       standings = effective.rows;
       source = effective.source;
+      standingsFormat = effective.standingsFormat;
     }
   } catch (error) {
     console.error('Failed to load standings from database', error);
@@ -155,6 +192,14 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
 
   const isIndividual = standings.some((row) => row.playerName !== null);
   const isArchived = Boolean(selectedSeason && !selectedSeason.isActive);
+  /**
+   * Derived rows live in `season_standings` and so come back as
+   * `source: 'snapshot'`, which is why the caption below *replaces* the archive
+   * sentence rather than joining it. "Imported from the league archive" is a
+   * false claim about a table this pipeline tallied from match rows itself, and
+   * the difference is exactly what a reader needs to weigh the numbers.
+   */
+  const isReconstructedTable = isDerivedStandings(standings);
 
   return (
     <main>
@@ -174,7 +219,14 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <FilterTabs
             tabs={divisions.map((d) => ({
-              label: d === 'All' ? 'Players' : d === 'JV' ? 'Junior Varsity' : d,
+              label:
+                d === 'All'
+                  ? 'Players'
+                  : d === 'JV'
+                    ? 'Junior Varsity'
+                    : d === COMBINED_DIVISION
+                      ? 'Combined table'
+                      : d,
               value: d,
               href: `/${game}/standings?division=${d}${selectedSeason ? `&season=${encodeURIComponent(selectedSeason.name)}` : ''}`,
             }))}
@@ -192,6 +244,11 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
           )}
         </div>
 
+        {/* Sits directly above the table it explains, not up with the system
+            notice: it answers "why is one school here twice, and where did the
+            division tabs go" at the moment the reader asks it. */}
+        {standingsFormat === 'combined' && <SeasonFormatNotice className="mb-4" />}
+
         {/* Standings Table */}
         <div className="bg-surface-raised/60 border border-line rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
           {standings.length === 0 ? (
@@ -201,14 +258,20 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
           ) : isIndividual ? (
             <PlayerStandingsTable rows={standings} />
           ) : (
-            <TeamStandingsTable rows={standings} />
+            <TeamStandingsTable rows={standings} standingsFormat={standingsFormat} />
           )}
         </div>
 
-        {source === 'snapshot' && (
+        {isReconstructedTable ? (
           <p className="mt-4 text-xs text-foreground-muted font-semibold">
-            Final standings imported from the league archive.
+            Reconstructed from match results
           </p>
+        ) : (
+          source === 'snapshot' && (
+            <p className="mt-4 text-xs text-foreground-muted font-semibold">
+              Final standings imported from the league archive.
+            </p>
+          )
         )}
       </Section>
     </main>

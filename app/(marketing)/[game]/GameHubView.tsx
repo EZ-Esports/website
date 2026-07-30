@@ -10,11 +10,13 @@ import Button from '@/app/components/ui/Button';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 import { getGameHubData } from '@/app/lib/db/queries';
 import {
+  COMBINED_DIVISION,
   HUB_DIVISIONS,
   divisionLabel,
   type HubDivision,
 } from '@/app/lib/db/match-page';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
+import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
 import { cx } from '@/app/lib/cx';
 import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
 import FormGuide from '@/app/components/ui/FormGuide';
@@ -107,7 +109,29 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
   // The division is a route segment, so it is one of exactly two values and
   // needs no validation — the router 404s anything else before this runs.
-  const { nextMatch, recentResults, topTeams, seasonName } = await getGameHubData(slug, division);
+  const {
+    nextMatch,
+    recentResults,
+    topTeams,
+    seasonName,
+    standingsFormat,
+    standingsReconstructed,
+  } = await getGameHubData(slug, division);
+
+  /**
+   * A combined season ran one table that several schools entered two squads
+   * into, so this route's division names a squad, not a bracket. Both routes
+   * therefore show the *same* standings, and everything on the page that would
+   * otherwise call that table "this division's" has to stop.
+   *
+   * The routing stays as it is, deliberately. PR #46 moved `/[game]` ->
+   * `/[game]/varsity` into `next.config.ts` as a static 308 precisely because an
+   * in-page `redirect()` degrades to a ~1s `<meta http-equiv="refresh">` on a
+   * streaming route — and a redirect that depends on one season's format cannot
+   * live in static config. Collapsing the two routes would cost every game that
+   * page's speed to fix one season's copy.
+   */
+  const combinedStandings = standingsFormat === 'combined';
 
   /**
    * A whole column of em dashes is a header promising data that does not exist
@@ -217,6 +241,19 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
         <MigrationNotice />
 
+        {/* Page level, alongside the other notice, rather than inside the
+            standings tile: the fact is about the season, not about one tile, and
+            it explains both why the table below lists a school twice and why the
+            division switch above changes the match tiles but not the table. The
+            tile is half a four-column grid — 486px at `lg` — so a badge plus two
+            lines of copy inside it would outweigh the standings it introduces.
+
+            Gated on `standingsSpan`, the same value that decides whether the
+            tile renders at all, because the planner owns that decision and this
+            page must never re-derive it: a notice explaining a table the reader
+            cannot see is a notice about nothing. */}
+        {combinedStandings && standingsSpan && <SeasonFormatNotice />}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* `getGameHubData` only ever resolves a season with `isActive` set,
               so a season named here is in progress by construction — the same
@@ -235,14 +272,19 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                   repeating that here said the same thing twice on one screen.
                   This line answers the question the badge leaves open — why
                   the grid below is empty — without inferring a cause. */}
+              {/* A combined season has no per-division data to be missing —
+                  naming the division here would report the absence of a table
+                  that was never supposed to exist. */}
               <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                {seasonName
-                  ? `No ${divisionLabel(division)} data published yet.`
-                  : 'Nothing to show here yet.'}
+                {!seasonName
+                  ? 'Nothing to show here yet.'
+                  : combinedStandings
+                    ? 'No data published yet.'
+                    : `No ${divisionLabel(division)} data published yet.`}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
-                Standings, schedules and rosters appear here as this division&rsquo;s data is
-                published.
+                Standings, schedules and rosters appear here as this{' '}
+                {combinedStandings ? 'season' : 'division'}&rsquo;s data is published.
               </p>
               {seasonName && (
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -307,8 +349,18 @@ export default async function GameHubView({ params, division }: GameHubViewProps
             <Tile
               // Named for the division on screen: this table was always
               // Varsity-only, while the page implied it covered both.
-              title={`${divisionLabel(division)} standings`}
-              href={`${getGameSubRoute(slug, 'standings')}?division=${division}`}
+              //
+              // Except when the season ran one table, where the division name
+              // would be the lie instead: `${divisionLabel(division)} standings`
+              // asserts a Varsity-only table that this competition never
+              // produced, and the JV route asserts the same about the other half.
+              title={combinedStandings ? 'Season standings' : `${divisionLabel(division)} standings`}
+              // Likewise the link: `?division=Varsity` names a division the
+              // season does not have, and the standings page's only tab is
+              // `Combined`.
+              href={`${getGameSubRoute(slug, 'standings')}?division=${
+                combinedStandings ? COMBINED_DIVISION : division
+              }`}
               linkLabel="Full table"
               flush
               className={standingsSpan}
@@ -340,7 +392,10 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                 </thead>
                 <tbody className="divide-y divide-line">
                   {topTeams.map((entry, index) => (
-                    <Tr key={entry.rank} interactive>
+                    // Rank alone is unique within one table, but a combined
+                    // table holds one school twice, so the squad rides along in
+                    // the key rather than leaving it to the rank to stay unique.
+                    <Tr key={`${entry.rank}-${entry.division}`} interactive>
                       {/* The leader carries the game's accent — the one place
                           the table earns colour. */}
                       <Td
@@ -354,7 +409,11 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                         )}
                         {entry.rank}
                       </Td>
-                      <Td className="font-bold text-foreground">{entry.team}</Td>
+                      {/* `teamLabel`, not `team`: `team` is the raw school name
+                          the form guide was keyed by, and only the label carries
+                          the squad that tells a combined table's two Brooklyn
+                          Technical rows apart. */}
+                      <Td className="font-bold text-foreground">{entry.teamLabel}</Td>
                       <Td className="font-medium whitespace-nowrap">
                         {entry.wins}&ndash;{entry.losses}
                       </Td>
@@ -373,6 +432,17 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                   ))}
                 </tbody>
               </Table>
+              {/* The database records whether a table was official or tallied
+                  here, and the site said nothing either way. It also answers the
+                  question the missing Form column raises: these records were
+                  reconstructed, so there is no separate match history to build
+                  chips from. `px-6` because the tile body is `flush` for the
+                  table. */}
+              {standingsReconstructed && (
+                <p className="px-6 pt-3 text-[11px] font-semibold text-foreground-muted">
+                  Reconstructed from match results
+                </p>
+              )}
             </Tile>
           )}
 
