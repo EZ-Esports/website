@@ -1,0 +1,1 @@
+ALTER TABLE "seasons" ADD COLUMN "standings_format" text DEFAULT 'divided' NOT NULL;

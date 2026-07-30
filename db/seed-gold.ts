@@ -68,11 +68,51 @@ function parseEastern(s: string): Date {
   return new Date(instant);
 }
 
+/**
+ * Reads a season's standings_format, refusing to guess.
+ *
+ * gold_data/ is gitignored (member PII), so a checkout whose normalizer writes
+ * standings_format can still be paired with a gold_seasons.csv generated before
+ * the column existed. Defaulting to 'divided' there would silently split the
+ * one combined-format season back across Varsity/JV tabs — the exact bug the
+ * column exists to fix — so a stale CSV has to fail the seed instead.
+ *
+ * Called once per row from step 0, BEFORE the wipe — see the comment there. It
+ * is deliberately not called again at the insert site: a second call would be a
+ * second place this check could drift back behind the deletes.
+ */
+function standingsFormatOf(s: Record<string, string>): string {
+  if (!('standings_format' in s)) {
+    throw new Error(
+      'gold_seasons.csv has no "standings_format" column: it predates the checked-out ' +
+        'pipeline. Regenerate it — from sharepoint/, run `python3 normalize_gold.py` — then re-run the seed.'
+    );
+  }
+  if (s.standings_format !== 'divided' && s.standings_format !== 'combined') {
+    throw new Error(
+      `gold_seasons.csv: season "${s.game_slug}" / "${s.name}" has standings_format ` +
+        `"${s.standings_format}" — expected "divided" or "combined".`
+    );
+  }
+  return s.standings_format;
+}
+
 const rosterKey = (season: string, game: string, school: string, division: string) =>
   `${season}|${game}|${school}|${division}`;
 
 async function main() {
   console.log('Importing gold archive data...');
+
+  // 0. Read and validate the one CSV this loader can reject, before anything is
+  //    deleted. Step 1 wipes the whole archive, so a standings_format this
+  //    script refuses to guess at has to fail here: a stale gold_seasons.csv is
+  //    the normal state of a fresh clone (gold_data/ is gitignored), and failing
+  //    after the wipe would leave the live site with zero seasons, matches,
+  //    standings, rosters and players. The validated values are carried down to
+  //    step 4 rather than re-derived there, so there is only one call site to
+  //    keep in front of the deletes.
+  const seasonRows = gold('gold_seasons.csv');
+  const seasonFormats = seasonRows.map(standingsFormatOf);
 
   // 1. Wipe owned tables (FK-safe order). leadership/news/CMS untouched;
   //    leadership.member_id is null for all rows, so wiping members is safe.
@@ -114,14 +154,15 @@ async function main() {
   const schoolBySlug = new Map(schools.map((s) => [s.slug, s]));
   console.log(`  schools:          ${schools.length}`);
 
-  // 4. Seasons — keyed `${gameSlug}|${name}`.
-  const seasonRows = gold('gold_seasons.csv');
+  // 4. Seasons — keyed `${gameSlug}|${name}`. Rows and formats both come from
+  //    step 0, already validated.
   const seasons = await db
     .insert(schema.seasons)
-    .values(seasonRows.map((s) => ({
+    .values(seasonRows.map((s, i) => ({
       gameId: gameBySlug.get(s.game_slug)!.id,
       name: s.name,
       isActive: s.is_active === 'True',
+      standingsFormat: seasonFormats[i],
     })))
     .returning();
   const seasonByKey = new Map<string, { id: string }>();
