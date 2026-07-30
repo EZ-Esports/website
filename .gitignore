@@ -58,3 +58,7 @@ next-env.d.ts
 
 # local assets directory
 /ez_esports_assets/
+
+# python bytecode from the sharepoint pipeline
+__pycache__/
+*.py[cod]

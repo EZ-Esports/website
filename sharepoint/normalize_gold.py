@@ -313,15 +313,22 @@ def assert_derived_standings_sound(standings, counted_matches):
     # whose games_played is short by that same drawn match — but not when the
     # drawn matches are confined to entries that are ALL rowless (two entries
     # that played only each other, to a draw, disappear together and leave every
-    # surviving row consistent). Scoped to the (season, game) pairs that produced
-    # derived rows, like the checks above.
+    # surviving row consistent).
+    #
+    # Unlike (a)-(c), this iterates the seasons that CONSUMED MATCHES, not the
+    # seasons that produced rows. Scoping it to `derived` would reintroduce the
+    # same blindness one level up: a season whose every counted fixture was
+    # drawn produces no derived rows at all, so it would appear in neither the
+    # loop nor any earlier check, and its entire table would be written empty
+    # with the script exiting 0. Keying off `entered` means a season that played
+    # matches must account for every entry that played one.
     ranked = {(s['season'], s['game_slug'], s['division'], s['school_slug']) for s in derived}
     entered = defaultdict(set)
     for m in counted_matches:
         key = (m['season'], m['game_slug'])
         entered[key].add(key + (m['home_division'], m['home_school_slug']))
         entered[key].add(key + (m['away_division'], m['away_school_slug']))
-    for key in sorted({(s['season'], s['game_slug']) for s in derived}):
+    for key in sorted(entered):
         dropped = sorted(entered[key] - ranked)
         if dropped:
             raise AssertionError(
