@@ -615,6 +615,31 @@ def main():
             f'{sorted((r["name"], r["game_slug"]) for r in combined)}. Check the '
             f'season name and game slug spelling.'
         )
+    # A combined season served from an IMPORTED snapshot is the one path no
+    # other check covers. assert_derived_standings_sound() filters to
+    # DERIVED_NOTE rows, so it inspects none of these; the cross-check above
+    # only proves the declared pair names a real season; and the read layer's
+    # snapshot branch trusts the ranks it is given. A snapshot recorded
+    # per-division restarts its ranks in each division, so merging it into one
+    # table publishes 1,1,2,2,3,3... — two firsts, two seconds, in an order that
+    # is not a ranking. A combined season may legitimately carry a snapshot, but
+    # only one the league recorded as a single table, which is exactly what
+    # unique ranks mean here.
+    for r in combined:
+        key = (r['name'], r['game_slug'])
+        ranks = [s['rank'] for s in standings
+                 if (s['season'], s['game_slug']) == key
+                 and s['notes'] != DERIVED_NOTE and not s['player_name'] and s['rank'] != '']
+        duplicated = sorted({x for x in ranks if ranks.count(x) > 1})
+        if duplicated:
+            raise AssertionError(
+                f'{key} is declared combined but its imported standings repeat '
+                f'rank(s) {duplicated} across {len(ranks)} rows. The snapshot was '
+                f'recorded as separate per-division tables, so merging it into one '
+                f'would publish several teams sharing each place. Either the season '
+                f'did not run as one table, or the snapshot needs re-importing as '
+                f'the single table it was.'
+            )
     write('gold_seasons.csv', ['game_slug', 'name', 'is_active', 'standings_format'],
           season_rows)
     write('gold_rosters.csv', ['season', 'game_slug', 'school_slug', 'division'],
