@@ -4,17 +4,20 @@ import * as schema from './schema';
 import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, notExists, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
-  DIVISIONS,
   canonicalDivision,
   clampPageLimit,
+  isDerivedStandings,
   normalizeSort,
   rankComputedStandings,
+  seasonDivisionList,
+  standingsTeamLabel,
   toHubDivision,
   type CanonicalDivision,
   type HubDivision,
   type MatchesPage,
   type MatchesPageParams,
   type SeasonStandingsResult,
+  type StandingsFormat,
 } from './match-page';
 import { FORM_LENGTH, buildFormGuide, type FormOutcome } from '@/app/lib/game-hub-form';
 
@@ -250,6 +253,27 @@ const hubDivisionSql = (column: SQLWrapper) =>
   sql<HubDivision>`case when ${column} in ('JV', 'B') then 'JV' else 'Varsity' end`;
 
 /**
+ * Narrow the `seasons.standings_format` column to the union, defaulting to
+ * `divided` for a season this database doesn't have and for any value the
+ * column somehow holds that isn't one of the two. `divided` is the column's own
+ * default and the behaviour every season had before the column existed, so an
+ * unrecognised value changes nothing rather than silently merging two divisions
+ * into one table.
+ */
+const toStandingsFormat = (value: string | null | undefined): StandingsFormat =>
+  value === 'combined' ? 'combined' : 'divided';
+
+/** One season's declared standings format. */
+async function readStandingsFormat(seasonId: string): Promise<StandingsFormat> {
+  const rows = await db
+    .select({ standingsFormat: schema.seasons.standingsFormat })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.id, seasonId))
+    .limit(1);
+  return toStandingsFormat(rows[0]?.standingsFormat);
+}
+
+/**
  * Divisions that actually exist for a season, ordered Varsity, JV, All.
  * Union of snapshot standings divisions and live roster divisions, since a
  * season may have either (TFT 2022-23 is only an "All" individual snapshot).
@@ -257,9 +281,15 @@ const hubDivisionSql = (column: SQLWrapper) =>
  * Rows are canonicalized first: a season whose rosters were created in Admin
  * spells its divisions `A`/`B`, which matched none of `DIVISIONS` and left the
  * season claiming to have no divisions at all.
+ *
+ * A `combined` season reports exactly one division, the `Combined` pseudo-value,
+ * even though its rows really do carry both `Varsity` and `JV`. Those labels name
+ * the squad each school entered, not a bracket it was ranked in, so offering
+ * them as a switch would put two tabs on screen that each promise a standings
+ * table this competition never produced.
  */
 export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
-  const [snapshotRows, rosterRows] = await Promise.all([
+  const [snapshotRows, rosterRows, format] = await Promise.all([
     db
       .selectDistinct({ division: schema.seasonStandings.division })
       .from(schema.seasonStandings)
@@ -269,32 +299,34 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
       .from(schema.rosters)
       .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
       .where(eq(schema.teams.seasonId, seasonId)),
+    // Folded into the same round trip rather than awaited first: the division
+    // lists are needed either way, and the format only decides whether they get
+    // collapsed.
+    readStandingsFormat(seasonId),
   ]);
-  const found = new Set([...snapshotRows, ...rosterRows].map((r) => canonicalDivision(r.division)));
-  const ordered = DIVISIONS.filter((d) => found.has(d));
-  return ordered.length > 0 ? ordered : ['Varsity'];
+  return seasonDivisionList(
+    format,
+    [...snapshotRows, ...rosterRows].map((r) => r.division)
+  );
 }
 
 /**
- * Standings for a season+division: archived seasons are served from the
- * season_standings snapshot table (imported from spreadsheets, since most
- * archived seasons lack per-match scores); seasons without a snapshot fall
- * back to the live roster_standings view computed from match results.
+ * The two halves of `getSeasonStandingsFor`'s read, as compilable queries.
  *
- * Both sides compare *canonical* divisions, not raw column values. The stored
- * spelling depends on who wrote the row — the archive importer writes
- * `Varsity`/`JV`, Admin -> Roster writes `A`/`B` — so an exact match dropped
- * every admin-managed season's standings on both the requested-division path
- * and the computed fallback, which is what made the hub's standings tile
- * unfillable on either tab. `division` is canonicalized once here, so callers
- * may pass whichever spelling they hold.
+ * They exist as functions only so the division predicate can be asserted
+ * without a database: whether that one line is present is the whole difference
+ * between a combined season's single table and every other season's two, and it
+ * is the riskiest line the format flag added. Both are exported for
+ * `queries-hub.test.ts`, which compiles them with `toSQL()` rather than needing
+ * a live database.
  */
-export async function getSeasonStandingsFor(
-  seasonId: string,
-  division: string
-): Promise<SeasonStandingsResult> {
-  const wanted = canonicalDivision(division);
-  const snapshot = await db
+export function buildSeasonStandingsSnapshotQuery(opts: {
+  seasonId: string;
+  /** Canonical division to select. Ignored when `combined`. */
+  division: CanonicalDivision;
+  combined: boolean;
+}) {
+  return db
     .select({
       schoolName: schema.schools.name,
       division: schema.seasonStandings.division,
@@ -312,19 +344,24 @@ export async function getSeasonStandingsFor(
     .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
     .where(
       and(
-        eq(schema.seasonStandings.seasonId, seasonId),
-        eq(canonicalDivisionSql(schema.seasonStandings.division), wanted)
+        eq(schema.seasonStandings.seasonId, opts.seasonId),
+        // Dropped for a combined season: there is one table, and the ranks
+        // stored on these rows were measured against the whole field.
+        ...(opts.combined
+          ? []
+          : [eq(canonicalDivisionSql(schema.seasonStandings.division), opts.division)])
       )
     )
     .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
+}
 
-  // Same reasoning as the computed branch below: report the division the
-  // caller asked for, not the spelling the importer happened to store.
-  if (snapshot.length > 0) {
-    return { source: 'snapshot', rows: snapshot.map((r) => ({ ...r, division: wanted })) };
-  }
-
-  const computed = await db
+/** @see buildSeasonStandingsSnapshotQuery */
+export function buildSeasonStandingsComputedQuery(opts: {
+  seasonId: string;
+  division: CanonicalDivision;
+  combined: boolean;
+}) {
+  return db
     .select({
       schoolName: schema.schools.name,
       division: schema.rosterStandings.division,
@@ -336,18 +373,93 @@ export async function getSeasonStandingsFor(
     .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
     .where(
       and(
-        eq(schema.teams.seasonId, seasonId),
-        eq(canonicalDivisionSql(schema.rosterStandings.division), wanted),
+        eq(schema.teams.seasonId, opts.seasonId),
+        // As above: a combined season ranks every roster in the season
+        // together, so there is nothing to filter on.
+        ...(opts.combined
+          ? []
+          : [eq(canonicalDivisionSql(schema.rosterStandings.division), opts.division)]),
         isNull(schema.schools.deletedAt)
       )
     );
+}
+
+/**
+ * Standings for a season+division: archived seasons are served from the
+ * season_standings snapshot table (imported from spreadsheets, since most
+ * archived seasons lack per-match scores); seasons without a snapshot fall
+ * back to the live roster_standings view computed from match results.
+ *
+ * Both sides compare *canonical* divisions, not raw column values. The stored
+ * spelling depends on who wrote the row — the archive importer writes
+ * `Varsity`/`JV`, Admin -> Roster writes `A`/`B` — so an exact match dropped
+ * every admin-managed season's standings on both the requested-division path
+ * and the computed fallback, which is what made the hub's standings tile
+ * unfillable on either tab. `division` is canonicalized once here, so callers
+ * may pass whichever spelling they hold.
+ *
+ * For a `combined` season the requested division is ignored entirely and the
+ * whole field comes back as one ranked table. Filtering it would slice a single
+ * round-robin into two tables whose records were earned mostly against teams in
+ * the *other* one — which is exactly the bug this format flag exists to end.
+ * Callers still pass a division because the routes still have one (see
+ * `GameHubView`); it just has nothing left to select on.
+ *
+ * `standingsFormat` may be supplied by a caller that already read it, to save
+ * the lookup; everything else is unchanged by passing it.
+ */
+export async function getSeasonStandingsFor(
+  seasonId: string,
+  division: string,
+  standingsFormat?: StandingsFormat
+): Promise<SeasonStandingsResult> {
+  const format = standingsFormat ?? (await readStandingsFormat(seasonId));
+  const combined = format === 'combined';
+  const wanted = canonicalDivision(division);
+  const snapshot = await buildSeasonStandingsSnapshotQuery({
+    seasonId,
+    division: wanted,
+    combined,
+  });
+
+  // Same reasoning as the computed branch below: report the division the
+  // caller asked for, not the spelling the importer happened to store.
+  //
+  // A combined season is the exception, and it is the one case where the row's
+  // own division is the load-bearing value: it names the squad the school
+  // entered, and it is all that distinguishes two rows of the same school from
+  // each other. Overwriting it with `wanted` would leave Brooklyn Technical
+  // listed twice, identically, at two different ranks.
+  if (snapshot.length > 0) {
+    return {
+      source: 'snapshot',
+      standingsFormat: format,
+      rows: snapshot.map((r) => ({
+        ...r,
+        division: combined ? canonicalDivision(r.division) : wanted,
+      })),
+    };
+  }
+
+  const computed = await buildSeasonStandingsComputedQuery({
+    seasonId,
+    division: wanted,
+    combined,
+  });
 
   return {
     source: 'computed',
+    standingsFormat: format,
     // Report the canonical division, not the raw column: the WHERE clause
     // above constrained the rows to `wanted`, and echoing `A` back from the
-    // column would contradict the tab that asked for Varsity.
-    rows: rankComputedStandings(computed.map((r) => ({ ...r, division: wanted }))),
+    // column would contradict the tab that asked for Varsity. A combined
+    // season keeps the row's own division — canonicalized, so an admin-written
+    // `A`/`B` still reads as the Varsity/JV squad it means — because there is no
+    // tab to contradict and the squad is what tells two rows of one school
+    // apart. `rankComputedStandings` tie-breaks on it too.
+    rows: rankComputedStandings(
+      computed.map((r) => ({ ...r, division: combined ? canonicalDivision(r.division) : wanted }))
+    ),
   };
 }
 
@@ -713,6 +825,13 @@ export async function getArchiveIndex() {
  * division, snapshot-aware via getSeasonStandingsFor, plus which of the two
  * sources produced each table. Individual (per-player) standings rows are
  * excluded from team summaries.
+ *
+ * A `combined` season has one table, and both hub routes get *that* table
+ * rather than a half of it. The routes still exist — `/[game]` -> `/[game]/varsity`
+ * is a static 308 in `next.config.ts` (PR #46) and a redirect conditional on one
+ * season's format cannot live in static config — so the honest answer is to
+ * serve the same combined standings on each and let the page stop claiming they
+ * are one division's.
  */
 export async function getGameSeasonSummary(seasonId: string) {
   // One snapshot query covers both divisions; only divisions without
@@ -724,20 +843,27 @@ export async function getGameSeasonSummary(seasonId: string) {
   // `A`/`B`, so a season managed entirely through Admin had a snapshot the hub
   // could never read, and both of its division tabs fell back to a computed
   // table that the same mismatch had already emptied.
-  const snapshot = await db
-    .select({
-      schoolName: schema.schools.name,
-      division: schema.seasonStandings.division,
-      rank: schema.seasonStandings.rank,
-      wins: schema.seasonStandings.wins,
-      losses: schema.seasonStandings.losses,
-      winPct: schema.seasonStandings.winPct,
-      playerName: schema.seasonStandings.playerName,
-    })
-    .from(schema.seasonStandings)
-    .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-    .where(eq(schema.seasonStandings.seasonId, seasonId))
-    .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
+  const [snapshot, standingsFormat] = await Promise.all([
+    db
+      .select({
+        schoolName: schema.schools.name,
+        division: schema.seasonStandings.division,
+        rank: schema.seasonStandings.rank,
+        wins: schema.seasonStandings.wins,
+        losses: schema.seasonStandings.losses,
+        winPct: schema.seasonStandings.winPct,
+        playerName: schema.seasonStandings.playerName,
+        // Read so the hub can caption a reconstructed table the same way
+        // /[game]/standings does, from the same marker.
+        notes: schema.seasonStandings.notes,
+      })
+      .from(schema.seasonStandings)
+      .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+      .where(eq(schema.seasonStandings.seasonId, seasonId))
+      .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name)),
+    readStandingsFormat(seasonId),
+  ]);
+  const combined = standingsFormat === 'combined';
 
   // One predicate for both the rows and the reported source, so the two can
   // never drift into disagreeing about which path a division came from.
@@ -747,27 +873,57 @@ export async function getGameSeasonSummary(seasonId: string) {
   // `All` from per-player games, so comparing the raw value would report
   // "computed" for a division whose snapshot it had merely failed to recognise
   // — and then show form chips beside an imported record.
+  //
+  // For a combined season the question stops being per-division: there is one
+  // table, so either the season has a snapshot of it or it doesn't.
   const hasSnapshot = (division: HubDivision) =>
-    snapshot.some((r) => toHubDivision(r.division) === division);
+    combined ? snapshot.length > 0 : snapshot.some((r) => toHubDivision(r.division) === division);
   const divisionRows = async (division: HubDivision) => {
     if (hasSnapshot(division)) {
-      return snapshot.filter((r) => toHubDivision(r.division) === division);
+      return combined ? snapshot : snapshot.filter((r) => toHubDivision(r.division) === division);
     }
-    return (await getSeasonStandingsFor(seasonId, division)).rows;
+    // `standingsFormat` is passed along: it is already in hand, and re-reading
+    // it per division would be two extra round trips for one answer. It is also
+    // what makes the `division` argument a no-op for a combined season — the
+    // call comes back with the whole field either way.
+    return (await getSeasonStandingsFor(seasonId, division, standingsFormat)).rows;
   };
-  const [varsityRows, jvRows] = await Promise.all([divisionRows('Varsity'), divisionRows('JV')]);
+  // A combined season resolves its one table once and hands the same rows to
+  // both routes; without this the identical query would run twice.
+  const combinedRows = combined ? await divisionRows('Varsity') : [];
+  const [varsityRows, jvRows] = combined
+    ? [combinedRows, combinedRows]
+    : await Promise.all([divisionRows('Varsity'), divisionRows('JV')]);
   const varsityTeams = varsityRows.filter((r) => r.playerName === null);
   const jvTeams = jvRows.filter((r) => r.playerName === null);
+  /**
+   * `team` is the raw school name and stays raw, because it is a *key*, not a
+   * label: `buildFormGuideQuery` matches it against `schools.name` in SQL and
+   * `buildFormGuide` keys its result map by the same string. Baking the squad
+   * suffix into it would make that lookup match nothing and silently drop every
+   * school's form chips. `teamLabel` is the string to print.
+   */
   const topFive = (rows: typeof varsityTeams) =>
     rows.slice(0, 5).map((r, i) => ({
       rank: r.rank ?? i + 1,
       team: r.schoolName,
+      teamLabel: standingsTeamLabel(r, standingsFormat),
+      /** The squad this row is, so a consumer can key two rows of one school apart. */
+      division: canonicalDivision(r.division),
       wins: r.wins ?? 0,
       losses: r.losses ?? 0,
       winPct: r.winPct ?? 0,
     }));
 
   return {
+    /** Whether the tables below are one competition or one division each. */
+    standingsFormat,
+    /**
+     * Whether the table was tallied here from match rows rather than imported
+     * from an official sheet. Both routes of a combined season read the same
+     * table, so this is one answer for the season, not one per division.
+     */
+    standingsReconstructed: isDerivedStandings(snapshot),
     // Both divisions are already in memory from the queries above, so serving
     // JV costs nothing extra — it was previously computed and discarded.
     topTeams: topFive(varsityTeams),
@@ -1023,7 +1179,19 @@ export interface GameHubData {
    */
   topTeams: {
     rank: number;
+    /**
+     * The raw school name. It is the key the form guide was looked up by, so it
+     * must stay exactly what `schools.name` holds — print `teamLabel` instead.
+     */
     team: string;
+    /**
+     * What to render. Identical to `team` for a divided season; for a combined
+     * one it carries the squad ("Brooklyn Technical High School — JV"), which is
+     * the only thing distinguishing two rows of the same school.
+     */
+    teamLabel: string;
+    /** The squad, so two rows of one school have distinct React keys. */
+    division: CanonicalDivision;
     wins: number;
     losses: number;
     winPct: number;
@@ -1031,6 +1199,14 @@ export interface GameHubData {
   }[];
   /** Name of the active season, for the hub's season-context meta pill. */
   seasonName: string | null;
+  /**
+   * Whether the season ran one table or one per division. `combined` means both
+   * hub routes are showing the *same* standings, and the page has to say so
+   * rather than titling them as this division's.
+   */
+  standingsFormat: StandingsFormat;
+  /** Whether that table was tallied from match rows instead of imported. */
+  standingsReconstructed: boolean;
   /** The division every other field on this object describes. */
   division: HubDivision;
 }
@@ -1057,6 +1233,10 @@ export async function getGameHubData(
   let recentResults: GameHubData['recentResults'] = [];
   let topTeams: GameHubData['topTeams'] = [];
   let seasonName: string | null = null;
+  // Defaults to the column's default: with no season resolved (or a failed
+  // query) there is no combined table to announce, so the page says nothing.
+  let standingsFormat: StandingsFormat = 'divided';
+  let standingsReconstructed = false;
 
   try {
     const gameRow = await db
@@ -1117,6 +1297,8 @@ export async function getGameHubData(
           getGameSeasonSummary(activeSeason[0].id),
         ]);
 
+        standingsFormat = summary.standingsFormat;
+        standingsReconstructed = summary.standingsReconstructed;
         const shownTeams = summary.topTeamsByDivision[division];
         /**
          * Snapshot standings get no form at all, even when the season happens to
@@ -1128,16 +1310,29 @@ export async function getGameHubData(
          * only honest answer, and the same one an archived season with no match
          * rows at all already gives.
          *
+         * A combined season gets none either, for a different reason: its table
+         * lists a school once per squad, and the form guide is keyed by school
+         * name alone — `buildFormGuideQuery` matches `schools.name` and
+         * `buildFormGuide` maps by the same string. There is no key that tells
+         * Brooklyn Technical's two squads apart, so one strip would be attached
+         * to both rows and at least one of them would be someone else's results.
+         *
          * The query runs after the summary because it needs the names the tile
          * is about to print, and it is skipped outright when there are none —
          * `inArray` on an empty list is a query with no answer to give.
          */
         const formRows =
-          summary.standingsSource[division] === 'snapshot' || shownTeams.length === 0
+          summary.standingsSource[division] === 'snapshot' ||
+          summary.standingsFormat === 'combined' ||
+          shownTeams.length === 0
             ? []
             : await buildFormGuideQuery({
                 seasonId: activeSeason[0].id,
                 division,
+                // The raw school name, never `teamLabel`: this list is matched
+                // against `schools.name` in SQL and read back out of a map keyed
+                // by the same string, so a squad-suffixed name here would match
+                // nothing and drop every chip with no error to show for it.
                 schools: shownTeams.map((entry) => entry.team),
                 perSchool: FORM_LENGTH,
               });
@@ -1145,6 +1340,7 @@ export async function getGameHubData(
         // A school with no matches in this division gets no chips at all.
         topTeams = shownTeams.map((entry) => ({
           ...entry,
+          // Keyed by the raw name for the same reason the query was.
           form: formGuides.get(entry.team) ?? [],
         }));
 
@@ -1196,7 +1392,15 @@ export async function getGameHubData(
     console.error(`Failed to load dynamic data for ${gameSlug}`, error);
   }
 
-  return { nextMatch, recentResults, topTeams, seasonName, division };
+  return {
+    nextMatch,
+    recentResults,
+    topTeams,
+    seasonName,
+    standingsFormat,
+    standingsReconstructed,
+    division,
+  };
 }
 
 // --- STAFF ACCESS CONTROL ---

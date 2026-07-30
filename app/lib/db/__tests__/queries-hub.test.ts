@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { eq, gte, inArray, isNotNull } from 'drizzle-orm';
-import { buildFormGuideQuery, buildHubMatchQuery } from '@/app/lib/db/queries';
+import {
+  buildFormGuideQuery,
+  buildHubMatchQuery,
+  buildSeasonStandingsComputedQuery,
+  buildSeasonStandingsSnapshotQuery,
+} from '@/app/lib/db/queries';
 import * as schema from '@/app/lib/db/schema';
 import { HUB_DIVISIONS, canonicalDivision, toHubDivision } from '@/app/lib/db/match-page';
 import { FORM_LENGTH } from '@/app/lib/game-hub-form';
@@ -232,6 +237,56 @@ describe('buildFormGuideQuery — attribution', () => {
     expect(sql).toContain('"matches"."home_score" is not null');
     // A draw is a chip, so nothing may require the two scores to differ.
     expect(sql).not.toMatch(/"home_score" <> /);
+  });
+});
+
+/**
+ * `getSeasonStandingsFor`'s two reads, snapshot and computed.
+ *
+ * One line decides what a standings table *is*: the division predicate. A
+ * `combined` season ran one table that several schools entered two squads into,
+ * so the predicate is not applied and the whole field comes back; every other
+ * season keeps it and gets its own Varsity and JV tables. Applying it to a
+ * combined season is the original bug — it sliced a single ten-entry round-robin
+ * into a 7-team and a 3-team table whose records were earned mostly against
+ * teams in the other one — and dropping it from a divided season would merge two
+ * real competitions. Both branches carry the predicate, so both are pinned here.
+ */
+const STANDINGS_BRANCHES = [
+  ['snapshot', buildSeasonStandingsSnapshotQuery],
+  ['computed', buildSeasonStandingsComputedQuery],
+] as const;
+
+describe('season standings — the division predicate', () => {
+  const SEASON = { seasonId: 'season-1', division: 'Varsity' } as const;
+
+  it.each(STANDINGS_BRANCHES)('a combined season carries none (%s)', (_branch, build) => {
+    const { sql, params } = build({ ...SEASON, combined: true }).toSQL();
+
+    // Neither the canonicalizing CASE nor the division it would be compared to
+    // appears at all: there is nothing left to select a subset of the field.
+    expect(sql).not.toContain("in ('JV', 'B')");
+    expect(sql).not.toContain('"division" =');
+    expect(params).not.toContain('Varsity');
+    // The season scope is untouched — one table, but still one season's table.
+    expect(params).toContain('season-1');
+  });
+
+  it.each(STANDINGS_BRANCHES)('a divided season still carries one (%s)', (_branch, build) => {
+    const { sql, params } = build({ ...SEASON, combined: false }).toSQL();
+
+    // Compared through the same canonicalizing CASE the rest of the file uses,
+    // so a row an admin wrote as `A` still lands in the Varsity table.
+    expect(sql).toContain("in ('JV', 'B')");
+    expect(sql).toContain("else 'Varsity' end");
+    expect(params.filter((p) => p === 'Varsity')).toHaveLength(1);
+    expect(params).toContain('season-1');
+  });
+
+  it.each(STANDINGS_BRANCHES)('selects the division it was asked for (%s)', (_branch, build) => {
+    const { params } = build({ ...SEASON, division: 'JV', combined: false }).toSQL();
+    expect(params).toContain('JV');
+    expect(params).not.toContain('Varsity');
   });
 });
 
