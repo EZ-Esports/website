@@ -52,5 +52,9 @@ next-env.d.ts
 .claude/worktrees/
 .claude/*.local.json
 
+# antigravity agent worktrees / local scratch (skills and agents are shared, see .gemini/skills and .gemini/agents)
+.gemini/worktrees/
+.gemini/*.local.json
+
 # local assets directory
 /ez_esports_assets/
