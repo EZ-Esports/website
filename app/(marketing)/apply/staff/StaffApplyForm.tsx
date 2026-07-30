@@ -21,7 +21,7 @@ const initialForm = {
 const SECTIONS = [
   { id: 'applicant', num: 1, title: 'Your Information', desc: 'How we can reach you.' },
   { id: 'role', num: 2, title: 'Role & Links', desc: 'What you want to do and your links.' },
-  { id: 'experience', num: 3, title: 'Experience & Why', desc: 'Tell us about your background.' },
+  { id: 'experience', num: 3, title: 'Experience & Why', desc: 'Tell us about your background in about 3-6 sentences.' },
   { id: 'review', num: 4, title: 'Review & Submit', desc: 'Agree to terms and send it in.' },
 ] as const;
 
@@ -605,13 +605,13 @@ ${form.message}
 
                 <div id="field-message" className={fieldWrapperClass('message', !!fieldErrors.message)}>
                   <label htmlFor="message" className={labelClass}>
-                    Tell us about your background, skills, and why you want to join EZ Esports {requiredMark}
+                    Tell us about your background, skills, and why you want to join EZ Esports (approx. 3-6 sentences) {requiredMark}
                   </label>
                   <Textarea
                     id="message"
                     name="message"
                     rows={6}
-                    placeholder="Include details about any relevant experience (e.g. running esports clubs, moderation, production, coding, graphic design) and what excites you about our mission..."
+                    placeholder="Include details about any relevant experience (e.g. running esports clubs, moderation, production, coding, graphic design) and what excites you about our mission (approx. 3-6 sentences)..."
                     value={form.message}
                     onChange={handleTextChange}
                     onFocus={() => setFocusedField('message')}
