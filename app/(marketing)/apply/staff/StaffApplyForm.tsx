@@ -579,7 +579,7 @@ ${form.message}
                 >
                   <span id="availability-label" className={labelClass}>Expected Weekly Time Commitment {requiredMark}</span>
                   <div className="flex flex-wrap gap-4 mt-2">
-                    {['< 2 hours', '2-5 hours', '5-10 hours', '10+ hours'].map((hours) => (
+                    {['5hrs', '10hrs', '15hrs', '20hrs', '30hrs'].map((hours) => (
                       <label key={hours} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
