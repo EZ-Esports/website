@@ -20,7 +20,10 @@ loader:
     today or later are upcoming fixtures -> 'scheduled'
   - standings derived from completed matches for seasons that have matches
     but no standings sheet (2023-24 LoL); skipped while a season still has
-    scheduled fixtures
+    scheduled fixtures. Ranked per division, except for the seasons declared
+    in COMBINED_STANDINGS which ran as one table; rows keep their own division
+    either way, and assert_derived_standings_sound() refuses to write a tally
+    that does not add up
 
 Run: python3 normalize_gold.py  (from sharepoint/; stdlib only)
 """
@@ -78,7 +81,48 @@ SCHOOL_REMAP = {'hchs': 'hunterhs'}
 
 DIVISION_LABELS = {'A': 'Varsity', 'B': 'JV', 'all': 'All'}
 
+# Seasons whose (season, game) ran as ONE competition, even though their teams
+# carry A/B division labels. Grouping derived standings by division assumes
+# division partitions the competition into separate, self-contained tables.
+# That holds for every season here but one, so it was never declared — it was
+# assumed, and the assumption silently fabricated two fake tables.
+#
+# 2023-24 League of Legends is the exception. Evidence from
+# bronze_data/EZ Esports_ League of Legends Schedule (2023_2024)/
+# Regular Season Schedule.csv:
+#
+#   1. Ten team-entries, and every one of them played exactly 9 DISTINCT
+#      opponents — every other entry, once. A complete single round-robin
+#      over ten entries (45 fixtures + 3 replays = 48).
+#   2. 23 of those 48 fixtures pair an A-labelled entry against a B-labelled
+#      one, and three are a school against its OWN other squad, with results:
+#        2024-03-29  Midwood A            vs Midwood B            -> A
+#        2024-04-07  Bronx Science B      vs Bronx Science A      -> A
+#        2024-04-19  Brooklyn Tech A      vs Brooklyn Tech B      -> A
+#      A school cannot play itself across a division boundary. These are two
+#      squads from one school, entered in one table.
+#   3. Three schools are consistently suffixed A/B (Brooklyn Tech, Midwood,
+#      Bronx Science); four are consistently unsuffixed. Zero schools are
+#      written inconsistently, so this is not a transcription error.
+#
+# So the A/B label names WHICH SQUAD A SCHOOL ENTERED, not which bracket it is
+# ranked in. Each standings row therefore keeps its own `division` value — that
+# is still true and still useful, it is the squad. Only the RANKING GROUP is
+# combined, so ranks run 1..10 over the competition that was actually played.
+#
+# The division-grouped output was measurably wrong: Varsity summed 39W-28L and
+# JV 9W-20L, an 11-game imbalance in each direction, though globally 48-48. A
+# closed round-robin must have W == L. See assert_derived_standings_sound().
+COMBINED_STANDINGS = {
+    ('2023-24', 'league-of-legends'),
+}
+
 ROLE_MAP = {'starter': 'player', 'player': 'player', 'sub': 'sub'}
+
+# Marks the standings rows this script tallies itself, as opposed to the rows
+# transcribed from a standings sheet. Only the former can be checked against
+# the matches, so the soundness guard filters on it.
+DERIVED_NOTE = 'Derived from match results'
 
 # grade word -> years until graduation, counted from the season's end year
 GRADE_WORD_OFFSET = {
@@ -154,6 +198,146 @@ def load_bronze_extras():
                 'grad_raw': (row.get(grade_col) or '').strip(),
             }
     return extras
+
+
+def ranking_group(season, game_slug, division):
+    """The table a standings row is ranked within.
+
+    Normally one table per division, because a division is a self-contained
+    competition. For the (season, game) pairs in COMBINED_STANDINGS the
+    division names the squad a school entered rather than a bracket, so every
+    entry is ranked in one table. Ranking and the soundness checks both read
+    this, so they can never disagree about what a table is.
+    """
+    if (season, game_slug) in COMBINED_STANDINGS:
+        return (season, game_slug)
+    return (season, game_slug, division)
+
+
+def assert_derived_standings_sound(standings, counted_matches):
+    """Refuse to write standings this script tallied wrong.
+
+    Checks only rows noted DERIVED_NOTE. The imported snapshot rows carry W/L
+    transcribed from a league standings sheet, not tallied from the matches in
+    this archive, so they are not this pipeline's arithmetic to defend. Dropping
+    that filter does not tighten the guard, it breaks it, measured against the
+    current output:
+
+      - it never reaches an assertion. 45 of the 173 snapshot rows are TFT
+        per-player rows scored in points, with `wins` blank, and check (a) sums
+        that column: `0 + ''` raises TypeError.
+      - past that, 6 of the 14 snapshot tables are already imbalanced, none of
+        them wrongly: 2021-22 TFT Varsity sums 598W-0L (its `wins` holds TFT
+        points, as the rows' own notes say), 2021-22 Valorant Varsity +2,
+        2022-23 Valorant JV +2, 2023-24 Valorant Varsity -4 and JV -2, 2024-25
+        Valorant JV +11 — sheets whose totals count games this archive never
+        recorded.
+      - and check (c) fails on all 173, because `counted_matches` holds only the
+        matches the derivation consumed. No snapshot season contributes one, so
+        every snapshot row is compared against 0 appearances.
+
+    None of that is a bug in the tally this function exists to defend, so the
+    filter stays.
+
+    `counted_matches` must be the exact list the derivation consumed, so a
+    mismatch can only mean the tally is wrong, never that the two disagree
+    about which matches were in play.
+    """
+    derived = [s for s in standings if s['notes'] == DERIVED_NOTE]
+
+    # (a) Every game hands out exactly one win and one loss, so a table whose
+    # members only play each other must sum W == L. An imbalance means the
+    # table's members played opponents who are not in it — i.e. it is not a
+    # real table. The invariant belongs to the TABLE, not to the division
+    # label: grouping this by (season, game, division) would fail on correct
+    # output, because 2023-24 LoL rows keep their true A/B divisions (39-28
+    # and 9-20) while being ranked as one ten-entry competition. So group by
+    # the same ranking_group() the ranks are assigned in.
+    tables = defaultdict(lambda: {'wins': 0, 'losses': 0, 'entries': 0, 'ranks': []})
+    for s in derived:
+        table = tables[ranking_group(s['season'], s['game_slug'], s['division'])]
+        table['wins'] += s['wins']
+        table['losses'] += s['losses']
+        table['entries'] += 1
+        table['ranks'].append(s['rank'])
+    for group, t in sorted(tables.items()):
+        if t['wins'] != t['losses']:
+            raise AssertionError(
+                f'Derived standings table {group} is not a closed competition: '
+                f"{t['entries']} entries summing {t['wins']}W-{t['losses']}L "
+                f"({t['wins'] - t['losses']:+d}). Its members played opponents "
+                f'that are not ranked with them, so the table is fabricated. '
+                f'If this (season, game) ran as one competition, declare it in '
+                f'COMBINED_STANDINGS.'
+            )
+        # (b) A rank only means anything inside the table it was measured in,
+        # so each table's ranks must be exactly 1..N. This is what catches the
+        # ranking code disagreeing with ranking_group(): (a) reads the same
+        # helper the ranks were assigned from, so on its own it is blind to
+        # that divergence — division-ranked 2023-24 LoL rows still sum 48W-48L
+        # over the combined table while handing out two 1sts and two 2nds.
+        if sorted(t['ranks']) != list(range(1, t['entries'] + 1)):
+            raise AssertionError(
+                f'Derived standings table {group} has ranks '
+                f"{sorted(t['ranks'])} for {t['entries']} entries, not "
+                f"1..{t['entries']}. The ranks were assigned over some other "
+                f'grouping than the table they are published in.'
+            )
+
+    # (c) A derived row's games_played must equal the matches that entry
+    # actually appeared in, over that same consumed match set. A shortfall
+    # means a result was dropped from the tally without being dropped from the
+    # season — a drawn match, say, which scores as neither a win nor a loss.
+    appearances = defaultdict(int)
+    for m in counted_matches:
+        key = (m['season'], m['game_slug'])
+        appearances[key + (m['home_division'], m['home_school_slug'])] += 1
+        appearances[key + (m['away_division'], m['away_school_slug'])] += 1
+    for s in derived:
+        entry = (s['season'], s['game_slug'], s['division'], s['school_slug'])
+        played = appearances[entry]
+        if s['games_played'] != played:
+            raise AssertionError(
+                f'Derived standings row {entry} counts {s["games_played"]} '
+                f"games played ({s['wins']}W-{s['losses']}L) but that entry "
+                f'appears in {played} of the matches the tally consumed. '
+                f'{played - s["games_played"]} result(s) were silently dropped.'
+            )
+
+    # (d) Every entry that played a counted match must have got a row. (c)
+    # iterates the derived ROWS, so it cannot see an entry that has none: an
+    # entry scoring no win and no loss — every one of its matches drawn — never
+    # enters `derived` at all and simply vanishes from the table, and a table
+    # missing an entry still sums W == L with ranks 1..N, so (a) and (b) are
+    # blind to it too. (c) usually catches it second-hand, through an opponent
+    # whose games_played is short by that same drawn match — but not when the
+    # drawn matches are confined to entries that are ALL rowless (two entries
+    # that played only each other, to a draw, disappear together and leave every
+    # surviving row consistent).
+    #
+    # Unlike (a)-(c), this iterates the seasons that CONSUMED MATCHES, not the
+    # seasons that produced rows. Scoping it to `derived` would reintroduce the
+    # same blindness one level up: a season whose every counted fixture was
+    # drawn produces no derived rows at all, so it would appear in neither the
+    # loop nor any earlier check, and its entire table would be written empty
+    # with the script exiting 0. Keying off `entered` means a season that played
+    # matches must account for every entry that played one.
+    ranked = {(s['season'], s['game_slug'], s['division'], s['school_slug']) for s in derived}
+    entered = defaultdict(set)
+    for m in counted_matches:
+        key = (m['season'], m['game_slug'])
+        entered[key].add(key + (m['home_division'], m['home_school_slug']))
+        entered[key].add(key + (m['away_division'], m['away_school_slug']))
+    for key in sorted(entered):
+        dropped = sorted(entered[key] - ranked)
+        if dropped:
+            raise AssertionError(
+                f'Derived standings for {key} rank {len(entered[key]) - len(dropped)} '
+                f'of the {len(entered[key])} entries that played a counted match. '
+                f'Missing: {dropped}. An entry with no win and no loss — every '
+                f'one of its matches drawn — is dropped from the table instead '
+                f'of being ranked last.'
+            )
 
 
 def main():
@@ -353,13 +537,18 @@ def main():
         if m['status'] == 'scheduled'
         or (m['status'] == 'completed' and (m['home_score'] == '' or m['away_score'] == ''))
     }
+    # Materialized so assert_derived_standings_sound() can check the tally
+    # against the very same matches, not against a re-derived filter.
+    counted_matches = [
+        m for m in matches
+        if (m['season'], m['game_slug']) not in covered
+        and (m['season'], m['game_slug']) not in incomplete
+        and m['status'] in ('completed', 'forfeit')
+        and m['home_score'] != '' and m['away_score'] != ''
+    ]
     derived = defaultdict(lambda: {'wins': 0, 'losses': 0})
-    for m in matches:
+    for m in counted_matches:
         key = (m['season'], m['game_slug'])
-        if key in covered or key in incomplete or (m['status'] not in ('completed', 'forfeit')):
-            continue
-        if m['home_score'] == '' or m['away_score'] == '':
-            continue
         home = key + (m['home_division'], m['home_school_slug'])
         away = key + (m['away_division'], m['away_school_slug'])
         if m['home_score'] > m['away_score']:
@@ -369,12 +558,20 @@ def main():
             derived[away]['wins'] += 1
             derived[home]['losses'] += 1
 
+    # Ranked per ranking_group(), which is the division only when the division
+    # really is its own competition — see COMBINED_STANDINGS. Each row keeps
+    # its OWN division either way: the label is true, it names the squad the
+    # school entered, and only the group the rank is measured against changes.
     by_group = defaultdict(list)
     for (season, game_slug, division, school_slug), rec in derived.items():
-        by_group[(season, game_slug, division)].append((school_slug, rec['wins'], rec['losses']))
-    for (season, game_slug, division), teams in sorted(by_group.items()):
-        teams.sort(key=lambda t: (-t[1], t[2], t[0]))
-        for rank, (school_slug, wins, losses) in enumerate(teams, start=1):
+        by_group[ranking_group(season, game_slug, division)].append(
+            (school_slug, division, rec['wins'], rec['losses']))
+    for group, teams in sorted(by_group.items()):
+        season, game_slug = group[0], group[1]
+        # wins desc, losses asc, then name — with the division breaking ties
+        # between two squads of one school, so the CSV is reproducible.
+        teams.sort(key=lambda t: (-t[2], t[3], t[0], t[1]))
+        for rank, (school_slug, division, wins, losses) in enumerate(teams, start=1):
             games = wins + losses
             standings.append({
                 'season': season, 'game_slug': game_slug, 'division': division,
@@ -382,8 +579,11 @@ def main():
                 'losses': losses, 'games_played': games,
                 'win_pct': round(wins / games, 3) if games else '',
                 'points': '', 'player_name': '', 'player_ign': '',
-                'notes': 'Derived from match results',
+                'notes': DERIVED_NOTE,
             })
+
+    # Nothing gets written unless the tally holds up.
+    assert_derived_standings_sound(standings, counted_matches)
 
     # --- write everything
     def write(name, fieldnames, rows):
@@ -397,8 +597,51 @@ def main():
           [dict(zip(['slug', 'display_name', 'short_name', 'image_url'], g)) for g in GAMES])
     write('gold_schools.csv', ['slug', 'name', 'display_order'],
           [{'slug': s, 'name': n, 'display_order': i} for i, (s, n) in enumerate(schools)])
-    write('gold_seasons.csv', ['game_slug', 'name', 'is_active'],
-          [{'game_slug': g, 'name': s, 'is_active': s == latest[g]} for g, s in seasons])
+    # standings_format is DECLARED here, from COMBINED_STANDINGS, not inferred
+    # downstream from the shape of the standings rows. Note `seasons` holds
+    # (game_slug, season) while COMBINED_STANDINGS holds (season, game_slug).
+    season_rows = [
+        {'game_slug': g, 'name': s, 'is_active': s == latest[g],
+         'standings_format': 'combined' if (s, g) in COMBINED_STANDINGS else 'divided'}
+        for g, s in seasons
+    ]
+    # Every declared pair must land on exactly one season, or the declaration
+    # names a (season, game) that does not exist and quietly does nothing.
+    combined = [r for r in season_rows if r['standings_format'] == 'combined']
+    if len(combined) != len(COMBINED_STANDINGS):
+        raise AssertionError(
+            f'COMBINED_STANDINGS declares {len(COMBINED_STANDINGS)} '
+            f'(season, game) pair(s) but {len(combined)} season row(s) matched: '
+            f'{sorted((r["name"], r["game_slug"]) for r in combined)}. Check the '
+            f'season name and game slug spelling.'
+        )
+    # A combined season served from an IMPORTED snapshot is the one path no
+    # other check covers. assert_derived_standings_sound() filters to
+    # DERIVED_NOTE rows, so it inspects none of these; the cross-check above
+    # only proves the declared pair names a real season; and the read layer's
+    # snapshot branch trusts the ranks it is given. A snapshot recorded
+    # per-division restarts its ranks in each division, so merging it into one
+    # table publishes 1,1,2,2,3,3... — two firsts, two seconds, in an order that
+    # is not a ranking. A combined season may legitimately carry a snapshot, but
+    # only one the league recorded as a single table, which is exactly what
+    # unique ranks mean here.
+    for r in combined:
+        key = (r['name'], r['game_slug'])
+        ranks = [s['rank'] for s in standings
+                 if (s['season'], s['game_slug']) == key
+                 and s['notes'] != DERIVED_NOTE and not s['player_name'] and s['rank'] != '']
+        duplicated = sorted({x for x in ranks if ranks.count(x) > 1})
+        if duplicated:
+            raise AssertionError(
+                f'{key} is declared combined but its imported standings repeat '
+                f'rank(s) {duplicated} across {len(ranks)} rows. The snapshot was '
+                f'recorded as separate per-division tables, so merging it into one '
+                f'would publish several teams sharing each place. Either the season '
+                f'did not run as one table, or the snapshot needs re-importing as '
+                f'the single table it was.'
+            )
+    write('gold_seasons.csv', ['game_slug', 'name', 'is_active', 'standings_format'],
+          season_rows)
     write('gold_rosters.csv', ['season', 'game_slug', 'school_slug', 'division'],
           [{'season': k[0], 'game_slug': k[1], 'school_slug': k[2], 'division': k[3]} for k in rosters])
     write('gold_members.csv', ['member_key', 'school_slug', 'first_name', 'last_name', 'discord', 'graduation_year'],

@@ -73,6 +73,20 @@ export const seasons = pgTable('seasons', {
   // held it. Turning a season on is a deliberate act, done in Admin -> League
   // Setup, which has always sent this field explicitly.
   isActive: boolean('is_active').default(false).notNull(),
+  // 'divided' | 'combined'. Whether this season's standings are one table per
+  // division or a single table across all of them. It is DECLARED, per season,
+  // never inferred from the standings rows themselves. A season's standings
+  // page makes a visible claim to the reader — "this is the JV table, and this
+  // school finished 1st in it" — and a claim like that should rest on a stated
+  // fact, not on the page reading the shape of the pipeline's own output and
+  // guessing. Treating inference as truth is exactly what produced the
+  // fabricated 2023-24 League of Legends split: three schools entered two
+  // squads each into ONE ten-entry round-robin, the A/B squad labels were read
+  // as brackets, and the archive published a 7-team "Varsity" table and a
+  // 3-team "JV" table that never existed. Defaults 'divided' because that is
+  // what every season but that one actually is; the exceptions are listed in
+  // COMBINED_STANDINGS in sharepoint/normalize_gold.py, with their evidence.
+  standingsFormat: text('standings_format').default('divided').notNull(),
   ...auditColumns,
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),

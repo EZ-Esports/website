@@ -5,8 +5,16 @@ import {
   rankComputedStandings,
   pointsFromNotes,
   canonicalDivision,
+  combinedTeamLabel,
   divisionLabel,
+  isDerivedStandings,
+  isReconstructed,
+  seasonDivisionList,
+  standingsTeamLabel,
   toHubDivision,
+  COMBINED_DIVISION,
+  DERIVED_STANDINGS_NOTE,
+  DIVISIONS,
   HUB_DIVISIONS,
   MAX_PAGE_SIZE,
   type CanonicalDivision,
@@ -72,6 +80,152 @@ describe('rankComputedStandings', () => {
     expect(only.wins).toBe(0);
     expect(only.losses).toBe(0);
     expect(only.winPct).toBeNull();
+  });
+
+  /**
+   * A combined season puts two squads of one school in one table, so
+   * `schoolName` stops being a unique key and the old "then name" tie-break ran
+   * out of comparisons. `Array.prototype.sort` is stable only with respect to
+   * input order, and the input here is an unordered SELECT — so two identical
+   * requests could hand the same two rows back in either order.
+   */
+  const squad = (schoolName: string, division: string, wins: number, losses: number) => ({
+    schoolName,
+    division,
+    wins,
+    losses,
+  });
+
+  it('breaks a same-school tie on the division, so two squads never collide', () => {
+    const [first, second] = rankComputedStandings([
+      squad('Brooklyn Technical High School', 'Varsity', 4, 5),
+      squad('Brooklyn Technical High School', 'JV', 4, 5),
+    ]);
+    expect([first.rank, second.rank]).toEqual([1, 2]);
+    // 'JV' < 'Varsity', matching the pipeline's own (-wins, losses, school,
+    // division) sort, so the derived snapshot and the computed fallback order an
+    // identical tie the same way.
+    expect([first.division, second.division]).toEqual(['JV', 'Varsity']);
+  });
+
+  it('ranks the same tied rows identically whatever order they arrive in', () => {
+    const rows = [
+      squad('Brooklyn Technical High School', 'Varsity', 4, 5),
+      squad('Midwood High School', 'JV', 4, 5),
+      squad('Brooklyn Technical High School', 'JV', 4, 5),
+      squad('Midwood High School', 'Varsity', 4, 5),
+    ];
+    const identity = (entries: ReturnType<typeof rankComputedStandings>) =>
+      entries.map((r) => `${r.rank}:${r.schoolName}:${r.division}`);
+    const forward = identity(rankComputedStandings(rows));
+    const reversed = identity(rankComputedStandings([...rows].reverse()));
+    expect(forward).toEqual(reversed);
+    // And every rank is distinct — nothing shares a place.
+    expect(new Set(forward.map((entry) => entry.split(':')[0])).size).toBe(rows.length);
+  });
+});
+
+describe('combinedTeamLabel', () => {
+  it('appends the squad a school entered', () => {
+    expect(combinedTeamLabel('Brooklyn Technical High School', 'JV')).toBe(
+      'Brooklyn Technical High School — JV'
+    );
+    expect(combinedTeamLabel('Midwood High School', 'Varsity')).toBe('Midwood High School — Varsity');
+  });
+
+  it('reads an admin-written A/B as the squad it means', () => {
+    expect(combinedTeamLabel('Bronx Science', 'B')).toBe('Bronx Science — JV');
+    expect(combinedTeamLabel('Bronx Science', 'A')).toBe('Bronx Science — Varsity');
+  });
+
+  it('leaves a per-player season alone: there is no squad to name', () => {
+    // TFT, osu! and Tetris run one undivided field, so "— All" would invent a
+    // distinction the season never had.
+    expect(combinedTeamLabel('Stuyvesant High School', 'All')).toBe('Stuyvesant High School');
+  });
+
+  it('uses an em dash, not a hyphen', () => {
+    expect(combinedTeamLabel('School', 'JV')).toContain('—');
+    expect(combinedTeamLabel('School', 'JV')).not.toContain(' - ');
+  });
+});
+
+describe('standingsTeamLabel', () => {
+  const row = { schoolName: 'Brooklyn Technical High School', division: 'JV' };
+
+  it('names the squad in a combined table, where it is the only thing telling two rows apart', () => {
+    expect(standingsTeamLabel(row, 'combined')).toBe('Brooklyn Technical High School — JV');
+  });
+
+  /**
+   * The regression that matters. In a divided season the division is the active
+   * tab directly above the table, so appending it to every row repeats the
+   * heading on every line — the tautology PR #46 removed from the match tiles.
+   */
+  it('does not relabel a divided season, on any division spelling', () => {
+    for (const division of ['Varsity', 'JV', 'A', 'B', 'All', '', 'C']) {
+      expect(standingsTeamLabel({ ...row, division }, 'divided')).toBe(row.schoolName);
+    }
+  });
+});
+
+describe('seasonDivisionList', () => {
+  it('collapses a combined season to one tab', () => {
+    // The rows really do carry both labels; they name the squad each school
+    // entered, so a Varsity/JV switch would offer two tables that never existed.
+    expect(seasonDivisionList('combined', ['Varsity', 'JV', 'A', 'B'])).toEqual([
+      COMBINED_DIVISION,
+    ]);
+  });
+
+  it('still offers Varsity and JV for a divided season, in display order', () => {
+    expect(seasonDivisionList('divided', ['JV', 'Varsity'])).toEqual(['Varsity', 'JV']);
+    expect(seasonDivisionList('divided', ['B', 'A'])).toEqual(['Varsity', 'JV']);
+    expect(seasonDivisionList('divided', ['All'])).toEqual(['All']);
+  });
+
+  it('falls back to Varsity when a divided season has nothing on record', () => {
+    expect(seasonDivisionList('divided', [])).toEqual(['Varsity']);
+  });
+
+  it('never returns the pseudo-division for a divided season', () => {
+    // `Combined` is not a stored value and `canonicalDivision` never produces
+    // it, so no amount of odd column data can smuggle it into a divided season.
+    expect(seasonDivisionList('divided', [COMBINED_DIVISION, null, undefined])).not.toContain(
+      COMBINED_DIVISION
+    );
+    expect(DIVISIONS).not.toContain(COMBINED_DIVISION);
+  });
+});
+
+describe('isReconstructed / isDerivedStandings', () => {
+  const derived = { notes: DERIVED_STANDINGS_NOTE };
+  const official = { notes: 'Final standings, Week 12 sheet' };
+
+  it('matches the exact marker the gold pipeline writes', () => {
+    expect(DERIVED_STANDINGS_NOTE).toBe('Derived from match results');
+    expect(isReconstructed(DERIVED_STANDINGS_NOTE)).toBe(true);
+    expect(isReconstructed(` ${DERIVED_STANDINGS_NOTE}\n`)).toBe(true);
+  });
+
+  it('does not read an unrelated note as a reconstruction', () => {
+    expect(isReconstructed(official.notes)).toBe(false);
+    expect(isReconstructed('Total Points: 120.0')).toBe(false);
+    expect(isReconstructed(null)).toBe(false);
+    expect(isReconstructed(undefined)).toBe(false);
+  });
+
+  it('calls a table reconstructed only when every row was', () => {
+    expect(isDerivedStandings([derived, derived])).toBe(true);
+    // One stray note must not relabel an imported archive table.
+    expect(isDerivedStandings([derived, official])).toBe(false);
+    expect(isDerivedStandings([official])).toBe(false);
+  });
+
+  it('makes no claim about an empty table', () => {
+    // The standings page falls back to the archive caption here, which is the
+    // right answer for a table that has no rows to describe.
+    expect(isDerivedStandings([])).toBe(false);
   });
 });
 
