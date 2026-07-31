@@ -36,12 +36,17 @@ describe.each(DESTRUCTIVE_SEEDS)('%s takes a backup before it deletes anything',
     expect(src).toMatch(/^\s*requireFreshBackup\(\);/m);
   });
 
-  it('calls it before the first delete, so a failed backup aborts the run', () => {
-    const guard = src.indexOf('requireFreshBackup();');
-    const firstDelete = src.indexOf('db.delete(');
+  // Scoped to the body of main(), because seed-gold.ts now defines a delete
+  // helper above it — the question is what runs first, not what appears first.
+  it('calls it before the run mutates anything, so a failed backup aborts', () => {
+    const body = src.slice(src.indexOf('async function main()'));
+    const guard = body.indexOf('requireFreshBackup();');
+    // The calls are chained across lines (`db\n  .insert(`), so this cannot be a
+    // literal search.
+    const firstMutation = body.search(/db\s*\.\s*(insert|delete)\s*\(/);
     expect(guard).toBeGreaterThan(-1);
-    expect(firstDelete).toBeGreaterThan(-1);
-    expect(guard).toBeLessThan(firstDelete);
+    expect(firstMutation).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(firstMutation);
   });
 });
 
@@ -85,6 +90,47 @@ describe('leadership.member_id does not cascade', () => {
   it('is SET NULL in the migration that changes it', () => {
     const sql = read('migrations/0027_redundant_sharon_ventura.sql');
     expect(sql).toMatch(/ALTER TABLE "leadership".*ON DELETE set null/s);
+  });
+});
+
+// The gold seed's whole failure mode was deleting tables it did not own. These
+// hold the shape of the rewrite: upserts, and deletes only where a row can be
+// proven to have come from the archive.
+describe('db/seed-gold.ts upserts rather than wiping', () => {
+  const src = read('seed-gold.ts');
+
+  const OWNED = [
+    'seasonStandings', 'matches', 'players', 'rosters',
+    'teams', 'seasons', 'members', 'schools', 'games',
+  ];
+
+  it.each(OWNED)('does not delete schema.%s wholesale', (table) => {
+    expect(src).not.toMatch(new RegExp(`db\\.delete\\(schema\\.${table}\\)`));
+  });
+
+  it('upserts every table it loads', () => {
+    // 9 tables, one onConflictDoUpdate each.
+    expect(src.match(/onConflictDoUpdate/g)).toHaveLength(9);
+  });
+
+  // The rule the school logos were lost to. gold_schools.csv carries slug, name
+  // and display_order; anything else on the table belongs to the admin editor.
+  it('never writes an admin-owned school column', () => {
+    const upsert = src.slice(src.indexOf('target: schema.schools.slug'));
+    const setBlock = upsert.slice(0, upsert.indexOf('.returning()'));
+    for (const column of ['logoUrl', 'storageKey', 'websiteUrl', 'isActive']) {
+      expect(setBlock).not.toMatch(new RegExp(column));
+    }
+  });
+
+  // Both guards on the prune. Without isNotNull it deletes admin rows; without
+  // the empty-key check a CSV that failed to parse deletes everything.
+  it('scopes the prune to archive-stamped rows', () => {
+    expect(src).toMatch(/isNotNull\(key\)/);
+  });
+
+  it('prunes nothing when the archive yields no keys', () => {
+    expect(src).toMatch(/if \(keys\.length === 0\) return 0;/);
   });
 });
 
