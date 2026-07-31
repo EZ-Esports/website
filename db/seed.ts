@@ -32,24 +32,35 @@
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { requireFreshBackup } from './backup';
+import { assertSeedTargetAllowed } from './seed-target';
+import { mergeLeadership } from './leadership-merge';
 import { buildImportPlan, readRecords, slugify, MATCHES_CSV, STAFF_CSV } from './import-archive';
 
 async function main() {
   console.log('Importing archived data...');
 
-  // 0. Back up first, before a CSV is read or a row is deleted. This seed is
-  //    one letter away from `db:seed:gold` in package.json and deletes strictly
-  //    more than it does — leadership included, directly rather than by cascade.
-  //    requireFreshBackup throws unless a complete dump is on disk, which aborts
-  //    the run here.
+  // 0a. Refuse a database this seed has no business wiping — before spending a
+  //     minute dumping one it is only going to refuse to touch. Loopback runs
+  //     freely; anything else has to be named in SEED_ALLOW_REMOTE.
+  assertSeedTargetAllowed();
+
+  // 0b. Back up, before a CSV is read or a row is deleted. This seed is
+  //     one letter away from `db:seed:gold` in package.json and deletes strictly
+  //     more than it does. requireFreshBackup throws unless a complete dump is
+  //     on disk, which aborts the run here.
   requireFreshBackup();
 
   const plan = buildImportPlan(readRecords(MATCHES_CSV), readRecords(STAFF_CSV));
 
   // 1. Wipe data owned by this seed (FK-safe order).
+  //
+  //    leadership is deliberately NOT in this list, though it used to be. It is
+  //    not this seed's data: it is authored in the admin editor, its rows carry
+  //    bios and member links that exist in no CSV, and wiping it is how 70 rows
+  //    were destroyed with no backup to restore them from. Step 8 merges into it
+  //    instead, which is also what makes re-running this seed safe for it.
   console.log('Clearing existing data...');
   await db.delete(schema.newsPosts);
-  await db.delete(schema.leadership);
   await db.delete(schema.matches);
   await db.delete(schema.players);
   await db.delete(schema.rosters);
@@ -134,9 +145,10 @@ async function main() {
     }))
   );
 
-  // 8. Leadership.
-  console.log(`Seeding ${plan.leadership.length} leadership records...`);
-  await db.insert(schema.leadership).values(plan.leadership.map((l) => ({ memberId: null, ...l })));
+  // 8. Leadership — merged, not replaced. See step 1 for why it is not wiped.
+  console.log(`Merging ${plan.leadership.length} leadership records...`);
+  const merged = await mergeLeadership(plan.leadership);
+  for (const note of merged.notes) console.log(`  note: ${note}`);
 
   console.log('\nImport complete:');
   console.log(`  games:       ${games.length}`);
@@ -145,7 +157,10 @@ async function main() {
   console.log(`  teams:       ${teamRows.length}`);
   console.log(`  rosters:     ${rosterRows.length}`);
   console.log(`  matches:     ${plan.matches.length}`);
-  console.log(`  leadership:  ${plan.leadership.length}`);
+  console.log(
+    `  leadership:  ${merged.inserted} added, ${merged.updated} bios filled, ` +
+      `${merged.skipped} left as they were`
+  );
 }
 
 main()

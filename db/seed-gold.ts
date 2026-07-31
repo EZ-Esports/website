@@ -11,8 +11,8 @@
  * gold normalizer — this script is a dumb loader that only resolves FKs.
  *
  * Wipes the tables it owns before re-importing. It does not touch news_posts or
- * the phase-2 CMS tables (sponsors, gallery, page content, admin/auth) — but it
- * does take leadership rows with it, see step 1.
+ * the phase-2 CMS tables (sponsors, gallery, page content, admin/auth), and as
+ * of migration 0027 it no longer destroys leadership rows either — see step 1.
  *
  * CAUTION: this is not idempotent. Re-importing regenerates every row's UUID,
  * so any Next.js unstable_cache entries (seasons, games, schools, ...) keep
@@ -23,13 +23,14 @@
  *
  * PR2 fixes this properly by upserting on the natural keys that migration 0026
  * adds (members.member_key, matches.source_key, season_standings.source_key).
- * Until then, step 0a's mandatory backup is the safety net.
+ * Until then, step 0b's mandatory backup is the safety net.
  *
  * Run: npm run db:seed:gold
  */
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { requireFreshBackup } from './backup';
+import { assertSeedTargetAllowed } from './seed-target';
 import { matchSourceKeys, memberKeyOf, standingSourceKeys } from './gold-keys';
 import { readRecords } from './import-archive';
 
@@ -86,7 +87,7 @@ function parseEastern(s: string): Date {
  * one combined-format season back across Varsity/JV tabs — the exact bug the
  * column exists to fix — so a stale CSV has to fail the seed instead.
  *
- * Called once per row from step 0b, BEFORE the wipe — see the comment there. It
+ * Called once per row from step 0c, BEFORE the wipe — see the comment there. It
  * is deliberately not called again at the insert site: a second call would be a
  * second place this check could drift back behind the deletes.
  */
@@ -112,13 +113,21 @@ const rosterKey = (season: string, game: string, school: string, division: strin
 async function main() {
   console.log('Importing gold archive data...');
 
-  // 0a. Back up first. Step 1 wipes nine tables; this has gone wrong against the
+  // 0a. Refuse a database this seed has no business wiping. `.env` on the
+  //     machine this is usually run from holds the production connection
+  //     string, so production was the default target and the only safeguard was
+  //     the operator remembering. Loopback runs freely; anything else has to be
+  //     named in SEED_ALLOW_REMOTE. Checked before the backup so a refused run
+  //     does not first spend a minute dumping the database it will not touch.
+  assertSeedTargetAllowed();
+
+  // 0b. Back up. Step 1 wipes nine tables; this has gone wrong against the
   //     live database twice, and both times there was nothing to restore from.
   //     requireFreshBackup throws unless a complete dump is on disk, which
   //     aborts the seed here — before any delete.
   requireFreshBackup();
 
-  // 0b. Read and validate the one CSV this loader can reject, before anything is
+  // 0c. Read and validate the one CSV this loader can reject, before anything is
   //    deleted. Step 1 wipes the whole archive, so a standings_format this
   //    script refuses to guess at has to fail here: a stale gold_seasons.csv is
   //    the normal state of a fresh clone (gold_data/ is gitignored), and failing
@@ -131,18 +140,19 @@ async function main() {
 
   // 1. Wipe owned tables (FK-safe order). news/CMS are untouched.
   //
-  //    leadership is NOT untouched. This comment used to say member_id was null
-  //    for every leadership row and that wiping members was therefore safe;
-  //    that was wrong. leadership.member_id is `onDelete: 'cascade'`
-  //    (schema.ts), so every leadership row pointing at a member goes with it —
-  //    which is how a seed run silently destroyed 70 of them. The rows that
-  //    survived are the ones whose member_id happened to be null, which is
-  //    presumably how the claim looked true afterwards.
+  //    This comment used to say member_id was null for every leadership row and
+  //    that wiping members was therefore safe. That was wrong twice over: it was
+  //    not null for 70 of them, and leadership.member_id was `onDelete:
+  //    'cascade'`, so wiping members destroyed every one of those rows. They had
+  //    no backup behind them and are still gone. The rows that survived are the
+  //    ones that had never been linked, which is presumably how the claim came
+  //    to look true afterwards.
   //
-  //    PR2 replaces these deletes with upserts on the natural keys added in
-  //    migration 0026, which removes the cascade entirely. Until then the
-  //    backup taken in step 0a is the only thing standing between a seed run
-  //    and that data.
+  //    Migration 0027 makes that FK SET NULL, so the delete below now clears the
+  //    link and leaves the record — `leadership.name` is NOT NULL precisely so
+  //    the row still renders without its member. Do not verify this by reading
+  //    this comment; two comments in this file have already been wrong about it.
+  //    db/__tests__/seed-guards.test.ts asserts the constraint instead.
   console.log('Clearing existing data...');
   await db.delete(schema.seasonStandings);
   await db.delete(schema.matches);

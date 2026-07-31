@@ -242,8 +242,15 @@ export const newsPosts = pgTable('news_posts', {
 // Leadership team members
 export const leadership = pgTable('leadership', {
   id: uuid('id').defaultRandom().primaryKey(),
+  // SET NULL, emphatically not CASCADE. A leadership row is a record that
+  // somebody held a role in a given year; the member link is a convenience on
+  // top of it, and losing the link is not a reason to lose the record. Under
+  // CASCADE it was: the gold seed wipes `members` on every run, which silently
+  // deleted the 70 leadership rows that happened to be linked, and with no
+  // backup they are still gone. `name` is populated on every row precisely so
+  // the row still renders once the link is gone.
   memberId: uuid('member_id')
-    .references(() => members.id, { onDelete: 'cascade' }),
+    .references(() => members.id, { onDelete: 'set null' }),
   name: text('name').notNull(), // Fallback if memberId is null
   role: text('role').notNull(),
   year: text('year').notNull(), // e.g., "2025"

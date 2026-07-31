@@ -45,6 +45,63 @@ describe.each(DESTRUCTIVE_SEEDS)('%s takes a backup before it deletes anything',
   });
 });
 
+describe.each(DESTRUCTIVE_SEEDS)('%s refuses a database it was not pointed at', (file) => {
+  const src = read(file);
+
+  it('imports the interlock from db/seed-target', () => {
+    expect(src).toMatch(/import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/);
+  });
+
+  it('calls it', () => {
+    expect(src).toMatch(/^\s*assertSeedTargetAllowed\(\);/m);
+  });
+
+  // Ordering matters in both directions. Before the first delete for the obvious
+  // reason; before the backup because dumping a production database for a minute
+  // and then refusing to touch it is a slow way to say no.
+  it('calls it before taking the backup', () => {
+    const interlock = src.indexOf('assertSeedTargetAllowed();');
+    const backup = src.indexOf('requireFreshBackup();');
+    expect(interlock).toBeGreaterThan(-1);
+    expect(interlock).toBeLessThan(backup);
+  });
+});
+
+// The constraint that destroyed the 70 rows. Both seeds wipe `members`, so
+// whether leadership survives that is decided entirely here. Reverting it is a
+// one-word edit, and every comment claiming leadership is safe depends on it.
+describe('leadership.member_id does not cascade', () => {
+  it('is SET NULL in the schema', () => {
+    const src = readFileSync(
+      resolve(__dirname, '..', '..', 'app', 'lib', 'db', 'schema.ts'),
+      'utf8'
+    );
+    const table = src.slice(src.indexOf('export const leadership = pgTable'));
+    const memberId = table.slice(0, table.indexOf('name: text('));
+    expect(memberId).toMatch(/onDelete:\s*'set null'/);
+    expect(memberId).not.toMatch(/onDelete:\s*'cascade'/);
+  });
+
+  it('is SET NULL in the migration that changes it', () => {
+    const sql = read('migrations/0027_redundant_sharon_ventura.sql');
+    expect(sql).toMatch(/ALTER TABLE "leadership".*ON DELETE set null/s);
+  });
+});
+
+// The specific line that destroyed the 70 rows this PR exists because of. It is
+// a one-line edit to put back, and nothing else in the suite would notice.
+describe('db/seed.ts leaves leadership alone', () => {
+  const src = read('seed.ts');
+
+  it('does not delete the table', () => {
+    expect(src).not.toMatch(/db\.delete\(schema\.leadership\)/);
+  });
+
+  it('merges into it instead', () => {
+    expect(src).toMatch(/mergeLeadership\(/);
+  });
+});
+
 describe('migration 0026', () => {
   const sql = read('migrations/0026_lush_genesis.sql');
 
