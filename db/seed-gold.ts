@@ -264,6 +264,16 @@ async function main() {
   console.log(`  season_standings: ${standingRows.length}`);
 
   console.log('Import complete.');
+  console.log('');
+  console.log('  NEXT STEP — every row above has a NEW uuid, so every cached query');
+  console.log('  now holds primary keys that no longer exist. Until they are retired');
+  console.log('  the standings page renders "No standings recorded for this season');
+  console.log('  and division yet." for every game and every season, and logs nothing.');
+  console.log('');
+  console.log('    Bump CACHE_EPOCH in app/lib/db/queries.ts, then deploy.');
+  console.log('');
+  console.log('  Redeploying alone does NOT clear this on Vercel: the Data Cache is');
+  console.log('  infrastructure rather than build output, and outlives a deployment.');
 }
 
 main()

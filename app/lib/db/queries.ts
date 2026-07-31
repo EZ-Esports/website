@@ -24,11 +24,33 @@ import { FORM_LENGTH, buildFormGuide, type FormOutcome } from '@/app/lib/game-hu
 /** Default page size for public-facing paginated lists. */
 export const DEFAULT_PAGE_SIZE = 20;
 
+/**
+ * Bump this after every `npm run db:seed:gold`.
+ *
+ * That seed deletes and re-inserts the whole archive, and every row gets a new
+ * UUID. The caches below hand those UUIDs to their callers, so after a re-seed
+ * a cached entry is a list of primary keys that no longer exist:
+ * `getSeasonsWithGames` returns dead season ids, the standings page resolves
+ * one, queries it, and renders "No standings recorded for this season and
+ * division yet." for every game and every season at once — with nothing logged,
+ * because the query succeeded and simply matched no rows.
+ *
+ * `seed-gold.ts` says to fix this by redeploying. On Vercel that is not enough:
+ * the Data Cache is infrastructure rather than build output, and survives a new
+ * deployment. `revalidateTag` does clear it, but its only callers are admin
+ * server actions, so nothing runs unless someone happens to edit a roster.
+ *
+ * Putting this in every key means one edit retires the whole poisoned
+ * generation on the next deploy, needing neither dashboard access nor an admin
+ * session.
+ */
+const CACHE_EPOCH = 'seed-2026-07-31';
+
 export const getCachedGames = unstable_cache(
   async () => {
     return db.select().from(schema.games);
   },
-  ['games-list'],
+  ['games-list', CACHE_EPOCH],
   { tags: ['games'] }
 );
 
@@ -40,7 +62,7 @@ export const getCachedSchools = unstable_cache(
       .where(and(eq(schema.schools.isActive, true), isNull(schema.schools.deletedAt)))
       .orderBy(asc(schema.schools.displayOrder), asc(schema.schools.name));
   },
-  ['schools-list'],
+  ['schools-list', CACHE_EPOCH],
   { tags: ['schools'] }
 );
 
@@ -48,7 +70,7 @@ export const getCachedMembers = unstable_cache(
   async () => {
     return db.select().from(schema.members);
   },
-  ['members-list'],
+  ['members-list', CACHE_EPOCH],
   { tags: ['members'] }
 );
 
@@ -68,7 +90,7 @@ export const getCachedTeams = unstable_cache(
       .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
       .where(isNull(schema.schools.deletedAt));
   },
-  ['teams-list'],
+  ['teams-list', CACHE_EPOCH],
   { tags: ['teams'] }
 );
 
@@ -76,7 +98,7 @@ export const getCachedSeasons = unstable_cache(
   async () => {
     return db.select().from(schema.seasons).where(eq(schema.seasons.isActive, true));
   },
-  ['seasons-active'],
+  ['seasons-active', CACHE_EPOCH],
   { tags: ['seasons'] }
 );
 
@@ -96,7 +118,7 @@ export const getCachedMatches = unstable_cache(
       .limit(limit)
       .offset(offset);
   },
-  ['matches-list'],
+  ['matches-list', CACHE_EPOCH],
   { tags: ['matches'] }
 );
 
@@ -121,7 +143,7 @@ export const getSeasonsWithGames = unstable_cache(
       .from(schema.seasons)
       .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
       .orderBy(asc(schema.games.slug), desc(schema.seasons.name)),
-  ['seasons-with-games'],
+  ['seasons-with-games', CACHE_EPOCH],
   { tags: ['seasons', 'games'] }
 );
 
@@ -467,7 +489,7 @@ export const getCachedRosters = unstable_cache(
   async () => {
     return db.select().from(schema.rosterStandings);
   },
-  ['rosters-list'],
+  ['rosters-list', CACHE_EPOCH],
   { tags: ['rosters'] }
 );
 
@@ -475,7 +497,7 @@ export const getCachedPlayers = unstable_cache(
   async () => {
     return db.select().from(schema.players);
   },
-  ['players-list'],
+  ['players-list', CACHE_EPOCH],
   { tags: ['players'] }
 );
 
@@ -493,7 +515,7 @@ export const getCachedNews = unstable_cache(
       .limit(limit)
       .offset(offset);
   },
-  ['news-list'],
+  ['news-list', CACHE_EPOCH],
   { tags: ['news'] }
 );
 
@@ -523,7 +545,7 @@ export const getCachedLeadership = unstable_cache(
       .where(isNull(schema.leadership.deletedAt))
       .orderBy(desc(schema.leadership.year));
   },
-  ['leadership-list'],
+  ['leadership-list', CACHE_EPOCH],
   { tags: ['leadership'] }
 );
 
@@ -534,7 +556,7 @@ export const getCachedSponsors = unstable_cache(
       .from(schema.sponsors)
       .where(and(eq(schema.sponsors.isActive, true), isNull(schema.sponsors.deletedAt)))
       .orderBy(schema.sponsors.tier, schema.sponsors.displayOrder),
-  ['sponsors'],
+  ['sponsors', CACHE_EPOCH],
   { tags: ['sponsors'] }
 );
 
@@ -547,7 +569,7 @@ export const getCachedPageContent = unstable_cache(
       .limit(1);
     return rows[0] ?? null;
   },
-  ['page-content'],
+  ['page-content', CACHE_EPOCH],
   { tags: ['page-content'] }
 );
 
@@ -564,7 +586,7 @@ export const getCachedHomepageContent = unstable_cache(
 
     return Object.fromEntries(rows.map((row) => [row.key, row.content]));
   },
-  ['homepage-content'],
+  ['homepage-content', CACHE_EPOCH],
   { tags: ['page-content'] }
 );
 
@@ -612,7 +634,7 @@ export const getCachedHomepageGallery = unstable_cache(
       })),
     };
   },
-  ['homepage-gallery'],
+  ['homepage-gallery', CACHE_EPOCH],
   { tags: ['gallery-images'] }
 );
 
@@ -747,7 +769,7 @@ export const getCachedRecentResults = unstable_cache(
       .limit(3);
     return rows.map((r) => ({ ...r, scheduledAt: r.scheduledAt.toISOString() }));
   },
-  ['recent-results'],
+  ['recent-results', CACHE_EPOCH],
   { tags: ['matches', 'schools', 'rosters', 'teams', 'games', 'seasons'] }
 );
 
