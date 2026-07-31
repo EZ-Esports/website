@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
   assertUsableDump,
   backupPath,
+  requireUsableDumpOrDiscard,
   resolvePgDump,
+  splitConnectionSecret,
   MIN_BACKUP_BYTES,
   REQUIRED_MARKERS,
 } from '../backup';
@@ -79,6 +81,85 @@ describe('assertUsableDump', () => {
     expect(() => assertUsableDump(write('midway.sql', cut))).toThrow(
       /PostgreSQL database dump complete/
     );
+  });
+});
+
+describe('requireUsableDumpOrDiscard', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'backup-discard-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const write = (name: string, contents: string) => {
+    const file = join(dir, name);
+    writeFileSync(file, contents);
+    return file;
+  };
+
+  it('keeps a dump it accepts', () => {
+    const file = write('ok.sql', goodDump());
+    expect(() => requireUsableDumpOrDiscard(file)).not.toThrow();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  // Otherwise every aborted seed leaves a stub behind and db/backups/ fills with
+  // files that look like backups and would not restore.
+  it('deletes a dump it rejects, so stubs cannot pile up in db/backups', () => {
+    const file = write('stub.sql', '-- PostgreSQL database dump\n');
+    expect(() => requireUsableDumpOrDiscard(file)).toThrow(/below the/);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it('deletes a big file that is not a dump of this schema', () => {
+    const file = write('wrong.sql', '-- filler\n'.repeat(20000));
+    expect(() => requireUsableDumpOrDiscard(file)).toThrow(/missing expected content/);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it('still reports a dump that was never written', () => {
+    expect(() => requireUsableDumpOrDiscard(join(dir, 'nope.sql'))).toThrow(/wrote no file/);
+  });
+});
+
+// The password must not be an argv element: argv is readable via `ps` by any
+// user on the box for as long as pg_dump runs.
+describe('splitConnectionSecret', () => {
+  it('moves the password out of the URL', () => {
+    expect(splitConnectionSecret('postgresql://postgres:hunter2@db.example:5432/app')).toEqual({
+      safeUrl: 'postgresql://postgres@db.example:5432/app',
+      password: 'hunter2',
+    });
+  });
+
+  it('hands PGPASSWORD the decoded password, since libpq does not unescape it', () => {
+    const { password } = splitConnectionSecret('postgresql://u:p%40ss%2Fword%3A1@h:5432/d');
+    expect(password).toBe('p@ss/word:1');
+  });
+
+  it('keeps the rest of the URL intact — user, host, port, database, params', () => {
+    const { safeUrl } = splitConnectionSecret(
+      'postgresql://admin:s3cret@db.example:6543/app?sslmode=require&application_name=seed'
+    );
+    expect(safeUrl).toBe(
+      'postgresql://admin@db.example:6543/app?sslmode=require&application_name=seed'
+    );
+    expect(safeUrl).not.toContain('s3cret');
+  });
+
+  it('leaves a passwordless URL exactly as it was', () => {
+    const url = 'postgresql://postgres@127.0.0.1:5432/app';
+    expect(splitConnectionSecret(url)).toEqual({ safeUrl: url });
+  });
+
+  // Rewriting a string we could not parse is how a connection quietly starts
+  // pointing at a different database.
+  it('passes a non-URI DSN through untouched', () => {
+    const dsn = 'host=127.0.0.1 port=5432 dbname=app user=postgres';
+    expect(splitConnectionSecret(dsn)).toEqual({ safeUrl: dsn });
   });
 });
 

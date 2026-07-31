@@ -22,15 +22,15 @@
  * a seed — locally delete .next/, in production redeploy.
  *
  * PR2 fixes this properly by upserting on the natural keys that migration 0026
- * adds (members.member_key, matches.source_key, the season_standings unique
- * constraint). Until then, step 0a's mandatory backup is the safety net.
+ * adds (members.member_key, matches.source_key, season_standings.source_key).
+ * Until then, step 0a's mandatory backup is the safety net.
  *
  * Run: npm run db:seed:gold
  */
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { requireFreshBackup } from './backup';
-import { matchSourceKeys, memberKeyOf } from './gold-keys';
+import { matchSourceKeys, memberKeyOf, standingSourceKeys } from './gold-keys';
 import { readRecords } from './import-archive';
 
 const GOLD_DIR = 'sharepoint/gold_data';
@@ -283,8 +283,12 @@ async function main() {
   console.log(`  matches:          ${matchRows.length}`);
 
   // 10. Season standings snapshots.
+  //     source_key, like the two above, keeps the rows this seed writes aligned
+  //     with what migration 0026 backfilled. It deliberately excludes `rank` —
+  //     see db/gold-keys.ts for why rank is payload rather than identity.
   const standingRows = gold('gold_standings.csv');
-  await db.insert(schema.seasonStandings).values(standingRows.map((s) => ({
+  const standingKeys = standingSourceKeys(standingRows);
+  await db.insert(schema.seasonStandings).values(standingRows.map((s, i) => ({
     seasonId: seasonByKey.get(`${s.game_slug}|${s.season}`)!.id,
     schoolId: schoolBySlug.get(s.school_slug)!.id,
     division: s.division,
@@ -297,6 +301,7 @@ async function main() {
     playerName: orNull(s.player_name),
     playerIgn: orNull(s.player_ign),
     notes: orNull(s.notes),
+    sourceKey: standingKeys[i],
   })));
   console.log(`  season_standings: ${standingRows.length}`);
 

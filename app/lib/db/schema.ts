@@ -1,4 +1,4 @@
-import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, unique, uniqueIndex, bigint, primaryKey, real } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Shared audit columns
@@ -63,6 +63,11 @@ export const members = pgTable('members', {
   // so they carry no key. That makes the unique index NULLS DISTINCT (the Postgres
   // default), which is required — NULLS NOT DISTINCT would let the second
   // admin-created member collide with the first on a shared NULL.
+  //
+  // For the same reason, migration 0026 only backfills this where the derived key
+  // is unambiguous: createMember has no duplicate check, so two same-named members
+  // at one school are legal, and stamping both would abort the migration on a
+  // duplicate key — as well as claiming an archive origin neither row has.
   memberKey: text('member_key'),
   ...auditColumns,
 }, (table) => [
@@ -292,25 +297,35 @@ export const seasonStandings = pgTable('season_standings', {
   playerName: text('player_name'),
   playerIgn: text('player_ign'),
   notes: text('notes'),
+  // Natural key for the gold archive. Format:
+  //   `${season}|${game_slug}|${division}|${school_slug}|${player_name}#${n}`
+  // with `n` a 0-based occurrence ordinal, exactly like matches.source_key.
+  //
+  // `rank` is deliberately NOT in the key. It is payload — the field an admin
+  // edits to correct a result — so keying on it would mean a rank correction
+  // re-keys the row and the seed's upsert inserts a duplicate instead of
+  // updating. The 45 TFT rows in the "All" division make that acute: their
+  // ranks are league-wide, so adding a single player would re-key dozens of
+  // rows at once and churn every one of their UUIDs.
+  //
+  // The ordinal covers the two groups that collide without rank, both TFT
+  // 2021-22 Varsity: Midwood at ranks 2 and 6, Stuyvesant at ranks 3 and 5.
+  // Those are per-player rows whose player_name the normalizer never recovered,
+  // so 4 rows out of 183 carry no identity in the data at all and any
+  // discriminator for them is arbitrary. The ordinal confines that
+  // arbitrariness to those 4 rows. See db/gold-keys.ts.
+  //
+  // Nullable: standings created through the admin UI have no archive row.
+  sourceKey: text('source_key'),
   ...auditColumns,
 }, (table) => [
   index('season_standings_season_id_idx').on(table.seasonId),
   index('season_standings_school_id_idx').on(table.schoolId),
   index('season_standings_division_idx').on(table.division),
-  // Natural key for the gold archive. `rank`, not `playerName`, is the
-  // discriminator: TFT 2021-22 Varsity lists Midwood at ranks 2 and 6 and
-  // Stuyvesant at ranks 3 and 5 as per-player rows whose player_name was never
-  // recovered, so (season, school, division, playerName) has 2 duplicate groups
-  // while (season, school, division, rank) has none across all 183 rows.
-  //
-  // NULLS NOT DISTINCT, so it has to be a unique *constraint* rather than a
-  // uniqueIndex (drizzle only exposes nullsNotDistinct on the former). `rank` is
-  // non-null on all 183 archived rows today, but the column is nullable, and
-  // under the default NULLS DISTINCT any future null-rank rows would escape the
-  // constraint entirely and the seed's upsert would never match them.
-  unique('season_standings_natural_key_unique')
-    .on(table.seasonId, table.schoolId, table.division, table.rank)
-    .nullsNotDistinct(),
+  // NULLS DISTINCT (the Postgres default) is what keeps the admin path working:
+  // the rank input is optional and admin-created rows carry no key at all, so
+  // any number of them can coexist on a shared NULL.
+  uniqueIndex('season_standings_source_key_unique_idx').on(table.sourceKey),
 ]).enableRLS();
 
 // --- PHASE 2 CMS TABLES ---

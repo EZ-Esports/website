@@ -22,15 +22,27 @@
  *    equality.
  *
  * Pure parsing/transform logic lives in import-archive.ts (unit-tested there).
- * Idempotent: clears the tables it owns before re-importing. Phase-2 CMS tables
- * (sponsors, gallery, page content) are managed by seed-phase2.ts and untouched.
+ * Clears the tables it owns before re-importing. Phase-2 CMS tables (sponsors,
+ * gallery, page content) are managed by seed-phase2.ts and untouched.
+ *
+ * DESTRUCTIVE, and more so than db/seed:gold: it wipes leadership, schools and
+ * games as well, and regenerates every UUID it re-inserts. Step 0 takes a
+ * verified backup first and aborts the run if it cannot get one.
  */
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
+import { requireFreshBackup } from './backup';
 import { buildImportPlan, readRecords, slugify, MATCHES_CSV, STAFF_CSV } from './import-archive';
 
 async function main() {
   console.log('Importing archived data...');
+
+  // 0. Back up first, before a CSV is read or a row is deleted. This seed is
+  //    one letter away from `db:seed:gold` in package.json and deletes strictly
+  //    more than it does — leadership included, directly rather than by cascade.
+  //    requireFreshBackup throws unless a complete dump is on disk, which aborts
+  //    the run here.
+  requireFreshBackup();
 
   const plan = buildImportPlan(readRecords(MATCHES_CSV), readRecords(STAFF_CSV));
 

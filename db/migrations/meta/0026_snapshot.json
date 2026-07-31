@@ -1,5 +1,5 @@
 {
-  "id": "3830cb59-ccfd-4df5-b83e-bc1df6bd26f1",
+  "id": "2c01f27f-4bcb-4fdf-8098-08404b1bcd92",
   "prevId": "0b7bf7b9-d308-41a7-a16f-b3644f8ec2a4",
   "version": "7",
   "dialect": "postgresql",
@@ -1522,6 +1522,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source_key": {
+          "name": "source_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1582,6 +1588,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "season_standings_source_key_unique_idx": {
+          "name": "season_standings_source_key_unique_idx",
+          "columns": [
+            {
+              "expression": "source_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1613,18 +1634,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "season_standings_natural_key_unique": {
-          "name": "season_standings_natural_key_unique",
-          "nullsNotDistinct": true,
-          "columns": [
-            "season_id",
-            "school_id",
-            "division",
-            "rank"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": true

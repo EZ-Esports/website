@@ -6,11 +6,15 @@
  * dump to go back to. So: take one first, prove it is real, and refuse to let
  * the seed run at all if either step fails.
  *
- * The seed calls `requireFreshBackup()` as its very first action, before it
- * reads a CSV or deletes a row — see the call site in seed-gold.ts. Putting the
- * guard inside the seed rather than in front of it as a separate npm script is
- * deliberate: `npm run db:seed:gold` is not the only way people start this
- * thing, and a guard you can skip by invoking tsx directly is not a guard.
+ * Both destructive seeds call `requireFreshBackup()` as their very first
+ * action, before they read a CSV or delete a row — see the call sites in
+ * seed-gold.ts and seed.ts. db/seed.ts is if anything the more dangerous of the
+ * two (it wipes leadership, schools and games as well) and its npm script is
+ * one word away from the other's, so guarding only seed-gold would leave the
+ * bigger hole open. Putting the guard inside each seed rather than in front of
+ * it as a separate npm script is deliberate: `npm run db:seed` is not the only
+ * way people start these things, and a guard you can skip by invoking tsx
+ * directly is not a guard.
  */
 import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from 'fs';
@@ -98,12 +102,62 @@ export function assertUsableDump(file: string): void {
 }
 
 /**
+ * Same checks as `assertUsableDump`, but a dump that fails them is deleted
+ * before the error propagates.
+ *
+ * A rejected dump is by definition not a backup — a header pg_dump wrote before
+ * it died, or a file that is not a dump of this schema. Leaving it in
+ * db/backups/ next to the real ones lets partial dumps accumulate, and the next
+ * person reaching for "the most recent backup" reaches for a broken one. The
+ * non-zero-exit path already cleans up; this closes the other half.
+ */
+export function requireUsableDumpOrDiscard(file: string): void {
+  try {
+    assertUsableDump(file);
+  } catch (err) {
+    if (existsSync(file)) unlinkSync(file);
+    throw err;
+  }
+}
+
+/**
+ * Splits a libpq connection URI into its password and a URI without it.
+ *
+ * The password must not travel as an argv element: argv is readable by any
+ * process on the machine via `ps` for as long as pg_dump runs, and dumping this
+ * database is not instant. Postgres reads `PGPASSWORD` from the environment
+ * instead, which is visible only to the process itself and to root.
+ *
+ * Anything that does not parse as a URI (a libpq keyword/value DSN, a bare
+ * database name) is handed back untouched: those forms are already either
+ * passwordless or the caller's own doing, and rewriting a string we did not
+ * parse is how a connection quietly starts pointing somewhere else.
+ */
+export function splitConnectionSecret(url: string): { safeUrl: string; password?: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { safeUrl: url };
+  }
+  if (!parsed.password) return { safeUrl: url };
+
+  // `URL` hands back the percent-encoded form; PGPASSWORD wants the literal.
+  const password = decodeURIComponent(parsed.password);
+  parsed.password = '';
+  return { safeUrl: parsed.toString(), password };
+}
+
+/**
  * Dumps the database `DATABASE_URL` points at and returns the file path.
  * Throws — which aborts the seed — if anything about the dump is not right.
  *
- * The connection string is passed as an argv element to a non-shell spawn, so
- * it is never word-split, never interpolated, and never logged: it carries the
- * database password.
+ * The connection string never reaches a shell (spawn without `shell: true`, so
+ * it is never word-split or interpolated) and is never logged. Its password is
+ * stripped out of the argv pg_dump is given and handed over in the child's
+ * environment as `PGPASSWORD` instead, so it is not on display in `ps` for the
+ * length of the dump. The backup path is built from a timestamp alone and never
+ * embeds a credential.
  */
 export function requireFreshBackup(): string {
   const url = process.env.DATABASE_URL;
@@ -114,12 +168,16 @@ export function requireFreshBackup(): string {
   mkdirSync(resolve(process.cwd(), BACKUP_DIR), { recursive: true });
   const file = backupPath();
   const pgDump = resolvePgDump();
+  const { safeUrl, password } = splitConnectionSecret(url);
 
   console.log(`Backing up with ${pgDump} -> ${file}`);
   const result = spawnSync(
     pgDump,
-    ['--no-owner', '--no-acl', '--schema=public', '--file', file, url],
-    { encoding: 'utf8' }
+    ['--no-owner', '--no-acl', '--schema=public', '--file', file, safeUrl],
+    {
+      encoding: 'utf8',
+      env: password === undefined ? process.env : { ...process.env, PGPASSWORD: password },
+    }
   );
 
   if (result.error) {
@@ -137,7 +195,7 @@ export function requireFreshBackup(): string {
     );
   }
 
-  assertUsableDump(file);
+  requireUsableDumpOrDiscard(file);
   const kb = Math.round(statSync(file).size / 1024);
   console.log(`  backup OK (${kb} KB). Proceeding.`);
   return file;
