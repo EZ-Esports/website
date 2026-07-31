@@ -1,4 +1,4 @@
-import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, unique, uniqueIndex, bigint, primaryKey, real } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Shared audit columns
@@ -54,9 +54,20 @@ export const members = pgTable('members', {
   schoolId: uuid('school_id')
     .references(() => schools.id, { onDelete: 'restrict' })
     .notNull(),
+  // Natural key for the gold archive: `${school_slug}|${lower first}|${lower last}`,
+  // matching gold_members.csv's own member_key column. This is what lets the seed
+  // upsert a member instead of deleting and re-inserting it, which is what churned
+  // every member UUID (and cascade-deleted leadership rows) on every seed run.
+  //
+  // Nullable on purpose: members created through the admin UI have no archive row,
+  // so they carry no key. That makes the unique index NULLS DISTINCT (the Postgres
+  // default), which is required — NULLS NOT DISTINCT would let the second
+  // admin-created member collide with the first on a shared NULL.
+  memberKey: text('member_key'),
   ...auditColumns,
 }, (table) => [
   index('members_school_id_idx').on(table.schoolId),
+  uniqueIndex('members_member_key_unique_idx').on(table.memberKey),
 ]).enableRLS();
 
 // Seasons config
@@ -175,12 +186,33 @@ export const matches = pgTable('matches', {
   status: matchStatusEnum('status').default('scheduled').notNull(),
   mvp: text('mvp'), // match MVP as recorded in season sheets, e.g. 'Kyle "Kuli" Ng'
   notes: text('notes'), // reschedules, DQs, data-quality caveats
+  // Natural key for the gold archive. Format:
+  //   `${season}|${game_slug}|${home_school_slug}|${home_division}` +
+  //   `|${away_school_slug}|${away_division}|${scheduled_at}#${n}`
+  // where scheduled_at is the CSV's America/New_York wall time
+  // ("YYYY-MM-DD HH:MM:SS") and `n` is a 0-based occurrence ordinal.
+  //
+  // The ordinal exists because the natural fields alone are NOT unique: the
+  // 2022-23 Valorant season's scheduled_at is synthesized from a weekly date
+  // block, so two genuinely different rounds of New Dorp vs Cardozo collapse
+  // onto 2022-12-28 19:30 — once in Varsity and once in JV, 4 rows total. Those
+  // rows are byte-identical in every column except free-text `notes`, so `notes`
+  // is the only field that could otherwise separate them; keying on it was
+  // rejected because editing a note would silently change a match's identity and
+  // churn its UUID. `n` is assigned in CSV file order within a collision group,
+  // so it is stable when unrelated fields change. Every row carries `#n` (`#0`
+  // for the 717 non-colliding ones) so a future third collision cannot shift the
+  // keys of the rows already there.
+  //
+  // Nullable: matches created through the admin UI have no archive row.
+  sourceKey: text('source_key'),
   ...auditColumns,
 }, (table) => [
   index('matches_scheduled_at_idx').on(table.scheduledAt),
   index('matches_season_id_idx').on(table.seasonId),
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
+  uniqueIndex('matches_source_key_unique_idx').on(table.sourceKey),
 ]).enableRLS();
 
 // --- CMS & LEADERSHIP ---
@@ -265,6 +297,20 @@ export const seasonStandings = pgTable('season_standings', {
   index('season_standings_season_id_idx').on(table.seasonId),
   index('season_standings_school_id_idx').on(table.schoolId),
   index('season_standings_division_idx').on(table.division),
+  // Natural key for the gold archive. `rank`, not `playerName`, is the
+  // discriminator: TFT 2021-22 Varsity lists Midwood at ranks 2 and 6 and
+  // Stuyvesant at ranks 3 and 5 as per-player rows whose player_name was never
+  // recovered, so (season, school, division, playerName) has 2 duplicate groups
+  // while (season, school, division, rank) has none across all 183 rows.
+  //
+  // NULLS NOT DISTINCT, so it has to be a unique *constraint* rather than a
+  // uniqueIndex (drizzle only exposes nullsNotDistinct on the former). `rank` is
+  // non-null on all 183 archived rows today, but the column is nullable, and
+  // under the default NULLS DISTINCT any future null-rank rows would escape the
+  // constraint entirely and the seed's upsert would never match them.
+  unique('season_standings_natural_key_unique')
+    .on(table.seasonId, table.schoolId, table.division, table.rank)
+    .nullsNotDistinct(),
 ]).enableRLS();
 
 // --- PHASE 2 CMS TABLES ---

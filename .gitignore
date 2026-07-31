@@ -41,6 +41,10 @@ yarn-error.log*
 /sharepoint/silver_data/
 /sharepoint/gold_data/
 
+# Pre-seed pg_dump backups written by db/backup.ts. Full database dumps, so they
+# carry the same member PII plus whatever else is in the database.
+/db/backups/
+
 # vercel
 .vercel
 

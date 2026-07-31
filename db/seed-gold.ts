@@ -10,18 +10,27 @@
  * member dedup, captain recovery, match status inference) happens in the
  * gold normalizer — this script is a dumb loader that only resolves FKs.
  *
- * Idempotent: wipes the tables it owns before re-importing. It does NOT
- * touch leadership (managed by the staff import), news_posts, or the
- * phase-2 CMS tables (sponsors, gallery, page content, admin/auth).
+ * Wipes the tables it owns before re-importing. It does not touch news_posts or
+ * the phase-2 CMS tables (sponsors, gallery, page content, admin/auth) — but it
+ * does take leadership rows with it, see step 1.
  *
- * CAUTION: re-importing regenerates every row's UUID, so any Next.js
- * unstable_cache entries (seasons, games, schools, ...) go stale until the
- * cache is flushed — locally delete .next/, in production redeploy.
+ * CAUTION: this is not idempotent. Re-importing regenerates every row's UUID,
+ * so any Next.js unstable_cache entries (seasons, games, schools, ...) keep
+ * handing out UUIDs that no longer exist; the queries still succeed and match
+ * nothing, which is why a seed once turned every standings page into "No
+ * standings recorded for this season and division yet." Flush the cache after
+ * a seed — locally delete .next/, in production redeploy.
+ *
+ * PR2 fixes this properly by upserting on the natural keys that migration 0026
+ * adds (members.member_key, matches.source_key, the season_standings unique
+ * constraint). Until then, step 0a's mandatory backup is the safety net.
  *
  * Run: npm run db:seed:gold
  */
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
+import { requireFreshBackup } from './backup';
+import { matchSourceKeys, memberKeyOf } from './gold-keys';
 import { readRecords } from './import-archive';
 
 const GOLD_DIR = 'sharepoint/gold_data';
@@ -77,7 +86,7 @@ function parseEastern(s: string): Date {
  * one combined-format season back across Varsity/JV tabs — the exact bug the
  * column exists to fix — so a stale CSV has to fail the seed instead.
  *
- * Called once per row from step 0, BEFORE the wipe — see the comment there. It
+ * Called once per row from step 0b, BEFORE the wipe — see the comment there. It
  * is deliberately not called again at the insert site: a second call would be a
  * second place this check could drift back behind the deletes.
  */
@@ -103,7 +112,13 @@ const rosterKey = (season: string, game: string, school: string, division: strin
 async function main() {
   console.log('Importing gold archive data...');
 
-  // 0. Read and validate the one CSV this loader can reject, before anything is
+  // 0a. Back up first. Step 1 wipes nine tables; this has gone wrong against the
+  //     live database twice, and both times there was nothing to restore from.
+  //     requireFreshBackup throws unless a complete dump is on disk, which
+  //     aborts the seed here — before any delete.
+  requireFreshBackup();
+
+  // 0b. Read and validate the one CSV this loader can reject, before anything is
   //    deleted. Step 1 wipes the whole archive, so a standings_format this
   //    script refuses to guess at has to fail here: a stale gold_seasons.csv is
   //    the normal state of a fresh clone (gold_data/ is gitignored), and failing
@@ -114,8 +129,20 @@ async function main() {
   const seasonRows = gold('gold_seasons.csv');
   const seasonFormats = seasonRows.map(standingsFormatOf);
 
-  // 1. Wipe owned tables (FK-safe order). leadership/news/CMS untouched;
-  //    leadership.member_id is null for all rows, so wiping members is safe.
+  // 1. Wipe owned tables (FK-safe order). news/CMS are untouched.
+  //
+  //    leadership is NOT untouched. This comment used to say member_id was null
+  //    for every leadership row and that wiping members was therefore safe;
+  //    that was wrong. leadership.member_id is `onDelete: 'cascade'`
+  //    (schema.ts), so every leadership row pointing at a member goes with it —
+  //    which is how a seed run silently destroyed 70 of them. The rows that
+  //    survived are the ones whose member_id happened to be null, which is
+  //    presumably how the claim looked true afterwards.
+  //
+  //    PR2 replaces these deletes with upserts on the natural keys added in
+  //    migration 0026, which removes the cascade entirely. Until then the
+  //    backup taken in step 0a is the only thing standing between a seed run
+  //    and that data.
   console.log('Clearing existing data...');
   await db.delete(schema.seasonStandings);
   await db.delete(schema.matches);
@@ -202,6 +229,10 @@ async function main() {
   console.log(`  rosters:          ${rosters.length}`);
 
   // 7. Members (already deduped across seasons/games by the normalizer).
+  //    member_key is written here so the rows this seed creates carry the same
+  //    natural key migration 0026 backfilled onto the rows already in the
+  //    database. Without it a single run of this seed would blank the column
+  //    again and PR2's first upsert would match nothing.
   const memberRows = gold('gold_members.csv');
   const members = await db
     .insert(schema.members)
@@ -211,6 +242,7 @@ async function main() {
       discord: orNull(m.discord),
       graduationYear: intOrNull(m.graduation_year),
       schoolId: schoolBySlug.get(m.school_slug)!.id,
+      memberKey: memberKeyOf(m),
     })))
     .returning();
   const memberByKey = new Map<string, { id: string }>();
@@ -231,8 +263,12 @@ async function main() {
 
   // 9. Matches. Each side resolves its own roster — cross-division matches
   //    exist (e.g. 2023-24 LoL ran Midwood Varsity vs Midwood JV).
+  //    source_key, like member_key above, keeps the rows this seed writes
+  //    aligned with what migration 0026 backfilled. See db/gold-keys.ts for why
+  //    the key needs an occurrence ordinal.
   const matchRows = gold('gold_matches.csv');
-  await db.insert(schema.matches).values(matchRows.map((m) => ({
+  const sourceKeys = matchSourceKeys(matchRows);
+  await db.insert(schema.matches).values(matchRows.map((m, i) => ({
     seasonId: seasonByKey.get(`${m.game_slug}|${m.season}`)!.id,
     homeRosterId: rosterByKey.get(rosterKey(m.season, m.game_slug, m.home_school_slug, m.home_division))!.id,
     awayRosterId: rosterByKey.get(rosterKey(m.season, m.game_slug, m.away_school_slug, m.away_division))!.id,
@@ -242,6 +278,7 @@ async function main() {
     status: m.status as (typeof schema.matchStatusEnum.enumValues)[number],
     mvp: orNull(m.mvp),
     notes: orNull(m.notes),
+    sourceKey: sourceKeys[i],
   })));
   console.log(`  matches:          ${matchRows.length}`);
 
