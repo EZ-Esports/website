@@ -200,6 +200,76 @@ def load_bronze_extras():
     return extras
 
 
+PEOPLE_CSV = 'bronze_data/_ledger_people/People.csv'
+
+
+def build_leadership():
+    """
+    Staff rows for the `leadership` table, from the ledger's People tab.
+
+    Deliberately NOT composed here. The database already holds 99 staff rows
+    whose name and role were built by displayName()/formatRole() in
+    db/import-archive.ts, and the importer merges on (name, role, year). A second
+    implementation of those two rules in Python would only have to drift by a
+    space to stop matching them, and the merge would then insert a duplicate of
+    every person instead of updating them. So this emits the source columns and
+    lets the TypeScript side compose, with the same functions that produced the
+    rows already in the table.
+
+    Returns (rows, skipped) — skipped carries a reason per unusable row, because
+    saying precisely what is missing is most of this export's value right now.
+    leadership.role and .year are NOT NULL, so a person with no Position and no
+    Division, or no Years Active, cannot be represented at all.
+    """
+    if not os.path.exists(PEOPLE_CSV):
+        return [], [f'{PEOPLE_CSV} not found — run main.py to refresh bronze']
+
+    rows, skipped = [], []
+    for i, r in enumerate(read(PEOPLE_CSV), start=2):  # row 1 is the header
+        def get(k):
+            return (r.get(k) or '').strip()
+
+        first, last = get('First'), get('Last')
+        name = ' '.join(p for p in (first, last) if p)
+        division, position = get('Division'), get('Position')
+        years = get('Years Active')
+
+        missing = []
+        if not name:
+            missing.append('First/Last')
+        # formatRole falls back to the department when there is no position, so
+        # either one alone still names a role — but not neither.
+        if not position and not division:
+            missing.append('Division/Position')
+        if not years:
+            missing.append('Years Active')
+        if missing:
+            skipped.append(f'{name or f"row {i}"}: no {", ".join(missing)}')
+            continue
+
+        # "2021-22, 2022-23" or "2024" -> one row per season. leadership.year is
+        # a single year that the public pages route on, so somebody active for
+        # three years is three rows — which is how the surviving rows look.
+        for season in re.split(r'[,;/]| and ', years):
+            season = season.strip()
+            if not season:
+                continue
+            m = re.match(r'(\d{4})', season)
+            if not m:
+                skipped.append(f'{name}: unparseable Years Active "{season}"')
+                continue
+            rows.append({
+                'first_name': first,
+                'last_name': last,
+                'preferred_name': get('Preferred name'),
+                'division': division,
+                'position': position,
+                'year': m.group(1),
+                'fun_fact': get('Fun Fact'),
+            })
+    return rows, skipped
+
+
 def ranking_group(season, game_slug, division):
     """The table a standings row is ranked within.
 
@@ -652,6 +722,20 @@ def main():
           matches)
     write('gold_standings.csv', ['season', 'game_slug', 'division', 'school_slug', 'rank', 'wins', 'losses', 'games_played', 'win_pct', 'points', 'player_name', 'player_ign', 'notes'],
           standings)
+
+    leadership, skipped = build_leadership()
+    write('gold_leadership.csv',
+          ['first_name', 'last_name', 'preferred_name', 'division', 'position', 'year', 'fun_fact'],
+          leadership)
+    if skipped:
+        # Loud on purpose. The People tab is the only surviving route back to the
+        # 70 staff rows a seed destroyed, and every line here is a person who
+        # cannot be imported until somebody fills a cell in.
+        print(f'  ⚠️ {len(skipped)} staff row(s) not exportable:')
+        for reason in skipped[:20]:
+            print(f'       - {reason}')
+        if len(skipped) > 20:
+            print(f'       ... and {len(skipped) - 20} more')
 
     captains = sum(1 for p in players.values() if p['is_captain'])
     grads = sum(1 for m in members.values() if m['graduation_year'])

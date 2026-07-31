@@ -2,8 +2,14 @@
 
 Normalizes the EZ Esports historical spreadsheets into load-ready CSVs for the
 website database. Driven by the master ledger spreadsheet
-(`1qEzCT6bvpGEm2bjf0TR0WK-iJ2yMyiE_Ol7BuLID1Gs`, `MAIN` tab), which lists one
-row per (season, game, division, data_type) with a link to the source sheet.
+(`1qEzCT6bvpGEm2bjf0TR0WK-iJ2yMyiE_Ol7BuLID1Gs`), which lists one row per
+(season, game, division, data_type) with a link to the source sheet.
+
+`main.py` finds that ledger tab **by its columns**, not by its name. It was
+called `MAIN`, it is called `Engineering` now, and hardcoding either one meant a
+tab rename silently stopped every bronze refresh — which is not hypothetical:
+the script had been exiting on "does not contain a 'MAIN' sheet" for a while
+before anyone noticed.
 
 ## Run
 
@@ -11,8 +17,10 @@ row per (season, game, division, data_type) with a link to the source sheet.
 cd sharepoint
 python3 main.py               # bronze: download every ledger sheet -> bronze_data/
 python3 normalize_silver.py   # silver: flat matches/rosters/standings CSVs
-python3 normalize_gold.py     # gold:   DB-shaped CSVs for db/seed-gold.ts
-cd .. && npm run db:seed:gold # load into the database (wipes + reloads)
+python3 normalize_gold.py     # gold:   DB-shaped CSVs for the loaders below
+cd ..
+npm run db:seed:gold          # archive -> db (upserts; row ids are preserved)
+npm run db:seed:leadership    # staff   -> db (merges; only adds and fills)
 ```
 
 `main.py` and `normalize_silver.py` need the venv (`uv sync`; pandas,
@@ -60,7 +68,35 @@ Tetris and Minecraft are **deferred**: their results live on Challonge
 brackets (2022-23 pages on the old site; challonge.com/ezesportstetrio for
 2023-24) which block scraping. Only a 2023-24 Tetris lineup sheet exists.
 
+## Staff / leadership
+
+The ledger's **People** tab is the only source for the `leadership` table. It is
+dumped to `bronze_data/_ledger_people/People.csv` by `main.py` (it lives in the
+ledger workbook itself rather than behind a link), and `normalize_gold.py` turns
+it into `gold_leadership.csv`.
+
+**This is the only route back for 70 destroyed staff rows.** A seed run on
+2026-07-30 cascade-deleted them; the export they originally came from
+(`staff_completeroster.csv`, 169 records covering 2021-2025) was gitignored,
+never committed, and no longer exists anywhere. 99 rows survived.
+
+A person needs **First/Last**, **Division or Position**, and **Years Active** to
+be importable — `leadership.role` and `.year` are NOT NULL. `normalize_gold.py`
+prints exactly who is missing which field. As of the last run all three People
+rows were unusable: no Division, no Position, no Years Active.
+
+`Years Active` may list several seasons (`2021-22, 2022-23`); each becomes its
+own row, because the public pages route on a single year.
+
+Importing only ever **adds rows and fills blank bios**. It never overwrites a
+bio, never touches `member_id`, never resurrects a soft-deleted row, and never
+deletes. Re-run it after every edit to the sheet; a second run is a no-op.
+
 ## Open items (data chasing)
+
+- **Refill the People tab.** Every staff member from 2021-2025 with their
+  division, position and years active. This is data entry, not engineering —
+  the pipeline is ready and waiting for it.
 
 - Confirm which season the `TFT Scoreboard` sheet `1ha50…` covers — the
   ledger lists it under BOTH 2023-24 results and 2024-25 schedule/results;
