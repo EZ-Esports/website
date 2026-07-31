@@ -114,6 +114,27 @@ export function displayName(name: string, preferred: string): string {
   return preferred && preferred !== name ? `${name} (${preferred})` : name;
 }
 
+/**
+ * gold_leadership.csv rows -> leadership records.
+ *
+ * Lives here, beside displayName and formatRole, because the identity the
+ * importer merges on is (name, role, year), and those two functions built the
+ * name and role of every staff row already in the database. Composing anywhere
+ * else — in particular in the Python exporter the source columns come from —
+ * risks a second definition drifting by a space, which would turn every update
+ * into a duplicate insert.
+ */
+export function toLeadershipRecords(
+  rows: Record<string, string>[]
+): { name: string; role: string; year: string; bio: string | null }[] {
+  return rows.map((r) => ({
+    name: displayName(`${r.first_name ?? ''} ${r.last_name ?? ''}`.trim(), r.preferred_name ?? ''),
+    role: formatRole(r.division ?? '', r.position ?? ''),
+    year: r.year,
+    bio: r.fun_fact ? r.fun_fact : null,
+  }));
+}
+
 // --- Plan building (pure: derives the full set of rows to insert) ---
 
 export interface ImportPlan {

@@ -42,6 +42,37 @@ def fetch_spreadsheet_title(url):
         print(f"   ⚠️ Warning: Failed to fetch online title for {url} ({e})")
     return None
 
+PEOPLE_SHEET = "People"
+PEOPLE_DIR = "_ledger_people"
+
+
+def dump_people_tab(xl_master):
+    """
+    Dumps the ledger's own People tab to bronze_data/_ledger_people/People.csv.
+
+    Staff are the one dataset that lives in the ledger workbook rather than
+    behind a link in it, so the download pass never sees them. They are also the
+    only source for `leadership`, and the absence of any staff row in the ledger
+    is why 70 leadership rows destroyed by a seed could not be rebuilt: the
+    export they originally came from was never committed and is gone.
+
+    A missing or empty tab is a warning, not an error. The rest of the archive
+    does not depend on it, and failing the whole bronze refresh over staff data
+    would trade one gap for a much larger one.
+    """
+    if PEOPLE_SHEET not in xl_master.sheet_names:
+        print(f"   ⚠️ Ledger has no '{PEOPLE_SHEET}' tab; skipping staff export.")
+        return
+
+    people = pd.read_excel(xl_master, sheet_name=PEOPLE_SHEET)
+    people = people.dropna(how='all')
+    out_dir = os.path.join(OUTPUT_DIR, PEOPLE_DIR)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"{PEOPLE_SHEET}.csv")
+    people.to_csv(out_path, index=False)
+    print(f"   👥 {PEOPLE_SHEET}: {len(people)} rows -> {out_path}")
+
+
 def main():
     print(f"🧹 Preparing output directory '{OUTPUT_DIR}'...")
     if os.path.exists(OUTPUT_DIR):
@@ -61,27 +92,43 @@ def main():
         print(f"❌ Error downloading master ledger: {e}")
         return
 
-    try:
-        # Load the MAIN sheet from the master ledger workbook
-        xl_master = pd.ExcelFile(master_scratch)
-        if 'MAIN' not in xl_master.sheet_names:
-            print("❌ The master ledger does not contain a 'MAIN' sheet.")
-            return
+    required_cols = ['season_id', 'game_id', 'division', 'data_type', 'access']
 
-        df = pd.read_excel(xl_master, sheet_name='MAIN')
+    try:
+        xl_master = pd.ExcelFile(master_scratch)
+
+        # The ledger tab is found by its columns, not by its name. It was called
+        # MAIN when this script was written and is called "Engineering" now, and
+        # hardcoding either one means the next reorganisation of somebody's
+        # spreadsheet silently stops every bronze refresh — which is exactly what
+        # happened: this script had been exiting on "does not contain a 'MAIN'
+        # sheet" for long enough that nobody noticed.
+        ledger_sheet, df = None, None
+        for name in xl_master.sheet_names:
+            candidate = pd.read_excel(xl_master, sheet_name=name)
+            if all(col in candidate.columns for col in required_cols):
+                ledger_sheet, df = name, candidate
+                break
+
+        if df is None:
+            print(
+                f"❌ No sheet in the master ledger has the ledger columns "
+                f"({', '.join(required_cols)}). Tabs present: "
+                f"{', '.join(xl_master.sheet_names)}."
+            )
+            return
+        print(f"   📒 Ledger tab: '{ledger_sheet}' ({len(df)} rows)")
+
+        # The People tab lives in the ledger workbook itself rather than behind a
+        # link, so it is dumped here rather than in the download pass below.
+        # Staff are the one dataset the ledger holds directly.
+        dump_people_tab(xl_master)
     except Exception as e:
         print(f"❌ Error reading master ledger: {e}")
         return
     finally:
         if os.path.exists(master_scratch):
             os.remove(master_scratch)
-
-    # Ensure required columns are present
-    required_cols = ['season_id', 'game_id', 'division', 'data_type', 'access']
-    for col in required_cols:
-        if col not in df.columns:
-            print(f"❌ Missing required column '{col}' in MAIN sheet.")
-            return
 
     scratchpad = "raw_download.xlsx"
 

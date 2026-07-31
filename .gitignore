@@ -37,6 +37,11 @@ yarn-error.log*
 # Archived seed source data — contains member PII (emails, Discord, etc.).
 # Keep local; do NOT commit to this public repo. Required by `npm run db:seed`.
 /*.csv
+# Same files kept alongside the pipeline instead of at the repo root. The rule
+# above is anchored to the root and does NOT cover these: staff_completeroster.csv
+# carries 169 students' emails, Discord handles, hometowns and graduation years,
+# and sat untracked-but-committable until this line existed.
+/sharepoint/*.csv
 /sharepoint/bronze_data/
 /sharepoint/silver_data/
 /sharepoint/gold_data/
