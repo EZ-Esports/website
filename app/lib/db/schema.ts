@@ -54,9 +54,25 @@ export const members = pgTable('members', {
   schoolId: uuid('school_id')
     .references(() => schools.id, { onDelete: 'restrict' })
     .notNull(),
+  // Natural key for the gold archive: `${school_slug}|${lower first}|${lower last}`,
+  // matching gold_members.csv's own member_key column. This is what lets the seed
+  // upsert a member instead of deleting and re-inserting it, which is what churned
+  // every member UUID (and cascade-deleted leadership rows) on every seed run.
+  //
+  // Nullable on purpose: members created through the admin UI have no archive row,
+  // so they carry no key. That makes the unique index NULLS DISTINCT (the Postgres
+  // default), which is required — NULLS NOT DISTINCT would let the second
+  // admin-created member collide with the first on a shared NULL.
+  //
+  // For the same reason, migration 0026 only backfills this where the derived key
+  // is unambiguous: createMember has no duplicate check, so two same-named members
+  // at one school are legal, and stamping both would abort the migration on a
+  // duplicate key — as well as claiming an archive origin neither row has.
+  memberKey: text('member_key'),
   ...auditColumns,
 }, (table) => [
   index('members_school_id_idx').on(table.schoolId),
+  uniqueIndex('members_member_key_unique_idx').on(table.memberKey),
 ]).enableRLS();
 
 // Seasons config
@@ -175,12 +191,33 @@ export const matches = pgTable('matches', {
   status: matchStatusEnum('status').default('scheduled').notNull(),
   mvp: text('mvp'), // match MVP as recorded in season sheets, e.g. 'Kyle "Kuli" Ng'
   notes: text('notes'), // reschedules, DQs, data-quality caveats
+  // Natural key for the gold archive. Format:
+  //   `${season}|${game_slug}|${home_school_slug}|${home_division}` +
+  //   `|${away_school_slug}|${away_division}|${scheduled_at}#${n}`
+  // where scheduled_at is the CSV's America/New_York wall time
+  // ("YYYY-MM-DD HH:MM:SS") and `n` is a 0-based occurrence ordinal.
+  //
+  // The ordinal exists because the natural fields alone are NOT unique: the
+  // 2022-23 Valorant season's scheduled_at is synthesized from a weekly date
+  // block, so two genuinely different rounds of New Dorp vs Cardozo collapse
+  // onto 2022-12-28 19:30 — once in Varsity and once in JV, 4 rows total. Those
+  // rows are byte-identical in every column except free-text `notes`, so `notes`
+  // is the only field that could otherwise separate them; keying on it was
+  // rejected because editing a note would silently change a match's identity and
+  // churn its UUID. `n` is assigned in CSV file order within a collision group,
+  // so it is stable when unrelated fields change. Every row carries `#n` (`#0`
+  // for the 717 non-colliding ones) so a future third collision cannot shift the
+  // keys of the rows already there.
+  //
+  // Nullable: matches created through the admin UI have no archive row.
+  sourceKey: text('source_key'),
   ...auditColumns,
 }, (table) => [
   index('matches_scheduled_at_idx').on(table.scheduledAt),
   index('matches_season_id_idx').on(table.seasonId),
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
+  uniqueIndex('matches_source_key_unique_idx').on(table.sourceKey),
 ]).enableRLS();
 
 // --- CMS & LEADERSHIP ---
@@ -205,8 +242,15 @@ export const newsPosts = pgTable('news_posts', {
 // Leadership team members
 export const leadership = pgTable('leadership', {
   id: uuid('id').defaultRandom().primaryKey(),
+  // SET NULL, emphatically not CASCADE. A leadership row is a record that
+  // somebody held a role in a given year; the member link is a convenience on
+  // top of it, and losing the link is not a reason to lose the record. Under
+  // CASCADE it was: the gold seed wipes `members` on every run, which silently
+  // deleted the 70 leadership rows that happened to be linked, and with no
+  // backup they are still gone. `name` is populated on every row precisely so
+  // the row still renders once the link is gone.
   memberId: uuid('member_id')
-    .references(() => members.id, { onDelete: 'cascade' }),
+    .references(() => members.id, { onDelete: 'set null' }),
   name: text('name').notNull(), // Fallback if memberId is null
   role: text('role').notNull(),
   year: text('year').notNull(), // e.g., "2025"
@@ -260,11 +304,35 @@ export const seasonStandings = pgTable('season_standings', {
   playerName: text('player_name'),
   playerIgn: text('player_ign'),
   notes: text('notes'),
+  // Natural key for the gold archive. Format:
+  //   `${season}|${game_slug}|${division}|${school_slug}|${player_name}#${n}`
+  // with `n` a 0-based occurrence ordinal, exactly like matches.source_key.
+  //
+  // `rank` is deliberately NOT in the key. It is payload — the field an admin
+  // edits to correct a result — so keying on it would mean a rank correction
+  // re-keys the row and the seed's upsert inserts a duplicate instead of
+  // updating. The 45 TFT rows in the "All" division make that acute: their
+  // ranks are league-wide, so adding a single player would re-key dozens of
+  // rows at once and churn every one of their UUIDs.
+  //
+  // The ordinal covers the two groups that collide without rank, both TFT
+  // 2021-22 Varsity: Midwood at ranks 2 and 6, Stuyvesant at ranks 3 and 5.
+  // Those are per-player rows whose player_name the normalizer never recovered,
+  // so 4 rows out of 183 carry no identity in the data at all and any
+  // discriminator for them is arbitrary. The ordinal confines that
+  // arbitrariness to those 4 rows. See db/gold-keys.ts.
+  //
+  // Nullable: standings created through the admin UI have no archive row.
+  sourceKey: text('source_key'),
   ...auditColumns,
 }, (table) => [
   index('season_standings_season_id_idx').on(table.seasonId),
   index('season_standings_school_id_idx').on(table.schoolId),
   index('season_standings_division_idx').on(table.division),
+  // NULLS DISTINCT (the Postgres default) is what keeps the admin path working:
+  // the rank input is optional and admin-created rows carry no key at all, so
+  // any number of them can coexist on a shared NULL.
+  uniqueIndex('season_standings_source_key_unique_idx').on(table.sourceKey),
 ]).enableRLS();
 
 // --- PHASE 2 CMS TABLES ---
