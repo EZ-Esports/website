@@ -46,8 +46,8 @@ export type MergeResult = {
 };
 
 /** The identity tuple, normalised so whitespace and casing cannot fork a row. */
-export function leadershipKey(r: { name: string; role: string; year: string }): string {
-  return [r.name, r.role, r.year].map((v) => v.trim().toLowerCase()).join('|');
+export function leadershipKey(r: { name: string; year: string }): string {
+  return [r.name, r.year].map((v) => v.trim().toLowerCase()).join('|');
 }
 
 /**
@@ -55,7 +55,7 @@ export function leadershipKey(r: { name: string; role: string; year: string }): 
  * bio among them.
  *
  * The CSV is an export of a spreadsheet people maintained by hand, so the same
- * person can appear twice for one role and year. Left alone that would insert a
+ * person can appear twice for one year. Left alone that would insert a
  * row on the first pass and match ambiguously on every pass after, so the merge
  * would never settle.
  */
@@ -73,7 +73,7 @@ export function dedupeRecords(records: LeadershipRecord[]): {
       byKey.set(key, { ...r });
       continue;
     }
-    collapsed.push(`${r.name} — ${r.role} (${r.year})`);
+    collapsed.push(`${r.name} (${r.year})`);
     if (!seen.bio && r.bio) seen.bio = r.bio;
     if (!seen.highSchool && r.highSchool) seen.highSchool = r.highSchool;
     if (!seen.university && r.university) seen.university = r.university;
@@ -97,7 +97,7 @@ export function planRecord(
   if (existing.length > 1) {
     return {
       action: 'skip',
-      note: `${existing.length} rows already match ${record.name} — ${record.role} (${record.year}); leaving all of them alone`,
+      note: `${existing.length} rows already match ${record.name} (${record.year}); leaving all of them alone`,
     };
   }
 
@@ -105,7 +105,7 @@ export function planRecord(
   if (row.deletedAt !== null) {
     return {
       action: 'skip',
-      note: `${record.name} — ${record.role} (${record.year}) is soft-deleted; not resurrecting it`,
+      note: `${record.name} (${record.year}) is soft-deleted; not resurrecting it`,
     };
   }
 

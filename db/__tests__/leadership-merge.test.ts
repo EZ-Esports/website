@@ -27,13 +27,13 @@ const row = (over: Partial<{ id: string; bio: string | null; deletedAt: Date | n
 
 describe('leadershipKey', () => {
   it('is stable across casing and surrounding whitespace', () => {
-    expect(leadershipKey({ name: ' Jane Doe ', role: 'Director', year: '2022' }))
-      .toBe(leadershipKey({ name: 'jane doe', role: 'DIRECTOR', year: '2022' }));
+    expect(leadershipKey({ name: ' Jane Doe ', year: '2022' }))
+      .toBe(leadershipKey({ name: 'jane doe', year: '2022' }));
   });
 
   it('separates people who differ only by year', () => {
-    expect(leadershipKey({ name: 'Jane Doe', role: 'Director', year: '2022' }))
-      .not.toBe(leadershipKey({ name: 'Jane Doe', role: 'Director', year: '2023' }));
+    expect(leadershipKey({ name: 'Jane Doe', year: '2022' }))
+      .not.toBe(leadershipKey({ name: 'Jane Doe', year: '2023' }));
   });
 });
 
@@ -92,7 +92,7 @@ describe('planRecord', () => {
 
 describe('dedupeRecords', () => {
   it('passes distinct records through untouched', () => {
-    const records = [record(), record({ year: '2023' }), record({ role: 'LoL Director' })];
+    const records = [record(), record({ year: '2023' }), record({ name: 'Bob Smith' })];
     expect(dedupeRecords(records).unique).toHaveLength(3);
     expect(dedupeRecords(records).collapsed).toEqual([]);
   });
