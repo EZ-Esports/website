@@ -59,8 +59,8 @@ describe('formatRole', () => {
 });
 
 describe('displayName', () => {
-  it('appends a distinct preferred name', () => {
-    expect(displayName('Kishi Wijaya', 'DolphyVix')).toBe('Kishi Wijaya (DolphyVix)');
+  it('returns clean name without appended preferred name', () => {
+    expect(displayName('Kishi Wijaya', 'DolphyVix')).toBe('Kishi Wijaya');
     expect(displayName('Edison Zhong', '')).toBe('Edison Zhong');
   });
 });
@@ -114,7 +114,7 @@ describe('buildImportPlan', () => {
   it('maps staff into leadership with start-year and composed role', () => {
     const plan = buildImportPlan(matches as never, staff as never);
     expect(plan.leadership).toEqual([
-      { name: 'Jane Doe', role: 'VALORANT Director', year: '2022', bio: 'likes cats', highSchool: null, university: null },
+      { name: 'Jane Doe', role: 'VALORANT Director', year: '2022', bio: 'likes cats' },
     ]);
   });
 });

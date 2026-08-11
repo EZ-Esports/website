@@ -83,10 +83,13 @@ describe('planRecord', () => {
     expect(plan).toHaveProperty('note', expect.stringMatching(/soft-deleted/));
   });
 
-  it('leaves an ambiguous match entirely alone and says so', () => {
-    const plan = planRecord(record(), [row({ id: 'a' }), row({ id: 'b' })]);
-    expect(plan.action).toBe('skip');
-    expect(plan).toHaveProperty('note', expect.stringMatching(/2 rows already match/));
+  it('matches by role when multiple active rows exist', () => {
+    const plan = planRecord(record({ role: 'President', bio: 'new bio' }), [
+      row({ id: 'a', role: 'Engineering Director', bio: null }),
+      row({ id: 'b', role: 'President', bio: null }),
+    ]);
+    expect(plan.action).toBe('fill-bio');
+    expect(plan).toHaveProperty('id', 'b');
   });
 });
 
