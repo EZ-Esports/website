@@ -58,29 +58,35 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
               </p>
             </Card>
           ) : (
-            leaders.map((leader) => (
-              <Card key={leader.name} interactive className="w-full md:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
-                {/* Placeholder for image */}
-                <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-surface border-2 border-line flex items-center justify-center text-foreground">
-                  <span className="text-3xl font-extrabold tracking-tight">
-                    {leader.name.split(' ').map((n: string) => n[0]).join('')}
-                  </span>
-                </div>
+            leaders.map((leader) => {
+              const displaySchool = leader.university
+                ? leader.university
+                : (leader.highSchool || leader.schoolName || '');
 
-                <div className="text-center">
-                  <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
-                  <p className="text-accent text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
+              return (
+                <Card key={leader.name} interactive className="w-full md:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
+                  {/* Placeholder for image */}
+                  <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-surface border-2 border-line flex items-center justify-center text-foreground">
+                    <span className="text-3xl font-extrabold tracking-tight">
+                      {leader.name.split(' ').map((n: string) => n[0]).join('')}
+                    </span>
+                  </div>
 
-                  {(leader.schoolName || leader.graduationYear) && (
-                    <p className="text-foreground-secondary text-sm leading-relaxed border-t border-line pt-3 mt-3">
-                      {leader.schoolName || ''}
-                      {leader.schoolName && leader.graduationYear ? ' ' : ''}
-                      {leader.graduationYear ? `'${leader.graduationYear.toString().slice(-2)}` : ''}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            ))
+                  <div className="text-center">
+                    <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
+                    <p className="text-accent text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
+
+                    {(displaySchool || leader.graduationYear) && (
+                      <p className="text-foreground-secondary text-sm leading-relaxed border-t border-line pt-3 mt-3">
+                        {displaySchool}
+                        {displaySchool && leader.graduationYear ? ' ' : ''}
+                        {leader.graduationYear ? `'${leader.graduationYear.toString().slice(-2)}` : ''}
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })
           )}
         </div>
       </Section>

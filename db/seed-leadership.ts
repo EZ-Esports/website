@@ -55,6 +55,8 @@ function fromArchiveExport(rows: Record<string, string>[]): LeadershipRecord[] {
       role: formatRole(r.division, r.role),
       year: r.season_id.slice(0, 4),
       bio: r.fun_fact || r.notes || null,
+      highSchool: r.high_school || r.highschool || null,
+      university: r.university || r.college || null,
     }));
 }
 

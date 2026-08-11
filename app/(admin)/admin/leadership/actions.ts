@@ -14,6 +14,8 @@ export async function createLeader(formData: FormData) {
   const role = formData.get('role') as string;
   const year = formData.get('year') as string;
   const memberId = (formData.get('memberId') as string) || null;
+  const highSchool = (formData.get('highSchool') as string) || null;
+  const university = (formData.get('university') as string) || null;
 
   if (!name || !role || !year) {
     return { success: false, error: 'Name, Role, and Year are required.' };
@@ -25,6 +27,8 @@ export async function createLeader(formData: FormData) {
       role,
       year,
       memberId,
+      highSchool,
+      university,
     });
   } catch (error) {
     console.error('Failed to create leader', error);
@@ -45,9 +49,11 @@ export async function updateLeader(id: string, year: string, formData: FormData)
   const role = formData.get('role') as string;
   const newYear = formData.get('year') as string;
   const memberId = (formData.get('memberId') as string) || null;
+  const highSchool = (formData.get('highSchool') as string) || null;
+  const university = (formData.get('university') as string) || null;
   if (!name || !role || !newYear) return { success: false, error: 'Name, Role, and Year are required.' };
   try {
-    await db.update(schema.leadership).set({ name, role, year: newYear, memberId }).where(eq(schema.leadership.id, id));
+    await db.update(schema.leadership).set({ name, role, year: newYear, memberId, highSchool, university }).where(eq(schema.leadership.id, id));
   } catch (error) {
     console.error('Failed to update leader', error);
     return { success: false, error: sanitizeDbError(error) };

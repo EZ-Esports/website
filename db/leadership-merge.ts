@@ -32,11 +32,13 @@ export type LeadershipRecord = {
   role: string;
   year: string;
   bio: string | null;
+  highSchool?: string | null;
+  university?: string | null;
 };
 
 export type MergeResult = {
   inserted: number;
-  /** Rows that gained a bio they did not have. Rows already complete are untouched. */
+  /** Rows that gained a bio or school info they did not have. Rows already complete are untouched. */
   updated: number;
   /** Matched a soft-deleted row, or more than one row — see `notes`. */
   skipped: number;
@@ -68,11 +70,13 @@ export function dedupeRecords(records: LeadershipRecord[]): {
     const key = leadershipKey(r);
     const seen = byKey.get(key);
     if (!seen) {
-      byKey.set(key, r);
+      byKey.set(key, { ...r });
       continue;
     }
     collapsed.push(`${r.name} — ${r.role} (${r.year})`);
-    if (!seen.bio && r.bio) byKey.set(key, { ...seen, bio: r.bio });
+    if (!seen.bio && r.bio) seen.bio = r.bio;
+    if (!seen.highSchool && r.highSchool) seen.highSchool = r.highSchool;
+    if (!seen.university && r.university) seen.university = r.university;
   }
 
   return { unique: [...byKey.values()], collapsed };
@@ -86,8 +90,8 @@ export function dedupeRecords(records: LeadershipRecord[]): {
  */
 export function planRecord(
   record: LeadershipRecord,
-  existing: { id: string; bio: string | null; deletedAt: Date | null }[]
-): { action: 'insert' } | { action: 'fill-bio'; id: string } | { action: 'skip'; note: string } {
+  existing: { id: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
+): { action: 'insert' } | { action: 'fill-bio'; id: string; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
   if (existing.length === 0) return { action: 'insert' };
 
   if (existing.length > 1) {
@@ -106,9 +110,24 @@ export function planRecord(
   }
 
   const hasBio = row.bio !== null && row.bio.trim() !== '';
-  if (hasBio || !record.bio) return { action: 'skip', note: '' };
+  const needsBio = !hasBio && Boolean(record.bio);
 
-  return { action: 'fill-bio', id: row.id };
+  const hasHighSchool = row.highSchool !== null && row.highSchool !== undefined && row.highSchool.trim() !== '';
+  const needsHighSchool = !hasHighSchool && Boolean(record.highSchool);
+
+  const hasUniversity = row.university !== null && row.university !== undefined && row.university.trim() !== '';
+  const needsUniversity = !hasUniversity && Boolean(record.university);
+
+  if (needsBio || needsHighSchool || needsUniversity) {
+    return {
+      action: 'fill-bio',
+      id: row.id,
+      fillHighSchool: needsHighSchool ? record.highSchool : undefined,
+      fillUniversity: needsUniversity ? record.university : undefined,
+    };
+  }
+
+  return { action: 'skip', note: '' };
 }
 
 /** Merges records into `leadership`, inserting what is missing and nothing else. */
@@ -125,6 +144,8 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
       role: schema.leadership.role,
       year: schema.leadership.year,
       bio: schema.leadership.bio,
+      highSchool: schema.leadership.highSchool,
+      university: schema.leadership.university,
       deletedAt: schema.leadership.deletedAt,
     })
     .from(schema.leadership);
@@ -151,12 +172,19 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
         role: record.role,
         year: record.year,
         bio: record.bio,
+        highSchool: record.highSchool ?? null,
+        university: record.university ?? null,
       });
       inserted++;
     } else if (plan.action === 'fill-bio') {
+      const updates: Record<string, string | null> = {};
+      if (record.bio) updates.bio = record.bio;
+      if (plan.fillHighSchool) updates.highSchool = plan.fillHighSchool;
+      if (plan.fillUniversity) updates.university = plan.fillUniversity;
+
       await db
         .update(schema.leadership)
-        .set({ bio: record.bio })
+        .set(updates)
         .where(and(eq(schema.leadership.id, plan.id)));
       updated++;
     } else {

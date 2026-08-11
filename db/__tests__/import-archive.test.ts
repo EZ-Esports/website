@@ -114,7 +114,7 @@ describe('buildImportPlan', () => {
   it('maps staff into leadership with start-year and composed role', () => {
     const plan = buildImportPlan(matches as never, staff as never);
     expect(plan.leadership).toEqual([
-      { name: 'Jane Doe', role: 'VALORANT Director', year: '2022', bio: 'likes cats' },
+      { name: 'Jane Doe', role: 'VALORANT Director', year: '2022', bio: 'likes cats', highSchool: null, university: null },
     ]);
   });
 });

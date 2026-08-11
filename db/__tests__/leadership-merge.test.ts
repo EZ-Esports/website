@@ -58,7 +58,21 @@ describe('planRecord', () => {
       .toEqual({ action: 'skip', note: '' });
   });
 
-  it('does nothing when the record has no bio to contribute', () => {
+  it('fills missing high school and university fields', () => {
+    expect(
+      planRecord(
+        record({ bio: 'cats', highSchool: 'Brooklyn Tech', university: 'NYU' }),
+        [row({ bio: 'cats', highSchool: null, university: null })]
+      )
+    ).toEqual({
+      action: 'fill-bio',
+      id: 'row-1',
+      fillHighSchool: 'Brooklyn Tech',
+      fillUniversity: 'NYU',
+    });
+  });
+
+  it('does nothing when the record has no bio or school info to contribute', () => {
     expect(planRecord(record({ bio: null }), [row({ bio: null })]))
       .toEqual({ action: 'skip', note: '' });
   });

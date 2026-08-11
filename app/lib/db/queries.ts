@@ -514,6 +514,8 @@ export const getCachedLeadership = unstable_cache(
         name: schema.leadership.name,
         role: schema.leadership.role,
         year: schema.leadership.year,
+        highSchool: schema.leadership.highSchool,
+        university: schema.leadership.university,
         schoolName: schema.schools.name,
         graduationYear: schema.members.graduationYear,
       })

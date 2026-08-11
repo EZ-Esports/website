@@ -13,6 +13,8 @@ interface Leader {
   role: string;
   year: string;
   memberId: string | null;
+  highSchool?: string | null;
+  university?: string | null;
   schoolName: string | null;
   graduationYear: number | null;
 }
@@ -76,7 +78,15 @@ export default function LeadershipRow({
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Year</label>
               <input name="year" type="text" required pattern="[0-9]{4}" title="Four-digit year, e.g. 2026" defaultValue={leader.year} className={inputClass} />
             </div>
-            <div className="sm:col-span-2 lg:col-span-4">
+            <div>
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">High School</label>
+              <input name="highSchool" type="text" placeholder="e.g. Stuyvesant High School" defaultValue={leader.highSchool ?? ''} className={inputClass} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">University</label>
+              <input name="university" type="text" placeholder="e.g. Columbia University" defaultValue={leader.university ?? ''} className={inputClass} />
+            </div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Associated Member</label>
               <select
                 name="memberId"
@@ -118,12 +128,16 @@ export default function LeadershipRow({
     );
   }
 
+  const schoolDisplay = leader.university
+    ? `${leader.university} (Uni)`
+    : (leader.highSchool || (leader.schoolName ? `${leader.schoolName}${leader.graduationYear ? ` '${leader.graduationYear.toString().slice(-2)}` : ''}` : 'No school specified'));
+
   return (
     <tr className="hover:bg-line/10 transition-colors">
       <td className="px-6 py-4">
         <div className="font-bold text-white text-base tracking-tight">{leader.name}</div>
         <div className="text-xs text-foreground-secondary max-w-xs truncate mt-1 leading-relaxed">
-          {leader.schoolName ? `${leader.schoolName}${leader.graduationYear ? ` '${leader.graduationYear.toString().slice(-2)}` : ''}` : 'No member linked'}
+          {schoolDisplay}
         </div>
       </td>
       <td className="px-6 py-4 font-bold text-foreground">{leader.role}</td>

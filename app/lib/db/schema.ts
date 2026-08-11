@@ -255,6 +255,8 @@ export const leadership = pgTable('leadership', {
   role: text('role').notNull(),
   year: text('year').notNull(), // e.g., "2025"
   bio: text('bio'),
+  highSchool: text('high_school'),
+  university: text('university'),
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),
   ...auditColumns,

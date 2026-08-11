@@ -109,6 +109,32 @@ export default async function AdminLeadershipPage() {
               </div>
 
               <div>
+                <label htmlFor="highSchool" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+                  High School (Optional)
+                </label>
+                <input
+                  id="highSchool"
+                  name="highSchool"
+                  type="text"
+                  placeholder="e.g. Stuyvesant High School"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="university" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+                  University (Optional - Takes Priority)
+                </label>
+                <input
+                  id="university"
+                  name="university"
+                  type="text"
+                  placeholder="e.g. NYU / Columbia"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
                 <label htmlFor="memberId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
                   Associated Member
                 </label>
