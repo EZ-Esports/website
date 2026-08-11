@@ -83,16 +83,10 @@ describe('planRecord', () => {
     expect(plan).toHaveProperty('note', expect.stringMatching(/soft-deleted/));
   });
 
-  it('matches by role when multiple active rows exist for the same person and year', () => {
-    const plan = planRecord(record({ role: 'Advisor', highSchool: 'Brooklyn Tech' }), [
-      row({ id: 'a', role: 'President', highSchool: null }),
-      row({ id: 'b', role: 'Advisor', highSchool: null }),
-    ]);
-    expect(plan).toEqual({
-      action: 'fill-bio',
-      id: 'b',
-      fillHighSchool: 'Brooklyn Tech',
-    });
+  it('leaves an ambiguous match entirely alone and says so', () => {
+    const plan = planRecord(record(), [row({ id: 'a' }), row({ id: 'b' })]);
+    expect(plan.action).toBe('skip');
+    expect(plan).toHaveProperty('note', expect.stringMatching(/2 rows already match/));
   });
 });
 

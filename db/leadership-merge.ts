@@ -90,20 +90,24 @@ export function dedupeRecords(records: LeadershipRecord[]): {
  */
 export function planRecord(
   record: LeadershipRecord,
-  existing: { id: string; role?: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
+  existing: { id: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
 ): { action: 'insert' } | { action: 'fill-bio'; id: string; fillBio?: string | null; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
   if (existing.length === 0) return { action: 'insert' };
 
-  const active = existing.filter((r) => r.deletedAt === null);
+  if (existing.length > 1) {
+    return {
+      action: 'skip',
+      note: `${existing.length} rows already match ${record.name} (${record.year}); leaving all of them alone`,
+    };
+  }
 
-  if (active.length === 0) {
+  const [row] = existing;
+  if (row.deletedAt !== null) {
     return {
       action: 'skip',
       note: `${record.name} (${record.year}) is soft-deleted; not resurrecting it`,
     };
   }
-
-  const row = active.find((r) => r.role && r.role.trim().toLowerCase() === record.role.trim().toLowerCase()) ?? active[0];
 
   const hasBio = row.bio !== null && row.bio !== undefined && row.bio.trim() !== '';
   const needsBio = !hasBio && Boolean(record.bio && record.bio.trim() !== '');

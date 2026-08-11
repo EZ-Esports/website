@@ -42,34 +42,35 @@ def fetch_spreadsheet_title(url):
         print(f"   ⚠️ Warning: Failed to fetch online title for {url} ({e})")
     return None
 
-PEOPLE_SHEET_NAMES = ["people", "staff", "staff roster", "staff_completeroster", "leadership", "roster", "staff complete roster"]
+PEOPLE_SHEET = "People"
 PEOPLE_DIR = "_ledger_people"
 
 
 def dump_people_tab(xl_master):
     """
-    Dumps the ledger's staff/people tabs to bronze_data/_ledger_people/.
+    Dumps the ledger's own People tab to bronze_data/_ledger_people/People.csv.
 
-    Searches master ledger sheet names for any matching staff/people tabs,
-    including 'People', 'Staff', 'Staff Roster', 'staff_completeroster', etc.
+    Staff are the one dataset that lives in the ledger workbook rather than
+    behind a link in it, so the download pass never sees them. They are also the
+    only source for `leadership`, and the absence of any staff row in the ledger
+    is why 70 leadership rows destroyed by a seed could not be rebuilt: the
+    export they originally came from was never committed and is gone.
+
+    A missing or empty tab is a warning, not an error. The rest of the archive
+    does not depend on it, and failing the whole bronze refresh over staff data
+    would trade one gap for a much larger one.
     """
-    found = False
-    for name in xl_master.sheet_names:
-        clean_name = str(name).strip().lower()
-        if any(target in clean_name for target in PEOPLE_SHEET_NAMES):
-            people = pd.read_excel(xl_master, sheet_name=name)
-            people = people.dropna(how='all')
-            out_dir = os.path.join(OUTPUT_DIR, PEOPLE_DIR)
-            os.makedirs(out_dir, exist_ok=True)
-            safe_name = sanitize_filename(name)
-            out_path = os.path.join(out_dir, f"{safe_name}.csv")
-            people.to_csv(out_path, index=False)
-            print(f"   👥 Staff sheet '{name}': {len(people)} rows -> {out_path}")
-            found = True
+    if PEOPLE_SHEET not in xl_master.sheet_names:
+        print(f"   ⚠️ Ledger has no '{PEOPLE_SHEET}' tab; skipping staff export.")
+        return
 
-    if not found:
-        print(f"   ⚠️ Master ledger has no staff/people tabs ({', '.join(PEOPLE_SHEET_NAMES)}); skipping staff export.")
-
+    people = pd.read_excel(xl_master, sheet_name=PEOPLE_SHEET)
+    people = people.dropna(how='all')
+    out_dir = os.path.join(OUTPUT_DIR, PEOPLE_DIR)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"{PEOPLE_SHEET}.csv")
+    people.to_csv(out_path, index=False)
+    print(f"   👥 {PEOPLE_SHEET}: {len(people)} rows -> {out_path}")
 
 
 def main():
