@@ -10,6 +10,7 @@ import type { DBMember, School } from '@/app/types';
 interface Leader {
   id: string;
   name: string;
+  handle?: string | null;
   role: string;
   year: string;
   memberId: string | null;
@@ -71,6 +72,10 @@ export default function LeadershipRow({
               <input ref={firstFieldRef} name="name" type="text" required defaultValue={leader.name} className={inputClass} />
             </div>
             <div>
+              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Handle / IGN</label>
+              <input name="handle" type="text" placeholder="e.g. eddyson." defaultValue={leader.handle ?? ''} className={inputClass} />
+            </div>
+            <div>
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Role</label>
               <input name="role" type="text" required defaultValue={leader.role} className={inputClass} />
             </div>
@@ -78,7 +83,7 @@ export default function LeadershipRow({
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Year</label>
               <input name="year" type="text" required pattern="[0-9]{4}" title="Four-digit year, e.g. 2026" defaultValue={leader.year} className={inputClass} />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">High School</label>
               <input name="highSchool" type="text" placeholder="e.g. Stuyvesant High School" defaultValue={leader.highSchool ?? ''} className={inputClass} />
             </div>
@@ -135,7 +140,10 @@ export default function LeadershipRow({
   return (
     <tr className="hover:bg-line/10 transition-colors">
       <td className="px-6 py-4">
-        <div className="font-bold text-white text-base tracking-tight">{leader.name}</div>
+        <div className="font-bold text-white text-base tracking-tight flex items-center gap-1.5">
+          <span>{leader.name}</span>
+          {leader.handle && <span className="text-xs text-foreground-muted font-normal">({leader.handle})</span>}
+        </div>
         <div className="text-xs text-foreground-secondary max-w-xs truncate mt-1 leading-relaxed">
           {schoolDisplay}
         </div>

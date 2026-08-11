@@ -78,6 +78,19 @@ export default async function AdminLeadershipPage() {
               </div>
 
               <div>
+                <label htmlFor="handle" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+                  Handle / IGN (Optional)
+                </label>
+                <input
+                  id="handle"
+                  name="handle"
+                  type="text"
+                  placeholder="e.g. eddyson."
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
                 <label htmlFor="role" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
                   Role Title
                 </label>

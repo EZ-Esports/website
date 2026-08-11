@@ -1,0 +1,1 @@
+ALTER TABLE "leadership" ADD COLUMN "handle" text;

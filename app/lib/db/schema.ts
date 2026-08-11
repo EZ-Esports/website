@@ -252,6 +252,7 @@ export const leadership = pgTable('leadership', {
   memberId: uuid('member_id')
     .references(() => members.id, { onDelete: 'set null' }),
   name: text('name').notNull(), // Fallback if memberId is null
+  handle: text('handle'), // Online handle / preferred name (e.g., "eddyson.", "Red")
   role: text('role').notNull(),
   year: text('year').notNull(), // e.g., "2025"
   bio: text('bio'),
