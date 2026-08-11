@@ -200,75 +200,119 @@ def load_bronze_extras():
     return extras
 
 
-PEOPLE_CSV = 'bronze_data/_ledger_people/People.csv'
+PEOPLE_DIR = 'bronze_data/_ledger_people'
+
+
+def find_staff_csvs():
+    """Find all staff/people candidate CSVs in bronze_data (excluding game player rosters)."""
+    candidates = []
+
+    # 1. Direct dumps in _ledger_people
+    if os.path.exists(PEOPLE_DIR):
+        for f in sorted(os.listdir(PEOPLE_DIR)):
+            if f.endswith('.csv'):
+                candidates.append(os.path.join(PEOPLE_DIR, f))
+
+    # 2. Specific staff roster files from SharePoint (e.g. staffroster_2021-25)
+    if os.path.exists('bronze_data'):
+        for root, _dirs, files in os.walk('bronze_data'):
+            for f in sorted(files):
+                if not f.endswith('.csv') or f.endswith('__bold.csv'):
+                    continue
+                path = os.path.join(root, f)
+                if path in candidates:
+                    continue
+                fn_lower = f.lower()
+                parent_lower = os.path.basename(root).lower()
+                # ONLY match actual staff/leadership roster files, NOT game player rosters
+                if 'staffroster' in fn_lower or 'staffroster' in parent_lower or 'staff_completeroster' in fn_lower or 'staff_completeroster' in parent_lower or fn_lower == 'people.csv':
+                    candidates.append(path)
+
+    return candidates
+
+
+def flex_get(row, keys):
+    """Retrieve string value for the first matching key (case-insensitive)."""
+    for target in keys:
+        target_lower = target.lower()
+        for col_name in row.keys():
+            if col_name and str(col_name).strip().lower() == target_lower:
+                val = str(row.get(col_name) or '').strip()
+                if val and val.lower() != 'nan':
+                    return val
+    return ''
 
 
 def build_leadership():
     """
-    Staff rows for the `leadership` table, from the ledger's People tab.
-
-    Deliberately NOT composed here. The database already holds 99 staff rows
-    whose name and role were built by displayName()/formatRole() in
-    db/import-archive.ts, and the importer merges on (name, role, year). A second
-    implementation of those two rules in Python would only have to drift by a
-    space to stop matching them, and the merge would then insert a duplicate of
-    every person instead of updating them. So this emits the source columns and
-    lets the TypeScript side compose, with the same functions that produced the
-    rows already in the table.
-
-    Returns (rows, skipped) — skipped carries a reason per unusable row, because
-    saying precisely what is missing is most of this export's value right now.
-    leadership.role and .year are NOT NULL, so a person with no Position and no
-    Division, or no Years Active, cannot be represented at all.
+    Staff rows for the `leadership` table from SharePoint bronze staff exports.
     """
-    if not os.path.exists(PEOPLE_CSV):
-        return [], [f'{PEOPLE_CSV} not found — run main.py to refresh bronze']
+    csv_paths = find_staff_csvs()
+    if not csv_paths:
+        return [], ['No staff/people CSVs found in bronze_data — run main.py to refresh bronze']
 
     rows, skipped = [], []
-    for i, r in enumerate(read(PEOPLE_CSV), start=2):  # row 1 is the header
-        def get(k):
-            return (r.get(k) or '').strip()
+    seen_keys = set()
 
-        first, last = get('First'), get('Last')
-        name = ' '.join(p for p in (first, last) if p)
-        division, position = get('Division'), get('Position')
-        years = get('Years Active')
+    for csv_path in csv_paths:
+        for i, r in enumerate(read(csv_path), start=2):
+            first = flex_get(r, ['first', 'first_name', 'first name', 'first_name'])
+            last = flex_get(r, ['last', 'last_name', 'last name', 'last_name'])
+            full_name = flex_get(r, ['name', 'full_name', 'full name', 'person'])
 
-        missing = []
-        if not name:
-            missing.append('First/Last')
-        # formatRole falls back to the department when there is no position, so
-        # either one alone still names a role — but not neither.
-        if not position and not division:
-            missing.append('Division/Position')
-        if not years:
-            missing.append('Years Active')
-        if missing:
-            skipped.append(f'{name or f"row {i}"}: no {", ".join(missing)}')
-            continue
+            if not (first or last) and full_name:
+                parts = full_name.split(' ', 1)
+                first = parts[0]
+                last = parts[1] if len(parts) > 1 else ''
 
-        # "2021-22, 2022-23" or "2024" -> one row per season. leadership.year is
-        # a single year that the public pages route on, so somebody active for
-        # three years is three rows — which is how the surviving rows look.
-        for season in re.split(r'[,;/]| and ', years):
-            season = season.strip()
-            if not season:
+            name = ' '.join(p for p in (first, last) if p)
+            division = flex_get(r, ['division', 'department', 'dept'])
+            position = flex_get(r, ['position', 'role', 'title', 'pos'])
+            years = flex_get(r, ['years active', 'years_active', 'years', 'season_id', 'year', 'season'])
+
+            missing = []
+            if not name:
+                missing.append('Name')
+            if not position and not division:
+                missing.append('Division/Position')
+            if not years:
+                missing.append('Years Active')
+            if missing:
+                skipped.append(f'{name or f"row {i} in {os.path.basename(csv_path)}"}: no {", ".join(missing)}')
                 continue
-            m = re.match(r'(\d{4})', season)
-            if not m:
-                skipped.append(f'{name}: unparseable Years Active "{season}"')
-                continue
-            rows.append({
-                'first_name': first,
-                'last_name': last,
-                'preferred_name': get('Preferred name'),
-                'division': division,
-                'position': position,
-                'year': m.group(1),
-                'fun_fact': get('Fun Fact'),
-                'high_school': get('High School') or get('Highschool') or get('High School Name'),
-                'university': get('University') or get('College'),
-            })
+
+            preferred = flex_get(r, ['preferred name', 'preferred_name', 'preferred', 'handle', 'discord'])
+            fun_fact = flex_get(r, ['fun fact', 'fun_fact', 'notes', 'bio'])
+            high_school = flex_get(r, ['high school', 'high_school', 'highschool', 'high school name', 'hs'])
+            university = flex_get(r, ['university', 'college', 'uni'])
+
+            for season in re.split(r'[,;/]| and ', years):
+                season = season.strip()
+                if not season:
+                    continue
+                m = re.match(r'(\d{4})', season)
+                if not m:
+                    skipped.append(f'{name}: unparseable Years Active "{season}"')
+                    continue
+
+                parsed_year = m.group(1)
+                dedupe_key = (name.lower(), position.lower(), division.lower(), parsed_year)
+                if dedupe_key in seen_keys:
+                    continue
+                seen_keys.add(dedupe_key)
+
+                rows.append({
+                    'first_name': first,
+                    'last_name': last,
+                    'preferred_name': preferred,
+                    'division': division,
+                    'position': position,
+                    'year': parsed_year,
+                    'fun_fact': fun_fact,
+                    'high_school': high_school,
+                    'university': university,
+                })
+
     return rows, skipped
 
 
@@ -657,13 +701,15 @@ def main():
     # Nothing gets written unless the tally holds up.
     assert_derived_standings_sound(standings, counted_matches)
 
-    # --- write everything
+    OUT_DIR = os.path.join(os.path.dirname(__file__), 'gold_data')
+    os.makedirs(OUT_DIR, exist_ok=True)
     def write(name, fieldnames, rows):
-        with open(f'gold_data/{name}', 'w', newline='') as f:
+        out_path = os.path.join(OUT_DIR, name)
+        with open(out_path, 'w', newline='') as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
             w.writeheader()
             w.writerows(rows)
-        print(f'  gold_data/{name}: {len(rows)} rows')
+        print(f'  {out_path}: {len(rows)} rows')
 
     write('gold_games.csv', ['slug', 'display_name', 'short_name', 'image_url'],
           [dict(zip(['slug', 'display_name', 'short_name', 'image_url'], g)) for g in GAMES])
