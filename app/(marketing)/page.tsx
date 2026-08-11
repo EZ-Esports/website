@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import HomeHero from '@/app/components/sections/HomeHero';
+import StudentOrgSection from '@/app/components/sections/StudentOrgSection';
 import MediaGrid from '@/app/components/sections/MediaGrid';
 import GameShowcase from '@/app/components/sections/GameShowcase';
 import VideoShowcase from '@/app/components/sections/VideoShowcase';
@@ -67,6 +68,11 @@ export default async function HomePage() {
         primaryCTA={{ label: 'Watch Live', href: twitchLink, external: true }}
         secondaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
+
+      {/* 2. Student Organization Section */}
+      <ScrollReveal>
+        <StudentOrgSection />
+      </ScrollReveal>
 
 
 
