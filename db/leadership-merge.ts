@@ -32,11 +32,13 @@ export type LeadershipRecord = {
   role: string;
   year: string;
   bio: string | null;
+  highSchool?: string | null;
+  university?: string | null;
 };
 
 export type MergeResult = {
   inserted: number;
-  /** Rows that gained a bio they did not have. Rows already complete are untouched. */
+  /** Rows that gained a bio or school info they did not have. Rows already complete are untouched. */
   updated: number;
   /** Matched a soft-deleted row, or more than one row — see `notes`. */
   skipped: number;
@@ -44,8 +46,8 @@ export type MergeResult = {
 };
 
 /** The identity tuple, normalised so whitespace and casing cannot fork a row. */
-export function leadershipKey(r: { name: string; role: string; year: string }): string {
-  return [r.name, r.role, r.year].map((v) => v.trim().toLowerCase()).join('|');
+export function leadershipKey(r: { name: string; year: string }): string {
+  return [r.name, r.year].map((v) => v.trim().toLowerCase()).join('|');
 }
 
 /**
@@ -53,7 +55,7 @@ export function leadershipKey(r: { name: string; role: string; year: string }): 
  * bio among them.
  *
  * The CSV is an export of a spreadsheet people maintained by hand, so the same
- * person can appear twice for one role and year. Left alone that would insert a
+ * person can appear twice for one year. Left alone that would insert a
  * row on the first pass and match ambiguously on every pass after, so the merge
  * would never settle.
  */
@@ -68,11 +70,13 @@ export function dedupeRecords(records: LeadershipRecord[]): {
     const key = leadershipKey(r);
     const seen = byKey.get(key);
     if (!seen) {
-      byKey.set(key, r);
+      byKey.set(key, { ...r });
       continue;
     }
-    collapsed.push(`${r.name} — ${r.role} (${r.year})`);
-    if (!seen.bio && r.bio) byKey.set(key, { ...seen, bio: r.bio });
+    collapsed.push(`${r.name} (${r.year})`);
+    if (!seen.bio && r.bio) seen.bio = r.bio;
+    if (!seen.highSchool && r.highSchool) seen.highSchool = r.highSchool;
+    if (!seen.university && r.university) seen.university = r.university;
   }
 
   return { unique: [...byKey.values()], collapsed };
@@ -86,14 +90,14 @@ export function dedupeRecords(records: LeadershipRecord[]): {
  */
 export function planRecord(
   record: LeadershipRecord,
-  existing: { id: string; bio: string | null; deletedAt: Date | null }[]
-): { action: 'insert' } | { action: 'fill-bio'; id: string } | { action: 'skip'; note: string } {
+  existing: { id: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
+): { action: 'insert' } | { action: 'fill-bio'; id: string; fillBio?: string | null; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
   if (existing.length === 0) return { action: 'insert' };
 
   if (existing.length > 1) {
     return {
       action: 'skip',
-      note: `${existing.length} rows already match ${record.name} — ${record.role} (${record.year}); leaving all of them alone`,
+      note: `${existing.length} rows already match ${record.name} (${record.year}); leaving all of them alone`,
     };
   }
 
@@ -101,14 +105,30 @@ export function planRecord(
   if (row.deletedAt !== null) {
     return {
       action: 'skip',
-      note: `${record.name} — ${record.role} (${record.year}) is soft-deleted; not resurrecting it`,
+      note: `${record.name} (${record.year}) is soft-deleted; not resurrecting it`,
     };
   }
 
-  const hasBio = row.bio !== null && row.bio.trim() !== '';
-  if (hasBio || !record.bio) return { action: 'skip', note: '' };
+  const hasBio = row.bio !== null && row.bio !== undefined && row.bio.trim() !== '';
+  const needsBio = !hasBio && Boolean(record.bio && record.bio.trim() !== '');
 
-  return { action: 'fill-bio', id: row.id };
+  const hasHighSchool = row.highSchool !== null && row.highSchool !== undefined && row.highSchool.trim() !== '';
+  const needsHighSchool = !hasHighSchool && Boolean(record.highSchool && record.highSchool.trim() !== '');
+
+  const hasUniversity = row.university !== null && row.university !== undefined && row.university.trim() !== '';
+  const needsUniversity = !hasUniversity && Boolean(record.university && record.university.trim() !== '');
+
+  if (needsBio || needsHighSchool || needsUniversity) {
+    return {
+      action: 'fill-bio',
+      id: row.id,
+      fillBio: needsBio ? record.bio : undefined,
+      fillHighSchool: needsHighSchool ? record.highSchool : undefined,
+      fillUniversity: needsUniversity ? record.university : undefined,
+    };
+  }
+
+  return { action: 'skip', note: '' };
 }
 
 /** Merges records into `leadership`, inserting what is missing and nothing else. */
@@ -125,6 +145,8 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
       role: schema.leadership.role,
       year: schema.leadership.year,
       bio: schema.leadership.bio,
+      highSchool: schema.leadership.highSchool,
+      university: schema.leadership.university,
       deletedAt: schema.leadership.deletedAt,
     })
     .from(schema.leadership);
@@ -151,14 +173,23 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
         role: record.role,
         year: record.year,
         bio: record.bio,
+        highSchool: record.highSchool ?? null,
+        university: record.university ?? null,
       });
       inserted++;
     } else if (plan.action === 'fill-bio') {
-      await db
-        .update(schema.leadership)
-        .set({ bio: record.bio })
-        .where(and(eq(schema.leadership.id, plan.id)));
-      updated++;
+      const updates: Record<string, string | null> = {};
+      if (plan.fillBio) updates.bio = plan.fillBio;
+      if (plan.fillHighSchool) updates.highSchool = plan.fillHighSchool;
+      if (plan.fillUniversity) updates.university = plan.fillUniversity;
+
+      if (Object.keys(updates).length > 0) {
+        await db
+          .update(schema.leadership)
+          .set(updates)
+          .where(and(eq(schema.leadership.id, plan.id)));
+        updated++;
+      }
     } else {
       skipped++;
       if (plan.note) notes.push(plan.note);

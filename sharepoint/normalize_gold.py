@@ -266,6 +266,8 @@ def build_leadership():
                 'position': position,
                 'year': m.group(1),
                 'fun_fact': get('Fun Fact'),
+                'high_school': get('High School') or get('Highschool') or get('High School Name'),
+                'university': get('University') or get('College'),
             })
     return rows, skipped
 
@@ -725,7 +727,7 @@ def main():
 
     leadership, skipped = build_leadership()
     write('gold_leadership.csv',
-          ['first_name', 'last_name', 'preferred_name', 'division', 'position', 'year', 'fun_fact'],
+          ['first_name', 'last_name', 'preferred_name', 'division', 'position', 'year', 'fun_fact', 'high_school', 'university'],
           leadership)
     if skipped:
         # Loud on purpose. The People tab is the only surviving route back to the

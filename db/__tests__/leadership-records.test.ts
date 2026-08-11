@@ -30,7 +30,17 @@ describe('toLeadershipRecords', () => {
       role: 'Productions Director',
       year: '2025',
       bio: 'likes racing',
+      highSchool: null,
+      university: null,
     });
+  });
+
+  it('extracts high school and university fields', () => {
+    const [r] = toLeadershipRecords([
+      row({ high_school: 'Stuyvesant High School', university: 'Columbia University' }),
+    ]);
+    expect(r.highSchool).toBe('Stuyvesant High School');
+    expect(r.university).toBe('Columbia University');
   });
 
   it('leaves the name alone when there is no preferred name', () => {

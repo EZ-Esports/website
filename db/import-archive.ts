@@ -126,12 +126,14 @@ export function displayName(name: string, preferred: string): string {
  */
 export function toLeadershipRecords(
   rows: Record<string, string>[]
-): { name: string; role: string; year: string; bio: string | null }[] {
+): { name: string; role: string; year: string; bio: string | null; highSchool: string | null; university: string | null }[] {
   return rows.map((r) => ({
     name: displayName(`${r.first_name ?? ''} ${r.last_name ?? ''}`.trim(), r.preferred_name ?? ''),
     role: formatRole(r.division ?? '', r.position ?? ''),
     year: r.year,
     bio: r.fun_fact ? r.fun_fact : null,
+    highSchool: r.high_school || r.highschool || null,
+    university: r.university || r.college || null,
   }));
 }
 
