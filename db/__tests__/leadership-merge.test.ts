@@ -44,12 +44,12 @@ describe('planRecord', () => {
 
   it('fills a blank bio', () => {
     expect(planRecord(record({ bio: 'likes cats' }), [row({ bio: null })]))
-      .toEqual({ action: 'fill-bio', id: 'row-1' });
+      .toEqual({ action: 'fill-bio', id: 'row-1', fillBio: 'likes cats' });
   });
 
   it('treats a whitespace-only bio as blank', () => {
     expect(planRecord(record({ bio: 'likes cats' }), [row({ bio: '   ' })]))
-      .toEqual({ action: 'fill-bio', id: 'row-1' });
+      .toEqual({ action: 'fill-bio', id: 'row-1', fillBio: 'likes cats' });
   });
 
   it('never overwrites a bio that is already there', () => {

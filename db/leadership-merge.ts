@@ -91,7 +91,7 @@ export function dedupeRecords(records: LeadershipRecord[]): {
 export function planRecord(
   record: LeadershipRecord,
   existing: { id: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
-): { action: 'insert' } | { action: 'fill-bio'; id: string; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
+): { action: 'insert' } | { action: 'fill-bio'; id: string; fillBio?: string | null; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
   if (existing.length === 0) return { action: 'insert' };
 
   if (existing.length > 1) {
@@ -122,6 +122,7 @@ export function planRecord(
     return {
       action: 'fill-bio',
       id: row.id,
+      fillBio: needsBio ? record.bio : undefined,
       fillHighSchool: needsHighSchool ? record.highSchool : undefined,
       fillUniversity: needsUniversity ? record.university : undefined,
     };
@@ -178,15 +179,17 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
       inserted++;
     } else if (plan.action === 'fill-bio') {
       const updates: Record<string, string | null> = {};
-      if (record.bio) updates.bio = record.bio;
+      if (plan.fillBio) updates.bio = plan.fillBio;
       if (plan.fillHighSchool) updates.highSchool = plan.fillHighSchool;
       if (plan.fillUniversity) updates.university = plan.fillUniversity;
 
-      await db
-        .update(schema.leadership)
-        .set(updates)
-        .where(and(eq(schema.leadership.id, plan.id)));
-      updated++;
+      if (Object.keys(updates).length > 0) {
+        await db
+          .update(schema.leadership)
+          .set(updates)
+          .where(and(eq(schema.leadership.id, plan.id)));
+        updated++;
+      }
     } else {
       skipped++;
       if (plan.note) notes.push(plan.note);
