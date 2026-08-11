@@ -129,7 +129,7 @@ export default function LeadershipRow({
   }
 
   const schoolDisplay = leader.university
-    ? `${leader.university} (Uni)`
+    ? leader.university
     : (leader.highSchool || (leader.schoolName ? `${leader.schoolName}${leader.graduationYear ? ` '${leader.graduationYear.toString().slice(-2)}` : ''}` : 'No school specified'));
 
   return (
