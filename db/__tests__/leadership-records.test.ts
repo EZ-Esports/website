@@ -24,9 +24,10 @@ const row = (over: Record<string, string> = {}) => ({
 
 describe('toLeadershipRecords', () => {
   // Verbatim from production: "Austin Pierron (Red)" / "Productions Director".
-  it('reproduces a surviving row exactly', () => {
+  it('extracts name and handle separately', () => {
     expect(toLeadershipRecords([row()])[0]).toEqual({
-      name: 'Austin Pierron (Red)',
+      name: 'Austin Pierron',
+      handle: 'Red',
       role: 'Productions Director',
       year: '2025',
       bio: 'likes racing',

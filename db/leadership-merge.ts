@@ -29,6 +29,7 @@ import * as schema from '../app/lib/db/schema';
 
 export type LeadershipRecord = {
   name: string;
+  handle?: string | null;
   role: string;
   year: string;
   bio: string | null;
@@ -38,7 +39,7 @@ export type LeadershipRecord = {
 
 export type MergeResult = {
   inserted: number;
-  /** Rows that gained a bio or school info they did not have. Rows already complete are untouched. */
+  /** Rows that gained a bio, handle, or school info they did not have. Rows already complete are untouched. */
   updated: number;
   /** Matched a soft-deleted row, or more than one row — see `notes`. */
   skipped: number;
@@ -75,6 +76,7 @@ export function dedupeRecords(records: LeadershipRecord[]): {
     }
     collapsed.push(`${r.name} (${r.year})`);
     if (!seen.bio && r.bio) seen.bio = r.bio;
+    if (!seen.handle && r.handle) seen.handle = r.handle;
     if (!seen.highSchool && r.highSchool) seen.highSchool = r.highSchool;
     if (!seen.university && r.university) seen.university = r.university;
   }
@@ -90,27 +92,26 @@ export function dedupeRecords(records: LeadershipRecord[]): {
  */
 export function planRecord(
   record: LeadershipRecord,
-  existing: { id: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
-): { action: 'insert' } | { action: 'fill-bio'; id: string; fillBio?: string | null; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
+  existing: { id: string; role?: string; bio: string | null; handle?: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
+): { action: 'insert' } | { action: 'fill-bio'; id: string; fillBio?: string | null; fillHandle?: string | null; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
   if (existing.length === 0) return { action: 'insert' };
 
-  if (existing.length > 1) {
-    return {
-      action: 'skip',
-      note: `${existing.length} rows already match ${record.name} (${record.year}); leaving all of them alone`,
-    };
-  }
+  const active = existing.filter((r) => r.deletedAt === null);
 
-  const [row] = existing;
-  if (row.deletedAt !== null) {
+  if (active.length === 0) {
     return {
       action: 'skip',
       note: `${record.name} (${record.year}) is soft-deleted; not resurrecting it`,
     };
   }
 
+  const row = active.find((r) => r.role && r.role.trim().toLowerCase() === record.role.trim().toLowerCase()) ?? active[0];
+
   const hasBio = row.bio !== null && row.bio !== undefined && row.bio.trim() !== '';
   const needsBio = !hasBio && Boolean(record.bio && record.bio.trim() !== '');
+
+  const hasHandle = row.handle !== null && row.handle !== undefined && row.handle.trim() !== '';
+  const needsHandle = !hasHandle && Boolean(record.handle && record.handle.trim() !== '');
 
   const hasHighSchool = row.highSchool !== null && row.highSchool !== undefined && row.highSchool.trim() !== '';
   const needsHighSchool = !hasHighSchool && Boolean(record.highSchool && record.highSchool.trim() !== '');
@@ -118,11 +119,12 @@ export function planRecord(
   const hasUniversity = row.university !== null && row.university !== undefined && row.university.trim() !== '';
   const needsUniversity = !hasUniversity && Boolean(record.university && record.university.trim() !== '');
 
-  if (needsBio || needsHighSchool || needsUniversity) {
+  if (needsBio || needsHandle || needsHighSchool || needsUniversity) {
     return {
       action: 'fill-bio',
       id: row.id,
       fillBio: needsBio ? record.bio : undefined,
+      fillHandle: needsHandle ? record.handle : undefined,
       fillHighSchool: needsHighSchool ? record.highSchool : undefined,
       fillUniversity: needsUniversity ? record.university : undefined,
     };
@@ -142,6 +144,7 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
     .select({
       id: schema.leadership.id,
       name: schema.leadership.name,
+      handle: schema.leadership.handle,
       role: schema.leadership.role,
       year: schema.leadership.year,
       bio: schema.leadership.bio,
@@ -170,6 +173,7 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
       await db.insert(schema.leadership).values({
         memberId: null,
         name: record.name,
+        handle: record.handle ?? null,
         role: record.role,
         year: record.year,
         bio: record.bio,
@@ -180,6 +184,7 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
     } else if (plan.action === 'fill-bio') {
       const updates: Record<string, string | null> = {};
       if (plan.fillBio) updates.bio = plan.fillBio;
+      if (plan.fillHandle) updates.handle = plan.fillHandle;
       if (plan.fillHighSchool) updates.highSchool = plan.fillHighSchool;
       if (plan.fillUniversity) updates.university = plan.fillUniversity;
 
