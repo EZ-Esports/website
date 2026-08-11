@@ -18,9 +18,12 @@ const record = (over: Partial<LeadershipRecord> = {}): LeadershipRecord => ({
   ...over,
 });
 
-const row = (over: Partial<{ id: string; bio: string | null; deletedAt: Date | null }> = {}) => ({
+const row = (over: Partial<{ id: string; role?: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }> = {}) => ({
   id: 'row-1',
+  role: 'VALORANT Director',
   bio: null as string | null,
+  highSchool: null as string | null,
+  university: null as string | null,
   deletedAt: null as Date | null,
   ...over,
 });
