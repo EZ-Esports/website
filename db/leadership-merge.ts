@@ -109,14 +109,14 @@ export function planRecord(
     };
   }
 
-  const hasBio = row.bio !== null && row.bio.trim() !== '';
-  const needsBio = !hasBio && Boolean(record.bio);
+  const hasBio = row.bio !== null && row.bio !== undefined && row.bio.trim() !== '';
+  const needsBio = !hasBio && Boolean(record.bio && record.bio.trim() !== '');
 
   const hasHighSchool = row.highSchool !== null && row.highSchool !== undefined && row.highSchool.trim() !== '';
-  const needsHighSchool = !hasHighSchool && Boolean(record.highSchool);
+  const needsHighSchool = !hasHighSchool && Boolean(record.highSchool && record.highSchool.trim() !== '');
 
   const hasUniversity = row.university !== null && row.university !== undefined && row.university.trim() !== '';
-  const needsUniversity = !hasUniversity && Boolean(record.university);
+  const needsUniversity = !hasUniversity && Boolean(record.university && record.university.trim() !== '');
 
   if (needsBio || needsHighSchool || needsUniversity) {
     return {

@@ -59,9 +59,10 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
             </Card>
           ) : (
             leaders.map((leader) => {
-              const displaySchool = leader.university
-                ? leader.university
-                : (leader.highSchool || leader.schoolName || '');
+              const uni = leader.university?.trim() || null;
+              const hs = leader.highSchool?.trim() || null;
+              const sn = leader.schoolName?.trim() || null;
+              const displaySchool = uni || hs || sn || '';
 
               return (
                 <Card key={leader.name} interactive className="w-full md:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
