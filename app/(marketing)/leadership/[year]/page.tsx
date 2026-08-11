@@ -74,7 +74,10 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
                   </div>
 
                   <div className="text-center">
-                    <h2 className="text-xl font-bold mb-1 tracking-tight text-foreground">{leader.name}</h2>
+                    <h2 className="text-xl font-bold mb-0.5 tracking-tight text-foreground">{leader.name}</h2>
+                    {leader.handle && (
+                      <p className="text-xs text-foreground-secondary font-medium mb-1.5">({leader.handle})</p>
+                    )}
                     <p className="text-accent text-sm font-bold uppercase tracking-widest mb-3">{leader.role}</p>
 
                     {(displaySchool || leader.graduationYear) && (
