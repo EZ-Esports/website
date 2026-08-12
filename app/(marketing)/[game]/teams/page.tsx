@@ -4,13 +4,11 @@ import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
-import Badge from '@/app/components/ui/Badge';
-import Card from '@/app/components/ui/Card';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
-
+import TeamsFilterClient, { TeamRosterGroup } from './TeamsFilterClient';
 
 interface TeamsPageProps {
   params: Promise<{ game: string }>;
@@ -47,11 +45,6 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
     division: string;
     record: string;
     players: PlayerItem[];
-  }
-
-  interface TeamRosterGroup {
-    teamName: string;
-    rosters: RosterItem[];
   }
 
   let teamGroups: TeamRosterGroup[] = [];
@@ -169,62 +162,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         />
         <MigrationNotice />
 
-        <div className="space-y-12">
-          {teamGroups.length === 0 ? (
-            <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line">
-              No active teams or rosters registered for this game yet.
-            </div>
-          ) : (
-            teamGroups.map((group, index) => (
-              <Card key={index} as="section" padding="lg" className="space-y-6">
-                <div className="flex items-center gap-4 border-b border-line pb-4">
-                  <div className="w-12 h-12 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-foreground shrink-0">
-                    <span className="text-lg font-black">{group.teamName.charAt(0)}</span>
-                  </div>
-                  <h2 className="text-2xl font-black text-foreground tracking-tight">{group.teamName}</h2>
-                </div>
-
-                <div className="space-y-8">
-                  {group.rosters.map((roster) => (
-                    <div key={roster.id} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary">
-                          {roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division
-                        </h3>
-                        <Badge size="sm">Record: {roster.record}</Badge>
-                      </div>
-
-                      {roster.players.length === 0 ? (
-                        <p className="text-xs text-foreground-muted italic pl-2">
-                          No players registered under this division roster.
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {roster.players.map((player, pIdx) => (
-                            <Card key={pIdx} interactive padding="sm" className="flex flex-col justify-between">
-                              <div>
-                                <div className="flex items-center justify-between mb-2 gap-2">
-                                  <h4 className="font-bold text-base tracking-tight text-foreground">{player.name}</h4>
-                                  <Badge
-                                    size="sm"
-                                    variant={player.role === 'Captain' ? 'accent' : 'neutral'}
-                                  >
-                                    {player.role}
-                                  </Badge>
-                                </div>
-                                <p className="text-xs text-foreground-secondary leading-relaxed mt-1.5">{player.bio}</p>
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))
-          )}
-        </div>
+        <TeamsFilterClient teamGroups={teamGroups} gameDisplayName={gameConfig.displayName} />
       </Section>
     </main>
   );
