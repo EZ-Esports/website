@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 import Button from '@/app/components/ui/Button';
+import { slugify } from '@/app/lib/text-utils';
 
 export interface PlayerItem {
   name: string;
@@ -46,22 +48,20 @@ interface TeamsFilterClientProps {
   schoolGroups?: SchoolGroup[];
   teamGroups?: TeamRosterGroup[];
   gameDisplayName: string;
+  gameSlug?: string;
 }
 
 export default function TeamsFilterClient({
   schoolGroups,
   teamGroups,
   gameDisplayName,
+  gameSlug,
 }: TeamsFilterClientProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [captainsOnly, setCaptainsOnly] = useState(false);
-
-  // Active modal state for clicking into a school
-  const [selectedSchool, setSelectedSchool] = useState<SchoolGroup | null>(null);
-  const [modalSeasonFilter, setModalSeasonFilter] = useState<string>('all');
 
   // Normalize inputs to ensure backwards compatibility with PR 68's teamGroups
   const normalizedSchoolGroups: SchoolGroup[] = useMemo(() => {
@@ -70,6 +70,7 @@ export default function TeamsFilterClient({
     return teamGroups.map((g, idx) => ({
       schoolId: `legacy-school-${idx}`,
       schoolName: g.teamName,
+      schoolSlug: slugify(g.teamName),
       seasons: [
         {
           seasonId: 'current-season',
@@ -120,28 +121,7 @@ export default function TeamsFilterClient({
     return Array.from(set).sort();
   }, [normalizedSchoolGroups]);
 
-  // Handle escape key & lock background body scrolling when modal/drawer is open
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedSchool(null);
-      }
-    };
-
-    if (selectedSchool) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    } else {
-      document.body.style.overflow = '';
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedSchool]);
-
-  // Perform in-memory filtering (No lazy loading)
+  // Perform in-memory filtering
   const filteredSchools = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
@@ -239,17 +219,14 @@ export default function TeamsFilterClient({
     setCaptainsOnly(false);
   };
 
-  const openSchoolModal = (school: SchoolGroup) => {
-    setSelectedSchool(school);
-    setModalSeasonFilter('all');
-  };
+  const resolvedGameSlug = gameSlug || slugify(gameDisplayName);
 
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Filtering Control Bar */}
       <Card padding="md" className="space-y-4 border border-line bg-surface-raised/80 p-4 sm:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          {/* Search Input (text-base on mobile prevents iOS auto-zoom) */}
+          {/* Search Input */}
           <div className="relative flex-1">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-foreground-muted">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -403,7 +380,7 @@ export default function TeamsFilterClient({
         </div>
       </Card>
 
-      {/* Main Grid: Member Schools List (Students hidden behind schools) */}
+      {/* Main Grid: Member Schools List (Students hidden behind schools, links to /[game]/teams/[school]) */}
       <div className="space-y-6">
         {filteredSchools.length === 0 ? (
           <div className="text-center p-8 sm:p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line space-y-4">
@@ -421,7 +398,6 @@ export default function TeamsFilterClient({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredSchools.map((school) => {
-              // Gather division badges across seasons
               const divisionsSet = new Set<string>();
               let totalSchoolPlayers = 0;
 
@@ -433,16 +409,17 @@ export default function TeamsFilterClient({
               });
 
               const divisions = Array.from(divisionsSet);
+              const schoolSlug = school.schoolSlug || slugify(school.schoolName);
+              const schoolHref = `/${resolvedGameSlug}/teams/${schoolSlug}`;
 
               return (
                 <Card
                   key={school.schoolId}
                   interactive
                   padding="md"
-                  onClick={() => openSchoolModal(school)}
                   className="flex flex-col justify-between space-y-5 p-5 sm:p-6 group hover:border-accent/60 transition-all duration-300 touch-manipulation"
                 >
-                  <div className="space-y-4">
+                  <Link href={schoolHref} className="space-y-4 block">
                     {/* Header: Logo & School Name */}
                     <div className="flex items-start gap-3">
                       <div className="w-11 h-11 sm:w-12 sm:h-12 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-foreground font-black text-lg sm:text-xl shrink-0 group-hover:border-accent/40 group-hover:text-accent transition-colors">
@@ -480,18 +457,15 @@ export default function TeamsFilterClient({
                         <span className="font-bold text-foreground">{totalSchoolPlayers}</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
 
-                  {/* Click-into Action CTA */}
+                  {/* Dedicated Page Route Link CTA */}
                   <div className="pt-2">
                     <Button
+                      href={schoolHref}
                       variant="outline"
                       size="sm"
                       className="w-full min-h-[44px] sm:min-h-[38px] flex items-center justify-center gap-2 group-hover:bg-accent group-hover:text-on-accent group-hover:border-accent transition-all duration-300 touch-manipulation"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openSchoolModal(school);
-                      }}
                     >
                       <span>View School Snapshots & Teams</span>
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -505,158 +479,6 @@ export default function TeamsFilterClient({
           </div>
         )}
       </div>
-
-      {/* Interactive School Snapshot Mobile Drawer / Dialog View */}
-      {selectedSchool && (
-        <div
-          className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex flex-col justify-end md:justify-center p-0 md:p-6 overflow-y-auto animate-fade-in"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="school-modal-title"
-          onClick={() => setSelectedSchool(null)}
-        >
-          {/* Modal / Mobile Sheet Panel with top clearance margin clearing fixed nav chrome */}
-          <div
-            className="relative w-full max-h-[78vh] sm:max-h-[82vh] md:max-h-[82vh] md:max-w-4xl bg-surface-raised border-t md:border border-line rounded-t-3xl md:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 md:space-y-6 overflow-y-auto mt-16 sm:mt-20 md:my-auto animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Mobile Drag Indicator Pull Bar */}
-            <div className="w-12 h-1.5 bg-foreground-muted/40 rounded-full mx-auto mb-1 md:hidden" />
-
-            {/* Modal Sticky Header (Stays visible while scrolling inside drawer) */}
-            <div className="sticky top-0 bg-surface-raised z-20 flex items-start justify-between gap-3 border-b border-line pb-3 md:pb-5 pt-1">
-              <div className="flex items-center gap-3 md:gap-4 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-accent font-black text-lg sm:text-xl md:text-2xl shrink-0">
-                  {selectedSchool.schoolName.charAt(0)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 id="school-modal-title" className="text-lg sm:text-2xl md:text-3xl font-black text-foreground tracking-tight leading-tight line-clamp-2">
-                    {selectedSchool.schoolName}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">
-                    Season Team Snapshots for {gameDisplayName}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedSchool(null)}
-                className="w-10 h-10 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground bg-surface-sunken hover:bg-surface-sunken/80 transition-colors cursor-pointer shrink-0 touch-manipulation"
-                title="Close dialog"
-                aria-label="Close dialog"
-              >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* In-Modal Season Filter Bar */}
-            {selectedSchool.seasons.length > 1 && (
-              <div className="flex items-center gap-2 border-b border-line/60 pb-3 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 scroll-smooth snap-x touch-manipulation">
-                <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted shrink-0 mr-1 hidden sm:inline">
-                  Season:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setModalSeasonFilter('all')}
-                  className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 min-h-[40px] ${
-                    modalSeasonFilter === 'all'
-                      ? 'bg-accent text-on-accent border-accent'
-                      : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground'
-                  }`}
-                >
-                  All Seasons ({selectedSchool.seasons.length})
-                </button>
-                {selectedSchool.seasons.map((season) => (
-                  <button
-                    key={season.seasonId}
-                    type="button"
-                    onClick={() => setModalSeasonFilter(season.seasonName)}
-                    className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 min-h-[40px] ${
-                      modalSeasonFilter === season.seasonName
-                        ? 'bg-accent text-on-accent border-accent'
-                        : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground'
-                    }`}
-                  >
-                    {season.seasonName} {season.isSeasonActive ? '(Current)' : ''}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Season Team Snapshots */}
-            <div className="space-y-6 pt-1">
-              {selectedSchool.seasons
-                .filter((season) => {
-                  if (modalSeasonFilter === 'all') return true;
-                  return season.seasonName === modalSeasonFilter;
-                })
-                .map((season) => (
-                  <div key={season.seasonId} className="space-y-4 sm:space-y-5 bg-surface-sunken/40 rounded-2xl p-4 sm:p-5 border border-line/60">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/50 pb-3">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base sm:text-lg font-black text-foreground">{season.seasonName} Snapshot</h3>
-                        {season.isSeasonActive && <Badge size="sm" variant="success">Active Season</Badge>}
-                      </div>
-                      <span className="text-xs text-foreground-muted">
-                        {season.rosters.length} Division Roster{season.rosters.length === 1 ? '' : 's'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-5">
-                      {season.rosters.map((roster) => (
-                        <div key={roster.id} className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">
-                              <span>{roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division</span>
-                            </h4>
-                            <Badge size="sm" variant="neutral">Record: {roster.record}</Badge>
-                          </div>
-
-                          {roster.players.length === 0 ? (
-                            <p className="text-xs text-foreground-muted italic pl-2">
-                              No registered players found under active filters.
-                            </p>
-                          ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {roster.players.map((player, pIdx) => (
-                                <Card key={pIdx} padding="sm" className="flex flex-col justify-between bg-surface-raised/90 p-3.5 sm:p-4">
-                                  <div>
-                                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                                      <h5 className="font-bold text-sm tracking-tight text-foreground line-clamp-1">{player.name}</h5>
-                                      <Badge
-                                        size="sm"
-                                        variant={player.isCaptain || player.role === 'Captain' ? 'accent' : 'neutral'}
-                                      >
-                                        {player.role}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-xs text-foreground-secondary leading-relaxed mt-1 line-clamp-2">
-                                      {player.bio}
-                                    </p>
-                                  </div>
-                                </Card>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-end pt-3 border-t border-line">
-              <Button variant="secondary" size="sm" className="w-full sm:w-auto min-h-[44px] sm:min-h-[38px] touch-manipulation" onClick={() => setSelectedSchool(null)}>
-                Close Window
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

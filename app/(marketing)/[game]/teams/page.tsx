@@ -180,7 +180,11 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         />
         <MigrationNotice />
 
-        <TeamsFilterClient schoolGroups={schoolGroups} gameDisplayName={gameConfig.displayName} />
+        <TeamsFilterClient
+          schoolGroups={schoolGroups}
+          gameDisplayName={gameConfig.displayName}
+          gameSlug={game}
+        />
       </Section>
     </main>
   );
