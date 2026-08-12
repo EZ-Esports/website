@@ -8,7 +8,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
-import TeamsFilterClient, { TeamRosterGroup } from './TeamsFilterClient';
+import TeamsFilterClient, { SchoolGroup, PlayerItem, RosterItem } from './TeamsFilterClient';
 
 interface TeamsPageProps {
   params: Promise<{ game: string }>;
@@ -19,8 +19,8 @@ export async function generateMetadata({ params }: TeamsPageProps): Promise<Meta
   if (!GAME_SLUGS.includes(game as GameSlug)) return {};
   const gameConfig = GAMES[game as GameSlug];
   return {
-    title: `${gameConfig.displayName} Teams & Rosters | EZ Esports`,
-    description: `View school teams, division squads, and registered player rosters for EZ Esports ${gameConfig.displayName}.`,
+    title: `${gameConfig.displayName} School Teams & Rosters | EZ Esports`,
+    description: `Browse member schools, season team snapshots, division rosters, and player profiles for EZ Esports ${gameConfig.displayName}.`,
   };
 }
 
@@ -33,21 +33,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
   const gameConfig = GAMES[game as GameSlug];
 
-  interface PlayerItem {
-    name: string;
-    role: string;
-    bio: string;
-  }
-
-  interface RosterItem {
-    id: string;
-    name: string;
-    division: string;
-    record: string;
-    players: PlayerItem[];
-  }
-
-  let teamGroups: TeamRosterGroup[] = [];
+  let schoolGroups: SchoolGroup[] = [];
   try {
     const gameRow = await db
       .select()
@@ -58,18 +44,24 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
     if (gameRow[0]) {
       const teamsList = await db
         .select({
-          id: schema.teams.id,
+          teamId: schema.teams.id,
           schoolId: schema.teams.schoolId,
           gameId: schema.teams.gameId,
           seasonId: schema.teams.seasonId,
-          name: schema.schools.name,
+          schoolName: schema.schools.name,
+          schoolSlug: schema.schools.slug,
+          logoUrl: schema.schools.logoUrl,
+          websiteUrl: schema.schools.websiteUrl,
+          seasonName: schema.seasons.name,
+          isSeasonActive: schema.seasons.isActive,
         })
         .from(schema.teams)
         .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+        .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
         .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)))
-        .orderBy(schema.schools.name);
+        .orderBy(schema.schools.name, desc(schema.seasons.name));
 
-      const teamIds = teamsList.map((t) => t.id);
+      const teamIds = teamsList.map((t) => t.teamId);
 
       if (teamIds.length > 0) {
         const rostersList = await db
@@ -96,7 +88,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
               .where(inArray(schema.players.rosterId, rosterIds))
           : [];
 
-        // Fetch real standings for record display (DATA-001)
+        // Fetch real standings for record display
         const standingsRows = await db
           .select()
           .from(schema.rosterStandings)
@@ -122,11 +114,12 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
             name: p.ign ? `${p.firstName} "${p.ign}" ${p.lastName}` : `${p.firstName} ${p.lastName}`,
             role: p.role.charAt(0).toUpperCase() + p.role.slice(1),
             bio: p.bio || 'Active Player',
+            isCaptain: p.isCaptain || p.role.toLowerCase() === 'captain',
           });
           playersByRoster.set(p.rosterId, arr);
         });
 
-        // Group rosters by team
+        // Group rosters by teamId
         const rostersByTeam = new Map<string, RosterItem[]>();
         rostersList.forEach((r) => {
           const arr = rostersByTeam.get(r.teamId) || [];
@@ -142,14 +135,39 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
           rostersByTeam.set(r.teamId, arr);
         });
 
-        teamGroups = teamsList.map((t) => ({
-          teamName: t.name,
-          rosters: rostersByTeam.get(t.id) || [],
-        })).filter(g => g.rosters.length > 0);
+        // Group team snapshots by schoolId
+        const schoolsMap = new Map<string, SchoolGroup>();
+
+        teamsList.forEach((t) => {
+          let school = schoolsMap.get(t.schoolId);
+          if (!school) {
+            school = {
+              schoolId: t.schoolId,
+              schoolName: t.schoolName,
+              schoolSlug: t.schoolSlug,
+              logoUrl: t.logoUrl,
+              websiteUrl: t.websiteUrl,
+              seasons: [],
+            };
+            schoolsMap.set(t.schoolId, school);
+          }
+
+          const rosters = rostersByTeam.get(t.teamId) || [];
+          school.seasons.push({
+            seasonId: t.seasonId,
+            seasonName: t.seasonName,
+            isSeasonActive: t.isSeasonActive,
+            rosters,
+          });
+        });
+
+        schoolGroups = Array.from(schoolsMap.values()).filter(
+          (s) => s.seasons.some((season) => season.rosters.length > 0)
+        );
       }
     }
   } catch (error) {
-    console.error('Failed to load teams and rosters from database', error);
+    console.error('Failed to load school teams and rosters from database', error);
   }
 
   return (
@@ -157,12 +175,12 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
       <Section>
         <SectionHeader
           as="h1"
-          title={`${gameConfig.displayName} Teams & Rosters`}
-          lead="View school teams, division squads, and registered player rosters"
+          title={`${gameConfig.displayName} School Teams & Rosters`}
+          lead="Explore member schools, season team snapshots, division squads, and player rosters"
         />
         <MigrationNotice />
 
-        <TeamsFilterClient teamGroups={teamGroups} gameDisplayName={gameConfig.displayName} />
+        <TeamsFilterClient schoolGroups={schoolGroups} gameDisplayName={gameConfig.displayName} />
       </Section>
     </main>
   );
