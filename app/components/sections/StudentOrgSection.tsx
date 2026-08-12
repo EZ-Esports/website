@@ -9,7 +9,7 @@ export default function StudentOrgSection() {
   const pillars = [
     {
       icon: <HiOutlineUserGroup className="h-6 w-6 text-accent" />,
-      title: 'Student-Run Operations',
+      title: 'Student-Founded Operations',
       description: 'Built and managed entirely by NYC high school club officers, alumni, and student volunteers.',
     },
     {
@@ -36,7 +36,7 @@ export default function StudentOrgSection() {
           <div>
             <Eyebrow className="mb-3 block">Student Organization</Eyebrow>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-foreground tracking-tight">
-              A Five-Borough League, <span className="text-accent">Student-Run</span>
+              A Five-Borough League, <span className="text-accent">Student-Founded</span>
             </h2>
           </div>
           <p className="max-w-xl text-foreground-secondary text-base leading-relaxed">
