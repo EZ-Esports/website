@@ -120,17 +120,25 @@ export default function TeamsFilterClient({
     return Array.from(set).sort();
   }, [normalizedSchoolGroups]);
 
-  // Handle escape key to close school snapshot modal
+  // Handle escape key & lock background body scrolling when modal/drawer is open
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelectedSchool(null);
       }
     };
+
     if (selectedSchool) {
+      document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = '';
     }
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [selectedSchool]);
 
   // Perform in-memory filtering (No lazy loading)
@@ -237,11 +245,11 @@ export default function TeamsFilterClient({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Filtering Control Bar */}
-      <Card padding="md" className="space-y-4 border border-line bg-surface-raised/80">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Search Input */}
+      <Card padding="md" className="space-y-4 border border-line bg-surface-raised/80 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Search Input (text-base on mobile prevents iOS auto-zoom) */}
           <div className="relative flex-1">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-foreground-muted">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -258,13 +266,13 @@ export default function TeamsFilterClient({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={`Search ${gameDisplayName} schools, rosters, IGNs, or players...`}
-              className="w-full rounded-xl border border-line bg-surface-sunken py-2.5 pl-10 pr-9 text-sm text-foreground placeholder:text-foreground-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-xl border border-line bg-surface-sunken py-3 sm:py-2.5 pl-10 pr-9 text-base md:text-sm text-foreground placeholder:text-foreground-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent touch-manipulation"
               aria-label="Filter schools and rosters by search text"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-foreground-muted hover:text-foreground"
+                className="absolute inset-y-0 right-0 flex items-center pr-3 min-w-[44px] justify-center text-foreground-muted hover:text-foreground touch-manipulation"
                 title="Clear search"
                 type="button"
               >
@@ -275,15 +283,50 @@ export default function TeamsFilterClient({
             )}
           </div>
 
-          {/* Filters Row: Seasons & Divisions */}
-          <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 lg:pb-0 no-scrollbar">
-            {/* Season Selector Dropdown (if multiple seasons exist) */}
+          {/* Division Selector Swipeable Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth snap-x touch-manipulation">
+            <button
+              type="button"
+              onClick={() => setSelectedDivision('all')}
+              className={`px-3.5 py-2 min-h-[40px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
+                selectedDivision === 'all'
+                  ? 'bg-accent text-on-accent border-accent'
+                  : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
+              }`}
+            >
+              All Divisions
+            </button>
+            {availableDivisions.map((divName) => {
+              const label = divName === 'JV' ? 'Junior Varsity' : divName;
+              const isActive = selectedDivision.toLowerCase() === divName.toLowerCase();
+              return (
+                <button
+                  key={divName}
+                  type="button"
+                  onClick={() => setSelectedDivision(divName)}
+                  className={`px-3.5 py-2 min-h-[40px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
+                    isActive
+                      ? 'bg-accent text-on-accent border-accent'
+                      : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Secondary Filter Row: Season, Role & Captains Toggles */}
+        <div className="flex flex-col gap-3 pt-3 border-t border-line/60 sm:flex-row sm:items-center sm:justify-between">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+            {/* Season Selector Dropdown */}
             {availableSeasons.length > 0 && (
-              <div className="relative shrink-0">
+              <div className="relative col-span-1">
                 <select
                   value={selectedSeason}
                   onChange={(e) => setSelectedSeason(e.target.value)}
-                  className="appearance-none rounded-lg border border-line bg-surface-sunken py-2 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer"
+                  className="w-full sm:w-auto appearance-none rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
                   aria-label="Filter by season"
                 >
                   <option value="all">All Seasons</option>
@@ -301,65 +344,13 @@ export default function TeamsFilterClient({
               </div>
             )}
 
-            {/* Division Selector Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setSelectedDivision('all')}
-                className={`px-3 py-2 text-xs font-bold rounded-lg border transition-colors cursor-pointer whitespace-nowrap ${
-                  selectedDivision === 'all'
-                    ? 'bg-accent text-on-accent border-accent'
-                    : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
-                }`}
-              >
-                All Divisions
-              </button>
-              {availableDivisions.map((divName) => {
-                const label = divName === 'JV' ? 'Junior Varsity' : divName;
-                const isActive = selectedDivision.toLowerCase() === divName.toLowerCase();
-                return (
-                  <button
-                    key={divName}
-                    type="button"
-                    onClick={() => setSelectedDivision(divName)}
-                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition-colors cursor-pointer whitespace-nowrap ${
-                      isActive
-                        ? 'bg-accent text-on-accent border-accent'
-                        : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Secondary Filter Row: Roles & Quick Toggles */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-line/60">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Captains Toggle */}
-            <button
-              type="button"
-              onClick={() => setCaptainsOnly(!captainsOnly)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                captainsOnly
-                  ? 'bg-accent/15 border-accent text-accent'
-                  : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              <span className="text-accent">★</span>
-              Captains Only
-            </button>
-
             {/* Role Select Dropdown */}
             {availableRoles.length > 0 && (
-              <div className="relative">
+              <div className="relative col-span-1">
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
-                  className="appearance-none rounded-lg border border-line bg-surface-sunken py-1.5 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer"
+                  className="w-full sm:w-auto appearance-none rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
                   aria-label="Filter by player role"
                 >
                   <option value="all">All Roles</option>
@@ -376,11 +367,25 @@ export default function TeamsFilterClient({
                 </div>
               </div>
             )}
+
+            {/* Captains Toggle */}
+            <button
+              type="button"
+              onClick={() => setCaptainsOnly(!captainsOnly)}
+              className={`col-span-2 sm:col-span-1 px-3.5 py-2.5 sm:py-2 text-xs font-bold rounded-xl border transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation ${
+                captainsOnly
+                  ? 'bg-accent/15 border-accent text-accent'
+                  : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              <span className="text-accent">★</span>
+              Captains Only
+            </button>
           </div>
 
           {/* Results Counter & Reset Button */}
-          <div className="flex items-center gap-3 text-xs text-foreground-muted">
-            <span>
+          <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-foreground-muted pt-1 sm:pt-0">
+            <span className="truncate">
               Showing <strong className="text-foreground font-bold">{totalMatchingSchools}</strong> school
               {totalMatchingSchools === 1 ? '' : 's'} ({totalMatchingSeasons} season snapshot
               {totalMatchingSeasons === 1 ? '' : 's'}, <strong className="text-foreground font-bold">{totalMatchingPlayers}</strong> player{totalMatchingPlayers === 1 ? '' : 's'})
@@ -389,7 +394,7 @@ export default function TeamsFilterClient({
               <button
                 type="button"
                 onClick={handleReset}
-                className="font-bold text-accent hover:underline cursor-pointer"
+                className="font-bold text-accent hover:underline cursor-pointer shrink-0 py-1"
               >
                 Reset Filters
               </button>
@@ -401,7 +406,7 @@ export default function TeamsFilterClient({
       {/* Main Grid: Member Schools List (Students hidden behind schools) */}
       <div className="space-y-6">
         {filteredSchools.length === 0 ? (
-          <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line space-y-4">
+          <div className="text-center p-8 sm:p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line space-y-4">
             <p className="font-semibold text-foreground-secondary">
               {isFiltered ? 'No member schools match your active filters.' : 'No active school teams registered for this game yet.'}
             </p>
@@ -414,7 +419,7 @@ export default function TeamsFilterClient({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredSchools.map((school) => {
               // Gather division badges across seasons
               const divisionsSet = new Set<string>();
@@ -433,25 +438,23 @@ export default function TeamsFilterClient({
                 <Card
                   key={school.schoolId}
                   interactive
-                  padding="lg"
+                  padding="md"
                   onClick={() => openSchoolModal(school)}
-                  className="flex flex-col justify-between space-y-6 group hover:border-accent/60 transition-all duration-300"
+                  className="flex flex-col justify-between space-y-5 p-5 sm:p-6 group hover:border-accent/60 transition-all duration-300 touch-manipulation"
                 >
                   <div className="space-y-4">
                     {/* Header: Logo & School Name */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-foreground font-black text-xl shrink-0 group-hover:border-accent/40 group-hover:text-accent transition-colors">
-                          {school.schoolName.charAt(0)}
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-black text-foreground tracking-tight group-hover:text-accent transition-colors leading-tight">
-                            {school.schoolName}
-                          </h2>
-                          <p className="text-xs text-foreground-muted mt-0.5">
-                            {school.seasons.length} Season Snapshot{school.seasons.length === 1 ? '' : 's'}
-                          </p>
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-foreground font-black text-lg sm:text-xl shrink-0 group-hover:border-accent/40 group-hover:text-accent transition-colors">
+                        {school.schoolName.charAt(0)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-base sm:text-lg font-black text-foreground tracking-tight group-hover:text-accent transition-colors leading-snug line-clamp-2">
+                          {school.schoolName}
+                        </h2>
+                        <p className="text-xs text-foreground-muted mt-0.5">
+                          {school.seasons.length} Season Snapshot{school.seasons.length === 1 ? '' : 's'}
+                        </p>
                       </div>
                     </div>
 
@@ -465,7 +468,7 @@ export default function TeamsFilterClient({
                     </div>
 
                     {/* Quick Stats Summary */}
-                    <div className="text-xs text-foreground-secondary border-t border-line/50 pt-3 space-y-1">
+                    <div className="text-xs text-foreground-secondary border-t border-line/50 pt-3 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span>Active Roster Snapshots</span>
                         <span className="font-bold text-foreground">
@@ -484,7 +487,7 @@ export default function TeamsFilterClient({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full flex items-center justify-center gap-2 group-hover:bg-accent group-hover:text-on-accent group-hover:border-accent transition-all duration-300"
+                      className="w-full min-h-[44px] sm:min-h-[38px] flex items-center justify-center gap-2 group-hover:bg-accent group-hover:text-on-accent group-hover:border-accent transition-all duration-300 touch-manipulation"
                       onClick={(e) => {
                         e.stopPropagation();
                         openSchoolModal(school);
@@ -503,31 +506,35 @@ export default function TeamsFilterClient({
         )}
       </div>
 
-      {/* Interactive School Snapshot Modal / Detail View */}
+      {/* Interactive School Snapshot Mobile Drawer / Dialog View */}
       {selectedSchool && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6 overflow-y-auto animate-fade-in"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end md:justify-center p-0 md:p-6 overflow-y-auto animate-fade-in"
           role="dialog"
           aria-modal="true"
           aria-labelledby="school-modal-title"
           onClick={() => setSelectedSchool(null)}
         >
+          {/* Modal / Mobile Sheet Panel */}
           <div
-            className="relative w-full max-w-4xl bg-surface-raised border border-line rounded-2xl shadow-2xl p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto my-auto"
+            className="relative w-full max-h-[92vh] md:max-h-[85vh] md:max-w-4xl bg-surface-raised border-t md:border border-line rounded-t-3xl md:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 space-y-5 md:space-y-6 overflow-y-auto md:my-auto animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mobile Drag Indicator Pull Bar */}
+            <div className="w-12 h-1.5 bg-foreground-muted/40 rounded-full mx-auto mb-1 md:hidden" />
+
             {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 border-b border-line pb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-accent font-black text-2xl shrink-0">
+            <div className="flex items-start justify-between gap-3 border-b border-line pb-4 md:pb-6">
+              <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                <div className="w-11 h-11 md:w-14 md:h-14 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-accent font-black text-xl md:text-2xl shrink-0">
                   {selectedSchool.schoolName.charAt(0)}
                 </div>
-                <div>
-                  <h2 id="school-modal-title" className="text-2xl md:text-3xl font-black text-foreground tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <h2 id="school-modal-title" className="text-xl sm:text-2xl md:text-3xl font-black text-foreground tracking-tight leading-tight line-clamp-2">
                     {selectedSchool.schoolName}
                   </h2>
-                  <p className="text-sm text-foreground-secondary mt-1">
-                    Season Team Snapshots & Division Rosters for {gameDisplayName}
+                  <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">
+                    Season Team Snapshots for {gameDisplayName}
                   </p>
                 </div>
               </div>
@@ -535,7 +542,7 @@ export default function TeamsFilterClient({
               <button
                 type="button"
                 onClick={() => setSelectedSchool(null)}
-                className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-sunken transition-colors cursor-pointer"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-sunken transition-colors cursor-pointer shrink-0 touch-manipulation"
                 title="Close dialog"
                 aria-label="Close dialog"
               >
@@ -547,14 +554,14 @@ export default function TeamsFilterClient({
 
             {/* In-Modal Season Filter Bar */}
             {selectedSchool.seasons.length > 1 && (
-              <div className="flex items-center gap-2 border-b border-line/60 pb-4 overflow-x-auto no-scrollbar">
-                <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted shrink-0 mr-1">
-                  Filter Season:
+              <div className="flex items-center gap-2 border-b border-line/60 pb-3 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 scroll-smooth snap-x touch-manipulation">
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted shrink-0 mr-1 hidden sm:inline">
+                  Season:
                 </span>
                 <button
                   type="button"
                   onClick={() => setModalSeasonFilter('all')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 min-h-[40px] ${
                     modalSeasonFilter === 'all'
                       ? 'bg-accent text-on-accent border-accent'
                       : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground'
@@ -567,7 +574,7 @@ export default function TeamsFilterClient({
                     key={season.seasonId}
                     type="button"
                     onClick={() => setModalSeasonFilter(season.seasonName)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors cursor-pointer whitespace-nowrap ${
+                    className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 min-h-[40px] ${
                       modalSeasonFilter === season.seasonName
                         ? 'bg-accent text-on-accent border-accent'
                         : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground'
@@ -580,17 +587,17 @@ export default function TeamsFilterClient({
             )}
 
             {/* Season Team Snapshots */}
-            <div className="space-y-8 pt-2">
+            <div className="space-y-6 pt-1">
               {selectedSchool.seasons
                 .filter((season) => {
                   if (modalSeasonFilter === 'all') return true;
                   return season.seasonName === modalSeasonFilter;
                 })
                 .map((season) => (
-                  <div key={season.seasonId} className="space-y-6 bg-surface-sunken/40 rounded-xl p-5 border border-line/60">
-                    <div className="flex items-center justify-between border-b border-line/50 pb-3">
+                  <div key={season.seasonId} className="space-y-4 sm:space-y-5 bg-surface-sunken/40 rounded-2xl p-4 sm:p-5 border border-line/60">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/50 pb-3">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-black text-foreground">{season.seasonName} Snapshot</h3>
+                        <h3 className="text-base sm:text-lg font-black text-foreground">{season.seasonName} Snapshot</h3>
                         {season.isSeasonActive && <Badge size="sm" variant="success">Active Season</Badge>}
                       </div>
                       <span className="text-xs text-foreground-muted">
@@ -598,11 +605,11 @@ export default function TeamsFilterClient({
                       </span>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-5">
                       {season.rosters.map((roster) => (
                         <div key={roster.id} className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">
+                            <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">
                               <span>{roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division</span>
                             </h4>
                             <Badge size="sm" variant="neutral">Record: {roster.record}</Badge>
@@ -613,12 +620,12 @@ export default function TeamsFilterClient({
                               No registered players found under active filters.
                             </p>
                           ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {roster.players.map((player, pIdx) => (
-                                <Card key={pIdx} padding="sm" className="flex flex-col justify-between bg-surface-raised/90">
+                                <Card key={pIdx} padding="sm" className="flex flex-col justify-between bg-surface-raised/90 p-3.5 sm:p-4">
                                   <div>
                                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                                      <h5 className="font-bold text-sm tracking-tight text-foreground">{player.name}</h5>
+                                      <h5 className="font-bold text-sm tracking-tight text-foreground line-clamp-1">{player.name}</h5>
                                       <Badge
                                         size="sm"
                                         variant={player.isCaptain || player.role === 'Captain' ? 'accent' : 'neutral'}
@@ -626,7 +633,7 @@ export default function TeamsFilterClient({
                                         {player.role}
                                       </Badge>
                                     </div>
-                                    <p className="text-xs text-foreground-secondary leading-relaxed mt-1">
+                                    <p className="text-xs text-foreground-secondary leading-relaxed mt-1 line-clamp-2">
                                       {player.bio}
                                     </p>
                                   </div>
@@ -642,8 +649,8 @@ export default function TeamsFilterClient({
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end pt-4 border-t border-line">
-              <Button variant="secondary" size="sm" onClick={() => setSelectedSchool(null)}>
+            <div className="flex justify-end pt-3 border-t border-line">
+              <Button variant="secondary" size="sm" className="w-full sm:w-auto min-h-[44px] sm:min-h-[38px] touch-manipulation" onClick={() => setSelectedSchool(null)}>
                 Close Window
               </Button>
             </div>
