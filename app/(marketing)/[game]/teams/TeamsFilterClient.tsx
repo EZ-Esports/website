@@ -515,9 +515,9 @@ export default function TeamsFilterClient({
           aria-labelledby="school-modal-title"
           onClick={() => setSelectedSchool(null)}
         >
-          {/* Modal / Mobile Sheet Panel */}
+          {/* Modal / Mobile Sheet Panel with top clearance margin clearing fixed nav chrome */}
           <div
-            className="relative w-full max-h-[85vh] md:max-h-[80vh] md:max-w-4xl bg-surface-raised border-t md:border border-line rounded-t-3xl md:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 md:space-y-6 overflow-y-auto my-0 md:my-auto animate-slide-up"
+            className="relative w-full max-h-[78vh] sm:max-h-[82vh] md:max-h-[82vh] md:max-w-4xl bg-surface-raised border-t md:border border-line rounded-t-3xl md:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 md:space-y-6 overflow-y-auto mt-16 sm:mt-20 md:my-auto animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Mobile Drag Indicator Pull Bar */}

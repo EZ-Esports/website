@@ -172,7 +172,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
 
   return (
     <main>
-      <Section>
+      <Section className="pt-20 md:pt-24">
         <SectionHeader
           as="h1"
           title={`${gameConfig.displayName} School Teams & Rosters`}
