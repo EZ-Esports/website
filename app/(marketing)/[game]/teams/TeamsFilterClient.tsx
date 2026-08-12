@@ -509,7 +509,7 @@ export default function TeamsFilterClient({
       {/* Interactive School Snapshot Mobile Drawer / Dialog View */}
       {selectedSchool && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end md:justify-center p-0 md:p-6 overflow-y-auto animate-fade-in"
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex flex-col justify-end md:justify-center p-0 md:p-6 overflow-y-auto animate-fade-in"
           role="dialog"
           aria-modal="true"
           aria-labelledby="school-modal-title"
@@ -517,20 +517,20 @@ export default function TeamsFilterClient({
         >
           {/* Modal / Mobile Sheet Panel */}
           <div
-            className="relative w-full max-h-[92vh] md:max-h-[85vh] md:max-w-4xl bg-surface-raised border-t md:border border-line rounded-t-3xl md:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 space-y-5 md:space-y-6 overflow-y-auto md:my-auto animate-slide-up"
+            className="relative w-full max-h-[85vh] md:max-h-[80vh] md:max-w-4xl bg-surface-raised border-t md:border border-line rounded-t-3xl md:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 space-y-4 md:space-y-6 overflow-y-auto my-0 md:my-auto animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Mobile Drag Indicator Pull Bar */}
             <div className="w-12 h-1.5 bg-foreground-muted/40 rounded-full mx-auto mb-1 md:hidden" />
 
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-line pb-4 md:pb-6">
+            {/* Modal Sticky Header (Stays visible while scrolling inside drawer) */}
+            <div className="sticky top-0 bg-surface-raised z-20 flex items-start justify-between gap-3 border-b border-line pb-3 md:pb-5 pt-1">
               <div className="flex items-center gap-3 md:gap-4 min-w-0">
-                <div className="w-11 h-11 md:w-14 md:h-14 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-accent font-black text-xl md:text-2xl shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-surface-sunken border border-line rounded-full flex items-center justify-center text-accent font-black text-lg sm:text-xl md:text-2xl shrink-0">
                   {selectedSchool.schoolName.charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 id="school-modal-title" className="text-xl sm:text-2xl md:text-3xl font-black text-foreground tracking-tight leading-tight line-clamp-2">
+                  <h2 id="school-modal-title" className="text-lg sm:text-2xl md:text-3xl font-black text-foreground tracking-tight leading-tight line-clamp-2">
                     {selectedSchool.schoolName}
                   </h2>
                   <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">
@@ -542,11 +542,11 @@ export default function TeamsFilterClient({
               <button
                 type="button"
                 onClick={() => setSelectedSchool(null)}
-                className="w-10 h-10 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-sunken transition-colors cursor-pointer shrink-0 touch-manipulation"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground bg-surface-sunken hover:bg-surface-sunken/80 transition-colors cursor-pointer shrink-0 touch-manipulation"
                 title="Close dialog"
                 aria-label="Close dialog"
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
