@@ -111,89 +111,94 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
     <Section tone="default" className="border-t border-line/30">
       {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
 
-      {/* Carousel Wrapper with padded gutters for navigation arrows */}
+      {/* Carousel Wrapper */}
       <div
         ref={carouselRef}
-        className="relative group outline-none px-10 sm:px-14"
+        className="relative group outline-none"
         tabIndex={0}
         onKeyDown={handleCarouselKeyDown}
         aria-roledescription="carousel"
         aria-label={heading || 'Photo Gallery'}
       >
-        {/* Navigation Arrows positioned in side gutters so they never clip into cards */}
-        {items.length > visibleCount && (
-          <>
+        {/* Main Flex Row: Left Arrow + Viewport + Right Arrow */}
+        <div className="flex items-center gap-2 sm:gap-4 w-full">
+          {/* Navigation Arrow Left */}
+          {items.length > visibleCount && (
             <button
               type="button"
               onClick={prevSlide}
               aria-label="Previous photos"
-              className="absolute left-0 sm:left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+              className="shrink-0 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
+          )}
+
+          {/* Slide Viewport */}
+          <div className="overflow-hidden rounded-2xl p-1 flex-1 touch-pan-y">
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.1}
+              onDragEnd={handleDragEnd}
+              animate={{ x: `-${currentIndex * (100 / visibleCount)}%` }}
+              transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+              className="flex cursor-grab active:cursor-grabbing gap-4 sm:gap-6"
+            >
+              {items.map((item, index) => (
+                <motion.div
+                  key={item.id || index}
+                  style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(16 * (visibleCount - 1)) / visibleCount}px)` }}
+                  whileHover={{ scale: 1.015 }}
+                  transition={{ duration: 0.2 }}
+                  className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40 select-none"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelectedImageIndex(index)}
+                    aria-label={`View photo: ${item.alt}`}
+                    className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <Image
+                      src={item.src}
+                      alt={item.alt}
+                      fill
+                      unoptimized
+                      loading="lazy"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
+                    />
+
+                    <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/25 transition-colors flex items-center justify-center">
+                      <Badge
+                        variant="accent"
+                        size="sm"
+                        className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
+                      >
+                        View Photo
+                      </Badge>
+                    </div>
+                  </button>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+
+          {/* Navigation Arrow Right */}
+          {items.length > visibleCount && (
             <button
               type="button"
               onClick={nextSlide}
               aria-label="Next photos"
-              className="absolute right-0 sm:right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+              className="shrink-0 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
-          </>
-        )}
-
-        {/* Slide Viewport */}
-        <div className="overflow-hidden rounded-2xl p-1 touch-pan-y">
-          <motion.div
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.1}
-            onDragEnd={handleDragEnd}
-            animate={{ x: `-${currentIndex * (100 / visibleCount)}%` }}
-            transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-            className="flex cursor-grab active:cursor-grabbing gap-4 sm:gap-6"
-          >
-            {items.map((item, index) => (
-              <motion.div
-                key={item.id || index}
-                style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(16 * (visibleCount - 1)) / visibleCount}px)` }}
-                whileHover={{ scale: 1.015 }}
-                transition={{ duration: 0.2 }}
-                className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40 select-none"
-              >
-                <button
-                  type="button"
-                  onClick={() => setSelectedImageIndex(index)}
-                  aria-label={`View photo: ${item.alt}`}
-                  className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  <Image
-                    src={item.src}
-                    alt={item.alt}
-                    fill
-                    unoptimized
-                    loading="lazy"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
-                  />
-
-                  <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/25 transition-colors flex items-center justify-center">
-                    <Badge
-                      variant="accent"
-                      size="sm"
-                      className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
-                    >
-                      View Photo
-                    </Badge>
-                  </div>
-                </button>
-              </motion.div>
-            ))}
-          </motion.div>
+          )}
         </div>
 
         {/* Carousel Pagination Controls & Position Counter */}
