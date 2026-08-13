@@ -36,7 +36,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
 
           const content = (
             <div
-              className="relative rounded-xl overflow-hidden group cursor-pointer border border-line/80 hover:border-accent/60 transition-all duration-200 active:scale-[0.98]"
+              className="relative rounded-2xl overflow-hidden group cursor-pointer border border-line/80 hover:border-accent/60 shadow-xl shadow-black/20 transition-all duration-300 active:scale-[0.98]"
             >
               <Image
                 src={game.imageUrl}

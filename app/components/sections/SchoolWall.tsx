@@ -1,4 +1,5 @@
 import { getCachedSchools } from '@/app/lib/db/queries';
+import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 
 type School = Awaited<ReturnType<typeof getCachedSchools>>[number];
@@ -6,7 +7,7 @@ type School = Awaited<ReturnType<typeof getCachedSchools>>[number];
 /** Logo tile for a school that has a logo image: square artwork, name below. */
 function SchoolLogoTile({ school }: { school: School }) {
   return (
-    <div className="flex h-full flex-col items-center gap-3 p-4 rounded-xl bg-surface-raised border border-line hover:border-accent/40 transition-all duration-200 group hover:scale-105">
+    <div className="flex h-full flex-col items-center gap-3 p-4 rounded-2xl bg-surface-raised border border-line hover:border-accent/40 transition-all duration-200 group hover:scale-105">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={school.logoUrl!}
@@ -48,44 +49,42 @@ export default async function SchoolWall() {
   if (!schools || schools.length === 0) return null;
 
   return (
-    <section className="bg-surface-sunken py-16 md:py-24 border-t border-line">
-      <div className="container mx-auto px-4">
-        <SectionHeader eyebrow="Member Schools" title="Our Schools" />
+    <Section tone="sunken" className="border-t border-line">
+      <SectionHeader eyebrow="Member Schools" title="Our Schools" />
 
-        <div className="flex flex-wrap justify-center items-start gap-4 max-w-5xl mx-auto">
-          {schools.map((school) => {
-            const hasLogo = Boolean(school.logoUrl);
-            const tile = hasLogo ? (
-              <SchoolLogoTile school={school} />
-            ) : (
-              <SchoolNameChip school={school} />
-            );
-            // Logo tiles share a fixed square footprint so the artwork grid stays
-            // even; name chips size to their own text instead.
-            const wrapperClassName = hasLogo ? 'block h-full w-32 sm:w-36' : 'block';
+      <div className="flex flex-wrap justify-center items-start gap-4 max-w-5xl mx-auto">
+        {schools.map((school) => {
+          const hasLogo = Boolean(school.logoUrl);
+          const tile = hasLogo ? (
+            <SchoolLogoTile school={school} />
+          ) : (
+            <SchoolNameChip school={school} />
+          );
+          // Logo tiles share a fixed square footprint so the artwork grid stays
+          // even; name chips size to their own text instead.
+          const wrapperClassName = hasLogo ? 'block h-full w-32 sm:w-36' : 'block';
 
-            if (school.websiteUrl) {
-              return (
-                <a
-                  key={school.id}
-                  href={school.websiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={wrapperClassName}
-                >
-                  {tile}
-                </a>
-              );
-            }
-
+          if (school.websiteUrl) {
             return (
-              <div key={school.id} className={wrapperClassName}>
+              <a
+                key={school.id}
+                href={school.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={wrapperClassName}
+              >
                 {tile}
-              </div>
+              </a>
             );
-          })}
-        </div>
+          }
+
+          return (
+            <div key={school.id} className={wrapperClassName}>
+              {tile}
+            </div>
+          );
+        })}
       </div>
-    </section>
+    </Section>
   );
 }

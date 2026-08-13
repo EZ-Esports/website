@@ -27,7 +27,7 @@ const dotStyles: Record<BadgeVariant, string> = {
 };
 
 const sizeStyles: Record<BadgeSize, string> = {
-  sm: 'text-[10px] px-2 py-0.5 rounded-md gap-1',
+  sm: 'text-[10px] px-2.5 py-0.5 rounded-full gap-1',
   md: 'text-xs px-3 py-1 rounded-full gap-1.5',
 };
 
