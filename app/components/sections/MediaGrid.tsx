@@ -69,7 +69,7 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   };
 
   return (
-    <Section tone="surface" className="border-t border-line/30">
+    <Section tone="default" className="border-t border-line/30">
       {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
       <div className="flex flex-wrap justify-center gap-6">
         {items.map((item, index) => (
