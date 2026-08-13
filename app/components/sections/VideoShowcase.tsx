@@ -20,7 +20,7 @@ export default function VideoShowcase({
         {videos.map((video, index) => (
           <div
             key={video.id || index}
-            className="relative aspect-video rounded-xl overflow-hidden border border-accent/20 bg-surface/40"
+            className="relative aspect-video rounded-2xl overflow-hidden border border-accent/20 bg-surface/40 shadow-xl shadow-black/20"
           >
             <iframe
               src={`${YOUTUBE_EMBED_BASE_URL}/${video.videoId}`}

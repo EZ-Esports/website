@@ -36,34 +36,39 @@ export default async function LeaguePulse() {
           <Link
             key={match.id}
             href={`/${match.gameSlug}/schedule?season=${encodeURIComponent(match.seasonName)}&division=${encodeURIComponent(match.division)}`}
-            className="block"
+            className="block h-full"
           >
-            <Card accent interactive className="group">
-              <div className="flex items-center justify-between mb-3">
-                <Badge size="sm">
-                  {match.gameShortName === 'VAL'
-                    ? 'Valorant'
-                    : match.gameShortName === 'LoL'
-                    ? 'League of Legends'
-                    : match.gameShortName === 'TFT'
-                    ? 'Teamfight Tactics'
-                    : match.gameShortName} · {match.division === 'JV' ? 'Junior Varsity' : match.division}
-                </Badge>
-                <span className="text-xs font-bold text-foreground-muted">
-                  {new Date(match.scheduledAt).toLocaleDateString('en-US', {
-                    timeZone: 'America/New_York',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </span>
+            <Card accent interactive className="group h-full flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <Badge size="sm" className="shrink-0">
+                    {match.gameShortName === 'VAL'
+                      ? 'Valorant'
+                      : match.gameShortName === 'LoL'
+                      ? 'League of Legends'
+                      : match.gameShortName === 'TFT'
+                      ? 'Teamfight Tactics'
+                      : match.gameShortName} · {match.division === 'JV' ? 'Junior Varsity' : match.division}
+                  </Badge>
+                  <span className="text-xs font-bold text-foreground-muted shrink-0">
+                    {new Date(match.scheduledAt).toLocaleDateString('en-US', {
+                      timeZone: 'America/New_York',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <div
+                  className="text-sm font-bold text-foreground group-hover:text-accent transition-colors leading-snug line-clamp-2"
+                  title={`${match.homeTeam} vs ${match.awayTeam}`}
+                >
+                  {match.homeTeam}
+                  <span className="text-foreground-muted font-medium px-1.5">vs</span>
+                  {match.awayTeam}
+                </div>
               </div>
-              <div className="text-sm font-bold text-foreground group-hover:text-accent transition-colors leading-snug">
-                {match.homeTeam}
-                <span className="text-foreground-muted font-medium px-1.5">vs</span>
-                {match.awayTeam}
-              </div>
-              <div className="mt-2 text-lg font-black text-foreground-secondary flex items-center gap-2">
+              <div className="mt-3 text-lg font-black text-foreground-secondary flex items-center gap-2">
                 {match.homeScore} - {match.awayScore}
                 {match.status === 'forfeit' && <Badge variant="warning" size="sm">Forfeit</Badge>}
               </div>

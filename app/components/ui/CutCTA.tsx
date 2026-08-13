@@ -29,17 +29,17 @@ const CLIP = '[clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14
 
 const edgeStyles: Record<'primary' | 'outline', string> = {
   primary: 'bg-accent group-hover:bg-white',
-  outline: 'bg-foreground/30 group-hover:bg-white',
+  outline: 'bg-line group-hover:bg-accent/80',
 };
 
 const fillStyles: Record<'primary' | 'outline', string> = {
   primary: 'bg-accent group-hover:bg-white',
-  outline: 'bg-white/[0.04] group-hover:bg-black',
+  outline: 'bg-surface-raised group-hover:bg-surface-raised/90',
 };
 
 const textStyles: Record<'primary' | 'outline', string> = {
   primary: 'text-on-accent',
-  outline: 'text-foreground',
+  outline: 'text-foreground group-hover:text-accent',
 };
 
 const sizeStyles: Record<'md' | 'sm', string> = {

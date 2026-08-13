@@ -1,4 +1,5 @@
 import { getCachedSchools } from '@/app/lib/db/queries';
+import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 
 type School = Awaited<ReturnType<typeof getCachedSchools>>[number];
@@ -6,31 +7,26 @@ type School = Awaited<ReturnType<typeof getCachedSchools>>[number];
 /** Logo tile for a school that has a logo image: square artwork, name below. */
 function SchoolLogoTile({ school }: { school: School }) {
   return (
-    <div className="flex h-full flex-col items-center gap-3 p-4 rounded-xl bg-surface-raised border border-line hover:border-accent/40 transition-all duration-200 group hover:scale-105">
+    <div className="flex h-32 w-full flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-surface-raised border border-line hover:border-accent/40 transition-all duration-200 group hover:scale-105 shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={school.logoUrl!}
         alt={`${school.name} logo`}
         loading="lazy"
-        className="w-16 h-16 object-contain rounded-lg"
+        className="w-12 h-12 object-contain rounded-lg shrink-0"
       />
-      <span className="text-sm text-foreground-secondary text-center font-medium group-hover:text-foreground transition-colors leading-tight">
+      <span className="text-xs text-foreground-secondary text-center font-medium group-hover:text-foreground transition-colors leading-tight line-clamp-2">
         {school.name}
       </span>
     </div>
   );
 }
 
-/**
- * Name-first chip for a school with no logo on file. Rather than a generated
- * monogram square (which collided/looked repetitive across ~27 schools with no
- * artwork), this reads as a bordered pill sized to its text so school names
- * stay on one line instead of being squeezed into a fixed logo-tile square.
- */
+/** Name-first tile for a school with no logo on file. Matches SchoolLogoTile footprint for clean grid alignment. */
 function SchoolNameChip({ school }: { school: School }) {
   return (
-    <div className="flex items-center px-5 py-3 rounded-full bg-surface-raised border border-line hover:border-accent/40 transition-all duration-200 group hover:scale-105">
-      <span className="text-sm text-foreground text-center font-semibold whitespace-nowrap group-hover:text-accent transition-colors">
+    <div className="flex h-32 w-full flex-col items-center justify-center p-4 rounded-2xl bg-surface-raised border border-line hover:border-accent/40 transition-all duration-200 group hover:scale-105 shadow-sm">
+      <span className="text-xs sm:text-sm text-foreground text-center font-semibold leading-snug group-hover:text-accent transition-colors line-clamp-3">
         {school.name}
       </span>
     </div>
@@ -48,44 +44,39 @@ export default async function SchoolWall() {
   if (!schools || schools.length === 0) return null;
 
   return (
-    <section className="bg-surface-sunken py-16 md:py-24 border-t border-line">
-      <div className="container mx-auto px-4">
-        <SectionHeader eyebrow="Member Schools" title="Our Schools" />
+    <Section tone="sunken" className="border-t border-line">
+      <SectionHeader eyebrow="Member Schools" title="Our Schools" />
 
-        <div className="flex flex-wrap justify-center items-start gap-4 max-w-5xl mx-auto">
-          {schools.map((school) => {
-            const hasLogo = Boolean(school.logoUrl);
-            const tile = hasLogo ? (
-              <SchoolLogoTile school={school} />
-            ) : (
-              <SchoolNameChip school={school} />
-            );
-            // Logo tiles share a fixed square footprint so the artwork grid stays
-            // even; name chips size to their own text instead.
-            const wrapperClassName = hasLogo ? 'block h-full w-32 sm:w-36' : 'block';
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto">
+        {schools.map((school) => {
+          const hasLogo = Boolean(school.logoUrl);
+          const tile = hasLogo ? (
+            <SchoolLogoTile school={school} />
+          ) : (
+            <SchoolNameChip school={school} />
+          );
 
-            if (school.websiteUrl) {
-              return (
-                <a
-                  key={school.id}
-                  href={school.websiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={wrapperClassName}
-                >
-                  {tile}
-                </a>
-              );
-            }
-
+          if (school.websiteUrl) {
             return (
-              <div key={school.id} className={wrapperClassName}>
+              <a
+                key={school.id}
+                href={school.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full h-32"
+              >
                 {tile}
-              </div>
+              </a>
             );
-          })}
-        </div>
+          }
+
+          return (
+            <div key={school.id} className="block w-full h-32">
+              {tile}
+            </div>
+          );
+        })}
       </div>
-    </section>
+    </Section>
   );
 }

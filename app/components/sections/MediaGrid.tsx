@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Image from 'next/image';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import { GALLERY_ITEM_WIDTHS } from '@/app/lib/constants';
+import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
+import Badge from '@/app/components/ui/Badge';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 
 function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; index: number; widthClass: string; onOpen: (i: number) => void }) {
@@ -15,7 +17,7 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
       type="button"
       onClick={() => onOpen(index)}
       aria-label={`View photo: ${item.alt}`}
-      className={`${widthClass} shrink-0 aspect-square rounded-xl overflow-hidden relative border border-line/80 hover:border-accent/50 cursor-pointer transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface`}
+      className={`${widthClass} shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 cursor-pointer transition-all duration-300 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface`}
     >
       <Image
         src={item.src}
@@ -25,10 +27,10 @@ function GalleryItem({ item, index, widthClass, onOpen }: { item: ImageType; ind
         className="object-cover transition-opacity duration-300 group-hover:opacity-80"
         onError={() => setErrored(true)}
       />
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-        <span className="text-on-accent bg-accent px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-200">
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+        <Badge variant="accent" size="sm" className="opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md">
           View Photo
-        </span>
+        </Badge>
       </div>
     </button>
   );
@@ -67,14 +69,12 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   };
 
   return (
-    <section className="bg-surface text-foreground py-16 md:py-24 border-t border-line/30">
-      <div className="container mx-auto px-4">
-        {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
-        <div className="flex flex-wrap justify-center gap-6">
-          {items.map((item, index) => (
-            <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={setSelectedImageIndex} />
-          ))}
-        </div>
+    <Section tone="default" className="border-t border-line/30">
+      {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
+      <div className="flex flex-wrap justify-center gap-6">
+        {items.map((item, index) => (
+          <GalleryItem key={item.id || index} item={item} index={index} widthClass={GALLERY_ITEM_WIDTHS[columns]} onOpen={setSelectedImageIndex} />
+        ))}
       </div>
 
       {/* Lightbox Modal — RAC ModalOverlay owns focus containment, Escape-to-close,
@@ -152,6 +152,6 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
           </div>
         </Modal>
       </Overlay>
-    </section>
+    </Section>
   );
 }
