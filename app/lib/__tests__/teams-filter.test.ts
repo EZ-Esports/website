@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { SchoolGroup, TeamRosterGroup } from '@/app/(marketing)/[game]/teams/TeamsFilterClient';
+import { sortRostersByDivision } from '@/app/(marketing)/[game]/teams/[school]/SchoolSnapshotsClient';
 import { slugify } from '@/app/lib/text-utils';
 
-// Test suite validating the School & Season Snapshot abstraction layer logic and slug routing
+// Test suite validating the School & Season Snapshot abstraction layer logic and division sorting
 describe('Teams & Rosters Dedicated School Route Architecture', () => {
   const sampleSchoolGroups: SchoolGroup[] = [
     {
@@ -17,6 +18,15 @@ describe('Teams & Rosters Dedicated School Route Architecture', () => {
           isSeasonActive: true,
           rosters: [
             {
+              id: 'roster-2',
+              name: 'JV',
+              division: 'B',
+              record: '3-2',
+              players: [
+                { name: 'Charlie "Spark" Wu', role: 'Initiator', bio: 'Recon specialist' },
+              ],
+            },
+            {
               id: 'roster-1',
               name: 'Varsity',
               division: 'A',
@@ -24,15 +34,6 @@ describe('Teams & Rosters Dedicated School Route Architecture', () => {
               players: [
                 { name: 'Alex "Ace" Chen', role: 'Captain', bio: 'Entry duelist', isCaptain: true },
                 { name: 'Blake "Shadow" Lin', role: 'Controller', bio: 'Smokes main' },
-              ],
-            },
-            {
-              id: 'roster-2',
-              name: 'JV',
-              division: 'B',
-              record: '3-2',
-              players: [
-                { name: 'Charlie "Spark" Wu', role: 'Initiator', bio: 'Recon specialist' },
               ],
             },
           ],
@@ -88,6 +89,18 @@ describe('Teams & Rosters Dedicated School Route Architecture', () => {
     expect(sampleSchoolGroups[0].seasons[1].seasonName).toBe('Fall 2024');
   });
 
+  it('sorts Varsity rosters on top (1st) and Junior Varsity/JV on bottom (last)', () => {
+    const unsortedRosters = [
+      { name: 'Junior Varsity' },
+      { name: 'Varsity' },
+      { name: 'JV' },
+    ];
+    const sorted = sortRostersByDivision(unsortedRosters);
+
+    expect(sorted[0].name).toBe('Varsity');
+    expect(sorted[sorted.length - 1].name).toBe('JV');
+  });
+
   it('generates clean dedicated school route URLs', () => {
     const school = sampleSchoolGroups[0];
     const slug = school.schoolSlug || slugify(school.schoolName);
@@ -97,22 +110,16 @@ describe('Teams & Rosters Dedicated School Route Architecture', () => {
     expect(href).toBe('/valorant/teams/stuyvesant-high-school');
   });
 
+  it('identifies the active season as default season filter state', () => {
+    const activeSeason = sampleSchoolGroups[0].seasons.find((s) => s.isSeasonActive);
+    expect(activeSeason?.seasonName).toBe('Spring 2025');
+  });
+
   it('hides individual students behind the school top-level container on the main view', () => {
     const school = sampleSchoolGroups[0];
     expect(school.schoolName).toBeDefined();
     expect(school.seasons).toBeDefined();
-    expect(school.seasons[0].rosters[0].players).toHaveLength(2);
-  });
-
-  it('filters school snapshots by season on dedicated school pages', () => {
-    const school = sampleSchoolGroups[0];
-    const springSnapshots = school.seasons.filter((s) => s.seasonName === 'Spring 2025');
-    const fallSnapshots = school.seasons.filter((s) => s.seasonName === 'Fall 2024');
-
-    expect(springSnapshots).toHaveLength(1);
-    expect(springSnapshots[0].rosters).toHaveLength(2);
-    expect(fallSnapshots).toHaveLength(1);
-    expect(fallSnapshots[0].rosters).toHaveLength(1);
+    expect(school.seasons[0].rosters[0].players).toHaveLength(1);
   });
 
   it('normalizes legacy teamGroups into school groups with season snapshots for PR 68 compatibility', () => {

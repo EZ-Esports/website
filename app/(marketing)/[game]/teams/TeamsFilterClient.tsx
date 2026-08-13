@@ -6,6 +6,7 @@ import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 import Button from '@/app/components/ui/Button';
 import { slugify } from '@/app/lib/text-utils';
+import { sortRostersByDivision } from './[school]/SchoolSnapshotsClient';
 
 export interface PlayerItem {
   name: string;
@@ -57,12 +58,6 @@ export default function TeamsFilterClient({
   gameDisplayName,
   gameSlug,
 }: TeamsFilterClientProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSeason, setSelectedSeason] = useState<string>('all');
-  const [selectedDivision, setSelectedDivision] = useState<string>('all');
-  const [selectedRole, setSelectedRole] = useState<string>('all');
-  const [captainsOnly, setCaptainsOnly] = useState(false);
-
   // Normalize inputs to ensure backwards compatibility with PR 68's teamGroups
   const normalizedSchoolGroups: SchoolGroup[] = useMemo(() => {
     if (schoolGroups && schoolGroups.length > 0) return schoolGroups;
@@ -93,7 +88,27 @@ export default function TeamsFilterClient({
     return Array.from(set);
   }, [normalizedSchoolGroups]);
 
-  // Extract unique divisions from the data
+  // Find default season: Current/Active season if present, else most recent season
+  const defaultSeasonName = useMemo(() => {
+    let activeName = '';
+    normalizedSchoolGroups.forEach((school) => {
+      school.seasons.forEach((season) => {
+        if (season.isSeasonActive && !activeName) {
+          activeName = season.seasonName;
+        }
+      });
+    });
+    if (activeName) return activeName;
+    return availableSeasons.length > 0 ? availableSeasons[0] : 'all';
+  }, [normalizedSchoolGroups, availableSeasons]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSeason, setSelectedSeason] = useState<string>(defaultSeasonName);
+  const [selectedDivision, setSelectedDivision] = useState<string>('all');
+  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [captainsOnly, setCaptainsOnly] = useState(false);
+
+  // Extract unique divisions from the data, sorted: Varsity on top, JV on bottom
   const availableDivisions = useMemo(() => {
     const set = new Set<string>();
     normalizedSchoolGroups.forEach((school) => {
@@ -103,7 +118,8 @@ export default function TeamsFilterClient({
         });
       });
     });
-    return Array.from(set);
+    const items = Array.from(set).map((name) => ({ name }));
+    return sortRostersByDivision(items).map((item) => item.name);
   }, [normalizedSchoolGroups]);
 
   // Extract unique roles from the data
@@ -137,11 +153,12 @@ export default function TeamsFilterClient({
           .map((season) => {
             const seasonNameMatches = q ? season.seasonName.toLowerCase().includes(q) : false;
 
-            const filteredRosters = season.rosters
-              .filter((roster) => {
+            const filteredRosters = sortRostersByDivision(
+              season.rosters.filter((roster) => {
                 if (selectedDivision === 'all') return true;
                 return roster.name.toLowerCase() === selectedDivision.toLowerCase();
               })
+            )
               .map((roster) => {
                 const rosterNameMatches = q ? roster.name.toLowerCase().includes(q) : false;
 
@@ -206,14 +223,14 @@ export default function TeamsFilterClient({
 
   const isFiltered =
     searchQuery !== '' ||
-    selectedSeason !== 'all' ||
+    selectedSeason !== defaultSeasonName ||
     selectedDivision !== 'all' ||
     selectedRole !== 'all' ||
     captainsOnly;
 
   const handleReset = () => {
     setSearchQuery('');
-    setSelectedSeason('all');
+    setSelectedSeason(defaultSeasonName);
     setSelectedDivision('all');
     setSelectedRole('all');
     setCaptainsOnly(false);
@@ -297,7 +314,7 @@ export default function TeamsFilterClient({
         {/* Secondary Filter Row: Season, Role & Captains Toggles */}
         <div className="flex flex-col gap-3 pt-3 border-t border-line/60 sm:flex-row sm:items-center sm:justify-between">
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-            {/* Season Selector Dropdown */}
+            {/* Season Selector Dropdown (Defaults to Current Season) */}
             {availableSeasons.length > 0 && (
               <div className="relative col-span-1">
                 <select
@@ -306,12 +323,12 @@ export default function TeamsFilterClient({
                   className="w-full sm:w-auto appearance-none rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
                   aria-label="Filter by season"
                 >
-                  <option value="all">All Seasons</option>
                   {availableSeasons.map((seasonName) => (
                     <option key={seasonName} value={seasonName}>
-                      {seasonName}
+                      {seasonName} {seasonName === defaultSeasonName ? '(Current Season)' : ''}
                     </option>
                   ))}
+                  <option value="all">All Seasons</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-foreground-muted">
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -380,7 +397,7 @@ export default function TeamsFilterClient({
         </div>
       </Card>
 
-      {/* Main Grid: Member Schools List (Students hidden behind schools, links to /[game]/teams/[school]) */}
+      {/* Main Grid: Member Schools List */}
       <div className="space-y-6">
         {filteredSchools.length === 0 ? (
           <div className="text-center p-8 sm:p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line space-y-4">
@@ -408,7 +425,10 @@ export default function TeamsFilterClient({
                 });
               });
 
-              const divisions = Array.from(divisionsSet);
+              // Sort division badges: Varsity on top (1st), Junior Varsity on bottom (2nd)
+              const sortedDivisions = Array.from(divisionsSet).map((name) => ({ name }));
+              const divisions = sortRostersByDivision(sortedDivisions).map((item) => item.name);
+
               const schoolSlug = school.schoolSlug || slugify(school.schoolName);
               const schoolHref = `/${resolvedGameSlug}/teams/${schoolSlug}`;
 
@@ -435,7 +455,7 @@ export default function TeamsFilterClient({
                       </div>
                     </div>
 
-                    {/* Divisions & Badges */}
+                    {/* Divisions & Badges (Varsity 1st, Junior Varsity 2nd) */}
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {divisions.map((divName) => (
                         <Badge key={divName} size="sm" variant="neutral">

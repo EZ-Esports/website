@@ -41,8 +41,25 @@ interface SchoolSnapshotsClientProps {
   gameDisplayName: string;
 }
 
+/** Division sort helper: Varsity on top (1), Junior Varsity on bottom (100) */
+export function sortRostersByDivision<T extends { name: string }>(rosters: T[]): T[] {
+  const getRank = (name: string) => {
+    const lower = name.toLowerCase().trim();
+    if (lower === 'varsity' || (lower.includes('varsity') && !lower.includes('junior'))) return 1;
+    if (lower === 'jv' || lower.includes('junior varsity') || lower.includes('junior')) return 100;
+    return 50;
+  };
+  return [...rosters].sort((a, b) => getRank(a.name) - getRank(b.name));
+}
+
 export default function SchoolSnapshotsClient({ school, gameDisplayName }: SchoolSnapshotsClientProps) {
-  const [selectedSeason, setSelectedSeason] = useState<string>('all');
+  // Determine default season: Active season if flagged, otherwise the first (most recent) season
+  const defaultSeasonName = useMemo(() => {
+    const active = school.seasons.find((s) => s.isSeasonActive);
+    return active ? active.seasonName : (school.seasons[0]?.seasonName || 'all');
+  }, [school]);
+
+  const [selectedSeason, setSelectedSeason] = useState<string>(defaultSeasonName);
 
   // Extract available seasons for this school
   const availableSeasons = useMemo(() => {
@@ -122,23 +139,12 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName }: Schoo
         </div>
       </Card>
 
-      {/* Season Filter Selector Tabs */}
-      {availableSeasons.length > 1 && (
+      {/* Season Filter Selector Tabs (Current Season Selected by Default) */}
+      {availableSeasons.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth snap-x touch-manipulation">
           <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted shrink-0 mr-2 hidden sm:inline">
             Filter Season:
           </span>
-          <button
-            type="button"
-            onClick={() => setSelectedSeason('all')}
-            className={`px-4 py-2 min-h-[40px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
-              selectedSeason === 'all'
-                ? 'bg-accent text-on-accent border-accent'
-                : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
-            }`}
-          >
-            All Seasons ({school.seasons.length})
-          </button>
           {availableSeasons.map((seasonName) => {
             const seasonObj = school.seasons.find((s) => s.seasonName === seasonName);
             const isActive = selectedSeason === seasonName;
@@ -153,10 +159,21 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName }: Schoo
                     : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
                 }`}
               >
-                {seasonName} {seasonObj?.isSeasonActive ? '(Active)' : ''}
+                {seasonName} {seasonObj?.isSeasonActive ? '(Current Season)' : ''}
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setSelectedSeason('all')}
+            className={`px-4 py-2 min-h-[40px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
+              selectedSeason === 'all'
+                ? 'bg-accent text-on-accent border-accent'
+                : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
+            }`}
+          >
+            All Seasons ({school.seasons.length})
+          </button>
         </div>
       )}
 
@@ -167,73 +184,78 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName }: Schoo
             No team snapshots registered for this season filter.
           </div>
         ) : (
-          filteredSeasons.map((season) => (
-            <Card
-              key={season.seasonId}
-              padding="lg"
-              className="space-y-6 border border-line bg-surface-raised/80 p-5 sm:p-8"
-            >
-              {/* Season Snapshot Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
-                    {season.seasonName} Team Snapshot
-                  </h2>
-                  {season.isSeasonActive && <Badge size="sm" variant="success">Active Season</Badge>}
-                </div>
-                <span className="text-xs text-foreground-muted">
-                  {season.rosters.length} Division Squad{season.rosters.length === 1 ? '' : 's'}
-                </span>
-              </div>
+          filteredSeasons.map((season) => {
+            // Sort rosters: Varsity on top, Junior Varsity on bottom
+            const sortedRosters = sortRostersByDivision(season.rosters);
 
-              {/* Division Rosters */}
-              <div className="space-y-8">
-                {season.rosters.map((roster) => (
-                  <div key={roster.id} className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">
-                        <span>{roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division</span>
-                      </h3>
-                      <Badge size="sm" variant="neutral">Record: {roster.record}</Badge>
-                    </div>
-
-                    {roster.players.length === 0 ? (
-                      <p className="text-xs text-foreground-muted italic pl-2">
-                        No registered players under this division roster.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {roster.players.map((player, pIdx) => (
-                          <Card
-                            key={pIdx}
-                            padding="sm"
-                            className="flex flex-col justify-between bg-surface-sunken/60 border border-line/60 p-4"
-                          >
-                            <div>
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <h4 className="font-bold text-base tracking-tight text-foreground line-clamp-1">
-                                  {player.name}
-                                </h4>
-                                <Badge
-                                  size="sm"
-                                  variant={player.isCaptain || player.role === 'Captain' ? 'accent' : 'neutral'}
-                                >
-                                  {player.role}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-foreground-secondary leading-relaxed mt-1 line-clamp-3">
-                                {player.bio}
-                              </p>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
+            return (
+              <Card
+                key={season.seasonId}
+                padding="lg"
+                className="space-y-6 border border-line bg-surface-raised/80 p-5 sm:p-8"
+              >
+                {/* Season Snapshot Header */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+                      {season.seasonName} Team Snapshot
+                    </h2>
+                    {season.isSeasonActive && <Badge size="sm" variant="success">Current Season</Badge>}
                   </div>
-                ))}
-              </div>
-            </Card>
-          ))
+                  <span className="text-xs text-foreground-muted">
+                    {season.rosters.length} Division Squad{season.rosters.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                {/* Division Rosters (Varsity on top, Junior Varsity on bottom) */}
+                <div className="space-y-8">
+                  {sortedRosters.map((roster) => (
+                    <div key={roster.id} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-line/30 pb-2">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">
+                          <span>{roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division</span>
+                        </h3>
+                        <Badge size="sm" variant="neutral">Record: {roster.record}</Badge>
+                      </div>
+
+                      {roster.players.length === 0 ? (
+                        <p className="text-xs text-foreground-muted italic pl-2">
+                          No registered players under this division roster.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {roster.players.map((player, pIdx) => (
+                            <Card
+                              key={pIdx}
+                              padding="sm"
+                              className="flex flex-col justify-between bg-surface-sunken/60 border border-line/60 p-4"
+                            >
+                              <div>
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <h4 className="font-bold text-base tracking-tight text-foreground line-clamp-1">
+                                    {player.name}
+                                  </h4>
+                                  <Badge
+                                    size="sm"
+                                    variant={player.isCaptain || player.role === 'Captain' ? 'accent' : 'neutral'}
+                                  >
+                                    {player.role}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-foreground-secondary leading-relaxed mt-1 line-clamp-3">
+                                  {player.bio}
+                                </p>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>
