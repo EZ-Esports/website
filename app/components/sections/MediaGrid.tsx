@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
@@ -20,8 +21,6 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(3);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   // Dynamically determine how many cards to show per slide based on screen width
@@ -51,27 +50,14 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
     setCurrentIndex((prev) => (prev < maxIndex ? prev + 1 : 0));
   }, [maxIndex]);
 
-  // Touch Swipe Handling for Mobile
-  const minSwipeDistance = 50;
+  // Framer motion drag handler
+  const handleDragEnd = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const swipeThreshold = 40;
+    const velocityThreshold = 200;
 
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe) {
+    if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
       nextSlide();
-    } else if (isRightSwipe) {
+    } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
       prevSlide();
     }
   };
@@ -118,9 +104,6 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
         className="relative group outline-none"
         tabIndex={0}
         onKeyDown={handleCarouselKeyDown}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         aria-roledescription="carousel"
         aria-label={heading || 'Photo Gallery'}
       >
@@ -151,22 +134,27 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
         )}
 
         {/* Slide Viewport */}
-        <div className="overflow-hidden rounded-2xl p-1">
-          <div
-            className="flex transition-transform duration-500 ease-out gap-4 sm:gap-6"
-            style={{
-              transform: `translateX(-${currentIndex * (100 / visibleCount)}%)`,
-            }}
+        <div className="overflow-hidden rounded-2xl p-1 touch-pan-y">
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.1}
+            onDragEnd={handleDragEnd}
+            animate={{ x: `-${currentIndex * (100 / visibleCount)}%` }}
+            transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+            className="flex cursor-grab active:cursor-grabbing gap-4 sm:gap-6"
           >
             {items.map((item, index) => {
               // Lazy windowing: only load full image component for items within visible/neighboring window
               const isNearViewport = Math.abs(index - currentIndex) <= visibleCount + 1;
 
               return (
-                <div
+                <motion.div
                   key={item.id || index}
                   style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(16 * (visibleCount - 1)) / visibleCount}px)` }}
-                  className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-all duration-300 bg-surface-raised/40"
+                  whileHover={{ scale: 1.015 }}
+                  transition={{ duration: 0.2 }}
+                  className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40 select-none"
                 >
                   <button
                     type="button"
@@ -182,7 +170,7 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
                         unoptimized
                         loading="lazy"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-500 group-hover/card:scale-105"
+                        className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
                       />
                     ) : (
                       <div className="w-full h-full bg-surface-raised/60 animate-pulse flex items-center justify-center">
@@ -200,10 +188,10 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
                       </Badge>
                     </div>
                   </button>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         </div>
 
         {/* Carousel Pagination Controls & Position Counter */}
@@ -252,58 +240,67 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
               aria-describedby={selectedImageIndex !== null ? 'lightbox-caption' : undefined}
             >
               {selectedImageIndex !== null && (
-                <>
-                  {/* Close Button */}
-                  <button
-                    onClick={closeLightbox}
-                    className="absolute top-6 right-6 text-foreground hover:text-accent p-2 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
-                    aria-label="Close photo viewer"
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={selectedImageIndex}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="contents"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                    {/* Close Button */}
+                    <button
+                      onClick={closeLightbox}
+                      className="absolute top-6 right-6 text-foreground hover:text-accent p-2 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
+                      aria-label="Close photo viewer"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
 
-                  {/* Navigation Controls */}
-                  <button
-                    onClick={(e) => navigateLightbox('prev', e)}
-                    className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
-                    aria-label="Previous photo"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
+                    {/* Navigation Controls */}
+                    <button
+                      onClick={(e) => navigateLightbox('prev', e)}
+                      className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
+                      aria-label="Previous photo"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
 
-                  <button
-                    onClick={(e) => navigateLightbox('next', e)}
-                    className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
-                    aria-label="Next photo"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+                    <button
+                      onClick={(e) => navigateLightbox('next', e)}
+                      className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-foreground hover:text-accent p-3 bg-surface-sunken/40 rounded-full border border-line/60 transition-colors cursor-pointer z-50"
+                      aria-label="Next photo"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
 
-                  {/* Active Image */}
-                  <div
-                    className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center cursor-default"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Image
-                      src={items[selectedImageIndex].src}
-                      alt={items[selectedImageIndex].alt}
-                      width={1200}
-                      height={800}
-                      unoptimized
-                      priority
-                      className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
-                    />
-                    <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-foreground-secondary text-sm">
-                      {selectedImageIndex + 1} / {items.length} • {items[selectedImageIndex].alt}
+                    {/* Active Image */}
+                    <div
+                      className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center cursor-default"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Image
+                        src={items[selectedImageIndex].src}
+                        alt={items[selectedImageIndex].alt}
+                        width={1200}
+                        height={800}
+                        unoptimized
+                        priority
+                        className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
+                      />
+                      <div id="lightbox-caption" className="absolute bottom-[-40px] left-0 right-0 text-center text-foreground-secondary text-sm">
+                        {selectedImageIndex + 1} / {items.length} • {items[selectedImageIndex].alt}
+                      </div>
                     </div>
-                  </div>
-                </>
+                  </motion.div>
+                </AnimatePresence>
               )}
             </Dialog>
           </div>
