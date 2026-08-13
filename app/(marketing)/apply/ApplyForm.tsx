@@ -46,6 +46,7 @@ const initialForm = {
   },
   interestedGamesOther: '',
   feedback: '',
+  agreedRules: true,
 };
 
 const SECTIONS = [
@@ -252,7 +253,7 @@ ${form.feedback.trim() || 'N/A'}
       if (!res.ok) throw new Error('Submission failed');
       setSubmitted(true);
     } catch {
-      setError('Something went wrong. Please try again or reach out to "angesumi" on Discord.');
+      setError('Something went wrong. Please try again or reach out to "angesumi" on Discord or email info@ezesports.org.');
     } finally {
       setLoading(false);
     }
@@ -324,17 +325,66 @@ ${form.feedback.trim() || 'N/A'}
   return (
     <section className="theme-light min-h-screen bg-gradient-to-br from-[#fff0f5] via-[#ffeef6] to-[#ffdceb] pt-12 md:pt-16 pb-16 md:pb-24 relative z-10">
       <div className="container mx-auto px-4 max-w-6xl">
-        {/* Form Header & Context Links */}
+        {/* Header: title, meta badges, description, benefits & notice */}
         <div className="mb-10 md:mb-14 max-w-3xl">
           <span className="inline-block text-accent uppercase tracking-widest text-xs font-bold mb-3">
-            School Registration Portal
+            Registration Portal
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-foreground to-accent bg-clip-text text-transparent uppercase">
-            EZ Esports: Club Intel Gathering
+            School Application
           </h1>
 
-          {/* Quick links matching Google Form */}
+          {/* Metadata badges */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-xs font-semibold text-foreground-secondary">
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              New York City
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              ~5 min to complete
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              {SECTIONS.length} sections
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Free for schools
+            </span>
+          </div>
+
+          {/* Description & League Highlights */}
+          <p className="text-foreground-secondary text-sm md:text-base mt-5 font-medium leading-relaxed">
+            Bring competitive high-school esports to your campus. Any teacher, faculty advisor, administrator, or
+            student club officer can apply on behalf of their school. Joining gets your students:
+          </p>
+          <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
+            {[
+              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, Tetris, and Clash Royale with real standings',
+              'Live-streamed matches broadcast to audiences across NYC',
+              'Community and pathways into gaming and technology careers',
+            ].map((benefit) => (
+              <li key={benefit} className="flex items-start gap-2.5">
+                <svg className="w-4 h-4 mt-0.5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
+
+          {/* Quick resource links */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-6 text-xs font-semibold text-foreground-secondary">
             <a
               href="https://www.instagram.com/e.z.esports/"
               target="_blank"
@@ -355,7 +405,7 @@ ${form.feedback.trim() || 'N/A'}
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12H4z" />
               </svg>
-              Pitch Deck (2023)
+              Pitch Deck
             </a>
             <a
               href="https://www.silive.com/sports/2023/01/game-on-susan-wagner-student-spurred-a-city-wide-esports-league-which-is-now-home-to-hundreds-of-members.html"
@@ -370,23 +420,20 @@ ${form.feedback.trim() || 'N/A'}
             </a>
           </div>
 
-          {/* Notice Banner matching Google Form */}
+          {/* Notice Banner */}
           <div className="mt-6 bg-accent/10 border border-accent/30 rounded-xl p-5 space-y-2 text-sm text-foreground">
-            <p className="font-bold text-accent uppercase tracking-wider text-xs">Notice</p>
+            <p className="font-bold text-accent uppercase tracking-wider text-xs">Notice &amp; Instructions</p>
             <p className="font-semibold">
               [EZEsports Update // We&apos;re making some exciting changes and updates this summer! Keep an eye out for special announcements and upcoming news.]
             </p>
             <p className="text-foreground-secondary leading-relaxed">
-              To complete this form, you must be a high school student leading your school&apos;s Esports Club for the <strong className="text-foreground">2026–2027</strong> school year. If you share leadership with a co-leader, please include their details under the <strong>&quot;Vice President&quot;</strong> section.
+              To complete this application, you must be a high school student leading your school&apos;s Esports Club for the <strong className="text-foreground">2026–2027</strong> school year. If you share leadership with a co-leader, please include their details under the <strong>&quot;Vice President&quot;</strong> section.
             </p>
             <p className="text-foreground font-semibold">
               EZEsports requires at least 3 points of contact, no less.
             </p>
-            <p className="text-xs text-foreground-muted">
-              [The purpose of this form is to collect club info to prep for upcoming events. Thank you for your cooperation]
-            </p>
             <p className="text-xs text-foreground-secondary">
-              If you have any questions or need further clarification, feel free to reach out to <strong className="text-accent">&quot;angesumi&quot;</strong> on Discord. Thank you!
+              If you have any questions or need further clarification, feel free to reach out to <strong className="text-accent">&quot;angesumi&quot;</strong> on Discord or email <strong className="text-accent">info@ezesports.org</strong>.
             </p>
           </div>
         </div>
@@ -399,9 +446,9 @@ ${form.feedback.trim() || 'N/A'}
               </svg>
             </div>
             <div>
-              <h2 className="text-2xl font-black text-foreground">Intel Gathering Form Submitted!</h2>
+              <h2 className="text-2xl font-black text-foreground">Application Received!</h2>
               <p className="text-foreground-secondary text-sm mt-3 leading-relaxed">
-                Thank you for completing the club info gatherer. We have saved your 3 points of contact and club details. We will contact your leadership team at <strong className="text-foreground">{form.presidentEmail}</strong>.
+                Thank you for applying. We have registered your school&apos;s 3 points of contact and club details. We will review your application and reach out to <strong className="text-foreground">{form.presidentEmail}</strong> soon.
               </p>
             </div>
             <button
@@ -411,19 +458,19 @@ ${form.feedback.trim() || 'N/A'}
               }}
               className="text-accent hover:underline text-sm font-semibold focus:outline-none cursor-pointer"
             >
-              Submit another club application
+              Submit another application
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left rail: sticky section navigation + progress */}
+            {/* Left rail: sticky scroll-spy navigation + After You Apply timeline + Assistance */}
             <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
               <nav
                 aria-label="Application sections"
                 className="bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Application Layers</h3>
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Application</h3>
                   <span className="text-xs font-bold text-accent tabular-nums">{progress}%</span>
                 </div>
                 <div
@@ -481,23 +528,42 @@ ${form.feedback.trim() || 'N/A'}
                 </ul>
               </nav>
 
-              {/* Requirement Summary Box */}
+              {/* What happens next / Timeline */}
               <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
-                <h3 className="text-xs font-bold text-foreground mb-3 uppercase tracking-wider">Form Requirements</h3>
-                <ul className="space-y-2 text-xs text-foreground-secondary">
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent font-bold">•</span>
-                    <span>Must be a high school student leading your Esports Club for 2026–2027.</span>
+                <h3 className="text-sm font-bold text-foreground mb-4 uppercase tracking-wider">After You Apply</h3>
+                <ol className="relative border-l-2 border-line ml-2.5 pl-5 space-y-5 text-sm">
+                  <li className="relative">
+                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-surface" />
+                    <p className="font-bold text-foreground">Consultation call</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Short meeting to review league rules &amp; format.</p>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent font-bold">•</span>
-                    <span>Requires 3 distinct student points of contact (President, VP/Co-President, 3rd Officer).</span>
+                  <li className="relative">
+                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-line ring-4 ring-surface" />
+                    <p className="font-bold text-foreground">Roster registration</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Register players and assign coaches/captains.</p>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent font-bold">•</span>
-                    <span>Requires NYC school advisor contact (@schools.nyc.gov).</span>
+                  <li className="relative">
+                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-line ring-4 ring-surface" />
+                    <p className="font-bold text-foreground">Season kickoff</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Match schedules are generated &amp; games start!</p>
                   </li>
-                </ul>
+                </ol>
+              </div>
+
+              {/* Assistance */}
+              <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
+                <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">Need Assistance?</h3>
+                <p className="text-xs text-foreground-muted mb-3 leading-relaxed">
+                  Have questions about student eligibility, club requirements, or discord onboarding? We are here to help.
+                </p>
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <a href="mailto:info@ezesports.org" className="text-accent hover:underline font-bold transition-all">
+                    info@ezesports.org
+                  </a>
+                  <p className="text-foreground-muted">
+                    Discord: <span className="font-semibold text-foreground">angesumi</span>
+                  </p>
+                </div>
               </div>
             </aside>
 
@@ -974,7 +1040,7 @@ ${form.feedback.trim() || 'N/A'}
 
                 <div className="bg-surface-raised/40 border border-line/60 rounded-xl p-4 text-xs text-foreground-secondary">
                   <p>
-                    Every part is <strong className="text-foreground">crucial</strong>! Please double check to ensure that every information filled out is <strong className="text-foreground">accurate</strong>.
+                    Every part is <strong className="text-foreground">crucial</strong>! Please double check to ensure that all information filled out is <strong className="text-foreground">accurate</strong>.
                   </p>
                 </div>
 
@@ -1154,6 +1220,19 @@ ${form.feedback.trim() || 'N/A'}
                   />
                 </div>
 
+                {/* Rules & Terms Reference Link */}
+                <div className="rounded-xl border border-line bg-accent/5 p-4 text-xs text-foreground-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span>Review league rules, terms of participation, and handbook:</span>
+                  <a
+                    href="https://www.ezesports.org/rules"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent font-bold hover:underline shrink-0"
+                  >
+                    View Rulebook &amp; Terms →
+                  </a>
+                </div>
+
                 {/* Submit Action Bar */}
                 <div className="flex flex-col gap-3 pt-4 border-t border-line/50">
                   <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1162,7 +1241,7 @@ ${form.feedback.trim() || 'N/A'}
                       disabled={loading}
                       className="w-full sm:w-auto min-h-[46px] shadow-lg shadow-accent/5 hover:shadow-accent/20 hover:scale-[1.02] transition-all"
                     >
-                      {loading ? 'Submitting Form…' : 'Submit Club Intel Form'}
+                      {loading ? 'Submitting…' : 'Submit Application'}
                     </Button>
 
                     <button
@@ -1171,7 +1250,7 @@ ${form.feedback.trim() || 'N/A'}
                         setForm(initialForm);
                         setFieldErrors({});
                       }}
-                      className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200"
+                      className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200 cursor-pointer"
                     >
                       Clear Form Responses
                     </button>

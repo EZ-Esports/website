@@ -74,7 +74,91 @@ export function validateSchoolApplicationForm(form: {
   return errors;
 }
 
-describe('School Application Form Validation (4-Layer Structure)', () => {
+export function compileApplicationPayload(form: {
+  presidentFirstName: string;
+  presidentLastName: string;
+  schoolName: string;
+  presidentGradYear: string;
+  presidentEmail: string;
+  presidentDiscord: string;
+  presidentPreferredContact: string;
+
+  vpFirstName: string;
+  vpLastName: string;
+  vpGradYear: string;
+  vpDiscord: string;
+  vpEmail: string;
+  vpPreferredContact: string;
+
+  officerFirstName: string;
+  officerLastName: string;
+  officerGradYear: string;
+  officerEmail: string;
+  officerPreferredContact: string;
+
+  clubSocials?: string;
+  advisorName: string;
+  advisorEmail: string;
+  activeStudentsCount: string;
+  interestedGames: Record<string, boolean>;
+  interestedGamesOther?: string;
+  feedback?: string;
+}) {
+  const selectedGames: string[] = [];
+  if (form.interestedGames.valorant) selectedGames.push('Valorant');
+  if (form.interestedGames.lol) selectedGames.push('League of Legends (LoL)');
+  if (form.interestedGames.tft) selectedGames.push('Teamfight Tactics (TFT)');
+  if (form.interestedGames.tetris) selectedGames.push('Tetris');
+  if (form.interestedGames.clashRoyale) selectedGames.push('Clash Royale');
+  if (form.interestedGames.other && form.interestedGamesOther) {
+    selectedGames.push(`Other: ${form.interestedGamesOther.trim()}`);
+  }
+
+  const message = `
+=== 1. PRESIDENT INFO ===
+President Name: ${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}
+School Name: ${form.schoolName.trim()}
+Graduation Year: ${form.presidentGradYear}
+Email: ${form.presidentEmail.trim()}
+Discord Username: ${form.presidentDiscord.trim()}
+Best Contact Platform: ${form.presidentPreferredContact.trim()}
+
+=== 2. VICE PRESIDENT INFO ===
+VP Name: ${form.vpFirstName.trim()} ${form.vpLastName.trim()}
+Graduation Year: ${form.vpGradYear}
+Discord Username: ${form.vpDiscord.trim()}
+Email: ${form.vpEmail.trim()}
+Best Contact Platform: ${form.vpPreferredContact.trim()}
+
+=== 3. 3RD STUDENT CLUB OFFICER INFO ===
+Officer Name: ${form.officerFirstName.trim()} ${form.officerLastName.trim()}
+Graduation Year: ${form.officerGradYear}
+Email: ${form.officerEmail.trim()}
+Best Contact Platform: ${form.officerPreferredContact.trim()}
+
+=== 4. CLUB INFO ===
+Club Socials:
+${form.clubSocials?.trim() || 'N/A'}
+
+Club Advisor Name: ${form.advisorName.trim()}
+Club Advisor Email (@schools.nyc.gov): ${form.advisorEmail.trim()}
+Estimated Active Club Members: ${form.activeStudentsCount.trim()}
+Interested Games: ${selectedGames.join(', ')}
+
+Feedback / Notes:
+${form.feedback?.trim() || 'N/A'}
+`.trim();
+
+  return {
+    applicantName: `${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}`,
+    schoolName: form.schoolName.trim(),
+    role: 'Esports Club President',
+    email: form.presidentEmail.trim(),
+    message,
+  };
+}
+
+describe('School Application Form Validation & Consolidation', () => {
   const validForm = {
     presidentFirstName: 'Jane',
     presidentLastName: 'Doe',
@@ -100,7 +184,8 @@ describe('School Application Form Validation (4-Layer Structure)', () => {
     advisorName: 'Mr. Davis',
     advisorEmail: 'davis@schools.nyc.gov',
     activeStudentsCount: '30',
-    interestedGames: { valorant: true },
+    interestedGames: { valorant: true, clashRoyale: true },
+    feedback: 'Excited for the upcoming season!',
   };
 
   it('validates a complete 4-layer form with no errors', () => {
@@ -120,5 +205,28 @@ describe('School Application Form Validation (4-Layer Structure)', () => {
     const errors = validateSchoolApplicationForm(missingAdvisor);
     expect(errors.advisorName).toBeDefined();
     expect(errors.interestedGames).toBeDefined();
+  });
+
+  it('requires custom game text when other is selected', () => {
+    const withOtherNoText = {
+      ...validForm,
+      interestedGames: { other: true },
+      interestedGamesOther: '',
+    };
+    const errors = validateSchoolApplicationForm(withOtherNoText);
+    expect(errors.interestedGamesOther).toBeDefined();
+  });
+
+  it('compiles message payload correctly with all 4 layers', () => {
+    const payload = compileApplicationPayload(validForm);
+    expect(payload.applicantName).toBe('Jane Doe');
+    expect(payload.schoolName).toBe('Brooklyn Tech');
+    expect(payload.role).toBe('Esports Club President');
+    expect(payload.email).toBe('jane@example.com');
+    expect(payload.message).toContain('=== 1. PRESIDENT INFO ===');
+    expect(payload.message).toContain('=== 2. VICE PRESIDENT INFO ===');
+    expect(payload.message).toContain('=== 3. 3RD STUDENT CLUB OFFICER INFO ===');
+    expect(payload.message).toContain('=== 4. CLUB INFO ===');
+    expect(payload.message).toContain('Valorant, Clash Royale');
   });
 });
