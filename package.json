@@ -16,7 +16,8 @@
     "db:seed": "npx tsx --env-file-if-exists=.env db/seed.ts",
     "db:seed:gold": "npx tsx --env-file-if-exists=.env db/seed-gold.ts",
     "db:seed:leadership": "npx tsx --env-file-if-exists=.env db/seed-leadership.ts",
-    "db:seed-owner": "npx tsx --env-file-if-exists=.env db/seed-owner.ts"
+    "db:seed-owner": "npx tsx --env-file-if-exists=.env db/seed-owner.ts",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
