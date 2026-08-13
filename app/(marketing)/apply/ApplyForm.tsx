@@ -2,46 +2,57 @@
 
 import { useEffect, useState } from 'react';
 import Button from '@/app/components/ui/Button';
-import { Input, Textarea } from '@/app/components/ui/form';
+import { Textarea } from '@/app/components/ui/form';
+
+const GRAD_YEARS = ["'27", "'28", "'29", "'30"] as const;
 
 const initialForm = {
-  name: '',
-  preferredFirstName: '',
-  email: '',
-  phone: '',
-  discordTag: '',
-  school: '',
-  schoolCode: '',
-  location: '', // Bronx, Queens, Manhattan, Brooklyn, Staten Island, Other
-  locationOther: '',
-  role: '',
-  learnSource: '', // LinkedIn, Instagram, Twitch, Youtube, Web search, Friend/teacher/parent, Other
-  learnSourceOther: '',
-  linkedin: '',
-  captainsCoaches: '',
-  teamInfo: '',
-  needPlayerHelp: '', // Yes, No
-  commPlatforms: {
-    email: false,
-    discord: false,
-    text: false,
-  },
-  divisions: {
+  // Layer 1: President Info
+  presidentFirstName: '',
+  presidentLastName: '',
+  schoolName: '',
+  presidentGradYear: '',
+  presidentEmail: '',
+  presidentDiscord: '',
+  presidentPreferredContact: '',
+
+  // Layer 2: Vice President Info
+  vpFirstName: '',
+  vpLastName: '',
+  vpGradYear: '',
+  vpDiscord: '',
+  vpEmail: '',
+  vpPreferredContact: '',
+
+  // Layer 3: 3rd Student Club Officer Info
+  officerFirstName: '',
+  officerLastName: '',
+  officerGradYear: '',
+  officerEmail: '',
+  officerPreferredContact: '',
+
+  // Layer 4: Club Info
+  clubSocials: '',
+  advisorName: '',
+  advisorEmail: '',
+  activeStudentsCount: '',
+  interestedGames: {
+    valorant: false,
+    lol: false,
     tft: false,
     tetris: false,
-    lol: false,
-    valorant: false,
+    clashRoyale: false,
+    other: false,
   },
-  agreedRules: false,
-  additionalShare: '',
+  interestedGamesOther: '',
+  feedback: '',
 };
 
 const SECTIONS = [
-  { id: 'applicant', num: 1, title: 'Your Information', desc: 'How we can reach you during onboarding.' },
-  { id: 'school', num: 2, title: 'School Information', desc: 'Tell us which campus you represent.' },
-  { id: 'team', num: 3, title: 'Team Details', desc: 'Coaches, captains, and roster status.' },
-  { id: 'preferences', num: 4, title: 'League Preferences', desc: 'Divisions and how you want to communicate.' },
-  { id: 'review', num: 5, title: 'Review & Submit', desc: 'Agree to the rules and send it in.' },
+  { id: 'president', num: 1, title: 'President Info', desc: 'Primary student leader contact and school details.' },
+  { id: 'vicePresident', num: 2, title: 'Vice President Info', desc: 'Co-president, VP, or primary club manager.' },
+  { id: 'thirdOfficer', num: 3, title: '3rd Student Officer Info', desc: 'Third student point of contact.' },
+  { id: 'clubInfo', num: 4, title: 'Club Info', desc: 'Socials, advisor details, active members & games.' },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
@@ -54,7 +65,7 @@ export default function ApplyForm() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionId>('applicant');
+  const [activeSection, setActiveSection] = useState<SectionId>('president');
 
   const [form, setForm] = useState(initialForm);
 
@@ -80,19 +91,37 @@ export default function ApplyForm() {
   }, [submitted]);
 
   const requiredChecks: Record<SectionId, boolean[]> = {
-    applicant: [!!form.name.trim(), EMAIL_RE.test(form.email), !!form.phone.trim()],
-    school: [
-      !!form.school.trim(),
-      !!form.location && (form.location !== 'Other' || !!form.locationOther.trim()),
-      !!form.role.trim(),
+    president: [
+      !!form.presidentFirstName.trim(),
+      !!form.presidentLastName.trim(),
+      !!form.schoolName.trim(),
+      !!form.presidentGradYear,
+      EMAIL_RE.test(form.presidentEmail),
+      !!form.presidentDiscord.trim(),
+      !!form.presidentPreferredContact.trim(),
     ],
-    team: [!!form.needPlayerHelp],
-    preferences: [
-      !!form.learnSource && (form.learnSource !== 'Other' || !!form.learnSourceOther.trim()),
-      Object.values(form.commPlatforms).some((v) => v),
-      Object.values(form.divisions).some((v) => v),
+    vicePresident: [
+      !!form.vpFirstName.trim(),
+      !!form.vpLastName.trim(),
+      !!form.vpGradYear,
+      !!form.vpDiscord.trim(),
+      EMAIL_RE.test(form.vpEmail),
+      !!form.vpPreferredContact.trim(),
     ],
-    review: [form.agreedRules],
+    thirdOfficer: [
+      !!form.officerFirstName.trim(),
+      !!form.officerLastName.trim(),
+      !!form.officerGradYear,
+      EMAIL_RE.test(form.officerEmail),
+      !!form.officerPreferredContact.trim(),
+    ],
+    clubInfo: [
+      !!form.advisorName.trim(),
+      EMAIL_RE.test(form.advisorEmail),
+      !!form.activeStudentsCount.trim(),
+      Object.values(form.interestedGames).some(Boolean) &&
+        (!form.interestedGames.other || !!form.interestedGamesOther.trim()),
+    ],
   };
 
   const sectionComplete = (id: SectionId) => requiredChecks[id].every(Boolean);
@@ -105,25 +134,46 @@ export default function ApplyForm() {
 
   const validate = () => {
     const errors: Record<string, string> = {};
-    if (!form.name.trim()) errors.name = 'Full name is required.';
-    if (!form.email.trim()) errors.email = 'Email address is required.';
-    else if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
-    if (!form.phone.trim()) errors.phone = 'Phone number is required.';
-    if (!form.school.trim()) errors.school = 'School name is required.';
-    if (!form.location) errors.location = 'Please select your school location.';
-    if (form.location === 'Other' && !form.locationOther.trim()) errors.location = 'Please specify other location.';
-    if (!form.role.trim()) errors.role = 'Please specify your role within your school.';
-    if (!form.learnSource) errors.learnSource = 'Please specify how you learned about us.';
-    if (form.learnSource === 'Other' && !form.learnSourceOther.trim()) errors.learnSource = 'Please specify other learn source.';
-    if (!form.needPlayerHelp) errors.needPlayerHelp = 'Please select if you need help finding players.';
 
-    const hasComm = Object.values(form.commPlatforms).some(v => v);
-    if (!hasComm) errors.commPlatforms = 'Please select at least one preferred communication platform.';
+    // Layer 1 validation
+    if (!form.presidentFirstName.trim()) errors.presidentFirstName = 'President first name is required.';
+    if (!form.presidentLastName.trim()) errors.presidentLastName = 'President last name is required.';
+    if (!form.schoolName.trim()) errors.schoolName = 'School name is required.';
+    if (!form.presidentGradYear) errors.presidentGradYear = 'Please select a graduation year.';
+    if (!form.presidentEmail.trim()) errors.presidentEmail = 'President email is required.';
+    else if (!EMAIL_RE.test(form.presidentEmail)) errors.presidentEmail = 'Enter a valid email address.';
+    if (!form.presidentDiscord.trim()) errors.presidentDiscord = 'Discord username is required.';
+    if (!form.presidentPreferredContact.trim()) errors.presidentPreferredContact = 'Please specify best contact platform.';
 
-    const hasDiv = Object.values(form.divisions).some(v => v);
-    if (!hasDiv) errors.divisions = 'Please select at least one division you want to compete in.';
+    // Layer 2 validation
+    if (!form.vpFirstName.trim()) errors.vpFirstName = 'Vice President first name is required.';
+    if (!form.vpLastName.trim()) errors.vpLastName = 'Vice President last name is required.';
+    if (!form.vpGradYear) errors.vpGradYear = 'Please select a graduation year.';
+    if (!form.vpDiscord.trim()) errors.vpDiscord = 'Discord username is required.';
+    if (!form.vpEmail.trim()) errors.vpEmail = 'Vice President email is required.';
+    else if (!EMAIL_RE.test(form.vpEmail)) errors.vpEmail = 'Enter a valid email address.';
+    if (!form.vpPreferredContact.trim()) errors.vpPreferredContact = 'Please specify best contact platform.';
 
-    if (!form.agreedRules) errors.agreedRules = 'You must agree to the rules and terms of service.';
+    // Layer 3 validation
+    if (!form.officerFirstName.trim()) errors.officerFirstName = 'Officer first name is required.';
+    if (!form.officerLastName.trim()) errors.officerLastName = 'Officer last name is required.';
+    if (!form.officerGradYear) errors.officerGradYear = 'Please select a graduation year.';
+    if (!form.officerEmail.trim()) errors.officerEmail = 'Officer email is required.';
+    else if (!EMAIL_RE.test(form.officerEmail)) errors.officerEmail = 'Enter a valid email address.';
+    if (!form.officerPreferredContact.trim()) errors.officerPreferredContact = 'Please specify best contact platform.';
+
+    // Layer 4 validation
+    if (!form.advisorName.trim()) errors.advisorName = 'Club advisor name is required.';
+    if (!form.advisorEmail.trim()) errors.advisorEmail = 'Club advisor email is required.';
+    else if (!EMAIL_RE.test(form.advisorEmail)) errors.advisorEmail = 'Enter a valid email address.';
+    if (!form.activeStudentsCount.trim()) errors.activeStudentsCount = 'Estimated student count is required.';
+
+    const hasGame = Object.values(form.interestedGames).some(Boolean);
+    if (!hasGame) {
+      errors.interestedGames = 'Select at least one game your club is interested in.';
+    } else if (form.interestedGames.other && !form.interestedGamesOther.trim()) {
+      errors.interestedGamesOther = 'Please specify the other game.';
+    }
 
     return errors;
   };
@@ -133,7 +183,6 @@ export default function ApplyForm() {
     const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      // Scroll to the first error
       const firstErrorKey = Object.keys(errors)[0];
       const element = document.getElementById(`field-${firstErrorKey}`);
       if (element) {
@@ -145,28 +194,47 @@ export default function ApplyForm() {
     setLoading(true);
     setError('');
 
+    const selectedGames: string[] = [];
+    if (form.interestedGames.valorant) selectedGames.push('Valorant');
+    if (form.interestedGames.lol) selectedGames.push('League of Legends (LoL)');
+    if (form.interestedGames.tft) selectedGames.push('Teamfight Tactics (TFT)');
+    if (form.interestedGames.tetris) selectedGames.push('Tetris');
+    if (form.interestedGames.clashRoyale) selectedGames.push('Clash Royale');
+    if (form.interestedGames.other) selectedGames.push(`Other: ${form.interestedGamesOther.trim()}`);
+
     const compiledMessage = `
-Preferred first name: ${form.preferredFirstName || 'N/A'}
-Phone number: ${form.phone || 'N/A'}
-Discord tag: ${form.discordTag || 'N/A'}
-School code: ${form.schoolCode || 'N/A'}
-School location: ${form.location === 'Other' ? `Other: ${form.locationOther}` : form.location}
-How did you learn about us: ${form.learnSource === 'Other' ? `Other: ${form.learnSourceOther}` : form.learnSource}
-LinkedIn profile: ${form.linkedin || 'N/A'}
+=== 1. PRESIDENT INFO ===
+President Name: ${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}
+School Name: ${form.schoolName.trim()}
+Graduation Year: ${form.presidentGradYear}
+Email: ${form.presidentEmail.trim()}
+Discord Username: ${form.presidentDiscord.trim()}
+Best Contact Platform: ${form.presidentPreferredContact.trim()}
 
-Captains / Coaches:
-${form.captainsCoaches || 'N/A'}
+=== 2. VICE PRESIDENT INFO ===
+VP Name: ${form.vpFirstName.trim()} ${form.vpLastName.trim()}
+Graduation Year: ${form.vpGradYear}
+Discord Username: ${form.vpDiscord.trim()}
+Email: ${form.vpEmail.trim()}
+Best Contact Platform: ${form.vpPreferredContact.trim()}
 
-Anything to know about team:
-${form.teamInfo || 'N/A'}
+=== 3. 3RD STUDENT CLUB OFFICER INFO ===
+Officer Name: ${form.officerFirstName.trim()} ${form.officerLastName.trim()}
+Graduation Year: ${form.officerGradYear}
+Email: ${form.officerEmail.trim()}
+Best Contact Platform: ${form.officerPreferredContact.trim()}
 
-Need help finding players: ${form.needPlayerHelp}
-Preferred communication platform: ${Object.keys(form.commPlatforms).filter(k => form.commPlatforms[k as keyof typeof form.commPlatforms]).join(', ')}
-Interested Divisions: ${Object.keys(form.divisions).filter(k => form.divisions[k as keyof typeof form.divisions]).join(', ')}
-Rules Agreement: ${form.agreedRules ? 'Agreed' : 'Disagreed'}
+=== 4. CLUB INFO ===
+Club Socials:
+${form.clubSocials.trim() || 'N/A'}
 
-Additional Notes:
-${form.additionalShare || 'N/A'}
+Club Advisor Name: ${form.advisorName.trim()}
+Club Advisor Email (@schools.nyc.gov): ${form.advisorEmail.trim()}
+Estimated Active Club Members: ${form.activeStudentsCount.trim()}
+Interested Games: ${selectedGames.join(', ')}
+
+Feedback / Notes:
+${form.feedback.trim() || 'N/A'}
 `.trim();
 
     try {
@@ -174,17 +242,17 @@ ${form.additionalShare || 'N/A'}
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          applicantName: form.name,
-          schoolName: form.school,
-          role: form.role,
-          email: form.email,
+          applicantName: `${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}`,
+          schoolName: form.schoolName.trim(),
+          role: 'Esports Club President',
+          email: form.presidentEmail.trim(),
           message: compiledMessage,
         }),
       });
       if (!res.ok) throw new Error('Submission failed');
       setSubmitted(true);
     } catch {
-      setError('Something went wrong. Please try again or email us at info@ezesports.org.');
+      setError('Something went wrong. Please try again or reach out to "angesumi" on Discord.');
     } finally {
       setLoading(false);
     }
@@ -202,48 +270,24 @@ ${form.additionalShare || 'N/A'}
     }
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
-    }
-  };
-
-  const handleCheckboxChange = (group: 'commPlatforms' | 'divisions', name: string, checked: boolean) => {
+  const handleGameCheckboxChange = (key: keyof typeof initialForm.interestedGames, checked: boolean) => {
     setForm((prev) => ({
       ...prev,
-      [group]: {
-        ...prev[group],
-        [name]: checked,
+      interestedGames: {
+        ...prev.interestedGames,
+        [key]: checked,
       },
     }));
-    if (fieldErrors[group]) {
+    if (fieldErrors.interestedGames || fieldErrors.interestedGamesOther) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        delete next[group];
+        delete next.interestedGames;
+        delete next.interestedGamesOther;
         return next;
       });
     }
   };
 
-  const handleRulesChange = (checked: boolean) => {
-    setForm((prev) => ({ ...prev, agreedRules: checked }));
-    if (fieldErrors.agreedRules) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.agreedRules;
-        return next;
-      });
-    }
-  };
-
-  // Mirrors the base Input/Textarea primitive (form.tsx) but adds the error-state
-  // branch inline, since these five fields need a validation-driven border color
-  // that the shared primitive doesn't support out of the box.
   const textInputClass = (hasError: boolean) =>
     `w-full px-4 py-3 bg-surface border rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 transition-all text-sm shadow-sm ${
       hasError
@@ -254,11 +298,7 @@ ${form.additionalShare || 'N/A'}
   const fieldWrapperClass = (fieldId: string, hasError: boolean) => {
     const isFocused = focusedField === fieldId;
     return `transition-all duration-300 border-l-2 pl-3 w-full ${
-      hasError
-        ? 'border-danger'
-        : isFocused
-        ? 'border-accent'
-        : 'border-transparent'
+      hasError ? 'border-danger' : isFocused ? 'border-accent' : 'border-transparent'
     }`;
   };
 
@@ -284,60 +324,71 @@ ${form.additionalShare || 'N/A'}
   return (
     <section className="theme-light min-h-screen bg-gradient-to-br from-[#fff0f5] via-[#ffeef6] to-[#ffdceb] pt-12 md:pt-16 pb-16 md:pb-24 relative z-10">
       <div className="container mx-auto px-4 max-w-6xl">
-
-        {/* Careers-style header: title, meta, description, benefits */}
+        {/* Form Header & Context Links */}
         <div className="mb-10 md:mb-14 max-w-3xl">
           <span className="inline-block text-accent uppercase tracking-widest text-xs font-bold mb-3">
-            Registration Portal
+            School Registration Portal
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-foreground to-accent bg-clip-text text-transparent uppercase">
-            School Application
+            EZ Esports: Club Intel Gathering
           </h1>
+
+          {/* Quick links matching Google Form */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-xs font-semibold text-foreground-secondary">
-            <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            <a
+              href="https://www.instagram.com/e.z.esports/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-accent transition-colors"
+            >
+              <svg className="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
               </svg>
-              New York City
-            </span>
-            <span className="inline-flex items-center gap-1.5">
+              Instagram
+            </a>
+            <a
+              href="https://docs.google.com/presentation/d/1IQ1GnfzcZQTfVkaMUCzu17BGx10D0hicYxKPc5574uc/edit?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-accent transition-colors"
+            >
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12H4z" />
               </svg>
-              ~5 min to complete
-            </span>
-            <span className="inline-flex items-center gap-1.5">
+              Pitch Deck (2023)
+            </a>
+            <a
+              href="https://www.silive.com/sports/2023/01/game-on-susan-wagner-student-spurred-a-city-wide-esports-league-which-is-now-home-to-hundreds-of-members.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-accent transition-colors"
+            >
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6m-6 4h6" />
               </svg>
-              {SECTIONS.length} sections
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Free for schools
-            </span>
+              News Article
+            </a>
           </div>
-          <p className="text-foreground-secondary text-sm md:text-base mt-5 font-medium leading-relaxed">
-            Bring competitive high-school esports to your campus. Any teacher, faculty advisor, administrator, or
-            student club officer can apply on behalf of their school. Joining gets your students:
-          </p>
-          <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
-            {[
-              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, and Tetris with real standings',
-              'Live-streamed matches broadcast to audiences across NYC',
-              'Community and pathways into gaming and technology careers',
-            ].map((benefit) => (
-              <li key={benefit} className="flex items-start gap-2.5">
-                <svg className="w-4 h-4 mt-0.5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{benefit}</span>
-              </li>
-            ))}
-          </ul>
+
+          {/* Notice Banner matching Google Form */}
+          <div className="mt-6 bg-accent/10 border border-accent/30 rounded-xl p-5 space-y-2 text-sm text-foreground">
+            <p className="font-bold text-accent uppercase tracking-wider text-xs">Notice</p>
+            <p className="font-semibold">
+              [EZEsports Update // We&apos;re making some exciting changes and updates this summer! Keep an eye out for special announcements and upcoming news.]
+            </p>
+            <p className="text-foreground-secondary leading-relaxed">
+              To complete this form, you must be a high school student leading your school&apos;s Esports Club for the <strong className="text-foreground">2026–2027</strong> school year. If you share leadership with a co-leader, please include their details under the <strong>&quot;Vice President&quot;</strong> section.
+            </p>
+            <p className="text-foreground font-semibold">
+              EZEsports requires at least 3 points of contact, no less.
+            </p>
+            <p className="text-xs text-foreground-muted">
+              [The purpose of this form is to collect club info to prep for upcoming events. Thank you for your cooperation]
+            </p>
+            <p className="text-xs text-foreground-secondary">
+              If you have any questions or need further clarification, feel free to reach out to <strong className="text-accent">&quot;angesumi&quot;</strong> on Discord. Thank you!
+            </p>
+          </div>
         </div>
 
         {submitted ? (
@@ -348,9 +399,9 @@ ${form.additionalShare || 'N/A'}
               </svg>
             </div>
             <div>
-              <h2 className="text-2xl font-black text-foreground">Application Received!</h2>
+              <h2 className="text-2xl font-black text-foreground">Intel Gathering Form Submitted!</h2>
               <p className="text-foreground-secondary text-sm mt-3 leading-relaxed">
-                Thank you for applying. We have registered your response. We will review your application and contact you at <strong className="text-foreground">{form.email}</strong> soon.
+                Thank you for completing the club info gatherer. We have saved your 3 points of contact and club details. We will contact your leadership team at <strong className="text-foreground">{form.presidentEmail}</strong>.
               </p>
             </div>
             <button
@@ -360,20 +411,19 @@ ${form.additionalShare || 'N/A'}
               }}
               className="text-accent hover:underline text-sm font-semibold focus:outline-none cursor-pointer"
             >
-              Submit another application
+              Submit another club application
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-            {/* Left rail: sticky scroll-spy navigation + progress (big-tech careers style) */}
+            {/* Left rail: sticky section navigation + progress */}
             <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
               <nav
                 aria-label="Application sections"
                 className="bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Application</h3>
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Application Layers</h3>
                   <span className="text-xs font-bold text-accent tabular-nums">{progress}%</span>
                 </div>
                 <div
@@ -431,547 +481,688 @@ ${form.additionalShare || 'N/A'}
                 </ul>
               </nav>
 
-              {/* What happens next */}
+              {/* Requirement Summary Box */}
               <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-foreground mb-4 uppercase tracking-wider">After You Apply</h3>
-                <ol className="relative border-l-2 border-line ml-2.5 pl-5 space-y-5 text-sm">
-                  <li className="relative">
-                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-surface" />
-                    <p className="font-bold text-foreground">Consultation call</p>
-                    <p className="text-xs text-foreground-muted mt-0.5">Short meeting to review league rules &amp; format.</p>
+                <h3 className="text-xs font-bold text-foreground mb-3 uppercase tracking-wider">Form Requirements</h3>
+                <ul className="space-y-2 text-xs text-foreground-secondary">
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Must be a high school student leading your Esports Club for 2026–2027.</span>
                   </li>
-                  <li className="relative">
-                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-line ring-4 ring-surface" />
-                    <p className="font-bold text-foreground">Roster registration</p>
-                    <p className="text-xs text-foreground-muted mt-0.5">Register players and assign coaches/captains.</p>
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Requires 3 distinct student points of contact (President, VP/Co-President, 3rd Officer).</span>
                   </li>
-                  <li className="relative">
-                    <span className="absolute -left-[27px] top-1 h-2.5 w-2.5 rounded-full bg-line ring-4 ring-surface" />
-                    <p className="font-bold text-foreground">Season kickoff</p>
-                    <p className="text-xs text-foreground-muted mt-0.5">Match schedules are generated &amp; games start!</p>
+                  <li className="flex items-start gap-2">
+                    <span className="text-accent font-bold">•</span>
+                    <span>Requires NYC school advisor contact (@schools.nyc.gov).</span>
                   </li>
-                </ol>
-              </div>
-
-              {/* Assistance */}
-              <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
-                <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">Need Assistance?</h3>
-                <p className="text-xs text-foreground-muted mb-3 leading-relaxed">
-                  Have questions about DBN codes, student eligibility, or system specs? We are here to help.
-                </p>
-                <a href="mailto:info@ezesports.org" className="text-xs text-accent hover:underline font-bold transition-all">
-                  info@ezesports.org
-                </a>
+                </ul>
               </div>
             </aside>
 
-            {/* Right column: sectioned form */}
+            {/* Right column: 4 Layers Form */}
             <form onSubmit={handleSubmit} className="lg:col-span-8 space-y-6" noValidate>
 
-              {/* Step 1: Your Information */}
-              <div id="section-applicant" className={sectionCardClass}>
-                {sectionHeader('applicant')}
+              {/* LAYER 1: President Info */}
+              <div id="section-president" className={sectionCardClass}>
+                {sectionHeader('president')}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Full name */}
-                  <div id="field-name" className={fieldWrapperClass('name', !!fieldErrors.name)}>
-                    <label htmlFor="name" className={labelClass}>Full name {requiredMark}</label>
+                  {/* President First Name */}
+                  <div id="field-presidentFirstName" className={fieldWrapperClass('presidentFirstName', !!fieldErrors.presidentFirstName)}>
+                    <label htmlFor="presidentFirstName" className={labelClass}>President First Name {requiredMark}</label>
                     <input
-                      id="name"
-                      name="name"
+                      id="presidentFirstName"
+                      name="presidentFirstName"
                       type="text"
-                      placeholder="Jane Smith"
-                      value={form.name}
+                      placeholder="Jane"
+                      value={form.presidentFirstName}
                       onChange={handleTextChange}
-                      onFocus={() => setFocusedField('name')}
+                      onFocus={() => setFocusedField('presidentFirstName')}
                       onBlur={() => setFocusedField(null)}
-                      className={textInputClass(!!fieldErrors.name)}
+                      className={textInputClass(!!fieldErrors.presidentFirstName)}
                       required
-                      aria-invalid={!!fieldErrors.name}
-                      aria-describedby={fieldErrors.name ? 'name-error' : undefined}
+                      aria-invalid={!!fieldErrors.presidentFirstName}
+                      aria-describedby={fieldErrors.presidentFirstName ? 'presidentFirstName-error' : undefined}
                     />
-                    {fieldErrors.name && (
-                      <p id="name-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.name}</p>
+                    {fieldErrors.presidentFirstName && (
+                      <p id="presidentFirstName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.presidentFirstName}</p>
                     )}
                   </div>
 
-                  {/* Preferred first name */}
-                  <div id="field-preferredFirstName" className={fieldWrapperClass('preferredFirstName', false)}>
-                    <label htmlFor="preferredFirstName" className={labelClass}>Preferred first name</label>
-                    <Input
-                      id="preferredFirstName"
-                      name="preferredFirstName"
-                      type="text"
-                      placeholder="Preferred name"
-                      value={form.preferredFirstName}
-                      onChange={handleTextChange}
-                      onFocus={() => setFocusedField('preferredFirstName')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Email address */}
-                  <div id="field-email" className={fieldWrapperClass('email', !!fieldErrors.email)}>
-                    <label htmlFor="email" className={labelClass}>Email address {requiredMark}</label>
+                  {/* President Last Name */}
+                  <div id="field-presidentLastName" className={fieldWrapperClass('presidentLastName', !!fieldErrors.presidentLastName)}>
+                    <label htmlFor="presidentLastName" className={labelClass}>President Last Name {requiredMark}</label>
                     <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="jsmith@school.edu"
-                      value={form.email}
-                      onChange={handleTextChange}
-                      onFocus={() => setFocusedField('email')}
-                      onBlur={() => setFocusedField(null)}
-                      className={textInputClass(!!fieldErrors.email)}
-                      required
-                      aria-invalid={!!fieldErrors.email}
-                      aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                    />
-                    {fieldErrors.email && (
-                      <p id="email-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.email}</p>
-                    )}
-                  </div>
-
-                  {/* Phone number */}
-                  <div id="field-phone" className={fieldWrapperClass('phone', !!fieldErrors.phone)}>
-                    <label htmlFor="phone" className={labelClass}>Phone number {requiredMark}</label>
-                    <input
-                      id="phone"
-                      name="phone"
+                      id="presidentLastName"
+                      name="presidentLastName"
                       type="text"
-                      placeholder="(555) 555-5555"
-                      value={form.phone}
+                      placeholder="Smith"
+                      value={form.presidentLastName}
                       onChange={handleTextChange}
-                      onFocus={() => setFocusedField('phone')}
+                      onFocus={() => setFocusedField('presidentLastName')}
                       onBlur={() => setFocusedField(null)}
-                      className={textInputClass(!!fieldErrors.phone)}
+                      className={textInputClass(!!fieldErrors.presidentLastName)}
                       required
-                      aria-invalid={!!fieldErrors.phone}
-                      aria-describedby={fieldErrors.phone ? 'phone-error' : undefined}
+                      aria-invalid={!!fieldErrors.presidentLastName}
+                      aria-describedby={fieldErrors.presidentLastName ? 'presidentLastName-error' : undefined}
                     />
-                    {fieldErrors.phone && (
-                      <p id="phone-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.phone}</p>
+                    {fieldErrors.presidentLastName && (
+                      <p id="presidentLastName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.presidentLastName}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Discord tag */}
-                  <div id="field-discordTag" className={fieldWrapperClass('discordTag', false)}>
-                    <label htmlFor="discordTag" className={labelClass}>Discord username</label>
-                    <Input
-                      id="discordTag"
-                      name="discordTag"
-                      type="text"
-                      placeholder="username"
-                      value={form.discordTag}
-                      onChange={handleTextChange}
-                      onFocus={() => setFocusedField('discordTag')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                  </div>
-
-                  {/* LinkedIn Profile */}
-                  <div id="field-linkedin" className={fieldWrapperClass('linkedin', false)}>
-                    <label htmlFor="linkedin" className={labelClass}>LinkedIn profile link</label>
-                    <Input
-                      id="linkedin"
-                      name="linkedin"
-                      type="text"
-                      placeholder="https://linkedin.com/in/username"
-                      value={form.linkedin}
-                      onChange={handleTextChange}
-                      onFocus={() => setFocusedField('linkedin')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 2: School Information */}
-              <div id="section-school" className={sectionCardClass}>
-                {sectionHeader('school')}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* School name */}
-                  <div id="field-school" className={fieldWrapperClass('school', !!fieldErrors.school)}>
-                    <label htmlFor="school" className={labelClass}>School name {requiredMark}</label>
-                    <input
-                      id="school"
-                      name="school"
-                      type="text"
-                      placeholder="Brooklyn Technical High School"
-                      value={form.school}
-                      onChange={handleTextChange}
-                      onFocus={() => setFocusedField('school')}
-                      onBlur={() => setFocusedField(null)}
-                      className={textInputClass(!!fieldErrors.school)}
-                      required
-                      aria-invalid={!!fieldErrors.school}
-                      aria-describedby={fieldErrors.school ? 'school-error' : undefined}
-                    />
-                    {fieldErrors.school && (
-                      <p id="school-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.school}</p>
-                    )}
-                  </div>
-
-                  {/* School code */}
-                  <div id="field-schoolCode" className={fieldWrapperClass('schoolCode', false)}>
-                    <label htmlFor="schoolCode" className={labelClass}>School Code / DBN</label>
-                    <Input
-                      id="schoolCode"
-                      name="schoolCode"
-                      type="text"
-                      placeholder="13K430"
-                      value={form.schoolCode}
-                      onChange={handleTextChange}
-                      onFocus={() => setFocusedField('schoolCode')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                  </div>
-                </div>
-
-                {/* Role within school */}
-                <div id="field-role" className={fieldWrapperClass('role', !!fieldErrors.role)}>
-                  <label htmlFor="role" className={labelClass}>
-                    What is your role within your school? {requiredMark}
+                {/* Name of School */}
+                <div id="field-schoolName" className={fieldWrapperClass('schoolName', !!fieldErrors.schoolName)}>
+                  <label htmlFor="schoolName" className={labelClass}>
+                    Name of School (Ex: Brooklyn Technical High School) {requiredMark}
                   </label>
                   <input
-                    id="role"
-                    name="role"
+                    id="schoolName"
+                    name="schoolName"
                     type="text"
-                    placeholder="e.g. School Principal, Athletic Director, Esports Club Advisor"
-                    value={form.role}
+                    placeholder="Brooklyn Technical High School"
+                    value={form.schoolName}
                     onChange={handleTextChange}
-                    onFocus={() => setFocusedField('role')}
+                    onFocus={() => setFocusedField('schoolName')}
                     onBlur={() => setFocusedField(null)}
-                    className={textInputClass(!!fieldErrors.role)}
+                    className={textInputClass(!!fieldErrors.schoolName)}
                     required
-                    aria-invalid={!!fieldErrors.role}
-                    aria-describedby={fieldErrors.role ? 'role-error' : undefined}
+                    aria-invalid={!!fieldErrors.schoolName}
+                    aria-describedby={fieldErrors.schoolName ? 'schoolName-error' : undefined}
                   />
-                  {fieldErrors.role && (
-                    <p id="role-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.role}</p>
+                  {fieldErrors.schoolName && (
+                    <p id="schoolName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.schoolName}</p>
                   )}
                 </div>
 
-                {/* Where is your school located? */}
+                {/* Graduation Year */}
                 <div
-                  id="field-location"
-                  className={fieldWrapperClass('location', !!fieldErrors.location)}
+                  id="field-presidentGradYear"
+                  className={fieldWrapperClass('presidentGradYear', !!fieldErrors.presidentGradYear)}
                   role="group"
-                  aria-labelledby="location-label"
-                  aria-describedby={fieldErrors.location ? 'location-error' : undefined}
+                  aria-labelledby="presidentGradYear-label"
                 >
-                  <span id="location-label" className={labelClass}>Where is your school located? {requiredMark}</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {['Bronx', 'Queens', 'Manhattan', 'Brooklyn', 'Staten Island'].map((borough) => (
-                      <label key={borough} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                  <span id="presidentGradYear-label" className={labelClass}>Graduation Year {requiredMark}</span>
+                  <div className="flex flex-wrap gap-4 mt-2">
+                    {GRAD_YEARS.map((yr) => (
+                      <label key={yr} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
-                          name="location"
-                          value={borough}
-                          checked={form.location === borough}
-                          onChange={() => handleSelectChange('location', borough)}
+                          name="presidentGradYear"
+                          value={yr}
+                          checked={form.presidentGradYear === yr}
+                          onChange={handleTextChange}
                           className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
-                        <span>{borough}</span>
+                        <span>{yr}</span>
                       </label>
                     ))}
+                  </div>
+                  {fieldErrors.presidentGradYear && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.presidentGradYear}</p>
+                  )}
+                </div>
 
-                    {/* Other option inline */}
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
+                {/* President Email */}
+                <div id="field-presidentEmail" className={fieldWrapperClass('presidentEmail', !!fieldErrors.presidentEmail)}>
+                  <label htmlFor="presidentEmail" className={labelClass}>
+                    Please type your email below. (Fill this out with the email you check the most often!) {requiredMark}
+                  </label>
+                  <input
+                    id="presidentEmail"
+                    name="presidentEmail"
+                    type="email"
+                    placeholder="jsmith@gmail.com"
+                    value={form.presidentEmail}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('presidentEmail')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.presidentEmail)}
+                    required
+                    aria-invalid={!!fieldErrors.presidentEmail}
+                    aria-describedby={fieldErrors.presidentEmail ? 'presidentEmail-error' : undefined}
+                  />
+                  {fieldErrors.presidentEmail && (
+                    <p id="presidentEmail-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.presidentEmail}</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* President Discord */}
+                  <div id="field-presidentDiscord" className={fieldWrapperClass('presidentDiscord', !!fieldErrors.presidentDiscord)}>
+                    <label htmlFor="presidentDiscord" className={labelClass}>Discord username (ex: angesumi) {requiredMark}</label>
+                    <input
+                      id="presidentDiscord"
+                      name="presidentDiscord"
+                      type="text"
+                      placeholder="angesumi"
+                      value={form.presidentDiscord}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('presidentDiscord')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.presidentDiscord)}
+                      required
+                      aria-invalid={!!fieldErrors.presidentDiscord}
+                      aria-describedby={fieldErrors.presidentDiscord ? 'presidentDiscord-error' : undefined}
+                    />
+                    {fieldErrors.presidentDiscord && (
+                      <p id="presidentDiscord-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.presidentDiscord}</p>
+                    )}
+                  </div>
+
+                  {/* Best place to reach you */}
+                  <div id="field-presidentPreferredContact" className={fieldWrapperClass('presidentPreferredContact', !!fieldErrors.presidentPreferredContact)}>
+                    <label htmlFor="presidentPreferredContact" className={labelClass}>
+                      Where is the best place to reach you? (platform) {requiredMark}
+                    </label>
+                    <input
+                      id="presidentPreferredContact"
+                      name="presidentPreferredContact"
+                      type="text"
+                      placeholder="Discord / Email / SMS"
+                      value={form.presidentPreferredContact}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('presidentPreferredContact')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.presidentPreferredContact)}
+                      required
+                      aria-invalid={!!fieldErrors.presidentPreferredContact}
+                      aria-describedby={fieldErrors.presidentPreferredContact ? 'presidentPreferredContact-error' : undefined}
+                    />
+                    {fieldErrors.presidentPreferredContact && (
+                      <p id="presidentPreferredContact-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.presidentPreferredContact}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* LAYER 2: Vice President Info */}
+              <div id="section-vicePresident" className={sectionCardClass}>
+                {sectionHeader('vicePresident')}
+
+                <div className="bg-surface-raised/40 border border-line/60 rounded-xl p-4 text-xs text-foreground-secondary space-y-1">
+                  <p className="italic font-semibold text-foreground">also applies to co-presidents</p>
+                  <p>
+                    If this role does not apply to your club, please fill out below with a <strong className="text-foreground">manager</strong> (could be for a certain team, your club, etc.) or an officer that is most active and likely to interact with <strong className="text-foreground">EZEsports</strong>. Thank you for your time!
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* VP First Name */}
+                  <div id="field-vpFirstName" className={fieldWrapperClass('vpFirstName', !!fieldErrors.vpFirstName)}>
+                    <label htmlFor="vpFirstName" className={labelClass}>Vice President First Name {requiredMark}</label>
+                    <input
+                      id="vpFirstName"
+                      name="vpFirstName"
+                      type="text"
+                      placeholder="Alex"
+                      value={form.vpFirstName}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('vpFirstName')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.vpFirstName)}
+                      required
+                      aria-invalid={!!fieldErrors.vpFirstName}
+                      aria-describedby={fieldErrors.vpFirstName ? 'vpFirstName-error' : undefined}
+                    />
+                    {fieldErrors.vpFirstName && (
+                      <p id="vpFirstName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.vpFirstName}</p>
+                    )}
+                  </div>
+
+                  {/* VP Last Name */}
+                  <div id="field-vpLastName" className={fieldWrapperClass('vpLastName', !!fieldErrors.vpLastName)}>
+                    <label htmlFor="vpLastName" className={labelClass}>Vice President Last Name {requiredMark}</label>
+                    <input
+                      id="vpLastName"
+                      name="vpLastName"
+                      type="text"
+                      placeholder="Taylor"
+                      value={form.vpLastName}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('vpLastName')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.vpLastName)}
+                      required
+                      aria-invalid={!!fieldErrors.vpLastName}
+                      aria-describedby={fieldErrors.vpLastName ? 'vpLastName-error' : undefined}
+                    />
+                    {fieldErrors.vpLastName && (
+                      <p id="vpLastName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.vpLastName}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* VP Graduation Year */}
+                <div
+                  id="field-vpGradYear"
+                  className={fieldWrapperClass('vpGradYear', !!fieldErrors.vpGradYear)}
+                  role="group"
+                  aria-labelledby="vpGradYear-label"
+                >
+                  <span id="vpGradYear-label" className={labelClass}>Graduation Year {requiredMark}</span>
+                  <div className="flex flex-wrap gap-4 mt-2">
+                    {GRAD_YEARS.map((yr) => (
+                      <label key={yr} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
-                          name="location"
-                          value="Other"
-                          checked={form.location === 'Other'}
-                          onChange={() => handleSelectChange('location', 'Other')}
+                          name="vpGradYear"
+                          value={yr}
+                          checked={form.vpGradYear === yr}
+                          onChange={handleTextChange}
                           className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
-                        <span>Other:</span>
+                        <span>{yr}</span>
                       </label>
-                      {form.location === 'Other' && (
-                        <input
-                          type="text"
-                          placeholder="Specify borough"
-                          value={form.locationOther}
-                          onChange={(e) => handleTextChange(e)}
-                          name="locationOther"
-                          className="border-b border-line focus:border-b-2 focus:border-accent focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-foreground"
-                        />
-                      )}
-                    </div>
+                    ))}
                   </div>
-                  {fieldErrors.location && (
-                    <p id="location-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.location}</p>
+                  {fieldErrors.vpGradYear && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.vpGradYear}</p>
+                  )}
+                </div>
+
+                {/* VP Discord */}
+                <div id="field-vpDiscord" className={fieldWrapperClass('vpDiscord', !!fieldErrors.vpDiscord)}>
+                  <label htmlFor="vpDiscord" className={labelClass}>Discord Username (ex: angesumi) {requiredMark}</label>
+                  <input
+                    id="vpDiscord"
+                    name="vpDiscord"
+                    type="text"
+                    placeholder="alextaylor"
+                    value={form.vpDiscord}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('vpDiscord')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.vpDiscord)}
+                    required
+                    aria-invalid={!!fieldErrors.vpDiscord}
+                    aria-describedby={fieldErrors.vpDiscord ? 'vpDiscord-error' : undefined}
+                  />
+                  {fieldErrors.vpDiscord && (
+                    <p id="vpDiscord-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.vpDiscord}</p>
+                  )}
+                </div>
+
+                {/* VP Email */}
+                <div id="field-vpEmail" className={fieldWrapperClass('vpEmail', !!fieldErrors.vpEmail)}>
+                  <label htmlFor="vpEmail" className={labelClass}>
+                    Please type your email below. (Fill this out with the email you check the most often!) {requiredMark}
+                  </label>
+                  <input
+                    id="vpEmail"
+                    name="vpEmail"
+                    type="email"
+                    placeholder="alext@gmail.com"
+                    value={form.vpEmail}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('vpEmail')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.vpEmail)}
+                    required
+                    aria-invalid={!!fieldErrors.vpEmail}
+                    aria-describedby={fieldErrors.vpEmail ? 'vpEmail-error' : undefined}
+                  />
+                  {fieldErrors.vpEmail && (
+                    <p id="vpEmail-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.vpEmail}</p>
+                  )}
+                </div>
+
+                {/* VP Preferred Contact */}
+                <div id="field-vpPreferredContact" className={fieldWrapperClass('vpPreferredContact', !!fieldErrors.vpPreferredContact)}>
+                  <label htmlFor="vpPreferredContact" className={labelClass}>
+                    Where is the best place to reach you? (platform) {requiredMark}
+                  </label>
+                  <input
+                    id="vpPreferredContact"
+                    name="vpPreferredContact"
+                    type="text"
+                    placeholder="Discord / Email / SMS"
+                    value={form.vpPreferredContact}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('vpPreferredContact')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.vpPreferredContact)}
+                    required
+                    aria-invalid={!!fieldErrors.vpPreferredContact}
+                    aria-describedby={fieldErrors.vpPreferredContact ? 'vpPreferredContact-error' : undefined}
+                  />
+                  {fieldErrors.vpPreferredContact && (
+                    <p id="vpPreferredContact-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.vpPreferredContact}</p>
                   )}
                 </div>
               </div>
 
-              {/* Step 3: Team Details */}
-              <div id="section-team" className={sectionCardClass}>
-                {sectionHeader('team')}
+              {/* LAYER 3: 3rd Student Club Officer Info */}
+              <div id="section-thirdOfficer" className={sectionCardClass}>
+                {sectionHeader('thirdOfficer')}
 
-                {/* List out intended captains/coaches */}
-                <div id="field-captainsCoaches" className={fieldWrapperClass('captainsCoaches', false)}>
-                  <label htmlFor="captainsCoaches" className={labelClass}>
-                    Intended Captains and/or Coaches List
-                    <span className="text-xs text-foreground-secondary font-normal leading-relaxed block mt-1 lowercase first-letter:uppercase">
-                      Please list in format: [Game name] Name, Email, Phone number
+                <div className="bg-surface-raised/40 border border-line/60 rounded-xl p-4 text-xs text-foreground-secondary">
+                  <p>
+                    Please fill this out with the <strong className="text-foreground">officer</strong> that is most <strong className="text-foreground">active</strong> and likely to interact with EZEsports! If you already filled the previous section with an officer, pick the second most active student. Thank you!
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Officer First Name */}
+                  <div id="field-officerFirstName" className={fieldWrapperClass('officerFirstName', !!fieldErrors.officerFirstName)}>
+                    <label htmlFor="officerFirstName" className={labelClass}>Officer First Name {requiredMark}</label>
+                    <input
+                      id="officerFirstName"
+                      name="officerFirstName"
+                      type="text"
+                      placeholder="Jordan"
+                      value={form.officerFirstName}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('officerFirstName')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.officerFirstName)}
+                      required
+                      aria-invalid={!!fieldErrors.officerFirstName}
+                      aria-describedby={fieldErrors.officerFirstName ? 'officerFirstName-error' : undefined}
+                    />
+                    {fieldErrors.officerFirstName && (
+                      <p id="officerFirstName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.officerFirstName}</p>
+                    )}
+                  </div>
+
+                  {/* Officer Last Name */}
+                  <div id="field-officerLastName" className={fieldWrapperClass('officerLastName', !!fieldErrors.officerLastName)}>
+                    <label htmlFor="officerLastName" className={labelClass}>Officer Last Name {requiredMark}</label>
+                    <input
+                      id="officerLastName"
+                      name="officerLastName"
+                      type="text"
+                      placeholder="Lee"
+                      value={form.officerLastName}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('officerLastName')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.officerLastName)}
+                      required
+                      aria-invalid={!!fieldErrors.officerLastName}
+                      aria-describedby={fieldErrors.officerLastName ? 'officerLastName-error' : undefined}
+                    />
+                    {fieldErrors.officerLastName && (
+                      <p id="officerLastName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.officerLastName}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Officer Graduation Year */}
+                <div
+                  id="field-officerGradYear"
+                  className={fieldWrapperClass('officerGradYear', !!fieldErrors.officerGradYear)}
+                  role="group"
+                  aria-labelledby="officerGradYear-label"
+                >
+                  <span id="officerGradYear-label" className={labelClass}>Graduation Year {requiredMark}</span>
+                  <div className="flex flex-wrap gap-4 mt-2">
+                    {GRAD_YEARS.map((yr) => (
+                      <label key={yr} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="radio"
+                          name="officerGradYear"
+                          value={yr}
+                          checked={form.officerGradYear === yr}
+                          onChange={handleTextChange}
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                        />
+                        <span>{yr}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {fieldErrors.officerGradYear && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.officerGradYear}</p>
+                  )}
+                </div>
+
+                {/* Officer Email */}
+                <div id="field-officerEmail" className={fieldWrapperClass('officerEmail', !!fieldErrors.officerEmail)}>
+                  <label htmlFor="officerEmail" className={labelClass}>
+                    Please type your email below. (Fill this out with the email you check the most often!) {requiredMark}
+                  </label>
+                  <input
+                    id="officerEmail"
+                    name="officerEmail"
+                    type="email"
+                    placeholder="jordanl@gmail.com"
+                    value={form.officerEmail}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('officerEmail')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.officerEmail)}
+                    required
+                    aria-invalid={!!fieldErrors.officerEmail}
+                    aria-describedby={fieldErrors.officerEmail ? 'officerEmail-error' : undefined}
+                  />
+                  {fieldErrors.officerEmail && (
+                    <p id="officerEmail-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.officerEmail}</p>
+                  )}
+                </div>
+
+                {/* Officer Preferred Contact */}
+                <div id="field-officerPreferredContact" className={fieldWrapperClass('officerPreferredContact', !!fieldErrors.officerPreferredContact)}>
+                  <label htmlFor="officerPreferredContact" className={labelClass}>
+                    Where is the best place to reach you? (platform) {requiredMark}
+                  </label>
+                  <input
+                    id="officerPreferredContact"
+                    name="officerPreferredContact"
+                    type="text"
+                    placeholder="Discord / Email / SMS"
+                    value={form.officerPreferredContact}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('officerPreferredContact')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.officerPreferredContact)}
+                    required
+                    aria-invalid={!!fieldErrors.officerPreferredContact}
+                    aria-describedby={fieldErrors.officerPreferredContact ? 'officerPreferredContact-error' : undefined}
+                  />
+                  {fieldErrors.officerPreferredContact && (
+                    <p id="officerPreferredContact-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.officerPreferredContact}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* LAYER 4: Club Info */}
+              <div id="section-clubInfo" className={sectionCardClass}>
+                {sectionHeader('clubInfo')}
+
+                <div className="bg-surface-raised/40 border border-line/60 rounded-xl p-4 text-xs text-foreground-secondary">
+                  <p>
+                    Every part is <strong className="text-foreground">crucial</strong>! Please double check to ensure that every information filled out is <strong className="text-foreground">accurate</strong>.
+                  </p>
+                </div>
+
+                {/* Club Socials */}
+                <div id="field-clubSocials" className={fieldWrapperClass('clubSocials', false)}>
+                  <label htmlFor="clubSocials" className={labelClass}>
+                    Please add your club&apos;s socials below.
+                    <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
+                      (Ex: Instagram: @username, Discord: discordserverlink, etc.)
                     </span>
                   </label>
                   <Textarea
-                    id="captainsCoaches"
-                    name="captainsCoaches"
+                    id="clubSocials"
+                    name="clubSocials"
                     rows={3}
-                    placeholder="e.g. [Valorant] Coach Jane Doe, jdoe@school.edu, (555) 555-5555"
-                    value={form.captainsCoaches}
+                    placeholder={`Instagram: @bkltechnesports\nDiscord: https://discord.gg/...`}
+                    value={form.clubSocials}
                     onChange={handleTextChange}
-                    onFocus={() => setFocusedField('captainsCoaches')}
+                    onFocus={() => setFocusedField('clubSocials')}
                     onBlur={() => setFocusedField(null)}
                   />
                 </div>
 
-                {/* Anything we should know about your team? */}
-                <div id="field-teamInfo" className={fieldWrapperClass('teamInfo', false)}>
-                  <label htmlFor="teamInfo" className={labelClass}>Anything we should know about your team?</label>
-                  <Textarea
-                    id="teamInfo"
-                    name="teamInfo"
-                    rows={3}
-                    placeholder="Tell us about your team experience, current equipment setup, or history..."
-                    value={form.teamInfo}
-                    onChange={handleTextChange}
-                    onFocus={() => setFocusedField('teamInfo')}
-                    onBlur={() => setFocusedField(null)}
-                  />
-                </div>
-
-                {/* Do you need help finding extra players or forming a full team? */}
-                <div
-                  id="field-needPlayerHelp"
-                  className={fieldWrapperClass('needPlayerHelp', !!fieldErrors.needPlayerHelp)}
-                  role="group"
-                  aria-labelledby="needPlayerHelp-label"
-                  aria-describedby={fieldErrors.needPlayerHelp ? 'needPlayerHelp-error' : undefined}
-                >
-                  <span id="needPlayerHelp-label" className={labelClass}>Do you need help finding extra players or forming a full team? {requiredMark}</span>
-                  <div className="flex gap-6 mt-2">
-                    {['Yes', 'No'].map((opt) => (
-                      <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
-                        <input
-                          type="radio"
-                          name="needPlayerHelp"
-                          value={opt}
-                          checked={form.needPlayerHelp === opt}
-                          onChange={() => handleSelectChange('needPlayerHelp', opt)}
-                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
-                        />
-                        <span>{opt}</span>
-                      </label>
-                    ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Name of Club Advisor */}
+                  <div id="field-advisorName" className={fieldWrapperClass('advisorName', !!fieldErrors.advisorName)}>
+                    <label htmlFor="advisorName" className={labelClass}>Name of Club Advisor (Mr./Ms. ...) {requiredMark}</label>
+                    <input
+                      id="advisorName"
+                      name="advisorName"
+                      type="text"
+                      placeholder="Mr. John Davis"
+                      value={form.advisorName}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('advisorName')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.advisorName)}
+                      required
+                      aria-invalid={!!fieldErrors.advisorName}
+                      aria-describedby={fieldErrors.advisorName ? 'advisorName-error' : undefined}
+                    />
+                    {fieldErrors.advisorName && (
+                      <p id="advisorName-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.advisorName}</p>
+                    )}
                   </div>
-                  {fieldErrors.needPlayerHelp && (
-                    <p id="needPlayerHelp-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.needPlayerHelp}</p>
+
+                  {/* Email of Club Advisor */}
+                  <div id="field-advisorEmail" className={fieldWrapperClass('advisorEmail', !!fieldErrors.advisorEmail)}>
+                    <label htmlFor="advisorEmail" className={labelClass}>
+                      Email of Club Advisor (@schools.nyc.gov) {requiredMark}
+                    </label>
+                    <input
+                      id="advisorEmail"
+                      name="advisorEmail"
+                      type="email"
+                      placeholder="jdavis@schools.nyc.gov"
+                      value={form.advisorEmail}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('advisorEmail')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.advisorEmail)}
+                      required
+                      aria-invalid={!!fieldErrors.advisorEmail}
+                      aria-describedby={fieldErrors.advisorEmail ? 'advisorEmail-error' : undefined}
+                    />
+                    {fieldErrors.advisorEmail && (
+                      <p id="advisorEmail-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.advisorEmail}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Estimated active student count */}
+                <div id="field-activeStudentsCount" className={fieldWrapperClass('activeStudentsCount', !!fieldErrors.activeStudentsCount)}>
+                  <label htmlFor="activeStudentsCount" className={labelClass}>
+                    Estimated amount of students active in club / attending meetings (# input only) {requiredMark}
+                  </label>
+                  <input
+                    id="activeStudentsCount"
+                    name="activeStudentsCount"
+                    type="text"
+                    placeholder="25"
+                    value={form.activeStudentsCount}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('activeStudentsCount')}
+                    onBlur={() => setFocusedField(null)}
+                    className={textInputClass(!!fieldErrors.activeStudentsCount)}
+                    required
+                    aria-invalid={!!fieldErrors.activeStudentsCount}
+                    aria-describedby={fieldErrors.activeStudentsCount ? 'activeStudentsCount-error' : undefined}
+                  />
+                  {fieldErrors.activeStudentsCount && (
+                    <p id="activeStudentsCount-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.activeStudentsCount}</p>
                   )}
                 </div>
-              </div>
 
-              {/* Step 4: League Preferences */}
-              <div id="section-preferences" className={sectionCardClass}>
-                {sectionHeader('preferences')}
-
-                {/* How did you first learn about EZ Esports? */}
+                {/* Interested Games Checkboxes */}
                 <div
-                  id="field-learnSource"
-                  className={fieldWrapperClass('learnSource', !!fieldErrors.learnSource)}
+                  id="field-interestedGames"
+                  className={fieldWrapperClass('interestedGames', !!fieldErrors.interestedGames)}
                   role="group"
-                  aria-labelledby="learnSource-label"
-                  aria-describedby={fieldErrors.learnSource ? 'learnSource-error' : undefined}
+                  aria-labelledby="interestedGames-label"
                 >
-                  <span id="learnSource-label" className={labelClass}>How did you first learn about EZ Esports? {requiredMark}</span>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['LinkedIn', 'Instagram', 'Twitch', 'Youtube', 'Web search', 'Friend/teacher/parent'].map((src) => (
-                      <label key={src} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                  <span id="interestedGames-label" className={labelClass}>
+                    What games are you and your club members interested in competing for this year? {requiredMark}
+                    <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
+                      (note: we want to organize other games if there is interest, so please include games you feel confident organizing teams for)
+                    </span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {[
+                      { id: 'valorant', label: 'Valorant' },
+                      { id: 'lol', label: 'League of Legends (LoL)' },
+                      { id: 'tft', label: 'Teamfight Tactics (TFT)' },
+                      { id: 'tetris', label: 'Tetris' },
+                      { id: 'clashRoyale', label: 'Clash Royale' },
+                    ].map((g) => (
+                      <label key={g.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
-                          type="radio"
-                          name="learnSource"
-                          value={src}
-                          checked={form.learnSource === src}
-                          onChange={() => handleSelectChange('learnSource', src)}
-                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                          type="checkbox"
+                          checked={form.interestedGames[g.id as keyof typeof form.interestedGames]}
+                          onChange={(e) => handleGameCheckboxChange(g.id as keyof typeof form.interestedGames, e.target.checked)}
+                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
                         />
-                        <span>{src}</span>
+                        <span>{g.label}</span>
                       </label>
                     ))}
 
-                    {/* Other option inline */}
-                    <div className="col-span-2 flex items-center gap-2">
+                    {/* Other option with write-in field */}
+                    <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
                       <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
                         <input
-                          type="radio"
-                          name="learnSource"
-                          value="Other"
-                          checked={form.learnSource === 'Other'}
-                          onChange={() => handleSelectChange('learnSource', 'Other')}
-                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                          type="checkbox"
+                          checked={form.interestedGames.other}
+                          onChange={(e) => handleGameCheckboxChange('other', e.target.checked)}
+                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
                         />
                         <span>Other:</span>
                       </label>
-                      {form.learnSource === 'Other' && (
+                      {form.interestedGames.other && (
                         <input
+                          id="field-interestedGamesOther"
                           type="text"
-                          placeholder="Please specify"
-                          value={form.learnSourceOther}
-                          onChange={(e) => handleTextChange(e)}
-                          name="learnSourceOther"
-                          className="border-b border-line focus:border-b-2 focus:border-accent focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-foreground"
+                          name="interestedGamesOther"
+                          placeholder="Specify game name..."
+                          value={form.interestedGamesOther}
+                          onChange={handleTextChange}
+                          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
                         />
                       )}
                     </div>
                   </div>
-                  {fieldErrors.learnSource && (
-                    <p id="learnSource-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.learnSource}</p>
+                  {fieldErrors.interestedGames && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGames}</p>
+                  )}
+                  {fieldErrors.interestedGamesOther && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGamesOther}</p>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                  {/* Preferred communication platform */}
-                  <div
-                    id="field-commPlatforms"
-                    className={fieldWrapperClass('commPlatforms', !!fieldErrors.commPlatforms)}
-                    role="group"
-                    aria-labelledby="commPlatforms-label"
-                    aria-describedby={fieldErrors.commPlatforms ? 'commPlatforms-error' : undefined}
-                  >
-                    <span id="commPlatforms-label" className={labelClass}>Preferred Communication platform {requiredMark}</span>
-                    <div className="space-y-2.5">
-                      {[
-                        { id: 'email', label: 'Email' },
-                        { id: 'discord', label: 'Discord Server' },
-                        { id: 'text', label: 'SMS Texting' }
-                      ].map((plat) => (
-                        <label key={plat.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={form.commPlatforms[plat.id as keyof typeof form.commPlatforms]}
-                            onChange={(e) => handleCheckboxChange('commPlatforms', plat.id, e.target.checked)}
-                            className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                          />
-                          <span>{plat.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {fieldErrors.commPlatforms && (
-                      <p id="commPlatforms-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.commPlatforms}</p>
-                    )}
-                  </div>
-
-                  {/* Interested divisions */}
-                  <div
-                    id="field-divisions"
-                    className={fieldWrapperClass('divisions', !!fieldErrors.divisions)}
-                    role="group"
-                    aria-labelledby="divisions-label"
-                    aria-describedby={fieldErrors.divisions ? 'divisions-error' : undefined}
-                  >
-                    <span id="divisions-label" className={labelClass}>Interested Divisions {requiredMark}</span>
-                    <div className="space-y-2.5">
-                      {[
-                        { id: 'tft', label: 'Teamfight Tactics' },
-                        { id: 'tetris', label: 'Tetris' },
-                        { id: 'lol', label: 'League of Legends' },
-                        { id: 'valorant', label: 'Valorant' }
-                      ].map((div) => (
-                        <label key={div.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={form.divisions[div.id as keyof typeof form.divisions]}
-                            onChange={(e) => handleCheckboxChange('divisions', div.id, e.target.checked)}
-                            className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                          />
-                          <span>{div.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {fieldErrors.divisions && (
-                      <p id="divisions-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.divisions}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 5: Review & Submit */}
-              <div id="section-review" className={sectionCardClass}>
-                {sectionHeader('review')}
-
-                {/* Additional share */}
-                <div id="field-additionalShare" className={fieldWrapperClass('additionalShare', false)}>
-                  <label htmlFor="additionalShare" className={labelClass}>
-                    Anything else you want to share?
+                {/* Feedback */}
+                <div id="field-feedback" className={fieldWrapperClass('feedback', false)}>
+                  <label htmlFor="feedback" className={labelClass}>
+                    Feedback or suggestions for EZ Esports
+                    <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
+                      (Please include any feedback from you or your club about enhancing your school&apos;s experience with EZ Esports.)
+                    </span>
                   </label>
                   <Textarea
-                    id="additionalShare"
-                    name="additionalShare"
+                    id="feedback"
+                    name="feedback"
                     rows={3}
-                    placeholder="Type comments, questions, or specific scheduling requests..."
-                    value={form.additionalShare}
+                    placeholder="Share any thoughts, ideas, or feature requests..."
+                    value={form.feedback}
                     onChange={handleTextChange}
-                    onFocus={() => setFocusedField('additionalShare')}
+                    onFocus={() => setFocusedField('feedback')}
                     onBlur={() => setFocusedField(null)}
                   />
                 </div>
 
-                {/* Please review our rulebooks */}
-                <div
-                  id="field-agreedRules"
-                  className={`rounded-xl border p-4 sm:p-5 transition-colors ${
-                    fieldErrors.agreedRules ? 'border-danger bg-danger/5' : 'border-line bg-accent/5'
-                  }`}
-                  role="group"
-                  aria-labelledby="agreedRules-label"
-                  aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
-                >
-                  <span id="agreedRules-label" className={labelClass}>
-                    Rulebooks &amp; Terms Agreement {requiredMark}
-                  </span>
-                  <a
-                    href="https://www.ezesports.org/rules"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-accent hover:underline font-bold inline-block mb-3.5 transition-colors"
-                  >
-                    Click to review rules and terms of service
-                  </a>
-                  <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={form.agreedRules}
-                      onChange={(e) => handleRulesChange(e.target.checked)}
-                      className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                      aria-invalid={!!fieldErrors.agreedRules}
-                      aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
-                    />
-                    <span>I understand and agree to all tournament rules.</span>
-                  </label>
-                  {fieldErrors.agreedRules && (
-                    <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
-                  )}
-                </div>
-
-                {/* Action buttons & error feedback */}
-                <div className="flex flex-col gap-3 pt-2 border-t border-line/50">
-                  <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
+                {/* Submit Action Bar */}
+                <div className="flex flex-col gap-3 pt-4 border-t border-line/50">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
                     <Button
                       type="submit"
                       disabled={loading}
                       className="w-full sm:w-auto min-h-[46px] shadow-lg shadow-accent/5 hover:shadow-accent/20 hover:scale-[1.02] transition-all"
                     >
-                      {loading ? 'Submitting…' : 'Submit Application'}
+                      {loading ? 'Submitting Form…' : 'Submit Club Intel Form'}
                     </Button>
 
                     <button
@@ -982,7 +1173,7 @@ ${form.additionalShare || 'N/A'}
                       }}
                       className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200"
                     >
-                      Clear Form Response
+                      Clear Form Responses
                     </button>
                   </div>
 
