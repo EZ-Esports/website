@@ -2757,7 +2757,6 @@
       "schema": "public",
       "values": [
         "pending",
-        "reviewed",
         "accepted",
         "rejected"
       ]

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { updateApplicationStatus } from '@/app/(admin)/admin/applications/actions';
 
-type Status = 'pending' | 'reviewed' | 'accepted' | 'rejected';
+type Status = 'pending' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
 
 interface Application {
@@ -19,7 +19,6 @@ interface Application {
 
 const activeBadgeClass: Record<Status, string> = {
   pending: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-  reviewed: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
   accepted: 'bg-green-500/10 text-green-400 border border-green-500/20',
   rejected: 'bg-red-500/10 text-red-400 border border-red-500/20',
 };
@@ -83,7 +82,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
       </td>
       <td className="py-3 pr-4">
         <div className="flex gap-1">
-          {(['pending', 'reviewed', 'accepted', 'rejected'] as const).map(s => (
+          {(['pending', 'accepted', 'rejected'] as const).map(s => (
             <button
               key={s}
               disabled={isPending || status === s}

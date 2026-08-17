@@ -619,7 +619,7 @@ export const getCachedHomepageGallery = unstable_cache(
   { tags: ['gallery-images'] }
 );
 
-export type ApplicationStatus = 'pending' | 'reviewed' | 'accepted' | 'rejected';
+export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
 
 /** Subquery resolving the latest status log for each application */
 function getLatestStatusLogSubquery(type: 'school' | 'staff') {

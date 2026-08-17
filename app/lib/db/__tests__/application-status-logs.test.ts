@@ -4,10 +4,9 @@ import { buildSchoolApplicationsQuery, buildStaffApplicationsQuery } from '@/app
 
 describe('Application Status Logs & Append-Only Schema', () => {
   describe('Schema Definitions', () => {
-    it('defines applicationStatusEnum with pending, reviewed, accepted, rejected', () => {
+    it('defines applicationStatusEnum with pending, accepted, rejected', () => {
       expect(schema.applicationStatusEnum.enumValues).toEqual([
         'pending',
-        'reviewed',
         'accepted',
         'rejected',
       ]);
@@ -48,14 +47,6 @@ describe('Application Status Logs & Append-Only Schema', () => {
       const { sql } = query.toSQL();
 
       expect(sql).toContain('"latest_logs"."status" is null or "latest_logs"."status" =');
-    });
-
-    it('filters for reviewed applications strictly by latest status log', () => {
-      const query = buildSchoolApplicationsQuery('reviewed');
-      const { sql, params } = query.toSQL();
-
-      expect(sql).toContain('"latest_logs"."status" =');
-      expect(params).toContain('reviewed');
     });
 
     it('filters for accepted applications strictly by latest status log', () => {
@@ -103,14 +94,6 @@ describe('Application Status Logs & Append-Only Schema', () => {
       const { sql } = query.toSQL();
 
       expect(sql).toContain('"latest_logs"."status" is null or "latest_logs"."status" =');
-    });
-
-    it('filters for reviewed staff applications', () => {
-      const query = buildStaffApplicationsQuery('reviewed');
-      const { sql, params } = query.toSQL();
-
-      expect(sql).toContain('"latest_logs"."status" =');
-      expect(params).toContain('reviewed');
     });
 
     it('filters for accepted staff applications', () => {

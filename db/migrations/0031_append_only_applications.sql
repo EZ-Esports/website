@@ -18,13 +18,13 @@ CREATE INDEX "app_status_logs_type_id_created_idx" ON "application_status_logs" 
 --> statement-breakpoint
 CREATE INDEX "app_status_logs_created_at_idx" ON "application_status_logs" USING btree ("created_at");
 --> statement-breakpoint
--- Backfill existing school_applications statuses into application_status_logs 1:1 (preserving 'reviewed' as 'reviewed')
+-- Backfill existing school_applications into application_status_logs with status 'pending'
 INSERT INTO "application_status_logs" ("id", "application_id", "application_type", "status", "created_at")
 SELECT 
   gen_random_uuid(),
   "id",
   'school',
-  "status",
+  'pending'::"application_status",
   "submitted_at"
 FROM "school_applications" s
 WHERE NOT EXISTS (
@@ -32,13 +32,13 @@ WHERE NOT EXISTS (
   WHERE l."application_id" = s."id" AND l."application_type" = 'school'
 );
 --> statement-breakpoint
--- Backfill existing staff_applications statuses into application_status_logs 1:1 (preserving 'reviewed' as 'reviewed')
+-- Backfill existing staff_applications into application_status_logs with status 'pending'
 INSERT INTO "application_status_logs" ("id", "application_id", "application_type", "status", "created_at")
 SELECT 
   gen_random_uuid(),
   "id",
   'staff',
-  "status",
+  'pending'::"application_status",
   "submitted_at"
 FROM "staff_applications" s
 WHERE NOT EXISTS (

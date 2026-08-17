@@ -11,7 +11,7 @@ const auditColumns = {
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'completed', 'forfeit', 'cancelled']);
 export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
-export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted', 'rejected']);
+export const applicationStatusEnum = pgEnum('application_status', ['pending', 'accepted', 'rejected']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
 
 // --- CORE ENTITIES ---
