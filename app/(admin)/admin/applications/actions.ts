@@ -4,29 +4,42 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
-export async function updateApplicationStatus(id: string, status: 'pending' | 'reviewed' | 'accepted') {
-  await requirePermission(Permissions.MANAGE_APPLICATIONS);
-  await db.update(schema.schoolApplications).set({ status }).where(eq(schema.schoolApplications.id, id));
+export async function updateApplicationStatus(
+  id: string,
+  status: 'pending' | 'accepted' | 'rejected',
+  reason?: string
+) {
+  const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
+
+  await db.insert(schema.applicationStatusLogs).values({
+    applicationId: id,
+    applicationType: 'school',
+    status,
+    actorUserId: staff.id,
+    actorEmail: staff.email,
+    reason: reason ?? null,
+  });
+
   revalidatePath('/admin/applications');
 }
 
-export async function deleteApplication(id: string) {
-  await requirePermission(Permissions.MANAGE_APPLICATIONS);
-  await db.delete(schema.schoolApplications).where(eq(schema.schoolApplications.id, id));
-  revalidatePath('/admin/applications');
-}
+export async function updateStaffApplicationStatus(
+  id: string,
+  status: 'pending' | 'accepted' | 'rejected',
+  reason?: string
+) {
+  const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
 
-export async function updateStaffApplicationStatus(id: string, status: 'pending' | 'reviewed' | 'accepted') {
-  await requirePermission(Permissions.MANAGE_APPLICATIONS);
-  await db.update(schema.staffApplications).set({ status }).where(eq(schema.staffApplications.id, id));
-  revalidatePath('/admin/applications');
-}
+  await db.insert(schema.applicationStatusLogs).values({
+    applicationId: id,
+    applicationType: 'staff',
+    status,
+    actorUserId: staff.id,
+    actorEmail: staff.email,
+    reason: reason ?? null,
+  });
 
-export async function deleteStaffApplication(id: string) {
-  await requirePermission(Permissions.MANAGE_APPLICATIONS);
-  await db.delete(schema.staffApplications).where(eq(schema.staffApplications.id, id));
   revalidatePath('/admin/applications');
 }

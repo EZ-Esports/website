@@ -11,7 +11,7 @@ const auditColumns = {
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'completed', 'forfeit', 'cancelled']);
 export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
-export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted']);
+export const applicationStatusEnum = pgEnum('application_status', ['pending', 'accepted', 'rejected']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
 
 // --- CORE ENTITIES ---
@@ -381,11 +381,9 @@ export const schoolApplications = pgTable('school_applications', {
   role: text('role').notNull(),
   email: text('email').notNull(),
   message: text('message').default(''),
-  status: applicationStatusEnum('status').default('pending').notNull(),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
   ...auditColumns,
 }, (table) => [
-  index('school_applications_status_idx').on(table.status),
   index('school_applications_submitted_at_idx').on(table.submittedAt),
 ]).enableRLS();
 
@@ -398,13 +396,30 @@ export const staffApplications = pgTable('staff_applications', {
   discordTag: text('discord_tag'),
   role: text('role').notNull(),
   message: text('message').default(''),
-  status: applicationStatusEnum('status').default('pending').notNull(),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
   ...auditColumns,
 }, (table) => [
-  index('staff_applications_status_idx').on(table.status),
   index('staff_applications_submitted_at_idx').on(table.submittedAt),
 ]).enableRLS();
+
+export const applicationStatusLogs = pgTable(
+  'application_status_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    applicationId: uuid('application_id').notNull(),
+    applicationType: text('application_type').notNull(),
+    status: applicationStatusEnum('status').notNull(),
+    actorUserId: text('actor_user_id'),
+    actorEmail: text('actor_email'),
+    reason: text('reason'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('app_status_logs_app_id_idx').on(table.applicationId),
+    index('app_status_logs_type_id_created_idx').on(table.applicationType, table.applicationId, table.createdAt),
+    index('app_status_logs_created_at_idx').on(table.createdAt),
+  ]
+).enableRLS();
 
 // CMS key-value content blocks for editable page text
 export const pageContent = pgTable('page_content', {

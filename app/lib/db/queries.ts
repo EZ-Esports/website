@@ -619,22 +619,88 @@ export const getCachedHomepageGallery = unstable_cache(
   { tags: ['gallery-images'] }
 );
 
-export const getSchoolApplications = async (status?: 'pending' | 'reviewed' | 'accepted') => {
-  const conditions = status ? [eq(schema.schoolApplications.status, status)] : [];
+export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
+
+/** Subquery resolving the latest status log for each application */
+function getLatestStatusLogSubquery(type: 'school' | 'staff') {
   return db
-    .select()
+    .select({
+      applicationId: schema.applicationStatusLogs.applicationId,
+      status: schema.applicationStatusLogs.status,
+      rn: sql<number>`row_number() over (
+        partition by ${schema.applicationStatusLogs.applicationId}
+        order by ${schema.applicationStatusLogs.createdAt} desc, ${schema.applicationStatusLogs.id} desc
+      )`.as('rn'),
+    })
+    .from(schema.applicationStatusLogs)
+    .where(eq(schema.applicationStatusLogs.applicationType, type))
+    .as('latest_logs');
+}
+
+export const getSchoolApplications = async (statusFilter?: ApplicationStatus) => {
+  const latestLogs = getLatestStatusLogSubquery('school');
+
+  let query = db
+    .select({
+      id: schema.schoolApplications.id,
+      applicantName: schema.schoolApplications.applicantName,
+      schoolName: schema.schoolApplications.schoolName,
+      role: schema.schoolApplications.role,
+      email: schema.schoolApplications.email,
+      message: schema.schoolApplications.message,
+      submittedAt: schema.schoolApplications.submittedAt,
+      status: sql<ApplicationStatus>`COALESCE(${latestLogs.status}, 'pending')`.as('effective_status'),
+    })
     .from(schema.schoolApplications)
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(schema.schoolApplications.submittedAt));
+    .leftJoin(
+      latestLogs,
+      and(
+        eq(schema.schoolApplications.id, latestLogs.applicationId),
+        eq(latestLogs.rn, 1)
+      )
+    );
+
+  if (statusFilter === 'pending') {
+    query = query.where(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))) as typeof query;
+  } else if (statusFilter) {
+    query = query.where(eq(latestLogs.status, statusFilter)) as typeof query;
+  }
+
+  return query.orderBy(desc(schema.schoolApplications.submittedAt));
 };
 
-export const getStaffApplications = async (status?: 'pending' | 'reviewed' | 'accepted') => {
-  const conditions = status ? [eq(schema.staffApplications.status, status)] : [];
-  return db
-    .select()
+export const getStaffApplications = async (statusFilter?: ApplicationStatus) => {
+  const latestLogs = getLatestStatusLogSubquery('staff');
+
+  let query = db
+    .select({
+      id: schema.staffApplications.id,
+      name: schema.staffApplications.name,
+      preferredFirstName: schema.staffApplications.preferredFirstName,
+      email: schema.staffApplications.email,
+      phone: schema.staffApplications.phone,
+      discordTag: schema.staffApplications.discordTag,
+      role: schema.staffApplications.role,
+      message: schema.staffApplications.message,
+      submittedAt: schema.staffApplications.submittedAt,
+      status: sql<ApplicationStatus>`COALESCE(${latestLogs.status}, 'pending')`.as('effective_status'),
+    })
     .from(schema.staffApplications)
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(desc(schema.staffApplications.submittedAt));
+    .leftJoin(
+      latestLogs,
+      and(
+        eq(schema.staffApplications.id, latestLogs.applicationId),
+        eq(latestLogs.rn, 1)
+      )
+    );
+
+  if (statusFilter === 'pending') {
+    query = query.where(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))) as typeof query;
+  } else if (statusFilter) {
+    query = query.where(eq(latestLogs.status, statusFilter)) as typeof query;
+  }
+
+  return query.orderBy(desc(schema.staffApplications.submittedAt));
 };
 
 /** Count of all scheduled matches (for dashboard). */

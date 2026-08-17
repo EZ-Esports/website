@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { updateStaffApplicationStatus, deleteStaffApplication } from '@/app/(admin)/admin/applications/actions';
-import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import { updateStaffApplicationStatus } from '@/app/(admin)/admin/applications/actions';
 
-type Status = 'pending' | 'reviewed' | 'accepted';
+type Status = 'pending' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
 
 interface StaffApplication {
@@ -22,8 +21,8 @@ interface StaffApplication {
 
 const activeBadgeClass: Record<Status, string> = {
   pending: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-  reviewed: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
   accepted: 'bg-green-500/10 text-green-400 border border-green-500/20',
+  rejected: 'bg-red-500/10 text-red-400 border border-red-500/20',
 };
 
 export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app: StaffApplication; activeFilter?: StatusFilter }) {
@@ -31,14 +30,27 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
   const [expanded, setExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
-  // On a filtered view, a row whose status no longer matches the filter should
-  // leave the list immediately (server revalidation confirms this shortly after).
   const [removed, setRemoved] = useState(false);
 
   const message = app.message ?? '';
   const isLong = message.length > 80;
 
   if (removed) return null;
+
+  const handleStatusChange = (s: Status) => {
+    const prev = status;
+    setStatus(s);
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        await updateStaffApplicationStatus(app.id, s);
+        if (activeFilter !== 'all' && s !== activeFilter) setRemoved(true);
+      } catch {
+        setStatus(prev);
+        setActionError('Failed to update status. Please try again.');
+      }
+    });
+  };
 
   return (
     <tr className="hover:bg-surface-raised/40 transition-colors">
@@ -64,7 +76,7 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
       <td className="py-3 pr-4 text-foreground-secondary max-w-[240px] whitespace-pre-line">
         {message ? (
           <>
-            {expanded ? message : (isLong ? `${message.slice(0, 80)}` : message)}
+            {expanded ? message : (isLong ? `${message.slice(0, 80)}…` : message)}
             {isLong && (
               <button
                 onClick={() => setExpanded(v => !v)}
@@ -80,24 +92,11 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
       </td>
       <td className="py-3 pr-4">
         <div className="flex gap-1">
-          {(['pending', 'reviewed', 'accepted'] as const).map(s => (
+          {(['pending', 'accepted', 'rejected'] as const).map(s => (
             <button
               key={s}
               disabled={isPending || status === s}
-              onClick={() => {
-                const prev = status;
-                setStatus(s);
-                setActionError(null);
-                startTransition(async () => {
-                  try {
-                    await updateStaffApplicationStatus(app.id, s);
-                    if (activeFilter !== 'all' && s !== activeFilter) setRemoved(true);
-                  } catch {
-                    setStatus(prev);
-                    setActionError('Failed to update status. Please try again.');
-                  }
-                });
-              }}
+              onClick={() => handleStatusChange(s)}
               className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-default ${
                 status === s
                   ? activeBadgeClass[s]
@@ -120,12 +119,13 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
         })}
       </td>
       <td className="py-3 pl-2">
-        <ConfirmDeleteButton
-          action={deleteStaffApplication.bind(null, app.id)}
-          message={`Delete staff application from ${app.name}? This cannot be undone.`}
-          label="Delete"
-          className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer whitespace-nowrap"
-        />
+        <button
+          disabled={isPending || status === 'rejected'}
+          onClick={() => handleStatusChange('rejected')}
+          className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer disabled:cursor-default disabled:opacity-50 whitespace-nowrap"
+        >
+          Reject
+        </button>
       </td>
     </tr>
   );

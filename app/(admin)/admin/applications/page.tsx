@@ -7,16 +7,16 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 
-type StatusFilter = 'all' | 'pending' | 'reviewed' | 'accepted';
+type StatusFilter = 'all' | 'pending' | 'accepted' | 'rejected';
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
   all: 'All',
   pending: 'Pending',
-  reviewed: 'Reviewed',
   accepted: 'Accepted',
+  rejected: 'Rejected',
 };
 
-const VALID_STATUSES: StatusFilter[] = ['all', 'pending', 'reviewed', 'accepted'];
+const VALID_STATUSES: StatusFilter[] = ['all', 'pending', 'accepted', 'rejected'];
 
 function parseStatusFilter(raw: string | undefined): StatusFilter {
   return VALID_STATUSES.includes(raw as StatusFilter) ? (raw as StatusFilter) : 'all';
