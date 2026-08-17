@@ -1174,7 +1174,7 @@ export default function ApplyForm() {
                       aria-invalid={!!fieldErrors.agreedRules}
                       aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
                     />
-                    <span>I understand and agree to uphold the <Link href="/rules" target="_blank" className="text-accent font-bold hover:underline">league rules and terms of participation</Link>.</span>
+                    <span>I understand and agree to uphold all EZ Esports league rules, competitive integrity guidelines, and participation terms.</span>
                   </label>
                   {fieldErrors.agreedRules && (
                     <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
