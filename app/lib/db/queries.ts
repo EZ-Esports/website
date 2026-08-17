@@ -619,16 +619,17 @@ export const getCachedHomepageGallery = unstable_cache(
   { tags: ['gallery-images'] }
 );
 
-export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
+export type ApplicationStatus = 'pending' | 'reviewed' | 'accepted' | 'rejected';
 
 /** Subquery resolving the latest status log for each application */
 function getLatestStatusLogSubquery(type: 'school' | 'staff') {
   return db
     .select({
       applicationId: schema.applicationStatusLogs.applicationId,
+      applicationType: schema.applicationStatusLogs.applicationType,
       status: schema.applicationStatusLogs.status,
       rn: sql<number>`row_number() over (
-        partition by ${schema.applicationStatusLogs.applicationId}
+        partition by ${schema.applicationStatusLogs.applicationType}, ${schema.applicationStatusLogs.applicationId}
         order by ${schema.applicationStatusLogs.createdAt} desc, ${schema.applicationStatusLogs.id} desc
       )`.as('rn'),
     })
@@ -637,7 +638,7 @@ function getLatestStatusLogSubquery(type: 'school' | 'staff') {
     .as('latest_logs');
 }
 
-export const getSchoolApplications = async (statusFilter?: ApplicationStatus) => {
+export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 'all') {
   const latestLogs = getLatestStatusLogSubquery('school');
 
   let query = db
@@ -662,14 +663,18 @@ export const getSchoolApplications = async (statusFilter?: ApplicationStatus) =>
 
   if (statusFilter === 'pending') {
     query = query.where(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))) as typeof query;
-  } else if (statusFilter) {
+  } else if (statusFilter && statusFilter !== 'all') {
     query = query.where(eq(latestLogs.status, statusFilter)) as typeof query;
   }
 
   return query.orderBy(desc(schema.schoolApplications.submittedAt));
+}
+
+export const getSchoolApplications = async (statusFilter?: ApplicationStatus | 'all') => {
+  return buildSchoolApplicationsQuery(statusFilter);
 };
 
-export const getStaffApplications = async (statusFilter?: ApplicationStatus) => {
+export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | 'all') {
   const latestLogs = getLatestStatusLogSubquery('staff');
 
   let query = db
@@ -696,11 +701,15 @@ export const getStaffApplications = async (statusFilter?: ApplicationStatus) => 
 
   if (statusFilter === 'pending') {
     query = query.where(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))) as typeof query;
-  } else if (statusFilter) {
+  } else if (statusFilter && statusFilter !== 'all') {
     query = query.where(eq(latestLogs.status, statusFilter)) as typeof query;
   }
 
   return query.orderBy(desc(schema.staffApplications.submittedAt));
+}
+
+export const getStaffApplications = async (statusFilter?: ApplicationStatus | 'all') => {
+  return buildStaffApplicationsQuery(statusFilter);
 };
 
 /** Count of all scheduled matches (for dashboard). */

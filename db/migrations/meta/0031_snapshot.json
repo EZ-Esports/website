@@ -1,9 +1,136 @@
 {
-  "id": "d718e275-62d4-44ae-8248-c46b77e4bf4a",
-  "prevId": "3d034a59-6bda-42ea-b134-a44f92b92184",
+  "id": "e829f386-73e5-55bf-9359-d55f03f5cf5b",
+  "prevId": "d718e275-62d4-44ae-8248-c46b77e4bf4a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.application_status_logs": {
+      "name": "application_status_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "application_id": {
+          "name": "application_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "application_type": {
+          "name": "application_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "application_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_email": {
+          "name": "actor_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "app_status_logs_app_id_idx": {
+          "name": "app_status_logs_app_id_idx",
+          "columns": [
+            {
+              "expression": "application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "app_status_logs_type_id_created_idx": {
+          "name": "app_status_logs_type_id_created_idx",
+          "columns": [
+            {
+              "expression": "application_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "app_status_logs_created_at_idx": {
+          "name": "app_status_logs_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "app_status_logs_type_check": {
+          "name": "app_status_logs_type_check",
+          "value": "\"application_status_logs\".\"application_type\" IN ('school', 'staff')"
+        }
+      },
+      "isRLSEnabled": true
+    },
     "public.gallery_images": {
       "name": "gallery_images",
       "schema": "",
@@ -1275,14 +1402,6 @@
           "notNull": false,
           "default": "''"
         },
-        "status": {
-          "name": "status",
-          "type": "application_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
         "submitted_at": {
           "name": "submitted_at",
           "type": "timestamp",
@@ -1306,21 +1425,6 @@
         }
       },
       "indexes": {
-        "school_applications_status_idx": {
-          "name": "school_applications_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "school_applications_submitted_at_idx": {
           "name": "school_applications_submitted_at_idx",
           "columns": [
@@ -1947,14 +2051,6 @@
           "notNull": false,
           "default": "''"
         },
-        "status": {
-          "name": "status",
-          "type": "application_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
         "submitted_at": {
           "name": "submitted_at",
           "type": "timestamp",
@@ -1978,21 +2074,6 @@
         }
       },
       "indexes": {
-        "staff_applications_status_idx": {
-          "name": "staff_applications_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "staff_applications_submitted_at_idx": {
           "name": "staff_applications_submitted_at_idx",
           "columns": [

@@ -216,7 +216,14 @@
       "idx": 30,
       "version": "7",
       "when": 1786948964699,
-      "tag": "0030_append_only_applications",
+      "tag": "0030_add_rejected_application_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786948964700,
+      "tag": "0031_append_only_applications",
       "breakpoints": true
     }
   ]

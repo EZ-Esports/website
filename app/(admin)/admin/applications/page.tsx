@@ -7,16 +7,17 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 
-type StatusFilter = 'all' | 'pending' | 'accepted' | 'rejected';
+type StatusFilter = 'all' | 'pending' | 'reviewed' | 'accepted' | 'rejected';
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
   all: 'All',
   pending: 'Pending',
+  reviewed: 'Reviewed',
   accepted: 'Accepted',
   rejected: 'Rejected',
 };
 
-const VALID_STATUSES: StatusFilter[] = ['all', 'pending', 'accepted', 'rejected'];
+const VALID_STATUSES: StatusFilter[] = ['all', 'pending', 'reviewed', 'accepted', 'rejected'];
 
 function parseStatusFilter(raw: string | undefined): StatusFilter {
   return VALID_STATUSES.includes(raw as StatusFilter) ? (raw as StatusFilter) : 'all';
@@ -115,7 +116,6 @@ export default async function ApplicationsAdminPage({
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3">Submitted</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
@@ -172,7 +172,6 @@ export default async function ApplicationsAdminPage({
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3">Submitted</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">

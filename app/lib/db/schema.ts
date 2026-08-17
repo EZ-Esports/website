@@ -1,4 +1,4 @@
-import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Shared audit columns
@@ -11,7 +11,7 @@ const auditColumns = {
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'completed', 'forfeit', 'cancelled']);
 export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
-export const applicationStatusEnum = pgEnum('application_status', ['pending', 'accepted', 'rejected']);
+export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted', 'rejected']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
 
 // --- CORE ENTITIES ---
@@ -415,6 +415,7 @@ export const applicationStatusLogs = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
+    check('app_status_logs_type_check', sql`${table.applicationType} IN ('school', 'staff')`),
     index('app_status_logs_app_id_idx').on(table.applicationId),
     index('app_status_logs_type_id_created_idx').on(table.applicationType, table.applicationId, table.createdAt),
     index('app_status_logs_created_at_idx').on(table.createdAt),

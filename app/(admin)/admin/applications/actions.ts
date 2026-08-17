@@ -8,7 +8,7 @@ import { revalidatePath } from 'next/cache';
 
 export async function updateApplicationStatus(
   id: string,
-  status: 'pending' | 'accepted' | 'rejected',
+  status: 'pending' | 'reviewed' | 'accepted' | 'rejected',
   reason?: string
 ) {
   const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
@@ -27,7 +27,7 @@ export async function updateApplicationStatus(
 
 export async function updateStaffApplicationStatus(
   id: string,
-  status: 'pending' | 'accepted' | 'rejected',
+  status: 'pending' | 'reviewed' | 'accepted' | 'rejected',
   reason?: string
 ) {
   const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);

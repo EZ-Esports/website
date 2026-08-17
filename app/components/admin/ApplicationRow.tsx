@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { updateApplicationStatus } from '@/app/(admin)/admin/applications/actions';
 
-type Status = 'pending' | 'accepted' | 'rejected';
+type Status = 'pending' | 'reviewed' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
 
 interface Application {
@@ -19,6 +19,7 @@ interface Application {
 
 const activeBadgeClass: Record<Status, string> = {
   pending: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+  reviewed: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
   accepted: 'bg-green-500/10 text-green-400 border border-green-500/20',
   rejected: 'bg-red-500/10 text-red-400 border border-red-500/20',
 };
@@ -82,7 +83,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
       </td>
       <td className="py-3 pr-4">
         <div className="flex gap-1">
-          {(['pending', 'accepted', 'rejected'] as const).map(s => (
+          {(['pending', 'reviewed', 'accepted', 'rejected'] as const).map(s => (
             <button
               key={s}
               disabled={isPending || status === s}
@@ -108,15 +109,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
           year: 'numeric',
         })}
       </td>
-      <td className="py-3 pl-2">
-        <button
-          disabled={isPending || status === 'rejected'}
-          onClick={() => handleStatusChange('rejected')}
-          className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer disabled:cursor-default disabled:opacity-50 whitespace-nowrap"
-        >
-          Reject
-        </button>
-      </td>
+
     </tr>
   );
 }
