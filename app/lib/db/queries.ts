@@ -641,7 +641,7 @@ function getLatestStatusLogSubquery(type: 'school' | 'staff') {
 export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 'all') {
   const latestLogs = getLatestStatusLogSubquery('school');
 
-  let query = db
+  const query = db
     .select({
       id: schema.schoolApplications.id,
       applicantName: schema.schoolApplications.applicantName,
@@ -657,7 +657,7 @@ export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 
       latestLogs,
       and(
         eq(schema.schoolApplications.id, latestLogs.applicationId),
-        eq(latestLogs.rn, 1)
+        sql`"rn" = 1`
       )
     );
 
@@ -677,7 +677,7 @@ export const getSchoolApplications = buildSchoolApplicationsQuery;
 export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | 'all') {
   const latestLogs = getLatestStatusLogSubquery('staff');
 
-  let query = db
+  const query = db
     .select({
       id: schema.staffApplications.id,
       name: schema.staffApplications.name,
@@ -695,7 +695,7 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
       latestLogs,
       and(
         eq(schema.staffApplications.id, latestLogs.applicationId),
-        eq(latestLogs.rn, 1)
+        sql`"rn" = 1`
       )
     );
 

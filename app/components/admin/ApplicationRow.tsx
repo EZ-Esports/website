@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { updateApplicationStatus, softDeleteSchoolApplication } from '@/app/(admin)/admin/applications/actions';
+import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 
 type Status = 'pending' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
@@ -50,8 +51,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
     });
   };
 
-  const handleDelete = () => {
-    if (!confirm('Are you sure you want to remove this application?')) return;
+  const handleDelete = async () => {
     setActionError(null);
     startTransition(async () => {
       try {
@@ -122,14 +122,12 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
         })}
       </td>
       <td className="py-3 text-right whitespace-nowrap">
-        <button
-          disabled={isPending}
-          onClick={handleDelete}
+        <ConfirmDeleteButton
+          action={handleDelete}
+          message="Are you sure you want to remove this application?"
+          label="Remove"
           className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
-          title="Remove application"
-        >
-          Remove
-        </button>
+        />
       </td>
     </tr>
   );

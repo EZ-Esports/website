@@ -1,29 +1,35 @@
 import Card from '@/app/components/ui/Card';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
+import Badge from '@/app/components/ui/Badge';
 import Link from 'next/link';
 
 export const metadata = {
   title: 'League Rules & Handbook | EZ Esports',
-  description: 'Official competition rules, sportsmanship guidelines, and participation terms for EZ Esports leagues.',
+  description: 'Official competition rules, sportsmanship guidelines, and participation terms for the NYC High School Esports League.',
 };
 
 export default function RulesPage() {
   return (
     <Section className="py-12 md:py-20">
       <div className="max-w-4xl mx-auto space-y-10">
-        <SectionHeader
-          eyebrow="Official Documentation"
-          title="League Rules & Participation Terms"
-          lead="Guidelines, sportsmanship standards, and competition rules governing all EZ Esports tournaments and leagues."
-        />
+        <div className="space-y-4">
+          <Badge variant="neutral" size="md">
+            Last Updated: August 2026 | Version 1.0
+          </Badge>
+          <SectionHeader
+            eyebrow="Official Documentation"
+            title="NYC High School Esports League Rules & Participation Terms"
+            lead="Guidelines, sportsmanship standards, and competition rules governing the NYC High School Esports League."
+          />
+        </div>
 
         <div className="space-y-8">
           <Card className="bg-surface-raised/40 border border-line p-6 md:p-8 space-y-4">
             <h2 className="text-xl font-bold text-white uppercase tracking-wider">1. Eligibility & Roster Requirements</h2>
             <ul className="list-disc list-inside space-y-2 text-foreground-secondary text-sm leading-relaxed">
-              <li>Applicants must represent a verified high school or collegiate esports club/program.</li>
-              <li>Team captains and officers must maintain active student status at their respective institutions.</li>
+              <li>Applicants must represent a verified NYC high school esports club or program.</li>
+              <li>Team captains and officers must maintain active student status at their respective high schools.</li>
               <li>Roster substitutions must be declared at least 24 hours prior to scheduled match times.</li>
               <li>All player accounts (IGNs / Discord IDs) must match the registered roster submitted to league management.</li>
             </ul>

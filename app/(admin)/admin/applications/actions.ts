@@ -56,6 +56,15 @@ export async function softDeleteSchoolApplication(id: string) {
     })
     .where(eq(schema.schoolApplications.id, id));
 
+  await db.insert(schema.applicationStatusLogs).values({
+    applicationId: id,
+    applicationType: 'school',
+    status: 'rejected',
+    actorUserId: staff.id,
+    actorEmail: staff.email,
+    reason: 'Application soft-deleted by staff',
+  });
+
   revalidatePath('/admin/applications');
 }
 
@@ -69,6 +78,15 @@ export async function softDeleteStaffApplication(id: string) {
       deletedBy: staff.id,
     })
     .where(eq(schema.staffApplications.id, id));
+
+  await db.insert(schema.applicationStatusLogs).values({
+    applicationId: id,
+    applicationType: 'staff',
+    status: 'rejected',
+    actorUserId: staff.id,
+    actorEmail: staff.email,
+    reason: 'Application soft-deleted by staff',
+  });
 
   revalidatePath('/admin/applications');
 }

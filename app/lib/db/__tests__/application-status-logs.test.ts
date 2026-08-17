@@ -44,9 +44,8 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(sql).toContain('partition by "application_type", "application_id"');
       expect(sql).toContain('order by "created_at" desc, "id" desc');
       expect(sql).toContain('COALESCE("latest_logs"."status", \'pending\')');
-      expect(sql).toContain('"rn" =');
+      expect(sql).toContain('"rn" = 1');
       expect(sql).toContain('"school_applications"."deleted_at" is null');
-      expect(params).toContain(1);
       expect(params).toContain('school');
     });
 
@@ -94,9 +93,8 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(sql).toContain('partition by "application_type", "application_id"');
       expect(sql).toContain('order by "created_at" desc, "id" desc');
       expect(sql).toContain('COALESCE("latest_logs"."status", \'pending\')');
-      expect(sql).toContain('"rn" =');
+      expect(sql).toContain('"rn" = 1');
       expect(sql).toContain('"staff_applications"."deleted_at" is null');
-      expect(params).toContain(1);
       expect(params).toContain('staff');
     });
 
