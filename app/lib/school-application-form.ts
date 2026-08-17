@@ -74,7 +74,7 @@ export function validateSchoolApplicationForm(form: SchoolApplicationFormData) {
     errors.interestedGamesOther = "Please specify the other game.";
   }
 
-  if (form.agreedRules === false) {
+  if (!form.agreedRules) {
     errors.agreedRules = "You must agree to the EZ Esports league rules and terms.";
   }
 
@@ -122,6 +122,7 @@ Club Advisor Name: ${form.advisorName.trim()}
 Club Advisor Email (@schools.nyc.gov): ${form.advisorEmail.trim()}
 Estimated Active Club Members: ${form.activeStudentsCount.trim()}
 Interested Games: ${selectedGames.join(", ")}
+Rules Agreement: ${form.agreedRules ? 'Agreed' : 'Disagreed'}
 
 Feedback / Notes:
 ${form.feedback?.trim() || "N/A"}

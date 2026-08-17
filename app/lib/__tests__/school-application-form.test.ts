@@ -67,6 +67,11 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(errors.agreedRules).toBeDefined();
   });
 
+  it("records Disagreed in compiled message payload when agreedRules is false", () => {
+    const payload = compileApplicationPayload({ ...validForm, agreedRules: false });
+    expect(payload.message).toContain("Rules Agreement: Disagreed");
+  });
+
   it("compiles message payload correctly with all 4 layers", () => {
     const payload = compileApplicationPayload(validForm);
     expect(payload.applicantName).toBe("Jane Doe");
@@ -78,5 +83,6 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(payload.message).toContain("=== 3. 3RD STUDENT CLUB OFFICER INFO ===");
     expect(payload.message).toContain("=== 4. CLUB INFO ===");
     expect(payload.message).toContain("Valorant, Clash Royale");
+    expect(payload.message).toContain("Rules Agreement: Agreed");
   });
 });

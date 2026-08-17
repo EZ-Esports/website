@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { updateApplicationStatus } from '@/app/(admin)/admin/applications/actions';
+import { updateApplicationStatus, softDeleteSchoolApplication } from '@/app/(admin)/admin/applications/actions';
 
 type Status = 'pending' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
@@ -50,6 +50,19 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
     });
   };
 
+  const handleDelete = () => {
+    if (!confirm('Are you sure you want to remove this application?')) return;
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        await softDeleteSchoolApplication(app.id);
+        setRemoved(true);
+      } catch {
+        setActionError('Failed to delete application. Please try again.');
+      }
+    });
+  };
+
   return (
     <tr className="hover:bg-surface-raised/40 transition-colors">
       <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">{app.applicantName}</td>
@@ -81,7 +94,7 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
         )}
       </td>
       <td className="py-3 pr-4">
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
           {(['pending', 'accepted', 'rejected'] as const).map(s => (
             <button
               key={s}
@@ -101,14 +114,23 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
           )}
         </div>
       </td>
-      <td className="py-3 text-foreground-secondary whitespace-nowrap">
+      <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">
         {new Date(app.submittedAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
         })}
       </td>
-
+      <td className="py-3 text-right whitespace-nowrap">
+        <button
+          disabled={isPending}
+          onClick={handleDelete}
+          className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+          title="Remove application"
+        >
+          Remove
+        </button>
+      </td>
     </tr>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { compileApplicationPayload } from '@/app/lib/school-application-form';
+import { validateSchoolApplicationForm, compileApplicationPayload } from '@/app/lib/school-application-form';
 import Button from '@/app/components/ui/Button';
 import { Textarea } from '@/app/components/ui/form';
 
@@ -136,57 +136,10 @@ export default function ApplyForm() {
     document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const validate = () => {
-    const errors: Record<string, string> = {};
-
-    // Layer 1 validation
-    if (!form.presidentFirstName.trim()) errors.presidentFirstName = 'President first name is required.';
-    if (!form.presidentLastName.trim()) errors.presidentLastName = 'President last name is required.';
-    if (!form.schoolName.trim()) errors.schoolName = 'School name is required.';
-    if (!form.presidentGradYear) errors.presidentGradYear = 'Please select a graduation year.';
-    if (!form.presidentEmail.trim()) errors.presidentEmail = 'President email is required.';
-    else if (!EMAIL_RE.test(form.presidentEmail)) errors.presidentEmail = 'Enter a valid email address.';
-    if (!form.presidentDiscord.trim()) errors.presidentDiscord = 'Discord username is required.';
-    if (!form.presidentPreferredContact.trim()) errors.presidentPreferredContact = 'Please specify best contact platform.';
-
-    // Layer 2 validation
-    if (!form.vpFirstName.trim()) errors.vpFirstName = 'Vice President first name is required.';
-    if (!form.vpLastName.trim()) errors.vpLastName = 'Vice President last name is required.';
-    if (!form.vpGradYear) errors.vpGradYear = 'Please select a graduation year.';
-    if (!form.vpDiscord.trim()) errors.vpDiscord = 'Discord username is required.';
-    if (!form.vpEmail.trim()) errors.vpEmail = 'Vice President email is required.';
-    else if (!EMAIL_RE.test(form.vpEmail)) errors.vpEmail = 'Enter a valid email address.';
-    if (!form.vpPreferredContact.trim()) errors.vpPreferredContact = 'Please specify best contact platform.';
-
-    // Layer 3 validation
-    if (!form.officerFirstName.trim()) errors.officerFirstName = 'Officer first name is required.';
-    if (!form.officerLastName.trim()) errors.officerLastName = 'Officer last name is required.';
-    if (!form.officerGradYear) errors.officerGradYear = 'Please select a graduation year.';
-    if (!form.officerEmail.trim()) errors.officerEmail = 'Officer email is required.';
-    else if (!EMAIL_RE.test(form.officerEmail)) errors.officerEmail = 'Enter a valid email address.';
-    if (!form.officerPreferredContact.trim()) errors.officerPreferredContact = 'Please specify best contact platform.';
-
-    // Layer 4 validation
-    if (!form.advisorName.trim()) errors.advisorName = 'Club advisor name is required.';
-    if (!form.advisorEmail.trim()) errors.advisorEmail = 'Club advisor email is required.';
-    else if (!EMAIL_RE.test(form.advisorEmail)) errors.advisorEmail = 'Enter a valid email address.';
-    if (!form.activeStudentsCount.trim()) errors.activeStudentsCount = 'Estimated student count is required.';
-
-    const hasGame = Object.values(form.interestedGames).some(Boolean);
-    if (!form.agreedRules) errors.agreedRules = 'You must agree to the EZ Esports league rules and terms before submitting.';
-
-    if (!hasGame) {
-      errors.interestedGames = 'Select at least one game your club is interested in.';
-    } else if (form.interestedGames.other && !form.interestedGamesOther.trim()) {
-      errors.interestedGamesOther = 'Please specify the other game.';
-    }
-
-    return errors;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validate();
+    const errors = validateSchoolApplicationForm(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       const firstErrorKey = Object.keys(errors)[0];
@@ -1221,7 +1174,7 @@ export default function ApplyForm() {
                       aria-invalid={!!fieldErrors.agreedRules}
                       aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
                     />
-                    <span>I understand and agree to uphold the league rules and terms of participation.</span>
+                    <span>I understand and agree to uphold the <Link href="/rules" target="_blank" className="text-accent font-bold hover:underline">league rules and terms of participation</Link>.</span>
                   </label>
                   {fieldErrors.agreedRules && (
                     <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>

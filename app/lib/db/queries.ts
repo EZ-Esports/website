@@ -661,13 +661,15 @@ export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 
       )
     );
 
+  const conditions = [isNull(schema.schoolApplications.deletedAt)];
+
   if (statusFilter === 'pending') {
-    query = query.where(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))) as typeof query;
+    conditions.push(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))!);
   } else if (statusFilter && statusFilter !== 'all') {
-    query = query.where(eq(latestLogs.status, statusFilter)) as typeof query;
+    conditions.push(eq(latestLogs.status, statusFilter));
   }
 
-  return query.orderBy(desc(schema.schoolApplications.submittedAt));
+  return query.where(and(...conditions)).orderBy(desc(schema.schoolApplications.submittedAt));
 }
 
 export const getSchoolApplications = buildSchoolApplicationsQuery;
@@ -697,13 +699,15 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
       )
     );
 
+  const conditions = [isNull(schema.staffApplications.deletedAt)];
+
   if (statusFilter === 'pending') {
-    query = query.where(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))) as typeof query;
+    conditions.push(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))!);
   } else if (statusFilter && statusFilter !== 'all') {
-    query = query.where(eq(latestLogs.status, statusFilter)) as typeof query;
+    conditions.push(eq(latestLogs.status, statusFilter));
   }
 
-  return query.orderBy(desc(schema.staffApplications.submittedAt));
+  return query.where(and(...conditions)).orderBy(desc(schema.staffApplications.submittedAt));
 }
 
 export const getStaffApplications = buildStaffApplicationsQuery;
