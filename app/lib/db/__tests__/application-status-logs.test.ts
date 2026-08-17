@@ -4,9 +4,10 @@ import { buildSchoolApplicationsQuery, buildStaffApplicationsQuery } from '@/app
 
 describe('Application Status Logs & Append-Only Schema', () => {
   describe('Schema Definitions', () => {
-    it('defines applicationStatusEnum with pending, accepted, rejected', () => {
+    it('defines applicationStatusEnum with pending, reviewed, accepted, rejected', () => {
       expect(schema.applicationStatusEnum.enumValues).toEqual([
         'pending',
+        'reviewed',
         'accepted',
         'rejected',
       ]);
@@ -24,9 +25,13 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(columns.createdAt).toBeDefined();
     });
 
-    it('ensures schoolApplications and staffApplications do not carry legacy status columns', () => {
+    it('ensures schoolApplications and staffApplications carry soft-delete columns but not legacy status columns', () => {
       expect('status' in schema.schoolApplications).toBe(false);
       expect('status' in schema.staffApplications).toBe(false);
+      expect(schema.schoolApplications.deletedAt).toBeDefined();
+      expect(schema.schoolApplications.deletedBy).toBeDefined();
+      expect(schema.staffApplications.deletedAt).toBeDefined();
+      expect(schema.staffApplications.deletedBy).toBeDefined();
     });
   });
 
@@ -39,6 +44,8 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(sql).toContain('partition by "application_type", "application_id"');
       expect(sql).toContain('order by "created_at" desc, "id" desc');
       expect(sql).toContain('COALESCE("latest_logs"."status", \'pending\')');
+      expect(sql).toContain('"rn" =');
+      expect(params).toContain(1);
       expect(params).toContain('school');
     });
 
@@ -86,6 +93,8 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(sql).toContain('partition by "application_type", "application_id"');
       expect(sql).toContain('order by "created_at" desc, "id" desc');
       expect(sql).toContain('COALESCE("latest_logs"."status", \'pending\')');
+      expect(sql).toContain('"rn" =');
+      expect(params).toContain(1);
       expect(params).toContain('staff');
     });
 

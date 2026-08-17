@@ -24,7 +24,7 @@ SELECT
   gen_random_uuid(),
   "id",
   'school',
-  'pending'::"application_status",
+  CASE WHEN s."status"::text = 'accepted' THEN 'accepted'::"public"."application_status" ELSE 'pending'::"public"."application_status" END,
   "submitted_at"
 FROM "school_applications" s
 WHERE NOT EXISTS (
@@ -38,13 +38,21 @@ SELECT
   gen_random_uuid(),
   "id",
   'staff',
-  'pending'::"application_status",
+  CASE WHEN s."status"::text = 'accepted' THEN 'accepted'::"public"."application_status" ELSE 'pending'::"public"."application_status" END,
   "submitted_at"
 FROM "staff_applications" s
 WHERE NOT EXISTS (
   SELECT 1 FROM "application_status_logs" l 
   WHERE l."application_id" = s."id" AND l."application_type" = 'staff'
 );
+--> statement-breakpoint
+ALTER TABLE "school_applications" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp;
+--> statement-breakpoint
+ALTER TABLE "school_applications" ADD COLUMN IF NOT EXISTS "deleted_by" text;
+--> statement-breakpoint
+ALTER TABLE "staff_applications" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp;
+--> statement-breakpoint
+ALTER TABLE "staff_applications" ADD COLUMN IF NOT EXISTS "deleted_by" text;
 --> statement-breakpoint
 DROP INDEX IF EXISTS "school_applications_status_idx";
 --> statement-breakpoint
@@ -89,11 +97,43 @@ CREATE POLICY "app_status_logs_permission_insert" ON "application_status_logs"
 --> statement-breakpoint
 -- PostgreSQL BEFORE UPDATE OR DELETE triggers to enforce immutability at the DB engine level for all connection roles
 CREATE OR REPLACE FUNCTION prevent_application_mutation()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
-  RAISE EXCEPTION 'Table % is immutable: UPDATE and DELETE operations are prohibited', TG_TABLE_NAME;
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'Table % is immutable: DELETE operations are prohibited', TG_TABLE_NAME;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF TG_TABLE_NAME = 'application_status_logs' THEN
+      RAISE EXCEPTION 'Table application_status_logs is immutable: UPDATE operations are prohibited';
+    ELSIF TG_TABLE_NAME = 'school_applications' THEN
+      IF NEW.id IS DISTINCT FROM OLD.id OR
+         NEW.applicant_name IS DISTINCT FROM OLD.applicant_name OR
+         NEW.school_name IS DISTINCT FROM OLD.school_name OR
+         NEW.role IS DISTINCT FROM OLD.role OR
+         NEW.email IS DISTINCT FROM OLD.email OR
+         NEW.message IS DISTINCT FROM OLD.message OR
+         NEW.submitted_at IS DISTINCT FROM OLD.submitted_at THEN
+        RAISE EXCEPTION 'School application submission fields are immutable';
+      END IF;
+    ELSIF TG_TABLE_NAME = 'staff_applications' THEN
+      IF NEW.id IS DISTINCT FROM OLD.id OR
+         NEW.name IS DISTINCT FROM OLD.name OR
+         NEW.preferred_first_name IS DISTINCT FROM OLD.preferred_first_name OR
+         NEW.email IS DISTINCT FROM OLD.email OR
+         NEW.phone IS DISTINCT FROM OLD.phone OR
+         NEW.discord_tag IS DISTINCT FROM OLD.discord_tag OR
+         NEW.role IS DISTINCT FROM OLD.role OR
+         NEW.message IS DISTINCT FROM OLD.message OR
+         NEW.submitted_at IS DISTINCT FROM OLD.submitted_at THEN
+        RAISE EXCEPTION 'Staff application submission fields are immutable';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 --> statement-breakpoint
 CREATE OR REPLACE TRIGGER prevent_school_applications_mutation
 BEFORE UPDATE OR DELETE ON "school_applications"

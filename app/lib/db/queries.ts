@@ -670,9 +670,7 @@ export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 
   return query.orderBy(desc(schema.schoolApplications.submittedAt));
 }
 
-export const getSchoolApplications = async (statusFilter?: ApplicationStatus | 'all') => {
-  return buildSchoolApplicationsQuery(statusFilter);
-};
+export const getSchoolApplications = buildSchoolApplicationsQuery;
 
 export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | 'all') {
   const latestLogs = getLatestStatusLogSubquery('staff');
@@ -708,9 +706,7 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
   return query.orderBy(desc(schema.staffApplications.submittedAt));
 }
 
-export const getStaffApplications = async (statusFilter?: ApplicationStatus | 'all') => {
-  return buildStaffApplicationsQuery(statusFilter);
-};
+export const getStaffApplications = buildStaffApplicationsQuery;
 
 /** Count of all scheduled matches (for dashboard). */
 export const countScheduledMatches = async (): Promise<number> => {

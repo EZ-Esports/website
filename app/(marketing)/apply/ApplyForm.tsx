@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { compileApplicationPayload } from '@/app/lib/school-application-form';
 import Button from '@/app/components/ui/Button';
 import { Textarea } from '@/app/components/ui/form';
 
@@ -46,7 +48,7 @@ const initialForm = {
   },
   interestedGamesOther: '',
   feedback: '',
-  agreedRules: true,
+  agreedRules: false,
 };
 
 const SECTIONS = [
@@ -122,6 +124,7 @@ export default function ApplyForm() {
       !!form.activeStudentsCount.trim(),
       Object.values(form.interestedGames).some(Boolean) &&
         (!form.interestedGames.other || !!form.interestedGamesOther.trim()),
+      form.agreedRules,
     ],
   };
 
@@ -170,6 +173,8 @@ export default function ApplyForm() {
     if (!form.activeStudentsCount.trim()) errors.activeStudentsCount = 'Estimated student count is required.';
 
     const hasGame = Object.values(form.interestedGames).some(Boolean);
+    if (!form.agreedRules) errors.agreedRules = 'You must agree to the EZ Esports league rules and terms before submitting.';
+
     if (!hasGame) {
       errors.interestedGames = 'Select at least one game your club is interested in.';
     } else if (form.interestedGames.other && !form.interestedGamesOther.trim()) {
@@ -195,60 +200,12 @@ export default function ApplyForm() {
     setLoading(true);
     setError('');
 
-    const selectedGames: string[] = [];
-    if (form.interestedGames.valorant) selectedGames.push('Valorant');
-    if (form.interestedGames.lol) selectedGames.push('League of Legends (LoL)');
-    if (form.interestedGames.tft) selectedGames.push('Teamfight Tactics (TFT)');
-    if (form.interestedGames.tetris) selectedGames.push('Tetris');
-    if (form.interestedGames.clashRoyale) selectedGames.push('Clash Royale');
-    if (form.interestedGames.other) selectedGames.push(`Other: ${form.interestedGamesOther.trim()}`);
-
-    const compiledMessage = `
-=== 1. PRESIDENT INFO ===
-President Name: ${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}
-School Name: ${form.schoolName.trim()}
-Graduation Year: ${form.presidentGradYear}
-Email: ${form.presidentEmail.trim()}
-Discord Username: ${form.presidentDiscord.trim()}
-Best Contact Platform: ${form.presidentPreferredContact.trim()}
-
-=== 2. VICE PRESIDENT INFO ===
-VP Name: ${form.vpFirstName.trim()} ${form.vpLastName.trim()}
-Graduation Year: ${form.vpGradYear}
-Discord Username: ${form.vpDiscord.trim()}
-Email: ${form.vpEmail.trim()}
-Best Contact Platform: ${form.vpPreferredContact.trim()}
-
-=== 3. 3RD STUDENT CLUB OFFICER INFO ===
-Officer Name: ${form.officerFirstName.trim()} ${form.officerLastName.trim()}
-Graduation Year: ${form.officerGradYear}
-Email: ${form.officerEmail.trim()}
-Best Contact Platform: ${form.officerPreferredContact.trim()}
-
-=== 4. CLUB INFO ===
-Club Socials:
-${form.clubSocials.trim() || 'N/A'}
-
-Club Advisor Name: ${form.advisorName.trim()}
-Club Advisor Email (@schools.nyc.gov): ${form.advisorEmail.trim()}
-Estimated Active Club Members: ${form.activeStudentsCount.trim()}
-Interested Games: ${selectedGames.join(', ')}
-
-Feedback / Notes:
-${form.feedback.trim() || 'N/A'}
-`.trim();
-
     try {
+      const payload = compileApplicationPayload(form);
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          applicantName: `${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}`,
-          schoolName: form.schoolName.trim(),
-          role: 'Esports Club President',
-          email: form.presidentEmail.trim(),
-          message: compiledMessage,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Submission failed');
       setSubmitted(true);
@@ -266,6 +223,17 @@ ${form.feedback.trim() || 'N/A'}
       setFieldErrors((prev) => {
         const next = { ...prev };
         delete next[name];
+        return next;
+      });
+    }
+  };
+
+  const handleRulesChange = (checked: boolean) => {
+    setForm((prev) => ({ ...prev, agreedRules: checked }));
+    if (fieldErrors.agreedRules) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.agreedRules;
         return next;
       });
     }
@@ -365,8 +333,7 @@ ${form.feedback.trim() || 'N/A'}
 
           {/* Description & League Highlights */}
           <p className="text-foreground-secondary text-sm md:text-base mt-5 font-medium leading-relaxed">
-            Bring competitive high-school esports to your campus. Any teacher, faculty advisor, administrator, or
-            student club officer can apply on behalf of their school. Joining gets your students:
+            Bring competitive high-school esports to your campus. High school Esports Club presidents and student club officers can apply on behalf of their school. Joining gets your students:
           </p>
           <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
             {[
@@ -529,7 +496,7 @@ ${form.feedback.trim() || 'N/A'}
               </nav>
 
               {/* What happens next / Timeline */}
-              <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
+              <div className="bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
                 <h3 className="text-sm font-bold text-foreground mb-4 uppercase tracking-wider">After You Apply</h3>
                 <ol className="relative border-l-2 border-line ml-2.5 pl-5 space-y-5 text-sm">
                   <li className="relative">
@@ -551,7 +518,7 @@ ${form.feedback.trim() || 'N/A'}
               </div>
 
               {/* Assistance */}
-              <div className="hidden lg:block bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
+              <div className="bg-surface/85 backdrop-blur-md rounded-2xl border border-line p-6 shadow-sm">
                 <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">Need Assistance?</h3>
                 <p className="text-xs text-foreground-muted mb-3 leading-relaxed">
                   Have questions about student eligibility, club requirements, or discord onboarding? We are here to help.
@@ -1223,14 +1190,42 @@ ${form.feedback.trim() || 'N/A'}
                 {/* Rules & Terms Reference Link */}
                 <div className="rounded-xl border border-line bg-accent/5 p-4 text-xs text-foreground-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span>Review league rules, terms of participation, and handbook:</span>
-                  <a
-                    href="https://www.ezesports.org/rules"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Link
+                    href="/about"
                     className="text-accent font-bold hover:underline shrink-0"
                   >
                     View Rulebook &amp; Terms →
-                  </a>
+                  </Link>
+                </div>
+
+                {/* Rules Consent Checkbox */}
+                <div
+                  id="field-agreedRules"
+                  className={`rounded-xl border p-4 sm:p-5 transition-colors ${fieldErrors.agreedRules ? "border-danger bg-danger/5" : "border-line bg-accent/5"}`}
+                  role="group"
+                  aria-labelledby="agreedRules-label"
+                  aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
+                >
+                  <span id="agreedRules-label" className={labelClass}>
+                    League Rules &amp; Terms Consent {requiredMark}
+                  </span>
+                  <p className="text-xs text-foreground-secondary mb-3 leading-relaxed">
+                    By applying on behalf of your school, you confirm that your club officers and members will abide by EZ Esports league rules, competitive integrity guidelines, and sportsmanship policies.
+                  </p>
+                  <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={form.agreedRules}
+                      onChange={(e) => handleRulesChange(e.target.checked)}
+                      className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
+                      aria-invalid={!!fieldErrors.agreedRules}
+                      aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
+                    />
+                    <span>I understand and agree to uphold the league rules and terms of participation.</span>
+                  </label>
+                  {fieldErrors.agreedRules && (
+                    <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
+                  )}
                 </div>
 
                 {/* Submit Action Bar */}

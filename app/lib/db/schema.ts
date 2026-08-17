@@ -11,7 +11,7 @@ const auditColumns = {
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'completed', 'forfeit', 'cancelled']);
 export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach', 'sub']);
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
-export const applicationStatusEnum = pgEnum('application_status', ['pending', 'accepted', 'rejected']);
+export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted', 'rejected']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
 
 // --- CORE ENTITIES ---
@@ -382,6 +382,8 @@ export const schoolApplications = pgTable('school_applications', {
   email: text('email').notNull(),
   message: text('message').default(''),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
   index('school_applications_submitted_at_idx').on(table.submittedAt),
@@ -397,6 +399,8 @@ export const staffApplications = pgTable('staff_applications', {
   role: text('role').notNull(),
   message: text('message').default(''),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
   ...auditColumns,
 }, (table) => [
   index('staff_applications_submitted_at_idx').on(table.submittedAt),
