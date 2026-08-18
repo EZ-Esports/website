@@ -239,7 +239,7 @@ export const newsPosts = pgTable('news_posts', {
   index('news_posts_published_at_idx').on(table.publishedAt),
 ]).enableRLS();
 
-// Leadership team members
+// Leadership team members (Legacy flat table - preserved for backwards compatibility)
 export const leadership = pgTable('leadership', {
   id: uuid('id').defaultRandom().primaryKey(),
   // SET NULL, emphatically not CASCADE. A leadership row is a record that
@@ -263,6 +263,53 @@ export const leadership = pgTable('leadership', {
   ...auditColumns,
 }, (table) => [
   index('leadership_year_idx').on(table.year),
+]).enableRLS();
+
+// Normalized People / Profiles Table
+export const people = pgTable('people', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  fullName: text('full_name').notNull(),
+  preferredName: text('preferred_name'),
+  handle: text('handle'),
+  avatarUrl: text('avatar_url'),
+  storageKey: text('storage_key'),
+  highSchool: text('high_school'),
+  university: text('university'),
+  graduationYear: integer('graduation_year'),
+  bio: text('bio'),
+  email: text('email'),
+  discord: text('discord'),
+  userId: uuid('user_id').references(() => staffMembers.userId, { onDelete: 'set null' }),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  isActive: boolean('is_active').default(true).notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
+  ...auditColumns,
+}, (table) => [
+  index('people_full_name_idx').on(table.fullName),
+  index('people_handle_idx').on(table.handle),
+]).enableRLS();
+
+// Normalized Leadership Terms Table
+export const leadershipTerms = pgTable('leadership_terms', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  personId: uuid('person_id')
+    .references(() => people.id, { onDelete: 'cascade' })
+    .notNull(),
+  year: text('year').notNull(), // e.g. "2026", "2025"
+  role: text('role').notNull(), // e.g. "President", "CTO", "Marketing Director"
+  department: text('department'), // e.g. "Executive", "Operations", "Marketing", "Product", "Broadcasting"
+  displayOrder: integer('display_order').default(0).notNull(),
+  termBio: text('term_bio'), // optional role-specific override
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
+  ...auditColumns,
+}, (table) => [
+  index('leadership_terms_year_idx').on(table.year),
+  index('leadership_terms_person_id_idx').on(table.personId),
+  uniqueIndex('leadership_terms_person_year_role_idx')
+    .on(table.personId, table.year, table.role)
+    .where(sql`deleted_at IS NULL`),
 ]).enableRLS();
 
 // View for rosters with dynamically computed standings (wins and losses)

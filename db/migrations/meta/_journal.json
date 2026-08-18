@@ -225,6 +225,13 @@
       "when": 1786948964700,
       "tag": "0031_append_only_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787029766310,
+      "tag": "0032_nappy_blade",
+      "breakpoints": true
     }
   ]
 }
