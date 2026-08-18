@@ -509,25 +509,63 @@ export const getCachedLeadership = unstable_cache(
   async () => {
     return db
       .select({
-        id: schema.leadership.id,
-        memberId: schema.leadership.memberId,
-        name: schema.leadership.name,
-        handle: schema.leadership.handle,
-        role: schema.leadership.role,
-        year: schema.leadership.year,
-        highSchool: schema.leadership.highSchool,
-        university: schema.leadership.university,
+        id: schema.leadershipTerms.id,
+        termId: schema.leadershipTerms.id,
+        personId: schema.people.id,
+        memberId: schema.people.memberId,
+        name: schema.people.fullName,
+        handle: schema.people.handle,
+        role: schema.leadershipTerms.role,
+        department: schema.leadershipTerms.department,
+        year: schema.leadershipTerms.year,
+        displayOrder: schema.leadershipTerms.displayOrder,
+        bio: sql<string | null>`COALESCE(${schema.leadershipTerms.termBio}, ${schema.people.bio})`,
+        highSchool: schema.people.highSchool,
+        university: schema.people.university,
+        avatarUrl: schema.people.avatarUrl,
+        storageKey: schema.people.storageKey,
         schoolName: schema.schools.name,
-        graduationYear: schema.members.graduationYear,
+        graduationYear: sql<number | null>`COALESCE(${schema.people.graduationYear}, ${schema.members.graduationYear})`,
       })
-      .from(schema.leadership)
-      .leftJoin(schema.members, eq(schema.leadership.memberId, schema.members.id))
+      .from(schema.leadershipTerms)
+      .innerJoin(schema.people, eq(schema.leadershipTerms.personId, schema.people.id))
+      .leftJoin(schema.members, eq(schema.people.memberId, schema.members.id))
       .leftJoin(schema.schools, eq(schema.members.schoolId, schema.schools.id))
-      .where(isNull(schema.leadership.deletedAt))
-      .orderBy(desc(schema.leadership.year));
+      .where(and(isNull(schema.leadershipTerms.deletedAt), isNull(schema.people.deletedAt)))
+      .orderBy(
+        desc(schema.leadershipTerms.year),
+        asc(schema.leadershipTerms.displayOrder),
+        asc(schema.leadershipTerms.role),
+        asc(schema.people.fullName)
+      );
   },
   ['leadership-list'],
-  { tags: ['leadership'] }
+  { tags: ['leadership', 'people'] }
+);
+
+export const getCachedPeople = unstable_cache(
+  async () => {
+    return db
+      .select({
+        id: schema.people.id,
+        fullName: schema.people.fullName,
+        preferredName: schema.people.preferredName,
+        handle: schema.people.handle,
+        avatarUrl: schema.people.avatarUrl,
+        storageKey: schema.people.storageKey,
+        highSchool: schema.people.highSchool,
+        university: schema.people.university,
+        graduationYear: schema.people.graduationYear,
+        bio: schema.people.bio,
+        memberId: schema.people.memberId,
+        isActive: schema.people.isActive,
+      })
+      .from(schema.people)
+      .where(and(eq(schema.people.isActive, true), isNull(schema.people.deletedAt)))
+      .orderBy(asc(schema.people.fullName));
+  },
+  ['people-list'],
+  { tags: ['leadership', 'people'] }
 );
 
 export const getCachedSponsors = unstable_cache(

@@ -175,6 +175,42 @@ export interface DBLeadership {
   updatedAt: Date;
 }
 
+export interface DBPerson {
+  id: string;
+  fullName: string;
+  preferredName: string | null;
+  handle: string | null;
+  avatarUrl: string | null;
+  storageKey: string | null;
+  highSchool: string | null;
+  university: string | null;
+  graduationYear: number | null;
+  bio: string | null;
+  email: string | null;
+  discord: string | null;
+  userId: string | null;
+  memberId: string | null;
+  isActive: boolean;
+  deletedAt: Date | null;
+  deletedBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DBLeadershipTerm {
+  id: string;
+  personId: string;
+  year: string;
+  role: string;
+  department: string | null;
+  displayOrder: number;
+  termBio: string | null;
+  deletedAt: Date | null;
+  deletedBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface School {
   id: string;
   name: string;

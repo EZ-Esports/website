@@ -13,7 +13,10 @@ const UPLOAD_WINDOW_MS = 60_000;
 export async function POST(req: NextRequest) {
   try {
     await requireAnyPermission(
-      Permissions.MANAGE_GALLERY | Permissions.MANAGE_SPONSORS | Permissions.MANAGE_SCHOOLS,
+      Permissions.MANAGE_GALLERY |
+        Permissions.MANAGE_SPONSORS |
+        Permissions.MANAGE_SCHOOLS |
+        Permissions.MANAGE_LEADERSHIP,
     );
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
