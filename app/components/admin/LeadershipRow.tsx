@@ -28,7 +28,7 @@ export interface LeaderRowItem {
 }
 
 const inputClass =
-  'w-full px-3 py-2 bg-surface-sunken border border-line/80 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all';
+  'w-full px-3 py-2 bg-surface-sunken border border-line/80 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all';
 
 export default function LeadershipRow({
   leader,
@@ -71,7 +71,7 @@ export default function LeadershipRow({
   if (editing) {
     return (
       <tr className="bg-line/30 transition-colors">
-        <td colSpan={5} className="p-6">
+        <td colSpan={4} className="p-4">
           <form
             action={async (formData) => {
               setSaveError(null);
@@ -82,13 +82,13 @@ export default function LeadershipRow({
               }
               closeEditing();
             }}
-            className="space-y-6"
+            className="space-y-4 max-w-full"
           >
             <input type="hidden" name="personId" value={leader.personId} />
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
               {/* Left Column: Avatar Headshot Editor */}
-              <div className="md:col-span-4 bg-surface-sunken/60 p-4 rounded-xl border border-line/60 space-y-3">
+              <div className="md:col-span-4 bg-surface-sunken/60 p-3 rounded-xl border border-line/60 space-y-2">
                 <span className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
                   Profile Headshot
                 </span>
@@ -102,10 +102,10 @@ export default function LeadershipRow({
               </div>
 
               {/* Right Column: Person & Term Fields */}
-              <div className="md:col-span-8 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="md:col-span-8 space-y-3 min-w-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       Full Name
                     </label>
                     <input
@@ -119,7 +119,7 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       Handle / IGN
                     </label>
                     <input
@@ -132,7 +132,7 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       Role Title
                     </label>
                     <input
@@ -145,7 +145,7 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       Academic Year
                     </label>
                     <input
@@ -160,7 +160,7 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       Department
                     </label>
                     <input
@@ -173,23 +173,26 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                      Display Order
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                      Seniority Order
                     </label>
-                    <input
+                    <select
                       name="displayOrder"
-                      type="number"
-                      min="0"
-                      max="99"
-                      defaultValue={leader.displayOrder ?? 0}
+                      defaultValue={leader.displayOrder ?? 3}
                       className={inputClass}
-                    />
+                    >
+                      <option value="1">1 - Executive (President, CTO, Founders)</option>
+                      <option value="2">2 - Director / Lead (Dept & Game Leads)</option>
+                      <option value="3">3 - Associate / Staff (Associates, Coordinators)</option>
+                      <option value="4">4 - Advisor / Special Thanks</option>
+                      <option value="0">0 - Other / Unspecified</option>
+                    </select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       High School
                     </label>
                     <input
@@ -202,7 +205,7 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       University
                     </label>
                     <input
@@ -215,7 +218,7 @@ export default function LeadershipRow({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                       Graduation Year
                     </label>
                     <input
@@ -229,7 +232,7 @@ export default function LeadershipRow({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                     Associated League Member
                   </label>
                   <select
@@ -251,7 +254,7 @@ export default function LeadershipRow({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
                     Bio / Notes
                   </label>
                   <textarea
@@ -275,14 +278,14 @@ export default function LeadershipRow({
               <button
                 type="button"
                 onClick={closeEditing}
-                className="px-4 py-2 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary border border-line transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary border border-line transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <SubmitButton
                 label="Save Changes"
                 pendingLabel="Saving…"
-                className="px-5 py-2 bg-accent hover:bg-accent/80 font-bold text-xs uppercase tracking-wider rounded-lg text-on-accent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-1.5 bg-accent hover:bg-accent/80 font-bold text-xs uppercase tracking-wider rounded-lg text-on-accent transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </form>
@@ -307,9 +310,9 @@ export default function LeadershipRow({
   return (
     <tr className="hover:bg-line/10 transition-colors group">
       {/* Officer Avatar & Identity */}
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-full bg-surface-raised border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
+      <td className="px-3.5 py-3 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-surface-raised border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
             {leader.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -318,19 +321,19 @@ export default function LeadershipRow({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <span className="text-xs font-black text-foreground-secondary tracking-tight">
+              <span className="text-[10px] font-black text-foreground-secondary tracking-tight">
                 {initials}
               </span>
             )}
           </div>
-          <div>
-            <div className="font-bold text-white text-base tracking-tight flex items-center gap-1.5">
-              <span>{leader.name}</span>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-white text-xs tracking-tight flex items-center gap-1 truncate">
+              <span className="truncate">{leader.name}</span>
               {leader.handle && (
-                <span className="text-xs text-foreground-muted font-normal">({leader.handle})</span>
+                <span className="text-[10px] text-foreground-muted font-normal shrink-0">({leader.handle})</span>
               )}
             </div>
-            <div className="text-xs text-foreground-secondary max-w-xs truncate leading-relaxed">
+            <div className="text-[10px] text-foreground-secondary truncate max-w-full">
               {schoolDisplay}
             </div>
           </div>
@@ -338,19 +341,19 @@ export default function LeadershipRow({
       </td>
 
       {/* Role & Department */}
-      <td className="px-6 py-4">
-        <div className="font-bold text-foreground">{leader.role}</div>
+      <td className="px-3.5 py-3 min-w-0">
+        <div className="font-bold text-foreground text-xs truncate">{leader.role}</div>
         {leader.department && (
-          <span className="inline-block mt-0.5 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-surface-raised border border-line text-foreground-secondary">
+          <span className="inline-block mt-0.5 text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-surface-raised border border-line text-foreground-secondary truncate max-w-full">
             {leader.department}
           </span>
         )}
       </td>
 
       {/* Seniority Tier & Order */}
-      <td className="px-6 py-4">
+      <td className="px-3.5 py-3">
         <span
-          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
+          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
             seniorityTier === 'Executive'
               ? 'bg-accent/20 text-accent border border-accent/30'
               : seniorityTier === 'Director'
@@ -361,21 +364,18 @@ export default function LeadershipRow({
           }`}
         >
           {seniorityTier}
-          <span className="text-[10px] opacity-70">#{leader.displayOrder ?? 0}</span>
+          <span className="text-[9px] opacity-70">#{leader.displayOrder ?? 0}</span>
         </span>
       </td>
 
-      {/* Academic Year */}
-      <td className="px-6 py-4 text-foreground-secondary font-semibold">{leader.year}</td>
-
       {/* Actions */}
-      <td className="px-6 py-4 text-right">
-        <div className="flex gap-2 justify-end">
+      <td className="px-3.5 py-3 text-right">
+        <div className="flex gap-1.5 justify-end">
           <button
             ref={editBtnRef}
             type="button"
             onClick={() => setEditing(true)}
-            className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
+            className="px-2.5 py-1 bg-surface-raised hover:bg-line font-bold text-[11px] uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
           >
             Edit
           </button>
@@ -383,7 +383,7 @@ export default function LeadershipRow({
             action={deleteAction}
             label="Remove"
             message={`Remove ${leader.name} (${leader.role}, ${leader.year}) from leadership terms?`}
-            className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
+            className="px-2.5 py-1 bg-surface-raised hover:bg-red-950/20 font-bold text-[11px] uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
           />
         </div>
       </td>
