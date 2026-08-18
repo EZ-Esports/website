@@ -89,15 +89,12 @@ export default function LeadershipRow({
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
               {/* Left Column: Avatar Headshot Editor */}
               <div className="md:col-span-4 bg-surface-sunken/60 p-3 rounded-xl border border-line/60 space-y-2">
-                <span className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-                  Profile Headshot
-                </span>
                 <ImageUpload
                   name="avatarUrl"
                   storageKeyName="storageKey"
                   currentSrc={leader.avatarUrl || ''}
                   currentStorageKey={leader.storageKey || ''}
-                  label="Headshot Avatar"
+                  label="Profile Headshot"
                 />
               </div>
 

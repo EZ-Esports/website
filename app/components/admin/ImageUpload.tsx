@@ -151,7 +151,7 @@ export default function ImageUpload({
   };
 
   return (
-    <div ref={rootRef} className="space-y-2 w-full">
+    <div ref={rootRef} className="space-y-1.5 w-full">
       {label && (
         <span className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
           {label}
@@ -234,48 +234,47 @@ export default function ImageUpload({
           )}
         </div>
       ) : (
-        /* Image Preview with Replace & Remove Actions */
-        <div className="relative rounded-xl border border-line/80 bg-surface-sunken/80 p-3 flex items-center gap-3.5 group">
-          <div className="w-14 h-14 rounded-lg bg-surface-raised border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewUrl}
-              alt="Uploaded preview"
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          <div className="flex-grow min-w-0">
-            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span className="truncate">Image selected</span>
-              <span className="px-1.5 py-0.2 rounded bg-green-950/60 border border-green-900/60 text-green-400 text-[10px] font-semibold uppercase">
-                Ready
-              </span>
+        /* Image Preview with Unclipped Responsive Stack */
+        <div className="relative rounded-xl border border-line/80 bg-surface-sunken/80 p-3 space-y-2.5 w-full">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-11 h-11 rounded-lg bg-surface-raised border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="Uploaded preview"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate max-w-[120px] sm:max-w-[180px]">
+                  {storageKey ? storageKey.split('/').pop() : 'Image loaded'}
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-green-400 font-semibold uppercase mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                  <span>Ready</span>
+                </div>
+              </div>
             </div>
-            <p className="text-[11px] text-foreground-secondary truncate mt-0.5 max-w-[200px] sm:max-w-xs">
-              {storageKey ? storageKey.split('/').pop() : previewUrl}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Replace image"
-              className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md bg-surface-raised hover:bg-line text-foreground border border-line hover:border-line transition-all cursor-pointer flex items-center gap-1"
-            >
-              <HiArrowUpTray className="w-3 h-3 text-foreground-muted" />
-              Replace
-            </button>
             <button
               type="button"
               onClick={handleRemove}
               aria-label="Remove image"
-              className="p-1.5 rounded-md bg-surface-raised hover:bg-red-950/30 text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
+              className="p-1.5 rounded-lg bg-surface-raised hover:bg-red-950/30 text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer shrink-0"
             >
               <HiXMark className="w-4 h-4" />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Replace image"
+            className="w-full py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-surface-raised hover:bg-line text-foreground border border-line hover:border-line transition-all cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <HiArrowUpTray className="w-3.5 h-3.5 text-foreground-muted" />
+            Replace Image
+          </button>
         </div>
       )}
 

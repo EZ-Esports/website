@@ -40,14 +40,14 @@ export default function LeadershipManagerClient({
   membersList,
   schoolsList,
 }: LeadershipManagerClientProps) {
-  // Available unique years sorted from EARLIEST to LATEST
+  // Available unique years sorted in DESCENDING order (latest first)
   const availableYears = useMemo(() => {
     return Array.from(new Set(initialLeadership.map((l) => l.year))).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true })
+      b.localeCompare(a, undefined, { numeric: true })
     );
   }, [initialLeadership]);
 
-  // Default filter: always earliest year
+  // Default filter: always latest year
   const [selectedYear, setSelectedYear] = useState<string>(() => availableYears[0] || new Date().getFullYear().toString());
   const [searchQuery, setSearchQuery] = useState<string>('');
 
