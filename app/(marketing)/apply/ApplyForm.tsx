@@ -1,14 +1,77 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { validateSchoolApplicationForm, compileApplicationPayload } from '@/app/lib/school-application-form';
+import {
+  validateSchoolApplicationForm,
+  compileApplicationPayload,
+  GAME_LABELS,
+  CLUB_BARRIER_LABELS,
+  NON_ROSTER_OPPORTUNITY_LABELS,
+  INCLUSIVE_OPPORTUNITY_LABELS,
+  CONTRIBUTE_BEYOND_SCHOOL_LABELS,
+} from '@/app/lib/school-application-form';
 import Button from '@/app/components/ui/Button';
 import { Textarea } from '@/app/components/ui/form';
 
 const GRAD_YEARS = ["'27", "'28", "'29", "'30"] as const;
 
+const CLUB_STATUS_OPTIONS = [
+  'Active and returning',
+  'Rebuilding leadership',
+  'Newly forming',
+  'Unsure',
+  'Currently inactive',
+] as const;
+
+const ADVISOR_CONFIRMED_OPTIONS = ['Yes', 'Pending / in-progress', 'Not yet identified'] as const;
+
+// Single source of truth tying each checkbox-group form field to its label
+// map (and whether it has a write-in "Other" option), so the option key type
+// below can't drift from what's actually rendered.
+const CHECKBOX_GROUP_LABELS = {
+  interestedGames: { labels: GAME_LABELS, hasOther: true },
+  nonRosterOpportunities: { labels: NON_ROSTER_OPPORTUNITY_LABELS, hasOther: true },
+  inclusiveOpportunities: { labels: INCLUSIVE_OPPORTUNITY_LABELS, hasOther: true },
+  contributeBeyondSchool: { labels: CONTRIBUTE_BEYOND_SCHOOL_LABELS, hasOther: false },
+} as const;
+
+// Object.entries() widens keys to `string`; this recovers the literal key
+// union so checkbox option ids stay typo-checked at their call sites.
+function typedEntries<T extends Record<string, string>>(labels: T): [keyof T & string, string][] {
+  return Object.entries(labels) as [keyof T & string, string][];
+}
+
+// Hoisted out of JSX so these static label maps are only ever iterated once
+// (at module load) instead of being re-derived on every keystroke/render.
+const GAME_ENTRIES = typedEntries(GAME_LABELS);
+const NON_ROSTER_OPPORTUNITY_ENTRIES = typedEntries(NON_ROSTER_OPPORTUNITY_LABELS);
+const INCLUSIVE_OPPORTUNITY_ENTRIES = typedEntries(INCLUSIVE_OPPORTUNITY_LABELS);
+const CONTRIBUTE_BEYOND_SCHOOL_ENTRIES = typedEntries(CONTRIBUTE_BEYOND_SCHOOL_LABELS);
+// CLUB_BARRIER_LABELS is typed as `Record<string, string>` (not literal-keyed,
+// see its definition), so it can't go through typedEntries — but it's just as
+// static, so it's hoisted the same way to avoid re-deriving it every render.
+const CLUB_BARRIER_ENTRIES = Object.entries(CLUB_BARRIER_LABELS);
+
+// Derives an all-unchecked selection map from a *_LABELS export so the initial
+// state can never drift out of sync with the options actually rendered.
+function emptySelection(labels: Record<string, string>, hasOther: boolean): Record<string, boolean> {
+  const selection: Record<string, boolean> = {};
+  for (const key of Object.keys(labels)) selection[key] = false;
+  if (hasOther) selection.other = false;
+  return selection;
+}
+
+// A checkbox group is "complete" once at least one option is checked, and —
+// if the checked options include the write-in "Other" toggle — the write-in
+// text isn't blank. Shared by the progress/required-field checks below so
+// the completeness rule can't drift between checkbox groups.
+function isCheckboxGroupComplete(selection: Record<string, boolean>, otherText?: string): boolean {
+  return Object.values(selection).some(Boolean) && (!selection.other || !!otherText?.trim());
+}
+
 const initialForm = {
+  clubStatus: '',
+
   // Layer 1: President Info
   presidentFirstName: '',
   presidentLastName: '',
@@ -34,22 +97,34 @@ const initialForm = {
   officerPreferredContact: '',
 
   // Layer 4: Club Info
-  clubSocials: '',
+  instagramLink: '',
+  discordLink: '',
   advisorName: '',
   advisorEmail: '',
+  advisorConfirmed: '',
   activeStudentsCount: '',
-  interestedGames: {
-    valorant: false,
-    lol: false,
-    tft: false,
-    tetris: false,
-    clashRoyale: false,
-    other: false,
-  },
+  interestedGames: emptySelection(CHECKBOX_GROUP_LABELS.interestedGames.labels, CHECKBOX_GROUP_LABELS.interestedGames.hasOther),
   interestedGamesOther: '',
+  clubBarriers: '',
+  clubBarriersOther: '',
+  nonRosterOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.nonRosterOpportunities.labels, CHECKBOX_GROUP_LABELS.nonRosterOpportunities.hasOther),
+  nonRosterOpportunitiesOther: '',
+  inclusiveOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.inclusiveOpportunities.labels, CHECKBOX_GROUP_LABELS.inclusiveOpportunities.hasOther),
+  inclusiveOpportunitiesOther: '',
+  separateGamingClubs: '',
+  contributeBeyondSchool: emptySelection(CHECKBOX_GROUP_LABELS.contributeBeyondSchool.labels, CHECKBOX_GROUP_LABELS.contributeBeyondSchool.hasOther),
   feedback: '',
   agreedRules: false,
 };
+
+type CheckboxGroupKey = keyof typeof CHECKBOX_GROUP_LABELS;
+// 'other' is only a valid key for groups whose config sets hasOther: true —
+// this stays in sync with CHECKBOX_GROUP_LABELS instead of being available
+// (and silently unused) on every group regardless of whether it renders an
+// "Other:" write-in row.
+type CheckboxOptionKey<G extends CheckboxGroupKey> =
+  | (keyof (typeof CHECKBOX_GROUP_LABELS)[G]['labels'] & string)
+  | ((typeof CHECKBOX_GROUP_LABELS)[G]['hasOther'] extends true ? 'other' : never);
 
 const SECTIONS = [
   { id: 'president', num: 1, title: 'President Info', desc: 'Primary student leader contact and school details.' },
@@ -61,6 +136,63 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]['id'];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Shared "Other:" toggle + conditional write-in text field, reused by every
+// option group (radio or checkbox) that offers a free-text escape hatch.
+function OtherWriteInRow({
+  toggleType,
+  toggleName,
+  toggleValue,
+  toggleChecked,
+  onToggleChange,
+  textId,
+  textName,
+  textValue,
+  onTextChange,
+  placeholder,
+  spanTwoCols = true,
+}: {
+  toggleType: 'radio' | 'checkbox';
+  toggleName?: string;
+  toggleValue?: string;
+  toggleChecked: boolean;
+  onToggleChange: React.ChangeEventHandler<HTMLInputElement>;
+  textId: string;
+  textName: string;
+  textValue: string;
+  onTextChange: React.ChangeEventHandler<HTMLInputElement>;
+  placeholder: string;
+  spanTwoCols?: boolean;
+}) {
+  const toggleClass =
+    toggleType === 'checkbox' ? 'w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer' : 'w-4.5 h-4.5 accent-accent cursor-pointer';
+  return (
+    <div className={`${spanTwoCols ? 'sm:col-span-2 ' : ''}flex flex-col sm:flex-row sm:items-center gap-2 mt-1`}>
+      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
+        <input
+          type={toggleType}
+          name={toggleName}
+          value={toggleValue}
+          checked={toggleChecked}
+          onChange={onToggleChange}
+          className={toggleClass}
+        />
+        <span>Other:</span>
+      </label>
+      {toggleChecked && (
+        <input
+          id={textId}
+          type="text"
+          name={textName}
+          placeholder={placeholder}
+          value={textValue}
+          onChange={onTextChange}
+          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+        />
+      )}
+    </div>
+  );
+}
 
 export default function ApplyForm() {
   const [submitted, setSubmitted] = useState(false);
@@ -95,6 +227,7 @@ export default function ApplyForm() {
 
   const requiredChecks: Record<SectionId, boolean[]> = {
     president: [
+      !!form.clubStatus,
       !!form.presidentFirstName.trim(),
       !!form.presidentLastName.trim(),
       !!form.schoolName.trim(),
@@ -119,11 +252,18 @@ export default function ApplyForm() {
       !!form.officerPreferredContact.trim(),
     ],
     clubInfo: [
+      !!form.instagramLink.trim(),
+      !!form.discordLink.trim(),
       !!form.advisorName.trim(),
       EMAIL_RE.test(form.advisorEmail),
+      !!form.advisorConfirmed,
       !!form.activeStudentsCount.trim(),
-      Object.values(form.interestedGames).some(Boolean) &&
-        (!form.interestedGames.other || !!form.interestedGamesOther.trim()),
+      isCheckboxGroupComplete(form.interestedGames, form.interestedGamesOther),
+      !!form.clubBarriers && (form.clubBarriers !== 'other' || !!form.clubBarriersOther.trim()),
+      isCheckboxGroupComplete(form.nonRosterOpportunities, form.nonRosterOpportunitiesOther),
+      isCheckboxGroupComplete(form.inclusiveOpportunities, form.inclusiveOpportunitiesOther),
+      !!form.separateGamingClubs.trim(),
+      isCheckboxGroupComplete(form.contributeBeyondSchool),
       form.agreedRules,
     ],
   };
@@ -163,51 +303,53 @@ export default function ApplyForm() {
       if (!res.ok) throw new Error('Submission failed');
       setSubmitted(true);
     } catch {
-      setError('Something went wrong. Please try again or reach out to "angesumi" on Discord or email info@ezesports.org.');
+      setError('Something went wrong. Please try again or reach out to info@ezesports.org.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Shared by every change handler below so "clear the error(s) this edit
+  // just resolved" stays a single implementation instead of four copies.
+  const clearFieldErrors = (...keys: string[]) => {
+    if (!keys.some((key) => fieldErrors[key])) return;
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      for (const key of keys) delete next[key];
+      return next;
+    });
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
-    }
+    clearFieldErrors(name);
+  };
+
+  // clubBarriers pairs a radio group with a write-in "Other" field, same as
+  // the checkbox groups below — needs its own handler (rather than plain
+  // handleTextChange) so switching away from "other" also clears the
+  // now-irrelevant clubBarriersOther error, mirroring handleCheckboxGroupChange.
+  const handleClubBarriersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm((prev) => ({ ...prev, clubBarriers: value }));
+    clearFieldErrors('clubBarriers', 'clubBarriersOther');
   };
 
   const handleRulesChange = (checked: boolean) => {
     setForm((prev) => ({ ...prev, agreedRules: checked }));
-    if (fieldErrors.agreedRules) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.agreedRules;
-        return next;
-      });
-    }
+    clearFieldErrors('agreedRules');
   };
 
-  const handleGameCheckboxChange = (key: keyof typeof initialForm.interestedGames, checked: boolean) => {
+  const handleCheckboxGroupChange = <G extends CheckboxGroupKey>(group: G, key: CheckboxOptionKey<G>, checked: boolean) => {
     setForm((prev) => ({
       ...prev,
-      interestedGames: {
-        ...prev.interestedGames,
+      [group]: {
+        ...prev[group],
         [key]: checked,
       },
     }));
-    if (fieldErrors.interestedGames || fieldErrors.interestedGamesOther) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.interestedGames;
-        delete next.interestedGamesOther;
-        return next;
-      });
-    }
+    clearFieldErrors(group, `${group}Other`);
   };
 
   const textInputClass = (hasError: boolean) =>
@@ -286,11 +428,11 @@ export default function ApplyForm() {
 
           {/* Description & League Highlights */}
           <p className="text-foreground-secondary text-sm md:text-base mt-5 font-medium leading-relaxed">
-            Bring competitive high-school esports to your campus. High school Esports Club presidents and student club officers can apply on behalf of their school. Joining gets your students:
+            Bring competitive high-school esports to your campus for the <strong className="text-foreground">2026–2027</strong> school year. Any high school student currently leading their school&apos;s Esports Club can apply on behalf of their school. Joining gets your students:
           </p>
           <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
             {[
-              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, Tetris, and Clash Royale with real standings',
+              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, Tetris, Clash Royale, and Super Smash Bros. Ultimate with real standings',
               'Live-streamed matches broadcast to audiences across NYC',
               'Community and pathways into gaming and technology careers',
             ].map((benefit) => (
@@ -338,23 +480,6 @@ export default function ApplyForm() {
               </svg>
               News Article
             </a>
-          </div>
-
-          {/* Notice Banner */}
-          <div className="mt-6 bg-accent/10 border border-accent/30 rounded-xl p-5 space-y-2 text-sm text-foreground">
-            <p className="font-bold text-accent uppercase tracking-wider text-xs">Notice &amp; Instructions</p>
-            <p className="font-semibold">
-              [EZEsports Update // We&apos;re making some exciting changes and updates this summer! Keep an eye out for special announcements and upcoming news.]
-            </p>
-            <p className="text-foreground-secondary leading-relaxed">
-              To complete this application, you must be a high school student leading your school&apos;s Esports Club for the <strong className="text-foreground">2026–2027</strong> school year. If you share leadership with a co-leader, please include their details under the <strong>&quot;Vice President&quot;</strong> section.
-            </p>
-            <p className="text-foreground font-semibold">
-              EZEsports requires at least 3 points of contact, no less.
-            </p>
-            <p className="text-xs text-foreground-secondary">
-              If you have any questions or need further clarification, feel free to reach out to <strong className="text-accent">&quot;angesumi&quot;</strong> on Discord or email <strong className="text-accent">info@ezesports.org</strong>.
-            </p>
           </div>
         </div>
 
@@ -480,9 +605,6 @@ export default function ApplyForm() {
                   <a href="mailto:info@ezesports.org" className="text-accent hover:underline font-bold transition-all">
                     info@ezesports.org
                   </a>
-                  <p className="text-foreground-muted">
-                    Discord: <span className="font-semibold text-foreground">angesumi</span>
-                  </p>
                 </div>
               </div>
             </aside>
@@ -493,6 +615,36 @@ export default function ApplyForm() {
               {/* LAYER 1: President Info */}
               <div id="section-president" className={sectionCardClass}>
                 {sectionHeader('president')}
+
+                {/* Club Status */}
+                <div
+                  id="field-clubStatus"
+                  className={fieldWrapperClass('clubStatus', !!fieldErrors.clubStatus)}
+                  role="group"
+                  aria-labelledby="clubStatus-label"
+                >
+                  <span id="clubStatus-label" className={labelClass}>
+                    What is your club&apos;s current status for 2026–27? {requiredMark}
+                  </span>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {CLUB_STATUS_OPTIONS.map((status) => (
+                      <label key={status} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="radio"
+                          name="clubStatus"
+                          value={status}
+                          checked={form.clubStatus === status}
+                          onChange={handleTextChange}
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                        />
+                        <span>{status}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {fieldErrors.clubStatus && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubStatus}</p>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* President First Name */}
@@ -619,12 +771,12 @@ export default function ApplyForm() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* President Discord */}
                   <div id="field-presidentDiscord" className={fieldWrapperClass('presidentDiscord', !!fieldErrors.presidentDiscord)}>
-                    <label htmlFor="presidentDiscord" className={labelClass}>Discord username (ex: angesumi) {requiredMark}</label>
+                    <label htmlFor="presidentDiscord" className={labelClass}>Discord username {requiredMark}</label>
                     <input
                       id="presidentDiscord"
                       name="presidentDiscord"
                       type="text"
-                      placeholder="angesumi"
+                      placeholder="yourusername"
                       value={form.presidentDiscord}
                       onChange={handleTextChange}
                       onFocus={() => setFocusedField('presidentDiscord')}
@@ -752,7 +904,7 @@ export default function ApplyForm() {
 
                 {/* VP Discord */}
                 <div id="field-vpDiscord" className={fieldWrapperClass('vpDiscord', !!fieldErrors.vpDiscord)}>
-                  <label htmlFor="vpDiscord" className={labelClass}>Discord Username (ex: angesumi) {requiredMark}</label>
+                  <label htmlFor="vpDiscord" className={labelClass}>Discord Username {requiredMark}</label>
                   <input
                     id="vpDiscord"
                     name="vpDiscord"
@@ -964,24 +1116,50 @@ export default function ApplyForm() {
                   </p>
                 </div>
 
-                {/* Club Socials */}
-                <div id="field-clubSocials" className={fieldWrapperClass('clubSocials', false)}>
-                  <label htmlFor="clubSocials" className={labelClass}>
-                    Please add your club&apos;s socials below.
-                    <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
-                      (Ex: Instagram: @username, Discord: discordserverlink, etc.)
-                    </span>
-                  </label>
-                  <Textarea
-                    id="clubSocials"
-                    name="clubSocials"
-                    rows={3}
-                    placeholder={`Instagram: @bkltechnesports\nDiscord: https://discord.gg/...`}
-                    value={form.clubSocials}
-                    onChange={handleTextChange}
-                    onFocus={() => setFocusedField('clubSocials')}
-                    onBlur={() => setFocusedField(null)}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Club's Instagram account link */}
+                  <div id="field-instagramLink" className={fieldWrapperClass('instagramLink', !!fieldErrors.instagramLink)}>
+                    <label htmlFor="instagramLink" className={labelClass}>Club&apos;s Instagram account link {requiredMark}</label>
+                    <input
+                      id="instagramLink"
+                      name="instagramLink"
+                      type="text"
+                      placeholder="https://instagram.com/bkltechnesports"
+                      value={form.instagramLink}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('instagramLink')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.instagramLink)}
+                      required
+                      aria-invalid={!!fieldErrors.instagramLink}
+                      aria-describedby={fieldErrors.instagramLink ? 'instagramLink-error' : undefined}
+                    />
+                    {fieldErrors.instagramLink && (
+                      <p id="instagramLink-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.instagramLink}</p>
+                    )}
+                  </div>
+
+                  {/* Club's Discord link */}
+                  <div id="field-discordLink" className={fieldWrapperClass('discordLink', !!fieldErrors.discordLink)}>
+                    <label htmlFor="discordLink" className={labelClass}>Club&apos;s Discord link {requiredMark}</label>
+                    <input
+                      id="discordLink"
+                      name="discordLink"
+                      type="text"
+                      placeholder="https://discord.gg/..."
+                      value={form.discordLink}
+                      onChange={handleTextChange}
+                      onFocus={() => setFocusedField('discordLink')}
+                      onBlur={() => setFocusedField(null)}
+                      className={textInputClass(!!fieldErrors.discordLink)}
+                      required
+                      aria-invalid={!!fieldErrors.discordLink}
+                      aria-describedby={fieldErrors.discordLink ? 'discordLink-error' : undefined}
+                    />
+                    {fieldErrors.discordLink && (
+                      <p id="discordLink-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.discordLink}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1032,6 +1210,36 @@ export default function ApplyForm() {
                   </div>
                 </div>
 
+                {/* Advisor Confirmed */}
+                <div
+                  id="field-advisorConfirmed"
+                  className={fieldWrapperClass('advisorConfirmed', !!fieldErrors.advisorConfirmed)}
+                  role="group"
+                  aria-labelledby="advisorConfirmed-label"
+                >
+                  <span id="advisorConfirmed-label" className={labelClass}>
+                    Is the faculty advisor of your esports club confirmed? {requiredMark}
+                  </span>
+                  <div className="flex flex-wrap gap-4 mt-2">
+                    {ADVISOR_CONFIRMED_OPTIONS.map((opt) => (
+                      <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="radio"
+                          name="advisorConfirmed"
+                          value={opt}
+                          checked={form.advisorConfirmed === opt}
+                          onChange={handleTextChange}
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {fieldErrors.advisorConfirmed && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.advisorConfirmed}</p>
+                  )}
+                </div>
+
                 {/* Estimated active student count */}
                 <div id="field-activeStudentsCount" className={fieldWrapperClass('activeStudentsCount', !!fieldErrors.activeStudentsCount)}>
                   <label htmlFor="activeStudentsCount" className={labelClass}>
@@ -1070,53 +1278,216 @@ export default function ApplyForm() {
                     </span>
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {[
-                      { id: 'valorant', label: 'Valorant' },
-                      { id: 'lol', label: 'League of Legends (LoL)' },
-                      { id: 'tft', label: 'Teamfight Tactics (TFT)' },
-                      { id: 'tetris', label: 'Tetris' },
-                      { id: 'clashRoyale', label: 'Clash Royale' },
-                    ].map((g) => (
-                      <label key={g.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                    {GAME_ENTRIES.map(([id, label]) => (
+                      <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
-                          checked={form.interestedGames[g.id as keyof typeof form.interestedGames]}
-                          onChange={(e) => handleGameCheckboxChange(g.id as keyof typeof form.interestedGames, e.target.checked)}
+                          checked={form.interestedGames[id]}
+                          onChange={(e) => handleCheckboxGroupChange('interestedGames', id, e.target.checked)}
                           className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
                         />
-                        <span>{g.label}</span>
+                        <span>{label}</span>
                       </label>
                     ))}
 
-                    {/* Other option with write-in field */}
-                    <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={form.interestedGames.other}
-                          onChange={(e) => handleGameCheckboxChange('other', e.target.checked)}
-                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                        />
-                        <span>Other:</span>
-                      </label>
-                      {form.interestedGames.other && (
-                        <input
-                          id="field-interestedGamesOther"
-                          type="text"
-                          name="interestedGamesOther"
-                          placeholder="Specify game name..."
-                          value={form.interestedGamesOther}
-                          onChange={handleTextChange}
-                          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-                        />
-                      )}
-                    </div>
+                    <OtherWriteInRow
+                      toggleType="checkbox"
+                      toggleChecked={form.interestedGames.other}
+                      onToggleChange={(e) => handleCheckboxGroupChange('interestedGames', 'other', e.target.checked)}
+                      textId="field-interestedGamesOther"
+                      textName="interestedGamesOther"
+                      textValue={form.interestedGamesOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify game name..."
+                    />
                   </div>
                   {fieldErrors.interestedGames && (
                     <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGames}</p>
                   )}
                   {fieldErrors.interestedGamesOther && (
                     <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGamesOther}</p>
+                  )}
+                </div>
+
+                {/* Club's Biggest Barriers */}
+                <div
+                  id="field-clubBarriers"
+                  className={fieldWrapperClass('clubBarriers', !!fieldErrors.clubBarriers)}
+                  role="group"
+                  aria-labelledby="clubBarriers-label"
+                >
+                  <span id="clubBarriers-label" className={labelClass}>
+                    What are your club&apos;s biggest barriers? {requiredMark}
+                  </span>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {CLUB_BARRIER_ENTRIES.map(([id, label]) => (
+                      <label key={id} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="radio"
+                          name="clubBarriers"
+                          value={id}
+                          checked={form.clubBarriers === id}
+                          onChange={handleClubBarriersChange}
+                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                    <OtherWriteInRow
+                      toggleType="radio"
+                      toggleName="clubBarriers"
+                      toggleValue="other"
+                      toggleChecked={form.clubBarriers === 'other'}
+                      onToggleChange={handleClubBarriersChange}
+                      textId="field-clubBarriersOther"
+                      textName="clubBarriersOther"
+                      textValue={form.clubBarriersOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify barrier..."
+                      spanTwoCols={false}
+                    />
+                  </div>
+                  {fieldErrors.clubBarriers && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriers}</p>
+                  )}
+                  {fieldErrors.clubBarriersOther && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriersOther}</p>
+                  )}
+                </div>
+
+                {/* Non-roster opportunities */}
+                <div
+                  id="field-nonRosterOpportunities"
+                  className={fieldWrapperClass('nonRosterOpportunities', !!fieldErrors.nonRosterOpportunities)}
+                  role="group"
+                  aria-labelledby="nonRosterOpportunities-label"
+                >
+                  <span id="nonRosterOpportunities-label" className={labelClass}>
+                    Which opportunities would interest students who are not on a competitive roster? {requiredMark}
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {NON_ROSTER_OPPORTUNITY_ENTRIES.map(([id, label]) => (
+                      <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={form.nonRosterOpportunities[id]}
+                          onChange={(e) => handleCheckboxGroupChange('nonRosterOpportunities', id, e.target.checked)}
+                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                    <OtherWriteInRow
+                      toggleType="checkbox"
+                      toggleChecked={form.nonRosterOpportunities.other}
+                      onToggleChange={(e) => handleCheckboxGroupChange('nonRosterOpportunities', 'other', e.target.checked)}
+                      textId="field-nonRosterOpportunitiesOther"
+                      textName="nonRosterOpportunitiesOther"
+                      textValue={form.nonRosterOpportunitiesOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify opportunity..."
+                    />
+                  </div>
+                  {fieldErrors.nonRosterOpportunities && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunities}</p>
+                  )}
+                  {fieldErrors.nonRosterOpportunitiesOther && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunitiesOther}</p>
+                  )}
+                </div>
+
+                {/* Inclusive participation opportunities */}
+                <div
+                  id="field-inclusiveOpportunities"
+                  className={fieldWrapperClass('inclusiveOpportunities', !!fieldErrors.inclusiveOpportunities)}
+                  role="group"
+                  aria-labelledby="inclusiveOpportunities-label"
+                >
+                  <span id="inclusiveOpportunities-label" className={labelClass}>
+                    We want to make EZ Esports as inclusive as possible and are considering ways to include students who might not make it past try-outs for your esports teams but still want to participate in an esports environment. How might you approach this, or which additional opportunities would be most valuable to students at your school? {requiredMark}
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {INCLUSIVE_OPPORTUNITY_ENTRIES.map(([id, label]) => (
+                      <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={form.inclusiveOpportunities[id]}
+                          onChange={(e) => handleCheckboxGroupChange('inclusiveOpportunities', id, e.target.checked)}
+                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                    <OtherWriteInRow
+                      toggleType="checkbox"
+                      toggleChecked={form.inclusiveOpportunities.other}
+                      onToggleChange={(e) => handleCheckboxGroupChange('inclusiveOpportunities', 'other', e.target.checked)}
+                      textId="field-inclusiveOpportunitiesOther"
+                      textName="inclusiveOpportunitiesOther"
+                      textValue={form.inclusiveOpportunitiesOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify opportunity..."
+                    />
+                  </div>
+                  {fieldErrors.inclusiveOpportunities && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunities}</p>
+                  )}
+                  {fieldErrors.inclusiveOpportunitiesOther && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunitiesOther}</p>
+                  )}
+                </div>
+
+                {/* Separate gaming clubs/groups */}
+                <div id="field-separateGamingClubs" className={fieldWrapperClass('separateGamingClubs', !!fieldErrors.separateGamingClubs)}>
+                  <label htmlFor="separateGamingClubs" className={labelClass}>
+                    Because your esports club leadership understands your school community best, we&apos;d value your help identifying any gaming clubs or groups that operate separately from your esports club, including communities centered around titles such as Super Smash Bros. Ultimate, Tetris, etc. If one exists, which game(s) do they organize, how does your club currently interact with them, and would you be open to helping coordinate a conversation about opportunities that could benefit your school&apos;s video game community? {requiredMark}
+                    <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
+                      Write &quot;N/A&quot; if this doesn&apos;t apply to your school.
+                    </span>
+                  </label>
+                  <Textarea
+                    id="separateGamingClubs"
+                    name="separateGamingClubs"
+                    rows={3}
+                    placeholder="Describe any separate gaming clubs/groups, or write N/A..."
+                    value={form.separateGamingClubs}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('separateGamingClubs')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                  {fieldErrors.separateGamingClubs && (
+                    <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.separateGamingClubs}</p>
+                  )}
+                </div>
+
+                {/* Contribute beyond representing school */}
+                <div
+                  id="field-contributeBeyondSchool"
+                  className={fieldWrapperClass('contributeBeyondSchool', !!fieldErrors.contributeBeyondSchool)}
+                  role="group"
+                  aria-labelledby="contributeBeyondSchool-label"
+                >
+                  <span id="contributeBeyondSchool-label" className={labelClass}>
+                    Would you or another officer be interested in contributing to EZ Esports beyond representing your school? {requiredMark}
+                    <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
+                      Expressing interest does not commit you to a role.
+                    </span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {CONTRIBUTE_BEYOND_SCHOOL_ENTRIES.map(([id, label]) => (
+                      <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={form.contributeBeyondSchool[id]}
+                          onChange={(e) => handleCheckboxGroupChange('contributeBeyondSchool', id, e.target.checked)}
+                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {fieldErrors.contributeBeyondSchool && (
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.contributeBeyondSchool}</p>
                   )}
                 </div>
 
@@ -1138,17 +1509,6 @@ export default function ApplyForm() {
                     onFocus={() => setFocusedField('feedback')}
                     onBlur={() => setFocusedField(null)}
                   />
-                </div>
-
-                {/* Rules & Terms Reference Link */}
-                <div className="rounded-xl border border-line bg-accent/5 p-4 text-xs text-foreground-secondary flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span>Review league rules, terms of participation, and handbook:</span>
-                  <Link
-                    href="/about"
-                    className="text-accent font-bold hover:underline shrink-0"
-                  >
-                    View Rulebook &amp; Terms →
-                  </Link>
                 </div>
 
                 {/* Rules Consent Checkbox */}

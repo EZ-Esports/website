@@ -3,6 +3,8 @@ import { compileApplicationPayload, validateSchoolApplicationForm } from "@/app/
 
 describe("School Application Form Validation & Consolidation", () => {
   const validForm = {
+    clubStatus: "Active and returning",
+
     presidentFirstName: "Jane",
     presidentLastName: "Doe",
     schoolName: "Brooklyn Tech",
@@ -24,10 +26,18 @@ describe("School Application Form Validation & Consolidation", () => {
     officerEmail: "jordan@example.com",
     officerPreferredContact: "SMS",
 
+    instagramLink: "https://instagram.com/bkltechnesports",
+    discordLink: "https://discord.gg/bkltech",
     advisorName: "Mr. Davis",
     advisorEmail: "davis@schools.nyc.gov",
+    advisorConfirmed: "Yes",
     activeStudentsCount: "30",
     interestedGames: { valorant: true, clashRoyale: true },
+    clubBarriers: "recruitingPlayers",
+    nonRosterOpportunities: { oneDayTournaments: true },
+    inclusiveOpportunities: { friendlyScrimmages: true },
+    separateGamingClubs: "N/A",
+    contributeBeyondSchool: { notAtThisTime: true },
     feedback: "Excited for the upcoming season!",
     agreedRules: true,
   };
@@ -59,6 +69,44 @@ describe("School Application Form Validation & Consolidation", () => {
     };
     const errors = validateSchoolApplicationForm(withOtherNoText);
     expect(errors.interestedGamesOther).toBeDefined();
+  });
+
+  it("requires club status, socials, advisor confirmation, and barrier selection", () => {
+    const missingFields = {
+      ...validForm,
+      clubStatus: "",
+      instagramLink: "",
+      discordLink: "",
+      advisorConfirmed: "",
+      clubBarriers: "",
+      separateGamingClubs: "",
+    };
+    const errors = validateSchoolApplicationForm(missingFields);
+    expect(errors.clubStatus).toBeDefined();
+    expect(errors.instagramLink).toBeDefined();
+    expect(errors.discordLink).toBeDefined();
+    expect(errors.advisorConfirmed).toBeDefined();
+    expect(errors.clubBarriers).toBeDefined();
+    expect(errors.separateGamingClubs).toBeDefined();
+  });
+
+  it("requires custom barrier text when the barrier is 'other'", () => {
+    const withOtherNoText = { ...validForm, clubBarriers: "other", clubBarriersOther: "" };
+    const errors = validateSchoolApplicationForm(withOtherNoText);
+    expect(errors.clubBarriersOther).toBeDefined();
+  });
+
+  it("requires at least one selection for opportunity and contribution checkbox groups", () => {
+    const emptyGroups = {
+      ...validForm,
+      nonRosterOpportunities: {},
+      inclusiveOpportunities: {},
+      contributeBeyondSchool: {},
+    };
+    const errors = validateSchoolApplicationForm(emptyGroups);
+    expect(errors.nonRosterOpportunities).toBeDefined();
+    expect(errors.inclusiveOpportunities).toBeDefined();
+    expect(errors.contributeBeyondSchool).toBeDefined();
   });
 
   it("requires rules agreement when set to false", () => {
