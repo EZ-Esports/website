@@ -89,14 +89,8 @@ describe('extractTablesFromSql', () => {
   });
 });
 
-// determineScope() is the actual decision tree this feature's safety property
-// rests on. It takes an optional `sql` override (a fake tagged-template
-// function standing in for a real `postgres(url, { max: 1 })` connection) and
-// an optional `{ migrationsDir, journalPath }` override, so every branch below
-// runs against fake journal/migration files in a temp dir with no live
-// Postgres connection — see db/migrate.ts's determineScope() doc comment for
-// why the overrides exist and what main() does differently (nothing: it calls
-// determineScope() with no arguments, which is untouched).
+// Every branch here runs against fake journal/migration files and a fake sql
+// client, via determineScope()'s override params — no live Postgres needed.
 describe('determineScope', () => {
   let dir: string;
 
@@ -119,21 +113,9 @@ describe('determineScope', () => {
     writeFileSync(join(dir, `${tag}.sql`), sql);
   }
 
-  // determineScope()'s sql param is typed as a real postgres.js `Sql<{}>`
-  // connection, which carries many properties (`end`, `unsafe`, `json`, ...)
-  // this fake never needs — it only ever gets called as a tagged template for
-  // the two specific queries determineScope() issues. `ScopeSqlClient` names
-  // that real type without exporting it from db/migrate.ts, purely so the
-  // fake below can be cast to it once instead of at every call site.
   type ScopeSqlClient = NonNullable<Parameters<typeof determineScope>[0]>;
 
-  /**
-   * Fake `sql<T>\`...\`` tagged-template client dispatching on query text —
-   * exactly the two queries determineScope() issues, distinguished the same
-   * way a real postgres.js connection would answer them. Configure per test
-   * with `rows` (resolves) or `error` (rejects) for either query; an
-   * unconfigured query resolves to zero rows, matching a real empty result set.
-   */
+  /** Fake sql client dispatching on query text — the two queries determineScope() issues. */
   function fakeSql(config: {
     appliedMax?: { rows?: { applied: string | null }[]; error?: unknown };
     realTables?: { rows?: { tablename: string }[]; error?: unknown };

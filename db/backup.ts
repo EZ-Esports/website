@@ -41,21 +41,10 @@ export const DEFAULT_BACKUP_RETENTION = 20;
 export const MIN_BACKUP_BYTES = 16 * 1024;
 
 /**
- * Same idea as `MIN_BACKUP_BYTES`, but for a `--table`-scoped dump (see
- * `dumpTables()`), which is legitimately much smaller than a full-schema one —
- * most migrations and both seeds only ever touch a handful of tables, not all
- * of them.
- *
- * Measured directly against this schema (Postgres 16, all migrations applied,
- * empty tables): a scoped dump's preamble — the header/SET-statement block
- * before the first `CREATE TABLE` line — is ~676-681 bytes regardless of how
- * many tables are in scope. The smallest real single-table dump measured
- * (`--table=public.games`, 0 rows) was 2,769 bytes; a 9-table scoped dump
- * (matching db:seed:gold's table list) was 29,227 bytes. 1024 bytes sits in
- * the gap — comfortably above the ~680-byte header-only stub a dump that died
- * immediately would leave behind, comfortably below the smallest complete
- * scoped dump actually observed — so it cannot trip on a legitimately small
- * scoped dump and cannot pass one that died during the header.
+ * Same idea, sized for a `--table`-scoped dump (see `dumpTables()`), which is
+ * legitimately much smaller — a scoped dump's header is under 1KB and the
+ * smallest real single-table dump measured was ~2.7KB, so 1KB catches a dump
+ * that died in the header without tripping on a real small one.
  */
 export const MIN_SCOPED_BACKUP_BYTES = 1024;
 
@@ -73,15 +62,9 @@ export const REQUIRED_MARKERS = [
   '-- PostgreSQL database dump complete',
 ];
 
-/** pg_dump's own "I finished" line — the one marker every scope requires. */
 const COMPLETION_MARKER = '-- PostgreSQL database dump complete';
 
-/**
- * The markers a dump scoped to exactly `tables` must contain: its own
- * `CREATE TABLE`/`COPY` pair for every table in scope, plus the same trailing
- * completion marker every scope requires. Mirrors `REQUIRED_MARKERS`, which
- * stays as the fixed (members-only) marker set for the `'full'` scope.
- */
+/** Markers a dump scoped to exactly `tables` must contain. */
 function markersFor(tables: readonly string[]): string[] {
   return [
     ...tables.flatMap((t) => [`CREATE TABLE public.${t}`, `COPY public.${t}`]),
@@ -114,14 +97,12 @@ export function backupPath(now: Date = new Date()): string {
 }
 
 /**
- * Checks a dump on disk is a complete dump and not a stub. Exported so the
- * threshold and the markers are testable without shelling out to pg_dump.
+ * Checks a dump on disk is complete, not a stub. Exported so the threshold
+ * and markers are testable without shelling out to pg_dump.
  *
- * `tables` is the same scope the dump was taken with: `'full'` (the default,
- * so every pre-existing call site keeps compiling and passing unchanged)
- * checks against the fixed `MIN_BACKUP_BYTES`/`REQUIRED_MARKERS` pair; a table
- * list checks against `MIN_SCOPED_BACKUP_BYTES` and markers built for exactly
- * those tables via `markersFor()`.
+ * `tables` is the scope the dump was taken with: `'full'` (default) checks
+ * against `MIN_BACKUP_BYTES`/`REQUIRED_MARKERS`; a table list checks against
+ * `MIN_SCOPED_BACKUP_BYTES` and markers built for exactly those tables.
  */
 export function assertUsableDump(file: string, tables: readonly string[] | 'full' = 'full'): void {
   if (!existsSync(file)) {
@@ -195,21 +176,7 @@ export function splitConnectionSecret(url: string): { safeUrl: string; password?
   return { safeUrl: parsed.toString(), password };
 }
 
-/**
- * Runs pg_dump with the given scope flags (`--schema=public` for a full dump,
- * or one `--table public.<name>` per table for a scoped one) against
- * `DATABASE_URL` and writes to `outputFile`. Shared by `dumpSchema()` and
- * `dumpTables()` — a pure extraction of what used to be inline in
- * `requireFreshBackup()`, not a behavior change: the url-read, `mkdirSync`,
- * `spawnSync`, non-zero-exit/error handling, and stub-cleanup logic are all
- * unchanged from before.
- *
- * The connection string never reaches a shell (spawn without `shell: true`, so
- * it is never word-split or interpolated) and is never logged. Its password is
- * stripped out of the argv pg_dump is given and handed over in the child's
- * environment as `PGPASSWORD` instead, so it is not on display in `ps` for the
- * length of the dump.
- */
+/** Runs pg_dump with the given scope flags against DATABASE_URL, writing to outputFile. */
 function runPgDump(scopeFlags: string[], outputFile: string): void {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -246,37 +213,27 @@ function runPgDump(scopeFlags: string[], outputFile: string): void {
   }
 }
 
-/** Full `--schema=public` dump — the original, unscoped `requireFreshBackup()` behavior. */
+/** Full `--schema=public` dump. */
 export function dumpSchema(outputFile: string): void {
   runPgDump(['--schema=public'], outputFile);
 }
 
-/**
- * Builds the `--table public.<name>` flags for a scoped dump, one pair per
- * table, in the order given. A pure function so `dumpTables()`'s argv
- * construction is unit-testable without shelling out to a real pg_dump.
- */
+/** Builds one `--table public.<name>` flag per table, for a scoped dump. */
 export function tableScopeFlags(tables: string[]): string[] {
   return tables.flatMap((t) => ['--table', `public.${t}`]);
 }
 
-/**
- * Same pg_dump invocation as `dumpSchema()`, but scoped to specific tables via
- * one `--table public.<name>` flag per table instead of `--schema=public`.
- * Reuses `resolvePgDump()` and `splitConnectionSecret()` (via `runPgDump()`)
- * as-is.
- */
+/** Same as `dumpSchema()`, but scoped to specific tables instead of the whole schema. */
 export function dumpTables(tables: string[], outputFile: string): void {
   runPgDump(tableScopeFlags(tables), outputFile);
 }
 
 /**
  * Dumps the database `DATABASE_URL` points at, scoped to `tables` (or the
- * whole `public` schema when `tables` is `'full'`), and returns the file path.
- * Throws — which aborts the seed/migration — if anything about the dump is
- * not right. Prunes old local backups (`pruneLocalBackups()`) as its last
- * step, once the new file is already written and safely part of what gets
- * sorted — so pruning can never delete the backup it was just asked to take.
+ * whole `public` schema when `tables` is `'full'`), and returns the file
+ * path. Throws — which aborts the seed/migration — if anything about the
+ * dump is not right. Prunes old local backups as its last step, once the new
+ * file already exists, so pruning can never delete the backup just taken.
  */
 export function requireFreshBackup(tables: readonly string[] | 'full'): string {
   const file = backupPath();
@@ -298,11 +255,9 @@ export function requireFreshBackup(tables: readonly string[] | 'full'): string {
 /**
  * Deletes everything in `BACKUP_DIR` beyond the newest `keep` files.
  *
- * Sorting by filename (not mtime) is deliberate and sufficient: every name
- * `backupPath()` produces embeds an ISO timestamp with `:`/`.` swapped for
- * `-`, which sorts lexicographically in the same order as the timestamps
- * themselves. `dir` is overridable so this is testable against a scratch
- * directory instead of the real `db/backups/`.
+ * Sorts by filename, not mtime: `backupPath()`'s ISO-timestamp filenames sort
+ * lexicographically in the same order as the timestamps themselves. `dir` is
+ * overridable so this is testable against a scratch directory.
  */
 export function pruneLocalBackups(keep = DEFAULT_BACKUP_RETENTION, dir: string = resolve(process.cwd(), BACKUP_DIR)): string[] {
   if (!existsSync(dir)) return [];

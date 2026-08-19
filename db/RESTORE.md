@@ -53,15 +53,9 @@ what the target's migrations already ran.
 These are expected and harmless with plain `psql -f` — it keeps going past
 them (non-interactive default) — and the `COPY` of actual data still succeeds
 regardless. **Do not** treat a `psql` run with errors in its output as a
-failed restore; treat step 3's row-count check as the real verification. This
-was confirmed with a real restore drill: a fresh scratch database, migrations
-applied, a `--table=public.games` scoped dump of a 2-row table, the rows
-deleted, restored via `psql <url> -f <dump>.sql` (several harmless
-"already exists" errors along the way), both rows back with correct values.
+failed restore; treat step 3's row-count check as the real verification.
 
 ## Restore drill
 
 Do this once, for real, against a scratch database, before trusting that "we
-have backups" is more than a documented procedure nobody has run. See the note
-above — one such drill has already been performed as part of building this
-guard.
+have backups" is more than a documented procedure nobody has run.

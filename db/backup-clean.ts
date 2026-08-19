@@ -1,11 +1,6 @@
 /**
- * Manual entry point for `pruneLocalBackups()` (db/backup.ts).
- *
- * Every `requireFreshBackup()` call already prunes as its last step, so this
- * is not required for `db/backups/` to stay bounded — it exists for someone
- * who wants to reclaim the space without running a seed or migration.
- * Doesn't touch the database, so no `--env-file-if-exists=.env` in its npm
- * script.
+ * Manual entry point for `pruneLocalBackups()` — every backup already prunes
+ * itself after writing, this is just for reclaiming space on demand.
  */
 import { pruneLocalBackups } from './backup';
 
