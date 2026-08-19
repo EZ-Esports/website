@@ -32,15 +32,20 @@ describe.each(DESTRUCTIVE_SEEDS)('%s takes a backup before it deletes anything',
   // Guarding one seed and not the other is the hole this closes: `db:seed` and
   // `db:seed:gold` are one word apart in package.json, and `db:seed` is the more
   // destructive of the two — it wipes leadership, schools and games outright.
-  it('calls it', () => {
-    expect(src).toMatch(/^\s*requireFreshBackup\(\);/m);
+  //
+  // requireFreshBackup() now takes a table-scope argument (a caller-supplied
+  // list, or 'full') rather than being a bare call — this matches any single
+  // identifier argument (e.g. SEED_TABLES, GOLD_SEED_TABLES) rather than
+  // pinning the exact constant name, since that is each file's own choice.
+  it('calls it, scoped to a table list', () => {
+    expect(src).toMatch(/^\s*requireFreshBackup\(\w+\);/m);
   });
 
   // Scoped to the body of main(), because seed-gold.ts now defines a delete
   // helper above it — the question is what runs first, not what appears first.
   it('calls it before the run mutates anything, so a failed backup aborts', () => {
     const body = src.slice(src.indexOf('async function main()'));
-    const guard = body.indexOf('requireFreshBackup();');
+    const guard = body.search(/requireFreshBackup\(\w+\);/);
     // The calls are chained across lines (`db\n  .insert(`), so this cannot be a
     // literal search.
     const firstMutation = body.search(/db\s*\.\s*(insert|delete)\s*\(/);
@@ -66,8 +71,9 @@ describe.each(DESTRUCTIVE_SEEDS)('%s refuses a database it was not pointed at', 
   // and then refusing to touch it is a slow way to say no.
   it('calls it before taking the backup', () => {
     const interlock = src.indexOf('assertSeedTargetAllowed();');
-    const backup = src.indexOf('requireFreshBackup();');
+    const backup = src.search(/requireFreshBackup\(\w+\);/);
     expect(interlock).toBeGreaterThan(-1);
+    expect(backup).toBeGreaterThan(-1);
     expect(interlock).toBeLessThan(backup);
   });
 });

@@ -17,11 +17,14 @@
  * directly is not a guard.
  */
 import { spawnSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'fs';
 import { resolve } from 'path';
 
 /** Gitignored; see .gitignore. Relative to the repo root. */
 export const BACKUP_DIR = 'db/backups';
+
+/** How many local backups `requireFreshBackup()` and `db:backup:clean` keep. */
+export const DEFAULT_BACKUP_RETENTION = 20;
 
 /**
  * A dump that failed partway still leaves a file on disk: pg_dump writes its
@@ -38,17 +41,36 @@ export const BACKUP_DIR = 'db/backups';
 export const MIN_BACKUP_BYTES = 16 * 1024;
 
 /**
- * Content that must be present for the dump to be worth keeping. The schema
- * line proves pg_dump got as far as emitting DDL; the COPY line proves it
- * reached the data section of the one table whose loss started this (wiping
- * members cascade-deletes leadership rows); the trailing marker is pg_dump's
- * own "I finished" line and is the only reliable check against truncation.
+ * Same idea, sized for a `--table`-scoped dump (see `dumpTables()`), which is
+ * legitimately much smaller — a scoped dump's header is under 1KB and the
+ * smallest real single-table dump measured was ~2.7KB, so 1KB catches a dump
+ * that died in the header without tripping on a real small one.
+ */
+export const MIN_SCOPED_BACKUP_BYTES = 1024;
+
+/**
+ * Content that must be present for a full (`'full'` scope) dump to be worth
+ * keeping. The schema line proves pg_dump got as far as emitting DDL; the COPY
+ * line proves it reached the data section of the one table whose loss started
+ * this (wiping members cascade-deletes leadership rows); the trailing marker
+ * is pg_dump's own "I finished" line and is the only reliable check against
+ * truncation.
  */
 export const REQUIRED_MARKERS = [
   'CREATE TABLE public.members',
   'COPY public.members',
   '-- PostgreSQL database dump complete',
 ];
+
+const COMPLETION_MARKER = '-- PostgreSQL database dump complete';
+
+/** Markers a dump scoped to exactly `tables` must contain. */
+function markersFor(tables: readonly string[]): string[] {
+  return [
+    ...tables.flatMap((t) => [`CREATE TABLE public.${t}`, `COPY public.${t}`]),
+    COMPLETION_MARKER,
+  ];
+}
 
 /**
  * Where pg_dump lives. `PG_DUMP` wins; otherwise the first candidate that
@@ -75,23 +97,29 @@ export function backupPath(now: Date = new Date()): string {
 }
 
 /**
- * Checks a dump on disk is a complete dump and not a stub. Exported so the
- * threshold and the markers are testable without shelling out to pg_dump.
+ * Checks a dump on disk is complete, not a stub. Exported so the threshold
+ * and markers are testable without shelling out to pg_dump.
+ *
+ * `tables` is the scope the dump was taken with: `'full'` (default) checks
+ * against `MIN_BACKUP_BYTES`/`REQUIRED_MARKERS`; a table list checks against
+ * `MIN_SCOPED_BACKUP_BYTES` and markers built for exactly those tables.
  */
-export function assertUsableDump(file: string): void {
+export function assertUsableDump(file: string, tables: readonly string[] | 'full' = 'full'): void {
   if (!existsSync(file)) {
     throw new Error(`pg_dump reported success but wrote no file at ${file}.`);
   }
   const bytes = statSync(file).size;
-  if (bytes < MIN_BACKUP_BYTES) {
+  const minBytes = tables === 'full' ? MIN_BACKUP_BYTES : MIN_SCOPED_BACKUP_BYTES;
+  if (bytes < minBytes) {
     throw new Error(
-      `Backup at ${file} is ${bytes} bytes, below the ${MIN_BACKUP_BYTES}-byte minimum. ` +
+      `Backup at ${file} is ${bytes} bytes, below the ${minBytes}-byte minimum. ` +
         'A failed pg_dump still writes a header, so a small file means the dump did not ' +
         'complete — refusing to seed on top of it.'
     );
   }
+  const markers = tables === 'full' ? REQUIRED_MARKERS : markersFor(tables);
   const text = readFileSync(file, 'utf8');
-  const missing = REQUIRED_MARKERS.filter((m) => !text.includes(m));
+  const missing = markers.filter((m) => !text.includes(m));
   if (missing.length > 0) {
     throw new Error(
       `Backup at ${file} (${bytes} bytes) is missing expected content: ` +
@@ -111,9 +139,9 @@ export function assertUsableDump(file: string): void {
  * person reaching for "the most recent backup" reaches for a broken one. The
  * non-zero-exit path already cleans up; this closes the other half.
  */
-export function requireUsableDumpOrDiscard(file: string): void {
+export function requireUsableDumpOrDiscard(file: string, tables: readonly string[] | 'full' = 'full'): void {
   try {
-    assertUsableDump(file);
+    assertUsableDump(file, tables);
   } catch (err) {
     if (existsSync(file)) unlinkSync(file);
     throw err;
@@ -148,32 +176,21 @@ export function splitConnectionSecret(url: string): { safeUrl: string; password?
   return { safeUrl: parsed.toString(), password };
 }
 
-/**
- * Dumps the database `DATABASE_URL` points at and returns the file path.
- * Throws — which aborts the seed — if anything about the dump is not right.
- *
- * The connection string never reaches a shell (spawn without `shell: true`, so
- * it is never word-split or interpolated) and is never logged. Its password is
- * stripped out of the argv pg_dump is given and handed over in the child's
- * environment as `PGPASSWORD` instead, so it is not on display in `ps` for the
- * length of the dump. The backup path is built from a timestamp alone and never
- * embeds a credential.
- */
-export function requireFreshBackup(): string {
+/** Runs pg_dump with the given scope flags against DATABASE_URL, writing to outputFile. */
+function runPgDump(scopeFlags: string[], outputFile: string): void {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error('DATABASE_URL is not set — cannot back up before seeding.');
   }
 
   mkdirSync(resolve(process.cwd(), BACKUP_DIR), { recursive: true });
-  const file = backupPath();
   const pgDump = resolvePgDump();
   const { safeUrl, password } = splitConnectionSecret(url);
 
-  console.log(`Backing up with ${pgDump} -> ${file}`);
+  console.log(`Backing up with ${pgDump} -> ${outputFile}`);
   const result = spawnSync(
     pgDump,
-    ['--no-owner', '--no-acl', '--schema=public', '--file', file, safeUrl],
+    ['--no-owner', '--no-acl', ...scopeFlags, '--file', outputFile, safeUrl],
     {
       encoding: 'utf8',
       env: password === undefined ? process.env : { ...process.env, PGPASSWORD: password },
@@ -188,15 +205,70 @@ export function requireFreshBackup(): string {
   }
   if (result.status !== 0) {
     // Drop the stub so a later run cannot mistake it for a good backup.
-    if (existsSync(file)) unlinkSync(file);
+    if (existsSync(outputFile)) unlinkSync(outputFile);
     throw new Error(
-      `pg_dump exited ${result.status}. Refusing to seed without a backup.\n` +
+      `pg_dump exited ${result.status}. Refusing to proceed without a backup.\n` +
         `${(result.stderr ?? '').trim()}`
     );
   }
+}
 
-  requireUsableDumpOrDiscard(file);
+/** Full `--schema=public` dump. */
+export function dumpSchema(outputFile: string): void {
+  runPgDump(['--schema=public'], outputFile);
+}
+
+/** Builds one `--table public.<name>` flag per table, for a scoped dump. */
+export function tableScopeFlags(tables: string[]): string[] {
+  return tables.flatMap((t) => ['--table', `public.${t}`]);
+}
+
+/** Same as `dumpSchema()`, but scoped to specific tables instead of the whole schema. */
+export function dumpTables(tables: string[], outputFile: string): void {
+  runPgDump(tableScopeFlags(tables), outputFile);
+}
+
+/**
+ * Dumps the database `DATABASE_URL` points at, scoped to `tables` (or the
+ * whole `public` schema when `tables` is `'full'`), and returns the file
+ * path. Throws — which aborts the seed/migration — if anything about the
+ * dump is not right. Prunes old local backups as its last step, once the new
+ * file already exists, so pruning can never delete the backup just taken.
+ */
+export function requireFreshBackup(tables: readonly string[] | 'full'): string {
+  const file = backupPath();
+
+  if (tables === 'full') {
+    dumpSchema(file);
+  } else {
+    dumpTables([...tables], file);
+  }
+
+  requireUsableDumpOrDiscard(file, tables);
   const kb = Math.round(statSync(file).size / 1024);
   console.log(`  backup OK (${kb} KB). Proceeding.`);
+
+  pruneLocalBackups();
   return file;
+}
+
+/**
+ * Deletes everything in `BACKUP_DIR` beyond the newest `keep` files.
+ *
+ * Sorts by filename, not mtime: `backupPath()`'s ISO-timestamp filenames sort
+ * lexicographically in the same order as the timestamps themselves. `dir` is
+ * overridable so this is testable against a scratch directory.
+ */
+export function pruneLocalBackups(keep = DEFAULT_BACKUP_RETENTION, dir: string = resolve(process.cwd(), BACKUP_DIR)): string[] {
+  if (!existsSync(dir)) return [];
+
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith('.sql'))
+    .sort();
+
+  const toDelete = files.slice(0, Math.max(0, files.length - keep));
+  for (const name of toDelete) {
+    unlinkSync(resolve(dir, name));
+  }
+  return toDelete;
 }
