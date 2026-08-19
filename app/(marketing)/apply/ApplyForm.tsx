@@ -47,6 +47,10 @@ const GAME_ENTRIES = typedEntries(GAME_LABELS);
 const NON_ROSTER_OPPORTUNITY_ENTRIES = typedEntries(NON_ROSTER_OPPORTUNITY_LABELS);
 const INCLUSIVE_OPPORTUNITY_ENTRIES = typedEntries(INCLUSIVE_OPPORTUNITY_LABELS);
 const CONTRIBUTE_BEYOND_SCHOOL_ENTRIES = typedEntries(CONTRIBUTE_BEYOND_SCHOOL_LABELS);
+// CLUB_BARRIER_LABELS is typed as `Record<string, string>` (not literal-keyed,
+// see its definition), so it can't go through typedEntries — but it's just as
+// static, so it's hoisted the same way to avoid re-deriving it every render.
+const CLUB_BARRIER_ENTRIES = Object.entries(CLUB_BARRIER_LABELS);
 
 // Derives an all-unchecked selection map from a *_LABELS export so the initial
 // state can never drift out of sync with the options actually rendered.
@@ -1332,7 +1336,7 @@ export default function ApplyForm() {
                     What are your club&apos;s biggest barriers? {requiredMark}
                   </span>
                   <div className="flex flex-col gap-2 mt-2">
-                    {Object.entries(CLUB_BARRIER_LABELS).map(([id, label]) => (
+                    {CLUB_BARRIER_ENTRIES.map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
