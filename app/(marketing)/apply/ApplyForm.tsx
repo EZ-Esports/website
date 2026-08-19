@@ -309,16 +309,21 @@ export default function ApplyForm() {
     }
   };
 
+  // Shared by every change handler below so "clear the error(s) this edit
+  // just resolved" stays a single implementation instead of four copies.
+  const clearFieldErrors = (...keys: string[]) => {
+    if (!keys.some((key) => fieldErrors[key])) return;
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      for (const key of keys) delete next[key];
+      return next;
+    });
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
-    }
+    clearFieldErrors(name);
   };
 
   // clubBarriers pairs a radio group with a write-in "Other" field, same as
@@ -328,25 +333,12 @@ export default function ApplyForm() {
   const handleClubBarriersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setForm((prev) => ({ ...prev, clubBarriers: value }));
-    if (fieldErrors.clubBarriers || fieldErrors.clubBarriersOther) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.clubBarriers;
-        delete next.clubBarriersOther;
-        return next;
-      });
-    }
+    clearFieldErrors('clubBarriers', 'clubBarriersOther');
   };
 
   const handleRulesChange = (checked: boolean) => {
     setForm((prev) => ({ ...prev, agreedRules: checked }));
-    if (fieldErrors.agreedRules) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.agreedRules;
-        return next;
-      });
-    }
+    clearFieldErrors('agreedRules');
   };
 
   const handleCheckboxGroupChange = <G extends CheckboxGroupKey>(group: G, key: CheckboxOptionKey<G>, checked: boolean) => {
@@ -357,15 +349,7 @@ export default function ApplyForm() {
         [key]: checked,
       },
     }));
-    const otherKey = `${group}Other`;
-    if (fieldErrors[group] || fieldErrors[otherKey]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[group];
-        delete next[otherKey];
-        return next;
-      });
-    }
+    clearFieldErrors(group, `${group}Other`);
   };
 
   const textInputClass = (hasError: boolean) =>
