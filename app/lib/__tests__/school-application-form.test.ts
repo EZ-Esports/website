@@ -3,6 +3,8 @@ import { compileApplicationPayload, validateSchoolApplicationForm } from "@/app/
 
 describe("School Application Form Validation & Consolidation", () => {
   const validForm = {
+    clubStatus: "Active and returning",
+
     presidentFirstName: "Jane",
     presidentLastName: "Doe",
     schoolName: "Brooklyn Tech",
@@ -24,10 +26,18 @@ describe("School Application Form Validation & Consolidation", () => {
     officerEmail: "jordan@example.com",
     officerPreferredContact: "SMS",
 
+    instagramLink: "https://instagram.com/bkltechnesports",
+    discordLink: "https://discord.gg/bkltech",
     advisorName: "Mr. Davis",
     advisorEmail: "davis@schools.nyc.gov",
+    advisorConfirmed: "Yes",
     activeStudentsCount: "30",
     interestedGames: { valorant: true, clashRoyale: true },
+    clubBarriers: "recruitingPlayers",
+    nonRosterOpportunities: { oneDayTournaments: true },
+    inclusiveOpportunities: { friendlyScrimmages: true },
+    separateGamingClubs: "N/A",
+    contributeBeyondSchool: { notAtThisTime: true },
     feedback: "Excited for the upcoming season!",
     agreedRules: true,
   };
