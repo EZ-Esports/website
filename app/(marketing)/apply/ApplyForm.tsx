@@ -25,6 +25,30 @@ const CLUB_STATUS_OPTIONS = [
 
 const ADVISOR_CONFIRMED_OPTIONS = ['Yes', 'Pending / in-progress', 'Not yet identified'] as const;
 
+// Single source of truth tying each checkbox-group form field to its label
+// map, so the option key type below can't drift from what's actually rendered.
+const CHECKBOX_GROUP_LABELS = {
+  interestedGames: GAME_LABELS,
+  nonRosterOpportunities: NON_ROSTER_OPPORTUNITY_LABELS,
+  inclusiveOpportunities: INCLUSIVE_OPPORTUNITY_LABELS,
+  contributeBeyondSchool: CONTRIBUTE_BEYOND_SCHOOL_LABELS,
+} as const;
+
+// Object.entries() widens keys to `string`; this recovers the literal key
+// union so checkbox option ids stay typo-checked at their call sites.
+function typedEntries<T extends Record<string, string>>(labels: T): [keyof T & string, string][] {
+  return Object.entries(labels) as [keyof T & string, string][];
+}
+
+// Derives an all-unchecked selection map from a *_LABELS export so the initial
+// state can never drift out of sync with the options actually rendered.
+function emptySelection(labels: Record<string, string>, hasOther: boolean): Record<string, boolean> {
+  const selection: Record<string, boolean> = {};
+  for (const key of Object.keys(labels)) selection[key] = false;
+  if (hasOther) selection.other = false;
+  return selection;
+}
+
 const initialForm = {
   clubStatus: '',
 
@@ -59,53 +83,22 @@ const initialForm = {
   advisorEmail: '',
   advisorConfirmed: '',
   activeStudentsCount: '',
-  interestedGames: {
-    valorant: false,
-    lol: false,
-    tft: false,
-    tetris: false,
-    clashRoyale: false,
-    smashBros: false,
-    other: false,
-  } as Record<string, boolean>,
+  interestedGames: emptySelection(CHECKBOX_GROUP_LABELS.interestedGames, true),
   interestedGamesOther: '',
   clubBarriers: '',
   clubBarriersOther: '',
-  nonRosterOpportunities: {
-    oneDayTournaments: false,
-    castingProduction: false,
-    contentDesign: false,
-    eventOperations: false,
-    workshopsCareerPanels: false,
-    other: false,
-  } as Record<string, boolean>,
+  nonRosterOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.nonRosterOpportunities, true),
   nonRosterOpportunitiesOther: '',
-  inclusiveOpportunities: {
-    developmentalJV: false,
-    openTournaments: false,
-    friendlyScrimmages: false,
-    castingObserving: false,
-    coachingStrategy: false,
-    contentCreation: false,
-    workshopsCommunity: false,
-    other: false,
-  } as Record<string, boolean>,
+  inclusiveOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.inclusiveOpportunities, true),
   inclusiveOpportunitiesOther: '',
   separateGamingClubs: '',
-  contributeBeyondSchool: {
-    gameRules: false,
-    broadcasts: false,
-    communityEvents: false,
-    welcomingSchools: false,
-    marketingPartnerships: false,
-    leadersCouncil: false,
-    notAtThisTime: false,
-  } as Record<string, boolean>,
+  contributeBeyondSchool: emptySelection(CHECKBOX_GROUP_LABELS.contributeBeyondSchool, false),
   feedback: '',
   agreedRules: false,
 };
 
-type CheckboxGroupKey = 'interestedGames' | 'nonRosterOpportunities' | 'inclusiveOpportunities' | 'contributeBeyondSchool';
+type CheckboxGroupKey = keyof typeof CHECKBOX_GROUP_LABELS;
+type CheckboxOptionKey<G extends CheckboxGroupKey> = (keyof (typeof CHECKBOX_GROUP_LABELS)[G] & string) | 'other';
 
 const SECTIONS = [
   { id: 'president', num: 1, title: 'President Info', desc: 'Primary student leader contact and school details.' },
@@ -117,6 +110,63 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]['id'];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Shared "Other:" toggle + conditional write-in text field, reused by every
+// option group (radio or checkbox) that offers a free-text escape hatch.
+function OtherWriteInRow({
+  toggleType,
+  toggleName,
+  toggleValue,
+  toggleChecked,
+  onToggleChange,
+  textId,
+  textName,
+  textValue,
+  onTextChange,
+  placeholder,
+  spanTwoCols = true,
+}: {
+  toggleType: 'radio' | 'checkbox';
+  toggleName?: string;
+  toggleValue?: string;
+  toggleChecked: boolean;
+  onToggleChange: React.ChangeEventHandler<HTMLInputElement>;
+  textId: string;
+  textName: string;
+  textValue: string;
+  onTextChange: React.ChangeEventHandler<HTMLInputElement>;
+  placeholder: string;
+  spanTwoCols?: boolean;
+}) {
+  const toggleClass =
+    toggleType === 'checkbox' ? 'w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer' : 'w-4.5 h-4.5 accent-accent cursor-pointer';
+  return (
+    <div className={`${spanTwoCols ? 'sm:col-span-2 ' : ''}flex flex-col sm:flex-row sm:items-center gap-2 mt-1`}>
+      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
+        <input
+          type={toggleType}
+          name={toggleName}
+          value={toggleValue}
+          checked={toggleChecked}
+          onChange={onToggleChange}
+          className={toggleClass}
+        />
+        <span>Other:</span>
+      </label>
+      {toggleChecked && (
+        <input
+          id={textId}
+          type="text"
+          name={textName}
+          placeholder={placeholder}
+          value={textValue}
+          onChange={onTextChange}
+          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+        />
+      )}
+    </div>
+  );
+}
 
 export default function ApplyForm() {
   const [submitted, setSubmitted] = useState(false);
@@ -259,7 +309,7 @@ export default function ApplyForm() {
     }
   };
 
-  const handleCheckboxGroupChange = (group: CheckboxGroupKey, key: string, checked: boolean) => {
+  const handleCheckboxGroupChange = <G extends CheckboxGroupKey>(group: G, key: CheckboxOptionKey<G>, checked: boolean) => {
     setForm((prev) => ({
       ...prev,
       [group]: {
@@ -1204,7 +1254,7 @@ export default function ApplyForm() {
                     </span>
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {Object.entries(GAME_LABELS).map(([id, label]) => (
+                    {typedEntries(GAME_LABELS).map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
@@ -1216,29 +1266,16 @@ export default function ApplyForm() {
                       </label>
                     ))}
 
-                    {/* Other option with write-in field */}
-                    <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={form.interestedGames.other}
-                          onChange={(e) => handleCheckboxGroupChange('interestedGames', 'other', e.target.checked)}
-                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                        />
-                        <span>Other:</span>
-                      </label>
-                      {form.interestedGames.other && (
-                        <input
-                          id="field-interestedGamesOther"
-                          type="text"
-                          name="interestedGamesOther"
-                          placeholder="Specify game name..."
-                          value={form.interestedGamesOther}
-                          onChange={handleTextChange}
-                          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-                        />
-                      )}
-                    </div>
+                    <OtherWriteInRow
+                      toggleType="checkbox"
+                      toggleChecked={form.interestedGames.other}
+                      onToggleChange={(e) => handleCheckboxGroupChange('interestedGames', 'other', e.target.checked)}
+                      textId="field-interestedGamesOther"
+                      textName="interestedGamesOther"
+                      textValue={form.interestedGamesOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify game name..."
+                    />
                   </div>
                   {fieldErrors.interestedGames && (
                     <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGames}</p>
@@ -1272,30 +1309,19 @@ export default function ApplyForm() {
                         <span>{label}</span>
                       </label>
                     ))}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
-                      <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
-                        <input
-                          type="radio"
-                          name="clubBarriers"
-                          value="other"
-                          checked={form.clubBarriers === 'other'}
-                          onChange={handleTextChange}
-                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
-                        />
-                        <span>Other:</span>
-                      </label>
-                      {form.clubBarriers === 'other' && (
-                        <input
-                          id="field-clubBarriersOther"
-                          type="text"
-                          name="clubBarriersOther"
-                          placeholder="Specify barrier..."
-                          value={form.clubBarriersOther}
-                          onChange={handleTextChange}
-                          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-                        />
-                      )}
-                    </div>
+                    <OtherWriteInRow
+                      toggleType="radio"
+                      toggleName="clubBarriers"
+                      toggleValue="other"
+                      toggleChecked={form.clubBarriers === 'other'}
+                      onToggleChange={handleTextChange}
+                      textId="field-clubBarriersOther"
+                      textName="clubBarriersOther"
+                      textValue={form.clubBarriersOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify barrier..."
+                      spanTwoCols={false}
+                    />
                   </div>
                   {fieldErrors.clubBarriers && (
                     <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriers}</p>
@@ -1316,7 +1342,7 @@ export default function ApplyForm() {
                     Which opportunities would interest students who are not on a competitive roster? {requiredMark}
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {Object.entries(NON_ROSTER_OPPORTUNITY_LABELS).map(([id, label]) => (
+                    {typedEntries(NON_ROSTER_OPPORTUNITY_LABELS).map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
@@ -1327,28 +1353,16 @@ export default function ApplyForm() {
                         <span>{label}</span>
                       </label>
                     ))}
-                    <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={form.nonRosterOpportunities.other}
-                          onChange={(e) => handleCheckboxGroupChange('nonRosterOpportunities', 'other', e.target.checked)}
-                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                        />
-                        <span>Other:</span>
-                      </label>
-                      {form.nonRosterOpportunities.other && (
-                        <input
-                          id="field-nonRosterOpportunitiesOther"
-                          type="text"
-                          name="nonRosterOpportunitiesOther"
-                          placeholder="Specify opportunity..."
-                          value={form.nonRosterOpportunitiesOther}
-                          onChange={handleTextChange}
-                          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-                        />
-                      )}
-                    </div>
+                    <OtherWriteInRow
+                      toggleType="checkbox"
+                      toggleChecked={form.nonRosterOpportunities.other}
+                      onToggleChange={(e) => handleCheckboxGroupChange('nonRosterOpportunities', 'other', e.target.checked)}
+                      textId="field-nonRosterOpportunitiesOther"
+                      textName="nonRosterOpportunitiesOther"
+                      textValue={form.nonRosterOpportunitiesOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify opportunity..."
+                    />
                   </div>
                   {fieldErrors.nonRosterOpportunities && (
                     <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunities}</p>
@@ -1369,7 +1383,7 @@ export default function ApplyForm() {
                     We want to make EZ Esports as inclusive as possible and are considering ways to include students who might not make it past try-outs for your esports teams but still want to participate in an esports environment. How might you approach this, or which additional opportunities would be most valuable to students at your school? {requiredMark}
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {Object.entries(INCLUSIVE_OPPORTUNITY_LABELS).map(([id, label]) => (
+                    {typedEntries(INCLUSIVE_OPPORTUNITY_LABELS).map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
@@ -1380,28 +1394,16 @@ export default function ApplyForm() {
                         <span>{label}</span>
                       </label>
                     ))}
-                    <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={form.inclusiveOpportunities.other}
-                          onChange={(e) => handleCheckboxGroupChange('inclusiveOpportunities', 'other', e.target.checked)}
-                          className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                        />
-                        <span>Other:</span>
-                      </label>
-                      {form.inclusiveOpportunities.other && (
-                        <input
-                          id="field-inclusiveOpportunitiesOther"
-                          type="text"
-                          name="inclusiveOpportunitiesOther"
-                          placeholder="Specify opportunity..."
-                          value={form.inclusiveOpportunitiesOther}
-                          onChange={handleTextChange}
-                          className="w-full sm:flex-1 px-3 py-1.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
-                        />
-                      )}
-                    </div>
+                    <OtherWriteInRow
+                      toggleType="checkbox"
+                      toggleChecked={form.inclusiveOpportunities.other}
+                      onToggleChange={(e) => handleCheckboxGroupChange('inclusiveOpportunities', 'other', e.target.checked)}
+                      textId="field-inclusiveOpportunitiesOther"
+                      textName="inclusiveOpportunitiesOther"
+                      textValue={form.inclusiveOpportunitiesOther}
+                      onTextChange={handleTextChange}
+                      placeholder="Specify opportunity..."
+                    />
                   </div>
                   {fieldErrors.inclusiveOpportunities && (
                     <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunities}</p>
@@ -1448,7 +1450,7 @@ export default function ApplyForm() {
                     </span>
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {Object.entries(CONTRIBUTE_BEYOND_SCHOOL_LABELS).map(([id, label]) => (
+                    {typedEntries(CONTRIBUTE_BEYOND_SCHOOL_LABELS).map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
