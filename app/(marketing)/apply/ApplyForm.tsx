@@ -317,6 +317,23 @@ export default function ApplyForm() {
     }
   };
 
+  // clubBarriers pairs a radio group with a write-in "Other" field, same as
+  // the checkbox groups below — needs its own handler (rather than plain
+  // handleTextChange) so switching away from "other" also clears the
+  // now-irrelevant clubBarriersOther error, mirroring handleCheckboxGroupChange.
+  const handleClubBarriersChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setForm((prev) => ({ ...prev, clubBarriers: value }));
+    if (fieldErrors.clubBarriers || fieldErrors.clubBarriersOther) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.clubBarriers;
+        delete next.clubBarriersOther;
+        return next;
+      });
+    }
+  };
+
   const handleRulesChange = (checked: boolean) => {
     setForm((prev) => ({ ...prev, agreedRules: checked }));
     if (fieldErrors.agreedRules) {
@@ -1322,7 +1339,7 @@ export default function ApplyForm() {
                           name="clubBarriers"
                           value={id}
                           checked={form.clubBarriers === id}
-                          onChange={handleTextChange}
+                          onChange={handleClubBarriersChange}
                           className="w-4.5 h-4.5 accent-accent cursor-pointer"
                         />
                         <span>{label}</span>
@@ -1333,7 +1350,7 @@ export default function ApplyForm() {
                       toggleName="clubBarriers"
                       toggleValue="other"
                       toggleChecked={form.clubBarriers === 'other'}
-                      onToggleChange={handleTextChange}
+                      onToggleChange={handleClubBarriersChange}
                       textId="field-clubBarriersOther"
                       textName="clubBarriersOther"
                       textValue={form.clubBarriersOther}
