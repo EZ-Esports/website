@@ -26,12 +26,13 @@ const CLUB_STATUS_OPTIONS = [
 const ADVISOR_CONFIRMED_OPTIONS = ['Yes', 'Pending / in-progress', 'Not yet identified'] as const;
 
 // Single source of truth tying each checkbox-group form field to its label
-// map, so the option key type below can't drift from what's actually rendered.
+// map (and whether it has a write-in "Other" option), so the option key type
+// below can't drift from what's actually rendered.
 const CHECKBOX_GROUP_LABELS = {
-  interestedGames: GAME_LABELS,
-  nonRosterOpportunities: NON_ROSTER_OPPORTUNITY_LABELS,
-  inclusiveOpportunities: INCLUSIVE_OPPORTUNITY_LABELS,
-  contributeBeyondSchool: CONTRIBUTE_BEYOND_SCHOOL_LABELS,
+  interestedGames: { labels: GAME_LABELS, hasOther: true },
+  nonRosterOpportunities: { labels: NON_ROSTER_OPPORTUNITY_LABELS, hasOther: true },
+  inclusiveOpportunities: { labels: INCLUSIVE_OPPORTUNITY_LABELS, hasOther: true },
+  contributeBeyondSchool: { labels: CONTRIBUTE_BEYOND_SCHOOL_LABELS, hasOther: false },
 } as const;
 
 // Object.entries() widens keys to `string`; this recovers the literal key
@@ -40,6 +41,13 @@ function typedEntries<T extends Record<string, string>>(labels: T): [keyof T & s
   return Object.entries(labels) as [keyof T & string, string][];
 }
 
+// Hoisted out of JSX so these static label maps are only ever iterated once
+// (at module load) instead of being re-derived on every keystroke/render.
+const GAME_ENTRIES = typedEntries(GAME_LABELS);
+const NON_ROSTER_OPPORTUNITY_ENTRIES = typedEntries(NON_ROSTER_OPPORTUNITY_LABELS);
+const INCLUSIVE_OPPORTUNITY_ENTRIES = typedEntries(INCLUSIVE_OPPORTUNITY_LABELS);
+const CONTRIBUTE_BEYOND_SCHOOL_ENTRIES = typedEntries(CONTRIBUTE_BEYOND_SCHOOL_LABELS);
+
 // Derives an all-unchecked selection map from a *_LABELS export so the initial
 // state can never drift out of sync with the options actually rendered.
 function emptySelection(labels: Record<string, string>, hasOther: boolean): Record<string, boolean> {
@@ -47,6 +55,14 @@ function emptySelection(labels: Record<string, string>, hasOther: boolean): Reco
   for (const key of Object.keys(labels)) selection[key] = false;
   if (hasOther) selection.other = false;
   return selection;
+}
+
+// A checkbox group is "complete" once at least one option is checked, and —
+// if the checked options include the write-in "Other" toggle — the write-in
+// text isn't blank. Shared by the progress/required-field checks below so
+// the completeness rule can't drift between checkbox groups.
+function isCheckboxGroupComplete(selection: Record<string, boolean>, otherText?: string): boolean {
+  return Object.values(selection).some(Boolean) && (!selection.other || !!otherText?.trim());
 }
 
 const initialForm = {
@@ -83,22 +99,28 @@ const initialForm = {
   advisorEmail: '',
   advisorConfirmed: '',
   activeStudentsCount: '',
-  interestedGames: emptySelection(CHECKBOX_GROUP_LABELS.interestedGames, true),
+  interestedGames: emptySelection(CHECKBOX_GROUP_LABELS.interestedGames.labels, CHECKBOX_GROUP_LABELS.interestedGames.hasOther),
   interestedGamesOther: '',
   clubBarriers: '',
   clubBarriersOther: '',
-  nonRosterOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.nonRosterOpportunities, true),
+  nonRosterOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.nonRosterOpportunities.labels, CHECKBOX_GROUP_LABELS.nonRosterOpportunities.hasOther),
   nonRosterOpportunitiesOther: '',
-  inclusiveOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.inclusiveOpportunities, true),
+  inclusiveOpportunities: emptySelection(CHECKBOX_GROUP_LABELS.inclusiveOpportunities.labels, CHECKBOX_GROUP_LABELS.inclusiveOpportunities.hasOther),
   inclusiveOpportunitiesOther: '',
   separateGamingClubs: '',
-  contributeBeyondSchool: emptySelection(CHECKBOX_GROUP_LABELS.contributeBeyondSchool, false),
+  contributeBeyondSchool: emptySelection(CHECKBOX_GROUP_LABELS.contributeBeyondSchool.labels, CHECKBOX_GROUP_LABELS.contributeBeyondSchool.hasOther),
   feedback: '',
   agreedRules: false,
 };
 
 type CheckboxGroupKey = keyof typeof CHECKBOX_GROUP_LABELS;
-type CheckboxOptionKey<G extends CheckboxGroupKey> = (keyof (typeof CHECKBOX_GROUP_LABELS)[G] & string) | 'other';
+// 'other' is only a valid key for groups whose config sets hasOther: true —
+// this stays in sync with CHECKBOX_GROUP_LABELS instead of being available
+// (and silently unused) on every group regardless of whether it renders an
+// "Other:" write-in row.
+type CheckboxOptionKey<G extends CheckboxGroupKey> =
+  | (keyof (typeof CHECKBOX_GROUP_LABELS)[G]['labels'] & string)
+  | ((typeof CHECKBOX_GROUP_LABELS)[G]['hasOther'] extends true ? 'other' : never);
 
 const SECTIONS = [
   { id: 'president', num: 1, title: 'President Info', desc: 'Primary student leader contact and school details.' },
@@ -232,15 +254,12 @@ export default function ApplyForm() {
       EMAIL_RE.test(form.advisorEmail),
       !!form.advisorConfirmed,
       !!form.activeStudentsCount.trim(),
-      Object.values(form.interestedGames).some(Boolean) &&
-        (!form.interestedGames.other || !!form.interestedGamesOther.trim()),
+      isCheckboxGroupComplete(form.interestedGames, form.interestedGamesOther),
       !!form.clubBarriers && (form.clubBarriers !== 'other' || !!form.clubBarriersOther.trim()),
-      Object.values(form.nonRosterOpportunities).some(Boolean) &&
-        (!form.nonRosterOpportunities.other || !!form.nonRosterOpportunitiesOther.trim()),
-      Object.values(form.inclusiveOpportunities).some(Boolean) &&
-        (!form.inclusiveOpportunities.other || !!form.inclusiveOpportunitiesOther.trim()),
+      isCheckboxGroupComplete(form.nonRosterOpportunities, form.nonRosterOpportunitiesOther),
+      isCheckboxGroupComplete(form.inclusiveOpportunities, form.inclusiveOpportunitiesOther),
       !!form.separateGamingClubs.trim(),
-      Object.values(form.contributeBeyondSchool).some(Boolean),
+      isCheckboxGroupComplete(form.contributeBeyondSchool),
       form.agreedRules,
     ],
   };
@@ -1254,7 +1273,7 @@ export default function ApplyForm() {
                     </span>
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {typedEntries(GAME_LABELS).map(([id, label]) => (
+                    {GAME_ENTRIES.map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
@@ -1342,7 +1361,7 @@ export default function ApplyForm() {
                     Which opportunities would interest students who are not on a competitive roster? {requiredMark}
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {typedEntries(NON_ROSTER_OPPORTUNITY_LABELS).map(([id, label]) => (
+                    {NON_ROSTER_OPPORTUNITY_ENTRIES.map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
@@ -1383,7 +1402,7 @@ export default function ApplyForm() {
                     We want to make EZ Esports as inclusive as possible and are considering ways to include students who might not make it past try-outs for your esports teams but still want to participate in an esports environment. How might you approach this, or which additional opportunities would be most valuable to students at your school? {requiredMark}
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {typedEntries(INCLUSIVE_OPPORTUNITY_LABELS).map(([id, label]) => (
+                    {INCLUSIVE_OPPORTUNITY_ENTRIES.map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
@@ -1450,7 +1469,7 @@ export default function ApplyForm() {
                     </span>
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {typedEntries(CONTRIBUTE_BEYOND_SCHOOL_LABELS).map(([id, label]) => (
+                    {CONTRIBUTE_BEYOND_SCHOOL_ENTRIES.map(([id, label]) => (
                       <label key={id} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="checkbox"
