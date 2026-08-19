@@ -42,30 +42,38 @@ export interface SchoolApplicationFormData {
   agreedRules?: boolean;
 }
 
-export const GAME_LABELS: Record<string, string> = {
+// `satisfies` (rather than an explicit `: Record<string, string>` annotation)
+// keeps each object's keys literal so `typedEntries`/`CheckboxOptionKey` in
+// ApplyForm.tsx can actually typo-check checkbox option ids against these
+// keys — a `Record<string, string>` annotation would widen the keys to
+// `string` and silently defeat that check.
+export const GAME_LABELS = {
   valorant: 'Valorant',
   lol: 'League of Legends (LoL)',
   tft: 'Teamfight Tactics (TFT)',
   tetris: 'Tetris',
   clashRoyale: 'Clash Royale',
   smashBros: 'Super Smash Bros. Ultimate',
-};
+} satisfies Record<string, string>;
 
+// Kept as `Record<string, string>` (not `satisfies`) because it's indexed
+// below with a plain `string` (`form.clubBarriers`), which requires an index
+// signature rather than literal keys.
 export const CLUB_BARRIER_LABELS: Record<string, string> = {
   recruitingPlayers: 'Recruiting players',
   facultySupport: 'Faculty support',
   limitedExperience: 'Limited experience',
 };
 
-export const NON_ROSTER_OPPORTUNITY_LABELS: Record<string, string> = {
+export const NON_ROSTER_OPPORTUNITY_LABELS = {
   oneDayTournaments: 'One-day open tournaments',
   castingProduction: 'Casting or production',
   contentDesign: 'Content and design',
   eventOperations: 'Event operations',
   workshopsCareerPanels: 'Workshops or career panels',
-};
+} satisfies Record<string, string>;
 
-export const INCLUSIVE_OPPORTUNITY_LABELS: Record<string, string> = {
+export const INCLUSIVE_OPPORTUNITY_LABELS = {
   developmentalJV: 'Developmental or JV competition',
   openTournaments: 'Open, one-day tournaments',
   friendlyScrimmages: 'Friendly scrimmages',
@@ -73,9 +81,9 @@ export const INCLUSIVE_OPPORTUNITY_LABELS: Record<string, string> = {
   coachingStrategy: 'Coaching, strategy, or analytics',
   contentCreation: 'Content creation, design, or event operations',
   workshopsCommunity: 'Workshops or community events',
-};
+} satisfies Record<string, string>;
 
-export const CONTRIBUTE_BEYOND_SCHOOL_LABELS: Record<string, string> = {
+export const CONTRIBUTE_BEYOND_SCHOOL_LABELS = {
   gameRules: 'Collaborating and advising on game rules, formats, or scheduling',
   broadcasts: 'Helping with broadcasts, casting, or production',
   communityEvents: 'Supporting community events or one-off tournaments',
@@ -83,7 +91,7 @@ export const CONTRIBUTE_BEYOND_SCHOOL_LABELS: Record<string, string> = {
   marketingPartnerships: 'Contributing to marketing, partnerships, or software and technical development',
   leadersCouncil: 'Representing our high school on an EZ Esports Club Leaders Council',
   notAtThisTime: 'Not at this time',
-};
+} satisfies Record<string, string>;
 
 export function validateSchoolApplicationForm(form: SchoolApplicationFormData) {
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

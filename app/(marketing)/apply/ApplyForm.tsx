@@ -408,7 +408,7 @@ export default function ApplyForm() {
           </p>
           <ul className="mt-3 space-y-1.5 text-sm font-medium text-foreground-secondary">
             {[
-              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, Tetris, and Clash Royale with real standings',
+              'Organized leagues in Valorant, League of Legends, Teamfight Tactics, Tetris, Clash Royale, and Super Smash Bros. Ultimate with real standings',
               'Live-streamed matches broadcast to audiences across NYC',
               'Community and pathways into gaming and technology careers',
             ].map((benefit) => (
