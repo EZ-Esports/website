@@ -49,6 +49,7 @@
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import postgres from 'postgres';
 import { requireFreshBackup } from './backup';
 import { extractTablesFromSql } from './migrate-tables';
@@ -71,8 +72,8 @@ function isUndefinedTableError(err: unknown): boolean {
   );
 }
 
-function readJournalEntries(): JournalEntry[] {
-  const journal = JSON.parse(readFileSync(JOURNAL_PATH, 'utf8')) as { entries: JournalEntry[] };
+function readJournalEntries(journalPath: string = JOURNAL_PATH): JournalEntry[] {
+  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: JournalEntry[] };
   return journal.entries;
 }
 
@@ -85,7 +86,13 @@ function readJournalEntries(): JournalEntry[] {
  * entirely for this one outcome; every other outcome still goes through
  * `requireFreshBackup()`, no exceptions.
  */
-type Scope = readonly string[] | 'full' | 'empty-database';
+export type Scope = readonly string[] | 'full' | 'empty-database';
+
+/** The shape of a live `postgres(url, { max: 1 })` connection, exactly as
+ * `determineScope()` calls it: two tagged-template queries. Exists so tests
+ * can hand in a mock without a live Postgres — see
+ * db/__tests__/migrate.test.ts. */
+type SqlClient = ReturnType<typeof postgres>;
 
 /**
  * Determines the backup scope for the migration about to run: a table list
@@ -93,10 +100,24 @@ type Scope = readonly string[] | 'full' | 'empty-database';
  * *currently-existing* tables confidently extracted, `'full'` on any loss of
  * confidence along the way, `'empty-database'` when there is confidently
  * nothing in `public` at all.
+ *
+ * `sqlOverride`/`pathsOverride` exist solely for unit testing this decision
+ * tree without a live Postgres connection or the real journal/migrations
+ * directory — `main()` calls this with no arguments, which reproduces the
+ * exact original behavior: open a real connection from `DATABASE_URL`, read
+ * the real `db/migrations` journal, and close the connection on the way out.
+ * When `sqlOverride` is supplied, this function never opens or closes a
+ * connection of its own — the caller owns that lifecycle.
  */
-async function determineScope(): Promise<Scope> {
+export async function determineScope(
+  sqlOverride?: SqlClient,
+  pathsOverride?: { migrationsDir: string; journalPath: string }
+): Promise<Scope> {
+  const ownsConnection = sqlOverride === undefined;
   const url = process.env.DATABASE_URL ?? '';
-  const sql = postgres(url, { max: 1 });
+  const sql = sqlOverride ?? postgres(url, { max: 1 });
+  const migrationsDir = pathsOverride?.migrationsDir ?? MIGRATIONS_DIR;
+  const journalPath = pathsOverride?.journalPath ?? JOURNAL_PATH;
 
   try {
     let appliedMax: number | null;
@@ -121,7 +142,7 @@ async function determineScope(): Promise<Scope> {
       }
     }
 
-    const entries = readJournalEntries();
+    const entries = readJournalEntries(journalPath);
     const pending = entries
       .filter((e) => e.when > (appliedMax ?? -Infinity))
       .sort((a, b) => a.idx - b.idx);
@@ -150,7 +171,7 @@ async function determineScope(): Promise<Scope> {
 
     const extracted = new Set<string>();
     for (const entry of pending) {
-      const file = resolve(MIGRATIONS_DIR, `${entry.tag}.sql`);
+      const file = resolve(migrationsDir, `${entry.tag}.sql`);
       const text = readFileSync(file, 'utf8');
       for (const t of extractTablesFromSql(text, realTables)) extracted.add(t);
     }
@@ -186,7 +207,7 @@ async function determineScope(): Promise<Scope> {
 
     return existing;
   } finally {
-    await sql.end({ timeout: 5 });
+    if (ownsConnection) await sql.end({ timeout: 5 });
   }
 }
 
@@ -219,7 +240,15 @@ async function main() {
   process.exit(result.status ?? 1);
 }
 
-main().catch((err) => {
-  console.error('Migrate guard failed:', err);
-  process.exit(1);
-});
+// Only run as a side effect of executing this file directly (`npm run
+// db:migrate`, i.e. `tsx db/migrate.ts`) — not when it's imported, e.g. by
+// db/__tests__/migrate.test.ts to unit-test determineScope(). Mirrors the
+// reason migrate-tables.ts was split out in the first place (see its
+// docstring): importing this module must not have side effects.
+const isMainModule = process.argv[1] !== undefined && process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainModule) {
+  main().catch((err) => {
+    console.error('Migrate guard failed:', err);
+    process.exit(1);
+  });
+}
