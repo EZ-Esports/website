@@ -12,11 +12,12 @@
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs migrate",
+    "db:migrate": "npx tsx --env-file-if-exists=.env db/migrate.ts",
     "db:seed": "npx tsx --env-file-if-exists=.env db/seed.ts",
     "db:seed:gold": "npx tsx --env-file-if-exists=.env db/seed-gold.ts",
     "db:seed:leadership": "npx tsx --env-file-if-exists=.env db/seed-leadership.ts",
     "db:seed-owner": "npx tsx --env-file-if-exists=.env db/seed-owner.ts",
+    "db:backup:clean": "npx tsx db/backup-clean.ts",
     "prepare": "test -d .git && git config core.hooksPath .githooks || true"
   },
   "dependencies": {

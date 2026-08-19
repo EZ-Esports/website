@@ -36,6 +36,16 @@ import { assertSeedTargetAllowed } from './seed-target';
 import { mergeLeadership } from './leadership-merge';
 import { buildImportPlan, readRecords, slugify, MATCHES_CSV, STAFF_CSV } from './import-archive';
 
+/**
+ * Every table this seed deletes (step 1 below), in that same order. Passed to
+ * `requireFreshBackup()` so the pre-seed dump is scoped to exactly what this
+ * seed can destroy rather than the whole schema.
+ */
+const SEED_TABLES = [
+  'news_posts', 'matches', 'players', 'rosters',
+  'teams', 'seasons', 'members', 'schools', 'games',
+] as const;
+
 async function main() {
   console.log('Importing archived data...');
 
@@ -47,8 +57,9 @@ async function main() {
   // 0b. Back up, before a CSV is read or a row is deleted. This seed is
   //     one letter away from `db:seed:gold` in package.json and deletes strictly
   //     more than it does. requireFreshBackup throws unless a complete dump is
-  //     on disk, which aborts the run here.
-  requireFreshBackup();
+  //     on disk, which aborts the run here. Scoped to SEED_TABLES — exactly the
+  //     tables step 1 deletes.
+  requireFreshBackup(SEED_TABLES);
 
   const plan = buildImportPlan(readRecords(MATCHES_CSV), readRecords(STAFF_CSV));
 

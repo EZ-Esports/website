@@ -45,6 +45,17 @@ import { readRecords } from './import-archive';
 
 const GOLD_DIR = 'sharepoint/gold_data';
 
+/**
+ * Every table this seed touches (insert/upsert/prune), mirroring the list in
+ * the module doc comment above. Passed to `requireFreshBackup()` so the
+ * pre-seed dump is scoped to exactly what this seed can affect rather than
+ * the whole schema.
+ */
+const GOLD_SEED_TABLES = [
+  'games', 'schools', 'seasons', 'teams', 'rosters',
+  'members', 'players', 'matches', 'season_standings',
+] as const;
+
 const gold = (file: string) => readRecords(`${GOLD_DIR}/${file}`);
 
 const intOrNull = (v: string) => (v === '' ? null : parseInt(v, 10));
@@ -157,11 +168,12 @@ async function main() {
   //     does not first spend a minute dumping the database it will not touch.
   assertSeedTargetAllowed();
 
-  // 0b. Back up. Step 1 wipes nine tables; this has gone wrong against the
+  // 0b. Back up. Step 1 touches nine tables; this has gone wrong against the
   //     live database twice, and both times there was nothing to restore from.
   //     requireFreshBackup throws unless a complete dump is on disk, which
-  //     aborts the seed here — before any delete.
-  requireFreshBackup();
+  //     aborts the seed here — before any write. Scoped to GOLD_SEED_TABLES —
+  //     exactly the tables this seed inserts/upserts/prunes.
+  requireFreshBackup(GOLD_SEED_TABLES);
 
   // 0c. Read and validate the one CSV this loader can reject, before anything is
   //    deleted. Step 1 wipes the whole archive, so a standings_format this
