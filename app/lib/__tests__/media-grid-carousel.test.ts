@@ -1,42 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
-describe('MediaGrid Carousel Logic', () => {
+describe('MediaGrid Dual Marquee Logic', () => {
   const mockItems = Array.from({ length: 11 }, (_, i) => ({
     id: `photo-${i + 1}`,
     src: `/images/gallery/gallery-${i + 1}.png`,
     alt: `Test photo ${i + 1}`,
   }));
 
-  it('calculates visible count responsively', () => {
-    const getVisibleCount = (width: number, maxColumns = 3) => {
-      if (width < 640) return 1;
-      if (width < 1024) return 2;
-      return Math.min(maxColumns, 3);
-    };
+  it('splits items evenly into dual rows preserving original indices', () => {
+    const indexedItems = mockItems.map((item, originalIndex) => ({
+      ...item,
+      originalIndex,
+    }));
 
-    expect(getVisibleCount(375)).toBe(1);  // Mobile
-    expect(getVisibleCount(768)).toBe(2);  // Tablet
-    expect(getVisibleCount(1280)).toBe(3); // Desktop
+    const row1 = indexedItems.filter((_, i) => i % 2 === 0);
+    const row2 = indexedItems.filter((_, i) => i % 2 !== 0);
+
+    expect(row1.length).toBe(6);
+    expect(row2.length).toBe(5);
+    expect(row1[0]!.originalIndex).toBe(0);
+    expect(row2[0]!.originalIndex).toBe(1);
   });
 
-  it('calculates max index and bounds accurately', () => {
-    const visibleCount = 3;
-    const maxIndex = Math.max(0, mockItems.length - visibleCount);
-    expect(maxIndex).toBe(8); // 11 items - 3 visible = 8 max index
-  });
+  it('fills tracks to minimum count for seamless loop repetition', () => {
+    function prepareTrackItems<T>(row: T[], minCount = 8): T[] {
+      if (row.length === 0) return [];
+      const repetitions = Math.ceil(minCount / row.length);
+      return Array.from({ length: repetitions }, () => row).flat();
+    }
 
-  it('determines lazy loading window correctly', () => {
-    const currentIndex = 2;
-    const visibleCount = 3;
-    const isNearViewport = (index: number) => Math.abs(index - currentIndex) <= visibleCount + 1;
+    const shortList = [mockItems[0]!, mockItems[1]!];
+    const filled = prepareTrackItems(shortList, 8);
+    expect(filled.length).toBe(8);
 
-    // Items within buffer range (2 - 4 <= index <= 2 + 4 -> 0 to 6)
-    expect(isNearViewport(0)).toBe(true);
-    expect(isNearViewport(3)).toBe(true);
-    expect(isNearViewport(6)).toBe(true);
-
-    // Items outside buffer range
-    expect(isNearViewport(8)).toBe(false);
-    expect(isNearViewport(10)).toBe(false);
+    const normalRow = mockItems.slice(0, 6);
+    const filledNormal = prepareTrackItems(normalRow, 8);
+    expect(filledNormal.length).toBe(12); // 6 * 2 = 12 >= 8
   });
 });
+
