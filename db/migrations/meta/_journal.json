@@ -239,6 +239,13 @@
       "when": 1787189202661,
       "tag": "0033_sharp_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787197282409,
+      "tag": "0034_guard_application_details_immutability",
+      "breakpoints": true
     }
   ]
 }
