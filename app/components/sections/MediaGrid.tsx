@@ -21,10 +21,6 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(3);
-  // Actual px gap of the card row at the current breakpoint, kept in sync with
-  // visibleCount so the flex-basis calc below always matches the real gap
-  // (Tailwind gap-4 below 640px, gap-6 at and above it) instead of assuming one.
-  const [gapPx, setGapPx] = useState(24);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   // Dynamically determine how many cards to show per slide based on screen width
@@ -33,13 +29,10 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
       const w = window.innerWidth;
       if (w < 640) {
         setVisibleCount(1);
-        setGapPx(16);
       } else if (w < 1024) {
         setVisibleCount(2);
-        setGapPx(24);
       } else {
         setVisibleCount(Math.min(columns, 3));
-        setGapPx(24);
       }
     };
     updateVisibleCount();
@@ -48,6 +41,10 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   }, [columns]);
 
   const maxIndex = Math.max(0, items.length - visibleCount);
+  // Actual px gap of the card row at the current visibleCount, derived (not
+  // independent state) so it can never drift from the Tailwind gap it mirrors
+  // (gap-4 below 640px / 1-up, gap-6 at and above / 2-up and 3-up).
+  const gapPx = visibleCount === 1 ? 16 : 24;
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : maxIndex));
