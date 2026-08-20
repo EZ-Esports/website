@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-describe('MediaGrid Framer Motion Carousel Logic', () => {
+describe('MediaGrid Carousel Logic', () => {
   const mockItems = Array.from({ length: 11 }, (_, i) => ({
     id: `photo-${i + 1}`,
     src: `/images/gallery/gallery-${i + 1}.png`,
