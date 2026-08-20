@@ -1,25 +1,27 @@
-import Card from '@/app/components/ui/Card';
-import Link from 'next/link';
-import { getSchoolApplications, getStaffApplications } from '@/app/lib/db/queries';
-import ApplicationRow from '@/app/components/admin/ApplicationRow';
-import StaffApplicationRow from '@/app/components/admin/StaffApplicationRow';
-import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
-import PermissionDenied from '@/app/components/admin/PermissionDenied';
-import { getStaffForAdminSection } from '@/app/lib/auth';
+import Card from "@/app/components/ui/Card";
+import Link from "next/link";
+import { getSchoolApplications, getStaffApplications } from "@/app/lib/db/queries";
+import ApplicationRow from "@/app/components/admin/ApplicationRow";
+import StaffApplicationRow from "@/app/components/admin/StaffApplicationRow";
+import DownloadCsvButton from "@/app/components/admin/DownloadCsvButton";
+import DbErrorNotice from "@/app/components/admin/DbErrorNotice";
+import PermissionDenied from "@/app/components/admin/PermissionDenied";
+import { getStaffForAdminSection } from "@/app/lib/auth";
+import { schoolApplicationsToCsv, staffApplicationsToCsv } from "@/app/lib/application-csv";
 
-type StatusFilter = 'all' | 'pending' | 'accepted' | 'rejected';
+type StatusFilter = "all" | "pending" | "accepted" | "rejected";
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
-  all: 'All',
-  pending: 'Pending',
-  accepted: 'Accepted',
-  rejected: 'Rejected',
+  all: "All",
+  pending: "Pending",
+  accepted: "Accepted",
+  rejected: "Rejected",
 };
 
-const VALID_STATUSES: StatusFilter[] = ['all', 'pending', 'accepted', 'rejected'];
+const VALID_STATUSES: StatusFilter[] = ["all", "pending", "accepted", "rejected"];
 
 function parseStatusFilter(raw: string | undefined): StatusFilter {
-  return VALID_STATUSES.includes(raw as StatusFilter) ? (raw as StatusFilter) : 'all';
+  return VALID_STATUSES.includes(raw as StatusFilter) ? (raw as StatusFilter) : "all";
 }
 
 export default async function ApplicationsAdminPage({
@@ -27,13 +29,13 @@ export default async function ApplicationsAdminPage({
 }: {
   searchParams: Promise<{ status?: string; staffStatus?: string }>;
 }) {
-  if (!(await getStaffForAdminSection('/admin/applications'))) return <PermissionDenied />;
+  if (!(await getStaffForAdminSection("/admin/applications"))) return <PermissionDenied />;
 
   const { status: rawStatus, staffStatus: rawStaffStatus } = await searchParams;
   const statusFilter = parseStatusFilter(rawStatus);
   const staffStatusFilter = parseStatusFilter(rawStaffStatus);
-  const queryStatus = statusFilter === 'all' ? undefined : statusFilter;
-  const staffQueryStatus = staffStatusFilter === 'all' ? undefined : staffStatusFilter;
+  const queryStatus = statusFilter === "all" ? undefined : statusFilter;
+  const staffQueryStatus = staffStatusFilter === "all" ? undefined : staffStatusFilter;
 
   let applications: Awaited<ReturnType<typeof getSchoolApplications>> = [];
   let staffApplications: Awaited<ReturnType<typeof getStaffApplications>> = [];
@@ -53,19 +55,22 @@ export default async function ApplicationsAdminPage({
 
   const schoolFilterHref = (s: StatusFilter) => {
     const params = new URLSearchParams();
-    if (s !== 'all') params.set('status', s);
-    if (staffStatusFilter !== 'all') params.set('staffStatus', staffStatusFilter);
+    if (s !== "all") params.set("status", s);
+    if (staffStatusFilter !== "all") params.set("staffStatus", staffStatusFilter);
     const qs = params.toString();
-    return qs ? `/admin/applications?${qs}` : '/admin/applications';
+    return qs ? `/admin/applications?${qs}` : "/admin/applications";
   };
 
   const staffFilterHref = (s: StatusFilter) => {
     const params = new URLSearchParams();
-    if (statusFilter !== 'all') params.set('status', statusFilter);
-    if (s !== 'all') params.set('staffStatus', s);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (s !== "all") params.set("staffStatus", s);
     const qs = params.toString();
-    return qs ? `/admin/applications?${qs}` : '/admin/applications';
+    return qs ? `/admin/applications?${qs}` : "/admin/applications";
   };
+
+  const schoolCsv = dbConfigured ? schoolApplicationsToCsv(applications) : "";
+  const staffCsv = dbConfigured ? staffApplicationsToCsv(staffApplications) : "";
 
   return (
     <div className="space-y-8">
@@ -80,28 +85,33 @@ export default async function ApplicationsAdminPage({
             )}
           </h2>
 
-          {/* Status filter tabs */}
-          <div className="flex items-center gap-1 flex-wrap">
-            {VALID_STATUSES.map((s) => (
-              <Link
-                key={s}
-                href={schoolFilterHref(s)}
-                scroll={false}
-                className={`text-[10px] font-bold px-3 py-1.5 rounded-lg capitalize transition-all border ${
-                  statusFilter === s
-                    ? 'bg-accent/10 text-white border-accent/40'
-                    : 'bg-surface-raised text-foreground-secondary border-line hover:text-white hover:border-line'
-                }`}
-              >
-                {STATUS_LABELS[s]}
-              </Link>
-            ))}
+          {/* Status filter tabs + export */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1 flex-wrap">
+              {VALID_STATUSES.map((s) => (
+                <Link
+                  key={s}
+                  href={schoolFilterHref(s)}
+                  scroll={false}
+                  className={`text-[10px] font-bold px-3 py-1.5 rounded-lg capitalize transition-all border ${
+                    statusFilter === s
+                      ? "bg-accent/10 text-white border-accent/40"
+                      : "bg-surface-raised text-foreground-secondary border-line hover:text-white hover:border-line"
+                  }`}
+                >
+                  {STATUS_LABELS[s]}
+                </Link>
+              ))}
+            </div>
+            {dbConfigured && applications.length > 0 && (
+              <DownloadCsvButton content={schoolCsv} filename={`school-applications-${statusFilter}.csv`} />
+            )}
           </div>
         </div>
 
         {applications.length === 0 ? (
           <p className="text-foreground-secondary text-sm">
-            {statusFilter === 'all' ? 'No applications yet.' : `No ${statusFilter} applications.`}
+            {statusFilter === "all" ? "No applications yet." : `No ${statusFilter} applications.`}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -137,28 +147,33 @@ export default async function ApplicationsAdminPage({
             )}
           </h2>
 
-          {/* Status filter tabs */}
-          <div className="flex items-center gap-1 flex-wrap">
-            {VALID_STATUSES.map((s) => (
-              <Link
-                key={s}
-                href={staffFilterHref(s)}
-                scroll={false}
-                className={`text-[10px] font-bold px-3 py-1.5 rounded-lg capitalize transition-all border ${
-                  staffStatusFilter === s
-                    ? 'bg-accent/10 text-white border-accent/40'
-                    : 'bg-surface-raised text-foreground-secondary border-line hover:text-white hover:border-line'
-                }`}
-              >
-                {STATUS_LABELS[s]}
-              </Link>
-            ))}
+          {/* Status filter tabs + export */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1 flex-wrap">
+              {VALID_STATUSES.map((s) => (
+                <Link
+                  key={s}
+                  href={staffFilterHref(s)}
+                  scroll={false}
+                  className={`text-[10px] font-bold px-3 py-1.5 rounded-lg capitalize transition-all border ${
+                    staffStatusFilter === s
+                      ? "bg-accent/10 text-white border-accent/40"
+                      : "bg-surface-raised text-foreground-secondary border-line hover:text-white hover:border-line"
+                  }`}
+                >
+                  {STATUS_LABELS[s]}
+                </Link>
+              ))}
+            </div>
+            {dbConfigured && staffApplications.length > 0 && (
+              <DownloadCsvButton content={staffCsv} filename={`staff-applications-${staffStatusFilter}.csv`} />
+            )}
           </div>
         </div>
 
         {staffApplications.length === 0 ? (
           <p className="text-foreground-secondary text-sm">
-            {staffStatusFilter === 'all' ? 'No applications yet.' : `No ${staffStatusFilter} applications.`}
+            {staffStatusFilter === "all" ? "No applications yet." : `No ${staffStatusFilter} applications.`}
           </p>
         ) : (
           <div className="overflow-x-auto">

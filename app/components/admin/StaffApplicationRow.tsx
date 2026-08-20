@@ -1,14 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useTransition } from 'react';
-import { updateStaffApplicationStatus, softDeleteStaffApplication } from '@/app/(admin)/admin/applications/actions';
-import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
-import { formatStaffApplicationDetails, type StaffApplicationDetails } from '@/app/lib/staff-application-form';
+import { useState, useTransition } from "react";
+import { updateStaffApplicationStatus, softDeleteStaffApplication } from "@/app/(admin)/admin/applications/actions";
+import ConfirmDeleteButton from "@/app/components/admin/ConfirmDeleteButton";
+import StaffApplicationDetailModal from "@/app/components/admin/StaffApplicationDetailModal";
+import type { StaffApplicationDetails } from "@/app/lib/staff-application-form";
 
-type Status = 'pending' | 'accepted' | 'rejected';
-type StatusFilter = 'all' | Status;
+type Status = "pending" | "accepted" | "rejected";
+type StatusFilter = "all" | Status;
 
-interface StaffApplication {
+export interface StaffApplication {
   id: string;
   name: string;
   preferredFirstName: string | null;
@@ -23,19 +24,19 @@ interface StaffApplication {
 }
 
 const activeBadgeClass: Record<Status, string> = {
-  pending: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-  accepted: 'bg-green-500/10 text-green-400 border border-green-500/20',
-  rejected: 'bg-red-500/10 text-red-400 border border-red-500/20',
+  pending: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+  accepted: "bg-green-500/10 text-green-400 border border-green-500/20",
+  rejected: "bg-red-500/10 text-red-400 border border-red-500/20",
 };
 
-export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app: StaffApplication; activeFilter?: StatusFilter }) {
+export default function StaffApplicationRow({ app, activeFilter = "all" }: { app: StaffApplication; activeFilter?: StatusFilter }) {
   const [status, setStatus] = useState<Status>(app.status);
-  const [expanded, setExpanded] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
 
-  const message = app.message ?? '';
+  const message = app.message ?? "";
   const isLong = message.length > 80;
 
   if (removed) return null;
@@ -47,10 +48,10 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
     startTransition(async () => {
       try {
         await updateStaffApplicationStatus(app.id, s);
-        if (activeFilter !== 'all' && s !== activeFilter) setRemoved(true);
+        if (activeFilter !== "all" && s !== activeFilter) setRemoved(true);
       } catch {
         setStatus(prev);
-        setActionError('Failed to update status. Please try again.');
+        setActionError("Failed to update status. Please try again.");
       }
     });
   };
@@ -62,98 +63,82 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
         await softDeleteStaffApplication(app.id);
         setRemoved(true);
       } catch {
-        setActionError('Failed to delete application. Please try again.');
+        setActionError("Failed to delete application. Please try again.");
       }
     });
   };
 
   return (
-    <tr className="hover:bg-surface-raised/40 transition-colors">
-      <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">
-        {app.name}
-        {app.preferredFirstName && (
-          <span className="block text-xs font-normal text-foreground-muted">goes by {app.preferredFirstName}</span>
-        )}
-        {app.discordTag && (
-          <span className="block text-xs font-normal text-foreground-muted">{app.discordTag}</span>
-        )}
-      </td>
-      <td className="py-3 pr-4 text-foreground-secondary capitalize">{app.role}</td>
-      <td className="py-3 pr-4">
-        <a
-          href={`mailto:${app.email}`}
-          className="text-foreground-secondary hover:text-white transition-colors"
-        >
-          {app.email}
-        </a>
-      </td>
-      <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">{app.phone}</td>
-      <td className="py-3 pr-4 text-foreground-secondary max-w-[320px]">
-        {message || app.details ? (
-          <>
-            {expanded && app.details ? (
-              <dl className="space-y-1.5 whitespace-normal">
-                {formatStaffApplicationDetails(app.details).map(({ label, value }) => (
-                  <div key={label}>
-                    <dt className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">{label}</dt>
-                    <dd className="text-foreground-secondary">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <span className="whitespace-pre-line">
-                {expanded ? message : (isLong ? `${message.slice(0, 80)}…` : message)}
-              </span>
-            )}
-            {(isLong || app.details) && (
-              <button
-                onClick={() => setExpanded(v => !v)}
-                className="ml-1 text-foreground-muted hover:text-foreground-secondary transition-colors text-xs cursor-pointer"
-              >
-                {expanded ? '…less' : '…more'}
-              </button>
-            )}
-          </>
-        ) : (
-          <span className="text-foreground-muted italic">—</span>
-        )}
-      </td>
-      <td className="py-3 pr-4">
-        <div className="flex gap-1 items-center">
-          {(['pending', 'accepted', 'rejected'] as const).map(s => (
-            <button
-              key={s}
-              disabled={isPending || status === s}
-              onClick={() => handleStatusChange(s)}
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-default ${
-                status === s
-                  ? activeBadgeClass[s]
-                  : 'bg-line/50 text-foreground-muted border border-line hover:bg-line/50'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-          {actionError && (
-            <span className="text-[10px] text-red-400 ml-1">{actionError}</span>
+    <>
+      <tr className="hover:bg-surface-raised/40 transition-colors">
+        <td className="py-3 pr-4 font-semibold text-white whitespace-nowrap">
+          {app.name}
+          {app.preferredFirstName && (
+            <span className="block text-xs font-normal text-foreground-muted">goes by {app.preferredFirstName}</span>
           )}
-        </div>
-      </td>
-      <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">
-        {new Date(app.submittedAt).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })}
-      </td>
-      <td className="py-3 text-right whitespace-nowrap">
-        <ConfirmDeleteButton
-          action={handleDelete}
-          message="Are you sure you want to remove this application?"
-          label="Remove"
-          className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
-        />
-      </td>
-    </tr>
+          {app.discordTag && <span className="block text-xs font-normal text-foreground-muted">{app.discordTag}</span>}
+        </td>
+        <td className="py-3 pr-4 text-foreground-secondary capitalize">{app.role}</td>
+        <td className="py-3 pr-4">
+          <a href={`mailto:${app.email}`} className="text-foreground-secondary hover:text-white transition-colors">
+            {app.email}
+          </a>
+        </td>
+        <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">{app.phone}</td>
+        <td className="py-3 pr-4 text-foreground-secondary max-w-[320px]">
+          {message || app.details ? (
+            <>
+              {message && (
+                <span className="whitespace-pre-line">{isLong ? `${message.slice(0, 80)}…` : message}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => setDetailOpen(true)}
+                className="ml-1 text-accent hover:text-accent/80 transition-colors text-xs font-semibold cursor-pointer"
+              >
+                View
+              </button>
+            </>
+          ) : (
+            <span className="text-foreground-muted italic">—</span>
+          )}
+        </td>
+        <td className="py-3 pr-4">
+          <div className="flex gap-1 items-center">
+            {(["pending", "accepted", "rejected"] as const).map((s) => (
+              <button
+                key={s}
+                disabled={isPending || status === s}
+                onClick={() => handleStatusChange(s)}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-default ${
+                  status === s
+                    ? activeBadgeClass[s]
+                    : "bg-line/50 text-foreground-muted border border-line hover:bg-line/50"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+            {actionError && <span className="text-[10px] text-red-400 ml-1">{actionError}</span>}
+          </div>
+        </td>
+        <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">
+          {new Date(app.submittedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </td>
+        <td className="py-3 text-right whitespace-nowrap">
+          <ConfirmDeleteButton
+            action={handleDelete}
+            message="Are you sure you want to remove this application?"
+            label="Remove"
+            className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+          />
+        </td>
+      </tr>
+      <StaffApplicationDetailModal app={app} isOpen={detailOpen} onOpenChange={setDetailOpen} />
+    </>
   );
 }
