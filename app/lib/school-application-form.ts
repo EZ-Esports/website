@@ -178,6 +178,29 @@ export function validateSchoolApplicationForm(form: SchoolApplicationFormData) {
   return errors;
 }
 
+export interface SchoolApplicationDetails {
+  clubStatus: string;
+  president: { firstName: string; lastName: string; gradYear: string; email: string; discord: string; preferredContact: string };
+  vicePresident: { firstName: string; lastName: string; gradYear: string; discord: string; email: string; preferredContact: string };
+  thirdOfficer: { firstName: string; lastName: string; gradYear: string; email: string; preferredContact: string };
+  club: {
+    instagramLink: string;
+    discordLink: string;
+    advisorName: string;
+    advisorEmail: string;
+    advisorConfirmed: string;
+    activeStudentsCount: string;
+    interestedGames: string[];
+    clubBarrier: string;
+    nonRosterOpportunities: string[];
+    inclusiveOpportunities: string[];
+    separateGamingClubs: string;
+    contributeBeyondSchool: string[];
+  };
+  feedback: string;
+  agreedRules: boolean;
+}
+
 function selectedLabels(selection: Record<string, boolean>, labels: Record<string, string>, otherText?: string): string[] {
   const result = Object.keys(labels)
     .filter((key) => selection[key])
@@ -248,5 +271,185 @@ ${form.feedback?.trim() || "N/A"}
     role: "Esports Club President",
     email: form.presidentEmail.trim(),
     message,
+    details: buildSchoolApplicationDetails(form),
+  };
+}
+
+export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): SchoolApplicationDetails {
+  const barrierLabel =
+    form.clubBarriers === 'other'
+      ? `Other: ${form.clubBarriersOther?.trim() ?? ''}`
+      : CLUB_BARRIER_LABELS[form.clubBarriers] ?? form.clubBarriers;
+
+  return {
+    clubStatus: form.clubStatus,
+    president: {
+      firstName: form.presidentFirstName.trim(),
+      lastName: form.presidentLastName.trim(),
+      gradYear: form.presidentGradYear,
+      email: form.presidentEmail.trim(),
+      discord: form.presidentDiscord.trim(),
+      preferredContact: form.presidentPreferredContact.trim(),
+    },
+    vicePresident: {
+      firstName: form.vpFirstName.trim(),
+      lastName: form.vpLastName.trim(),
+      gradYear: form.vpGradYear,
+      discord: form.vpDiscord.trim(),
+      email: form.vpEmail.trim(),
+      preferredContact: form.vpPreferredContact.trim(),
+    },
+    thirdOfficer: {
+      firstName: form.officerFirstName.trim(),
+      lastName: form.officerLastName.trim(),
+      gradYear: form.officerGradYear,
+      email: form.officerEmail.trim(),
+      preferredContact: form.officerPreferredContact.trim(),
+    },
+    club: {
+      instagramLink: form.instagramLink.trim(),
+      discordLink: form.discordLink.trim(),
+      advisorName: form.advisorName.trim(),
+      advisorEmail: form.advisorEmail.trim(),
+      advisorConfirmed: form.advisorConfirmed,
+      activeStudentsCount: form.activeStudentsCount.trim(),
+      interestedGames: selectedLabels(form.interestedGames, GAME_LABELS, form.interestedGamesOther),
+      clubBarrier: barrierLabel,
+      nonRosterOpportunities: selectedLabels(form.nonRosterOpportunities, NON_ROSTER_OPPORTUNITY_LABELS, form.nonRosterOpportunitiesOther),
+      inclusiveOpportunities: selectedLabels(form.inclusiveOpportunities, INCLUSIVE_OPPORTUNITY_LABELS, form.inclusiveOpportunitiesOther),
+      separateGamingClubs: form.separateGamingClubs.trim(),
+      contributeBeyondSchool: selectedLabels(form.contributeBeyondSchool, CONTRIBUTE_BEYOND_SCHOOL_LABELS),
+    },
+    feedback: form.feedback?.trim() ?? '',
+    agreedRules: !!form.agreedRules,
+  };
+}
+
+export function formatSchoolApplicationDetails(d: SchoolApplicationDetails): { label: string; value: string }[] {
+  return [
+    { label: 'Club Status', value: d.clubStatus },
+    { label: 'President', value: `${d.president.firstName} ${d.president.lastName} — ${d.president.email}, ${d.president.discord}, grad ${d.president.gradYear} (prefers ${d.president.preferredContact})` },
+    { label: 'Vice President', value: `${d.vicePresident.firstName} ${d.vicePresident.lastName} — ${d.vicePresident.email}, ${d.vicePresident.discord}, grad ${d.vicePresident.gradYear} (prefers ${d.vicePresident.preferredContact})` },
+    { label: '3rd Club Officer', value: `${d.thirdOfficer.firstName} ${d.thirdOfficer.lastName} — ${d.thirdOfficer.email}, grad ${d.thirdOfficer.gradYear} (prefers ${d.thirdOfficer.preferredContact})` },
+    { label: 'Instagram', value: d.club.instagramLink || '—' },
+    { label: 'Discord', value: d.club.discordLink || '—' },
+    { label: 'Faculty Advisor', value: `${d.club.advisorName} (${d.club.advisorEmail}) — ${d.club.advisorConfirmed}` },
+    { label: 'Active Club Members', value: d.club.activeStudentsCount },
+    { label: 'Interested Games', value: d.club.interestedGames.join(', ') || '—' },
+    { label: 'Biggest Barrier', value: d.club.clubBarrier },
+    { label: 'Non-Roster Opportunities', value: d.club.nonRosterOpportunities.join(', ') || '—' },
+    { label: 'Inclusive Opportunities', value: d.club.inclusiveOpportunities.join(', ') || '—' },
+    { label: 'Separate Gaming Clubs/Groups', value: d.club.separateGamingClubs },
+    { label: 'Contribute Beyond School', value: d.club.contributeBeyondSchool.join(', ') || '—' },
+    { label: 'Feedback', value: d.feedback || '—' },
+    { label: 'Rules Agreement', value: d.agreedRules ? 'Agreed' : 'Disagreed' },
+  ];
+}
+
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
+}
+
+// Matches the exact `=== SECTION ===` / `Label: value` shape compileApplicationPayload
+// has always produced. Used only by db/backfill-application-details.ts to reconstruct
+// `details` for rows submitted before that column existed — a full-string match rather
+// than a per-line scrape so a message that doesn't fit this template (an older form
+// version, hand-edited data) fails closed and is left for a human to look at, rather
+// than silently producing a partially-wrong structured record.
+const SCHOOL_MESSAGE_PATTERN = new RegExp(
+  '^=== CLUB STATUS ===\\n' +
+  '(?<clubStatus>.*)\\n\\n' +
+  '=== 1\\. PRESIDENT INFO ===\\n' +
+  'President Name: (?<presName>.*)\\n' +
+  'School Name: (?<schoolName>.*)\\n' +
+  'Graduation Year: (?<presGradYear>.*)\\n' +
+  'Email: (?<presEmail>.*)\\n' +
+  'Discord Username: (?<presDiscord>.*)\\n' +
+  'Best Contact Platform: (?<presContact>.*)\\n\\n' +
+  '=== 2\\. VICE PRESIDENT INFO ===\\n' +
+  'VP Name: (?<vpName>.*)\\n' +
+  'Graduation Year: (?<vpGradYear>.*)\\n' +
+  'Discord Username: (?<vpDiscord>.*)\\n' +
+  'Email: (?<vpEmail>.*)\\n' +
+  'Best Contact Platform: (?<vpContact>.*)\\n\\n' +
+  '=== 3\\. 3RD STUDENT CLUB OFFICER INFO ===\\n' +
+  'Officer Name: (?<offName>.*)\\n' +
+  'Graduation Year: (?<offGradYear>.*)\\n' +
+  'Email: (?<offEmail>.*)\\n' +
+  'Best Contact Platform: (?<offContact>.*)\\n\\n' +
+  '=== 4\\. CLUB INFO ===\\n' +
+  "Club's Instagram Link: (?<instagram>.*)\\n" +
+  "Club's Discord Link: (?<discordLink>.*)\\n" +
+  'Club Advisor Name: (?<advisorName>.*)\\n' +
+  'Club Advisor Email \\(@schools\\.nyc\\.gov\\): (?<advisorEmail>.*)\\n' +
+  'Faculty Advisor Confirmed: (?<advisorConfirmed>.*)\\n' +
+  'Estimated Active Club Members: (?<activeCount>.*)\\n' +
+  'Interested Games: (?<games>.*)\\n' +
+  'Biggest Barrier: (?<barrier>.*)\\n' +
+  'Non-Roster Opportunities of Interest: (?<nonRoster>.*)\\n' +
+  'Inclusive Participation Opportunities: (?<inclusive>.*)\\n' +
+  'Separate Gaming Clubs/Groups: (?<separate>.*)\\n' +
+  'Interested in Contributing Beyond School: (?<contribute>.*)\\n' +
+  'Rules Agreement: (?<rulesAgreement>.*)\\n\\n' +
+  'Feedback / Notes:\\n' +
+  '(?<feedback>[\\s\\S]*)$'
+);
+
+function splitCsvLabels(value: string): string[] {
+  return value === '' ? [] : value.split(', ');
+}
+
+/** Reconstructs `SchoolApplicationDetails` from a legacy `message` blob, or `null` if it doesn't match the known template. */
+export function parseSchoolApplicationMessage(message: string): SchoolApplicationDetails | null {
+  const match = SCHOOL_MESSAGE_PATTERN.exec(message.trim());
+  if (!match?.groups) return null;
+  const g = match.groups;
+
+  const president = splitName(g.presName);
+  const vp = splitName(g.vpName);
+  const officer = splitName(g.offName);
+
+  return {
+    clubStatus: g.clubStatus,
+    president: {
+      firstName: president.firstName,
+      lastName: president.lastName,
+      gradYear: g.presGradYear,
+      email: g.presEmail,
+      discord: g.presDiscord,
+      preferredContact: g.presContact,
+    },
+    vicePresident: {
+      firstName: vp.firstName,
+      lastName: vp.lastName,
+      gradYear: g.vpGradYear,
+      discord: g.vpDiscord,
+      email: g.vpEmail,
+      preferredContact: g.vpContact,
+    },
+    thirdOfficer: {
+      firstName: officer.firstName,
+      lastName: officer.lastName,
+      gradYear: g.offGradYear,
+      email: g.offEmail,
+      preferredContact: g.offContact,
+    },
+    club: {
+      instagramLink: g.instagram,
+      discordLink: g.discordLink,
+      advisorName: g.advisorName,
+      advisorEmail: g.advisorEmail,
+      advisorConfirmed: g.advisorConfirmed,
+      activeStudentsCount: g.activeCount,
+      interestedGames: splitCsvLabels(g.games),
+      clubBarrier: g.barrier,
+      nonRosterOpportunities: splitCsvLabels(g.nonRoster),
+      inclusiveOpportunities: splitCsvLabels(g.inclusive),
+      separateGamingClubs: g.separate,
+      contributeBeyondSchool: splitCsvLabels(g.contribute),
+    },
+    feedback: g.feedback.trim(),
+    agreedRules: g.rulesAgreement.trim() === 'Agreed',
   };
 }

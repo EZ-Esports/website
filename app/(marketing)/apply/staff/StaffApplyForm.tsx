@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Button from '@/app/components/ui/Button';
 import { Input, Textarea } from '@/app/components/ui/form';
+import { buildStaffApplicationDetails } from '@/app/lib/staff-application-form';
 
 const initialForm = {
   name: '',
@@ -134,6 +135,7 @@ ${form.message}
           discordTag: form.discordTag,
           role: compiledRole,
           message: compiledMessage,
+          details: buildStaffApplicationDetails(form),
         }),
       });
       if (!res.ok) throw new Error('Submission failed');

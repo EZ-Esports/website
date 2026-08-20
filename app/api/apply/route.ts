@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { applicantName, schoolName, role, email, message } = body;
+    const { applicantName, schoolName, role, email, message, details } = body;
 
     if (!applicantName || !schoolName || !role || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       role,
       email,
       message: message ?? '',
+      details: details && typeof details === 'object' && !Array.isArray(details) ? details : null,
     });
 
     return NextResponse.json({ success: true }, { status: 201 });

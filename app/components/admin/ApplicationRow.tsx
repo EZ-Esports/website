@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { updateApplicationStatus, softDeleteSchoolApplication } from '@/app/(admin)/admin/applications/actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import { formatSchoolApplicationDetails, type SchoolApplicationDetails } from '@/app/lib/school-application-form';
 
 type Status = 'pending' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
@@ -14,6 +15,7 @@ interface Application {
   role: string;
   email: string;
   message: string | null;
+  details: SchoolApplicationDetails | null;
   status: Status;
   submittedAt: Date;
 }
@@ -76,11 +78,24 @@ export default function ApplicationRow({ app, activeFilter = 'all' }: { app: App
           {app.email}
         </a>
       </td>
-      <td className="py-3 pr-4 text-foreground-secondary max-w-[240px] whitespace-pre-line">
-        {message ? (
+      <td className="py-3 pr-4 text-foreground-secondary max-w-[320px]">
+        {message || app.details ? (
           <>
-            {expanded ? message : (isLong ? `${message.slice(0, 80)}…` : message)}
-            {isLong && (
+            {expanded && app.details ? (
+              <dl className="space-y-1.5 whitespace-normal">
+                {formatSchoolApplicationDetails(app.details).map(({ label, value }) => (
+                  <div key={label}>
+                    <dt className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">{label}</dt>
+                    <dd className="text-foreground-secondary">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <span className="whitespace-pre-line">
+                {expanded ? message : (isLong ? `${message.slice(0, 80)}…` : message)}
+              </span>
+            )}
+            {(isLong || app.details) && (
               <button
                 onClick={() => setExpanded(v => !v)}
                 className="ml-1 text-foreground-muted hover:text-foreground-secondary transition-colors text-xs cursor-pointer"

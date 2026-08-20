@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { compileApplicationPayload, validateSchoolApplicationForm } from "@/app/lib/school-application-form";
+import {
+  compileApplicationPayload,
+  validateSchoolApplicationForm,
+  buildSchoolApplicationDetails,
+  parseSchoolApplicationMessage,
+} from "@/app/lib/school-application-form";
 
 describe("School Application Form Validation & Consolidation", () => {
   const validForm = {
@@ -132,5 +137,30 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(payload.message).toContain("=== 4. CLUB INFO ===");
     expect(payload.message).toContain("Valorant, Clash Royale");
     expect(payload.message).toContain("Rules Agreement: Agreed");
+  });
+
+  it("builds structured details alongside the compiled message", () => {
+    const payload = compileApplicationPayload(validForm);
+    expect(payload.details).toEqual(buildSchoolApplicationDetails(validForm));
+    expect(payload.details.president).toEqual({
+      firstName: "Jane",
+      lastName: "Doe",
+      gradYear: "'27",
+      email: "jane@example.com",
+      discord: "janedoe",
+      preferredContact: "Discord",
+    });
+    expect(payload.details.club.interestedGames).toEqual(["Valorant", "Clash Royale"]);
+    expect(payload.details.agreedRules).toBe(true);
+  });
+
+  it("parses a compiled message back into the same structured details", () => {
+    const payload = compileApplicationPayload(validForm);
+    expect(parseSchoolApplicationMessage(payload.message)).toEqual(payload.details);
+  });
+
+  it("returns null when a message doesn't match the known template", () => {
+    expect(parseSchoolApplicationMessage("some unrelated legacy free text")).toBeNull();
+    expect(parseSchoolApplicationMessage("")).toBeNull();
   });
 });

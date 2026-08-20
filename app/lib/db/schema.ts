@@ -1,5 +1,7 @@
-import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real, check } from 'drizzle-orm/pg-core';
+import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real, check, jsonb } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { SchoolApplicationDetails } from '@/app/lib/school-application-form';
+import type { StaffApplicationDetails } from '@/app/lib/staff-application-form';
 
 // Shared audit columns
 const auditColumns = {
@@ -428,6 +430,7 @@ export const schoolApplications = pgTable('school_applications', {
   role: text('role').notNull(),
   email: text('email').notNull(),
   message: text('message').default(''),
+  details: jsonb('details').$type<SchoolApplicationDetails | null>(),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),
@@ -445,6 +448,7 @@ export const staffApplications = pgTable('staff_applications', {
   discordTag: text('discord_tag'),
   role: text('role').notNull(),
   message: text('message').default(''),
+  details: jsonb('details').$type<StaffApplicationDetails | null>(),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),
