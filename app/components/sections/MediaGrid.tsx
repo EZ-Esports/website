@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import useEmblaCarousel from 'embla-carousel-react';
+import AutoScroll from 'embla-carousel-auto-scroll';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import Section from '@/app/components/ui/Section';
@@ -21,48 +23,71 @@ interface IndexedImage extends ImageType {
   originalIndex: number;
 }
 
-function prepareTrackItems(row: IndexedImage[], minCount = 8): IndexedImage[] {
-  if (row.length === 0) return [];
-  const repetitions = Math.ceil(minCount / row.length);
-  return Array.from({ length: repetitions }, () => row).flat();
-}
-
-function MarqueeCard({
-  item,
-  onSelect,
+function MarqueeRow({
+  items,
+  direction = 'forward',
+  speed = 1,
+  onSelectPhoto,
 }: {
-  item: IndexedImage;
-  onSelect: (index: number) => void;
+  items: IndexedImage[];
+  direction?: 'forward' | 'backward';
+  speed?: number;
+  onSelectPhoto: (index: number) => void;
 }) {
-  return (
-    <div className="w-64 sm:w-80 md:w-96 shrink-0 select-none">
-      <div className="aspect-[16/10] rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-all duration-300 bg-surface-raised/40 shadow-md hover:shadow-xl">
-        <button
-          type="button"
-          onClick={() => onSelect(item.originalIndex)}
-          aria-label={`View photo: ${item.alt}`}
-          className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <Image
-            src={item.src}
-            alt={item.alt}
-            fill
-            unoptimized
-            loading="lazy"
-            sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, 384px"
-            className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
-          />
+  const [emblaRef] = useEmblaCarousel(
+    {
+      loop: true,
+      dragFree: true,
+    },
+    [
+      AutoScroll({
+        direction,
+        speed,
+        stopOnInteraction: false,
+        stopOnMouseEnter: true,
+        stopOnFocusIn: true,
+      }),
+    ]
+  );
 
-          <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/30 transition-colors flex items-center justify-center">
-            <Badge
-              variant="accent"
-              size="sm"
-              className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
-            >
-              View Photo
-            </Badge>
+  return (
+    <div className="overflow-hidden select-none touch-pan-y" ref={emblaRef}>
+      <div className="flex -ml-4 sm:-ml-6">
+        {items.map((item, index) => (
+          <div
+            key={`${item.id || index}-${index}`}
+            className="min-w-0 shrink-0 grow-0 pl-4 sm:pl-6 basis-[70%] sm:basis-[45%] md:basis-[32%] lg:basis-[26%]"
+          >
+            <div className="aspect-[16/10] rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-all duration-300 bg-surface-raised/40 shadow-md hover:shadow-xl">
+              <button
+                type="button"
+                onClick={() => onSelectPhoto(item.originalIndex)}
+                aria-label={`View photo: ${item.alt}`}
+                className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  fill
+                  unoptimized
+                  loading="lazy"
+                  sizes="(max-width: 640px) 70vw, (max-width: 1024px) 45vw, 26vw"
+                  className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
+                />
+
+                <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/30 transition-colors flex items-center justify-center">
+                  <Badge
+                    variant="accent"
+                    size="sm"
+                    className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
+                  >
+                    View Photo
+                  </Badge>
+                </div>
+              </button>
+            </div>
           </div>
-        </button>
+        ))}
       </div>
     </div>
   );
@@ -78,11 +103,18 @@ export default function MediaGrid({ items, eyebrow, heading }: MediaGridProps) {
     originalIndex,
   }));
 
+  // Ensure each row has enough items for seamless infinite looping in Embla
+  function padRow(list: IndexedImage[], minLength = 8): IndexedImage[] {
+    if (list.length === 0) return [];
+    const reps = Math.ceil(minLength / list.length);
+    return Array.from({ length: reps }, () => list).flat();
+  }
+
   const row1Raw = indexedItems.filter((_, i) => i % 2 === 0);
   const row2Raw = indexedItems.filter((_, i) => i % 2 !== 0);
 
-  const row1 = prepareTrackItems(row1Raw.length > 0 ? row1Raw : indexedItems);
-  const row2 = prepareTrackItems(row2Raw.length > 0 ? row2Raw : indexedItems);
+  const row1 = padRow(row1Raw.length > 0 ? row1Raw : indexedItems);
+  const row2 = padRow(row2Raw.length > 0 ? row2Raw : indexedItems);
 
   // Lightbox controls
   const closeLightbox = () => setSelectedImageIndex(null);
@@ -105,8 +137,8 @@ export default function MediaGrid({ items, eyebrow, heading }: MediaGridProps) {
     <Section tone="default" className="border-t border-line/30 overflow-hidden">
       {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
 
-      {/* Dual Infinite Marquee Container */}
-      <div className="relative group/marquee pause-on-hover py-2">
+      {/* Dual Continuous Marquee with Gradient Fade Masks */}
+      <div className="relative py-2">
         {/* Left Gradient Fade Mask */}
         <div
           className="pointer-events-none absolute inset-y-0 left-0 w-12 sm:w-28 md:w-36 bg-gradient-to-r from-surface to-transparent z-10"
@@ -120,33 +152,8 @@ export default function MediaGrid({ items, eyebrow, heading }: MediaGridProps) {
         />
 
         <div className="space-y-4 sm:space-y-6">
-          {/* Top Row: Scrolls Left */}
-          <div className="overflow-hidden flex">
-            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-left">
-              {row1.map((item, idx) => (
-                <MarqueeCard key={`row1-a-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
-              ))}
-            </div>
-            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-left" aria-hidden="true">
-              {row1.map((item, idx) => (
-                <MarqueeCard key={`row1-b-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
-              ))}
-            </div>
-          </div>
-
-          {/* Bottom Row: Scrolls Right */}
-          <div className="overflow-hidden flex">
-            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-right">
-              {row2.map((item, idx) => (
-                <MarqueeCard key={`row2-a-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
-              ))}
-            </div>
-            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-right" aria-hidden="true">
-              {row2.map((item, idx) => (
-                <MarqueeCard key={`row2-b-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
-              ))}
-            </div>
-          </div>
+          <MarqueeRow items={row1} direction="forward" speed={0.9} onSelectPhoto={setSelectedImageIndex} />
+          <MarqueeRow items={row2} direction="backward" speed={0.8} onSelectPhoto={setSelectedImageIndex} />
         </div>
       </div>
 
