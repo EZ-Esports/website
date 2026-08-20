@@ -41,6 +41,10 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   }, [columns]);
 
   const maxIndex = Math.max(0, items.length - visibleCount);
+  // Actual px gap of the card row at the current visibleCount, derived (not
+  // independent state) so it can never drift from the Tailwind gap it mirrors
+  // (gap-4 below 640px / 1-up, gap-6 at and above / 2-up and 3-up).
+  const gapPx = visibleCount === 1 ? 16 : 24;
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : maxIndex));
@@ -145,12 +149,13 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
               onDragEnd={handleDragEnd}
               animate={{ x: `-${currentIndex * (100 / visibleCount)}%` }}
               transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-              className="flex cursor-grab active:cursor-grabbing gap-4 sm:gap-6"
+              className="flex cursor-grab active:cursor-grabbing"
+              style={{ gap: gapPx }}
             >
               {items.map((item, index) => (
                 <motion.div
                   key={item.id || index}
-                  style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(16 * (visibleCount - 1)) / visibleCount}px)` }}
+                  style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(gapPx * (visibleCount - 1)) / visibleCount}px)` }}
                   whileHover={{ scale: 1.015 }}
                   transition={{ duration: 0.2 }}
                   className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40 select-none"
