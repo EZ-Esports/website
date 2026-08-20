@@ -394,7 +394,7 @@ export default function ApplyForm() {
             Registration Portal
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-foreground to-accent bg-clip-text text-transparent uppercase">
-            School Application
+            Submit Interest
           </h1>
 
           {/* Metadata badges */}
