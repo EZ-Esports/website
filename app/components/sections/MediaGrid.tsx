@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
+import useEmblaCarousel from 'embla-carousel-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
@@ -19,9 +20,35 @@ interface MediaGridProps {
 
 export default function MediaGrid({ items, columns = 3, eyebrow, heading }: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
   const [visibleCount, setVisibleCount] = useState(3);
   const carouselRef = useRef<HTMLDivElement>(null);
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    slidesToScroll: 1,
+    dragFree: false,
+  });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    const syncState = () => {
+      setScrollSnaps(emblaApi.scrollSnapList());
+      setSelectedIndex(emblaApi.selectedScrollSnap());
+    };
+
+    syncState();
+    emblaApi.on('select', syncState);
+    emblaApi.on('reInit', syncState);
+
+    return () => {
+      emblaApi.off('select', syncState);
+      emblaApi.off('reInit', syncState);
+    };
+  }, [emblaApi]);
 
   // Dynamically determine how many cards to show per slide based on screen width
   useEffect(() => {
@@ -40,50 +67,49 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
     return () => window.removeEventListener('resize', updateVisibleCount);
   }, [columns]);
 
-  const maxIndex = Math.max(0, items.length - visibleCount);
-  // Actual px gap of the card row at the current visibleCount, derived (not
-  // independent state) so it can never drift from the Tailwind gap it mirrors
-  // (gap-4 below 640px / 1-up, gap-6 at and above / 2-up and 3-up).
-  const gapPx = visibleCount === 1 ? 16 : 24;
-
-  const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : maxIndex));
-  }, [maxIndex]);
+  const scrollPrev = useCallback(() => {
+    if (!emblaApi) return;
+    if (emblaApi.canScrollPrev()) {
+      emblaApi.scrollPrev();
+    } else {
+      emblaApi.scrollTo(emblaApi.scrollSnapList().length - 1);
+    }
+  }, [emblaApi]);
 
   const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev < maxIndex ? prev + 1 : 0));
-  }, [maxIndex]);
+    if (!emblaApi) return;
+    if (emblaApi.canScrollNext()) {
+      emblaApi.scrollNext();
+    } else {
+      emblaApi.scrollTo(0);
+    }
+  }, [emblaApi]);
+
+  const scrollTo = useCallback(
+    (index: number) => {
+      if (emblaApi) emblaApi.scrollTo(index);
+    },
+    [emblaApi]
+  );
 
   // Preload upcoming images into browser memory so next slides render instantly
   useEffect(() => {
     if (typeof window === 'undefined' || !items || items.length === 0) return;
     const preloadAhead = 3;
     for (let i = 1; i <= preloadAhead; i++) {
-      const nextIndex = (currentIndex + visibleCount - 1 + i) % items.length;
+      const nextIndex = (selectedIndex + visibleCount - 1 + i) % items.length;
       if (items[nextIndex]?.src) {
         const img = new window.Image();
         img.src = items[nextIndex].src;
       }
     }
-  }, [currentIndex, visibleCount, items]);
-
-  // Framer motion drag handler
-  const handleDragEnd = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const swipeThreshold = 40;
-    const velocityThreshold = 200;
-
-    if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
-      nextSlide();
-    } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
-      prevSlide();
-    }
-  };
+  }, [selectedIndex, visibleCount, items]);
 
   // Keyboard navigation for main carousel when focused
   const handleCarouselKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      prevSlide();
+      scrollPrev();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       nextSlide();
@@ -130,7 +156,7 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
           {items.length > visibleCount && (
             <button
               type="button"
-              onClick={prevSlide}
+              onClick={scrollPrev}
               aria-label="Previous photos"
               className="shrink-0 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
             >
@@ -140,55 +166,45 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
             </button>
           )}
 
-          {/* Slide Viewport */}
-          <div className="overflow-hidden rounded-2xl p-1 flex-1 touch-pan-y">
-            <motion.div
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.1}
-              onDragEnd={handleDragEnd}
-              animate={{ x: `-${currentIndex * (100 / visibleCount)}%` }}
-              transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-              className="flex cursor-grab active:cursor-grabbing"
-              style={{ gap: gapPx }}
-            >
+          {/* Slide Viewport (Embla Carousel) */}
+          <div className="overflow-hidden rounded-2xl p-1 flex-1 touch-pan-y" ref={emblaRef}>
+            <div className="flex -ml-4 sm:-ml-6">
               {items.map((item, index) => (
-                <motion.div
+                <div
                   key={item.id || index}
-                  style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(gapPx * (visibleCount - 1)) / visibleCount}px)` }}
-                  whileHover={{ scale: 1.015 }}
-                  transition={{ duration: 0.2 }}
-                  className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40 select-none"
+                  className="min-w-0 shrink-0 grow-0 pl-4 sm:pl-6 basis-full sm:basis-1/2 lg:basis-1/3 select-none"
                 >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedImageIndex(index)}
-                    aria-label={`View photo: ${item.alt}`}
-                    className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <Image
-                      src={item.src}
-                      alt={item.alt}
-                      fill
-                      unoptimized
-                      loading="lazy"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
-                    />
+                  <div className="aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImageIndex(index)}
+                      aria-label={`View photo: ${item.alt}`}
+                      className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      <Image
+                        src={item.src}
+                        alt={item.alt}
+                        fill
+                        unoptimized
+                        loading="lazy"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
+                      />
 
-                    <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/25 transition-colors flex items-center justify-center">
-                      <Badge
-                        variant="accent"
-                        size="sm"
-                        className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
-                      >
-                        View Photo
-                      </Badge>
-                    </div>
-                  </button>
-                </motion.div>
+                      <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/25 transition-colors flex items-center justify-center">
+                        <Badge
+                          variant="accent"
+                          size="sm"
+                          className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
+                        >
+                          View Photo
+                        </Badge>
+                      </div>
+                    </button>
+                  </div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           </div>
 
           {/* Navigation Arrow Right */}
@@ -209,24 +225,24 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
         {/* Carousel Pagination Controls & Position Counter */}
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
           <p className="text-xs font-medium text-foreground-secondary">
-            Photo <span className="font-bold text-foreground">{currentIndex + 1}</span>–
-            <span className="font-bold text-foreground">{Math.min(currentIndex + visibleCount, items.length)}</span> of{' '}
+            Photo <span className="font-bold text-foreground">{selectedIndex + 1}</span>–
+            <span className="font-bold text-foreground">{Math.min(selectedIndex + visibleCount, items.length)}</span> of{' '}
             <span className="font-bold text-foreground">{items.length}</span>
           </p>
 
           {/* Dots Indicator */}
-          {items.length > visibleCount && (
+          {scrollSnaps.length > 1 && (
             <div className="flex items-center gap-1.5" role="tablist" aria-label="Gallery slides">
-              {Array.from({ length: maxIndex + 1 }).map((_, dotIndex) => (
+              {scrollSnaps.map((_, dotIndex) => (
                 <button
                   key={dotIndex}
                   type="button"
-                  onClick={() => setCurrentIndex(dotIndex)}
+                  onClick={() => scrollTo(dotIndex)}
                   role="tab"
-                  aria-selected={currentIndex === dotIndex}
+                  aria-selected={selectedIndex === dotIndex}
                   aria-label={`Go to slide group ${dotIndex + 1}`}
                   className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                    currentIndex === dotIndex
+                    selectedIndex === dotIndex
                       ? 'w-6 bg-accent'
                       : 'w-2 bg-line hover:bg-foreground-secondary'
                   }`}
