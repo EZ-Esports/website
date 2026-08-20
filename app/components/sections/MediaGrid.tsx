@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
-import useEmblaCarousel from 'embla-carousel-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import Section from '@/app/components/ui/Section';
@@ -18,108 +17,75 @@ interface MediaGridProps {
   heading?: string;
 }
 
-export default function MediaGrid({ items, columns = 3, eyebrow, heading }: MediaGridProps) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
-  const [visibleCount, setVisibleCount] = useState(3);
-  const carouselRef = useRef<HTMLDivElement>(null);
+interface IndexedImage extends ImageType {
+  originalIndex: number;
+}
 
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    align: 'start',
-    containScroll: 'trimSnaps',
-    slidesToScroll: 1,
-    dragFree: false,
-  });
+function prepareTrackItems(row: IndexedImage[], minCount = 8): IndexedImage[] {
+  if (row.length === 0) return [];
+  const repetitions = Math.ceil(minCount / row.length);
+  return Array.from({ length: repetitions }, () => row).flat();
+}
 
-  useEffect(() => {
-    if (!emblaApi) return;
+function MarqueeCard({
+  item,
+  onSelect,
+}: {
+  item: IndexedImage;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <div className="w-64 sm:w-80 md:w-96 shrink-0 select-none">
+      <div className="aspect-[16/10] rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-all duration-300 bg-surface-raised/40 shadow-md hover:shadow-xl">
+        <button
+          type="button"
+          onClick={() => onSelect(item.originalIndex)}
+          aria-label={`View photo: ${item.alt}`}
+          className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Image
+            src={item.src}
+            alt={item.alt}
+            fill
+            unoptimized
+            loading="lazy"
+            sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, 384px"
+            className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
+          />
 
-    const syncState = () => {
-      setScrollSnaps(emblaApi.scrollSnapList());
-      setSelectedIndex(emblaApi.selectedScrollSnap());
-    };
-
-    syncState();
-    emblaApi.on('select', syncState);
-    emblaApi.on('reInit', syncState);
-
-    return () => {
-      emblaApi.off('select', syncState);
-      emblaApi.off('reInit', syncState);
-    };
-  }, [emblaApi]);
-
-  // Dynamically determine how many cards to show per slide based on screen width
-  useEffect(() => {
-    const updateVisibleCount = () => {
-      const w = window.innerWidth;
-      if (w < 640) {
-        setVisibleCount(1);
-      } else if (w < 1024) {
-        setVisibleCount(2);
-      } else {
-        setVisibleCount(Math.min(columns, 3));
-      }
-    };
-    updateVisibleCount();
-    window.addEventListener('resize', updateVisibleCount);
-    return () => window.removeEventListener('resize', updateVisibleCount);
-  }, [columns]);
-
-  const scrollPrev = useCallback(() => {
-    if (!emblaApi) return;
-    if (emblaApi.canScrollPrev()) {
-      emblaApi.scrollPrev();
-    } else {
-      emblaApi.scrollTo(emblaApi.scrollSnapList().length - 1);
-    }
-  }, [emblaApi]);
-
-  const nextSlide = useCallback(() => {
-    if (!emblaApi) return;
-    if (emblaApi.canScrollNext()) {
-      emblaApi.scrollNext();
-    } else {
-      emblaApi.scrollTo(0);
-    }
-  }, [emblaApi]);
-
-  const scrollTo = useCallback(
-    (index: number) => {
-      if (emblaApi) emblaApi.scrollTo(index);
-    },
-    [emblaApi]
+          <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/30 transition-colors flex items-center justify-center">
+            <Badge
+              variant="accent"
+              size="sm"
+              className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
+            >
+              View Photo
+            </Badge>
+          </div>
+        </button>
+      </div>
+    </div>
   );
+}
 
-  // Preload upcoming images into browser memory so next slides render instantly
-  useEffect(() => {
-    if (typeof window === 'undefined' || !items || items.length === 0) return;
-    const preloadAhead = 3;
-    for (let i = 1; i <= preloadAhead; i++) {
-      const nextIndex = (selectedIndex + visibleCount - 1 + i) % items.length;
-      if (items[nextIndex]?.src) {
-        const img = new window.Image();
-        img.src = items[nextIndex].src;
-      }
-    }
-  }, [selectedIndex, visibleCount, items]);
+export default function MediaGrid({ items, eyebrow, heading }: MediaGridProps) {
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
-  // Keyboard navigation for main carousel when focused
-  const handleCarouselKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      scrollPrev();
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      nextSlide();
-    }
-  };
+  if (!items || items.length === 0) return null;
 
-  // Lightbox keyboard controls
-  const closeLightbox = () => {
-    setSelectedImageIndex(null);
-  };
+  const indexedItems: IndexedImage[] = items.map((item, originalIndex) => ({
+    ...item,
+    originalIndex,
+  }));
+
+  const row1Raw = indexedItems.filter((_, i) => i % 2 === 0);
+  const row2Raw = indexedItems.filter((_, i) => i % 2 !== 0);
+
+  const row1 = prepareTrackItems(row1Raw.length > 0 ? row1Raw : indexedItems);
+  const row2 = prepareTrackItems(row2Raw.length > 0 ? row2Raw : indexedItems);
+
+  // Lightbox controls
+  const closeLightbox = () => setSelectedImageIndex(null);
 
   const navigateLightbox = (direction: 'next' | 'prev', e: React.MouseEvent) => {
     e.stopPropagation();
@@ -135,121 +101,52 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
     if (e.key === 'ArrowLeft') setSelectedImageIndex((i) => (i === null ? null : (i - 1 + items.length) % items.length));
   };
 
-  if (!items || items.length === 0) return null;
-
   return (
-    <Section tone="default" className="border-t border-line/30">
+    <Section tone="default" className="border-t border-line/30 overflow-hidden">
       {heading && <SectionHeader eyebrow={eyebrow} title={heading} />}
 
-      {/* Carousel Wrapper */}
-      <div
-        ref={carouselRef}
-        className="relative group outline-none"
-        tabIndex={0}
-        onKeyDown={handleCarouselKeyDown}
-        aria-roledescription="carousel"
-        aria-label={heading || 'Photo Gallery'}
-      >
-        {/* Main Flex Row: Left Arrow + Viewport + Right Arrow */}
-        <div className="flex items-center gap-2 sm:gap-4 w-full">
-          {/* Navigation Arrow Left */}
-          {items.length > visibleCount && (
-            <button
-              type="button"
-              onClick={scrollPrev}
-              aria-label="Previous photos"
-              className="shrink-0 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          )}
+      {/* Dual Infinite Marquee Container */}
+      <div className="relative group/marquee pause-on-hover py-2">
+        {/* Left Gradient Fade Mask */}
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-12 sm:w-28 md:w-36 bg-gradient-to-r from-surface to-transparent z-10"
+          aria-hidden="true"
+        />
 
-          {/* Slide Viewport (Embla Carousel) */}
-          <div className="overflow-hidden rounded-2xl p-1 flex-1 touch-pan-y" ref={emblaRef}>
-            <div className="flex -ml-4 sm:-ml-6">
-              {items.map((item, index) => (
-                <div
-                  key={item.id || index}
-                  className="min-w-0 shrink-0 grow-0 pl-4 sm:pl-6 basis-full sm:basis-1/2 lg:basis-1/3 select-none"
-                >
-                  <div className="aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedImageIndex(index)}
-                      aria-label={`View photo: ${item.alt}`}
-                      className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                      <Image
-                        src={item.src}
-                        alt={item.alt}
-                        fill
-                        unoptimized
-                        loading="lazy"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
-                      />
+        {/* Right Gradient Fade Mask */}
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-12 sm:w-28 md:w-36 bg-gradient-to-l from-surface to-transparent z-10"
+          aria-hidden="true"
+        />
 
-                      <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/25 transition-colors flex items-center justify-center">
-                        <Badge
-                          variant="accent"
-                          size="sm"
-                          className="opacity-0 group-hover/card:opacity-100 transition-all duration-200 shadow-md"
-                        >
-                          View Photo
-                        </Badge>
-                      </div>
-                    </button>
-                  </div>
-                </div>
+        <div className="space-y-4 sm:space-y-6">
+          {/* Top Row: Scrolls Left */}
+          <div className="overflow-hidden flex">
+            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-left">
+              {row1.map((item, idx) => (
+                <MarqueeCard key={`row1-a-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
+              ))}
+            </div>
+            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-left" aria-hidden="true">
+              {row1.map((item, idx) => (
+                <MarqueeCard key={`row1-b-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
               ))}
             </div>
           </div>
 
-          {/* Navigation Arrow Right */}
-          {items.length > visibleCount && (
-            <button
-              type="button"
-              onClick={nextSlide}
-              aria-label="Next photos"
-              className="shrink-0 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-surface/90 border border-line text-foreground hover:text-accent hover:border-accent flex items-center justify-center shadow-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Carousel Pagination Controls & Position Counter */}
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
-          <p className="text-xs font-medium text-foreground-secondary">
-            Photo <span className="font-bold text-foreground">{selectedIndex + 1}</span>–
-            <span className="font-bold text-foreground">{Math.min(selectedIndex + visibleCount, items.length)}</span> of{' '}
-            <span className="font-bold text-foreground">{items.length}</span>
-          </p>
-
-          {/* Dots Indicator */}
-          {scrollSnaps.length > 1 && (
-            <div className="flex items-center gap-1.5" role="tablist" aria-label="Gallery slides">
-              {scrollSnaps.map((_, dotIndex) => (
-                <button
-                  key={dotIndex}
-                  type="button"
-                  onClick={() => scrollTo(dotIndex)}
-                  role="tab"
-                  aria-selected={selectedIndex === dotIndex}
-                  aria-label={`Go to slide group ${dotIndex + 1}`}
-                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                    selectedIndex === dotIndex
-                      ? 'w-6 bg-accent'
-                      : 'w-2 bg-line hover:bg-foreground-secondary'
-                  }`}
-                />
+          {/* Bottom Row: Scrolls Right */}
+          <div className="overflow-hidden flex">
+            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-right">
+              {row2.map((item, idx) => (
+                <MarqueeCard key={`row2-a-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
               ))}
             </div>
-          )}
+            <div className="flex shrink-0 gap-4 sm:gap-6 pr-4 sm:pr-6 animate-marquee-right" aria-hidden="true">
+              {row2.map((item, idx) => (
+                <MarqueeCard key={`row2-b-${item.id || idx}-${idx}`} item={item} onSelect={setSelectedImageIndex} />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
