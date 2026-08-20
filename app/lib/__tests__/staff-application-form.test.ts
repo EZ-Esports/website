@@ -37,6 +37,7 @@ describe("Staff Application Details", () => {
   it("builds structured details from the form", () => {
     const details = buildStaffApplicationDetails(validForm);
     expect(details).toEqual({
+      version: 1,
       preferredFirstName: "Janie",
       discordTag: "janesmith",
       linkedin: "https://linkedin.com/in/janesmith",
@@ -60,6 +61,7 @@ describe("Staff Application Details", () => {
     const sparseForm = { ...validForm, preferredFirstName: "", discordTag: "", linkedin: "" };
     const message = compileMessage(sparseForm);
     expect(parseStaffApplicationMessage(message)).toEqual({
+      version: 1,
       preferredFirstName: "",
       discordTag: "",
       linkedin: "",
@@ -71,5 +73,12 @@ describe("Staff Application Details", () => {
   it("returns null when a message doesn't match the known template", () => {
     expect(parseStaffApplicationMessage("some unrelated legacy free text")).toBeNull();
     expect(parseStaffApplicationMessage("")).toBeNull();
+  });
+
+  it("degrades to a message instead of rendering garbage for an unrecognized version", () => {
+    const unknown = { version: 99 } as unknown as ReturnType<typeof buildStaffApplicationDetails>;
+    expect(formatStaffApplicationDetails(unknown)).toEqual([
+      { label: "Details", value: "Could not display — unexpected data shape." },
+    ]);
   });
 });

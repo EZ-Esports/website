@@ -183,4 +183,59 @@ describe("School Application Form Validation & Consolidation", () => {
     const rows = formatSchoolApplicationDetails(corrupted);
     expect(rows.find((r) => r.label === "Interested Games")?.value).toBe("Valorant");
   });
+
+  describe("v1 (legacy team-registration) shape", () => {
+    // The exact message a real pre-redesign row had in production — the parser
+    // must keep understanding this forever, not just whatever the current form emits.
+    const v1Message =
+      "Preferred first name: Kyle\n" +
+      "Phone number: 9295597584\n" +
+      "Discord tag: keeyul_\n" +
+      "School code: 22K535\n" +
+      "School location: Brooklyn\n" +
+      "How did you learn about us: Friend/teacher/parent\n" +
+      "LinkedIn profile: N/A\n\n" +
+      "Captains / Coaches:\n" +
+      "[Valorant] Ethan Chu, ethanc306@nycstudents.net, 917-740-7047\n\n" +
+      "Anything to know about team:\n" +
+      "no\n\n" +
+      "Need help finding players: No\n" +
+      "Preferred communication platform: discord\n" +
+      "Interested Divisions: valorant\n" +
+      "Rules Agreement: Agreed\n\n" +
+      "Additional Notes:\n" +
+      "no";
+
+    it("parses a v1 message into a version-1 details object", () => {
+      const details = parseSchoolApplicationMessage(v1Message);
+      expect(details).toEqual({
+        version: 1,
+        preferredFirstName: "Kyle",
+        phone: "9295597584",
+        discordTag: "keeyul_",
+        schoolCode: "22K535",
+        schoolLocation: "Brooklyn",
+        howHeard: "Friend/teacher/parent",
+        linkedin: "",
+        captainsCoaches: "[Valorant] Ethan Chu, ethanc306@nycstudents.net, 917-740-7047",
+        teamNotes: "no",
+        needHelpFindingPlayers: "No",
+        preferredCommunicationPlatform: "discord",
+        interestedDivisions: "valorant",
+        agreedRules: true,
+        additionalNotes: "no",
+      });
+    });
+
+    it("formats a v1 details object without throwing", () => {
+      const details = parseSchoolApplicationMessage(v1Message)!;
+      const rows = formatSchoolApplicationDetails(details);
+      expect(rows.find((r) => r.label === "School Code")?.value).toBe("22K535");
+      expect(rows.find((r) => r.label === "Rules Agreement")?.value).toBe("Agreed");
+    });
+
+    it("does not mistake a v1 message for a v2 one", () => {
+      expect(parseSchoolApplicationMessage(v1Message)?.version).toBe(1);
+    });
+  });
 });
