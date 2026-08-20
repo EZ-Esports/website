@@ -21,6 +21,10 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(3);
+  // Actual px gap of the card row at the current breakpoint, kept in sync with
+  // visibleCount so the flex-basis calc below always matches the real gap
+  // (Tailwind gap-4 below 640px, gap-6 at and above it) instead of assuming one.
+  const [gapPx, setGapPx] = useState(24);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   // Dynamically determine how many cards to show per slide based on screen width
@@ -29,10 +33,13 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
       const w = window.innerWidth;
       if (w < 640) {
         setVisibleCount(1);
+        setGapPx(16);
       } else if (w < 1024) {
         setVisibleCount(2);
+        setGapPx(24);
       } else {
         setVisibleCount(Math.min(columns, 3));
+        setGapPx(24);
       }
     };
     updateVisibleCount();
@@ -145,12 +152,13 @@ export default function MediaGrid({ items, columns = 3, eyebrow, heading }: Medi
               onDragEnd={handleDragEnd}
               animate={{ x: `-${currentIndex * (100 / visibleCount)}%` }}
               transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-              className="flex cursor-grab active:cursor-grabbing gap-4 sm:gap-6"
+              className="flex cursor-grab active:cursor-grabbing"
+              style={{ gap: gapPx }}
             >
               {items.map((item, index) => (
                 <motion.div
                   key={item.id || index}
-                  style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(16 * (visibleCount - 1)) / visibleCount}px)` }}
+                  style={{ flex: `0 0 calc(${100 / visibleCount}% - ${(gapPx * (visibleCount - 1)) / visibleCount}px)` }}
                   whileHover={{ scale: 1.015 }}
                   transition={{ duration: 0.2 }}
                   className="shrink-0 aspect-square rounded-2xl overflow-hidden relative border border-line/80 hover:border-accent/50 group/card transition-colors bg-surface-raised/40 select-none"
