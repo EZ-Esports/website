@@ -4,6 +4,8 @@ import {
   validateSchoolApplicationForm,
   buildSchoolApplicationDetails,
   parseSchoolApplicationMessage,
+  formatSchoolApplicationDetails,
+  type SchoolApplicationDetails,
 } from "@/app/lib/school-application-form";
 
 describe("School Application Form Validation & Consolidation", () => {
@@ -162,5 +164,23 @@ describe("School Application Form Validation & Consolidation", () => {
   it("returns null when a message doesn't match the known template", () => {
     expect(parseSchoolApplicationMessage("some unrelated legacy free text")).toBeNull();
     expect(parseSchoolApplicationMessage("")).toBeNull();
+  });
+
+  it("degrades to a message instead of throwing when details is a malformed shape", () => {
+    // API-route input validation only checks `typeof === 'object' && !Array.isArray` —
+    // an empty object or one missing nested fields passes that check but isn't a real
+    // SchoolApplicationDetails, so the formatter must not assume the shape is intact.
+    const malformed = {} as SchoolApplicationDetails;
+    expect(() => formatSchoolApplicationDetails(malformed)).not.toThrow();
+    expect(formatSchoolApplicationDetails(malformed)).toEqual([
+      { label: "Details", value: "Could not display — unexpected data shape." },
+    ]);
+  });
+
+  it("falls back to '—' for club fields that aren't arrays", () => {
+    const details = buildSchoolApplicationDetails(validForm);
+    const corrupted = { ...details, club: { ...details.club, interestedGames: "Valorant" as unknown as string[] } };
+    const rows = formatSchoolApplicationDetails(corrupted);
+    expect(rows.find((r) => r.label === "Interested Games")?.value).toBe("Valorant");
   });
 });

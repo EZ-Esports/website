@@ -325,7 +325,14 @@ export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): 
   };
 }
 
+/** `details` comes straight off a public, unauthenticated POST body — guard against a shape that passed the API's `object && !Array.isArray` check but doesn't actually match `SchoolApplicationDetails`, so a malformed row degrades to a message instead of throwing when a staff member expands it. */
 export function formatSchoolApplicationDetails(d: SchoolApplicationDetails): { label: string; value: string }[] {
+  if (!d.president || !d.vicePresident || !d.thirdOfficer || !d.club || typeof d.agreedRules !== 'boolean') {
+    return [{ label: 'Details', value: 'Could not display — unexpected data shape.' }];
+  }
+
+  const list = (value: unknown) => (Array.isArray(value) ? value.join(', ') : String(value ?? '')) || '—';
+
   return [
     { label: 'Club Status', value: d.clubStatus },
     { label: 'President', value: `${d.president.firstName} ${d.president.lastName} — ${d.president.email}, ${d.president.discord}, grad ${d.president.gradYear} (prefers ${d.president.preferredContact})` },
@@ -335,12 +342,12 @@ export function formatSchoolApplicationDetails(d: SchoolApplicationDetails): { l
     { label: 'Discord', value: d.club.discordLink || '—' },
     { label: 'Faculty Advisor', value: `${d.club.advisorName} (${d.club.advisorEmail}) — ${d.club.advisorConfirmed}` },
     { label: 'Active Club Members', value: d.club.activeStudentsCount },
-    { label: 'Interested Games', value: d.club.interestedGames.join(', ') || '—' },
+    { label: 'Interested Games', value: list(d.club.interestedGames) },
     { label: 'Biggest Barrier', value: d.club.clubBarrier },
-    { label: 'Non-Roster Opportunities', value: d.club.nonRosterOpportunities.join(', ') || '—' },
-    { label: 'Inclusive Opportunities', value: d.club.inclusiveOpportunities.join(', ') || '—' },
+    { label: 'Non-Roster Opportunities', value: list(d.club.nonRosterOpportunities) },
+    { label: 'Inclusive Opportunities', value: list(d.club.inclusiveOpportunities) },
     { label: 'Separate Gaming Clubs/Groups', value: d.club.separateGamingClubs },
-    { label: 'Contribute Beyond School', value: d.club.contributeBeyondSchool.join(', ') || '—' },
+    { label: 'Contribute Beyond School', value: list(d.club.contributeBeyondSchool) },
     { label: 'Feedback', value: d.feedback || '—' },
     { label: 'Rules Agreement', value: d.agreedRules ? 'Agreed' : 'Disagreed' },
   ];
