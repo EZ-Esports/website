@@ -26,6 +26,22 @@ describe("csv helpers", () => {
     expect(escapeCsvField("Grade 9-12 (approx.)")).toBe("Grade 9-12 (approx.)");
   });
 
+  it("prefixes a leading '=' with an apostrophe to defuse formula injection", () => {
+    expect(escapeCsvField('=HYPERLINK("https://evil.example","click")')).toBe(
+      "\"'=HYPERLINK(\"\"https://evil.example\"\",\"\"click\"\")\""
+    );
+  });
+
+  it("prefixes other formula-trigger leading characters ('+', '-', '@')", () => {
+    expect(escapeCsvField("+1+1")).toBe("'+1+1");
+    expect(escapeCsvField("-1+1")).toBe("'-1+1");
+    expect(escapeCsvField("@SUM(1,1)")).toBe("\"'@SUM(1,1)\"");
+  });
+
+  it("does not touch a value that merely contains a formula-trigger character mid-string", () => {
+    expect(escapeCsvField("Class of 9-12")).toBe("Class of 9-12");
+  });
+
   it("joins fields into a row, escaping each field independently", () => {
     expect(toCsvRow(["Jane Doe", "Smith, Jane", "plain"])).toBe(
       "Jane Doe,\"Smith, Jane\",plain"
