@@ -100,7 +100,7 @@ export default async function HomePage() {
           <MediaGrid
             items={primaryGallery}
             columns={3}
-            eyebrow="Gallery"
+            eyebrow="Showcase"
             heading="Community in Action"
           />
         </ScrollReveal>
