@@ -225,7 +225,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                   League Setup is what takes the marker down. */}
               {seasonName && (
                 <Badge variant="success" dot>
-                  {seasonName} · In progress
+                  {seasonName} · Latest
                 </Badge>
               )}
             </div>
