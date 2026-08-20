@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { updateStaffApplicationStatus, softDeleteStaffApplication } from '@/app/(admin)/admin/applications/actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import { formatStaffApplicationDetails, type StaffApplicationDetails } from '@/app/lib/staff-application-form';
 
 type Status = 'pending' | 'accepted' | 'rejected';
 type StatusFilter = 'all' | Status;
@@ -16,6 +17,7 @@ interface StaffApplication {
   discordTag: string | null;
   role: string;
   message: string | null;
+  details: StaffApplicationDetails | null;
   status: Status;
   submittedAt: Date;
 }
@@ -86,11 +88,24 @@ export default function StaffApplicationRow({ app, activeFilter = 'all' }: { app
         </a>
       </td>
       <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">{app.phone}</td>
-      <td className="py-3 pr-4 text-foreground-secondary max-w-[240px] whitespace-pre-line">
-        {message ? (
+      <td className="py-3 pr-4 text-foreground-secondary max-w-[320px]">
+        {message || app.details ? (
           <>
-            {expanded ? message : (isLong ? `${message.slice(0, 80)}…` : message)}
-            {isLong && (
+            {expanded && app.details ? (
+              <dl className="space-y-1.5 whitespace-normal">
+                {formatStaffApplicationDetails(app.details).map(({ label, value }) => (
+                  <div key={label}>
+                    <dt className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">{label}</dt>
+                    <dd className="text-foreground-secondary">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <span className="whitespace-pre-line">
+                {expanded ? message : (isLong ? `${message.slice(0, 80)}…` : message)}
+              </span>
+            )}
+            {(isLong || app.details) && (
               <button
                 onClick={() => setExpanded(v => !v)}
                 className="ml-1 text-foreground-muted hover:text-foreground-secondary transition-colors text-xs cursor-pointer"

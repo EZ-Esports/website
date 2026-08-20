@@ -687,6 +687,7 @@ export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 
       role: schema.schoolApplications.role,
       email: schema.schoolApplications.email,
       message: schema.schoolApplications.message,
+      details: schema.schoolApplications.details,
       submittedAt: schema.schoolApplications.submittedAt,
       status: sql<ApplicationStatus>`COALESCE(${latestLogs.status}, 'pending')`.as('effective_status'),
     })
@@ -725,6 +726,7 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
       discordTag: schema.staffApplications.discordTag,
       role: schema.staffApplications.role,
       message: schema.staffApplications.message,
+      details: schema.staffApplications.details,
       submittedAt: schema.staffApplications.submittedAt,
       status: sql<ApplicationStatus>`COALESCE(${latestLogs.status}, 'pending')`.as('effective_status'),
     })
