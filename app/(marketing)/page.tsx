@@ -69,44 +69,24 @@ export default async function HomePage() {
         secondaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
 
-      {/* 2. Student Organization Section */}
+      {/* 2. Student Organization Section (A Five-Borough League, Student-Founded) */}
       <ScrollReveal>
         <StudentOrgSection />
       </ScrollReveal>
 
-
-
-      {/* 3. Competition Games */}
-      <ScrollReveal>
-        <GameShowcase
-          title={sectionContent.gameShowcase.title}
-          games={games}
-        />
-      </ScrollReveal>
-
-      {/* 3.5 League Pulse: latest results across games */}
-      <ScrollReveal>
-        <LeaguePulse />
-      </ScrollReveal>
-
-      {/* 4. School Wall */}
-      <ScrollReveal>
-        <SchoolWall />
-      </ScrollReveal>
-
-      {/* 6. Photo Gallery #1 */}
+      {/* 3. Photo Gallery #1 (Community in Action) */}
       {primaryGallery.length > 0 && (
         <ScrollReveal>
           <MediaGrid
             items={primaryGallery}
             columns={3}
-            eyebrow="Showcase"
+            eyebrow="Gallery"
             heading="Community in Action"
           />
         </ScrollReveal>
       )}
 
-      {/* 7. Video Showcase */}
+      {/* 4. Video Showcase */}
       <ScrollReveal>
         <VideoShowcase
           videos={featuredVideos}
@@ -114,9 +94,25 @@ export default async function HomePage() {
         />
       </ScrollReveal>
 
+      {/* 5. Competition Games */}
+      <ScrollReveal>
+        <GameShowcase
+          title={sectionContent.gameShowcase.title}
+          games={games}
+        />
+      </ScrollReveal>
 
+      {/* 6. League Pulse: latest results across games */}
+      <ScrollReveal>
+        <LeaguePulse />
+      </ScrollReveal>
 
-      {/* 9. Our Story */}
+      {/* 7. School Wall */}
+      <ScrollReveal>
+        <SchoolWall />
+      </ScrollReveal>
+
+      {/* 8. Our Story */}
       <ScrollReveal>
         <Section tone="sunken" className="overflow-hidden border-t border-b border-line">
           {/* Single soft glow behind the watermark — intentionally not stacked with other blurs */}
