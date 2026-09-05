@@ -69,12 +69,7 @@ export default async function HomePage() {
         secondaryCTA={{ label: heroCtaLabel, href: discordLink }}
       />
 
-      {/* 2. Student Organization Section (A Five-Borough League, Student-Founded) */}
-      <ScrollReveal>
-        <StudentOrgSection />
-      </ScrollReveal>
-
-      {/* 3. Photo Gallery #1 (Community in Action) */}
+      {/* 2. Photo Gallery #1 (Community in Action) */}
       {primaryGallery.length > 0 && (
         <ScrollReveal>
           <MediaGrid
@@ -85,6 +80,11 @@ export default async function HomePage() {
           />
         </ScrollReveal>
       )}
+
+      {/* 3. Student Organization Section (A Five-Borough League, Student-Founded) */}
+      <ScrollReveal>
+        <StudentOrgSection />
+      </ScrollReveal>
 
       {/* 4. Video Showcase */}
       <ScrollReveal>
