@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('Homepage Section Ordering and Architecture', () => {
-  const source = readFileSync(resolve(process.cwd(), 'app/(marketing)/page.tsx'), 'utf8');
+  const source = readFileSync(resolve(__dirname, '../../(marketing)/page.tsx'), 'utf8');
 
   it('renders all 8 homepage sections in exact sequential order in JSX', () => {
     const heroIndex = source.indexOf('<HomeHero');
