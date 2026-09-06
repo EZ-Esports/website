@@ -65,13 +65,14 @@ export default function Header() {
       <nav className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
-            <AriaLink href="/" className="hover:opacity-85 transition-opacity flex items-center">
+            <AriaLink href="/" className="hover:opacity-85 transition-opacity flex items-center select-none">
               <Image
                 src="/images/logos/wordmark.png"
                 alt={SITE_CONFIG.company}
                 width={160}
                 height={48}
-                className="h-10 w-auto transition-all duration-300"
+                className="h-10 w-auto transition-all duration-300 select-none"
+                draggable={false}
                 priority
               />
             </AriaLink>
