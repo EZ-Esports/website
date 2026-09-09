@@ -167,7 +167,11 @@ export const getGamesForShowcase = (): Game[] => {
 // API/URL Constants
 // ============================================================================
 
-export const YOUTUBE_EMBED_BASE_URL = 'https://www.youtube.com/embed';
+// Privacy-enhanced mode: youtube-nocookie.com does not set Google advertising/
+// tracking cookies until the viewer presses play, reducing pre-consent tracking
+// exposure under GDPR/ePrivacy. It does not by itself remove any consent
+// obligation.
+export const YOUTUBE_EMBED_BASE_URL = 'https://www.youtube-nocookie.com/embed';
 
 export const EXTERNAL_LINKS = {
   twitch: 'https://www.twitch.tv',
