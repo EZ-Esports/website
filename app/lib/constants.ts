@@ -70,8 +70,8 @@ export const GAMES: Record<GameSlug, GameConfig> = {
   },
   tetris: {
     slug: 'tetris',
-    displayName: 'Tetris',
-    shortName: 'Tetris',
+    displayName: 'TETR.IO',
+    shortName: 'TETR.IO',
     imageUrl: '/images/hero-background.jpg',
     accent: { color: '#0099FF', on: '#FFFFFF' },
   },

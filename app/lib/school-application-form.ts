@@ -51,7 +51,7 @@ export const GAME_LABELS = {
   valorant: 'Valorant',
   lol: 'League of Legends (LoL)',
   tft: 'Teamfight Tactics (TFT)',
-  tetris: 'Tetris',
+  tetris: 'TETR.IO',
   clashRoyale: 'Clash Royale',
   smashBros: 'Super Smash Bros. Ultimate',
 } satisfies Record<string, string>;
