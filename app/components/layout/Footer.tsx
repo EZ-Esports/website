@@ -33,6 +33,15 @@ export default function Footer() {
         <SocialLinks />
 
         <p className="text-center text-xs text-foreground-secondary mt-6">© {new Date().getFullYear()} EZ Esports. All rights reserved.</p>
+
+        {/* IP & Trademark disclaimer */}
+        <p className="text-center text-[11px] leading-relaxed text-foreground-muted mt-3 max-w-3xl mx-auto text-balance">
+          EZ Esports is a student-run, non-profit high-school league and is not
+          affiliated with, endorsed by, or sponsored by Riot Games, Inc.,
+          Nintendo of America Inc., Supercell Oy, or The Tetris Company. All game
+          titles, logos, artwork, and associated trademarks are property of their
+          respective owners.
+        </p>
       </div>
     </footer>
   );
