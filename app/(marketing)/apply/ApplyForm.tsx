@@ -1525,9 +1525,9 @@ export default function ApplyForm() {
                   </span>
                   <p className="text-xs text-foreground-secondary mb-3 leading-relaxed">
                     By applying on behalf of your school, you confirm that your club officers and members will abide by EZ Esports league rules, competitive integrity guidelines, and sportsmanship policies, as set out in our{' '}
-                    <Link href="/rules" className="text-accent hover:underline">League Rules &amp; Code of Conduct</Link>,{' '}
-                    <Link href="/terms" className="text-accent hover:underline">Terms of Service</Link>, and{' '}
-                    <Link href="/privacy" className="text-accent hover:underline">Privacy Policy</Link>.
+                    <Link href="/rules" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">League Rules &amp; Code of Conduct</Link>,{' '}
+                    <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Terms of Service</Link>, and{' '}
+                    <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Privacy Policy</Link>.
                   </p>
                   <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                     <input
