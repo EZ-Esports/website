@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   validateSchoolApplicationForm,
   compileApplicationPayload,
@@ -1523,7 +1524,8 @@ export default function ApplyForm() {
                     League Rules &amp; Terms Consent {requiredMark}
                   </span>
                   <p className="text-xs text-foreground-secondary mb-3 leading-relaxed">
-                    By applying on behalf of your school, you confirm that your club officers and members will abide by EZ Esports league rules, competitive integrity guidelines, and sportsmanship policies.
+                    By applying on behalf of your school, you confirm that your club officers and members will abide by EZ Esports league rules, competitive integrity guidelines, and sportsmanship policies, as set out in our{' '}
+                    <Link href="/terms" className="text-accent hover:underline">Terms of Service</Link>.
                   </p>
                   <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                     <input
@@ -1534,7 +1536,8 @@ export default function ApplyForm() {
                       aria-invalid={!!fieldErrors.agreedRules}
                       aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
                     />
-                    <span>I understand and agree to uphold all EZ Esports league rules, competitive integrity guidelines, and participation terms.</span>
+                    <span>I understand and agree to uphold all EZ Esports league rules, competitive integrity guidelines, and participation terms (see our{' '}
+                      <Link href="/terms" className="text-accent hover:underline">Terms of Service</Link>).</span>
                   </label>
                   {fieldErrors.agreedRules && (
                     <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
