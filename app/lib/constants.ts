@@ -25,6 +25,7 @@ export const ROUTES = {
   sponsors: '/sponsors',
   privacy: '/privacy',
   terms: '/terms',
+  rules: '/rules',
 } as const;
 
 export const getLeadershipRoute = (year: string): string => `${ROUTES.leadership}/${year}`;
@@ -203,8 +204,9 @@ export const FOOTER_LINKS = [
   { label: 'Sponsors', href: '/sponsors' },
   { label: 'About', href: '/about' },
   { label: 'Archives', href: '/archives' },
-  { label: 'Privacy Policy', href: '/privacy' },
+  { label: 'League Rules', href: '/rules' },
   { label: 'Terms of Service', href: '/terms' },
+  { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Staff Login', href: '/login' },
 ] as const;
 
