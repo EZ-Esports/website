@@ -46,7 +46,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
         { label: GAMES['league-of-legends']?.displayName || 'League of Legends', href: getGameRoute('league-of-legends') },
         { label: GAMES['osu']?.displayName || 'osu!', href: getGameRoute('osu') },
         { label: GAMES['minecraft']?.displayName || 'Minecraft', href: getGameRoute('minecraft') },
-        { label: GAMES['tetris']?.displayName || 'Tetris', href: getGameRoute('tetris') },
+        { label: GAMES['tetris']?.displayName || 'TETR.IO', href: getGameRoute('tetris') },
         { label: 'Past Seasons', href: ROUTES.archives },
       ],
     },

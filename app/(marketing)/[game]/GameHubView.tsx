@@ -34,7 +34,7 @@ const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
   minecraft:
     'Follow the EZ Esports Minecraft division — standings, schedules, match results, and school rosters for NYC high-school Minecraft competition.',
   tetris:
-    'Follow the EZ Esports Tetris division — standings, schedules, match results, and school rosters for NYC high-school Tetris competition.',
+    'Follow the EZ Esports TETR.IO division — standings, schedules, match results, and school rosters for NYC high-school TETR.IO competition.',
 };
 
 const RANK_MEDALS: Record<number, string> = { 1: '🏆', 2: '🥈', 3: '🥉' };
