@@ -79,7 +79,7 @@ export default function RulesPage() {
           </nav>
 
           <div className="space-y-4">
-            <h2 id="section-1" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-1" className="text-xl font-bold text-foreground scroll-mt-28">
               1. Player &amp; Roster Eligibility
             </h2>
             <p>
@@ -131,7 +131,7 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-2" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-2" className="text-xl font-bold text-foreground scroll-mt-28">
               2. Competitive Integrity &amp; Anti-Cheating
             </h2>
             <p>
@@ -182,7 +182,7 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-3" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-3" className="text-xl font-bold text-foreground scroll-mt-28">
               3. Sportsmanship &amp; Anti-Harassment
             </h2>
             <p>
@@ -228,7 +228,7 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-4" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-4" className="text-xl font-bold text-foreground scroll-mt-28">
               4. Match Operations &amp; Scheduling
             </h2>
             <p>
@@ -279,7 +279,7 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-5" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-5" className="text-xl font-bold text-foreground scroll-mt-28">
               5. Disciplinary Actions &amp; Appeals
             </h2>
             <p>
@@ -358,7 +358,7 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-6" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-6" className="text-xl font-bold text-foreground scroll-mt-28">
               6. Changes to the Rulebook
             </h2>
             <p>
@@ -372,7 +372,7 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-7" className="text-xl font-bold text-foreground scroll-mt-24">
+            <h2 id="section-7" className="text-xl font-bold text-foreground scroll-mt-28">
               7. Contact &amp; Questions
             </h2>
             <p>
