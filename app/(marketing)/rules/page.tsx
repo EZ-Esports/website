@@ -245,14 +245,14 @@ export default function RulesPage() {
               <li>
                 <strong className="text-foreground">Grace period.</strong> If a team is not ready at
                 match time, the opponent should notify an administrator. A team that cannot field the
-                minimum number of players within <strong className="text-foreground">15 minutes</strong>{' '}
+                minimum number of players within <strong className="text-foreground">10 minutes</strong>{' '}
                 of the scheduled start forfeits the match; if neither team is ready, the match may be
                 recorded as a double forfeit.
               </li>
               <li>
                 <strong className="text-foreground">Rescheduling.</strong> A match may be rescheduled
                 only if both teams and a league administrator agree, and the request is made at least{' '}
-                <strong className="text-foreground">48 hours</strong> before the original time, except
+                <strong className="text-foreground">72 hours</strong> before the original time, except
                 in a genuine emergency. The rescheduled match must be played before the week&apos;s
                 results deadline.
               </li>
@@ -260,6 +260,11 @@ export default function RulesPage() {
                 <strong className="text-foreground">Disconnects and pauses.</strong> Follow the
                 game-specific ruleset for mid-match disconnects, remakes, and technical pauses. Report
                 unresolved technical problems to an administrator rather than abandoning the match.
+              </li>
+              <li>
+                <strong className="text-foreground">Halftime and side selection.</strong> Any
+                halftime, break, or side/side-switch procedure follows the game-specific ruleset for
+                that title. Teams should be ready to resume promptly when the break ends.
               </li>
               <li>
                 <strong className="text-foreground">Results.</strong> The winning team, or both teams,
@@ -272,7 +277,7 @@ export default function RulesPage() {
               <strong className="text-foreground">Forfeit conditions.</strong> A team may forfeit a
               match by failing to check in, failing to field the minimum roster within the grace
               period, using an ineligible player, leaving a match early without cause, or being removed
-              by an administrator for a conduct violation. Repeated forfeits — generally three in a
+              by an administrator for a conduct violation. Repeated forfeits — two or more in a
               season — may result in the team being dropped from the remainder of the schedule, with
               its remaining and prior matches recorded as losses at the league&apos;s discretion.
             </p>
