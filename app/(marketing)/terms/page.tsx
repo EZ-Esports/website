@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
-  const lastUpdated = 'September 2025';
+  const lastUpdated = 'September 2026';
 
   return (
     <main>
