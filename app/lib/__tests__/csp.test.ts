@@ -131,20 +131,12 @@ describe('Content-Security-Policy (CSP)', () => {
   });
 
   describe('auth routes, redirects, and cookie handling', () => {
-    const originalEnv = process.env;
-
     beforeEach(() => {
       mockSetAllCookies = [];
       mockGetClaims.mockReset();
-      process.env = {
-        ...originalEnv,
-        NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
-      };
     });
 
     afterEach(() => {
-      process.env = originalEnv;
       vi.restoreAllMocks();
     });
 
@@ -194,6 +186,35 @@ describe('Content-Security-Policy (CSP)', () => {
       const cookie = res.cookies.get('sb-access-token');
       expect(cookie).toBeDefined();
       expect(cookie?.value).toBe('new-refreshed-token');
+    });
+
+    it('preserves CSP headers and forwards refreshed session cookies on /admin for authenticated users', async () => {
+      mockGetClaims.mockResolvedValue({
+        data: {
+          claims: { sub: 'admin-user-id', email: 'admin@ezesports.org' },
+        },
+      });
+      mockSetAllCookies = [
+        {
+          name: 'sb-access-token',
+          value: 'refreshed-admin-token',
+          options: { path: '/', httpOnly: true },
+        },
+      ];
+
+      const req = new NextRequest('https://ez-esports.vercel.app/admin');
+      const res = await updateSession(req);
+
+      expect(res.status).toBe(200);
+      const nonce = req.headers.get('x-nonce');
+      expect(nonce).toBeTruthy();
+      const csp = res.headers.get('Content-Security-Policy');
+      expect(csp).toBeTruthy();
+      expect(csp).toContain(`'nonce-${nonce}'`);
+
+      const cookie = res.cookies.get('sb-access-token');
+      expect(cookie).toBeDefined();
+      expect(cookie?.value).toBe('refreshed-admin-token');
     });
   });
 });
