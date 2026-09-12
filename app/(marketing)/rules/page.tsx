@@ -13,18 +13,17 @@ export default function RulesPage() {
   const effectiveDate = 'To be set upon approval';
 
   const sections = [
-    { id: 'section-1', label: '1. Purpose' },
-    { id: 'section-2', label: '2. Eligibility & Authority' },
-    { id: 'section-3', label: '3. Registration & Rosters' },
-    { id: 'section-4', label: '4. Accounts, Equipment & Platforms' },
-    { id: 'section-5', label: '5. Scheduling & Match Procedure' },
-    { id: 'section-6', label: '6. Competitive Integrity' },
-    { id: 'section-7', label: '7. Conduct' },
-    { id: 'section-8', label: '8. Privacy & Media' },
-    { id: 'section-9', label: '9. Reporting Concerns' },
-    { id: 'section-10', label: '10. Review & Discipline' },
-    { id: 'section-11', label: '11. Appeals' },
-    { id: 'section-12', label: '12. Publisher & Program Changes' },
+    { id: 'section-1', label: '1. Eligibility & Authority' },
+    { id: 'section-2', label: '2. Registration & Rosters' },
+    { id: 'section-3', label: '3. Accounts, Equipment & Platforms' },
+    { id: 'section-4', label: '4. Scheduling & Match Procedure' },
+    { id: 'section-5', label: '5. Competitive Integrity' },
+    { id: 'section-6', label: '6. Conduct' },
+    { id: 'section-7', label: '7. Privacy & Media' },
+    { id: 'section-8', label: '8. Reporting Concerns' },
+    { id: 'section-9', label: '9. Review & Discipline' },
+    { id: 'section-10', label: '10. Appeals' },
+    { id: 'section-11', label: '11. Publisher & Program Changes' },
   ];
 
   return (
@@ -79,20 +78,7 @@ export default function RulesPage() {
 
           <div className="space-y-4">
             <h2 id="section-1" className="text-xl font-bold text-foreground scroll-mt-28">
-              1. Purpose
-            </h2>
-            <p>
-              These Terms establish consistent expectations for students, teams, club officers,
-              advisors, coaches, staff, and others who participate in an EZ Esports competition.
-              Game-specific rules, schedules, and publisher requirements form part of these Terms.
-              Safety, fairness, student development, and school requirements take priority over
-              convenience or competitive advantage.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <h2 id="section-2" className="text-xl font-bold text-foreground scroll-mt-28">
-              2. Eligibility &amp; Authority
+              1. Eligibility &amp; Authority
             </h2>
             <p>A participant must:</p>
             <ul className="list-disc pl-6 space-y-2">
@@ -113,8 +99,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-3" className="text-xl font-bold text-foreground scroll-mt-28">
-              3. Registration &amp; Rosters
+            <h2 id="section-2" className="text-xl font-bold text-foreground scroll-mt-28">
+              2. Registration &amp; Rosters
             </h2>
             <p>
               Preliminary interest does not register a team. Final registration requires the requested
@@ -131,8 +117,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-4" className="text-xl font-bold text-foreground scroll-mt-28">
-              4. Accounts, Equipment &amp; Platforms
+            <h2 id="section-3" className="text-xl font-bold text-foreground scroll-mt-28">
+              3. Accounts, Equipment &amp; Platforms
             </h2>
             <p>
               Participants are responsible for lawful access to the game and an account in good
@@ -149,8 +135,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-5" className="text-xl font-bold text-foreground scroll-mt-28">
-              5. Scheduling &amp; Match Procedure
+            <h2 id="section-4" className="text-xl font-bold text-foreground scroll-mt-28">
+              4. Scheduling &amp; Match Procedure
             </h2>
             <p>
               Teams must monitor the official schedule and designated communication channel. Captains
@@ -167,8 +153,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-6" className="text-xl font-bold text-foreground scroll-mt-28">
-              6. Competitive Integrity
+            <h2 id="section-5" className="text-xl font-bold text-foreground scroll-mt-28">
+              5. Competitive Integrity
             </h2>
             <p>The following are prohibited:</p>
             <ul className="list-disc pl-6 space-y-2">
@@ -186,8 +172,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-7" className="text-xl font-bold text-foreground scroll-mt-28">
-              7. Conduct
+            <h2 id="section-6" className="text-xl font-bold text-foreground scroll-mt-28">
+              6. Conduct
             </h2>
             <p>
               Participants must communicate respectfully and help maintain an environment where
@@ -206,8 +192,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-8" className="text-xl font-bold text-foreground scroll-mt-28">
-              8. Privacy &amp; Media
+            <h2 id="section-7" className="text-xl font-bold text-foreground scroll-mt-28">
+              7. Privacy &amp; Media
             </h2>
             <p>
               Participants may not record or publish private staff channels, incident reports,
@@ -225,8 +211,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-9" className="text-xl font-bold text-foreground scroll-mt-28">
-              9. Reporting Concerns
+            <h2 id="section-8" className="text-xl font-bold text-foreground scroll-mt-28">
+              8. Reporting Concerns
             </h2>
             <p>
               Immediate danger should be reported to emergency services and an appropriate school
@@ -247,8 +233,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-10" className="text-xl font-bold text-foreground scroll-mt-28">
-              10. Review &amp; Discipline
+            <h2 id="section-9" className="text-xl font-bold text-foreground scroll-mt-28">
+              9. Review &amp; Discipline
             </h2>
             <p>
               EZ Esports may use temporary protective measures while reviewing a serious concern.
@@ -272,8 +258,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-11" className="text-xl font-bold text-foreground scroll-mt-28">
-              11. Appeals
+            <h2 id="section-10" className="text-xl font-bold text-foreground scroll-mt-28">
+              10. Appeals
             </h2>
             <p>
               A participant or school may submit one written appeal within the published deadline. The
@@ -285,8 +271,8 @@ export default function RulesPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 id="section-12" className="text-xl font-bold text-foreground scroll-mt-28">
-              12. Publisher &amp; Program Changes
+            <h2 id="section-11" className="text-xl font-bold text-foreground scroll-mt-28">
+              11. Publisher &amp; Program Changes
             </h2>
             <p>
               EZ Esports may amend game rules, schedules, or formats to comply with publisher
