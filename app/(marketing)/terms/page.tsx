@@ -4,18 +4,35 @@ import Hero from '@/app/components/sections/Hero';
 import Section from '@/app/components/ui/Section';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | EZ Esports',
+  title: 'Terms of Use | EZ Esports',
   description:
-    'The terms that govern participation in EZ Esports programs, use of the ezesports.org website, conduct expectations, event waivers, and dispute resolution.',
+    'The Terms of Use that govern access to ezesports.org and other online services operated by EZ Esports.',
 };
 
 export default function TermsPage() {
-  const lastUpdated = 'September 2026';
+  const effectiveDate = 'To be set upon approval';
+
+  const sections = [
+    { id: 'section-1', label: '1. Eligibility & Minors' },
+    { id: 'section-2', label: '2. Accounts & Security' },
+    { id: 'section-3', label: '3. Acceptable Use' },
+    { id: 'section-4', label: '4. EZ Esports Content & Intellectual Property' },
+    { id: 'section-5', label: '5. User Submissions' },
+    { id: 'section-6', label: '6. Applications, Competitions & Availability' },
+    { id: 'section-7', label: '7. Third-Party Services' },
+    { id: 'section-8', label: '8. Privacy' },
+    { id: 'section-9', label: '9. Copyright & Rights Concerns' },
+    { id: 'section-10', label: '10. Disclaimers' },
+    { id: 'section-11', label: '11. Limitation of Liability' },
+    { id: 'section-12', label: '12. Enforcement & Termination' },
+    { id: 'section-13', label: '13. Changes' },
+    { id: 'section-14', label: '14. Governing Law & Questions' },
+  ];
 
   return (
     <main>
       <Hero
-        title="Terms of Service"
+        title="Terms of Use"
         backgroundImage="/images/hero-background.jpg"
         size="medium"
       />
@@ -23,304 +40,311 @@ export default function TermsPage() {
       <Section width="narrow">
         <div className="max-w-3xl mx-auto space-y-10 text-foreground-secondary text-sm sm:text-base leading-relaxed">
           <p className="text-xs text-foreground-muted uppercase tracking-wider">
-            Last updated: {lastUpdated}
+            Effective date: {effectiveDate}
           </p>
 
           <div className="space-y-4">
             <p>
-              These Terms of Service (&quot;Terms&quot;) govern your access to and use of the EZ Esports
-              website (ezesports.org) and your participation in any EZ Esports league, tournament,
-              event, program, or activity (together, the &quot;Services&quot;). EZ Esports
-              (&quot;EZ Esports,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a student-run,
-              non-profit high-school esports league based in New York City. Please read these Terms
-              carefully. By using the Services, registering a school or club, submitting an
-              application, or attending an event, you agree to be bound by these Terms.
+              These Terms of Use (&quot;Terms&quot;) govern access to ezesports.org and other online
+              services that link to these Terms, including applications, registration pages,
+              schedules, standings, directories, and staff portals operated by EZ Esports
+              (&quot;EZ Esports,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). EZ Esports is a
+              student-founded organization pursuing nonprofit formation, operating a high-school
+              esports league based in New York City. &quot;Services&quot; means those websites and
+              online features.
             </p>
             <p>
-              These Terms work alongside our{' '}
+              Separate competition rules, consent forms, school agreements, and event terms may also
+              apply. If a separate document conflicts with these Terms for a specific program, the
+              more specific document controls for that program. By using the Services, a user agrees
+              to these Terms. A person who does not agree should not use the Services. Merely viewing
+              a public page does not enroll anyone in a league or bind a school.
+            </p>
+          </div>
+
+          <nav aria-label="Terms sections" className="space-y-3">
+            <p className="text-xs text-foreground-muted uppercase tracking-wider">On this page</p>
+            <ul className="space-y-2">
+              {sections.map((section) => (
+                <li key={section.id}>
+                  <a href={`#${section.id}`} className="text-accent hover:underline">
+                    {section.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <div className="space-y-4">
+            <h2 id="section-1" className="text-xl font-bold text-foreground scroll-mt-28">
+              1. Eligibility &amp; Minors
+            </h2>
+            <p>
+              The public informational portions of the Services are available to general visitors. A
+              person must be at least 13 years old to submit personal information directly through a
+              student form unless EZ Esports has established a verified parent, guardian, or
+              school-authorized process for that person.
+            </p>
+            <p>
+              Users under 18 should review these Terms with a parent or legal guardian. Participation
+              in competitions, events, staff roles, or media activities may require separate guardian
+              consent. A student representative may provide planning information for a school club but
+              may not bind a school, district, parent, teammate, or other person unless legally
+              authorized to do so.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-2" className="text-xl font-bold text-foreground scroll-mt-28">
+              2. Accounts &amp; Security
+            </h2>
+            <p>
+              Users must provide accurate information, keep credentials confidential, and use only
+              accounts assigned to them. Users may not share staff accounts, bypass access controls,
+              or allow another person to act under their identity. Users must promptly report
+              suspected compromise to{' '}
+              <a href="mailto:info@ezesports.org" className="text-accent hover:underline">
+                info@ezesports.org
+              </a>
+              .
+            </p>
+            <p>
+              EZ Esports may suspend or disable access when reasonably necessary to protect users,
+              investigate misuse, preserve competitive integrity, or secure the Services. Access to
+              internal systems ends when the related role ends.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-3" className="text-xl font-bold text-foreground scroll-mt-28">
+              3. Acceptable Use
+            </h2>
+            <p>Users may not:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Violate law, these Terms, competition rules, publisher rules, or platform rules.</li>
+              <li>
+                Harass, threaten, exploit, impersonate, stalk, dox, or discriminate against another
+                person.
+              </li>
+              <li>Collect, expose, or misuse another person&apos;s private information.</li>
+              <li>
+                Upload malware, probe systems without written authorization, interfere with
+                operations, or evade security controls.
+              </li>
+              <li>
+                Cheat, manipulate results, fix matches, gamble on EZ Esports competitions, or help
+                another person do so.
+              </li>
+              <li>Submit content they do not have permission to use.</li>
+              <li>Use the Services to advertise or solicit without written approval.</li>
+              <li>
+                Falsely suggest that EZ Esports, a school, a publisher, or a partner endorses a
+                person, product, or event.
+              </li>
+            </ul>
+            <p>
+              Good-faith security reports should be sent privately to{' '}
+              <a href="mailto:info@ezesports.org" className="text-accent hover:underline">
+                info@ezesports.org
+              </a>
+              . Public disclosure of a vulnerability before EZ Esports has a reasonable opportunity to
+              investigate may place users at risk.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-4" className="text-xl font-bold text-foreground scroll-mt-28">
+              4. EZ Esports Content &amp; Intellectual Property
+            </h2>
+            <p>
+              The Services, including original text, league graphics, software, databases, schedules,
+              formats, and audiovisual material, may be protected by copyright, trademark, and other
+              laws. Subject to these Terms, EZ Esports grants users a limited, revocable, nonexclusive,
+              nontransferable right to access the Services for personal, school-club, or approved
+              program use.
+            </p>
+            <p>
+              No license is granted to use EZ Esports names, logos, broadcast packages, or other brand
+              assets for commercial purposes or to imply endorsement. Schools and teams may share
+              approved league materials to promote their participation if they preserve credits and do
+              not materially alter the content.
+            </p>
+            <p>
+              Game titles, publisher names, logos, artwork, and other third-party materials belong to
+              their respective owners. EZ Esports is not affiliated with or endorsed by a game
+              publisher unless a specific written statement says otherwise.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-5" className="text-xl font-bold text-foreground scroll-mt-28">
+              5. User Submissions
+            </h2>
+            <p>
+              Users retain ownership of original material they submit. By submitting material for a
+              requested league purpose, the user gives EZ Esports a nonexclusive, worldwide,
+              royalty-free license to host, copy, format, and share the material only as reasonably
+              necessary to provide that purpose. The license ends when the purpose and required
+              retention period end, except for material already incorporated into an authorized public
+              record or broadcast.
+            </p>
+            <p>
+              Media involving a minor is governed by the applicable participant and guardian release.
+              EZ Esports will not treat a general website submission as permission to use a minor&apos;s
+              identity or likeness in sponsor advertising.
+            </p>
+            <p>
+              Users represent that their submissions are accurate to the best of their knowledge and
+              that they have permission to submit them. EZ Esports may remove content that violates
+              these Terms, another person&apos;s rights, safety rules, or legal obligations.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-6" className="text-xl font-bold text-foreground scroll-mt-28">
+              6. Applications, Competitions &amp; Availability
+            </h2>
+            <p>
+              An application or interest form does not guarantee acceptance, schedule availability, a
+              particular title, a roster spot, a broadcast, a prize, or continued participation. EZ
+              Esports may change, postpone, suspend, or cancel a feature or program when reasonably
+              necessary because of participation levels, school restrictions, publisher requirements,
+              safety, technical failures, or circumstances outside its control.
+            </p>
+            <p>
+              Competition decisions follow the applicable rules and appeal process. Website standings
+              and schedules may contain errors or change after review. Official notices sent through
+              designated league channels control over stale screenshots or third-party reposts.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-7" className="text-xl font-bold text-foreground scroll-mt-28">
+              7. Third-Party Services
+            </h2>
+            <p>
+              The Services may link to or interact with Discord, Twitch, YouTube, game publishers,
+              social networks, school systems, and other third-party services. Their terms and privacy
+              practices apply separately. EZ Esports does not control those services and cannot
+              guarantee their availability, security, content, or accessibility. Users and guardians
+              should review the age requirements and privacy settings of each service before use.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-8" className="text-xl font-bold text-foreground scroll-mt-28">
+              8. Privacy
+            </h2>
+            <p>
+              The{' '}
               <Link href="/privacy" className="text-accent hover:underline">
                 Privacy Policy
-              </Link>
-              , which explains how we collect, use, and protect information. By agreeing to these
-              Terms you also acknowledge the practices described in the Privacy Policy. Where a
-              specific league rulebook, competitive ruleset, or event-specific policy applies, that
-              document supplements these Terms; if there is a direct conflict, these Terms control
-              unless the other document expressly states otherwise.
+              </Link>{' '}
+              explains how EZ Esports collects, uses, shares, retains, and protects personal
+              information. Optional consent is governed by the language shown when consent is
+              requested and may be withdrawn as described there.
             </p>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">1. Acceptance &amp; Eligibility</h2>
-            <p>
-              The Services are intended for enrolled high-school students and for the adult advisors,
-              coaches, teachers, and school administrators who support them. By using the Services you
-              represent that:
-            </p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>
-                <strong className="text-foreground">Student participants</strong> are currently
-                enrolled at a recognized secondary school and meet any grade, age, and academic
-                eligibility requirements set out in the applicable league rulebook.
-              </li>
-              <li>
-                <strong className="text-foreground">Advisors, coaches, and staff</strong> are at
-                least 18 years old, are affiliated with the school or club they represent, and have
-                that school&apos;s authorization to act on its behalf.
-              </li>
-              <li>
-                You will provide accurate, current, and complete information when registering or
-                applying, and will keep that information up to date.
-              </li>
-            </ul>
-            <p>
-              <strong className="text-foreground">Consent for minors.</strong> Any participant under
-              the age of 18 must have a parent or legal guardian review and consent to these Terms,
-              including the event waiver in Section 3, before participating. We may require a signed
-              parent or guardian consent form, and a school-affiliated adult advisor must supervise
-              student participation. A parent or guardian may withdraw consent for their child at any
-              time by contacting us, after which that student&apos;s participation will end.
-            </p>
-            <p>
-              We may refuse, suspend, or terminate access to the Services for any participant, team,
-              club, or school that does not meet these eligibility requirements or that violates
-              these Terms or the applicable rulebook.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">2. Acceptable Use &amp; Conduct</h2>
-            <p>
-              EZ Esports is built on positive, inclusive, and educational competition. Everyone who
-              uses the Services is expected to treat other participants, volunteers, staff, opponents,
-              spectators, and broadcast talent with respect. You agree that you will:
-            </p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>Practice good sportsmanship, whether winning or losing, in text, voice, and stream chat.</li>
-              <li>Follow the instructions of tournament administrators, referees, event staff, and school advisors.</li>
-              <li>Compete only in the division and role for which you are properly rostered and eligible.</li>
-            </ul>
-            <p>The following behavior is prohibited on our platforms, in official communications, and at our events:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>
-                <strong className="text-foreground">Harassment and hate</strong> — bullying,
-                threats, sexual harassment, doxxing, or discriminatory or hateful speech targeting
-                race, ethnicity, national origin, religion, disability, gender, gender identity,
-                sexual orientation, or age.
-              </li>
-              <li>
-                <strong className="text-foreground">Cheating</strong> — use of unauthorized software,
-                hacks, exploits, bug abuse, or third-party assistance that provides an unfair
-                competitive advantage.
-              </li>
-              <li>
-                <strong className="text-foreground">Roster and identity fraud</strong> — smurfing,
-                account sharing, ringers, playing under another person&apos;s identity, or
-                misrepresenting a participant&apos;s school enrollment or eligibility.
-              </li>
-              <li>
-                <strong className="text-foreground">Match manipulation</strong> — match-fixing,
-                intentional losing, collusion, or any form of wagering or betting on EZ Esports
-                matches.
-              </li>
-              <li>
-                <strong className="text-foreground">Disruptive conduct</strong> — spamming, ban
-                evasion, impersonating EZ Esports staff, sharing sexually explicit or otherwise
-                age-inappropriate content, or promoting illegal activity, including underage use of
-                alcohol, tobacco, or controlled substances.
-              </li>
-              <li>
-                <strong className="text-foreground">Security abuse</strong> — attempting to gain
-                unauthorized access to our systems, admin portal, or another user&apos;s account, or
-                interfering with the normal operation of the Services.
-              </li>
-            </ul>
-            <p>
-              We may issue warnings, adjust match results, remove players or teams from competition,
-              revoke awards, and issue temporary or permanent bans for conduct violations. Serious
-              violations may be reported to the participant&apos;s school and, where appropriate, to
-              law enforcement or the relevant game publisher.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">
-              3. In-Person / LAN Tournament Waiver
+            <h2 id="section-9" className="text-xl font-bold text-foreground scroll-mt-28">
+              9. Copyright &amp; Rights Concerns
             </h2>
             <p>
-              This Section applies to any participant, and to the parent or legal guardian of any
-              participant under 18, who attends or competes in a physical EZ Esports event, including
-              LAN tournaments, finals, showcases, meetups, and watch parties (each, an &quot;Event&quot;).
-              By attending or allowing a child to attend an Event, you agree to the following:
-            </p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>
-                <strong className="text-foreground">Assumption of risk.</strong> Attendance at an
-                Event involves inherent risks, including travel to and from the venue, crowded
-                spaces, equipment and cabling, physical activity, illness, and the actions of other
-                attendees. You knowingly and voluntarily accept these risks on your own behalf and,
-                if applicable, on behalf of the minor participant.
-              </li>
-              <li>
-                <strong className="text-foreground">Release of liability.</strong> To the fullest
-                extent permitted by law, you release and agree not to sue EZ Esports and its
-                organizers, volunteers, staff, directors, partner schools, and venue hosts (the
-                &quot;Released Parties&quot;) from claims for injury, illness, loss, or damage to person or
-                property arising out of participation in or attendance at an Event, except for injury
-                or damage caused by a Released Party&apos;s gross negligence or willful misconduct.
-              </li>
-              <li>
-                <strong className="text-foreground">Medical and emergency treatment.</strong> If you
-                or the minor participant needs medical attention during an Event and a parent or
-                guardian cannot be reached, you authorize EZ Esports staff to seek and consent to
-                emergency medical care, and you are responsible for the resulting costs. You are
-                responsible for disclosing relevant medical conditions, allergies, and emergency
-                contact information on the Event registration form.
-              </li>
-              <li>
-                <strong className="text-foreground">Media and photo release.</strong> Events may be
-                photographed, recorded, and streamed. You grant EZ Esports permission to capture and
-                use your (or the minor participant&apos;s) name, image, likeness, voice, gameplay,
-                and in-game handle in photos, video, broadcasts, highlights, and promotional
-                materials, in any medium, without additional compensation. If you do not want a
-                participant featured, notify us in writing before the Event and identify the
-                participant to Event staff on arrival; we will make reasonable efforts to
-                accommodate, though incidental capture in wide or crowd shots may still occur.
-              </li>
-              <li>
-                <strong className="text-foreground">Conduct at the venue.</strong> Attendees must
-                follow venue rules, staff directions, and any code of conduct provided for the Event.
-                We may remove any attendee for unsafe or disruptive behavior without refund.
-              </li>
-            </ul>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">
-              4. Limitation of Liability &amp; &quot;As Is&quot; Warranty
-            </h2>
-            <p>
-              The Services are provided on an &quot;as is&quot; and &quot;as available&quot; basis. EZ Esports is a
-              volunteer-run non-profit and does not guarantee that the Services will be
-              uninterrupted, error-free, secure, or free of delays, and we may modify, suspend, or
-              discontinue any part of the Services, including seasons, divisions, schedules, or
-              features, at any time. To the fullest extent permitted by law, we disclaim all
-              warranties, express or implied, including implied warranties of merchantability,
-              fitness for a particular purpose, and non-infringement.
-            </p>
-            <p>
-              To the fullest extent permitted by law, EZ Esports and the Released Parties will not be
-              liable for any indirect, incidental, special, consequential, or punitive damages, or
-              for lost data, lost opportunities, or lost standing or prizes, arising out of or
-              related to your use of the Services. Our total aggregate liability for any claim
-              relating to the Services will not exceed one hundred U.S. dollars (US $100), or the
-              amount you paid to EZ Esports in connection with the matter giving rise to the claim,
-              whichever is greater. Some jurisdictions do not allow certain limitations, so some of
-              these limitations may not apply to you.
-            </p>
-            <p>
-              Game clients, publisher platforms, Discord, streaming services, and other third-party
-              tools we use to operate the league are governed by their own terms and are outside our
-              control. We are not responsible for the availability, accuracy, or conduct of those
-              third-party services.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">
-              5. Intellectual Property &amp; Submissions
-            </h2>
-            <p>
-              The EZ Esports name, logo, brackets, broadcast overlays, written content, and other
-              original materials are owned by EZ Esports or its licensors and are protected by
-              intellectual-property laws. You may not use our marks in a way that suggests
-              sponsorship or endorsement without our prior written permission. Game titles,
-              characters, and related assets are the property of their respective publishers, and
-              nothing in these Terms grants you rights in that material.
-            </p>
-            <p>
-              <strong className="text-foreground">Your content and feedback.</strong> If you submit
-              content to us, such as team logos, highlight clips, screenshots, written entries,
-              artwork, or forum and application-form responses, or if you send us feedback,
-              suggestions, or ideas, you grant EZ Esports a worldwide, non-exclusive, royalty-free,
-              transferable, sublicensable license to use, reproduce, display, distribute, adapt, and
-              create derivative works from that content for the purposes of operating, promoting, and
-              improving the league and its broadcasts. You retain ownership of your content.
-            </p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>
-                You represent that you own or have the rights to any content you submit and that it
-                does not infringe the rights of others or violate Section 2.
-              </li>
-              <li>
-                Feedback you provide is voluntary, and we are free to use it without obligation,
-                attribution, or compensation to you.
-              </li>
-              <li>
-                We may remove or decline to use any submitted content at our discretion, and we are
-                not obligated to store or return it.
-              </li>
-            </ul>
-            <p>
-              If you believe content on our Services infringes your copyright, contact us at{' '}
+              A person who believes content on the Services infringes their copyright, privacy,
+              publicity, or other rights may email{' '}
               <a href="mailto:info@ezesports.org" className="text-accent hover:underline">
                 info@ezesports.org
               </a>{' '}
-              with a description of the work and the material at issue.
+              with their contact information, the work or right at issue, the location of the
+              material, the requested action, and a statement explaining the basis of the request. EZ
+              Esports may request verification and will review good-faith notices promptly.
+            </p>
+            <p>
+              EZ Esports has not designated a formal agent under the Digital Millennium Copyright Act
+              and does not claim the formal safe-harbor procedures available under that law.
             </p>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">
-              6. Governing Law &amp; Dispute Resolution
+            <h2 id="section-10" className="text-xl font-bold text-foreground scroll-mt-28">
+              10. Disclaimers
             </h2>
             <p>
-              These Terms are governed by the laws of the State of New York, without regard to its
-              conflict-of-laws rules. Subject to the arbitration provision below, you agree that the
-              exclusive venue for any dispute that is not arbitrated will be the state or federal
-              courts located in the County of New York, State of New York, and you consent to the
-              personal jurisdiction of those courts.
+              To the fullest extent permitted by law, the Services are provided as available without
+              warranties that they will be uninterrupted, error-free, secure, or suitable for a
+              particular purpose. Nothing in these Terms excludes a warranty or responsibility that law
+              does not permit EZ Esports to exclude.
             </p>
             <p>
-              <strong className="text-foreground">Informal resolution first.</strong> Before starting
-              a formal proceeding, you agree to contact us at{' '}
-              <a href="mailto:info@ezesports.org" className="text-accent hover:underline">
-                info@ezesports.org
-              </a>{' '}
-              and give us at least 30 days to resolve the issue informally.
-            </p>
-            <p>
-              <strong className="text-foreground">Binding arbitration.</strong> If we cannot resolve
-              a dispute informally, it will be settled by final and binding arbitration administered
-              in the County of New York under the rules of a recognized arbitration provider, before
-              a single arbitrator, rather than in court, except that either party may bring an
-              individual claim in small-claims court. Disputes will be handled on an individual
-              basis; to the extent permitted by law, you and EZ Esports each waive any right to a
-              jury trial and to participate in a class or representative action. Nothing in this
-              Section prevents either party from seeking injunctive relief in court to protect
-              intellectual-property rights or address unauthorized access to the Services. Where a
-              participant is a minor, this Section is agreed to by the participant&apos;s parent or
-              legal guardian on the participant&apos;s behalf. If any part of this Section is found
-              unenforceable, the remainder stays in effect, except that if the class-action waiver is
-              held unenforceable, this arbitration provision will not apply to that dispute.
+              EZ Esports provides an extracurricular program and does not provide legal, medical,
+              mental-health, educational-placement, employment, or college-admissions advice.
+              References to professional development describe program goals, not guaranteed
+              employment or academic outcomes.
             </p>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">7. Changes to These Terms</h2>
+            <h2 id="section-11" className="text-xl font-bold text-foreground scroll-mt-28">
+              11. Limitation of Liability
+            </h2>
             <p>
-              We may update these Terms from time to time. When we do, we will update the
-              &quot;Last updated&quot; date at the top of this page, and we may provide additional notice for
-              material changes through our website or league communications. Changes are effective
-              when posted. Your continued use of the Services after an update means you accept the
-              revised Terms; if you do not agree, you should stop using the Services.
+              To the fullest extent permitted by law, EZ Esports and its directors, officers, staff,
+              and volunteers will not be liable for indirect, incidental, special, exemplary, or
+              consequential damages arising from use of the Services. This limitation does not apply
+              to liability that cannot lawfully be limited, including as applicable liability for
+              intentional misconduct, gross negligence, or legally protected rights.
+            </p>
+            <p>
+              These Terms do not ask a minor or guardian to waive claims that New York law does not
+              permit them to waive. Event-specific risks and insurance should be addressed separately.
             </p>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">8. Contact Us</h2>
+            <h2 id="section-12" className="text-xl font-bold text-foreground scroll-mt-28">
+              12. Enforcement &amp; Termination
+            </h2>
             <p>
-              If you have questions about these Terms, or need to provide notice regarding
-              participation, consent, or content, please reach out to:
+              EZ Esports may restrict or terminate access for material or repeated violations, threats
+              to safety or security, interference with competitions, or legal requirements. When
+              practical and safe, EZ Esports will provide notice and an opportunity to respond.
+              Immediate temporary action may occur while a serious matter is investigated.
+            </p>
+            <p>
+              Sections that by their nature should continue after termination, including intellectual
+              property, records, disclaimers, and permitted limitations of liability, will survive.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-13" className="text-xl font-bold text-foreground scroll-mt-28">
+              13. Changes
+            </h2>
+            <p>
+              EZ Esports may update these Terms prospectively. This page will identify the effective
+              date, and material changes will receive reasonable notice. When a change creates a new
+              material obligation or authorizes a new optional use of a minor&apos;s data, EZ Esports
+              will seek new consent where required rather than relying only on continued use.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 id="section-14" className="text-xl font-bold text-foreground scroll-mt-28">
+              14. Governing Law &amp; Questions
+            </h2>
+            <p>
+              New York law governs these Terms without regard to conflict-of-law rules. Any dispute
+              that cannot be resolved informally may be brought in a court with lawful jurisdiction in
+              New York, subject to rights that cannot be waived. These Terms do not require
+              arbitration or waive class-action rights.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-foreground">Contact Us</h2>
+            <p>
+              Questions about these Terms may be sent to:
             </p>
             <address className="not-italic space-y-1">
               <p className="font-semibold text-foreground">EZ Esports</p>
