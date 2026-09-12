@@ -177,6 +177,20 @@ describe('Markdown URL sanitization', () => {
       expect(html).toContain('Local File');
       expect(html).toContain('FTP');
     });
+
+    it('evaluates unclosed links in under 5ms without catastrophic backtracking (ReDoS prevention)', () => {
+      const unclosedPayload = '[click](' + 'a'.repeat(1000);
+      // Warm up
+      renderToStaticMarkup(<Markdown content="[warmup](https://example.com)" />);
+
+      const start = performance.now();
+      const html = renderToStaticMarkup(<Markdown content={unclosedPayload} />);
+      const durationMs = performance.now() - start;
+
+      expect(durationMs).toBeLessThan(5);
+      expect(html).not.toContain('<a');
+      expect(html).toContain(unclosedPayload);
+    });
   });
 
   describe('Markdown block elements containing links', () => {

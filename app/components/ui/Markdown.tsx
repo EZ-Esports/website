@@ -109,7 +109,8 @@ export function isSafeMarkdownUrl(url: string): {
 // Inline parser for bold, italics, links, and code
 function renderInline(text: string) {
   // Regex pattern for markdown tokens: [link](url), **bold**, *italic*, `code`
-  const tokenRegex = /(\[[^\]]*\]\((?:[^()]*|\([^()]*\))*\))|(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)/g;
+  // Note: link url regex unrolls repetition to avoid ReDoS / catastrophic backtracking
+  const tokenRegex = /(\[[^\]]*\]\([^()]*(?:\([^()]*\)[^()]*)*\))|(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)/g;
   const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
