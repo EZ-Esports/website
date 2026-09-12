@@ -23,7 +23,8 @@ export default function Header() {
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
                   pathname === '/sponsors' ||
-                  pathname === '/privacy';
+                  pathname === '/privacy' ||
+                  pathname === '/parents-bill-of-rights';
 
   // Toggle solid dark background on scroll
   useEffect(() => {

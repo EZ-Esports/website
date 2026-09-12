@@ -11,7 +11,8 @@ export default function MainContentWrapper({ children }: { children: React.React
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
                   pathname === '/sponsors' ||
-                  pathname === '/privacy';
+                  pathname === '/privacy' ||
+                  pathname === '/parents-bill-of-rights';
 
   return (
     <main id="main-content" tabIndex={-1} className={`flex-grow ${hasHero ? '' : 'pt-[88px]'}`}>
