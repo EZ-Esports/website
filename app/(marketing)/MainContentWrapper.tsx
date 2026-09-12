@@ -8,6 +8,7 @@ export default function MainContentWrapper({ children }: { children: React.React
   // identity row, so they need the solid header and the pt-[88px] offset.
   const hasHero = pathname === '/' ||
                   pathname === '/about' ||
+                  pathname === '/gallery' ||
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
                   pathname === '/sponsors' ||
