@@ -4,6 +4,7 @@ import "./globals.css";
 import { METADATA, SITE_CONFIG } from "@/app/lib/constants";
 import Providers from "@/app/components/ui/Providers";
 import { Analytics } from "@vercel/analytics/next";
+import { headers } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,11 +61,15 @@ export const metadata: Metadata = {
 };
 
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Awaiting headers opts the layout tree into dynamic rendering so Next.js
+  // can inject per-request CSP nonces into script tags during SSR.
+  await headers();
+
   return (
     <html lang="en">
       <body
