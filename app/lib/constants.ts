@@ -24,6 +24,7 @@ export const ROUTES = {
   staffApp: '/apply/staff',
   sponsors: '/sponsors',
   privacy: '/privacy',
+  terms: '/terms',
   rules: '/rules',
 } as const;
 
@@ -204,6 +205,7 @@ export const FOOTER_LINKS = [
   { label: 'About', href: '/about' },
   { label: 'Archives', href: '/archives' },
   { label: 'League Rules', href: '/rules' },
+  { label: 'Terms of Service', href: '/terms' },
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Staff Login', href: '/login' },
 ] as const;
