@@ -17,6 +17,7 @@ export const SITE_CONFIG = {
 export const ROUTES = {
   home: '/',
   about: '/about',
+  gallery: '/gallery',
   news: '/news',
   leadership: '/leadership',
   archives: '/archives',
@@ -200,6 +201,7 @@ export const FOOTER_LINKS = [
   { label: 'Apply', href: '/apply' },
   { label: 'News', href: '/news' },
   { label: 'Leadership', href: '/leadership' },
+  { label: 'Gallery', href: '/gallery' },
   { label: 'Sponsors', href: '/sponsors' },
   { label: 'About', href: '/about' },
   { label: 'Archives', href: '/archives' },
