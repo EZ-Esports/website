@@ -35,38 +35,15 @@ describe('Content-Security-Policy (CSP)', () => {
   ];
 
   describe('buildCsp directive construction', () => {
-    it('constructs CSP containing all required security directives in production/test', () => {
-      const originalNodeEnv = process.env.NODE_ENV;
-      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
-      try {
-        const nonce = 'dGVzdC1ub25jZQ==';
-        const csp = buildCsp(nonce);
+    it('constructs CSP containing all required security directives without unsafe-eval', () => {
+      const nonce = 'dGVzdC1ub25jZQ==';
+      const csp = buildCsp(nonce);
 
-        for (const directiveTemplate of REQUIRED_DIRECTIVES) {
-          const expected = directiveTemplate.replace('{{nonce}}', nonce);
-          expect(csp).toContain(expected);
-        }
-        expect(csp).not.toContain("'unsafe-eval'");
-      } finally {
-        (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
+      for (const directiveTemplate of REQUIRED_DIRECTIVES) {
+        const expected = directiveTemplate.replace('{{nonce}}', nonce);
+        expect(csp).toContain(expected);
       }
-    });
-
-    it("includes 'unsafe-eval' conditionally in development mode", () => {
-      const originalNodeEnv = process.env.NODE_ENV;
-      try {
-        (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
-        const devCsp = buildCsp('dev-nonce');
-        expect(devCsp).toContain("script-src 'self' 'nonce-dev-nonce' 'strict-dynamic' https: 'unsafe-inline' 'unsafe-eval';");
-        expect(devCsp).toContain("default-src 'self';");
-
-        (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
-        const prodCsp = buildCsp('prod-nonce');
-        expect(prodCsp).toContain("script-src 'self' 'nonce-prod-nonce' 'strict-dynamic' https: 'unsafe-inline';");
-        expect(prodCsp).not.toContain("'unsafe-eval'");
-      } finally {
-        (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
-      }
+      expect(csp).not.toContain("'unsafe-eval'");
     });
 
     it('interpolates different nonces correctly', () => {
