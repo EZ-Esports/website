@@ -85,11 +85,13 @@ vi.mock('next/cache', () => ({
 
 import {
   getScopedSchoolId,
+  requireRosterPermission,
+} from '@/app/(admin)/admin/roster/rbac';
+import {
   createMember,
   updateMember,
   deleteMember,
   listSchoolMembers,
-  requireRosterPermission,
 } from '@/app/(admin)/admin/roster/actions';
 
 describe('Roster Actions RBAC (Issue #114)', () => {
