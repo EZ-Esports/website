@@ -47,6 +47,7 @@ describe("School Application Form Validation & Consolidation", () => {
     contributeBeyondSchool: { notAtThisTime: true },
     feedback: "Excited for the upcoming season!",
     agreedRules: true,
+    agreedMediaRelease: true,
   };
 
   it("validates a complete 4-layer form with no errors", () => {
@@ -122,9 +123,20 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(errors.agreedRules).toBeDefined();
   });
 
+  it("requires media release agreement when set to false", () => {
+    const withoutMedia = { ...validForm, agreedMediaRelease: false };
+    const errors = validateSchoolApplicationForm(withoutMedia);
+    expect(errors.agreedMediaRelease).toBeDefined();
+  });
+
   it("records Disagreed in compiled message payload when agreedRules is false", () => {
     const payload = compileApplicationPayload({ ...validForm, agreedRules: false });
     expect(payload.message).toContain("Rules Agreement: Disagreed");
+  });
+
+  it("records Disagreed in compiled message payload when agreedMediaRelease is false", () => {
+    const payload = compileApplicationPayload({ ...validForm, agreedMediaRelease: false });
+    expect(payload.message).toContain("Media Release Agreement: Disagreed");
   });
 
   it("compiles message payload correctly with all 4 layers", () => {
@@ -139,6 +151,7 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(payload.message).toContain("=== 4. CLUB INFO ===");
     expect(payload.message).toContain("Valorant, Clash Royale");
     expect(payload.message).toContain("Rules Agreement: Agreed");
+    expect(payload.message).toContain("Media Release Agreement: Agreed");
   });
 
   it("builds structured details alongside the compiled message", () => {
@@ -154,11 +167,26 @@ describe("School Application Form Validation & Consolidation", () => {
     });
     expect(payload.details.club.interestedGames).toEqual(["Valorant", "Clash Royale"]);
     expect(payload.details.agreedRules).toBe(true);
+    expect(payload.details.agreedMediaRelease).toBe(true);
   });
 
   it("parses a compiled message back into the same structured details", () => {
     const payload = compileApplicationPayload(validForm);
     expect(parseSchoolApplicationMessage(payload.message)).toEqual(payload.details);
+  });
+
+  it("parses a historical v2 message without Media Release Agreement with agreedMediaRelease as undefined", () => {
+    const payload = compileApplicationPayload(validForm);
+    const historicalV2Message = payload.message.replace("\nMedia Release Agreement: Agreed", "");
+    const parsed = parseSchoolApplicationMessage(historicalV2Message);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.version).toBe(2);
+    expect((parsed as any).agreedRules).toBe(true);
+    expect((parsed as any).agreedMediaRelease).toBeUndefined();
+
+    const formatted = formatSchoolApplicationDetails(parsed!);
+    expect(formatted.find((r) => r.label === "Media Release Agreement")).toBeUndefined();
+    expect(formatted.find((r) => r.label === "Rules Agreement")?.value).toBe("Agreed");
   });
 
   it("returns null when a message doesn't match the known template", () => {

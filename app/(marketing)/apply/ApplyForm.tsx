@@ -116,6 +116,7 @@ const initialForm = {
   contributeBeyondSchool: emptySelection(CHECKBOX_GROUP_LABELS.contributeBeyondSchool.labels, CHECKBOX_GROUP_LABELS.contributeBeyondSchool.hasOther),
   feedback: '',
   agreedRules: false,
+  agreedMediaRelease: false,
 };
 
 type CheckboxGroupKey = keyof typeof CHECKBOX_GROUP_LABELS;
@@ -266,6 +267,7 @@ export default function ApplyForm() {
       !!form.separateGamingClubs.trim(),
       isCheckboxGroupComplete(form.contributeBeyondSchool),
       form.agreedRules,
+      form.agreedMediaRelease,
     ],
   };
 
@@ -340,6 +342,11 @@ export default function ApplyForm() {
   const handleRulesChange = (checked: boolean) => {
     setForm((prev) => ({ ...prev, agreedRules: checked }));
     clearFieldErrors('agreedRules');
+  };
+
+  const handleMediaReleaseChange = (checked: boolean) => {
+    setForm((prev) => ({ ...prev, agreedMediaRelease: checked }));
+    clearFieldErrors('agreedMediaRelease');
   };
 
   const handleCheckboxGroupChange = <G extends CheckboxGroupKey>(group: G, key: CheckboxOptionKey<G>, checked: boolean) => {
@@ -1550,6 +1557,71 @@ export default function ApplyForm() {
                   </label>
                   {fieldErrors.agreedRules && (
                     <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
+                  )}
+                </div>
+
+                {/* Media & Photo Likeness Consent & Release for Minors */}
+                <div
+                  id="field-agreedMediaRelease"
+                  className={`rounded-xl border p-4 sm:p-5 transition-colors ${fieldErrors.agreedMediaRelease ? "border-danger bg-danger/5" : "border-line bg-accent/5"}`}
+                  role="group"
+                  aria-labelledby="agreedMediaRelease-label"
+                  aria-describedby={fieldErrors.agreedMediaRelease ? 'agreedMediaRelease-error' : undefined}
+                >
+                  <span id="agreedMediaRelease-label" className={labelClass}>
+                    Media &amp; Photo Likeness Consent &amp; Release for Minors {requiredMark}
+                  </span>
+                  <div className="text-xs text-foreground-secondary mb-3 space-y-2 leading-relaxed">
+                    <p>
+                      Participating high school students may appear in public live match broadcasts (Twitch, YouTube), event photographs in the community gallery, and official match scoreboards.
+                    </p>
+                    <p>
+                      By checking this box, you confirm that your school advisor, coach, or club leadership has obtained the necessary parental/guardian media release forms or local school district consent according to school policies.
+                    </p>
+                    <p className="bg-surface/60 rounded-lg p-2.5 border border-line/50">
+                      <strong className="text-foreground">Privacy Hold Notice:</strong> Explicit notice that students with privacy flags or protective holds may opt out of photography and public name display, participating under anonymized gamer tags by contacting{' '}
+                      <a
+                        href="mailto:privacy@ezesports.org"
+                        className="text-accent underline hover:text-accent-secondary font-medium"
+                      >
+                        privacy@ezesports.org
+                      </a>
+                      . Additional details regarding student media likeness rights can be found in our{' '}
+                      <Link
+                        href="/privacy#media-minor-likeness"
+                        target="_blank"
+                        className="text-accent underline hover:text-accent-secondary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Privacy Policy
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                  <label className="flex items-start gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                    <input
+                      type="checkbox"
+                      name="agreedMediaRelease"
+                      checked={form.agreedMediaRelease}
+                      onChange={(e) => handleMediaReleaseChange(e.target.checked)}
+                      className="w-4.5 h-4.5 mt-0.5 rounded border-line accent-accent cursor-pointer shrink-0"
+                      aria-invalid={!!fieldErrors.agreedMediaRelease}
+                      aria-describedby={fieldErrors.agreedMediaRelease ? 'agreedMediaRelease-error' : undefined}
+                    />
+                    <span>
+                      I confirm that our school advisor/coach has obtained necessary parental/guardian media release forms or local school district consent according to school policies, and acknowledge that students with privacy flags or protective holds may opt out of photography and public name display by contacting{' '}
+                      <a
+                        href="mailto:privacy@ezesports.org"
+                        className="text-accent underline hover:text-accent-secondary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        privacy@ezesports.org
+                      </a>
+                      .
+                    </span>
+                  </label>
+                  {fieldErrors.agreedMediaRelease && (
+                    <p id="agreedMediaRelease-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedMediaRelease}</p>
                   )}
                 </div>
 

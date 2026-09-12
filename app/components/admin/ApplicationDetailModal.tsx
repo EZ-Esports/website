@@ -103,6 +103,9 @@ function DetailsBody({ details, message }: { details: SchoolApplicationDetails |
         <DetailSection title="Feedback">
           <DetailField label="Feedback / Notes" value={details.feedback} />
           <DetailField label="Rules Agreement" value={details.agreedRules ? "Agreed" : "Disagreed"} />
+          {details.agreedMediaRelease !== undefined && (
+            <DetailField label="Media Release Agreement" value={details.agreedMediaRelease ? "Agreed" : "Disagreed"} />
+          )}
         </DetailSection>
       </div>
     );
