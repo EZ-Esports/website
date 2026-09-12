@@ -282,9 +282,9 @@ export default function PrivacyPage() {
               7. Service Providers
             </h2>
             <p>
-              EZ Esports maintains an accurate internal register of every provider that can
+              EZ Esports must maintain an accurate internal register of every provider that can
               access personal information, the purpose of access, the data involved, location,
-              retention, security terms, and deletion method. Its contracts with providers
+              retention, security terms, and deletion method. Contracts with providers should
               require confidentiality, appropriate safeguards, incident notice, purpose limits,
               deletion, and assistance with rights requests. A provider may not use student
               information for its own advertising or product development when the law or school
@@ -385,8 +385,9 @@ export default function PrivacyPage() {
             <p>
               Strictly necessary security and authentication technologies may operate by default.
               On portions of the Services directed to minors, nonessential analytics, advertising,
-              or similar tracking remain off unless valid separate consent or another lawful basis
-              applies. EZ Esports does not permit targeted advertising based on student activity.
+              or similar tracking should remain off unless valid separate consent or another
+              lawful basis applies. EZ Esports does not permit targeted advertising based on
+              student activity.
             </p>
           </div>
 
@@ -396,10 +397,10 @@ export default function PrivacyPage() {
             </h2>
             <p>
               Discord, Twitch, YouTube, game publishers, social networks, and other linked
-              services have their own privacy practices and age requirements. EZ Esports avoids
-              requiring a platform for a student when the platform&apos;s minimum age or school
-              rules make that use inappropriate, and offers a reasonable advisor-based alternative
-              for essential communications when practical.
+              services have their own privacy practices and age requirements. EZ Esports should
+              avoid requiring a platform for a student when the platform&apos;s minimum age or
+              school rules make that use inappropriate and should offer a reasonable
+              advisor-based alternative for essential communications when practical.
             </p>
           </div>
 
