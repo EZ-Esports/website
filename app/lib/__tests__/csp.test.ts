@@ -3,6 +3,22 @@ import { NextRequest } from 'next/server';
 import { buildCsp, createCsp, generateCsp, updateSession } from '@/app/lib/supabase/middleware';
 import { proxy } from '@/proxy';
 
+const mockGetClaims = vi.fn();
+let mockSetAllCookies: Array<{ name: string; value: string; options?: Record<string, unknown> }> = [];
+
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: vi.fn((_url: string, _key: string, config: { cookies?: { setAll?: (cookies: Array<{ name: string; value: string; options?: Record<string, unknown> }>) => void } }) => {
+    if (mockSetAllCookies.length > 0 && config?.cookies?.setAll) {
+      config.cookies.setAll(mockSetAllCookies);
+    }
+    return {
+      auth: {
+        getClaims: mockGetClaims,
+      },
+    };
+  }),
+}));
+
 describe('Content-Security-Policy (CSP)', () => {
   const REQUIRED_DIRECTIVES = [
     "default-src 'self';",
@@ -19,13 +35,37 @@ describe('Content-Security-Policy (CSP)', () => {
   ];
 
   describe('buildCsp directive construction', () => {
-    it('constructs CSP containing all required security directives', () => {
-      const nonce = 'dGVzdC1ub25jZQ==';
-      const csp = buildCsp(nonce);
+    it('constructs CSP containing all required security directives in production/test', () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+      try {
+        const nonce = 'dGVzdC1ub25jZQ==';
+        const csp = buildCsp(nonce);
 
-      for (const directiveTemplate of REQUIRED_DIRECTIVES) {
-        const expected = directiveTemplate.replace('{{nonce}}', nonce);
-        expect(csp).toContain(expected);
+        for (const directiveTemplate of REQUIRED_DIRECTIVES) {
+          const expected = directiveTemplate.replace('{{nonce}}', nonce);
+          expect(csp).toContain(expected);
+        }
+        expect(csp).not.toContain("'unsafe-eval'");
+      } finally {
+        (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
+      }
+    });
+
+    it("includes 'unsafe-eval' conditionally in development mode", () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
+        const devCsp = buildCsp('dev-nonce');
+        expect(devCsp).toContain("script-src 'self' 'nonce-dev-nonce' 'strict-dynamic' https: 'unsafe-inline' 'unsafe-eval';");
+        expect(devCsp).toContain("default-src 'self';");
+
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+        const prodCsp = buildCsp('prod-nonce');
+        expect(prodCsp).toContain("script-src 'self' 'nonce-prod-nonce' 'strict-dynamic' https: 'unsafe-inline';");
+        expect(prodCsp).not.toContain("'unsafe-eval'");
+      } finally {
+        (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
       }
     });
 
@@ -113,10 +153,12 @@ describe('Content-Security-Policy (CSP)', () => {
     });
   });
 
-  describe('auth routes and cookie handling', () => {
+  describe('auth routes, redirects, and cookie handling', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
+      mockSetAllCookies = [];
+      mockGetClaims.mockReset();
       process.env = {
         ...originalEnv,
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
@@ -130,6 +172,8 @@ describe('Content-Security-Policy (CSP)', () => {
     });
 
     it('preserves CSP headers on auth routes for unauthenticated users', async () => {
+      mockGetClaims.mockResolvedValue({ data: { claims: null } });
+
       const req = new NextRequest('https://ez-esports.vercel.app/admin');
       const res = await updateSession(req);
 
@@ -139,6 +183,40 @@ describe('Content-Security-Policy (CSP)', () => {
       const csp = res.headers.get('Content-Security-Policy');
       expect(csp).toBeTruthy();
       expect(csp).toContain(`'nonce-${nonce}'`);
+    });
+
+    it('preserves CSP header and forwards refreshed session cookies on /login redirect', async () => {
+      mockGetClaims.mockResolvedValue({
+        data: {
+          claims: { sub: 'staff-user-id', email: 'staff@ezesports.org' },
+        },
+      });
+      mockSetAllCookies = [
+        {
+          name: 'sb-access-token',
+          value: 'new-refreshed-token',
+          options: { path: '/', httpOnly: true },
+        },
+      ];
+
+      const req = new NextRequest('https://ez-esports.vercel.app/login');
+      const res = await updateSession(req);
+
+      // Verify redirect target
+      expect(res.status).toBe(307);
+      expect(res.headers.get('Location')).toBe('https://ez-esports.vercel.app/admin');
+
+      // Verify CSP is preserved on redirect response
+      const nonce = req.headers.get('x-nonce');
+      expect(nonce).toBeTruthy();
+      const csp = res.headers.get('Content-Security-Policy');
+      expect(csp).toBeTruthy();
+      expect(csp).toContain(`'nonce-${nonce}'`);
+
+      // Verify refreshed cookies are preserved on redirect response
+      const cookie = res.cookies.get('sb-access-token');
+      expect(cookie).toBeDefined();
+      expect(cookie?.value).toBe('new-refreshed-token');
     });
   });
 });

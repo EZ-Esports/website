@@ -66,8 +66,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-  void nonce;
+  // Awaiting headers opts the layout tree into dynamic rendering so Next.js
+  // can inject per-request CSP nonces into script tags during SSR.
+  await headers();
 
   return (
     <html lang="en">
