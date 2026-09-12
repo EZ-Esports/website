@@ -40,6 +40,7 @@ export interface SchoolApplicationFormData {
   contributeBeyondSchool: Record<string, boolean>;
   feedback?: string;
   agreedRules?: boolean;
+  agreedMediaRelease?: boolean;
 }
 
 // `satisfies` (rather than an explicit `: Record<string, string>` annotation)
@@ -175,6 +176,10 @@ export function validateSchoolApplicationForm(form: SchoolApplicationFormData) {
     errors.agreedRules = "You must agree to the EZ Esports league rules and terms.";
   }
 
+  if (!form.agreedMediaRelease) {
+    errors.agreedMediaRelease = "You must confirm the media and photo likeness release for minors.";
+  }
+
   return errors;
 }
 
@@ -227,6 +232,7 @@ export interface SchoolApplicationDetailsV2 {
   };
   feedback: string;
   agreedRules: boolean;
+  agreedMediaRelease?: boolean;
 }
 
 export type SchoolApplicationDetails = SchoolApplicationDetailsV1 | SchoolApplicationDetailsV2;
@@ -290,6 +296,7 @@ Inclusive Participation Opportunities: ${inclusiveOpportunities.join(", ")}
 Separate Gaming Clubs/Groups: ${form.separateGamingClubs.trim()}
 Interested in Contributing Beyond School: ${contributeBeyondSchool.join(", ")}
 Rules Agreement: ${form.agreedRules ? 'Agreed' : 'Disagreed'}
+Media Release Agreement: ${form.agreedMediaRelease ? 'Agreed' : 'Disagreed'}
 
 Feedback / Notes:
 ${form.feedback?.trim() || "N/A"}
@@ -353,6 +360,7 @@ export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): 
     },
     feedback: form.feedback?.trim() ?? '',
     agreedRules: !!form.agreedRules,
+    agreedMediaRelease: !!form.agreedMediaRelease,
   };
 }
 
@@ -391,6 +399,7 @@ function formatSchoolApplicationDetailsV2(d: SchoolApplicationDetailsV2): { labe
     { label: 'Contribute Beyond School', value: list(d.club.contributeBeyondSchool) },
     { label: 'Feedback', value: d.feedback || '—' },
     { label: 'Rules Agreement', value: d.agreedRules ? 'Agreed' : 'Disagreed' },
+    ...(d.agreedMediaRelease !== undefined ? [{ label: 'Media Release Agreement', value: d.agreedMediaRelease ? 'Agreed' : 'Disagreed' }] : []),
   ];
 }
 
@@ -470,7 +479,8 @@ const SCHOOL_MESSAGE_PATTERN_V2 = new RegExp(
   'Inclusive Participation Opportunities: (?<inclusive>.*)\\n' +
   'Separate Gaming Clubs/Groups: (?<separate>.*)\\n' +
   'Interested in Contributing Beyond School: (?<contribute>.*)\\n' +
-  'Rules Agreement: (?<rulesAgreement>.*)\\n\\n' +
+  'Rules Agreement: (?<rulesAgreement>.*)\\n' +
+  '(?:Media Release Agreement: (?<mediaReleaseAgreement>.*)\\n)?\\n' +
   'Feedback / Notes:\\n' +
   '(?<feedback>[\\s\\S]*)$'
 );
@@ -530,6 +540,7 @@ function parseSchoolApplicationMessageV2(message: string): SchoolApplicationDeta
     },
     feedback: g.feedback.trim(),
     agreedRules: g.rulesAgreement.trim() === 'Agreed',
+    agreedMediaRelease: g.mediaReleaseAgreement ? g.mediaReleaseAgreement.trim() === 'Agreed' : undefined,
   };
 }
 

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = 'June 2025';
+  const lastUpdated = 'September 2026';
 
   return (
     <main>
@@ -131,18 +131,74 @@ export default function PrivacyPage() {
             </ul>
           </div>
 
+          <div id="media-minor-likeness" className="space-y-4 scroll-mt-28">
+            <h2 className="text-xl font-bold text-foreground">
+              6. Media Broadcasts, Event Photography &amp; Minor Likeness Rights
+            </h2>
+            <p>
+              As a scholastic esports league celebrating student achievements across New York City, EZ Esports produces public live match broadcasts, captures event photography, and publishes tournament results:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong className="text-foreground">Live Streaming &amp; Broadcasts</strong> — Competitive league matches may be live-streamed and archived on public video platforms including Twitch and YouTube. Broadcasts may include live in-game gameplay, player camera feeds, caster commentary, and student gamer tags.
+              </li>
+              <li>
+                <strong className="text-foreground">Event Photography &amp; Community Gallery</strong> — In-person events such as LAN finals, seasonal tournaments, workshops, and championship celebrations may be photographed. Selected high-resolution photographs showcasing participants, teams, and attendees may appear in our public community gallery, on our website, or in official league announcements.
+              </li>
+              <li>
+                <strong className="text-foreground">Public Match Scoreboards &amp; Standings</strong> — Official match outcomes, scores, leaderboards, and team rosters (displaying student gamer tags and school affiliations) are made publicly available to ensure competitive transparency and celebrate student performance.
+              </li>
+            </ul>
+            <p>
+              <strong className="text-foreground">Parental/Guardian Consent &amp; School Verification:</strong> Because the majority of our student competitors are minors enrolled in high school, participating schools (via their designated faculty advisor, coach, or club leadership) are required to verify that they have obtained requisite parental or guardian media release forms or confirmed compliance with their local school district&apos;s media consent regulations (such as NYC Public Schools media consent policies) prior to submitting students for public broadcast rosters or event photography.
+            </p>
+            <div className="bg-surface-raised/40 border border-line/60 rounded-xl p-4 sm:p-5 space-y-3">
+              <h3 className="text-base font-bold text-foreground">
+                Privacy Holds &amp; Media Opt-Out Procedure for Students, Parents, and Faculty
+              </h3>
+              <p>
+                We respect the privacy and safety of all participants. Students with active privacy flags, protective court orders, sensitive family situations, or personal objections—as well as their parents, legal guardians, or school faculty—may opt out of event photography and public likeness display at any time without forfeiting league participation:
+              </p>
+              <ul className="list-disc pl-6 space-y-2">
+                <li>
+                  <strong className="text-foreground">How to Request an Opt-Out:</strong> Submit a written request to{' '}
+                  <a
+                    href="mailto:privacy@ezesports.org"
+                    className="text-accent hover:underline font-semibold"
+                  >
+                    privacy@ezesports.org
+                  </a>{' '}
+                  specifying the student&apos;s name, school, current gamer tag, and desired accommodations (e.g., photography opt-out, broadcast camera suppression, or full scoreboard anonymity).
+                </li>
+                <li>
+                  <strong className="text-foreground">Anonymized Gamer Tags &amp; Scoreboards:</strong> Approved privacy-hold participants may compete under anonymized, randomized player aliases (e.g., &quot;Player 1&quot; or designated pseudonyms) on public match scoreboards and broadcast overlays to protect their real-world identities.
+                </li>
+                <li>
+                  <strong className="text-foreground">Takedown &amp; Photo Modification:</strong> If a student with an active privacy hold is identified in any community gallery photo or broadcast archive, we will promptly blur, crop, or remove the media upon notice to{' '}
+                  <a
+                    href="mailto:privacy@ezesports.org"
+                    className="text-accent hover:underline font-semibold"
+                  >
+                    privacy@ezesports.org
+                  </a>
+                  .
+                </li>
+              </ul>
+            </div>
+          </div>
+
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">6. Data Retention</h2>
+            <h2 className="text-xl font-bold text-foreground">7. Data Retention</h2>
             <p>
               We retain personal information only as long as necessary for the purposes described
               in this policy or as required by law. League season data (standings, rosters) may be
               retained indefinitely for archival purposes. You may request deletion of your personal
-              data by contacting us (see Section 9).
+              data by contacting us (see Section 10).
             </p>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">7. Security</h2>
+            <h2 className="text-xl font-bold text-foreground">8. Security</h2>
             <p>
               We implement reasonable technical and organizational safeguards to protect information
               against unauthorized access, alteration, disclosure, or destruction. These include
@@ -153,7 +209,7 @@ export default function PrivacyPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">8. Third-Party Links</h2>
+            <h2 className="text-xl font-bold text-foreground">9. Third-Party Links</h2>
             <p>
               Our website may contain links to third-party platforms such as Twitch, YouTube,
               Discord, Instagram, and Twitter/X. This Privacy Policy does not apply to those sites.
@@ -162,18 +218,25 @@ export default function PrivacyPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">9. Your Rights and Choices</h2>
+            <h2 className="text-xl font-bold text-foreground">10. Your Rights and Choices</h2>
             <p>
               Depending on your jurisdiction, you may have rights to access, correct, or delete your
               personal information, or to object to certain processing. To exercise these rights or
               ask questions about your data, please contact us at:
             </p>
-            <p>
+            <p className="flex flex-wrap gap-x-4 gap-y-1">
               <a
                 href="mailto:info@ezesports.org"
                 className="text-accent hover:underline font-medium"
               >
                 info@ezesports.org
+              </a>
+              <span className="text-foreground-muted">·</span>
+              <a
+                href="mailto:privacy@ezesports.org"
+                className="text-accent hover:underline font-medium"
+              >
+                privacy@ezesports.org
               </a>
             </p>
             <p>
@@ -184,7 +247,7 @@ export default function PrivacyPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">10. Changes to This Policy</h2>
+            <h2 className="text-xl font-bold text-foreground">11. Changes to This Policy</h2>
             <p>
               We may update this Privacy Policy from time to time. When we do, we will update the
               &quot;Last updated&quot; date at the top of this page. Continued use of our website after any
@@ -194,20 +257,29 @@ export default function PrivacyPage() {
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">11. Contact Us</h2>
+            <h2 className="text-xl font-bold text-foreground">12. Contact Us</h2>
             <p>
-              If you have any questions, concerns, or requests regarding this Privacy Policy or our
-              data practices, please reach out to:
+              If you have any questions, concerns, or requests regarding this Privacy Policy, media
+              releases, privacy holds, or our data practices, please reach out to:
             </p>
             <address className="not-italic space-y-1">
               <p className="font-semibold text-foreground">EZ Esports</p>
               <p>
-                Email:{' '}
+                General Inquiries:{' '}
                 <a
                   href="mailto:info@ezesports.org"
                   className="text-accent hover:underline"
                 >
                   info@ezesports.org
+                </a>
+              </p>
+              <p>
+                Privacy &amp; Media Release Holds:{' '}
+                <a
+                  href="mailto:privacy@ezesports.org"
+                  className="text-accent hover:underline"
+                >
+                  privacy@ezesports.org
                 </a>
               </p>
               <p>New York City, NY</p>
