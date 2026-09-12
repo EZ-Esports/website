@@ -70,10 +70,47 @@ export default function Markdown({ content }: MarkdownProps) {
   );
 }
 
+/**
+ * Validates and classifies URLs for Markdown links.
+ * Allows:
+ * - Safe external schemes: http://, https://, mailto:
+ * - Safe internal routes/links: relative URLs starting with / (excluding // and /\) or #
+ * Unsafe schemes (javascript:, data:, vbscript:, file:, etc.) and disallowed formats return isSafe: false.
+ */
+export function isSafeMarkdownUrl(url: string): {
+  isSafe: boolean;
+  isExternal: boolean;
+  sanitizedUrl: string;
+} {
+  const trimmedUrl = url?.trim() || '';
+  if (!trimmedUrl) {
+    return { isSafe: false, isExternal: false, sanitizedUrl: '' };
+  }
+
+  const lowerUrl = trimmedUrl.toLowerCase();
+  const isExternal =
+    lowerUrl.startsWith('http://') ||
+    lowerUrl.startsWith('https://') ||
+    lowerUrl.startsWith('mailto:');
+
+  const isInternal =
+    (trimmedUrl.startsWith('/') &&
+      !trimmedUrl.startsWith('//') &&
+      !trimmedUrl.startsWith('/\\')) ||
+    trimmedUrl.startsWith('#');
+
+  return {
+    isSafe: isExternal || isInternal,
+    isExternal,
+    sanitizedUrl: trimmedUrl,
+  };
+}
+
 // Inline parser for bold, italics, links, and code
 function renderInline(text: string) {
   // Regex pattern for markdown tokens: [link](url), **bold**, *italic*, `code`
-  const tokenRegex = /(\[.*?\]\(.*?\))|(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)/g;
+  // Note: link url regex unrolls repetition to avoid ReDoS / catastrophic backtracking
+  const tokenRegex = /(\[[^\]]*\]\([^()]*(?:\([^()]*\)[^()]*)*\))|(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)/g;
   const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
@@ -81,18 +118,23 @@ function renderInline(text: string) {
 
     // Link: [label](url)
     if (part.startsWith('[') && part.includes('](')) {
-      const match = part.match(/\[(.*?)\]\((.*?)\)/);
+      const match = part.match(/^\[([\s\S]*?)\]\(([\s\S]*)\)$/) || part.match(/\[(.*?)\]\((.*?)\)/);
       if (match) {
         const [, label, url] = match;
-        // Check if external or internal
-        const isExternal = url.startsWith('http') || url.startsWith('mailto');
+        const { isSafe, isExternal, sanitizedUrl } = isSafeMarkdownUrl(url);
+
+        // Disallowed schemes (javascript:, data:, etc.) are rendered as plain text
+        if (!isSafe) {
+          return label;
+        }
+
         const linkProps = isExternal
           ? { target: '_blank', rel: 'noopener noreferrer' }
           : {};
         return (
           <Link
             key={index}
-            href={url}
+            href={sanitizedUrl}
             className="text-accent hover:underline font-semibold"
             {...linkProps}
           >
