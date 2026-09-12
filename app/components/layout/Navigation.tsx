@@ -18,15 +18,20 @@ export default function Navigation({ onNavigate }: NavigationProps) {
     onNavigate?.();
   };
 
-  const isSubItemActive = (href: string) => {
+  const matchesRoute = (href: string) => {
     if (href === '/') {
       return pathname === '/';
     }
-    return pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const isDropdownActive = (items: { href: string }[]) => {
-    return items.some((subItem) => isSubItemActive(subItem.href));
+  // When multiple sibling items match (e.g. '/apply' and '/apply/staff' both
+  // match pathname '/apply/staff'), only the most specific (longest) href
+  // should be treated as active — otherwise every prefix match lights up.
+  const getActiveHref = (items: { href: string }[]) => {
+    const matches = items.filter((subItem) => matchesRoute(subItem.href));
+    if (matches.length === 0) return null;
+    return matches.reduce((best, subItem) => (subItem.href.length > best.href.length ? subItem : best)).href;
   };
 
   const getButtonClass = (isActive: boolean) =>
@@ -74,7 +79,8 @@ export default function Navigation({ onNavigate }: NavigationProps) {
     <nav className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4 lg:gap-6 w-full">
       {leagueNavItems.map((item) => {
         const isOpen = activeDropdown === item.id;
-        const isActive = isDropdownActive(item.items);
+        const activeHref = getActiveHref(item.items);
+        const isActive = activeHref !== null;
 
         return (
           <div key={item.id} className="relative">
@@ -101,7 +107,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
               >
                 <Menu className="outline-none py-1 space-y-1">
                   {item.items.map((subItem) => {
-                    const isSubActive = isSubItemActive(subItem.href);
+                    const isSubActive = subItem.href === activeHref;
                     return (
                       <MenuItem
                         key={subItem.href}
