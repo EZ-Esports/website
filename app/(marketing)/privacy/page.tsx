@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import Hero from '@/app/components/sections/Hero';
 import Section from '@/app/components/ui/Section';
 
@@ -72,6 +73,23 @@ export default function PrivacyPage() {
               </a>{' '}
               so we can remove it promptly.
             </p>
+            <div className="p-4 rounded-xl border border-line/60 bg-surface-raised/40 space-y-2">
+              <h3 className="text-base font-semibold text-foreground">Student Privacy &amp; Scholastic Records</h3>
+              <p>
+                EZ Esports partners with schools and educational agencies to administer scholastic esports programs.
+                All student personally identifiable information (PII) is handled in strict compliance with New York State
+                Education Law § 2-D, 8 NYCRR Part 121, and FERPA. Student PII is never sold, rented, leased, or used for
+                commercial marketing. For comprehensive information regarding student data rights, cybersecurity safeguards,
+                and complaint procedures, please review our{' '}
+                <Link
+                  href="/parents-bill-of-rights"
+                  className="text-accent hover:underline font-medium"
+                >
+                  Parents&apos; Bill of Rights for Data Privacy and Security
+                </Link>
+                .
+              </p>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -180,6 +198,17 @@ export default function PrivacyPage() {
               We will respond to verifiable requests within a reasonable timeframe. Some information
               may need to be retained even after a deletion request to comply with legal obligations
               or legitimate organizational interests.
+            </p>
+            <p>
+              For student records and educational data covered by New York State Education Law § 2-D, parents and eligible
+              students should also consult our{' '}
+              <Link
+                href="/parents-bill-of-rights"
+                className="text-accent hover:underline font-medium"
+              >
+                Parents&apos; Bill of Rights for Data Privacy and Security
+              </Link>{' '}
+              for specific statutory rights and procedures.
             </p>
           </div>
 
