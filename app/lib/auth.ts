@@ -13,6 +13,7 @@ export interface StaffIdentity {
   permissions: bigint;
   isOwner: boolean;
   highestRolePosition: number;
+  schoolId?: string | null;
 }
 
 /**
@@ -147,6 +148,10 @@ export const getStaff = cache(async (): Promise<StaffIdentity | null> => {
     return null;
   }
 
+  const rawClaims = claims as Record<string, unknown>;
+  const userMetadata = (rawClaims.user_metadata ?? {}) as Record<string, unknown>;
+  const schoolId = (userMetadata.school_id as string | undefined) ?? (userMetadata.schoolId as string | undefined) ?? (rawClaims.school_id as string | undefined) ?? null;
+
   const userId = claims.sub as string;
   const email = await ensureStaffMember(userId, claims.email as string | undefined);
 
@@ -175,7 +180,7 @@ export const getStaff = cache(async (): Promise<StaffIdentity | null> => {
     everyoneRole ?? null,
   );
 
-  return { id: userId, email, permissions, isOwner, highestRolePosition };
+  return { id: userId, email, permissions, isOwner, highestRolePosition, schoolId };
 });
 
 /** Require an authenticated staff identity, regardless of assigned roles. */
