@@ -1,15 +1,10 @@
 'use server';
-import { requirePermission } from '@/app/lib/auth';
-import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
-
-async function requireRosterPermission() {
-  return requirePermission(Permissions.MANAGE_ROSTERS);
-}
+import { requireRosterPermission, getScopedSchoolId } from './rbac';
 
 // Safe wrapper for cache revalidations to support testing/scripts outside Next.js runtime
 function safeRevalidateTag(tag: string) {
@@ -34,14 +29,20 @@ function safeRevalidatePath(path: string) {
 // --- MEMBER ACTIONS ---
 
 export async function createMember(formData: FormData) {
-  await requireRosterPermission();
+  const staff = await requireRosterPermission();
   try {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
-    const schoolId = formData.get('schoolId') as string;
+    const requestedSchoolId = formData.get('schoolId') as string;
     const email = formData.get('email') as string;
     const discord = formData.get('discord') as string;
     const gradYear = formData.get('graduationYear') as string;
+
+    const scoped = getScopedSchoolId(staff, requestedSchoolId);
+    if (!scoped.success) {
+      return scoped;
+    }
+    const schoolId = scoped.schoolId || requestedSchoolId;
 
     if (!firstName || !lastName || !schoolId) {
       return { success: false, error: 'First Name, Last Name, and School are required.' };
@@ -66,14 +67,35 @@ export async function createMember(formData: FormData) {
 }
 
 export async function updateMember(id: string, formData: FormData) {
-  await requireRosterPermission();
+  const staff = await requireRosterPermission();
   try {
+    const [existingMember] = await db
+      .select({ id: schema.members.id, schoolId: schema.members.schoolId })
+      .from(schema.members)
+      .where(eq(schema.members.id, id))
+      .limit(1);
+
+    if (!existingMember) {
+      return { success: false, error: 'Member not found.' };
+    }
+
+    const existingScope = getScopedSchoolId(staff, existingMember.schoolId);
+    if (!existingScope.success) {
+      return existingScope;
+    }
+
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
-    const schoolId = formData.get('schoolId') as string;
+    const requestedSchoolId = formData.get('schoolId') as string;
     const email = formData.get('email') as string;
     const discord = formData.get('discord') as string;
     const gradYear = formData.get('graduationYear') as string;
+
+    const targetScope = getScopedSchoolId(staff, requestedSchoolId || existingMember.schoolId);
+    if (!targetScope.success) {
+      return targetScope;
+    }
+    const schoolId = targetScope.schoolId || requestedSchoolId || existingMember.schoolId;
 
     if (!firstName || !lastName || !schoolId) {
       return { success: false, error: 'First Name, Last Name, and School are required.' };
@@ -101,8 +123,23 @@ export async function updateMember(id: string, formData: FormData) {
 }
 
 export async function deleteMember(id: string) {
-  await requireRosterPermission();
+  const staff = await requireRosterPermission();
   try {
+    const [existingMember] = await db
+      .select({ id: schema.members.id, schoolId: schema.members.schoolId })
+      .from(schema.members)
+      .where(eq(schema.members.id, id))
+      .limit(1);
+
+    if (!existingMember) {
+      return { success: false, error: 'Member not found.' };
+    }
+
+    const scoped = getScopedSchoolId(staff, existingMember.schoolId);
+    if (!scoped.success) {
+      return scoped;
+    }
+
     await db.delete(schema.members).where(eq(schema.members.id, id));
     safeRevalidateTag('members');
     safeRevalidatePath('/admin/roster');
@@ -332,11 +369,16 @@ export async function deleteRosterMember(id: string) {
 // of the page shipping every member and player to the client up front) ---
 
 export async function listSchoolMembers(schoolId: string) {
-  await requireRosterPermission();
+  const staff = await requireRosterPermission();
+  const scoped = getScopedSchoolId(staff, schoolId);
+  if (!scoped.success) {
+    throw new Error(scoped.error);
+  }
+  const targetSchoolId = scoped.schoolId || schoolId;
   return db
     .select()
     .from(schema.members)
-    .where(eq(schema.members.schoolId, schoolId))
+    .where(eq(schema.members.schoolId, targetSchoolId))
     .orderBy(asc(schema.members.firstName), asc(schema.members.lastName));
 }
 
