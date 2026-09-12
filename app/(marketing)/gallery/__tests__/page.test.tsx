@@ -89,19 +89,6 @@ describe('Community Gallery Page & Showcase Integration (/gallery)', () => {
       expect(html).toContain('aria-label="View photo: Test Photo 2: LAN Finals Arena"');
       expect(html).toContain('View Photo');
     });
-
-    it('renders the event photo submissions CTA and note', async () => {
-      const jsx = await GalleryPage();
-      const html = renderToStaticMarkup(jsx);
-
-      expect(html).toContain('Have Photos From An EZ Esports Event?');
-      expect(html).toContain('Submit Event Photos');
-      expect(html).toContain('Submit via Discord');
-      expect(html).toContain('Email Photo Desk');
-      expect(html).toContain('https://discord.com/invite/RajSZqNyvu');
-      expect(html).toContain('mailto:info@ezesports.org');
-      expect(html).toContain('Please include school name, event date, and photographer credit');
-    });
   });
 
   describe('Navigation, Constants & Sitemap Integration', () => {

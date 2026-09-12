@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import Hero from '@/app/components/sections/Hero';
 import Section from '@/app/components/ui/Section';
-import { SectionHeader, Eyebrow } from '@/app/components/ui/SectionHeader';
-import CutCTA from '@/app/components/ui/CutCTA';
+import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import GalleryGrid from './GalleryGrid';
 import { galleryImages1 } from '@/app/lib/homepage-data';
 import { getCachedHomepageGallery } from '@/app/lib/db/queries';
@@ -51,30 +50,6 @@ export default async function GalleryPage() {
           lead="Explore moments captured across our seasonal tournaments, five-borough LAN championships, watch parties, and student esports meetups."
         />
         <GalleryGrid items={galleryItems} />
-      </Section>
-
-      {/* 3. Event Photo Submissions CTA Section */}
-      <Section tone="sunken" className="border-t border-line">
-        <div className="max-w-3xl mx-auto text-center space-y-6">
-          <Eyebrow className="inline-block">Submit Event Photos</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">
-            Have Photos From An EZ Esports Event?
-          </h2>
-          <p className="text-foreground-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-            Were you at an EZ Esports tournament, LAN party, or school meetup? We welcome photo submissions from students, coaches, photographers, and fans to feature in our community gallery.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <CutCTA href="https://discord.com/invite/RajSZqNyvu" external variant="primary">
-              Submit via Discord
-            </CutCTA>
-            <CutCTA href="mailto:info@ezesports.org" external variant="outline">
-              Email Photo Desk
-            </CutCTA>
-          </div>
-          <p className="text-xs text-foreground-muted">
-            Please include school name, event date, and photographer credit with your submission.
-          </p>
-        </div>
       </Section>
     </main>
   );
