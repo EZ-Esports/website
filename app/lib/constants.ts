@@ -24,6 +24,7 @@ export const ROUTES = {
   staffApp: '/apply/staff',
   sponsors: '/sponsors',
   privacy: '/privacy',
+  rules: '/rules',
 } as const;
 
 export const getLeadershipRoute = (year: string): string => `${ROUTES.leadership}/${year}`;
@@ -202,6 +203,7 @@ export const FOOTER_LINKS = [
   { label: 'Sponsors', href: '/sponsors' },
   { label: 'About', href: '/about' },
   { label: 'Archives', href: '/archives' },
+  { label: 'League Rules', href: '/rules' },
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Staff Login', href: '/login' },
 ] as const;

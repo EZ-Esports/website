@@ -12,6 +12,7 @@ import {
 } from '@/app/lib/school-application-form';
 import Button from '@/app/components/ui/Button';
 import { Textarea } from '@/app/components/ui/form';
+import Link from 'next/link';
 
 const GRAD_YEARS = ["'27", "'28", "'29", "'30"] as const;
 
@@ -1534,7 +1535,18 @@ export default function ApplyForm() {
                       aria-invalid={!!fieldErrors.agreedRules}
                       aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
                     />
-                    <span>I understand and agree to uphold all EZ Esports league rules, competitive integrity guidelines, and participation terms.</span>
+                    <span>
+                      I understand and agree to uphold all EZ Esports{' '}
+                      <Link
+                        href="/rules"
+                        target="_blank"
+                        className="text-accent underline hover:text-accent-secondary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        league rules
+                      </Link>
+                      , competitive integrity guidelines, and participation terms.
+                    </span>
                   </label>
                   {fieldErrors.agreedRules && (
                     <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
