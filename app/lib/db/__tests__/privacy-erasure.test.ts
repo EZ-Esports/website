@@ -86,16 +86,30 @@ describe('Privacy erasure migration (0035)', () => {
       );
     });
 
-    it('returns OLD on authorized DELETE', () => {
+    it('returns OLD on authorized DELETE and logs audit for application tables only', () => {
       expect(migration0035).toMatch(
-        /IF TG_OP = 'DELETE' THEN[\s\S]*IF privacy_erasure_allowed THEN[\s\S]*RETURN OLD;/
+        /IF TG_OP = 'DELETE' THEN[\s\S]*IF privacy_erasure_allowed THEN[\s\S]*log_privacy_erasure_event[\s\S]*RETURN OLD;/
+      );
+      expect(migration0035).toMatch(
+        /TG_TABLE_NAME IN \('school_applications', 'staff_applications'\)/
       );
     });
 
-    it('allows UPDATE when privacy erasure is authorized (except status logs)', () => {
-      expect(migration0035).toMatch(
-        /ELSIF privacy_erasure_allowed THEN[\s\S]*RETURN NEW;/
+    it('still rejects id and submitted_at changes when privacy erasure is authorized', () => {
+      expect(migration0035).toContain(
+        "RAISE EXCEPTION 'School application id and submitted_at are immutable'"
       );
+      expect(migration0035).toContain(
+        "RAISE EXCEPTION 'Staff application id and submitted_at are immutable'"
+      );
+    });
+
+    it('logs redact audit from trigger when authorized UPDATE changes PII or soft-delete columns', () => {
+      expect(migration0035).toContain('"public"."log_privacy_erasure_event"');
+      expect(migration0035).toMatch(
+        /IF privacy_erasure_allowed THEN[\s\S]*redacted_columns[\s\S]*log_privacy_erasure_event[\s\S]*'redact'/
+      );
+      expect(migration0035).toContain("current_setting('app.privacy_erasure_actor', true)");
     });
 
     it('keeps SET search_path = empty on the trigger function', () => {
@@ -126,7 +140,7 @@ describe('Privacy erasure migration (0035)', () => {
       expect(migration0035).not.toContain('"reason"');
     });
 
-    it('audit inserts store metadata only, not original PII column values', () => {
+    it('resets transaction-local GUCs after success and on exception', () => {
       const schoolProcedure = migration0035.slice(
         migration0035.indexOf('"public"."erase_school_application_privacy"'),
         migration0035.indexOf('"public"."erase_staff_application_privacy"')
@@ -137,24 +151,48 @@ describe('Privacy erasure migration (0035)', () => {
       );
 
       for (const procedure of [schoolProcedure, staffProcedure]) {
-        expect(procedure).not.toContain('OLD.email');
-        expect(procedure).not.toContain('OLD.applicant_name');
-        expect(procedure).not.toContain('OLD.message');
-        expect(procedure).not.toContain('OLD.details');
-        expect(procedure).not.toContain('OLD.phone');
-        expect(procedure).not.toContain('OLD.discord_tag');
-        expect(procedure).toContain('INSERT INTO "public"."privacy_erasure_events"');
+        expect(procedure).toContain("set_config('app.allow_privacy_erasure', '', true)");
+        expect(procedure).toContain("set_config('app.privacy_erasure_actor', '', true)");
+        expect(procedure).toMatch(/EXCEPTION[\s\S]*set_config\('app\.allow_privacy_erasure', '', true\)[\s\S]*RAISE;/);
       }
+    });
 
+    it('does not duplicate audit inserts in procedures (trigger logs once)', () => {
+      const schoolProcedure = migration0035.slice(
+        migration0035.indexOf('"public"."erase_school_application_privacy"'),
+        migration0035.indexOf('"public"."erase_staff_application_privacy"')
+      );
+      const staffProcedure = migration0035.slice(
+        migration0035.indexOf('"public"."erase_staff_application_privacy"'),
+        migration0035.indexOf('REVOKE ALL ON FUNCTION "public"."erase_school_application_privacy"')
+      );
+
+      expect(schoolProcedure).not.toContain('INSERT INTO "public"."privacy_erasure_events"');
+      expect(staffProcedure).not.toContain('INSERT INTO "public"."privacy_erasure_events"');
+    });
+
+    it('audit helper stores metadata only, not original PII column values', () => {
+      const auditHelper = migration0035.slice(
+        migration0035.indexOf('"public"."log_privacy_erasure_event"'),
+        migration0035.indexOf('REVOKE ALL ON FUNCTION "public"."log_privacy_erasure_event"')
+      );
+
+      expect(auditHelper).toContain('INSERT INTO "public"."privacy_erasure_events"');
+      expect(auditHelper).not.toContain('OLD.email');
+      expect(auditHelper).not.toContain('OLD.applicant_name');
+      expect(auditHelper).not.toContain('OLD.message');
+      expect(auditHelper).not.toContain('OLD.details');
       expect(migration0035).toContain("'redact'");
       expect(migration0035).toContain("'delete'");
       expect(migration0035).toContain('"redacted_columns"');
     });
 
-    it('redacts PII to empty strings or null, not encrypted retention', () => {
+    it('redacts PII to empty strings or null and soft-deletes the row', () => {
       expect(migration0035).toContain('"applicant_name" = \'\'');
       expect(migration0035).toContain('"details" = NULL');
       expect(migration0035).toContain('"preferred_first_name" = NULL');
+      expect(migration0035).toContain('"deleted_at" = now()');
+      expect(migration0035).toContain('"deleted_by" = p_actor');
     });
 
     it('grants execute on procedures to service_role only', () => {
