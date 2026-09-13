@@ -112,9 +112,20 @@ describe('Privacy erasure migration (0035)', () => {
       expect(migration0035).toContain("current_setting('app.privacy_erasure_actor', true)");
     });
 
-    it('keeps SET search_path = empty on the trigger function', () => {
+    it('is SECURITY DEFINER with empty search_path so it can call the internal audit helper', () => {
       expect(migration0035).toMatch(
-        /CREATE OR REPLACE FUNCTION prevent_application_mutation\(\)[\s\S]*SET search_path = ''/
+        /CREATE OR REPLACE FUNCTION prevent_application_mutation\(\)[\s\S]*SECURITY DEFINER[\s\S]*SET search_path = ''/
+      );
+    });
+  });
+
+  describe('log_privacy_erasure_event helper access control', () => {
+    it('revokes the helper from PUBLIC without granting EXECUTE to service_role', () => {
+      expect(migration0035).toContain(
+        'REVOKE ALL ON FUNCTION "public"."log_privacy_erasure_event"(text, uuid, text, text[]) FROM PUBLIC'
+      );
+      expect(migration0035).not.toContain(
+        'GRANT EXECUTE ON FUNCTION "public"."log_privacy_erasure_event"'
       );
     });
   });

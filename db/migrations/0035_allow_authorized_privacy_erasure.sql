@@ -57,6 +57,7 @@ REVOKE ALL ON FUNCTION "public"."log_privacy_erasure_event"(text, uuid, text, te
 CREATE OR REPLACE FUNCTION prevent_application_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
