@@ -1,0 +1,183 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import * as schema from '@/app/lib/db/schema';
+
+const migrationsDir = resolve(__dirname, '../../../../db/migrations');
+const metaDir = resolve(migrationsDir, 'meta');
+
+const migration0035 = readFileSync(
+  resolve(migrationsDir, '0035_allow_authorized_privacy_erasure.sql'),
+  'utf8'
+);
+const journal = JSON.parse(readFileSync(resolve(metaDir, '_journal.json'), 'utf8')) as {
+  entries: { tag: string }[];
+};
+const snapshot0034 = JSON.parse(
+  readFileSync(resolve(metaDir, '0034_snapshot.json'), 'utf8')
+) as { id: string };
+const snapshot0035 = JSON.parse(
+  readFileSync(resolve(metaDir, '0035_snapshot.json'), 'utf8')
+) as { id: string; prevId: string };
+
+describe('Privacy erasure migration (0035)', () => {
+  describe('Schema definitions', () => {
+    it('defines privacyErasureEvents with metadata columns only, no PII payload fields', () => {
+      const columns = schema.privacyErasureEvents;
+      expect(columns.id).toBeDefined();
+      expect(columns.tableName).toBeDefined();
+      expect(columns.rowId).toBeDefined();
+      expect(columns.operation).toBeDefined();
+      expect(columns.actorIdentifier).toBeDefined();
+      expect(columns.redactedColumns).toBeDefined();
+      expect(columns.createdAt).toBeDefined();
+
+      const columnNames = Object.keys(columns);
+      expect(columnNames).not.toContain('email');
+      expect(columnNames).not.toContain('applicantName');
+      expect(columnNames).not.toContain('message');
+      expect(columnNames).not.toContain('details');
+      expect(columnNames).not.toContain('phone');
+      expect(columnNames).not.toContain('discordTag');
+    });
+  });
+
+  describe('Drizzle journal and snapshot chain', () => {
+    it('appends 0035_allow_authorized_privacy_erasure to the journal', () => {
+      const tags = journal.entries.map((entry) => entry.tag);
+      expect(tags).toContain('0035_allow_authorized_privacy_erasure');
+      expect(tags.at(-1)).toBe('0035_allow_authorized_privacy_erasure');
+    });
+
+    it('links 0035 snapshot prevId to 0034 snapshot id', () => {
+      expect(snapshot0035.prevId).toBe(snapshot0034.id);
+      expect(snapshot0035.id).not.toBe(snapshot0034.id);
+    });
+  });
+
+  describe('prevent_application_mutation() trigger function', () => {
+    it('still raises on unauthorized DELETE', () => {
+      expect(migration0035).toContain(
+        "RAISE EXCEPTION 'Table % is immutable: DELETE operations are prohibited', TG_TABLE_NAME"
+      );
+    });
+
+    it('still raises on unauthorized school application PII UPDATE', () => {
+      expect(migration0035).toContain(
+        "RAISE EXCEPTION 'School application submission fields are immutable'"
+      );
+    });
+
+    it('still raises on unauthorized staff application PII UPDATE', () => {
+      expect(migration0035).toContain(
+        "RAISE EXCEPTION 'Staff application submission fields are immutable'"
+      );
+    });
+
+    it('still raises on application_status_logs UPDATE even when erasure is authorized', () => {
+      expect(migration0035).toContain(
+        "RAISE EXCEPTION 'Table application_status_logs is immutable: UPDATE operations are prohibited'"
+      );
+    });
+
+    it('checks app.allow_privacy_erasure GUC with missing_ok', () => {
+      expect(migration0035).toContain(
+        "current_setting('app.allow_privacy_erasure', true) = 'true'"
+      );
+    });
+
+    it('returns OLD on authorized DELETE', () => {
+      expect(migration0035).toMatch(
+        /IF TG_OP = 'DELETE' THEN[\s\S]*IF privacy_erasure_allowed THEN[\s\S]*RETURN OLD;/
+      );
+    });
+
+    it('allows UPDATE when privacy erasure is authorized (except status logs)', () => {
+      expect(migration0035).toMatch(
+        /ELSIF privacy_erasure_allowed THEN[\s\S]*RETURN NEW;/
+      );
+    });
+
+    it('keeps SET search_path = empty on the trigger function', () => {
+      expect(migration0035).toMatch(
+        /CREATE OR REPLACE FUNCTION prevent_application_mutation\(\)[\s\S]*SET search_path = ''/
+      );
+    });
+  });
+
+  describe('SECURITY DEFINER erasure procedures', () => {
+    it('defines erase_school_application_privacy and erase_staff_application_privacy', () => {
+      expect(migration0035).toContain('"public"."erase_school_application_privacy"');
+      expect(migration0035).toContain('"public"."erase_staff_application_privacy"');
+    });
+
+    it('sets session GUCs via set_config before mutating data', () => {
+      expect(migration0035).toContain(
+        "set_config('app.allow_privacy_erasure', 'true', true)"
+      );
+      expect(migration0035).toContain(
+        "set_config('app.privacy_erasure_actor', p_actor, true)"
+      );
+    });
+
+    it('deletes application_status_logs as part of erasure without copying reason into audit', () => {
+      expect(migration0035).toContain('DELETE FROM "public"."application_status_logs"');
+      expect(migration0035).not.toContain('OLD.reason');
+      expect(migration0035).not.toContain('"reason"');
+    });
+
+    it('audit inserts store metadata only, not original PII column values', () => {
+      const schoolProcedure = migration0035.slice(
+        migration0035.indexOf('"public"."erase_school_application_privacy"'),
+        migration0035.indexOf('"public"."erase_staff_application_privacy"')
+      );
+      const staffProcedure = migration0035.slice(
+        migration0035.indexOf('"public"."erase_staff_application_privacy"'),
+        migration0035.indexOf('REVOKE ALL ON FUNCTION "public"."erase_school_application_privacy"')
+      );
+
+      for (const procedure of [schoolProcedure, staffProcedure]) {
+        expect(procedure).not.toContain('OLD.email');
+        expect(procedure).not.toContain('OLD.applicant_name');
+        expect(procedure).not.toContain('OLD.message');
+        expect(procedure).not.toContain('OLD.details');
+        expect(procedure).not.toContain('OLD.phone');
+        expect(procedure).not.toContain('OLD.discord_tag');
+        expect(procedure).toContain('INSERT INTO "public"."privacy_erasure_events"');
+      }
+
+      expect(migration0035).toContain("'redact'");
+      expect(migration0035).toContain("'delete'");
+      expect(migration0035).toContain('"redacted_columns"');
+    });
+
+    it('redacts PII to empty strings or null, not encrypted retention', () => {
+      expect(migration0035).toContain('"applicant_name" = \'\'');
+      expect(migration0035).toContain('"details" = NULL');
+      expect(migration0035).toContain('"preferred_first_name" = NULL');
+    });
+
+    it('grants execute on procedures to service_role only', () => {
+      expect(migration0035).toContain(
+        'GRANT EXECUTE ON FUNCTION "public"."erase_school_application_privacy"(uuid, text, text) TO "service_role"'
+      );
+      expect(migration0035).toContain(
+        'GRANT EXECUTE ON FUNCTION "public"."erase_staff_application_privacy"(uuid, text, text) TO "service_role"'
+      );
+    });
+  });
+
+  describe('privacy_erasure_events table and RLS', () => {
+    it('creates the audit table with operation check constraint', () => {
+      expect(migration0035).toContain('CREATE TABLE "privacy_erasure_events"');
+      expect(migration0035).toContain(
+        "CHECK (\"privacy_erasure_events\".\"operation\" IN ('redact', 'delete'))"
+      );
+    });
+
+    it('adds SELECT policy for MANAGE_APPLICATIONS permission (512)', () => {
+      expect(migration0035).toContain('"privacy_erasure_events_permission_select"');
+      expect(migration0035).toContain('"public"."has_permission"(512)');
+    });
+  });
+});
