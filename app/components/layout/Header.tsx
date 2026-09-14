@@ -20,6 +20,7 @@ export default function Header() {
   // header must stay solid over them from scroll position 0.
   const hasHero = pathname === '/' ||
                   pathname === '/about' ||
+                  pathname === '/gallery' ||
                   pathname === '/news' ||
                   pathname.startsWith('/news/') ||
                   pathname === '/sponsors' ||

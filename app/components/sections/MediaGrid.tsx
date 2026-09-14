@@ -10,6 +10,8 @@ import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Badge from '@/app/components/ui/Badge';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
+import CutCTA from '@/app/components/ui/CutCTA';
+import { ROUTES } from '@/app/lib/constants';
 
 interface MediaGridProps {
   items: ImageType[];
@@ -17,6 +19,8 @@ interface MediaGridProps {
   /** Optional heading rendered above the gallery via the shared SectionHeader primitive. */
   eyebrow?: string;
   heading?: string;
+  /** Whether to show the "View Full Gallery" CTA button. Defaults to true. */
+  showCta?: boolean;
 }
 
 interface IndexedImage extends ImageType {
@@ -93,7 +97,12 @@ function MarqueeRow({
   );
 }
 
-export default function MediaGrid({ items, eyebrow, heading }: MediaGridProps) {
+export default function MediaGrid({
+  items,
+  eyebrow,
+  heading,
+  showCta = true,
+}: MediaGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   if (!items || items.length === 0) return null;
@@ -156,6 +165,20 @@ export default function MediaGrid({ items, eyebrow, heading }: MediaGridProps) {
           <MarqueeRow items={row2} direction="backward" speed={0.8} onSelectPhoto={setSelectedImageIndex} />
         </div>
       </div>
+
+      {showCta && (
+        <div className="mt-8 sm:mt-10 flex justify-center">
+          <CutCTA href={ROUTES.gallery} variant="outline" className="group">
+            View Full Gallery
+            <span
+              className="inline-block transition-transform duration-200 group-hover:translate-x-1 ml-1"
+              aria-hidden="true"
+            >
+              →
+            </span>
+          </CutCTA>
+        </div>
+      )}
 
       {/* Lightbox Modal */}
       <Overlay
