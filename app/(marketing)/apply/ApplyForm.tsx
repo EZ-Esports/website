@@ -431,6 +431,11 @@ export default function ApplyForm() {
 
   const labelClass = 'block text-xs sm:text-sm font-bold text-foreground mb-2 tracking-wide uppercase';
   const requiredMark = <span className="text-accent ml-1" aria-hidden="true">*</span>;
+  const requiredFieldLegend = (
+    <p className="text-xs text-foreground-muted mb-2">
+      <span className="text-accent" aria-hidden="true">*</span> Required field
+    </p>
+  );
 
   const sectionCardClass =
     'bg-surface/90 backdrop-blur-md rounded-2xl border border-line/75 p-6 sm:p-8 shadow-sm space-y-5 scroll-mt-28';
@@ -726,9 +731,7 @@ export default function ApplyForm() {
                 />
               </div>
 
-              <p className="text-xs text-foreground-muted mb-2">
-                <span className="text-accent" aria-hidden="true">*</span> Required field
-              </p>
+              {requiredFieldLegend}
 
               {/* LAYER 1: President Info */}
               <div id="section-president" className={sectionCardClass}>
@@ -941,6 +944,8 @@ export default function ApplyForm() {
                 </div>
               </div>
 
+              {requiredFieldLegend}
+
               {/* LAYER 2: Vice President Info */}
               <div id="section-vicePresident" className={sectionCardClass}>
                 {sectionHeader('vicePresident')}
@@ -1101,6 +1106,8 @@ export default function ApplyForm() {
                 </div>
               </div>
 
+              {requiredFieldLegend}
+
               {/* LAYER 3: 3rd Student Club Officer Info */}
               <div id="section-thirdOfficer" className={sectionCardClass}>
                 {sectionHeader('thirdOfficer')}
@@ -1237,6 +1244,8 @@ export default function ApplyForm() {
                   )}
                 </div>
               </div>
+
+              {requiredFieldLegend}
 
               {/* LAYER 4: Club Info */}
               <div id="section-clubInfo" className={sectionCardClass}>
