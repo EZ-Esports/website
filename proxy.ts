@@ -1,9 +1,11 @@
 import { type NextRequest } from 'next/server';
-import { updateSession } from '@/app/lib/supabase/middleware';
+import { updateSession, buildCsp } from '@/app/lib/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
+
+export { buildCsp };
 
 export const config = {
   matcher: [
