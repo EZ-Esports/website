@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import Button from '@/app/components/ui/Button';
 import { Input, Textarea } from '@/app/components/ui/form';
 import { buildStaffApplicationDetails } from '@/app/lib/staff-application-form';
@@ -645,7 +646,10 @@ ${form.message}
                     Positive Environment Guidelines {requiredMark}
                   </span>
                   <p className="text-xs text-foreground-secondary mb-3 leading-relaxed">
-                    By applying, you commit to maintaining a supportive, inclusive, and fair scholastic esports environment. You agree to follow our staff guidelines, act professionally, and promote youth development across NYC high schools.
+                    By applying, you commit to maintaining a supportive, inclusive, and fair scholastic esports environment. You agree to follow our staff guidelines, act professionally, and promote youth development across NYC high schools, consistent with our{' '}
+                    <Link href="/rules" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">League Rulebook &amp; Code of Conduct</Link>,{' '}
+                    <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Terms of Service</Link>, and{' '}
+                    <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Privacy Policy</Link>.
                   </p>
                   <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                     <input
