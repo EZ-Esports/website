@@ -57,3 +57,9 @@ export function getClientIp(req: Request): string {
     'unknown'
   );
 }
+
+/** Reset the internal store. Useful for testing isolation. */
+export function _resetRateLimitStore(): void {
+  store.clear();
+}
+
