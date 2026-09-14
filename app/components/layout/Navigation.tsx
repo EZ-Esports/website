@@ -9,6 +9,21 @@ interface NavigationProps {
   onNavigate?: () => void;
 }
 
+interface NavSubItem {
+  label: string;
+  href: string;
+  /** When true, only highlights if pathname matches href exactly. Defaults to prefix matching. */
+  exact?: boolean;
+  /** Optional custom matcher for non-standard URLs (GameSubHeader uses a similar per-item override for its Overview tab, though there as a precomputed boolean rather than a function). */
+  isActive?: (pathname: string) => boolean;
+}
+
+interface NavDropdown {
+  label: string;
+  id: string;
+  items: NavSubItem[];
+}
+
 export default function Navigation({ onNavigate }: NavigationProps) {
   const pathname = usePathname();
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -18,15 +33,18 @@ export default function Navigation({ onNavigate }: NavigationProps) {
     onNavigate?.();
   };
 
-  const isSubItemActive = (href: string) => {
-    if (href === '/') {
-      return pathname === '/';
+  const isSubItemActive = (subItem: NavSubItem) => {
+    if (subItem.isActive) {
+      return subItem.isActive(pathname);
     }
-    return pathname.startsWith(href);
+    if (subItem.exact || subItem.href === '/') {
+      return pathname === subItem.href;
+    }
+    return pathname === subItem.href || pathname.startsWith(`${subItem.href}/`);
   };
 
-  const isDropdownActive = (items: { href: string }[]) => {
-    return items.some((subItem) => isSubItemActive(subItem.href));
+  const isDropdownActive = (items: NavSubItem[]) => {
+    return items.some(isSubItemActive);
   };
 
   const getButtonClass = (isActive: boolean) =>
@@ -36,7 +54,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
         : 'text-foreground/80 hover:text-foreground md:hover:text-accent'
     }`;
 
-  const leagueNavItems = [
+  const leagueNavItems: NavDropdown[] = [
     {
       label: 'Competition',
       id: 'competition',
@@ -47,14 +65,14 @@ export default function Navigation({ onNavigate }: NavigationProps) {
         { label: GAMES['osu']?.displayName || 'osu!', href: getGameRoute('osu') },
         { label: GAMES['minecraft']?.displayName || 'Minecraft', href: getGameRoute('minecraft') },
         { label: GAMES['tetris']?.displayName || 'TETR.IO', href: getGameRoute('tetris') },
-        { label: 'Past Seasons', href: ROUTES.archives },
+        { label: 'Past Seasons', href: ROUTES.archives, exact: true },
       ],
     },
     {
       label: 'About',
       id: 'about',
       items: [
-        { label: 'About the League', href: ROUTES.about },
+        { label: 'About the League', href: ROUTES.about, exact: true },
         { label: 'Leadership Team', href: ROUTES.leadership },
         { label: 'League News', href: ROUTES.news },
       ],
@@ -63,9 +81,9 @@ export default function Navigation({ onNavigate }: NavigationProps) {
       label: 'Get Involved',
       id: 'get-involved',
       items: [
-        { label: 'Apply to Play', href: ROUTES.apply },
-        { label: 'Staff App', href: ROUTES.staffApp },
-        { label: 'Sponsorship Tiers', href: ROUTES.sponsors },
+        { label: 'Apply to Play', href: ROUTES.apply, exact: true },
+        { label: 'Staff App', href: ROUTES.staffApp, exact: true },
+        { label: 'Sponsorship Tiers', href: ROUTES.sponsors, exact: true },
       ],
     },
   ];
@@ -101,11 +119,12 @@ export default function Navigation({ onNavigate }: NavigationProps) {
               >
                 <Menu className="outline-none py-1 space-y-1">
                   {item.items.map((subItem) => {
-                    const isSubActive = isSubItemActive(subItem.href);
+                    const isSubActive = isSubItemActive(subItem);
                     return (
                       <MenuItem
                         key={subItem.href}
                         href={subItem.href}
+                        aria-current={isSubActive ? 'page' : undefined}
                         className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-semibold rounded-lg transition-all outline-none cursor-pointer ${
                           isSubActive
                             ? 'bg-accent/10 text-accent font-extrabold'
