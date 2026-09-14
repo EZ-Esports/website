@@ -39,7 +39,12 @@ export interface SchoolApplicationFormData {
   separateGamingClubs: string;
   contributeBeyondSchool: Record<string, boolean>;
   feedback?: string;
-  agreedRules?: boolean;
+  // Split from a single `agreedRules` checkbox into three independently-required
+  // consents (issue #127) so an applicant explicitly agrees to each legal
+  // document rather than one checkbox bundling rules + terms + privacy together.
+  agreedToRules: boolean;
+  agreedToTerms: boolean;
+  agreedToPrivacy: boolean;
 }
 
 // `satisfies` (rather than an explicit `: Record<string, string>` annotation)
@@ -171,8 +176,14 @@ export function validateSchoolApplicationForm(form: SchoolApplicationFormData) {
     errors.contributeBeyondSchool = "Select at least one option.";
   }
 
-  if (!form.agreedRules) {
-    errors.agreedRules = "You must agree to the EZ Esports league rules and terms.";
+  if (!form.agreedToRules) {
+    errors.agreedToRules = "You must agree to the EZ Esports league rules & code of conduct.";
+  }
+  if (!form.agreedToTerms) {
+    errors.agreedToTerms = "You must agree to the Terms of Service.";
+  }
+  if (!form.agreedToPrivacy) {
+    errors.agreedToPrivacy = "You must agree to the Privacy Policy / data handling terms.";
   }
 
   return errors;
@@ -229,7 +240,38 @@ export interface SchoolApplicationDetailsV2 {
   agreedRules: boolean;
 }
 
-export type SchoolApplicationDetails = SchoolApplicationDetailsV1 | SchoolApplicationDetailsV2;
+// v3: the single `agreedRules` boolean became three independently-tracked
+// consents (issue #127) — a new version rather than reshaping v2's field, per
+// the versioning rule documented above.
+export interface SchoolApplicationDetailsV3 {
+  version: 3;
+  clubStatus: string;
+  president: { firstName: string; lastName: string; gradYear: string; email: string; discord: string; preferredContact: string };
+  vicePresident: { firstName: string; lastName: string; gradYear: string; discord: string; email: string; preferredContact: string };
+  thirdOfficer: { firstName: string; lastName: string; gradYear: string; email: string; preferredContact: string };
+  club: {
+    instagramLink: string;
+    discordLink: string;
+    advisorName: string;
+    advisorEmail: string;
+    advisorConfirmed: string;
+    activeStudentsCount: string;
+    interestedGames: string[];
+    clubBarrier: string;
+    nonRosterOpportunities: string[];
+    inclusiveOpportunities: string[];
+    separateGamingClubs: string;
+    contributeBeyondSchool: string[];
+  };
+  feedback: string;
+  consent: {
+    agreedToRules: boolean;
+    agreedToTerms: boolean;
+    agreedToPrivacy: boolean;
+  };
+}
+
+export type SchoolApplicationDetails = SchoolApplicationDetailsV1 | SchoolApplicationDetailsV2 | SchoolApplicationDetailsV3;
 
 function selectedLabels(selection: Record<string, boolean>, labels: Record<string, string>, otherText?: string): string[] {
   const result = Object.keys(labels)
@@ -289,7 +331,9 @@ Non-Roster Opportunities of Interest: ${nonRosterOpportunities.join(", ")}
 Inclusive Participation Opportunities: ${inclusiveOpportunities.join(", ")}
 Separate Gaming Clubs/Groups: ${form.separateGamingClubs.trim()}
 Interested in Contributing Beyond School: ${contributeBeyondSchool.join(", ")}
-Rules Agreement: ${form.agreedRules ? 'Agreed' : 'Disagreed'}
+League Rules & Code of Conduct: ${form.agreedToRules ? 'Agreed' : 'Disagreed'}
+Terms of Service: ${form.agreedToTerms ? 'Agreed' : 'Disagreed'}
+Privacy & Data Handling: ${form.agreedToPrivacy ? 'Agreed' : 'Disagreed'}
 
 Feedback / Notes:
 ${form.feedback?.trim() || "N/A"}
@@ -305,14 +349,14 @@ ${form.feedback?.trim() || "N/A"}
   };
 }
 
-export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): SchoolApplicationDetailsV2 {
+export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): SchoolApplicationDetailsV3 {
   const barrierLabel =
     form.clubBarriers === 'other'
       ? `Other: ${form.clubBarriersOther?.trim() ?? ''}`
       : CLUB_BARRIER_LABELS[form.clubBarriers] ?? form.clubBarriers;
 
   return {
-    version: 2,
+    version: 3,
     clubStatus: form.clubStatus,
     president: {
       firstName: form.presidentFirstName.trim(),
@@ -352,7 +396,11 @@ export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): 
       contributeBeyondSchool: selectedLabels(form.contributeBeyondSchool, CONTRIBUTE_BEYOND_SCHOOL_LABELS),
     },
     feedback: form.feedback?.trim() ?? '',
-    agreedRules: !!form.agreedRules,
+    consent: {
+      agreedToRules: !!form.agreedToRules,
+      agreedToTerms: !!form.agreedToTerms,
+      agreedToPrivacy: !!form.agreedToPrivacy,
+    },
   };
 }
 
@@ -361,10 +409,41 @@ const UNKNOWN_SHAPE_ROW = [{ label: 'Details', value: 'Could not display — une
 /** `details` comes straight off a public, unauthenticated POST body — dispatching on `version` (rather than trusting the shape) means a row with an unrecognized or missing version, or one whose write-time guard only checked `object && !Array.isArray`, degrades to a message instead of throwing when a staff member expands it. */
 export function formatSchoolApplicationDetails(d: SchoolApplicationDetails): { label: string; value: string }[] {
   switch (d?.version) {
+    case 3: return formatSchoolApplicationDetailsV3(d);
     case 2: return formatSchoolApplicationDetailsV2(d);
     case 1: return formatSchoolApplicationDetailsV1(d);
     default: return UNKNOWN_SHAPE_ROW;
   }
+}
+
+function formatSchoolApplicationDetailsV3(d: SchoolApplicationDetailsV3): { label: string; value: string }[] {
+  if (!d.president || !d.vicePresident || !d.thirdOfficer || !d.club || !d.consent) {
+    return UNKNOWN_SHAPE_ROW;
+  }
+
+  const list = (value: unknown) => (Array.isArray(value) ? value.join(', ') : String(value ?? '')) || '—';
+  const agreed = (v: boolean) => (v ? 'Agreed' : 'Disagreed');
+
+  return [
+    { label: 'Club Status', value: d.clubStatus },
+    { label: 'President', value: `${d.president.firstName} ${d.president.lastName} — ${d.president.email}, ${d.president.discord}, grad ${d.president.gradYear} (prefers ${d.president.preferredContact})` },
+    { label: 'Vice President', value: `${d.vicePresident.firstName} ${d.vicePresident.lastName} — ${d.vicePresident.email}, ${d.vicePresident.discord}, grad ${d.vicePresident.gradYear} (prefers ${d.vicePresident.preferredContact})` },
+    { label: '3rd Club Officer', value: `${d.thirdOfficer.firstName} ${d.thirdOfficer.lastName} — ${d.thirdOfficer.email}, grad ${d.thirdOfficer.gradYear} (prefers ${d.thirdOfficer.preferredContact})` },
+    { label: 'Instagram', value: d.club.instagramLink || '—' },
+    { label: 'Discord', value: d.club.discordLink || '—' },
+    { label: 'Faculty Advisor', value: `${d.club.advisorName} (${d.club.advisorEmail}) — ${d.club.advisorConfirmed}` },
+    { label: 'Active Club Members', value: d.club.activeStudentsCount },
+    { label: 'Interested Games', value: list(d.club.interestedGames) },
+    { label: 'Biggest Barrier', value: d.club.clubBarrier },
+    { label: 'Non-Roster Opportunities', value: list(d.club.nonRosterOpportunities) },
+    { label: 'Inclusive Opportunities', value: list(d.club.inclusiveOpportunities) },
+    { label: 'Separate Gaming Clubs/Groups', value: d.club.separateGamingClubs },
+    { label: 'Contribute Beyond School', value: list(d.club.contributeBeyondSchool) },
+    { label: 'Feedback', value: d.feedback || '—' },
+    { label: 'League Rules & Code of Conduct', value: agreed(d.consent.agreedToRules) },
+    { label: 'Terms of Service', value: agreed(d.consent.agreedToTerms) },
+    { label: 'Privacy & Data Handling', value: agreed(d.consent.agreedToPrivacy) },
+  ];
 }
 
 function formatSchoolApplicationDetailsV2(d: SchoolApplicationDetailsV2): { label: string; value: string }[] {
@@ -430,12 +509,120 @@ function undoPlaceholder(value: string): string {
  * partially-wrong structured record.
  */
 export function parseSchoolApplicationMessage(message: string): SchoolApplicationDetails | null {
-  return parseSchoolApplicationMessageV2(message) ?? parseSchoolApplicationMessageV1(message);
+  return (
+    parseSchoolApplicationMessageV3(message) ??
+    parseSchoolApplicationMessageV2(message) ??
+    parseSchoolApplicationMessageV1(message)
+  );
+}
+
+// Matches the v3 message shape: identical to v2 except the single "Rules
+// Agreement" line became three separate consent lines (issue #127). Tried
+// before v2 in parseSchoolApplicationMessage so a v3 message (which a v2
+// pattern would fail to match anyway, since the trailing lines differ) is
+// recognized as v3 rather than falling through unnecessarily.
+const SCHOOL_MESSAGE_PATTERN_V3 = new RegExp(
+  '^=== CLUB STATUS ===\\n' +
+  '(?<clubStatus>.*)\\n\\n' +
+  '=== 1\\. PRESIDENT INFO ===\\n' +
+  'President Name: (?<presName>.*)\\n' +
+  'School Name: (?<schoolName>.*)\\n' +
+  'Graduation Year: (?<presGradYear>.*)\\n' +
+  'Email: (?<presEmail>.*)\\n' +
+  'Discord Username: (?<presDiscord>.*)\\n' +
+  'Best Contact Platform: (?<presContact>.*)\\n\\n' +
+  '=== 2\\. VICE PRESIDENT INFO ===\\n' +
+  'VP Name: (?<vpName>.*)\\n' +
+  'Graduation Year: (?<vpGradYear>.*)\\n' +
+  'Discord Username: (?<vpDiscord>.*)\\n' +
+  'Email: (?<vpEmail>.*)\\n' +
+  'Best Contact Platform: (?<vpContact>.*)\\n\\n' +
+  '=== 3\\. 3RD STUDENT CLUB OFFICER INFO ===\\n' +
+  'Officer Name: (?<offName>.*)\\n' +
+  'Graduation Year: (?<offGradYear>.*)\\n' +
+  'Email: (?<offEmail>.*)\\n' +
+  'Best Contact Platform: (?<offContact>.*)\\n\\n' +
+  '=== 4\\. CLUB INFO ===\\n' +
+  "Club's Instagram Link: (?<instagram>.*)\\n" +
+  "Club's Discord Link: (?<discordLink>.*)\\n" +
+  'Club Advisor Name: (?<advisorName>.*)\\n' +
+  'Club Advisor Email \\(@schools\\.nyc\\.gov\\): (?<advisorEmail>.*)\\n' +
+  'Faculty Advisor Confirmed: (?<advisorConfirmed>.*)\\n' +
+  'Estimated Active Club Members: (?<activeCount>.*)\\n' +
+  'Interested Games: (?<games>.*)\\n' +
+  'Biggest Barrier: (?<barrier>.*)\\n' +
+  'Non-Roster Opportunities of Interest: (?<nonRoster>.*)\\n' +
+  'Inclusive Participation Opportunities: (?<inclusive>.*)\\n' +
+  'Separate Gaming Clubs/Groups: (?<separate>.*)\\n' +
+  'Interested in Contributing Beyond School: (?<contribute>.*)\\n' +
+  'League Rules & Code of Conduct: (?<rulesAgreement>.*)\\n' +
+  'Terms of Service: (?<termsAgreement>.*)\\n' +
+  'Privacy & Data Handling: (?<privacyAgreement>.*)\\n\\n' +
+  'Feedback / Notes:\\n' +
+  '(?<feedback>[\\s\\S]*)$'
+);
+
+function parseSchoolApplicationMessageV3(message: string): SchoolApplicationDetailsV3 | null {
+  const match = SCHOOL_MESSAGE_PATTERN_V3.exec(message.trim());
+  if (!match?.groups) return null;
+  const g = match.groups;
+
+  const president = splitName(g.presName);
+  const vp = splitName(g.vpName);
+  const officer = splitName(g.offName);
+
+  return {
+    version: 3,
+    clubStatus: g.clubStatus,
+    president: {
+      firstName: president.firstName,
+      lastName: president.lastName,
+      gradYear: g.presGradYear,
+      email: g.presEmail,
+      discord: g.presDiscord,
+      preferredContact: g.presContact,
+    },
+    vicePresident: {
+      firstName: vp.firstName,
+      lastName: vp.lastName,
+      gradYear: g.vpGradYear,
+      discord: g.vpDiscord,
+      email: g.vpEmail,
+      preferredContact: g.vpContact,
+    },
+    thirdOfficer: {
+      firstName: officer.firstName,
+      lastName: officer.lastName,
+      gradYear: g.offGradYear,
+      email: g.offEmail,
+      preferredContact: g.offContact,
+    },
+    club: {
+      instagramLink: g.instagram,
+      discordLink: g.discordLink,
+      advisorName: g.advisorName,
+      advisorEmail: g.advisorEmail,
+      advisorConfirmed: g.advisorConfirmed,
+      activeStudentsCount: g.activeCount,
+      interestedGames: splitCsvLabels(g.games),
+      clubBarrier: g.barrier,
+      nonRosterOpportunities: splitCsvLabels(g.nonRoster),
+      inclusiveOpportunities: splitCsvLabels(g.inclusive),
+      separateGamingClubs: g.separate,
+      contributeBeyondSchool: splitCsvLabels(g.contribute),
+    },
+    feedback: g.feedback.trim(),
+    consent: {
+      agreedToRules: g.rulesAgreement.trim() === 'Agreed',
+      agreedToTerms: g.termsAgreement.trim() === 'Agreed',
+      agreedToPrivacy: g.privacyAgreement.trim() === 'Agreed',
+    },
+  };
 }
 
 // Matches the exact `=== SECTION ===` / `Label: value` shape compileApplicationPayload
-// has always produced (the "v2" club-officer form, from the Google-Forms-parity redesign
-// onward).
+// produced from the Google-Forms-parity redesign through issue #127 (single "Rules
+// Agreement" line, before it split into three separate consents).
 const SCHOOL_MESSAGE_PATTERN_V2 = new RegExp(
   '^=== CLUB STATUS ===\\n' +
   '(?<clubStatus>.*)\\n\\n' +

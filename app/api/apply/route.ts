@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
+import { validateSchoolApplicationForm, compileApplicationPayload, type SchoolApplicationFormData } from '@/app/lib/school-application-form';
 
 // 5 submissions per IP per 10 minutes — generous enough for legitimate use,
 // strict enough to prevent spam flooding the applications inbox.
@@ -20,15 +21,32 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { applicantName, schoolName, role, email, message, details } = body;
-
-    if (!applicantName || !schoolName || !role || !email) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+    // Honeypot: a real applicant never sees or fills this field (visually
+    // hidden off-screen in ApplyForm.tsx, not merely `display:none`, and kept
+    // out of the tab order). A bot that fills every input on the page trips
+    // it. Respond as if the submission succeeded — a hard rejection just
+    // teaches the bot which field to skip — but never persist the row.
+    if (typeof body.website === 'string' && body.website.trim() !== '') {
+      console.warn('Rejected school application: honeypot field was filled', { ip });
+      return NextResponse.json({ success: true }, { status: 201 });
     }
+
+    // The client and server must agree on what's required. Rather than
+    // re-implement the same checks against a different shape (and risk them
+    // drifting apart), the route validates and compiles the raw form data
+    // with the exact same shared functions ApplyForm.tsx uses client-side —
+    // the client-side check is strictly a UX nicety, this is the real gate.
+    const { website: _honeypot, ...formData } = body;
+    const errors = validateSchoolApplicationForm(formData as SchoolApplicationFormData);
+    if (Object.keys(errors).length > 0) {
+      return NextResponse.json({ error: 'Missing or invalid required fields', fieldErrors: errors }, { status: 400 });
+    }
+
+    const { applicantName, schoolName, role, email, message, details } = compileApplicationPayload(formData as SchoolApplicationFormData);
 
     await db.insert(schema.schoolApplications).values({
       applicantName,

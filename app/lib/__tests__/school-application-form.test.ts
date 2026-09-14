@@ -46,7 +46,9 @@ describe("School Application Form Validation & Consolidation", () => {
     separateGamingClubs: "N/A",
     contributeBeyondSchool: { notAtThisTime: true },
     feedback: "Excited for the upcoming season!",
-    agreedRules: true,
+    agreedToRules: true,
+    agreedToTerms: true,
+    agreedToPrivacy: true,
   };
 
   it("validates a complete 4-layer form with no errors", () => {
@@ -116,15 +118,29 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(errors.contributeBeyondSchool).toBeDefined();
   });
 
-  it("requires rules agreement when set to false", () => {
-    const withoutRules = { ...validForm, agreedRules: false };
-    const errors = validateSchoolApplicationForm(withoutRules);
-    expect(errors.agreedRules).toBeDefined();
+  it("requires each of the three consents independently", () => {
+    const noRules = { ...validForm, agreedToRules: false };
+    expect(validateSchoolApplicationForm(noRules).agreedToRules).toBeDefined();
+
+    const noTerms = { ...validForm, agreedToTerms: false };
+    expect(validateSchoolApplicationForm(noTerms).agreedToTerms).toBeDefined();
+
+    const noPrivacy = { ...validForm, agreedToPrivacy: false };
+    expect(validateSchoolApplicationForm(noPrivacy).agreedToPrivacy).toBeDefined();
+
+    // Agreeing to one or two doesn't satisfy the others — each is independent.
+    const onlyRules = { ...validForm, agreedToRules: true, agreedToTerms: false, agreedToPrivacy: false };
+    const errors = validateSchoolApplicationForm(onlyRules);
+    expect(errors.agreedToRules).toBeUndefined();
+    expect(errors.agreedToTerms).toBeDefined();
+    expect(errors.agreedToPrivacy).toBeDefined();
   });
 
-  it("records Disagreed in compiled message payload when agreedRules is false", () => {
-    const payload = compileApplicationPayload({ ...validForm, agreedRules: false });
-    expect(payload.message).toContain("Rules Agreement: Disagreed");
+  it("records Disagreed in compiled message payload for whichever consent is false", () => {
+    const payload = compileApplicationPayload({ ...validForm, agreedToRules: false, agreedToTerms: true, agreedToPrivacy: true });
+    expect(payload.message).toContain("League Rules & Code of Conduct: Disagreed");
+    expect(payload.message).toContain("Terms of Service: Agreed");
+    expect(payload.message).toContain("Privacy & Data Handling: Agreed");
   });
 
   it("compiles message payload correctly with all 4 layers", () => {
@@ -138,7 +154,9 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(payload.message).toContain("=== 3. 3RD STUDENT CLUB OFFICER INFO ===");
     expect(payload.message).toContain("=== 4. CLUB INFO ===");
     expect(payload.message).toContain("Valorant, Clash Royale");
-    expect(payload.message).toContain("Rules Agreement: Agreed");
+    expect(payload.message).toContain("League Rules & Code of Conduct: Agreed");
+    expect(payload.message).toContain("Terms of Service: Agreed");
+    expect(payload.message).toContain("Privacy & Data Handling: Agreed");
   });
 
   it("builds structured details alongside the compiled message", () => {
@@ -153,7 +171,11 @@ describe("School Application Form Validation & Consolidation", () => {
       preferredContact: "Discord",
     });
     expect(payload.details.club.interestedGames).toEqual(["Valorant", "Clash Royale"]);
-    expect(payload.details.agreedRules).toBe(true);
+    expect(payload.details.consent).toEqual({
+      agreedToRules: true,
+      agreedToTerms: true,
+      agreedToPrivacy: true,
+    });
   });
 
   it("parses a compiled message back into the same structured details", () => {
@@ -175,6 +197,14 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(formatSchoolApplicationDetails(malformed)).toEqual([
       { label: "Details", value: "Could not display — unexpected data shape." },
     ]);
+  });
+
+  it("formats each of the three consents as its own labeled row (v3)", () => {
+    const details = buildSchoolApplicationDetails({ ...validForm, agreedToRules: true, agreedToTerms: false, agreedToPrivacy: true });
+    const rows = formatSchoolApplicationDetails(details);
+    expect(rows.find((r) => r.label === "League Rules & Code of Conduct")?.value).toBe("Agreed");
+    expect(rows.find((r) => r.label === "Terms of Service")?.value).toBe("Disagreed");
+    expect(rows.find((r) => r.label === "Privacy & Data Handling")?.value).toBe("Agreed");
   });
 
   it("falls back to '—' for club fields that aren't arrays", () => {
