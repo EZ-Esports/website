@@ -726,8 +726,8 @@ export default function ApplyForm() {
                 />
               </div>
 
-              <p className="text-xs text-foreground-muted -mb-2">
-                {requiredMark} Required field
+              <p className="text-xs text-foreground-muted mb-2">
+                <span className="text-accent" aria-hidden="true">*</span> Required field
               </p>
 
               {/* LAYER 1: President Info */}
