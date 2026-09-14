@@ -1652,7 +1652,8 @@ export default function ApplyForm() {
                 {/* Feedback */}
                 <div id="field-feedback" className={fieldWrapperClass('feedback', false)}>
                   <label htmlFor="feedback" className={labelClass}>
-                    Feedback or suggestions for EZ Esports
+                    Feedback or suggestions for EZ Esports{' '}
+                    <span className="text-foreground-muted font-normal normal-case">(Optional)</span>
                     <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
                       (Please include any feedback from you or your club about enhancing your school&apos;s experience with EZ Esports.)
                     </span>
