@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   validateSchoolApplicationForm,
-  buildSchoolApplicationDetails,
-  formatSchoolApplicationDetails,
   GAME_LABELS,
   CLUB_BARRIER_LABELS,
   NON_ROSTER_OPPORTUNITY_LABELS,
@@ -122,12 +120,6 @@ const initialForm = {
   agreedToPrivacy: false,
 } satisfies SchoolApplicationFormData;
 
-// Draft autosave: an applicant's in-progress answers on their own device, not
-// PII storage (see CLAUDE.md) — nothing here leaves the browser. Bumped
-// whenever initialForm's shape changes so an old, incompatible draft is
-// discarded instead of spreading stale/missing fields into the new shape.
-const DRAFT_STORAGE_KEY = 'ezesports:apply:draft:v2';
-
 type CheckboxGroupKey = keyof typeof CHECKBOX_GROUP_LABELS;
 // 'other' is only a valid key for groups whose config sets hasOther: true —
 // this stays in sync with CHECKBOX_GROUP_LABELS instead of being available
@@ -214,46 +206,6 @@ export default function ApplyForm() {
   const [activeSection, setActiveSection] = useState<SectionId>('president');
 
   const [form, setForm] = useState(initialForm);
-  // Honeypot: kept out of `form`/`SchoolApplicationFormData` entirely so it
-  // can never leak into validation, the compiled message, or the recap
-  // screen — it exists purely to catch bots that fill in every input.
-  const [honeypot, setHoneypot] = useState('');
-
-  // Draft autosave: restore any in-progress draft after mount (never during
-  // SSR/initial render, so the server-rendered blank form and the first
-  // client render match and React doesn't flag a hydration mismatch).
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (raw) {
-        const draft = JSON.parse(raw);
-        if (draft && typeof draft === 'object') {
-          setForm((prev) => ({ ...prev, ...draft }));
-        }
-      }
-    } catch {
-      // Corrupt JSON or inaccessible storage (private browsing, quota) —
-      // fall back to a blank form rather than block the page.
-    }
-  }, []);
-
-  // Skips the autosave write that would otherwise fire on the very first
-  // render (before any restored draft has been applied), so restoring an
-  // empty draft can't clobber one already in storage.
-  const skipNextAutosave = useRef(true);
-  useEffect(() => {
-    if (skipNextAutosave.current) {
-      skipNextAutosave.current = false;
-      return;
-    }
-    if (submitted) return;
-    try {
-      window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
-    } catch {
-      // Autosave is a convenience, not a requirement for submitting — ignore
-      // storage errors (quota, private browsing).
-    }
-  }, [form, submitted]);
 
   // Scroll-spy: highlight the section currently in view in the sidebar nav.
   useEffect(() => {
@@ -347,23 +299,15 @@ export default function ApplyForm() {
     setError('');
 
     try {
-      // Sends the raw form fields (plus the honeypot) rather than a
-      // pre-compiled payload — the API route runs the exact same
-      // validateSchoolApplicationForm/compileApplicationPayload from
-      // app/lib/school-application-form.ts, so client and server can never
-      // drift out of parity on what's required.
+      // The API route re-validates and compiles the raw form fields itself
+      // (app/api/apply/route.ts) using the same shared functions, so client
+      // and server can't drift out of parity on what's required.
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, website: honeypot }),
+        body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error('Submission failed');
-      try {
-        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-      } catch {
-        // Non-fatal — the draft is just stale data at this point, not a
-        // correctness problem.
-      }
       setSubmitted(true);
     } catch {
       setError('Something went wrong. Please try again or reach out to info@ezesports.org.');
@@ -431,11 +375,6 @@ export default function ApplyForm() {
 
   const labelClass = 'block text-xs sm:text-sm font-bold text-foreground mb-2 tracking-wide uppercase';
   const requiredMark = <span className="text-accent ml-1" aria-hidden="true">*</span>;
-  const requiredFieldLegend = (
-    <p className="text-xs text-foreground-muted mb-2">
-      <span className="text-accent" aria-hidden="true">*</span> Required field
-    </p>
-  );
 
   const sectionCardClass =
     'bg-surface/90 backdrop-blur-md rounded-2xl border border-line/75 p-6 sm:p-8 shadow-sm space-y-5 scroll-mt-28';
@@ -563,43 +502,11 @@ export default function ApplyForm() {
               <p className="text-foreground-secondary text-sm mt-3 leading-relaxed">
                 Thank you for applying. We have registered your school&apos;s 3 points of contact and club details. We will review your application and reach out to <strong className="text-foreground">{form.presidentEmail}</strong> soon.
               </p>
-              {/*
-                TODO(#127): no confirmation email is sent on submit. Deferred —
-                this repo has no email-sending integration at all (no Resend,
-                Nodemailer, SendGrid, Postmark, or similar; the only SMTP
-                config in the codebase is Supabase's local auth-email setup in
-                supabase/config.toml, unrelated to app-level sends). Standing
-                up an email provider is an infrastructure decision bigger than
-                this ticket's scope. A follow-up would need: choosing/
-                provisioning a transactional email provider, a sender domain
-                with SPF/DKIM, and a template — then a call from
-                app/api/apply/route.ts after the insert succeeds. Until then,
-                the recap below is the only confirmation the applicant gets,
-                which is why it's shown in full rather than just a summary line.
-              */}
-              <p className="text-foreground-muted text-xs mt-2 italic">
-                We don&apos;t send a confirmation email yet — save or screenshot this page as your record.
-              </p>
             </div>
-
-            {/* Applicant-facing recap (issue #127): submitted answers shown back
-                on the success screen. Reuses the exact same build/format
-                functions the admin panel uses to display a stored row, so this
-                stays byte-for-byte consistent with what was actually saved. */}
-            <div className="text-left rounded-xl border border-line bg-surface-raised/30 divide-y divide-line/60 max-h-80 overflow-y-auto">
-              {formatSchoolApplicationDetails(buildSchoolApplicationDetails(form)).map((row) => (
-                <div key={row.label} className="px-4 py-2.5 text-xs">
-                  <p className="font-bold text-foreground-secondary uppercase tracking-wide">{row.label}</p>
-                  <p className="text-foreground-muted mt-0.5 whitespace-pre-line break-words">{row.value}</p>
-                </div>
-              ))}
-            </div>
-
             <button
               onClick={() => {
                 setSubmitted(false);
                 setForm(initialForm);
-                setHoneypot('');
               }}
               className="text-accent hover:underline text-sm font-semibold focus:outline-none cursor-pointer"
             >
@@ -712,27 +619,6 @@ export default function ApplyForm() {
             {/* Right column: 4 Layers Form */}
             <form onSubmit={handleSubmit} className="lg:col-span-8 space-y-6" noValidate>
 
-              {/* Honeypot: invisible to sighted and screen-reader users alike
-                  (off-screen positioning, not display:none, so unsophisticated
-                  bots that skip display:none fields still fall for it; tabIndex
-                  -1 and aria-hidden keep it out of keyboard/AT navigation; a
-                  name real autofill won't target). A human never sees or fills
-                  this — app/api/apply/route.ts drops the submission if it's non-empty. */}
-              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}>
-                <label htmlFor="website">Leave this field blank</label>
-                <input
-                  id="website"
-                  name="website"
-                  type="text"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={honeypot}
-                  onChange={(e) => setHoneypot(e.target.value)}
-                />
-              </div>
-
-              {requiredFieldLegend}
-
               {/* LAYER 1: President Info */}
               <div id="section-president" className={sectionCardClass}>
                 {sectionHeader('president')}
@@ -743,7 +629,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('clubStatus', !!fieldErrors.clubStatus)}
                   role="group"
                   aria-labelledby="clubStatus-label"
-                  aria-describedby={fieldErrors.clubStatus ? 'clubStatus-error' : undefined}
                 >
                   <span id="clubStatus-label" className={labelClass}>
                     What is your club&apos;s current status for 2026–27? {requiredMark}
@@ -764,7 +649,7 @@ export default function ApplyForm() {
                     ))}
                   </div>
                   {fieldErrors.clubStatus && (
-                    <p id="clubStatus-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubStatus}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubStatus}</p>
                   )}
                 </div>
 
@@ -776,7 +661,6 @@ export default function ApplyForm() {
                       id="presidentFirstName"
                       name="presidentFirstName"
                       type="text"
-                      autoComplete="section-president given-name"
                       placeholder="Jane"
                       value={form.presidentFirstName}
                       onChange={handleTextChange}
@@ -799,7 +683,6 @@ export default function ApplyForm() {
                       id="presidentLastName"
                       name="presidentLastName"
                       type="text"
-                      autoComplete="section-president family-name"
                       placeholder="Smith"
                       value={form.presidentLastName}
                       onChange={handleTextChange}
@@ -825,7 +708,6 @@ export default function ApplyForm() {
                     id="schoolName"
                     name="schoolName"
                     type="text"
-                    autoComplete="organization"
                     placeholder="Brooklyn Technical High School"
                     value={form.schoolName}
                     onChange={handleTextChange}
@@ -847,7 +729,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('presidentGradYear', !!fieldErrors.presidentGradYear)}
                   role="group"
                   aria-labelledby="presidentGradYear-label"
-                  aria-describedby={fieldErrors.presidentGradYear ? 'presidentGradYear-error' : undefined}
                 >
                   <span id="presidentGradYear-label" className={labelClass}>Graduation Year {requiredMark}</span>
                   <div className="flex flex-wrap gap-4 mt-2">
@@ -866,7 +747,7 @@ export default function ApplyForm() {
                     ))}
                   </div>
                   {fieldErrors.presidentGradYear && (
-                    <p id="presidentGradYear-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.presidentGradYear}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.presidentGradYear}</p>
                   )}
                 </div>
 
@@ -879,7 +760,6 @@ export default function ApplyForm() {
                     id="presidentEmail"
                     name="presidentEmail"
                     type="email"
-                    autoComplete="section-president email"
                     placeholder="jsmith@gmail.com"
                     value={form.presidentEmail}
                     onChange={handleTextChange}
@@ -944,8 +824,6 @@ export default function ApplyForm() {
                 </div>
               </div>
 
-              {requiredFieldLegend}
-
               {/* LAYER 2: Vice President Info */}
               <div id="section-vicePresident" className={sectionCardClass}>
                 {sectionHeader('vicePresident')}
@@ -965,7 +843,6 @@ export default function ApplyForm() {
                       id="vpFirstName"
                       name="vpFirstName"
                       type="text"
-                      autoComplete="section-vp given-name"
                       placeholder="Alex"
                       value={form.vpFirstName}
                       onChange={handleTextChange}
@@ -988,7 +865,6 @@ export default function ApplyForm() {
                       id="vpLastName"
                       name="vpLastName"
                       type="text"
-                      autoComplete="section-vp family-name"
                       placeholder="Taylor"
                       value={form.vpLastName}
                       onChange={handleTextChange}
@@ -1011,7 +887,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('vpGradYear', !!fieldErrors.vpGradYear)}
                   role="group"
                   aria-labelledby="vpGradYear-label"
-                  aria-describedby={fieldErrors.vpGradYear ? 'vpGradYear-error' : undefined}
                 >
                   <span id="vpGradYear-label" className={labelClass}>Graduation Year {requiredMark}</span>
                   <div className="flex flex-wrap gap-4 mt-2">
@@ -1030,7 +905,7 @@ export default function ApplyForm() {
                     ))}
                   </div>
                   {fieldErrors.vpGradYear && (
-                    <p id="vpGradYear-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.vpGradYear}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.vpGradYear}</p>
                   )}
                 </div>
 
@@ -1065,7 +940,6 @@ export default function ApplyForm() {
                     id="vpEmail"
                     name="vpEmail"
                     type="email"
-                    autoComplete="section-vp email"
                     placeholder="alext@gmail.com"
                     value={form.vpEmail}
                     onChange={handleTextChange}
@@ -1106,8 +980,6 @@ export default function ApplyForm() {
                 </div>
               </div>
 
-              {requiredFieldLegend}
-
               {/* LAYER 3: 3rd Student Club Officer Info */}
               <div id="section-thirdOfficer" className={sectionCardClass}>
                 {sectionHeader('thirdOfficer')}
@@ -1126,7 +998,6 @@ export default function ApplyForm() {
                       id="officerFirstName"
                       name="officerFirstName"
                       type="text"
-                      autoComplete="section-officer given-name"
                       placeholder="Jordan"
                       value={form.officerFirstName}
                       onChange={handleTextChange}
@@ -1149,7 +1020,6 @@ export default function ApplyForm() {
                       id="officerLastName"
                       name="officerLastName"
                       type="text"
-                      autoComplete="section-officer family-name"
                       placeholder="Lee"
                       value={form.officerLastName}
                       onChange={handleTextChange}
@@ -1172,7 +1042,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('officerGradYear', !!fieldErrors.officerGradYear)}
                   role="group"
                   aria-labelledby="officerGradYear-label"
-                  aria-describedby={fieldErrors.officerGradYear ? 'officerGradYear-error' : undefined}
                 >
                   <span id="officerGradYear-label" className={labelClass}>Graduation Year {requiredMark}</span>
                   <div className="flex flex-wrap gap-4 mt-2">
@@ -1191,7 +1060,7 @@ export default function ApplyForm() {
                     ))}
                   </div>
                   {fieldErrors.officerGradYear && (
-                    <p id="officerGradYear-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.officerGradYear}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.officerGradYear}</p>
                   )}
                 </div>
 
@@ -1204,7 +1073,6 @@ export default function ApplyForm() {
                     id="officerEmail"
                     name="officerEmail"
                     type="email"
-                    autoComplete="section-officer email"
                     placeholder="jordanl@gmail.com"
                     value={form.officerEmail}
                     onChange={handleTextChange}
@@ -1244,8 +1112,6 @@ export default function ApplyForm() {
                   )}
                 </div>
               </div>
-
-              {requiredFieldLegend}
 
               {/* LAYER 4: Club Info */}
               <div id="section-clubInfo" className={sectionCardClass}>
@@ -1311,7 +1177,6 @@ export default function ApplyForm() {
                       id="advisorName"
                       name="advisorName"
                       type="text"
-                      autoComplete="section-advisor name"
                       placeholder="Mr. John Davis"
                       value={form.advisorName}
                       onChange={handleTextChange}
@@ -1336,7 +1201,6 @@ export default function ApplyForm() {
                       id="advisorEmail"
                       name="advisorEmail"
                       type="email"
-                      autoComplete="section-advisor email"
                       placeholder="jdavis@schools.nyc.gov"
                       value={form.advisorEmail}
                       onChange={handleTextChange}
@@ -1359,7 +1223,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('advisorConfirmed', !!fieldErrors.advisorConfirmed)}
                   role="group"
                   aria-labelledby="advisorConfirmed-label"
-                  aria-describedby={fieldErrors.advisorConfirmed ? 'advisorConfirmed-error' : undefined}
                 >
                   <span id="advisorConfirmed-label" className={labelClass}>
                     Is the faculty advisor of your esports club confirmed? {requiredMark}
@@ -1380,7 +1243,7 @@ export default function ApplyForm() {
                     ))}
                   </div>
                   {fieldErrors.advisorConfirmed && (
-                    <p id="advisorConfirmed-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.advisorConfirmed}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.advisorConfirmed}</p>
                   )}
                 </div>
 
@@ -1414,11 +1277,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('interestedGames', !!fieldErrors.interestedGames)}
                   role="group"
                   aria-labelledby="interestedGames-label"
-                  aria-describedby={
-                    [fieldErrors.interestedGames && 'interestedGames-error', fieldErrors.interestedGamesOther && 'interestedGamesOther-error']
-                      .filter(Boolean)
-                      .join(' ') || undefined
-                  }
                 >
                   <span id="interestedGames-label" className={labelClass}>
                     What games are you and your club members interested in competing for this year? {requiredMark}
@@ -1451,10 +1309,10 @@ export default function ApplyForm() {
                     />
                   </div>
                   {fieldErrors.interestedGames && (
-                    <p id="interestedGames-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGames}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGames}</p>
                   )}
                   {fieldErrors.interestedGamesOther && (
-                    <p id="interestedGamesOther-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGamesOther}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.interestedGamesOther}</p>
                   )}
                 </div>
 
@@ -1464,11 +1322,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('clubBarriers', !!fieldErrors.clubBarriers)}
                   role="group"
                   aria-labelledby="clubBarriers-label"
-                  aria-describedby={
-                    [fieldErrors.clubBarriers && 'clubBarriers-error', fieldErrors.clubBarriersOther && 'clubBarriersOther-error']
-                      .filter(Boolean)
-                      .join(' ') || undefined
-                  }
                 >
                   <span id="clubBarriers-label" className={labelClass}>
                     What are your club&apos;s biggest barriers? {requiredMark}
@@ -1502,10 +1355,10 @@ export default function ApplyForm() {
                     />
                   </div>
                   {fieldErrors.clubBarriers && (
-                    <p id="clubBarriers-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriers}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriers}</p>
                   )}
                   {fieldErrors.clubBarriersOther && (
-                    <p id="clubBarriersOther-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriersOther}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.clubBarriersOther}</p>
                   )}
                 </div>
 
@@ -1515,11 +1368,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('nonRosterOpportunities', !!fieldErrors.nonRosterOpportunities)}
                   role="group"
                   aria-labelledby="nonRosterOpportunities-label"
-                  aria-describedby={
-                    [fieldErrors.nonRosterOpportunities && 'nonRosterOpportunities-error', fieldErrors.nonRosterOpportunitiesOther && 'nonRosterOpportunitiesOther-error']
-                      .filter(Boolean)
-                      .join(' ') || undefined
-                  }
                 >
                   <span id="nonRosterOpportunities-label" className={labelClass}>
                     Which opportunities would interest students who are not on a competitive roster? {requiredMark}
@@ -1548,10 +1396,10 @@ export default function ApplyForm() {
                     />
                   </div>
                   {fieldErrors.nonRosterOpportunities && (
-                    <p id="nonRosterOpportunities-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunities}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunities}</p>
                   )}
                   {fieldErrors.nonRosterOpportunitiesOther && (
-                    <p id="nonRosterOpportunitiesOther-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunitiesOther}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.nonRosterOpportunitiesOther}</p>
                   )}
                 </div>
 
@@ -1561,11 +1409,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('inclusiveOpportunities', !!fieldErrors.inclusiveOpportunities)}
                   role="group"
                   aria-labelledby="inclusiveOpportunities-label"
-                  aria-describedby={
-                    [fieldErrors.inclusiveOpportunities && 'inclusiveOpportunities-error', fieldErrors.inclusiveOpportunitiesOther && 'inclusiveOpportunitiesOther-error']
-                      .filter(Boolean)
-                      .join(' ') || undefined
-                  }
                 >
                   <span id="inclusiveOpportunities-label" className={labelClass}>
                     We want to make EZ Esports as inclusive as possible and are considering ways to include students who might not make it past try-outs for your esports teams but still want to participate in an esports environment. How might you approach this, or which additional opportunities would be most valuable to students at your school? {requiredMark}
@@ -1594,10 +1437,10 @@ export default function ApplyForm() {
                     />
                   </div>
                   {fieldErrors.inclusiveOpportunities && (
-                    <p id="inclusiveOpportunities-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunities}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunities}</p>
                   )}
                   {fieldErrors.inclusiveOpportunitiesOther && (
-                    <p id="inclusiveOpportunitiesOther-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunitiesOther}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.inclusiveOpportunitiesOther}</p>
                   )}
                 </div>
 
@@ -1618,11 +1461,9 @@ export default function ApplyForm() {
                     onChange={handleTextChange}
                     onFocus={() => setFocusedField('separateGamingClubs')}
                     onBlur={() => setFocusedField(null)}
-                    aria-invalid={!!fieldErrors.separateGamingClubs}
-                    aria-describedby={fieldErrors.separateGamingClubs ? 'separateGamingClubs-error' : undefined}
                   />
                   {fieldErrors.separateGamingClubs && (
-                    <p id="separateGamingClubs-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.separateGamingClubs}</p>
+                    <p className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.separateGamingClubs}</p>
                   )}
                 </div>
 
@@ -1632,7 +1473,6 @@ export default function ApplyForm() {
                   className={fieldWrapperClass('contributeBeyondSchool', !!fieldErrors.contributeBeyondSchool)}
                   role="group"
                   aria-labelledby="contributeBeyondSchool-label"
-                  aria-describedby={fieldErrors.contributeBeyondSchool ? 'contributeBeyondSchool-error' : undefined}
                 >
                   <span id="contributeBeyondSchool-label" className={labelClass}>
                     Would you or another officer be interested in contributing to EZ Esports beyond representing your school? {requiredMark}
@@ -1654,15 +1494,14 @@ export default function ApplyForm() {
                     ))}
                   </div>
                   {fieldErrors.contributeBeyondSchool && (
-                    <p id="contributeBeyondSchool-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.contributeBeyondSchool}</p>
+                    <p className="mt-2 text-xs text-danger font-semibold">{fieldErrors.contributeBeyondSchool}</p>
                   )}
                 </div>
 
                 {/* Feedback */}
                 <div id="field-feedback" className={fieldWrapperClass('feedback', false)}>
                   <label htmlFor="feedback" className={labelClass}>
-                    Feedback or suggestions for EZ Esports{' '}
-                    <span className="text-foreground-muted font-normal normal-case">(Optional)</span>
+                    Feedback or suggestions for EZ Esports
                     <span className="text-xs text-foreground-secondary font-normal block mt-1 normal-case">
                       (Please include any feedback from you or your club about enhancing your school&apos;s experience with EZ Esports.)
                     </span>
@@ -1822,11 +1661,6 @@ export default function ApplyForm() {
                       onClick={() => {
                         setForm(initialForm);
                         setFieldErrors({});
-                        try {
-                          window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-                        } catch {
-                          // Non-fatal — the visible form is already cleared either way.
-                        }
                       }}
                       className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200 cursor-pointer"
                     >
