@@ -108,6 +108,77 @@ function DetailsBody({ details, message }: { details: SchoolApplicationDetails |
     );
   }
 
+  // v3 (issue #127): same nested shape as v2, except the single `agreedRules`
+  // boolean became three independently-tracked consents. Same defensive
+  // shape guard as the v2 branch above — `details` is unauthenticated input.
+  if (
+    details.version === 3 &&
+    details.president &&
+    details.vicePresident &&
+    details.thirdOfficer &&
+    details.club &&
+    details.consent
+  ) {
+    const games = details.club.interestedGames.join(", ") || "—";
+    const nonRoster = details.club.nonRosterOpportunities.join(", ") || "—";
+    const inclusive = details.club.inclusiveOpportunities.join(", ") || "—";
+    const contribute = details.club.contributeBeyondSchool.join(", ") || "—";
+    const agreed = (v: boolean) => (v ? "Agreed" : "Disagreed");
+
+    return (
+      <div className="space-y-4">
+        <DetailField label="Club Status" value={details.clubStatus} />
+
+        <DetailSection title="President">
+          <DetailField label="Name" value={`${details.president.firstName} ${details.president.lastName}`} />
+          <DetailField label="Email" value={details.president.email} />
+          <DetailField label="Discord" value={details.president.discord} />
+          <DetailField label="Graduation Year" value={details.president.gradYear} />
+          <DetailField label="Preferred Contact" value={details.president.preferredContact} />
+        </DetailSection>
+
+        <DetailSection title="Vice President">
+          <DetailField label="Name" value={`${details.vicePresident.firstName} ${details.vicePresident.lastName}`} />
+          <DetailField label="Email" value={details.vicePresident.email} />
+          <DetailField label="Discord" value={details.vicePresident.discord} />
+          <DetailField label="Graduation Year" value={details.vicePresident.gradYear} />
+          <DetailField label="Preferred Contact" value={details.vicePresident.preferredContact} />
+        </DetailSection>
+
+        <DetailSection title="3rd Club Officer">
+          <DetailField label="Name" value={`${details.thirdOfficer.firstName} ${details.thirdOfficer.lastName}`} />
+          <DetailField label="Email" value={details.thirdOfficer.email} />
+          <DetailField label="Graduation Year" value={details.thirdOfficer.gradYear} />
+          <DetailField label="Preferred Contact" value={details.thirdOfficer.preferredContact} />
+        </DetailSection>
+
+        <DetailSection title="Club Info">
+          <DetailField label="Instagram" value={details.club.instagramLink} />
+          <DetailField label="Discord" value={details.club.discordLink} />
+          <DetailField label="Faculty Advisor" value={`${details.club.advisorName} (${details.club.advisorEmail})`} />
+          <DetailField label="Advisor Confirmed" value={details.club.advisorConfirmed} />
+          <DetailField label="Active Club Members" value={details.club.activeStudentsCount} />
+          <DetailField label="Interested Games" value={games} />
+          <DetailField label="Biggest Barrier" value={details.club.clubBarrier} />
+          <DetailField label="Non-Roster Opportunities" value={nonRoster} />
+          <DetailField label="Inclusive Opportunities" value={inclusive} />
+          <DetailField label="Separate Gaming Clubs/Groups" value={details.club.separateGamingClubs} />
+          <DetailField label="Contribute Beyond School" value={contribute} />
+        </DetailSection>
+
+        <DetailSection title="Feedback">
+          <DetailField label="Feedback / Notes" value={details.feedback} />
+        </DetailSection>
+
+        <DetailSection title="Consent">
+          <DetailField label="League Rules & Code of Conduct" value={agreed(details.consent.agreedToRules)} />
+          <DetailField label="Terms of Service" value={agreed(details.consent.agreedToTerms)} />
+          <DetailField label="Privacy & Data Handling" value={agreed(details.consent.agreedToPrivacy)} />
+        </DetailSection>
+      </div>
+    );
+  }
+
   return <FlatDetailList rows={formatSchoolApplicationDetails(details)} />;
 }
 
