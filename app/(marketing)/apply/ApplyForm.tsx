@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   validateSchoolApplicationForm,
+  compileApplicationPayload,
   GAME_LABELS,
   CLUB_BARRIER_LABELS,
   NON_ROSTER_OPPORTUNITY_LABELS,
@@ -299,13 +300,14 @@ export default function ApplyForm() {
     setError('');
 
     try {
-      // The API route re-validates and compiles the raw form fields itself
-      // (app/api/apply/route.ts) using the same shared functions, so client
-      // and server can't drift out of parity on what's required.
+      // The client compiles the payload before sending; the API route
+      // (app/api/apply/route.ts) re-checks required fields, email format,
+      // and — the one check it can't skip — that all three legal consents
+      // were actually given, so that gate can't be bypassed client-side.
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(compileApplicationPayload(form)),
       });
       if (!res.ok) throw new Error('Submission failed');
       setSubmitted(true);

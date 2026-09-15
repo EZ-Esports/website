@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
-import { validateSchoolApplicationForm, compileApplicationPayload, type SchoolApplicationFormData } from '@/app/lib/school-application-form';
 
 // 5 submissions per IP per 10 minutes — generous enough for legitimate use,
 // strict enough to prevent spam flooding the applications inbox.
@@ -21,21 +20,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    const { applicantName, schoolName, role, email, message, details } = body;
+
+    if (!applicantName || !schoolName || !role || !email) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // The client and server must agree on what's required. Rather than
-    // re-implement the same checks against a different shape (and risk them
-    // drifting apart), the route validates and compiles the raw form data
-    // with the exact same shared functions ApplyForm.tsx uses client-side —
-    // the client-side check is strictly a UX nicety, this is the real gate.
-    const errors = validateSchoolApplicationForm(body as SchoolApplicationFormData);
-    if (Object.keys(errors).length > 0) {
-      return NextResponse.json({ error: 'Missing or invalid required fields', fieldErrors: errors }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    const { applicantName, schoolName, role, email, message, details } = compileApplicationPayload(body as SchoolApplicationFormData);
+    // Legal consent (issue #127) is the one gate that has to hold even though
+    // the rest of the hand-rolled validation was reverted: `details` is
+    // unauthenticated JSON, so every step here is optional-chained and
+    // strictly `=== true` rather than truthy, since a missing/null `details`
+    // or a non-boolean value must fail closed instead of throwing or passing.
+    const consent = details?.consent;
+    if (consent?.agreedToRules !== true || consent?.agreedToTerms !== true || consent?.agreedToPrivacy !== true) {
+      return NextResponse.json(
+        { error: 'You must agree to the league rules, Terms of Service, and Privacy Policy to submit an application.' },
+        { status: 400 },
+      );
+    }
 
     await db.insert(schema.schoolApplications).values({
       applicantName,
