@@ -73,7 +73,7 @@ describe('Homepage Section Ordering and Architecture', () => {
 
   it('exports page metadata and dynamic rendering config', () => {
     expect(source).toContain("export const dynamic = 'force-dynamic';");
-    expect(source).toContain("title: 'EZ Esports — NYC High School Esports League'");
+    expect(source).toContain("title: 'EZ Esports: NYC High School Esports League'");
   });
 
   it('includes robust try/catch fallback data fetching for gallery and content', () => {

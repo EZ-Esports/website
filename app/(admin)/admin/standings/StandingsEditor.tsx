@@ -309,7 +309,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
       <p className="text-[11px] text-foreground-muted leading-relaxed">
         These snapshots power the public standings pages for seasons whose match scores were never recorded.
         Seasons without snapshot rows fall back to standings computed live from match results.
-        For individual competitions (e.g. TFT), set the player name and keep W-L blank.
+        For individual competitions (e.g. Teamfight Tactics), set the player name and keep W-L blank.
       </p>
     </div>
   );

@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'EZ Esports — NYC High School Esports League';
+export const alt = 'EZ Esports: NYC High School Esports League';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

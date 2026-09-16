@@ -54,8 +54,8 @@ export interface SchoolApplicationFormData {
 // `string` and silently defeat that check.
 export const GAME_LABELS = {
   valorant: 'Valorant',
-  lol: 'League of Legends (LoL)',
-  tft: 'Teamfight Tactics (TFT)',
+  lol: 'League of Legends',
+  tft: 'Teamfight Tactics',
   tetris: 'TETR.IO',
   clashRoyale: 'Clash Royale',
   smashBros: 'Super Smash Bros. Ultimate',
