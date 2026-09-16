@@ -93,14 +93,14 @@ describe('League Rules Page (/rules)', () => {
     });
 
     it('ensures ApplyForm checkbox label links directly to /rules with target="_blank"', () => {
-      const applyFormSource = readFileSync(
-        resolve(process.cwd(), 'app/(marketing)/apply/ApplyForm.tsx'),
+      const clubInfoSectionSource = readFileSync(
+        resolve(process.cwd(), 'app/(marketing)/apply/sections/ClubInfoSection.tsx'),
         'utf8'
       );
-      expect(applyFormSource).toContain('<Link');
-      expect(applyFormSource).toContain('href="/rules"');
-      expect(applyFormSource).toContain('target="_blank"');
-      expect(applyFormSource).toContain('league rules');
+      expect(clubInfoSectionSource).toContain('<Link');
+      expect(clubInfoSectionSource).toContain('href="/rules"');
+      expect(clubInfoSectionSource).toContain('target="_blank"');
+      expect(clubInfoSectionSource).toContain('League Rules');
     });
   });
 });
