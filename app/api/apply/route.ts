@@ -30,6 +30,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    // Legal consent (issue #127) is the one gate that has to hold even though
+    // the rest of the hand-rolled validation was reverted: `details` is
+    // unauthenticated JSON, so every step here is optional-chained and
+    // strictly `=== true` rather than truthy, since a missing/null `details`
+    // or a non-boolean value must fail closed instead of throwing or passing.
+    const consent = details?.consent;
+    if (consent?.agreedToRules !== true || consent?.agreedToTerms !== true || consent?.agreedToPrivacy !== true) {
+      return NextResponse.json(
+        { error: 'You must agree to the league rules, Terms of Service, and Privacy Policy to submit an application.' },
+        { status: 400 },
+      );
+    }
+
     await db.insert(schema.schoolApplications).values({
       applicantName,
       schoolName,

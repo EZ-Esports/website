@@ -9,6 +9,7 @@ import {
   NON_ROSTER_OPPORTUNITY_LABELS,
   INCLUSIVE_OPPORTUNITY_LABELS,
   CONTRIBUTE_BEYOND_SCHOOL_LABELS,
+  type SchoolApplicationFormData,
 } from '@/app/lib/school-application-form';
 import Button from '@/app/components/ui/Button';
 import { Textarea } from '@/app/components/ui/form';
@@ -115,8 +116,10 @@ const initialForm = {
   separateGamingClubs: '',
   contributeBeyondSchool: emptySelection(CHECKBOX_GROUP_LABELS.contributeBeyondSchool.labels, CHECKBOX_GROUP_LABELS.contributeBeyondSchool.hasOther),
   feedback: '',
-  agreedRules: false,
-};
+  agreedToRules: false,
+  agreedToTerms: false,
+  agreedToPrivacy: false,
+} satisfies SchoolApplicationFormData;
 
 type CheckboxGroupKey = keyof typeof CHECKBOX_GROUP_LABELS;
 // 'other' is only a valid key for groups whose config sets hasOther: true —
@@ -265,7 +268,9 @@ export default function ApplyForm() {
       isCheckboxGroupComplete(form.inclusiveOpportunities, form.inclusiveOpportunitiesOther),
       !!form.separateGamingClubs.trim(),
       isCheckboxGroupComplete(form.contributeBeyondSchool),
-      form.agreedRules,
+      form.agreedToRules,
+      form.agreedToTerms,
+      form.agreedToPrivacy,
     ],
   };
 
@@ -295,11 +300,14 @@ export default function ApplyForm() {
     setError('');
 
     try {
-      const payload = compileApplicationPayload(form);
+      // The client compiles the payload before sending; the API route
+      // (app/api/apply/route.ts) re-checks required fields, email format,
+      // and — the one check it can't skip — that all three legal consents
+      // were actually given, so that gate can't be bypassed client-side.
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(compileApplicationPayload(form)),
       });
       if (!res.ok) throw new Error('Submission failed');
       setSubmitted(true);
@@ -337,9 +345,9 @@ export default function ApplyForm() {
     clearFieldErrors('clubBarriers', 'clubBarriersOther');
   };
 
-  const handleRulesChange = (checked: boolean) => {
-    setForm((prev) => ({ ...prev, agreedRules: checked }));
-    clearFieldErrors('agreedRules');
+  const handleConsentChange = (field: 'agreedToRules' | 'agreedToTerms' | 'agreedToPrivacy', checked: boolean) => {
+    setForm((prev) => ({ ...prev, [field]: checked }));
+    clearFieldErrors(field);
   };
 
   const handleCheckboxGroupChange = <G extends CheckboxGroupKey>(group: G, key: CheckboxOptionKey<G>, checked: boolean) => {
@@ -1512,46 +1520,132 @@ export default function ApplyForm() {
                   />
                 </div>
 
-                {/* Rules Consent Checkbox */}
-                <div
-                  id="field-agreedRules"
-                  className={`rounded-xl border p-4 sm:p-5 transition-colors ${fieldErrors.agreedRules ? "border-danger bg-danger/5" : "border-line bg-accent/5"}`}
-                  role="group"
-                  aria-labelledby="agreedRules-label"
-                  aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
-                >
-                  <span id="agreedRules-label" className={labelClass}>
-                    League Rules &amp; Terms Consent {requiredMark}
-                  </span>
-                  <p className="text-xs text-foreground-secondary mb-3 leading-relaxed">
-                    By applying on behalf of your school, you confirm that your club officers and members will abide by EZ Esports league rules, competitive integrity guidelines, and sportsmanship policies.
-                  </p>
-                  <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={form.agreedRules}
-                      onChange={(e) => handleRulesChange(e.target.checked)}
-                      className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                      aria-invalid={!!fieldErrors.agreedRules}
-                      aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
-                    />
-                    <span>
-                      I understand and agree to uphold all EZ Esports{' '}
-                      <Link
-                        href="/rules"
-                        target="_blank"
-                        className="text-accent underline hover:text-accent-secondary"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        league rules
-                      </Link>
-                      , competitive integrity guidelines, and participation terms.
-                    </span>
-                  </label>
-                  {fieldErrors.agreedRules && (
-                    <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
-                  )}
+                {/* Legal Consent: split into three independently-required checkboxes
+                    (issue #127) — previously a single checkbox bundled rules +
+                    competitive integrity + participation terms with no links to
+                    any of the documents being agreed to. Each consent now links
+                    to its actual document and must be checked on its own. */}
+                <div className="rounded-xl border border-line bg-accent/5 p-4 sm:p-5 space-y-4">
+                  <span className={labelClass}>Legal Agreements {requiredMark}</span>
+
+                  {/* League Rules & Code of Conduct */}
+                  <div
+                    id="field-agreedToRules"
+                    className={`border-l-2 pl-3 transition-colors ${fieldErrors.agreedToRules ? 'border-danger' : 'border-transparent'}`}
+                  >
+                    <label className="flex items-start gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.agreedToRules}
+                        onChange={(e) => handleConsentChange('agreedToRules', e.target.checked)}
+                        className="w-4.5 h-4.5 mt-0.5 rounded border-line accent-accent cursor-pointer shrink-0"
+                        aria-invalid={!!fieldErrors.agreedToRules}
+                        aria-describedby={fieldErrors.agreedToRules ? 'agreedToRules-error' : undefined}
+                      />
+                      <span>
+                        I have read and agree to the EZ Esports{' '}
+                        <Link
+                          href="/rules"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent underline hover:text-accent-secondary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          League Rules &amp; Code of Conduct
+                        </Link>
+                        , including its competitive integrity and sportsmanship policies. {requiredMark}
+                      </span>
+                    </label>
+                    {fieldErrors.agreedToRules && (
+                      <p id="agreedToRules-error" className="mt-1.5 ml-7 text-xs text-danger font-semibold">{fieldErrors.agreedToRules}</p>
+                    )}
+                  </div>
+
+                  {/* Terms of Service */}
+                  <div
+                    id="field-agreedToTerms"
+                    className={`border-l-2 pl-3 transition-colors ${fieldErrors.agreedToTerms ? 'border-danger' : 'border-transparent'}`}
+                  >
+                    <label className="flex items-start gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.agreedToTerms}
+                        onChange={(e) => handleConsentChange('agreedToTerms', e.target.checked)}
+                        className="w-4.5 h-4.5 mt-0.5 rounded border-line accent-accent cursor-pointer shrink-0"
+                        aria-invalid={!!fieldErrors.agreedToTerms}
+                        aria-describedby={fieldErrors.agreedToTerms ? 'agreedToTerms-error' : undefined}
+                      />
+                      <span>
+                        I have read and agree to the EZ Esports{' '}
+                        <Link
+                          href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent underline hover:text-accent-secondary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Terms of Service
+                        </Link>
+                        . {requiredMark}
+                      </span>
+                    </label>
+                    {fieldErrors.agreedToTerms && (
+                      <p id="agreedToTerms-error" className="mt-1.5 ml-7 text-xs text-danger font-semibold">{fieldErrors.agreedToTerms}</p>
+                    )}
+                  </div>
+
+                  {/* Privacy / data handling */}
+                  <div
+                    id="field-agreedToPrivacy"
+                    className={`border-l-2 pl-3 transition-colors ${fieldErrors.agreedToPrivacy ? 'border-danger' : 'border-transparent'}`}
+                  >
+                    <label className="flex items-start gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.agreedToPrivacy}
+                        onChange={(e) => handleConsentChange('agreedToPrivacy', e.target.checked)}
+                        className="w-4.5 h-4.5 mt-0.5 rounded border-line accent-accent cursor-pointer shrink-0"
+                        aria-invalid={!!fieldErrors.agreedToPrivacy}
+                        aria-describedby={fieldErrors.agreedToPrivacy ? 'agreedToPrivacy-error' : undefined}
+                      />
+                      <span>
+                        I have read and agree to the EZ Esports{' '}
+                        <Link
+                          href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent underline hover:text-accent-secondary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Privacy Policy
+                        </Link>
+                        , and consent to the collection of the officer and advisor contact details in this form. {requiredMark}
+                      </span>
+                    </label>
+                    {fieldErrors.agreedToPrivacy && (
+                      <p id="agreedToPrivacy-error" className="mt-1.5 ml-7 text-xs text-danger font-semibold">{fieldErrors.agreedToPrivacy}</p>
+                    )}
+                  </div>
                 </div>
+
+                {/* Privacy / data-use notice (issue #127): this form collects PII
+                    belonging to minors (student officer names, emails, Discord
+                    handles, grad years, advisor contact) — say plainly what's
+                    collected, why, and who sees it, right where applicants are
+                    about to submit it. */}
+                <p className="text-xs text-foreground-muted leading-relaxed bg-surface-raised/40 border border-line/60 rounded-xl p-3">
+                  <strong className="text-foreground-secondary">How we use this information: </strong>
+                  We collect the names, emails, Discord usernames, graduation years, and advisor contact info above to verify your club, register your school for the season, and reach your officers and advisor about league logistics. It&apos;s visible only to EZ Esports league staff and is never sold or shared with third parties. See our{' '}
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline hover:text-accent-secondary"
+                  >
+                    Privacy Policy
+                  </Link>{' '}
+                  for details.
+                </p>
 
                 {/* Submit Action Bar */}
                 <div className="flex flex-col gap-3 pt-4 border-t border-line/50">
