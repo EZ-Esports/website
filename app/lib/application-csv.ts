@@ -30,12 +30,12 @@ const SCHOOL_CSV_HEADER = ["Applicant Name", "School", "Role", "Email", "Status"
  * version without version-specific columns.
  *
  * A row can have `details: null` while still holding a real `message` --
- * db/backfill-application-details.ts documents this as a permanent state
- * for rows whose legacy message text did not match any known template and
- * was left for a human to look at rather than guessed at. Falling back to
- * the raw message keeps the export matching what the row already shows on
- * screen (ApplicationRow.tsx and the detail modal both fall back the same
- * way) instead of silently exporting an empty Details column.
+ * a permanent state for legacy rows predating the `details` column whose
+ * message text was never (or could never be) converted to structured data.
+ * Falling back to the raw message keeps the export matching what the row
+ * already shows on screen (ApplicationRow.tsx and the detail modal both
+ * fall back the same way) instead of silently exporting an empty Details
+ * column.
  */
 export function schoolApplicationsToCsv(apps: SchoolApplicationCsvSource[]): string {
   const rows = apps.map((app) => [

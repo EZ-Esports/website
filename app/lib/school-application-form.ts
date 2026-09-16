@@ -195,9 +195,9 @@ export function validateSchoolApplicationForm(form: SchoolApplicationFormData) {
 // force every future redesign through a single fixed shape — coercing old
 // rows into it (lossy) or leaving them permanently unparseable (what v1 rows
 // were before this) — `details` is a discriminated union tagged by
-// `version`. Each version keeps its own shape, its own formatter, and (for
-// backfill) its own parser forever; a new form redesign is a new union
-// member plus a version bump, never a migration of old rows.
+// `version`. Each version keeps its own shape and its own formatter forever
+// (old rows are immutable and must stay renderable); a new form redesign is
+// a new union member plus a version bump, never a migration of old rows.
 export interface SchoolApplicationDetailsV1 {
   version: 1;
   preferredFirstName: string;
@@ -283,68 +283,21 @@ function selectedLabels(selection: Record<string, boolean>, labels: Record<strin
   return result;
 }
 
+/**
+ * Builds the payload posted to /api/apply. This used to also compile a
+ * formatted `message` text blob duplicating everything in `details` (kept in
+ * sync historically via regex parsers that reverse-parsed `message` back into
+ * `details` for a one-off backfill — see issue #166). The DB `message` column
+ * still exists and is still read as a fallback for legacy rows whose
+ * `details` predates this column, but new submissions no longer populate it —
+ * `details` is now the sole source of truth going forward.
+ */
 export function compileApplicationPayload(form: SchoolApplicationFormData) {
-  const selectedGames = selectedLabels(form.interestedGames, GAME_LABELS, form.interestedGamesOther);
-  const barrierLabel =
-    form.clubBarriers === 'other'
-      ? `Other: ${form.clubBarriersOther?.trim() ?? ''}`
-      : CLUB_BARRIER_LABELS[form.clubBarriers] ?? form.clubBarriers;
-  const nonRosterOpportunities = selectedLabels(form.nonRosterOpportunities, NON_ROSTER_OPPORTUNITY_LABELS, form.nonRosterOpportunitiesOther);
-  const inclusiveOpportunities = selectedLabels(form.inclusiveOpportunities, INCLUSIVE_OPPORTUNITY_LABELS, form.inclusiveOpportunitiesOther);
-  const contributeBeyondSchool = selectedLabels(form.contributeBeyondSchool, CONTRIBUTE_BEYOND_SCHOOL_LABELS);
-
-  const message = `
-=== CLUB STATUS ===
-${form.clubStatus}
-
-=== 1. PRESIDENT INFO ===
-President Name: ${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}
-School Name: ${form.schoolName.trim()}
-Graduation Year: ${form.presidentGradYear}
-Email: ${form.presidentEmail.trim()}
-Discord Username: ${form.presidentDiscord.trim()}
-Best Contact Platform: ${form.presidentPreferredContact.trim()}
-
-=== 2. VICE PRESIDENT INFO ===
-VP Name: ${form.vpFirstName.trim()} ${form.vpLastName.trim()}
-Graduation Year: ${form.vpGradYear}
-Discord Username: ${form.vpDiscord.trim()}
-Email: ${form.vpEmail.trim()}
-Best Contact Platform: ${form.vpPreferredContact.trim()}
-
-=== 3. 3RD STUDENT CLUB OFFICER INFO ===
-Officer Name: ${form.officerFirstName.trim()} ${form.officerLastName.trim()}
-Graduation Year: ${form.officerGradYear}
-Email: ${form.officerEmail.trim()}
-Best Contact Platform: ${form.officerPreferredContact.trim()}
-
-=== 4. CLUB INFO ===
-Club's Instagram Link: ${form.instagramLink.trim()}
-Club's Discord Link: ${form.discordLink.trim()}
-Club Advisor Name: ${form.advisorName.trim()}
-Club Advisor Email (@schools.nyc.gov): ${form.advisorEmail.trim()}
-Faculty Advisor Confirmed: ${form.advisorConfirmed}
-Estimated Active Club Members: ${form.activeStudentsCount.trim()}
-Interested Games: ${selectedGames.join(", ")}
-Biggest Barrier: ${barrierLabel}
-Non-Roster Opportunities of Interest: ${nonRosterOpportunities.join(", ")}
-Inclusive Participation Opportunities: ${inclusiveOpportunities.join(", ")}
-Separate Gaming Clubs/Groups: ${form.separateGamingClubs.trim()}
-Interested in Contributing Beyond School: ${contributeBeyondSchool.join(", ")}
-League Rules & Code of Conduct: ${form.agreedToRules ? 'Agreed' : 'Disagreed'}
-Terms of Service: ${form.agreedToTerms ? 'Agreed' : 'Disagreed'}
-Privacy & Data Handling: ${form.agreedToPrivacy ? 'Agreed' : 'Disagreed'}
-
-Feedback / Notes:
-${form.feedback?.trim() || "N/A"}
-`.trim();
-
   return {
     applicantName: `${form.presidentFirstName.trim()} ${form.presidentLastName.trim()}`,
     schoolName: form.schoolName.trim(),
     role: "Esports Club President",
     email: form.presidentEmail.trim(),
-    message,
     details: buildSchoolApplicationDetails(form),
   };
 }
@@ -490,278 +443,4 @@ function formatSchoolApplicationDetailsV1(d: SchoolApplicationDetailsV1): { labe
     { label: 'Rules Agreement', value: d.agreedRules ? 'Agreed' : 'Disagreed' },
     { label: 'Additional Notes', value: d.additionalNotes || '—' },
   ];
-}
-
-function splitName(fullName: string): { firstName: string; lastName: string } {
-  const parts = fullName.trim().split(/\s+/);
-  return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
-}
-
-function undoPlaceholder(value: string): string {
-  return value.trim() === 'N/A' ? '' : value.trim();
-}
-
-/**
- * Reconstructs `SchoolApplicationDetails` from a legacy `message` blob for db/backfill-application-details.ts,
- * trying each known template newest-first. `null` if none match — an older form
- * version this repo doesn't have a parser for yet, or hand-edited data — so the row
- * fails closed and is left for a human to look at, rather than silently producing a
- * partially-wrong structured record.
- */
-export function parseSchoolApplicationMessage(message: string): SchoolApplicationDetails | null {
-  return (
-    parseSchoolApplicationMessageV3(message) ??
-    parseSchoolApplicationMessageV2(message) ??
-    parseSchoolApplicationMessageV1(message)
-  );
-}
-
-// Matches the v3 message shape: identical to v2 except the single "Rules
-// Agreement" line became three separate consent lines (issue #127). Tried
-// before v2 in parseSchoolApplicationMessage so a v3 message (which a v2
-// pattern would fail to match anyway, since the trailing lines differ) is
-// recognized as v3 rather than falling through unnecessarily.
-const SCHOOL_MESSAGE_PATTERN_V3 = new RegExp(
-  '^=== CLUB STATUS ===\\n' +
-  '(?<clubStatus>.*)\\n\\n' +
-  '=== 1\\. PRESIDENT INFO ===\\n' +
-  'President Name: (?<presName>.*)\\n' +
-  'School Name: (?<schoolName>.*)\\n' +
-  'Graduation Year: (?<presGradYear>.*)\\n' +
-  'Email: (?<presEmail>.*)\\n' +
-  'Discord Username: (?<presDiscord>.*)\\n' +
-  'Best Contact Platform: (?<presContact>.*)\\n\\n' +
-  '=== 2\\. VICE PRESIDENT INFO ===\\n' +
-  'VP Name: (?<vpName>.*)\\n' +
-  'Graduation Year: (?<vpGradYear>.*)\\n' +
-  'Discord Username: (?<vpDiscord>.*)\\n' +
-  'Email: (?<vpEmail>.*)\\n' +
-  'Best Contact Platform: (?<vpContact>.*)\\n\\n' +
-  '=== 3\\. 3RD STUDENT CLUB OFFICER INFO ===\\n' +
-  'Officer Name: (?<offName>.*)\\n' +
-  'Graduation Year: (?<offGradYear>.*)\\n' +
-  'Email: (?<offEmail>.*)\\n' +
-  'Best Contact Platform: (?<offContact>.*)\\n\\n' +
-  '=== 4\\. CLUB INFO ===\\n' +
-  "Club's Instagram Link: (?<instagram>.*)\\n" +
-  "Club's Discord Link: (?<discordLink>.*)\\n" +
-  'Club Advisor Name: (?<advisorName>.*)\\n' +
-  'Club Advisor Email \\(@schools\\.nyc\\.gov\\): (?<advisorEmail>.*)\\n' +
-  'Faculty Advisor Confirmed: (?<advisorConfirmed>.*)\\n' +
-  'Estimated Active Club Members: (?<activeCount>.*)\\n' +
-  'Interested Games: (?<games>.*)\\n' +
-  'Biggest Barrier: (?<barrier>.*)\\n' +
-  'Non-Roster Opportunities of Interest: (?<nonRoster>.*)\\n' +
-  'Inclusive Participation Opportunities: (?<inclusive>.*)\\n' +
-  'Separate Gaming Clubs/Groups: (?<separate>.*)\\n' +
-  'Interested in Contributing Beyond School: (?<contribute>.*)\\n' +
-  'League Rules & Code of Conduct: (?<rulesAgreement>.*)\\n' +
-  'Terms of Service: (?<termsAgreement>.*)\\n' +
-  'Privacy & Data Handling: (?<privacyAgreement>.*)\\n\\n' +
-  'Feedback / Notes:\\n' +
-  '(?<feedback>[\\s\\S]*)$'
-);
-
-function parseSchoolApplicationMessageV3(message: string): SchoolApplicationDetailsV3 | null {
-  const match = SCHOOL_MESSAGE_PATTERN_V3.exec(message.trim());
-  if (!match?.groups) return null;
-  const g = match.groups;
-
-  const president = splitName(g.presName);
-  const vp = splitName(g.vpName);
-  const officer = splitName(g.offName);
-
-  return {
-    version: 3,
-    clubStatus: g.clubStatus,
-    president: {
-      firstName: president.firstName,
-      lastName: president.lastName,
-      gradYear: g.presGradYear,
-      email: g.presEmail,
-      discord: g.presDiscord,
-      preferredContact: g.presContact,
-    },
-    vicePresident: {
-      firstName: vp.firstName,
-      lastName: vp.lastName,
-      gradYear: g.vpGradYear,
-      discord: g.vpDiscord,
-      email: g.vpEmail,
-      preferredContact: g.vpContact,
-    },
-    thirdOfficer: {
-      firstName: officer.firstName,
-      lastName: officer.lastName,
-      gradYear: g.offGradYear,
-      email: g.offEmail,
-      preferredContact: g.offContact,
-    },
-    club: {
-      instagramLink: g.instagram,
-      discordLink: g.discordLink,
-      advisorName: g.advisorName,
-      advisorEmail: g.advisorEmail,
-      advisorConfirmed: g.advisorConfirmed,
-      activeStudentsCount: g.activeCount,
-      interestedGames: splitCsvLabels(g.games),
-      clubBarrier: g.barrier,
-      nonRosterOpportunities: splitCsvLabels(g.nonRoster),
-      inclusiveOpportunities: splitCsvLabels(g.inclusive),
-      separateGamingClubs: g.separate,
-      contributeBeyondSchool: splitCsvLabels(g.contribute),
-    },
-    feedback: g.feedback.trim(),
-    consent: {
-      agreedToRules: g.rulesAgreement.trim() === 'Agreed',
-      agreedToTerms: g.termsAgreement.trim() === 'Agreed',
-      agreedToPrivacy: g.privacyAgreement.trim() === 'Agreed',
-    },
-  };
-}
-
-// Matches the exact `=== SECTION ===` / `Label: value` shape compileApplicationPayload
-// produced from the Google-Forms-parity redesign through issue #127 (single "Rules
-// Agreement" line, before it split into three separate consents).
-const SCHOOL_MESSAGE_PATTERN_V2 = new RegExp(
-  '^=== CLUB STATUS ===\\n' +
-  '(?<clubStatus>.*)\\n\\n' +
-  '=== 1\\. PRESIDENT INFO ===\\n' +
-  'President Name: (?<presName>.*)\\n' +
-  'School Name: (?<schoolName>.*)\\n' +
-  'Graduation Year: (?<presGradYear>.*)\\n' +
-  'Email: (?<presEmail>.*)\\n' +
-  'Discord Username: (?<presDiscord>.*)\\n' +
-  'Best Contact Platform: (?<presContact>.*)\\n\\n' +
-  '=== 2\\. VICE PRESIDENT INFO ===\\n' +
-  'VP Name: (?<vpName>.*)\\n' +
-  'Graduation Year: (?<vpGradYear>.*)\\n' +
-  'Discord Username: (?<vpDiscord>.*)\\n' +
-  'Email: (?<vpEmail>.*)\\n' +
-  'Best Contact Platform: (?<vpContact>.*)\\n\\n' +
-  '=== 3\\. 3RD STUDENT CLUB OFFICER INFO ===\\n' +
-  'Officer Name: (?<offName>.*)\\n' +
-  'Graduation Year: (?<offGradYear>.*)\\n' +
-  'Email: (?<offEmail>.*)\\n' +
-  'Best Contact Platform: (?<offContact>.*)\\n\\n' +
-  '=== 4\\. CLUB INFO ===\\n' +
-  "Club's Instagram Link: (?<instagram>.*)\\n" +
-  "Club's Discord Link: (?<discordLink>.*)\\n" +
-  'Club Advisor Name: (?<advisorName>.*)\\n' +
-  'Club Advisor Email \\(@schools\\.nyc\\.gov\\): (?<advisorEmail>.*)\\n' +
-  'Faculty Advisor Confirmed: (?<advisorConfirmed>.*)\\n' +
-  'Estimated Active Club Members: (?<activeCount>.*)\\n' +
-  'Interested Games: (?<games>.*)\\n' +
-  'Biggest Barrier: (?<barrier>.*)\\n' +
-  'Non-Roster Opportunities of Interest: (?<nonRoster>.*)\\n' +
-  'Inclusive Participation Opportunities: (?<inclusive>.*)\\n' +
-  'Separate Gaming Clubs/Groups: (?<separate>.*)\\n' +
-  'Interested in Contributing Beyond School: (?<contribute>.*)\\n' +
-  'Rules Agreement: (?<rulesAgreement>.*)\\n\\n' +
-  'Feedback / Notes:\\n' +
-  '(?<feedback>[\\s\\S]*)$'
-);
-
-function splitCsvLabels(value: string): string[] {
-  return value === '' ? [] : value.split(', ');
-}
-
-function parseSchoolApplicationMessageV2(message: string): SchoolApplicationDetailsV2 | null {
-  const match = SCHOOL_MESSAGE_PATTERN_V2.exec(message.trim());
-  if (!match?.groups) return null;
-  const g = match.groups;
-
-  const president = splitName(g.presName);
-  const vp = splitName(g.vpName);
-  const officer = splitName(g.offName);
-
-  return {
-    version: 2,
-    clubStatus: g.clubStatus,
-    president: {
-      firstName: president.firstName,
-      lastName: president.lastName,
-      gradYear: g.presGradYear,
-      email: g.presEmail,
-      discord: g.presDiscord,
-      preferredContact: g.presContact,
-    },
-    vicePresident: {
-      firstName: vp.firstName,
-      lastName: vp.lastName,
-      gradYear: g.vpGradYear,
-      discord: g.vpDiscord,
-      email: g.vpEmail,
-      preferredContact: g.vpContact,
-    },
-    thirdOfficer: {
-      firstName: officer.firstName,
-      lastName: officer.lastName,
-      gradYear: g.offGradYear,
-      email: g.offEmail,
-      preferredContact: g.offContact,
-    },
-    club: {
-      instagramLink: g.instagram,
-      discordLink: g.discordLink,
-      advisorName: g.advisorName,
-      advisorEmail: g.advisorEmail,
-      advisorConfirmed: g.advisorConfirmed,
-      activeStudentsCount: g.activeCount,
-      interestedGames: splitCsvLabels(g.games),
-      clubBarrier: g.barrier,
-      nonRosterOpportunities: splitCsvLabels(g.nonRoster),
-      inclusiveOpportunities: splitCsvLabels(g.inclusive),
-      separateGamingClubs: g.separate,
-      contributeBeyondSchool: splitCsvLabels(g.contribute),
-    },
-    feedback: g.feedback.trim(),
-    agreedRules: g.rulesAgreement.trim() === 'Agreed',
-  };
-}
-
-// Matches the team-registration-style template that predates the club-officer
-// redesign — no VP/officer contacts, a single free-text captains/coaches blob.
-const SCHOOL_MESSAGE_PATTERN_V1 = new RegExp(
-  '^Preferred first name: (?<preferredFirstName>.*)\\n' +
-  'Phone number: (?<phone>.*)\\n' +
-  'Discord tag: (?<discordTag>.*)\\n' +
-  'School code: (?<schoolCode>.*)\\n' +
-  'School location: (?<schoolLocation>.*)\\n' +
-  'How did you learn about us: (?<howHeard>.*)\\n' +
-  'LinkedIn profile: (?<linkedin>.*)\\n\\n' +
-  'Captains / Coaches:\\n' +
-  '(?<captainsCoaches>[\\s\\S]*?)\\n\\n' +
-  'Anything to know about team:\\n' +
-  '(?<teamNotes>[\\s\\S]*?)\\n\\n' +
-  'Need help finding players: (?<needHelpFindingPlayers>.*)\\n' +
-  'Preferred communication platform: (?<preferredCommunicationPlatform>.*)\\n' +
-  'Interested Divisions: (?<interestedDivisions>.*)\\n' +
-  'Rules Agreement: (?<rulesAgreement>.*)\\n\\n' +
-  'Additional Notes:\\n' +
-  '(?<additionalNotes>[\\s\\S]*)$'
-);
-
-function parseSchoolApplicationMessageV1(message: string): SchoolApplicationDetailsV1 | null {
-  const match = SCHOOL_MESSAGE_PATTERN_V1.exec(message.trim());
-  if (!match?.groups) return null;
-  const g = match.groups;
-
-  return {
-    version: 1,
-    preferredFirstName: undoPlaceholder(g.preferredFirstName),
-    phone: g.phone.trim(),
-    discordTag: undoPlaceholder(g.discordTag),
-    schoolCode: g.schoolCode.trim(),
-    schoolLocation: g.schoolLocation.trim(),
-    howHeard: g.howHeard.trim(),
-    linkedin: undoPlaceholder(g.linkedin),
-    captainsCoaches: g.captainsCoaches.trim(),
-    teamNotes: g.teamNotes.trim(),
-    needHelpFindingPlayers: g.needHelpFindingPlayers.trim(),
-    preferredCommunicationPlatform: g.preferredCommunicationPlatform.trim(),
-    interestedDivisions: g.interestedDivisions.trim(),
-    agreedRules: g.rulesAgreement.trim() === 'Agreed',
-    additionalNotes: g.additionalNotes.trim(),
-  };
 }
