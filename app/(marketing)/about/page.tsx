@@ -7,7 +7,7 @@ import Card from '@/app/components/ui/Card';
 import CutCTA from '@/app/components/ui/CutCTA';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import { cx } from '@/app/lib/cx';
-import { getCachedSchools, getCachedPlayers, getCachedGames } from '@/app/lib/db/queries';
+import { getCachedSchools } from '@/app/lib/db/queries';
 import { ROUTES, SOCIAL_LINKS, GAMES, GAME_SLUGS } from '@/app/lib/constants';
 
 export const metadata: Metadata = {
@@ -44,17 +44,9 @@ const HISTORY = [
 
 export default async function AboutPage() {
   let schoolCount = 0;
-  let playerCount = 0;
-  let gameCount = 0;
   try {
-    const [schools, players, games] = await Promise.all([
-      getCachedSchools(),
-      getCachedPlayers(),
-      getCachedGames(),
-    ]);
+    const schools = await getCachedSchools();
     schoolCount = schools.length;
-    playerCount = players.length;
-    gameCount = games.length;
   } catch (error) {
     console.error('Failed to load About page stats', error);
   }
@@ -64,8 +56,7 @@ export default async function AboutPage() {
 
   const scoreboard = [
     { value: schoolCount > 0 ? schoolCount : 28, label: 'Schools' },
-    { value: playerCount > 0 ? playerCount.toLocaleString() : '2,800', label: 'Players' },
-    { value: gameCount > 0 ? gameCount : 3, label: 'Titles' },
+    { value: '1K+', label: 'Players' },
     { value: '+100%', label: "Growth '22–23", highlight: true },
     { value: '85%', label: 'Student-run', highlight: true },
   ];
@@ -83,7 +74,7 @@ export default async function AboutPage() {
       {/* Scoreboard strip */}
       <div className="relative z-10 -mt-px bg-surface-sunken border-y border-line">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 sm:grid-cols-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4">
             {scoreboard.map((cell) => (
               <div
                 key={cell.label}
