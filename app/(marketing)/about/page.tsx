@@ -43,9 +43,9 @@ const HISTORY = [
 ];
 
 export default async function AboutPage() {
-  let schoolCount = 0;
   // Fetched for potential future use in the scoreboard below; not currently
-  // rendered (Players and Titles cells show static values for now).
+  // rendered (Schools, Players, and Titles cells show static values for now).
+  let _schoolCount = 0;
   let _playerCount = 0;
   let _gameCount = 0;
   try {
@@ -54,7 +54,7 @@ export default async function AboutPage() {
       getCachedPlayers(),
       getCachedGames(),
     ]);
-    schoolCount = schools.length;
+    _schoolCount = schools.length;
     _playerCount = players.length;
     _gameCount = games.length;
   } catch (error) {
@@ -65,7 +65,7 @@ export default async function AboutPage() {
     || 'https://discord.com/invite/RajSZqNyvu';
 
   const scoreboard = [
-    { value: schoolCount > 0 ? schoolCount : 28, label: 'Schools' },
+    { value: '40+', label: 'Schools' },
     { value: '1K+', label: 'Players' },
     { value: '+100%', label: "Growth '22–23", highlight: true },
     { value: '85%', label: 'Student-run', highlight: true },
