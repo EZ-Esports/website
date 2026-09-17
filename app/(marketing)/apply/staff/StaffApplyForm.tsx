@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import Button from '@/app/components/ui/Button';
 import { Input, Textarea } from '@/app/components/ui/form';
 import { buildStaffApplicationDetails } from '@/app/lib/staff-application-form';
@@ -16,7 +17,8 @@ const initialForm = {
   message: '', // Experience, skills, why you want to join
   linkedin: '', // Resume / Portfolio / LinkedIn link
   availability: '', // hours per week
-  agreedRules: false,
+  agreedToTerms: false,
+  agreedToPrivacy: false,
 };
 
 const SECTIONS = [
@@ -68,7 +70,7 @@ export default function StaffApplyForm() {
       !!form.availability
     ],
     experience: [!!form.message.trim()],
-    review: [form.agreedRules],
+    review: [form.agreedToTerms, form.agreedToPrivacy],
   };
 
   const sectionComplete = (id: SectionId) => requiredChecks[id].every(Boolean);
@@ -89,7 +91,8 @@ export default function StaffApplyForm() {
     if (form.role === 'Other' && !form.roleOther.trim()) errors.role = 'Please specify your other role.';
     if (!form.availability) errors.availability = 'Please select your weekly availability.';
     if (!form.message.trim()) errors.message = 'Please provide details about your background and experience.';
-    if (!form.agreedRules) errors.agreedRules = 'You must agree to the positive environment guidelines.';
+    if (!form.agreedToTerms) errors.agreedToTerms = 'You must agree to the Terms of Service.';
+    if (!form.agreedToPrivacy) errors.agreedToPrivacy = 'You must agree to the Privacy Policy.';
 
     return errors;
   };
@@ -159,12 +162,12 @@ export default function StaffApplyForm() {
     }
   };
 
-  const handleRulesChange = (checked: boolean) => {
-    setForm((prev) => ({ ...prev, agreedRules: checked }));
-    if (fieldErrors.agreedRules) {
+  const handleConsentChange = (field: 'agreedToTerms' | 'agreedToPrivacy', checked: boolean) => {
+    setForm((prev) => ({ ...prev, [field]: checked }));
+    if (fieldErrors[field]) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        delete next.agreedRules;
+        delete next[field];
         return next;
       });
     }
@@ -620,36 +623,84 @@ export default function StaffApplyForm() {
               <div id="section-review" className={sectionCardClass}>
                 {sectionHeader('review')}
 
-                {/* Guidelines Agreement */}
-                <div
-                  id="field-agreedRules"
-                  className={`rounded-xl border p-4 sm:p-5 transition-colors ${
-                    fieldErrors.agreedRules ? 'border-danger bg-danger/5' : 'border-line bg-accent/5'
-                  }`}
-                  role="group"
-                  aria-labelledby="agreedRules-label"
-                  aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
-                >
-                  <span id="agreedRules-label" className={labelClass}>
+                {/* Guidelines Agreement: split into two independently-required
+                    checkboxes (issue #107), mirroring the agreedToTerms/
+                    agreedToPrivacy split already shipped for the school form
+                    (issue #127, see ClubInfoSection.tsx) — each consent links
+                    to its actual document and must be checked on its own. */}
+                <div className="rounded-xl border border-line bg-accent/5 p-4 sm:p-5 space-y-4">
+                  <span className={labelClass}>
                     Positive Environment Guidelines {requiredMark}
                   </span>
-                  <p className="text-xs text-foreground-secondary mb-3 leading-relaxed">
+                  <p className="text-xs text-foreground-secondary leading-relaxed">
                     By applying, you commit to maintaining a supportive, inclusive, and fair scholastic esports environment. You agree to follow our staff guidelines, act professionally, and promote youth development across NYC high schools.
                   </p>
-                  <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={form.agreedRules}
-                      onChange={(e) => handleRulesChange(e.target.checked)}
-                      className="w-4.5 h-4.5 rounded border-line accent-accent cursor-pointer"
-                      aria-invalid={!!fieldErrors.agreedRules}
-                      aria-describedby={fieldErrors.agreedRules ? 'agreedRules-error' : undefined}
-                    />
-                    <span>I understand and agree to uphold these values.</span>
-                  </label>
-                  {fieldErrors.agreedRules && (
-                    <p id="agreedRules-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.agreedRules}</p>
-                  )}
+
+                  {/* Terms of Service */}
+                  <div
+                    id="field-agreedToTerms"
+                    className={`border-l-2 pl-3 transition-colors ${fieldErrors.agreedToTerms ? 'border-danger' : 'border-transparent'}`}
+                  >
+                    <label className="flex items-start gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.agreedToTerms}
+                        onChange={(e) => handleConsentChange('agreedToTerms', e.target.checked)}
+                        className="w-4.5 h-4.5 mt-0.5 rounded border-line accent-accent cursor-pointer shrink-0"
+                        aria-invalid={!!fieldErrors.agreedToTerms}
+                        aria-describedby={fieldErrors.agreedToTerms ? 'agreedToTerms-error' : undefined}
+                      />
+                      <span>
+                        I have read and agree to the EZ Esports{' '}
+                        <Link
+                          href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent underline hover:text-accent-secondary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Terms of Service
+                        </Link>
+                        . {requiredMark}
+                      </span>
+                    </label>
+                    {fieldErrors.agreedToTerms && (
+                      <p id="agreedToTerms-error" className="mt-1.5 ml-7 text-xs text-danger font-semibold">{fieldErrors.agreedToTerms}</p>
+                    )}
+                  </div>
+
+                  {/* Privacy Policy */}
+                  <div
+                    id="field-agreedToPrivacy"
+                    className={`border-l-2 pl-3 transition-colors ${fieldErrors.agreedToPrivacy ? 'border-danger' : 'border-transparent'}`}
+                  >
+                    <label className="flex items-start gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form.agreedToPrivacy}
+                        onChange={(e) => handleConsentChange('agreedToPrivacy', e.target.checked)}
+                        className="w-4.5 h-4.5 mt-0.5 rounded border-line accent-accent cursor-pointer shrink-0"
+                        aria-invalid={!!fieldErrors.agreedToPrivacy}
+                        aria-describedby={fieldErrors.agreedToPrivacy ? 'agreedToPrivacy-error' : undefined}
+                      />
+                      <span>
+                        I have read and agree to the EZ Esports{' '}
+                        <Link
+                          href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent underline hover:text-accent-secondary"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Privacy Policy
+                        </Link>
+                        . {requiredMark}
+                      </span>
+                    </label>
+                    {fieldErrors.agreedToPrivacy && (
+                      <p id="agreedToPrivacy-error" className="mt-1.5 ml-7 text-xs text-danger font-semibold">{fieldErrors.agreedToPrivacy}</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Submit button & reset */}

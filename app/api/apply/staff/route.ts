@@ -29,6 +29,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    // Legal consent (issue #107, mirroring the school form's issue #127 gate
+    // in app/api/apply/route.ts) is the one check that has to hold server-side
+    // even though `details` is otherwise unauthenticated JSON: every step is
+    // optional-chained and strictly `=== true` rather than truthy, since a
+    // missing/null `details` or a non-boolean value must fail closed instead
+    // of throwing or passing.
+    const consent = details?.consent;
+    if (consent?.agreedToTerms !== true || consent?.agreedToPrivacy !== true) {
+      return NextResponse.json(
+        { error: 'You must agree to the Terms of Service and Privacy Policy to submit an application.' },
+        { status: 400 },
+      );
+    }
+
     await db.insert(schema.staffApplications).values({
       name,
       preferredFirstName: preferredFirstName ?? '',
