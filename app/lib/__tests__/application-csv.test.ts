@@ -34,6 +34,7 @@ const staffDetails: StaffApplicationDetailsV1 = {
   linkedin: "https://linkedin.com/in/example",
   availability: "10 hrs/week",
   agreedRules: true,
+  backgroundMotivation: "Two years running a Discord community moderation team.",
 };
 
 describe("schoolApplicationsToCsv", () => {

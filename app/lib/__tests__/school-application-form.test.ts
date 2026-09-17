@@ -3,7 +3,6 @@ import {
   compileApplicationPayload,
   validateSchoolApplicationForm,
   buildSchoolApplicationDetails,
-  parseSchoolApplicationMessage,
   formatSchoolApplicationDetails,
   type SchoolApplicationDetails,
 } from "@/app/lib/school-application-form";
@@ -136,30 +135,18 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(errors.agreedToPrivacy).toBeDefined();
   });
 
-  it("records Disagreed in compiled message payload for whichever consent is false", () => {
-    const payload = compileApplicationPayload({ ...validForm, agreedToRules: false, agreedToTerms: true, agreedToPrivacy: true });
-    expect(payload.message).toContain("League Rules & Code of Conduct: Disagreed");
-    expect(payload.message).toContain("Terms of Service: Agreed");
-    expect(payload.message).toContain("Privacy & Data Handling: Agreed");
-  });
-
-  it("compiles message payload correctly with all 4 layers", () => {
+  it("compiles a payload with no message field — details is the sole source of truth for new submissions", () => {
     const payload = compileApplicationPayload(validForm);
-    expect(payload.applicantName).toBe("Jane Doe");
-    expect(payload.schoolName).toBe("Brooklyn Tech");
-    expect(payload.role).toBe("Esports Club President");
-    expect(payload.email).toBe("jane@example.com");
-    expect(payload.message).toContain("=== 1. PRESIDENT INFO ===");
-    expect(payload.message).toContain("=== 2. VICE PRESIDENT INFO ===");
-    expect(payload.message).toContain("=== 3. 3RD STUDENT CLUB OFFICER INFO ===");
-    expect(payload.message).toContain("=== 4. CLUB INFO ===");
-    expect(payload.message).toContain("Valorant, Clash Royale");
-    expect(payload.message).toContain("League Rules & Code of Conduct: Agreed");
-    expect(payload.message).toContain("Terms of Service: Agreed");
-    expect(payload.message).toContain("Privacy & Data Handling: Agreed");
+    expect(payload).toEqual({
+      applicantName: "Jane Doe",
+      schoolName: "Brooklyn Tech",
+      role: "Esports Club President",
+      email: "jane@example.com",
+      details: expect.any(Object),
+    });
   });
 
-  it("builds structured details alongside the compiled message", () => {
+  it("builds structured details alongside the compiled payload", () => {
     const payload = compileApplicationPayload(validForm);
     expect(payload.details).toEqual(buildSchoolApplicationDetails(validForm));
     expect(payload.details.president).toEqual({
@@ -176,16 +163,6 @@ describe("School Application Form Validation & Consolidation", () => {
       agreedToTerms: true,
       agreedToPrivacy: true,
     });
-  });
-
-  it("parses a compiled message back into the same structured details", () => {
-    const payload = compileApplicationPayload(validForm);
-    expect(parseSchoolApplicationMessage(payload.message)).toEqual(payload.details);
-  });
-
-  it("returns null when a message doesn't match the known template", () => {
-    expect(parseSchoolApplicationMessage("some unrelated legacy free text")).toBeNull();
-    expect(parseSchoolApplicationMessage("")).toBeNull();
   });
 
   it("degrades to a message instead of throwing when details is a malformed shape", () => {
@@ -214,31 +191,12 @@ describe("School Application Form Validation & Consolidation", () => {
     expect(rows.find((r) => r.label === "Interested Games")?.value).toBe("Valorant");
   });
 
-  describe("v1 (legacy team-registration) shape", () => {
-    // The exact message a real pre-redesign row had in production — the parser
-    // must keep understanding this forever, not just whatever the current form emits.
-    const v1Message =
-      "Preferred first name: Kyle\n" +
-      "Phone number: 9295597584\n" +
-      "Discord tag: keeyul_\n" +
-      "School code: 22K535\n" +
-      "School location: Brooklyn\n" +
-      "How did you learn about us: Friend/teacher/parent\n" +
-      "LinkedIn profile: N/A\n\n" +
-      "Captains / Coaches:\n" +
-      "[Valorant] Ethan Chu, ethanc306@nycstudents.net, 917-740-7047\n\n" +
-      "Anything to know about team:\n" +
-      "no\n\n" +
-      "Need help finding players: No\n" +
-      "Preferred communication platform: discord\n" +
-      "Interested Divisions: valorant\n" +
-      "Rules Agreement: Agreed\n\n" +
-      "Additional Notes:\n" +
-      "no";
-
-    it("parses a v1 message into a version-1 details object", () => {
-      const details = parseSchoolApplicationMessage(v1Message);
-      expect(details).toEqual({
+  describe("v1 (legacy team-registration) shape — format-only, no live parser", () => {
+    // Old rows can still carry this shape in `details` even though the parser that
+    // used to backfill it from a `message` blob is gone (issue #166) — the format
+    // function must keep rendering it forever since those rows are immutable.
+    it("formats a v1 details object without throwing", () => {
+      const v1Details: SchoolApplicationDetails = {
         version: 1,
         preferredFirstName: "Kyle",
         phone: "9295597584",
@@ -254,18 +212,10 @@ describe("School Application Form Validation & Consolidation", () => {
         interestedDivisions: "valorant",
         agreedRules: true,
         additionalNotes: "no",
-      });
-    });
-
-    it("formats a v1 details object without throwing", () => {
-      const details = parseSchoolApplicationMessage(v1Message)!;
-      const rows = formatSchoolApplicationDetails(details);
+      };
+      const rows = formatSchoolApplicationDetails(v1Details);
       expect(rows.find((r) => r.label === "School Code")?.value).toBe("22K535");
       expect(rows.find((r) => r.label === "Rules Agreement")?.value).toBe("Agreed");
-    });
-
-    it("does not mistake a v1 message for a v2 one", () => {
-      expect(parseSchoolApplicationMessage(v1Message)?.version).toBe(1);
     });
   });
 });

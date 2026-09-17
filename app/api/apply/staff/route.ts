@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, preferredFirstName, email, phone, discordTag, role, message, details } = body;
+    const { name, preferredFirstName, email, phone, discordTag, role, details } = body;
 
     if (!name || !email || !phone || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
       phone,
       discordTag: discordTag ?? '',
       role,
-      message: message ?? '',
       details: details && typeof details === 'object' && !Array.isArray(details) ? details : null,
     });
 

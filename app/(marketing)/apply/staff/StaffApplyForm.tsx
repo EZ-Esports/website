@@ -112,16 +112,6 @@ export default function StaffApplyForm() {
     setError('');
 
     const compiledRole = form.role === 'Other' ? `Other: ${form.roleOther}` : form.role;
-    const compiledMessage = `
-Preferred first name: ${form.preferredFirstName || 'N/A'}
-Phone number: ${form.phone || 'N/A'}
-Discord tag: ${form.discordTag || 'N/A'}
-LinkedIn / Portfolio: ${form.linkedin || 'N/A'}
-Weekly availability: ${form.availability}
-
-Background & Motivation:
-${form.message}
-`.trim();
 
     try {
       const res = await fetch('/api/apply/staff', {
@@ -134,7 +124,6 @@ ${form.message}
           phone: form.phone,
           discordTag: form.discordTag,
           role: compiledRole,
-          message: compiledMessage,
           details: buildStaffApplicationDetails(form),
         }),
       });
