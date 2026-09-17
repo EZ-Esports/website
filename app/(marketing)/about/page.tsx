@@ -7,7 +7,7 @@ import Card from '@/app/components/ui/Card';
 import CutCTA from '@/app/components/ui/CutCTA';
 import ScrollReveal from '@/app/components/ui/ScrollReveal';
 import { cx } from '@/app/lib/cx';
-import { getCachedSchools } from '@/app/lib/db/queries';
+import { getCachedSchools, getCachedPlayers, getCachedGames } from '@/app/lib/db/queries';
 import { ROUTES, SOCIAL_LINKS, GAMES, GAME_SLUGS } from '@/app/lib/constants';
 
 export const metadata: Metadata = {
@@ -44,9 +44,19 @@ const HISTORY = [
 
 export default async function AboutPage() {
   let schoolCount = 0;
+  // Fetched for potential future use in the scoreboard below; not currently
+  // rendered (Players and Titles cells show static values for now).
+  let _playerCount = 0;
+  let _gameCount = 0;
   try {
-    const schools = await getCachedSchools();
+    const [schools, players, games] = await Promise.all([
+      getCachedSchools(),
+      getCachedPlayers(),
+      getCachedGames(),
+    ]);
     schoolCount = schools.length;
+    _playerCount = players.length;
+    _gameCount = games.length;
   } catch (error) {
     console.error('Failed to load About page stats', error);
   }
