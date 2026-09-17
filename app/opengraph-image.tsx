@@ -133,7 +133,7 @@ export default function OpengraphImage() {
               color: '#ef4444',
             }}
           >
-            ez-esports.vercel.app
+            ezesports.org
           </div>
         </div>
       </div>

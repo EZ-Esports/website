@@ -60,7 +60,7 @@ function TeamStandingsTable({
    * Only a combined table names the squad on each row (`standingsTeamLabel`
    * decides, for this page and the game hub alike). In a divided season the
    * division is the active tab directly above this table, so repeating it on
-   * every row would say once more what the heading already says — the tautology
+   * every row would say once more what the heading already says, the tautology
    * PR #46 took off the match tiles. Here it is the opposite: three schools
    * entered two squads, so without it three names appear twice, identically, at
    * two different ranks.
@@ -146,48 +146,42 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
 
   const gameConfig = GAMES[game as GameSlug];
 
-  let seasons: Awaited<ReturnType<typeof getSeasonsWithGames>> = [];
+  // No try/catch here: a failed query should surface as a real error, not
+  // silently collapse into these same empty-state defaults. The marketing
+  // route's error boundary (`app/(marketing)/error.tsx`) handles it instead.
   let divisions: string[] = ['Varsity', 'JV'];
   let standings: StandingRow[] = [];
   let source: 'snapshot' | 'computed' = 'computed';
   let standingsFormat: StandingsFormat = 'divided';
   let division = divisionParam ?? 'Varsity';
 
-  try {
-    seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
-  } catch (error) {
-    console.error('Failed to load seasons from database', error);
-  }
+  const seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
 
   const selectedSeason = resolveSelectedSeason(seasons, seasonParam);
 
-  try {
-    if (selectedSeason) {
-      // Optimistically fetch the requested division alongside the division
-      // list; refetch only in the rare case the requested one doesn't exist.
-      const [divisionList, result] = await Promise.all([
-        getSeasonDivisions(selectedSeason.id),
-        getSeasonStandingsFor(selectedSeason.id, division),
-      ]);
-      divisions = divisionList;
-      let effective = result;
-      if (result.standingsFormat === 'combined') {
-        // A combined season offers exactly one tab, and the fetch above already
-        // returned the whole table — it ignores the requested division entirely
-        // — so the tab moves onto `Combined` with no second query. Without this
-        // the default `?division=Varsity` would refetch the identical rows just
-        // to arrive at the same place.
-        division = COMBINED_DIVISION;
-      } else if (!divisions.includes(division)) {
-        division = divisions[0];
-        effective = await getSeasonStandingsFor(selectedSeason.id, division);
-      }
-      standings = effective.rows;
-      source = effective.source;
-      standingsFormat = effective.standingsFormat;
+  if (selectedSeason) {
+    // Optimistically fetch the requested division alongside the division
+    // list; refetch only in the rare case the requested one doesn't exist.
+    const [divisionList, result] = await Promise.all([
+      getSeasonDivisions(selectedSeason.id),
+      getSeasonStandingsFor(selectedSeason.id, division),
+    ]);
+    divisions = divisionList;
+    let effective = result;
+    if (result.standingsFormat === 'combined') {
+      // A combined season offers exactly one tab, and the fetch above already
+      // returned the whole table (it ignores the requested division entirely),
+      // so the tab moves onto `Combined` with no second query. Without this
+      // the default `?division=Varsity` would refetch the identical rows just
+      // to arrive at the same place.
+      division = COMBINED_DIVISION;
+    } else if (!divisions.includes(division)) {
+      division = divisions[0];
+      effective = await getSeasonStandingsFor(selectedSeason.id, division);
     }
-  } catch (error) {
-    console.error('Failed to load standings from database', error);
+    standings = effective.rows;
+    source = effective.source;
+    standingsFormat = effective.standingsFormat;
   }
 
   const isIndividual = standings.some((row) => row.playerName !== null);
@@ -213,7 +207,10 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               : 'Current season standings for all teams'
           }
         />
-        <MigrationNotice />
+        {/* A failed fetch now throws and hits the route's error boundary, so
+            an empty table here is a real "nothing recorded yet", the only
+            case left where this notice is warranted. */}
+        {standings.length === 0 && <MigrationNotice />}
 
         {/* Filters: division tabs + season picker */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">

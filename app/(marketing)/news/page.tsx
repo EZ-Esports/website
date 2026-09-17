@@ -23,31 +23,29 @@ export default async function NewsPage() {
     date: string;
   }
 
-  let newsItems: NewsItem[] = [];
-  try {
-    const postRows = await db
-      .select()
-      .from(schema.newsPosts)
-      .where(and(eq(schema.newsPosts.status, 'published'), isNull(schema.newsPosts.deletedAt)))
-      .orderBy(desc(schema.newsPosts.publishedAt));
+  // No try/catch here: a failed query should surface as a real error, not
+  // silently collapse into an empty news feed. The marketing route's error
+  // boundary (`app/(marketing)/error.tsx`) handles it instead.
+  const postRows = await db
+    .select()
+    .from(schema.newsPosts)
+    .where(and(eq(schema.newsPosts.status, 'published'), isNull(schema.newsPosts.deletedAt)))
+    .orderBy(desc(schema.newsPosts.publishedAt));
 
-    newsItems = postRows.map((p) => ({
-      id: p.id,
-      title: p.title,
-      category: p.category,
-      excerpt: p.excerpt || '',
-      date: p.publishedAt
-        ? new Date(p.publishedAt).toLocaleDateString('en-US', {
-            timeZone: 'America/New_York',
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-          })
-        : '',
-    }));
-  } catch (error) {
-    console.error('Failed to load news posts from database', error);
-  }
+  const newsItems: NewsItem[] = postRows.map((p) => ({
+    id: p.id,
+    title: p.title,
+    category: p.category,
+    excerpt: p.excerpt || '',
+    date: p.publishedAt
+      ? new Date(p.publishedAt).toLocaleDateString('en-US', {
+          timeZone: 'America/New_York',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : '',
+  }));
 
   return (
     <main>
