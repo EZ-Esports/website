@@ -59,7 +59,7 @@ export default async function SponsorsPage() {
               </p>
               {sponsors.length > 0 && (
                 <p className="mt-8 text-sm font-extrabold uppercase tracking-widest text-foreground-muted sm:text-base">
-                  — Join others in supporting EZ Esports
+                  Join others in supporting EZ Esports
                 </p>
               )}
             </div>

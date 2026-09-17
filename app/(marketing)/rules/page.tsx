@@ -197,7 +197,7 @@ export default function RulesPage() {
                 </li>
                 <li>
                   <strong className="text-foreground">Ringers &amp; Impersonation:</strong> Permitting any individual who is not the registered student
-                  to play on a registered account—or fielding non-rostered collegiate, alumni, or outside players—is considered severe fraud and will
+                  to play on a registered account, or fielding non-rostered collegiate, alumni, or outside players, is considered severe fraud and will
                   result in immediate match forfeiture and team disqualification.
                 </li>
               </ul>
@@ -223,8 +223,8 @@ export default function RulesPage() {
             <div className="space-y-3">
               <h3 className="text-lg font-bold text-foreground">3.1 Respectful Communication &amp; Chat Standards</h3>
               <p>
-                All competitors represent their respective high schools, student bodies, and communities. All communication—whether in game lobbies,
-                all-chat, voice channels, official Discord servers, or social media—must reflect high standards of maturity and mutual respect.
+                All competitors represent their respective high schools, student bodies, and communities. All communication, whether in game lobbies,
+                all-chat, voice channels, official Discord servers, or social media, must reflect high standards of maturity and mutual respect.
               </p>
             </div>
 

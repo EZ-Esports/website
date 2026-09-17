@@ -41,22 +41,22 @@ export default function PrivacyPage() {
             <p>We may collect the following categories of information:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>
-                <strong className="text-foreground">Contact and identification information</strong> — name,
+                <strong className="text-foreground">Contact and identification information:</strong> name,
                 school name, email address, and role (e.g., student, coach, administrator) submitted
                 through application or contact forms.
               </li>
               <li>
-                <strong className="text-foreground">Usage data</strong> — browser type, pages visited,
+                <strong className="text-foreground">Usage data:</strong> browser type, pages visited,
                 referring URLs, and general geographic region collected automatically through standard
                 server logs and analytics tools.
               </li>
               <li>
-                <strong className="text-foreground">Player and roster information</strong> — in-game
+                <strong className="text-foreground">Player and roster information:</strong> in-game
                 usernames, division placement (Varsity / Junior Varsity), and performance records
                 entered by authorized school staff for league management purposes.
               </li>
               <li>
-                <strong className="text-foreground">Communications</strong> — content of messages sent
+                <strong className="text-foreground">Communications:</strong> content of messages sent
                 to us via email or contact forms.
               </li>
             </ul>
@@ -112,20 +112,20 @@ export default function PrivacyPage() {
             <p>We may share information in the following limited circumstances:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>
-                <strong className="text-foreground">Service providers</strong> — trusted vendors who
+                <strong className="text-foreground">Service providers:</strong> trusted vendors who
                 assist with hosting, database infrastructure, or email delivery, bound by
                 confidentiality obligations.
               </li>
               <li>
-                <strong className="text-foreground">School administrators</strong> — roster and player
+                <strong className="text-foreground">School administrators:</strong> roster and player
                 data may be shared with the relevant school&apos;s authorized staff.
               </li>
               <li>
-                <strong className="text-foreground">Legal requirements</strong> — when required by law,
+                <strong className="text-foreground">Legal requirements:</strong> when required by law,
                 court order, or governmental authority.
               </li>
               <li>
-                <strong className="text-foreground">Safety</strong> — to protect the safety and
+                <strong className="text-foreground">Safety:</strong> to protect the safety and
                 well-being of our participants or the public.
               </li>
             </ul>

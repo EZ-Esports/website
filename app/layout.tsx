@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     "Esports Rosters",
     "Valorant High School League",
     "League of Legends High School League",
-    "TFT High School League",
+    "Teamfight Tactics High School League",
     "High School Gaming"
   ],
   metadataBase: new URL(

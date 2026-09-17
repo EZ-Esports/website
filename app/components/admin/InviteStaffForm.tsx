@@ -123,7 +123,7 @@ export default function InviteStaffForm({ assignableRoles }: InviteStaffFormProp
       {link && (
         <div className="bg-green-500/5 border border-green-500/30 rounded-lg p-4 space-y-2">
           <p className="text-sm text-green-300 font-sans">
-            Invite link for <span className="font-semibold">{invitedEmail}</span> — copy and send it now. It
+            Invite link for <span className="font-semibold">{invitedEmail}</span>. Copy and send it now. It
             won&apos;t be shown again.
           </p>
           <div className="flex gap-2">

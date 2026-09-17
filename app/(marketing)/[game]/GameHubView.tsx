@@ -24,17 +24,17 @@ import FormGuide from '@/app/components/ui/FormGuide';
 
 const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
   valorant:
-    'Follow the EZ Esports Valorant league — standings, schedules, match results, and school rosters for NYC high-school Valorant competition.',
+    'Follow the EZ Esports Valorant league: standings, schedules, match results, and school rosters for NYC high-school Valorant competition.',
   'league-of-legends':
-    'Follow the EZ Esports League of Legends division — standings, schedules, match results, and school rosters for NYC high-school League of Legends competition.',
+    'Follow the EZ Esports League of Legends division: standings, schedules, match results, and school rosters for NYC high-school League of Legends competition.',
   'team-fight-tactics':
-    'Follow the EZ Esports Teamfight Tactics league — standings, schedules, match results, and school rosters for NYC high-school Teamfight Tactics competition.',
+    'Follow the EZ Esports Teamfight Tactics league: standings, schedules, match results, and school rosters for NYC high-school Teamfight Tactics competition.',
   osu:
-    'Follow the EZ Esports osu! division — standings, schedules, match results, and school rosters for NYC high-school osu! competition.',
+    'Follow the EZ Esports osu! division: standings, schedules, match results, and school rosters for NYC high-school osu! competition.',
   minecraft:
-    'Follow the EZ Esports Minecraft division — standings, schedules, match results, and school rosters for NYC high-school Minecraft competition.',
+    'Follow the EZ Esports Minecraft division: standings, schedules, match results, and school rosters for NYC high-school Minecraft competition.',
   tetris:
-    'Follow the EZ Esports TETR.IO division — standings, schedules, match results, and school rosters for NYC high-school TETR.IO competition.',
+    'Follow the EZ Esports TETR.IO division: standings, schedules, match results, and school rosters for NYC high-school TETR.IO competition.',
 };
 
 const RANK_MEDALS: Record<number, string> = { 1: '🏆', 2: '🥈', 3: '🥉' };
@@ -509,7 +509,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
             className={archivesSpan}
           >
             <p className="text-sm leading-relaxed text-foreground-secondary">
-              {`Every past ${gameConfig.displayName} season in one place — final standings, champion schools, and the full match history behind them.`}
+              {`Every past ${gameConfig.displayName} season in one place: final standings, champion schools, and the full match history behind them.`}
             </p>
           </Tile>
         </div>
