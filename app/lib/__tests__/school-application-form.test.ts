@@ -137,11 +137,13 @@ describe("School Application Form Validation & Consolidation", () => {
 
   it("compiles a payload with no message field — details is the sole source of truth for new submissions", () => {
     const payload = compileApplicationPayload(validForm);
-    expect(payload.applicantName).toBe("Jane Doe");
-    expect(payload.schoolName).toBe("Brooklyn Tech");
-    expect(payload.role).toBe("Esports Club President");
-    expect(payload.email).toBe("jane@example.com");
-    expect(payload).not.toHaveProperty("message");
+    expect(payload).toEqual({
+      applicantName: "Jane Doe",
+      schoolName: "Brooklyn Tech",
+      role: "Esports Club President",
+      email: "jane@example.com",
+      details: expect.any(Object),
+    });
   });
 
   it("builds structured details alongside the compiled payload", () => {
