@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
+import { getClientIp } from '@/app/lib/rate-limit';
+import { redisRateLimit } from '@/app/lib/redis-rate-limit';
 
-// 5 submissions per IP per 10 minutes — consistent with general apply limit
+// 5 submissions per IP per 10 minutes — consistent with general apply limit.
+// Backed by Redis (see app/lib/redis-rate-limit.ts) rather than the
+// in-memory limiter, since this route runs across multiple serverless
+// instances that would otherwise each track their own counters.
 const APPLY_LIMIT = 5;
 const APPLY_WINDOW_MS = 10 * 60_000;
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  const rl = rateLimit(ip, APPLY_LIMIT, APPLY_WINDOW_MS);
+  const rl = await redisRateLimit(ip, APPLY_LIMIT, APPLY_WINDOW_MS);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
