@@ -69,6 +69,15 @@ export interface GameConfig {
   shortName: string;
   imageUrl: string;
   accent: GameAccent;
+  /**
+   * Whether this title runs a separate Junior Varsity division at all.
+   * Valorant and League of Legends field distinct Varsity/JV squads; the
+   * per-player titles (Teamfight Tactics, osu!, Minecraft, TETR.IO) run one
+   * undivided field that `toHubDivision` (app/lib/db/match-page.ts) always
+   * folds onto Varsity. Their JV route is structurally empty, not merely
+   * unpublished, so this flag lets the JV hub and the sitemap say so.
+   */
+  hasJvSplit: boolean;
 }
 
 export type NavigationState = 'league' | 'game';

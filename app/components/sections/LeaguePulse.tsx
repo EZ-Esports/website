@@ -9,13 +9,40 @@ import { getCachedRecentResults } from '@/app/lib/db/queries';
  * Homepage entry point into league data: the latest recorded results across
  * all games, with jump-offs to schedules, standings, and the archive.
  * Renders nothing if no results exist yet (fresh database).
+ *
+ * This section is embedded in a composite page (`app/(marketing)/page.tsx`)
+ * alongside several independent sections, none of which are wrapped in their
+ * own boundary. An uncaught error here would bubble to the route's
+ * `error.tsx` and blank the entire homepage over one section's DB hiccup.
+ * So a failure is caught locally, same as the homepage's own content/gallery
+ * fetches, but surfaced as a distinct notice rather than silently returning
+ * `null` (which read identically to a genuinely empty database).
  */
 export default async function LeaguePulse() {
-  let results: Awaited<ReturnType<typeof getCachedRecentResults>> = [];
+  let results: Awaited<ReturnType<typeof getCachedRecentResults>>;
   try {
     results = await getCachedRecentResults();
   } catch (error) {
-    console.error('Failed to load recent results', error);
+    console.error('Failed to load recent results for League Pulse', error);
+    return (
+      <Section>
+        <SectionHeader eyebrow="League Pulse" title="Latest Results" />
+        <Card
+          variant="tinted"
+          padding="sm"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 bg-warning/5 border-warning/20"
+        >
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="warning" size="sm" className="font-black">
+              Unable to Load
+            </Badge>
+          </div>
+          <p className="text-xs text-foreground-secondary font-semibold leading-relaxed">
+            We couldn&rsquo;t load the latest results right now. Refresh the page to try again.
+          </p>
+        </Card>
+      </Section>
+    );
   }
 
   if (results.length === 0) return null;

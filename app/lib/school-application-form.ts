@@ -52,13 +52,16 @@ export interface SchoolApplicationFormData {
 // ApplyForm.tsx can actually typo-check checkbox option ids against these
 // keys — a `Record<string, string>` annotation would widen the keys to
 // `string` and silently defeat that check.
+// Key order mirrors GAME_SLUGS' canonical order (app/lib/constants.ts) —
+// clashRoyale/smashBros were removed and osu/minecraft added because the
+// league doesn't run the former and does run the latter two.
 export const GAME_LABELS = {
   valorant: 'Valorant',
-  lol: 'League of Legends',
   tft: 'Teamfight Tactics',
+  lol: 'League of Legends',
+  osu: 'osu!',
+  minecraft: 'Minecraft',
   tetris: 'TETR.IO',
-  clashRoyale: 'Clash Royale',
-  smashBros: 'Super Smash Bros. Ultimate',
 } satisfies Record<string, string>;
 
 // Kept as `Record<string, string>` (not `satisfies`) because it's indexed

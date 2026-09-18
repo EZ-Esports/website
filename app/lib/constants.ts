@@ -31,6 +31,17 @@ export const ROUTES = {
 export const getLeadershipRoute = (year: string): string => `${ROUTES.leadership}/${year}`;
 
 // ============================================================================
+// Canonical Domain
+// ============================================================================
+
+/**
+ * The site's real production domain. Used as the fallback wherever
+ * `NEXT_PUBLIC_APP_URL` is unset, so metadata/sitemap/robots/OG output never
+ * silently points at the old `ez-esports.vercel.app` deployment URL.
+ */
+export const CANONICAL_APP_URL = 'https://ezesports.org';
+
+// ============================================================================
 // Game Constants
 // ============================================================================
 
@@ -41,6 +52,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     shortName: 'Valorant',
     imageUrl: '/images/games/val-banner.png',
     accent: { color: '#FF4655', on: '#FFFFFF' },
+    hasJvSplit: true,
   },
   'league-of-legends': {
     slug: 'league-of-legends',
@@ -48,13 +60,19 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     shortName: 'League',
     imageUrl: '/images/games/lol-banner.png',
     accent: { color: '#C8AA6E', on: '#1C1508' },
+    hasJvSplit: true,
   },
+  // Teamfight Tactics, osu!, Minecraft, and TETR.IO run one undivided field
+  // per season (rosters/standings are written with division 'All'), so
+  // `toHubDivision` always folds them onto Varsity. There is no JV split to
+  // show, ever, not just one that hasn't been published yet.
   'team-fight-tactics': {
     slug: 'team-fight-tactics',
     displayName: 'Teamfight Tactics',
     shortName: 'Teamfight Tactics',
     imageUrl: '/images/games/tft-banner.png',
     accent: { color: '#9D7FE0', on: '#1A1330' },
+    hasJvSplit: false,
   },
   osu: {
     slug: 'osu',
@@ -62,6 +80,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     shortName: 'osu!',
     imageUrl: '/images/hero-background.jpg',
     accent: { color: '#FF66AA', on: '#FFFFFF' },
+    hasJvSplit: false,
   },
   minecraft: {
     slug: 'minecraft',
@@ -69,6 +88,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     shortName: 'Minecraft',
     imageUrl: '/images/hero-background.jpg',
     accent: { color: '#478A3A', on: '#FFFFFF' },
+    hasJvSplit: false,
   },
   tetris: {
     slug: 'tetris',
@@ -76,6 +96,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     shortName: 'TETR.IO',
     imageUrl: '/images/hero-background.jpg',
     accent: { color: '#0099FF', on: '#FFFFFF' },
+    hasJvSplit: false,
   },
 } as const;
 
@@ -93,7 +114,7 @@ export const getGameSubRoute = (gameSlug: GameSlug, subRoute: 'schedule' | 'stan
 
 /**
  * The game hub serves one division at a time, and which one is part of the
- * page's identity, not a filter on it — so it lives in the path rather than a
+ * page's identity, not a filter on it, so it lives in the path rather than a
  * query string. These are real route segments under `app/(marketing)/[game]/`,
  * siblings of `schedule`/`standings`/`teams`; `/[game]` itself redirects to the
  * Varsity one.

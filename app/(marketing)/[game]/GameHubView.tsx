@@ -45,7 +45,7 @@ const RANK_MEDALS: Record<number, string> = { 1: '🏆', 2: '🥈', 3: '🥉' };
  * `gameConfig.accent.on` is deliberately *not* plumbed: solid accent on this
  * page only ever carries non-text elements (the identity rule, the standings
  * leader bar, the chip dot). Small text sits on accent *tints* instead, where
- * the normal foreground tokens are what's legible — so a text-on-accent color
+ * the normal foreground tokens are what's legible, so a text-on-accent color
  * would be declared and never read.
  */
 type GameThemeStyle = CSSProperties & {
@@ -56,7 +56,7 @@ type GameThemeStyle = CSSProperties & {
 };
 
 /**
- * Grid spans as literal classes — Tailwind only generates what it can see in
+ * Grid spans as literal classes. Tailwind only generates what it can see in
  * the source, so these can never be assembled from a template string.
  */
 const SM_COL_SPAN: Record<number, string> = {
@@ -108,7 +108,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
   const slug = game as GameSlug;
 
   // The division is a route segment, so it is one of exactly two values and
-  // needs no validation — the router 404s anything else before this runs.
+  // needs no validation. The router 404s anything else before this runs.
   const {
     nextMatch,
     recentResults,
@@ -127,15 +127,15 @@ export default async function GameHubView({ params, division }: GameHubViewProps
    * The routing stays as it is, deliberately. PR #46 moved `/[game]` ->
    * `/[game]/varsity` into `next.config.ts` as a static 308 precisely because an
    * in-page `redirect()` degrades to a ~1s `<meta http-equiv="refresh">` on a
-   * streaming route — and a redirect that depends on one season's format cannot
+   * streaming route, and a redirect that depends on one season's format cannot
    * live in static config. Collapsing the two routes would cost every game that
    * page's speed to fix one season's copy.
    */
   const combinedStandings = standingsFormat === 'combined';
 
   /**
-   * A whole column of em dashes is a header promising data that does not exist
-   * — worse than no column. Form appears only when at least one school in the
+   * A whole column of em dashes is a header promising data that does not
+   * exist, worse than no column. Form appears only when at least one school in the
    * table has any, which is exactly the divisions whose standings were tallied
    * from match rows. Within such a table an individual school can still be
    * blank (it has played nothing yet), and there the dash is meaningful: the
@@ -145,6 +145,16 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
   const lastResult = recentResults[0] ?? null;
   const olderResults = recentResults.slice(1);
+
+  /**
+   * This title's JV route is structurally empty, not merely unpublished.
+   * `toHubDivision` (app/lib/db/match-page.ts) always folds a per-player
+   * game's one undivided field onto Varsity, so a game with `hasJvSplit:
+   * false` (Teamfight Tactics, osu!, Minecraft, TETR.IO) never has JV rows to
+   * find. Saying "not published yet" here would promise a page that is
+   * coming; it never is.
+   */
+  const lacksJvSplit = division === 'JV' && !gameConfig.hasJvSplit;
 
   /**
    * Tile spans are planned by simulating CSS grid's row-flow auto-placement
@@ -160,7 +170,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
   /**
    * Which tiles render is decided by the planner and read back here, never
-   * re-derived from the data — the planner's packing guarantee is only worth
+   * re-derived from the data: the planner's packing guarantee is only worth
    * anything if the page renders exactly the set it planned. `spanClass`
    * returns undefined for a tile that wasn't planned, so it doubles as the
    * render gate.
@@ -186,7 +196,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
   // Divisions are a switch, not a label: the hub shows one division at a time,
   // so listing them as pills as well would say twice what the tabs already say
-  // once — and only the tabs say which one you're reading.
+  // once, and only the tabs say which one you're reading.
   //
   // Both are always offered, including on games that have never fielded a JV
   // division. A tab that opens onto an empty division states that plainly;
@@ -220,7 +230,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {/* The season the hub resolved is an active one by construction,
-                  so it carries the live marker — the same green "Active" signal
+                  so it carries the live marker: the same green "Active" signal
                   SeasonSelect puts on this flag. Retiring a season in Admin →
                   League Setup is what takes the marker down. */}
               {seasonName && (
@@ -239,13 +249,21 @@ export default async function GameHubView({ params, division }: GameHubViewProps
           className="mb-5 flex-wrap"
         />
 
-        <MigrationNotice />
+        {/* A failed fetch now throws and hits the route's error boundary, so
+            what's left here is a real gap: no active season resolved, or one
+            resolved with nothing in it yet, the only case this notice is
+            warranted for. Never on a `lacksJvSplit` route: that page is empty
+            by design, forever, not because data is still being migrated in. */}
+        {!lacksJvSplit &&
+          (!seasonName || (topTeams.length === 0 && !nextMatch && recentResults.length === 0)) && (
+            <MigrationNotice />
+          )}
 
         {/* Page level, alongside the other notice, rather than inside the
             standings tile: the fact is about the season, not about one tile, and
             it explains both why the table below lists a school twice and why the
             division switch above changes the match tiles but not the table. The
-            tile is half a four-column grid — 486px at `lg` — so a badge plus two
+            tile is half a four-column grid (486px at `lg`), so a badge plus two
             lines of copy inside it would outweigh the standings it introduces.
 
             Gated on `standingsSpan`, the same value that decides whether the
@@ -256,7 +274,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* `getGameHubData` only ever resolves a season with `isActive` set,
-              so a season named here is in progress by construction — the same
+              so a season named here is in progress by construction, the same
               claim SeasonSelect and ArchiveCommandDeck make from the same flag.
               A season that has finished is retired in Admin → League Setup; the
               page must not second-guess that flag with hedged copy.
@@ -270,21 +288,30 @@ export default async function GameHubView({ params, division }: GameHubViewProps
             <Tile title="This season" tone="accent" className={seasonSummarySpan}>
               {/* The badge above already names the season and marks it live;
                   repeating that here said the same thing twice on one screen.
-                  This line answers the question the badge leaves open — why
-                  the grid below is empty — without inferring a cause. */}
-              {/* A combined season has no per-division data to be missing —
+                  This line answers the question the badge leaves open (why
+                  the grid below is empty) without inferring a cause. */}
+              {/* A combined season has no per-division data to be missing:
                   naming the division here would report the absence of a table
                   that was never supposed to exist. */}
               <p className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                {!seasonName
-                  ? 'Nothing to show here yet.'
-                  : combinedStandings
-                    ? 'No data published yet.'
-                    : `No ${divisionLabel(division)} data published yet.`}
+                {lacksJvSplit
+                  ? `${gameConfig.displayName} has no JV division.`
+                  : !seasonName
+                    ? 'Nothing to show here yet.'
+                    : combinedStandings
+                      ? 'No data published yet.'
+                      : `No ${divisionLabel(division)} data published yet.`}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
-                Standings, schedules and rosters appear here as this{' '}
-                {combinedStandings ? 'season' : 'division'}&rsquo;s data is published.
+                {lacksJvSplit
+                  ? // The buttons below are gated on `seasonName` alone, not on
+                    // `lacksJvSplit`: "the links below" must only be promised
+                    // when they will actually render.
+                    `${gameConfig.displayName} runs one Varsity-only competition. See the Varsity tab${
+                      seasonName ? ', or use the links below,' : ''
+                    } for standings and rosters.`
+                  : <>Standings, schedules and rosters appear here as this{' '}
+                    {combinedStandings ? 'season' : 'division'}&rsquo;s data is published.</>}
               </p>
               {seasonName && (
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -308,7 +335,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
           )}
 
           {/* `nextMatch &&` is TypeScript narrowing, not a second opinion on
-              whether the tile renders — `nextMatchSpan` already decided that. */}
+              whether the tile renders: `nextMatchSpan` already decided that. */}
           {nextMatchSpan && nextMatch && (
             // The dominant tile of the grid: the planner gives it the full
             // width, and the `feature` tone carries the game's accent as a
@@ -372,17 +399,15 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                     <Th>Team</Th>
                     <Th className="whitespace-nowrap">W&ndash;L</Th>
                     <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
-                    {/* Form needs ~150px (five chips plus the cell's px-6) on
-                        top of the four columns
-                        already here, and the tile is half of a four-column grid
-                        — 486px at `lg`, of which five `px-6` cells already spend
-                        240px on padding alone. So `lg` is not enough: measured
-                        on real data the table overflowed its shell by 47px at
-                        1024 and 9px at 1100, scrolling sideways and wrapping
-                        school names to three lines, which is the outcome this
-                        comment set out to avoid. `xl` is where the fifth column
-                        fits. Nothing is lost below it: /[game]/standings carries
-                        the full table at every width. */}
+                    {/* Form needs ~150px (five chips plus the cell's px-6) beyond
+                        the four columns already here, and the tile is half of a
+                        four-column grid (486px at `lg`), of which five `px-6`
+                        cells already spend 240px on padding alone. `lg` isn't
+                        enough: on real data the table overflowed its shell by
+                        47px at 1024 and 9px at 1100, scrolling sideways and
+                        wrapping school names to three lines. `xl` is where the
+                        fifth column fits; nothing is lost below it, since
+                        /[game]/standings carries the full table at every width. */}
                     {showForm && (
                       <Th align="right" className="hidden xl:table-cell">
                         Form
@@ -396,7 +421,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                     // table holds one school twice, so the squad rides along in
                     // the key rather than leaving it to the rank to stay unique.
                     <Tr key={`${entry.rank}-${entry.division}`} interactive>
-                      {/* The leader carries the game's accent — the one place
+                      {/* The leader carries the game's accent, the one place
                           the table earns colour. */}
                       <Td
                         className={cx(
@@ -421,7 +446,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                         {(entry.winPct * 100).toFixed(1)}%
                       </Td>
                       {/* Blank for a school with no completed matches in this
-                          division — the tile says so by showing nothing rather
+                          division: the tile says so by showing nothing rather
                           than five losses. */}
                       {showForm && (
                         <Td className="hidden xl:table-cell text-right whitespace-nowrap">
@@ -489,8 +514,8 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                       </p>
                       {/* Not `truncate`: `teams` reads "<home> vs. <away>", and
                           at 390px the row leaves ~228px for it, so clipping
-                          took the opponent — the one name that makes the row
-                          worth reading — with no tooltip to recover it. */}
+                          took the opponent (the one name that makes the row
+                          worth reading) with no tooltip to recover it. */}
                       <p className="text-sm font-bold leading-snug text-foreground">{match.teams}</p>
                     </div>
                     <Badge variant={resultVariant(match.outcome)} size="sm">

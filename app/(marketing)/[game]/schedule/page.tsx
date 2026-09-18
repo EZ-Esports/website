@@ -40,12 +40,10 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
 
   const gameConfig = GAMES[game as GameSlug];
 
-  let seasons: Awaited<ReturnType<typeof getSeasonsWithGames>> = [];
-  try {
-    seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
-  } catch (error) {
-    console.error('Failed to load seasons from database', error);
-  }
+  // No try/catch here: a failed query should surface as a real error, not
+  // silently collapse into these same empty-state defaults. The marketing
+  // route's error boundary (`app/(marketing)/error.tsx`) handles it instead.
+  const seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
 
   const selectedSeason = resolveSelectedSeason(seasons, seasonParam);
   const isArchived = Boolean(selectedSeason && !selectedSeason.isActive);
@@ -53,19 +51,15 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
   // Active season -> full-season calendar; archived -> lazy-loaded list.
   let calendarMatches: Awaited<ReturnType<typeof getSeasonMatches>> = [];
   let archivePage: Awaited<ReturnType<typeof getMatchesPage>> = { items: [], nextCursor: null };
-  try {
-    if (selectedSeason && !isArchived) {
-      calendarMatches = await getSeasonMatches(selectedSeason.id, division);
-    } else if (selectedSeason) {
-      archivePage = await getMatchesPage({
-        seasonId: selectedSeason.id,
-        division,
-        sort,
-        limit: 20,
-      });
-    }
-  } catch (error) {
-    console.error('Failed to load schedule from database', error);
+  if (selectedSeason && !isArchived) {
+    calendarMatches = await getSeasonMatches(selectedSeason.id, division);
+  } else if (selectedSeason) {
+    archivePage = await getMatchesPage({
+      seasonId: selectedSeason.id,
+      division,
+      sort,
+      limit: 20,
+    });
   }
 
   const schedule = calendarMatches.map((m) => ({
@@ -110,7 +104,12 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
               : 'View all scheduled matches for the current season'
           }
         />
-        <MigrationNotice />
+        {/* A failed fetch now throws and hits the route's error boundary, so
+            an empty schedule here is a real "nothing yet", the only case
+            left where this notice is warranted. */}
+        {(!selectedSeason || (calendarMatches.length === 0 && archivePage.items.length === 0)) && (
+          <MigrationNotice />
+        )}
 
         {/* Filters: division tabs, season picker, sort (archive only) */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">

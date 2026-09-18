@@ -24,7 +24,7 @@ import { getCachedHomepageContent, getCachedHomepageGallery } from '@/app/lib/db
 export const metadata: Metadata = {
   title: 'EZ Esports: NYC High School Esports League',
   description:
-    'EZ Esports is NYC\'s premier high-school esports league. Compete in Valorant, League of Legends, and Teamfight Tactics while shaping tomorrow\'s leaders through esports.',
+    'EZ Esports is NYC\'s premier high-school esports league. Compete in Valorant, Teamfight Tactics, League of Legends, osu!, Minecraft, and TETR.IO while shaping tomorrow\'s leaders through esports.',
 };
 
 export const dynamic = 'force-dynamic';

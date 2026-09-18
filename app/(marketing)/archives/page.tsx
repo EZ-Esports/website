@@ -13,12 +13,10 @@ export const metadata: Metadata = {
 };
 
 export default async function ArchivesPage() {
-  let seasons: Awaited<ReturnType<typeof getArchiveIndex>> = [];
-  try {
-    seasons = await getArchiveIndex();
-  } catch (error) {
-    console.error('Failed to load archive index', error);
-  }
+  // No try/catch here: a failed query should surface as a real error, not
+  // silently collapse into an empty archive. The marketing route's error
+  // boundary (`app/(marketing)/error.tsx`) handles it instead.
+  const seasons = await getArchiveIndex();
 
   // Group seasons under their game, newest first (getArchiveIndex pre-sorts).
   const byGame = new Map<string, typeof seasons>();
@@ -49,7 +47,10 @@ export default async function ArchivesPage() {
           title="Archives"
           lead="Every season at a glance: matches played, champion schools, and a shape of the league's history across every game."
         />
-        <MigrationNotice />
+        {/* A failed fetch now throws and hits the route's error boundary, so
+            an empty archive here is a real "nothing archived yet", the only
+            case left where this notice is warranted. */}
+        {seasons.length === 0 && <MigrationNotice />}
 
         {seasons.length === 0 ? (
           <Card className="max-w-2xl mx-auto text-center py-12">

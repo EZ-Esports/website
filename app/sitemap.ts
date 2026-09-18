@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
-import { GAME_SLUGS, getGameDivisionRoute, getGameSubRoute } from '@/app/lib/constants';
+import { CANONICAL_APP_URL, GAMES, GAME_SLUGS, getGameDivisionRoute, getGameSubRoute } from '@/app/lib/constants';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ez-esports.vercel.app';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || CANONICAL_APP_URL;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -25,7 +25,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // one that forwards.
   const gameRoutes: MetadataRoute.Sitemap = GAME_SLUGS.flatMap((slug) => [
     { url: `${BASE_URL}${getGameDivisionRoute(slug, 'Varsity')}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.9 },
-    { url: `${BASE_URL}${getGameDivisionRoute(slug, 'JV')}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 },
+    // The JV route is structurally empty for a game with no JV split (its
+    // division always collapses to Varsity — see `hasJvSplit` in
+    // app/lib/constants.ts) — a permanently-empty page has no business being
+    // submitted to search engines.
+    ...(GAMES[slug].hasJvSplit
+      ? [{ url: `${BASE_URL}${getGameDivisionRoute(slug, 'JV')}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 }]
+      : []),
     { url: `${BASE_URL}${getGameSubRoute(slug, 'schedule')}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.8 },
     { url: `${BASE_URL}${getGameSubRoute(slug, 'standings')}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.8 },
     { url: `${BASE_URL}${getGameSubRoute(slug, 'teams')}`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },

@@ -38,7 +38,7 @@ describe("School Application Form Validation & Consolidation", () => {
     advisorEmail: "davis@schools.nyc.gov",
     advisorConfirmed: "Yes",
     activeStudentsCount: "30",
-    interestedGames: { valorant: true, clashRoyale: true },
+    interestedGames: { valorant: true, osu: true },
     clubBarriers: "recruitingPlayers",
     nonRosterOpportunities: { oneDayTournaments: true },
     inclusiveOpportunities: { friendlyScrimmages: true },
@@ -157,7 +157,7 @@ describe("School Application Form Validation & Consolidation", () => {
       discord: "janedoe",
       preferredContact: "Discord",
     });
-    expect(payload.details.club.interestedGames).toEqual(["Valorant", "Clash Royale"]);
+    expect(payload.details.club.interestedGames).toEqual(["Valorant", "osu!"]);
     expect(payload.details.consent).toEqual({
       agreedToRules: true,
       agreedToTerms: true,

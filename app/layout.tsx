@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { METADATA, SITE_CONFIG } from "@/app/lib/constants";
+import { CANONICAL_APP_URL, METADATA, SITE_CONFIG } from "@/app/lib/constants";
 import Providers from "@/app/components/ui/Providers";
 import { Analytics } from "@vercel/analytics/next";
 import { headers } from "next/headers";
@@ -43,12 +43,12 @@ export const metadata: Metadata = {
     "High School Gaming"
   ],
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || 'https://ez-esports.vercel.app'
+    process.env.NEXT_PUBLIC_APP_URL || CANONICAL_APP_URL
   ),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'https://ez-esports.vercel.app',
+    url: process.env.NEXT_PUBLIC_APP_URL || CANONICAL_APP_URL,
     siteName: METADATA.siteName,
     title: METADATA.defaultTitle,
     description: METADATA.defaultDescription,
