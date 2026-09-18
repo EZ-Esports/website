@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildStaffApplicationDetails,
   formatStaffApplicationDetails,
+  type StaffApplicationDetailsV1,
   type StaffApplicationFormData,
 } from "@/app/lib/staff-application-form";
 
@@ -16,19 +17,20 @@ const validForm: StaffApplicationFormData = {
   message: "I have run a Discord community of 500 members for two years.",
   linkedin: "https://linkedin.com/in/janesmith",
   availability: "10hrs",
-  agreedRules: true,
+  agreedToTerms: true,
+  agreedToPrivacy: true,
 };
 
 describe("Staff Application Details", () => {
   it("builds structured details from the form", () => {
     const details = buildStaffApplicationDetails(validForm);
     expect(details).toEqual({
-      version: 1,
+      version: 2,
       preferredFirstName: "Janie",
       discordTag: "janesmith",
       linkedin: "https://linkedin.com/in/janesmith",
       availability: "10hrs",
-      agreedRules: true,
+      consent: { agreedToTerms: true, agreedToPrivacy: true },
       backgroundMotivation: "I have run a Discord community of 500 members for two years.",
     });
   });
@@ -41,7 +43,8 @@ describe("Staff Application Details", () => {
   it("formats details into labeled rows", () => {
     const rows = formatStaffApplicationDetails(buildStaffApplicationDetails(validForm));
     expect(rows).toContainEqual({ label: "Weekly Availability", value: "10hrs" });
-    expect(rows).toContainEqual({ label: "Rules Agreement", value: "Agreed" });
+    expect(rows).toContainEqual({ label: "Terms of Service", value: "Agreed" });
+    expect(rows).toContainEqual({ label: "Privacy Policy", value: "Agreed" });
     expect(rows).toContainEqual({
       label: "Background & Motivation",
       value: "I have run a Discord community of 500 members for two years.",
@@ -51,6 +54,27 @@ describe("Staff Application Details", () => {
   it("falls back to an em dash when background & motivation is blank", () => {
     const rows = formatStaffApplicationDetails(buildStaffApplicationDetails({ ...validForm, message: "" }));
     expect(rows).toContainEqual({ label: "Background & Motivation", value: "—" });
+  });
+
+  it("still formats legacy v1 rows (pre-#107 single agreedRules checkbox)", () => {
+    const legacy: StaffApplicationDetailsV1 = {
+      version: 1,
+      preferredFirstName: "Janie",
+      discordTag: "janesmith",
+      linkedin: "https://linkedin.com/in/janesmith",
+      availability: "10hrs",
+      agreedRules: true,
+      backgroundMotivation: "I have run a Discord community of 500 members for two years.",
+    };
+    expect(formatStaffApplicationDetails(legacy)).toEqual([
+      { label: "LinkedIn / Portfolio", value: "https://linkedin.com/in/janesmith" },
+      { label: "Weekly Availability", value: "10hrs" },
+      { label: "Rules Agreement", value: "Agreed" },
+      {
+        label: "Background & Motivation",
+        value: "I have run a Discord community of 500 members for two years.",
+      },
+    ]);
   });
 
   it("degrades to a message instead of rendering garbage for an unrecognized version", () => {
