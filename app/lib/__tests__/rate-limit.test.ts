@@ -62,15 +62,40 @@ describe('rateLimit', () => {
 });
 
 describe('getClientIp', () => {
-  it('extracts the first IP from x-forwarded-for', () => {
+  it('does not let a spoofed, client-prepended leading x-forwarded-for entry change the derived IP', () => {
     const { getClientIp } = rateLimitModule;
-    const req = new Request('http://localhost', {
+    // A client can freely set everything before the last hop; '9.9.9.9' here
+    // stands in for an attacker trying to disguise their rate-limit identity.
+    const spoofed = new Request('http://localhost', {
+      headers: { 'x-forwarded-for': '9.9.9.9, 5.6.7.8' },
+    });
+    const notSpoofed = new Request('http://localhost', {
       headers: { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' },
     });
-    expect(getClientIp(req)).toBe('1.2.3.4');
+    expect(getClientIp(spoofed)).not.toBe('9.9.9.9');
+    expect(getClientIp(spoofed)).toBe(getClientIp(notSpoofed));
   });
 
-  it('falls back to x-real-ip', () => {
+  it('uses the last entry of a multi-hop x-forwarded-for chain', () => {
+    const { getClientIp } = rateLimitModule;
+    const req = new Request('http://localhost', {
+      headers: { 'x-forwarded-for': '1.2.3.4, 10.0.0.1, 5.6.7.8' },
+    });
+    expect(getClientIp(req)).toBe('5.6.7.8');
+  });
+
+  it('prefers x-real-ip over x-forwarded-for when both are present', () => {
+    const { getClientIp } = rateLimitModule;
+    const req = new Request('http://localhost', {
+      headers: {
+        'x-forwarded-for': '1.2.3.4, 5.6.7.8',
+        'x-real-ip': '9.10.11.12',
+      },
+    });
+    expect(getClientIp(req)).toBe('9.10.11.12');
+  });
+
+  it('falls back to x-real-ip when x-forwarded-for is absent', () => {
     const { getClientIp } = rateLimitModule;
     const req = new Request('http://localhost', {
       headers: { 'x-real-ip': '9.10.11.12' },

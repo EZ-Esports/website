@@ -23,6 +23,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.93.3",
+    "@upstash/ratelimit": "^2.1.0",
+    "@upstash/redis": "^1.38.4",
     "@vercel/analytics": "^2.0.1",
     "drizzle-orm": "^0.45.2",
     "embla-carousel-auto-scroll": "^8.6.0",
