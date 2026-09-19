@@ -4,6 +4,7 @@ import {
   formatStaffApplicationDetails,
   isStaffRole,
   STAFF_ROLES,
+  type StaffRole,
   type StaffApplicationDetailsV1,
   type StaffApplicationFormData,
 } from "@/app/lib/staff-application-form";
@@ -85,7 +86,7 @@ describe("Staff Application Details", () => {
     ]);
   });
 
-  it("offers exactly the seven divisions, in order", () => {
+  it("offers exactly the nine divisions, in order", () => {
     expect([...STAFF_ROLES]).toEqual([
       "Software Engineering Division",
       "Marketing Division",
@@ -93,12 +94,16 @@ describe("Staff Application Details", () => {
       "Development Division",
       "Productions Crew",
       "Legal Division",
-      "Games Division",
+      "VALORANT Division",
+      "League of Legends Division",
+      "Teamfight Tactics Division",
     ]);
   });
 
   it("rejects retired role values and the old Other option", () => {
-    expect(isStaffRole("Games Division")).toBe(true);
+    const validRole: StaffRole = "VALORANT Division";
+    expect(isStaffRole(validRole)).toBe(true);
+    expect(isStaffRole("Games Division")).toBe(false);
     expect(isStaffRole("Community Moderator")).toBe(false);
     expect(isStaffRole("Other: Something")).toBe(false);
     expect(isStaffRole(undefined)).toBe(false);

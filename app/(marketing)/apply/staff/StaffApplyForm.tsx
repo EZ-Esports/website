@@ -506,7 +506,6 @@ export default function StaffApplyForm() {
                         <span>{roleOption}</span>
                       </label>
                     ))}
-
                   </div>
                   {fieldErrors.role && (
                     <p id="role-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.role}</p>

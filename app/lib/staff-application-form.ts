@@ -11,10 +11,14 @@ export const STAFF_ROLES = [
   'Development Division',
   'Productions Crew',
   'Legal Division',
-  'Games Division',
+  'VALORANT Division',
+  'League of Legends Division',
+  'Teamfight Tactics Division',
 ] as const;
 
-export function isStaffRole(value: unknown): value is (typeof STAFF_ROLES)[number] {
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export function isStaffRole(value: unknown): value is StaffRole {
   return typeof value === 'string' && (STAFF_ROLES as readonly string[]).includes(value);
 }
 
