@@ -99,7 +99,7 @@ export async function updateNewsPost(id: string, formData: FormData) {
   }
 
   revalidateAll();
-  revalidatePath(`/news/${slug}`);
+  revalidatePath(`/news/${id}`);
   redirect('/admin/news');
 }
 
