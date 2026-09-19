@@ -245,7 +245,7 @@ export default async function AdminNewsPage({
                                     </button>
                                   </form>
                                   <a
-                                    href={`/news/${post.slug}`}
+                                    href={`/news/${post.id}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
