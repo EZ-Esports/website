@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Claude Code agent worktrees (gitignored scratch copies of the repo).
     ".claude/**",
+    // Antigravity/Gemini agent worktrees.
+    ".gemini/**",
   ]),
   {
     rules: {
