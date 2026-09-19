@@ -255,9 +255,9 @@ export const BUTTON_VARIANTS = {
 // ============================================================================
 
 export const METADATA = {
-  defaultTitle: SITE_CONFIG.name,
+  defaultTitle: 'EZ Esports | NYC High School Esports League',
   defaultDescription: SITE_CONFIG.description,
-  siteName: SITE_CONFIG.name,
+  siteName: SITE_CONFIG.company,
 } as const;
 
 // ============================================================================
