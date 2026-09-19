@@ -25,6 +25,12 @@ export const metadata: Metadata = {
   title: 'EZ Esports: NYC High School Esports League',
   description:
     'EZ Esports is NYC\'s premier high-school esports league. Compete in Valorant, Teamfight Tactics, League of Legends, osu!, Minecraft, and TETR.IO while shaping tomorrow\'s leaders through esports.',
+  openGraph: {
+    title: 'EZ Esports | NYC High School Esports League',
+  },
+  twitter: {
+    title: 'EZ Esports | NYC High School Esports League',
+  },
 };
 
 export const dynamic = 'force-dynamic';
