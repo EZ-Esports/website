@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildStaffApplicationDetails,
   formatStaffApplicationDetails,
+  isStaffRole,
+  STAFF_ROLES,
+  type StaffRole,
   type StaffApplicationDetailsV1,
   type StaffApplicationFormData,
 } from "@/app/lib/staff-application-form";
@@ -12,8 +15,7 @@ const validForm: StaffApplicationFormData = {
   email: "jane@example.com",
   phone: "(555) 555-5555",
   discordTag: "janesmith",
-  role: "Community Moderator",
-  roleOther: "",
+  role: "Marketing Division",
   message: "I have run a Discord community of 500 members for two years.",
   linkedin: "https://linkedin.com/in/janesmith",
   availability: "10hrs",
@@ -82,5 +84,28 @@ describe("Staff Application Details", () => {
     expect(formatStaffApplicationDetails(unknown)).toEqual([
       { label: "Details", value: "Could not display — unexpected data shape." },
     ]);
+  });
+
+  it("offers exactly the nine divisions, in order", () => {
+    expect([...STAFF_ROLES]).toEqual([
+      "Software Engineering Division",
+      "Marketing Division",
+      "Operations Division",
+      "Development Division",
+      "Productions Crew",
+      "Legal Division",
+      "VALORANT Division",
+      "League of Legends Division",
+      "Teamfight Tactics Division",
+    ]);
+  });
+
+  it("rejects retired role values and the old Other option", () => {
+    const validRole: StaffRole = "VALORANT Division";
+    expect(isStaffRole(validRole)).toBe(true);
+    expect(isStaffRole("Games Division")).toBe(false);
+    expect(isStaffRole("Community Moderator")).toBe(false);
+    expect(isStaffRole("Other: Something")).toBe(false);
+    expect(isStaffRole(undefined)).toBe(false);
   });
 });

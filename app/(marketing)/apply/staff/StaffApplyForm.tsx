@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Button from '@/app/components/ui/Button';
 import { Input, Textarea } from '@/app/components/ui/form';
-import { buildStaffApplicationDetails } from '@/app/lib/staff-application-form';
+import { buildStaffApplicationDetails, STAFF_ROLES } from '@/app/lib/staff-application-form';
 
 const initialForm = {
   name: '',
@@ -13,7 +13,6 @@ const initialForm = {
   phone: '',
   discordTag: '',
   role: '', // Primary role of interest
-  roleOther: '',
   message: '', // Experience, skills, why you want to join
   linkedin: '', // Resume / Portfolio / LinkedIn link
   availability: '', // hours per week
@@ -66,7 +65,7 @@ export default function StaffApplyForm() {
   const requiredChecks: Record<SectionId, boolean[]> = {
     applicant: [!!form.name.trim(), EMAIL_RE.test(form.email), !!form.phone.trim()],
     role: [
-      !!form.role && (form.role !== 'Other' || !!form.roleOther.trim()),
+      !!form.role,
       !!form.availability
     ],
     experience: [!!form.message.trim()],
@@ -88,7 +87,6 @@ export default function StaffApplyForm() {
     else if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
     if (!form.phone.trim()) errors.phone = 'Phone number is required.';
     if (!form.role) errors.role = 'Please select a primary role.';
-    if (form.role === 'Other' && !form.roleOther.trim()) errors.role = 'Please specify your other role.';
     if (!form.availability) errors.availability = 'Please select your weekly availability.';
     if (!form.message.trim()) errors.message = 'Please provide details about your background and experience.';
     if (!form.agreedToTerms) errors.agreedToTerms = 'You must agree to the Terms of Service.';
@@ -114,8 +112,6 @@ export default function StaffApplyForm() {
     setLoading(true);
     setError('');
 
-    const compiledRole = form.role === 'Other' ? `Other: ${form.roleOther}` : form.role;
-
     try {
       const res = await fetch('/api/apply/staff', {
         method: 'POST',
@@ -126,7 +122,7 @@ export default function StaffApplyForm() {
           email: form.email,
           phone: form.phone,
           discordTag: form.discordTag,
-          role: compiledRole,
+          role: form.role,
           details: buildStaffApplicationDetails(form),
         }),
       });
@@ -497,14 +493,7 @@ export default function StaffApplyForm() {
                 >
                   <span id="role-label" className={labelClass}>Primary Role of Interest {requiredMark}</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      'Tournament Organizer / Administrator',
-                      'Production Crew / Shoutcaster',
-                      'Web Development & Tech Support',
-                      'Social Media & Marketing Specialist',
-                      'Graphic Design / Video Editor',
-                      'Community Moderator',
-                    ].map((roleOption) => (
+                    {STAFF_ROLES.map((roleOption) => (
                       <label key={roleOption} className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors">
                         <input
                           type="radio"
@@ -517,31 +506,6 @@ export default function StaffApplyForm() {
                         <span>{roleOption}</span>
                       </label>
                     ))}
-
-                    {/* Other option inline */}
-                    <div className="sm:col-span-2 flex items-center gap-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors shrink-0">
-                        <input
-                          type="radio"
-                          name="role"
-                          value="Other"
-                          checked={form.role === 'Other'}
-                          onChange={() => handleSelectChange('role', 'Other')}
-                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
-                        />
-                        <span>Other:</span>
-                      </label>
-                      {form.role === 'Other' && (
-                        <input
-                          type="text"
-                          placeholder="Please specify role"
-                          value={form.roleOther}
-                          onChange={handleTextChange}
-                          name="roleOther"
-                          className="border-b border-line focus:border-b-2 focus:border-accent focus:outline-none py-0.5 text-xs bg-transparent flex-1 text-foreground"
-                        />
-                      )}
-                    </div>
                   </div>
                   {fieldErrors.role && (
                     <p id="role-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.role}</p>

@@ -1,3 +1,27 @@
+/**
+ * Selectable "Primary Role of Interest" choices, in display order. Stored as-is
+ * in `staff_applications.role` (a free-text column), so rows submitted before
+ * the divisions change still hold old values (e.g. "Community Moderator",
+ * "Other: ...") and admin views render them verbatim.
+ */
+export const STAFF_ROLES = [
+  'Software Engineering Division',
+  'Marketing Division',
+  'Operations Division',
+  'Development Division',
+  'Productions Crew',
+  'Legal Division',
+  'VALORANT Division',
+  'League of Legends Division',
+  'Teamfight Tactics Division',
+] as const;
+
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export function isStaffRole(value: unknown): value is StaffRole {
+  return typeof value === 'string' && (STAFF_ROLES as readonly string[]).includes(value);
+}
+
 export interface StaffApplicationFormData {
   name: string;
   preferredFirstName: string;
@@ -5,7 +29,6 @@ export interface StaffApplicationFormData {
   phone: string;
   discordTag: string;
   role: string;
-  roleOther: string;
   message: string;
   linkedin: string;
   availability: string;
