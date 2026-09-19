@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { isStaffRole } from '@/app/lib/staff-application-form';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
 
 // 5 submissions per IP per 10 minutes — consistent with general apply limit
@@ -23,6 +24,10 @@ export async function POST(request: NextRequest) {
 
     if (!name || !email || !phone || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (!isStaffRole(role)) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
