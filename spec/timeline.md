@@ -58,11 +58,11 @@ No commits 1–10 Aug.
 
 ---
 
-## Quality Audit & Hardening Sprint — Sep 2026 (PRs #142, #161–#184)
+## Quality Audit & Hardening Sprint — Sep 2026 (PRs #142, #180–#186)
 
-- **13 Sep — Quality audit & agent memory.**
-  - **PR #161 `e88ba4c`** — Recorded full-tree quality audit in `docs/audits/2026-09-13-codebase-quality-audit.md` (8 independent review passes, dedup into 18 PR-sized follow-ups #143–#160). Codified `codebase-quality-audit` skill and `codebase-quality-auditor` agent. Closed after filing follow-ups.
-  - **PR #162 `40e2be1` / `77be6c8`** — Established `spec/` as authoritative LLM project memory (timeline, product, architecture, incidents, open threads). Codified `spec/` as the 1st point of reference (and git history strictly as the last) directly into `implement`, `review-loop`, `cleanup`, and `orchestrator` agent workflows. Added `_scratch/` gitignore.
+- **13–20 Sep — Quality audit & agent memory.**
+  - **PR #186 `36dc62d` (superseding #161)** — Recorded full-tree quality audit in `docs/audits/2026-09-13-codebase-quality-audit.md` (8 independent review passes, dedup into 18 PR-sized follow-ups #143–#160). Codified `codebase-quality-audit` skill and `codebase-quality-auditor` agent with positive behavioral framing.
+  - **PR #185 `f8aa4ea` (superseding #162)** — Established `spec/` as authoritative LLM project memory (timeline, product, architecture, incidents, open threads). Codified `spec/` as the 1st point of reference (and git history strictly as the last) directly into `implement`, `review-loop`, `cleanup`, and `orchestrator` agent workflows with positive declarative assertions. Added `_scratch/` gitignore.
 - **19–20 Sep — Security, Storage, Auth, and Timezone Hardening Sprint.**
   - **PR #142 `a1aeca6` (#103)** — Privacy erasure workflow (`/privacy` erasure intake, preflight DB backup, migration `0035_dazzling_omega_red.sql`).
   - **PR #180 `2e3e5d8` (#146)** — Database safety gates. Applied `assertSeedTargetAllowed()` across `db/migrate.ts`, `drizzle.config.ts`, `db/seed-owner.ts`, `db/backfill-leadership.ts`, and `app/lib/db/seed-phase2.ts`. Deprecated UUID-churning delete-and-reinsert `db/seed.ts`. Gitignored `sharepoint/**/*.csv`.
