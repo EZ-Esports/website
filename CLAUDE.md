@@ -13,13 +13,17 @@ The `spec/` directory is the authoritative living memory of this project for all
 copy. There is no separate environment. Treat any script that reads `.env` as
 capable of touching production data — because it is.
 
-`npm run db:seed` and `npm run db:seed:gold` both delete and re-insert rows.
-They are gated by `assertSeedTargetAllowed()` (`db/seed-target.ts`), which
-refuses to run against anything but a loopback host unless
-`SEED_ALLOW_REMOTE=<exact-hostname>` is set. **Do not treat that gate as
-permission.** It stops an accident; it does not substitute for asking the user
-before running a seed or a migration against production. Confirm first, every
-time, even though the code would technically allow it.
+Database mutating scripts (`db:migrate`, `db:push`, `db:seed:gold`,
+`db:seed:leadership`, `db:seed-owner`, leadership backfill) are gated by
+`assertSeedTargetAllowed()` (`db/seed-target.ts`), which refuses to run
+against anything but a loopback host unless
+`SEED_ALLOW_REMOTE=<exact-hostname>` is set. `npm run db:seed` has been
+retired because its legacy delete-and-reinsert pattern churned UUIDs and
+caused stale-cache empty pages; canonical archive loads must use
+`npm run db:seed:gold` (which upserts without UUID churn).
+**Do not treat that gate as permission.** It stops an accident; it does not
+substitute for asking the user before running a seed or a migration against
+production. Confirm first, every time, even though the code would technically allow it.
 
 If you're testing seed/migration changes, do it against a local Postgres with
 an explicit `DATABASE_URL` — never by relying on `.env`.
@@ -50,11 +54,9 @@ names, emails, Discord handles, hometowns, graduation years. This is a public
 repo. All of these must stay gitignored.
 
 Before any broad `git add -A` or similar, check `git status` for anything
-under `sharepoint/` or `db/backups/` that looks like it shouldn't be there —
-`.gitignore` patterns anchored to the repo root (`/*.csv`) do **not** cover the
-same filename one directory down (`sharepoint/*.csv`). That gap existed here
-and left two files with 169 students' contact info sitting untracked but
-committable for an unknown period.
+under `sharepoint/` or `db/backups/` that looks like it shouldn't be there.
+`.gitignore` now ignores all nested CSVs (`sharepoint/**/*.csv`), but vigilance
+is still required when handling spreadsheet exports.
 
 ## Before declaring source data unrecoverable, ask
 

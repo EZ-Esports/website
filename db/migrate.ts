@@ -16,6 +16,7 @@ import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import postgres from 'postgres';
 import { requireFreshBackup } from './backup';
+import { assertSeedTargetAllowed } from './seed-target';
 import { extractTablesFromSql } from './migrate-tables';
 
 const MIGRATIONS_DIR = resolve(process.cwd(), 'db/migrations');
@@ -57,6 +58,9 @@ export async function determineScope(
   pathsOverride?: { migrationsDir: string; journalPath: string }
 ): Promise<Scope> {
   const ownsConnection = sqlOverride === undefined;
+  if (ownsConnection) {
+    assertSeedTargetAllowed();
+  }
   const url = process.env.DATABASE_URL ?? '';
   const sql = sqlOverride ?? postgres(url, { max: 1 });
   const migrationsDir = pathsOverride?.migrationsDir ?? MIGRATIONS_DIR;
@@ -140,6 +144,7 @@ export async function determineScope(
 }
 
 async function main() {
+  assertSeedTargetAllowed();
   console.log('Determining pending-migration scope for the pre-migration backup...');
   const scope = await determineScope();
 

@@ -1,80 +1,170 @@
 /**
- * Structural guards over the two destructive seeds and migration 0026.
+ * Structural guards over database seeds, migrations, backfills, push guards, and migration 0026.
  *
- * These read source rather than executing it. Both subjects are things that
- * cannot be exercised in a unit test — running a seed needs a database it is
- * allowed to wipe, and running the migration needs one restored from a dump —
- * but both encode an invariant that is easy to break by accident later, and
- * both broke in exactly that way before this PR. Asserting on the source is a
- * weaker check than running it, and it is a much stronger check than nothing.
- *
- * The migration's real proof is a restore of the production dump into a
- * throwaway cluster, applying 0026, and diffing the backfilled keys against
- * what db/gold-keys.ts derives from the CSVs. That is a manual step; these
- * tests keep the properties it verified from being edited away.
+ * These read source rather than executing it where appropriate. Subjects like
+ * running migrations or destructive seeds cannot be fully exercised in a unit test
+ * without a dedicated throwaway cluster, but asserting structural invariants on
+ * the source prevents accidental regressions.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { spawnSync } from 'child_process';
+import { determineScope } from '../migrate';
+import { ALLOW_REMOTE_ENV } from '../seed-target';
 
 const read = (p: string) => readFileSync(resolve(__dirname, '..', p), 'utf8');
 
-/** Both wipe tables. db/seed.ts wipes strictly more, including leadership. */
-const DESTRUCTIVE_SEEDS = ['seed.ts', 'seed-gold.ts'] as const;
-
-describe.each(DESTRUCTIVE_SEEDS)('%s takes a backup before it deletes anything', (file) => {
-  const src = read(file);
+describe('db/seed-gold.ts takes a backup before it deletes anything', () => {
+  const src = read('seed-gold.ts');
 
   it('imports the guard from db/backup', () => {
     expect(src).toMatch(/import \{ requireFreshBackup \} from '\.\/backup'/);
   });
 
-  // Guarding one seed and not the other is the hole this closes: `db:seed` and
-  // `db:seed:gold` are one word apart in package.json, and `db:seed` is the more
-  // destructive of the two — it wipes leadership, schools and games outright.
-  //
-  // requireFreshBackup() now takes a table-scope argument (a caller-supplied
-  // list, or 'full') rather than being a bare call — this matches any single
-  // identifier argument (e.g. SEED_TABLES, GOLD_SEED_TABLES) rather than
-  // pinning the exact constant name, since that is each file's own choice.
   it('calls it, scoped to a table list', () => {
     expect(src).toMatch(/^\s*requireFreshBackup\(\w+\);/m);
   });
 
-  // Scoped to the body of main(), because seed-gold.ts now defines a delete
-  // helper above it — the question is what runs first, not what appears first.
   it('calls it before the run mutates anything, so a failed backup aborts', () => {
     const body = src.slice(src.indexOf('async function main()'));
     const guard = body.search(/requireFreshBackup\(\w+\);/);
-    // The calls are chained across lines (`db\n  .insert(`), so this cannot be a
-    // literal search.
     const firstMutation = body.search(/db\s*\.\s*(insert|delete)\s*\(/);
     expect(guard).toBeGreaterThan(-1);
     expect(firstMutation).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(firstMutation);
   });
-});
 
-describe.each(DESTRUCTIVE_SEEDS)('%s refuses a database it was not pointed at', (file) => {
-  const src = read(file);
-
-  it('imports the interlock from db/seed-target', () => {
-    expect(src).toMatch(/import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/);
-  });
-
-  it('calls it', () => {
-    expect(src).toMatch(/^\s*assertSeedTargetAllowed\(\);/m);
-  });
-
-  // Ordering matters in both directions. Before the first delete for the obvious
-  // reason; before the backup because dumping a production database for a minute
-  // and then refusing to touch it is a slow way to say no.
-  it('calls it before taking the backup', () => {
+  it('calls assertSeedTargetAllowed() before taking the backup', () => {
     const interlock = src.indexOf('assertSeedTargetAllowed();');
     const backup = src.search(/requireFreshBackup\(\w+\);/);
     expect(interlock).toBeGreaterThan(-1);
     expect(backup).toBeGreaterThan(-1);
     expect(interlock).toBeLessThan(backup);
+  });
+});
+
+/**
+ * Audit IDs: DB-3, DB-9, ARCH-9, DB-10.
+ * Every operational script capable of mutating DB state must refuse a non-loopback
+ * DATABASE_URL without SEED_ALLOW_REMOTE.
+ */
+const GATED_SCRIPTS = [
+  { file: 'seed-gold.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
+  { file: 'seed-leadership.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
+  { file: 'migrate.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
+  { file: '../drizzle.config.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/db\/seed-target'/ },
+  { file: 'backfill-leadership.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
+  { file: 'seed-owner.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
+  { file: '../app/lib/db/seed-phase2.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\.\/\.\.\/\.\.\/db\/seed-target'/ },
+  { file: 'seed.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
+] as const;
+
+describe.each(GATED_SCRIPTS)('$file refuses an unauthorized remote database', ({ file, importPattern }) => {
+  const src = read(file);
+
+  it('imports the interlock from seed-target', () => {
+    expect(src).toMatch(importPattern);
+  });
+
+  it('calls assertSeedTargetAllowed()', () => {
+    expect(src).toMatch(/assertSeedTargetAllowed\(\)/);
+  });
+});
+
+describe('db/migrate.ts host gate ordering', () => {
+  const src = read('migrate.ts');
+
+  it('calls assertSeedTargetAllowed() at the very start of main() before determining scope', () => {
+    const mainBody = src.slice(src.indexOf('async function main()'));
+    const gate = mainBody.indexOf('assertSeedTargetAllowed();');
+    const determine = mainBody.indexOf('determineScope();');
+    expect(gate).toBeGreaterThan(-1);
+    expect(determine).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(determine);
+  });
+
+  it('calls assertSeedTargetAllowed() before taking pre-migration backup', () => {
+    const mainBody = src.slice(src.indexOf('async function main()'));
+    const gate = mainBody.indexOf('assertSeedTargetAllowed();');
+    const backup = mainBody.search(/requireFreshBackup\(/);
+    expect(gate).toBeGreaterThan(-1);
+    expect(backup).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(backup);
+  });
+
+  it('calls assertSeedTargetAllowed() inside determineScope when owning connection', () => {
+    const determineBody = src.slice(src.indexOf('export async function determineScope('));
+    const ownsConn = determineBody.indexOf('if (ownsConnection)');
+    const gateInside = determineBody.indexOf('assertSeedTargetAllowed();', ownsConn);
+    expect(ownsConn).toBeGreaterThan(-1);
+    expect(gateInside).toBeGreaterThan(-1);
+  });
+});
+
+describe('drizzle.config.ts push guard', () => {
+  const src = read('../drizzle.config.ts');
+
+  it('gates drizzle-kit push against remote targets', () => {
+    expect(src).toMatch(/process\.argv\.(some|includes)\(.*push.*\)/);
+    expect(src).toMatch(/assertSeedTargetAllowed\(\)/);
+  });
+});
+
+
+describe('app/lib/db/seed-phase2.ts cannot silently write production CMS rows', () => {
+  const src = read('../app/lib/db/seed-phase2.ts');
+
+  it('is marked as deprecated / unsafe', () => {
+    expect(src).toMatch(/@deprecated/);
+  });
+
+  it('calls assertSeedTargetAllowed() before inserting CMS rows', () => {
+    const seedFunc = src.slice(src.indexOf('async function seedPhase2()'));
+    const gate = seedFunc.indexOf('assertSeedTargetAllowed();');
+    const insert = seedFunc.search(/db\s*\.\s*insert\(/);
+    expect(gate).toBeGreaterThan(-1);
+    expect(insert).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(insert);
+  });
+});
+
+describe('db/seed.ts retirement and UUID-churn prevention', () => {
+  const src = read('seed.ts');
+
+  it('is marked as deprecated / retired', () => {
+    expect(src).toMatch(/@deprecated/);
+  });
+
+  it('does not delete news_posts', () => {
+    expect(src).not.toMatch(/db\.delete\(schema\.newsPosts\)/);
+  });
+
+  const CORE_TABLES = [
+    'newsPosts', 'matches', 'players', 'rosters',
+    'teams', 'seasons', 'members', 'schools', 'games', 'leadership',
+  ];
+
+  it.each(CORE_TABLES)('does not delete schema.%s', (table) => {
+    expect(src).not.toMatch(new RegExp(`db\\.delete\\(schema\\.${table}\\)`));
+  });
+
+  it('does not insert or churn row UUIDs', () => {
+    expect(src).not.toMatch(/db\.insert\(/);
+  });
+
+  it('refuses execution and directs operators to gold and leadership seeds', () => {
+    expect(src).toMatch(/db:seed:gold/);
+    expect(src).toMatch(/db:seed:leadership/);
+    expect(src).toMatch(/process\.exit\(1\)/);
+  });
+});
+
+describe('.gitignore sharepoint nested CSVs', () => {
+  const gitignore = read('../.gitignore');
+
+  it('ignores nested CSVs under sharepoint to prevent PII leaks', () => {
+    expect(gitignore).toMatch(/sharepoint\/\*\*\/\*\.csv/);
   });
 });
 
@@ -140,20 +230,6 @@ describe('db/seed-gold.ts upserts rather than wiping', () => {
   });
 });
 
-// The specific line that destroyed the 70 rows this PR exists because of. It is
-// a one-line edit to put back, and nothing else in the suite would notice.
-describe('db/seed.ts leaves leadership alone', () => {
-  const src = read('seed.ts');
-
-  it('does not delete the table', () => {
-    expect(src).not.toMatch(/db\.delete\(schema\.leadership\)/);
-  });
-
-  it('merges into it instead', () => {
-    expect(src).toMatch(/mergeLeadership\(/);
-  });
-});
-
 describe('migration 0026', () => {
   const sql = read('migrations/0026_lush_genesis.sql');
 
@@ -200,3 +276,32 @@ describe('migration 0026', () => {
     expect(lastUpdate).toBeLessThan(firstIndex);
   });
 });
+
+describe('runtime enforcement of guards', () => {
+  const originalUrl = process.env.DATABASE_URL;
+  const originalAllow = process.env[ALLOW_REMOTE_ENV];
+
+  afterEach(() => {
+    if (originalUrl !== undefined) process.env.DATABASE_URL = originalUrl;
+    else delete process.env.DATABASE_URL;
+    if (originalAllow !== undefined) process.env[ALLOW_REMOTE_ENV] = originalAllow;
+    else delete process.env[ALLOW_REMOTE_ENV];
+  });
+
+  it('determineScope() fails closed against a remote target when ownsConnection is true', async () => {
+    process.env.DATABASE_URL = 'postgresql://u:pw@db.production.supabase.co:5432/postgres';
+    delete process.env[ALLOW_REMOTE_ENV];
+
+    await expect(determineScope()).rejects.toThrow(/not loopback/);
+  });
+
+  it('git check-ignore ignores deeply nested CSV files under sharepoint', () => {
+    const result = spawnSync('git', ['check-ignore', 'sharepoint/a/b/c/students.csv'], {
+      cwd: resolve(__dirname, '../..'),
+      encoding: 'utf8',
+    });
+    expect(result.stdout.trim()).toBe('sharepoint/a/b/c/students.csv');
+    expect(result.status).toBe(0);
+  });
+});
+

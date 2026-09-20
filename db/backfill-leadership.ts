@@ -11,7 +11,7 @@
  */
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { assertSeedTargetAllowed } from './seed-target';
 
 export function classifyRole(role: string): { displayOrder: number; department: string } {
   const lower = role.toLowerCase().trim();
@@ -81,6 +81,7 @@ interface PersonAgg {
 }
 
 async function backfill() {
+  assertSeedTargetAllowed();
   console.log('🚀 Starting Leadership Normalization & Backfill...');
 
   // 1. Fetch all rows from legacy leadership
@@ -224,6 +225,7 @@ async function backfill() {
 }
 
 if (process.argv[1] && process.argv[1].includes('backfill-leadership')) {
+  assertSeedTargetAllowed();
   backfill()
     .then(() => process.exit(0))
     .catch((err) => {
