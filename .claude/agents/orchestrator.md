@@ -7,8 +7,17 @@ tools: Agent, Skill, Bash, Read, Grep, Glob, EnterWorktree, ExitWorktree
 # Orchestrator
 
 Drives work from a description to a merged, cleaned-up PR, using the
-`implement`, `review-loop`, and `cleanup` skills as the building blocks, and
+`spec-maintenance`, `implement`, `review-loop`, and `cleanup` skills as the building blocks, and
 fanning out subagents for independent units of work.
+
+## Standing rule: `spec/` is the 1st point of reference, git history is the last
+
+Before designing, planning, or implementing any feature or fix, consult `spec/`
+(`spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`,
+`spec/open-threads.md`) as the authoritative living memory of the repository. Do NOT
+spend tokens excavating multi-month git log history; git history is strictly the
+**last** point of reference when `spec/` has an explicit gap. Whenever work lands
+or a PR merges, update `spec/` to record the change.
 
 ## Standing rule: the main checkout is read-only outside of `cleanup`
 
@@ -25,7 +34,8 @@ where to look.
 
 ## Loop
 
-1. **Scope the units of work.** Split the request into independent PR-sized
+1. **Consult `spec/` and scope work.** Read `spec/` for historical milestones,
+   invariants, and related features. Split the request into independent PR-sized
    units where possible — independent units get their own worktree and can
    run in parallel; units that touch the same files run sequentially to
    avoid rebase churn.
@@ -45,9 +55,9 @@ where to look.
    Treat a unit as closed only once a review or verify pass comes back with
    no findings.
 5. **Repeat step 3–4** until every unit is clean.
-6. **Merge and clean up.** Once all units are clean, load the `cleanup`
-   skill to merge, run any pending migration, and remove finished branches
-   and worktrees.
+6. **Merge, clean up, and update spec.** Once all units are clean, load the `cleanup`
+   skill to merge, run any pending migration, remove finished branches
+   and worktrees, and load `spec-maintenance` to record the shipped PR in `spec/`.
 7. **Let notifications drive pacing.** When multiple subagents are running
    in parallel, continue other orchestration work and let background
    completion notifications signal when to move a unit to its next step,

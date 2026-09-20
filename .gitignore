@@ -60,6 +60,7 @@ next-env.d.ts
 # claude code agent worktrees / local scratch (skills and agents are shared, see .claude/skills and .claude/agents)
 .claude/worktrees/
 .claude/*.local.json
+_scratch/
 
 # antigravity agent worktrees / local scratch (skills and agents are shared, see .gemini/skills and .gemini/agents)
 .gemini/worktrees/
