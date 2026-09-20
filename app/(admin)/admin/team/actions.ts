@@ -3,7 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { requirePermission } from '@/app/lib/auth';
-import { Permissions, canActOnMember, canManageRole, canGrantPermissions } from '@/app/lib/roles';
+import {
+  Permissions,
+  canActOnMember,
+  canManageRole,
+  canGrantPermissions,
+  calculateEffectiveStaffAccess,
+  hasPermission,
+} from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { createServiceClient } from '@/app/lib/supabase/service';
@@ -18,16 +25,19 @@ import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
 const INVITE_TTL_MS = INVITE_TTL_DAYS * 24 * 60 * 60 * 1000;
 const INVITE_RATE_LIMIT = 10;
 const INVITE_RATE_WINDOW_MS = 60_000;
-const ROLE_MUTATE_LOCK_KEY = 8765002;
+
+type TransactionExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbOrTx = typeof db | TransactionExecutor;
 
 /** Helper to fetch a user's roles from the database */
-async function getUserRolesInfo(userId: string) {
-  const userRolesRows = await db
+async function getUserRolesInfo(userId: string, txOrDb: DbOrTx = db) {
+  const userRolesRows = await txOrDb
     .select({
       id: schema.roles.id,
       name: schema.roles.name,
       position: schema.roles.position,
       isOwner: schema.roles.isOwner,
+      permissions: schema.roles.permissions,
     })
     .from(schema.userRoles)
     .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
@@ -36,6 +46,50 @@ async function getUserRolesInfo(userId: string) {
   const isOwner = userRolesRows.some((r) => r.isOwner);
   const highestPosition = userRolesRows.reduce((max, r) => (r.position > max ? r.position : max), 0);
   return { roles: userRolesRows, isOwner, highestPosition };
+}
+
+/** Helper to fetch fresh effective permissions and hierarchy position for an actor under lock */
+async function getFreshActorAccess(userId: string, txOrDb: DbOrTx = db) {
+  const [member] = await txOrDb
+    .select({ userId: schema.staffMembers.userId })
+    .from(schema.staffMembers)
+    .where(eq(schema.staffMembers.userId, userId))
+    .limit(1);
+
+  if (!member) {
+    throw new ActionError('UNAUTHORIZED', 'You are no longer a staff member.');
+  }
+
+  const assignedRoles = await txOrDb
+    .select({
+      permissions: schema.roles.permissions,
+      position: schema.roles.position,
+      isOwner: schema.roles.isOwner,
+    })
+    .from(schema.userRoles)
+    .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+    .where(eq(schema.userRoles.userId, userId));
+
+  const [everyoneRole] = await txOrDb
+    .select({
+      permissions: schema.roles.permissions,
+      position: schema.roles.position,
+      isOwner: schema.roles.isOwner,
+    })
+    .from(schema.roles)
+    .where(eq(schema.roles.name, '@everyone'))
+    .limit(1);
+
+  const { isOwner, permissions, highestRolePosition } = calculateEffectiveStaffAccess(
+    assignedRoles,
+    everyoneRole ?? null,
+  );
+
+  if (!hasPermission(permissions, isOwner, Permissions.MANAGE_ROLES)) {
+    throw new ActionError('FORBIDDEN', 'You do not have permission to manage roles.');
+  }
+
+  return { id: userId, isOwner, permissions, highestRolePosition };
 }
 
 /** Create a single-use staff invite, optionally mapping it to initial roles. */
@@ -96,6 +150,8 @@ export async function inviteStaff(formData: FormData): Promise<{
       // a check cannot race a newly persisted revocation tombstone.
       await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
+      const freshStaff = await getFreshActorAccess(staff.id, tx);
+
       const [existingStaff] = await tx
         .select({ userId: schema.staffMembers.userId })
         .from(schema.staffMembers)
@@ -117,6 +173,32 @@ export async function inviteStaff(formData: FormData): Promise<{
         );
       }
 
+      // Re-verify requested roles under lock against fresh actor authority
+      if (roleIds.length > 0) {
+        const lockedSelectedRoles = await tx
+          .select()
+          .from(schema.roles)
+          .where(inArray(schema.roles.id, roleIds));
+
+        if (lockedSelectedRoles.length !== roleIds.length) {
+          throw new ActionError('INVALID_ROLE', 'One or more selected roles do not exist.');
+        }
+        for (const role of lockedSelectedRoles) {
+          if (!canManageRole(freshStaff.highestRolePosition, freshStaff.isOwner, role.position)) {
+            throw new ActionError(
+              'HIERARCHY_VIOLATION',
+              `You cannot grant the role "${role.name}" because it is equal to or higher than your own highest role.`,
+            );
+          }
+          if (!canGrantPermissions(freshStaff.permissions, freshStaff.isOwner, BigInt(role.permissions))) {
+            throw new ActionError(
+              'PRIVILEGE_ESCALATION',
+              `You cannot grant the role "${role.name}" because it contains permissions you do not possess.`,
+            );
+          }
+        }
+      }
+
       // Clear out previous pending invites for this email
       const supersededInvites = await tx
         .select({ id: schema.staffInvites.id })
@@ -134,7 +216,7 @@ export async function inviteStaff(formData: FormData): Promise<{
           .where(inArray(schema.staffInviteRoles.inviteId, supersededInviteIds));
 
         for (const role of associatedRoles) {
-          if (!canManageRole(staff.highestRolePosition, staff.isOwner, role.position)) {
+          if (!canManageRole(freshStaff.highestRolePosition, freshStaff.isOwner, role.position)) {
             throw new ActionError(
               'SUPERSEDE_FORBIDDEN',
               `Only staff with a higher role rank can replace this pending invite containing the "${role.name}" role.`
@@ -194,15 +276,49 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
   }
 
   try {
-    const deleted = await db
-      .delete(schema.staffInvites)
-      .where(and(eq(schema.staffInvites.id, inviteId), isNull(schema.staffInvites.acceptedAt)))
-      .returning({ id: schema.staffInvites.id });
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
-    if (deleted.length === 0) {
-      return { success: false, error: 'Invite not found or already accepted.' };
-    }
+      const freshActor = await getFreshActorAccess(admin.id, tx);
+
+      const [invite] = await tx
+        .select({ id: schema.staffInvites.id })
+        .from(schema.staffInvites)
+        .where(and(eq(schema.staffInvites.id, inviteId), isNull(schema.staffInvites.acceptedAt)))
+        .limit(1);
+
+      if (!invite) {
+        throw new ActionError('INVITE_NOT_FOUND', 'Invite not found or already accepted.');
+      }
+
+      const lockedInviteRoles = await tx
+        .select({ name: schema.roles.name, position: schema.roles.position })
+        .from(schema.staffInviteRoles)
+        .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id))
+        .where(eq(schema.staffInviteRoles.inviteId, inviteId));
+
+      for (const role of lockedInviteRoles) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+          throw new ActionError(
+            'STAFF_HIERARCHY_CHANGED',
+            `You cannot revoke this invite because it contains the "${role.name}" role which is equal to or higher than your own highest role.`
+          );
+        }
+      }
+
+      const deleted = await tx
+        .delete(schema.staffInvites)
+        .where(and(eq(schema.staffInvites.id, inviteId), isNull(schema.staffInvites.acceptedAt)))
+        .returning({ id: schema.staffInvites.id });
+
+      if (deleted.length === 0) {
+        throw new ActionError('INVITE_NOT_FOUND', 'Invite not found or already accepted.');
+      }
+    });
   } catch (error) {
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
+    }
     console.error('Failed to revoke staff invite', error);
     return { success: false, error: 'Could not revoke invite. Please try again.' };
   }
@@ -257,6 +373,8 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
       }
       revokedEmail = lockedTargetMember.email.trim().toLowerCase();
 
+      const freshActor = await getFreshActorAccess(staff.id, tx);
+
       const lockedTargetRoles = await tx
         .select({ position: schema.roles.position, isOwner: schema.roles.isOwner })
         .from(schema.userRoles)
@@ -269,8 +387,8 @@ export async function revokeStaff(userId: string): Promise<{ success: boolean; e
       );
 
       if (!canActOnMember(
-        staff.highestRolePosition,
-        staff.isOwner,
+        freshActor.highestRolePosition,
+        freshActor.isOwner,
         lockedTargetHighestPosition,
         lockedTargetIsOwner,
       )) {
@@ -404,7 +522,13 @@ export async function createRole(formData: FormData): Promise<{ success: boolean
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${ROLE_MUTATE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const freshActor = await getFreshActorAccess(admin.id, tx);
+
+      if (!canGrantPermissions(freshActor.permissions, freshActor.isOwner, permissionsVal)) {
+        throw new ActionError('PRIVILEGE_ESCALATION', 'You cannot grant permissions that you do not possess.');
+      }
 
       // Determine initial position (1 + maximum position below actor's highest role, or position 1)
       let initialPosition = 1;
@@ -412,9 +536,9 @@ export async function createRole(formData: FormData): Promise<{ success: boolean
         .select({ maxPos: sql<number>`max(${schema.roles.position})::int` })
         .from(schema.roles)
         .where(
-          admin.isOwner
+          freshActor.isOwner
             ? undefined
-            : sql`${schema.roles.position} < ${admin.highestRolePosition}`
+            : sql`${schema.roles.position} < ${freshActor.highestRolePosition}`
         );
 
       if (maxPosRow && maxPosRow.maxPos !== null) {
@@ -442,6 +566,9 @@ export async function createRole(formData: FormData): Promise<{ success: boolean
       });
     });
   } catch (error) {
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
+    }
     console.error('Failed to create role', error);
     return { success: false, error: sanitizeDbError(error) };
   }
@@ -494,15 +621,53 @@ export async function updateRole(roleId: string, formData: FormData): Promise<{ 
   }
 
   try {
-    await db
-      .update(schema.roles)
-      .set({
-        name,
-        color,
-        permissions: permissionsVal,
-      })
-      .where(eq(schema.roles.id, roleId));
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const freshActor = await getFreshActorAccess(admin.id, tx);
+
+      const [role] = await tx
+        .select()
+        .from(schema.roles)
+        .where(eq(schema.roles.id, roleId))
+        .limit(1);
+
+      if (!role) {
+        throw new ActionError('ROLE_NOT_FOUND', 'Role not found.');
+      }
+
+      if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+        throw new ActionError(
+          'STAFF_HIERARCHY_CHANGED',
+          'You do not have permission to manage this role due to role hierarchy.'
+        );
+      }
+
+      if (role.isSystem && name !== role.name) {
+        throw new ActionError('SYSTEM_ROLE', 'You cannot rename a system-defined role.');
+      }
+
+      if (!canGrantPermissions(freshActor.permissions, freshActor.isOwner, permissionsVal)) {
+        throw new ActionError('PRIVILEGE_ESCALATION', 'You cannot grant permissions that you do not possess.');
+      }
+
+      if (role.isOwner && permissionsVal !== BigInt(role.permissions)) {
+        throw new ActionError('OWNER_IMMUTABLE', 'The Owner role permissions are immutable.');
+      }
+
+      await tx
+        .update(schema.roles)
+        .set({
+          name,
+          color,
+          permissions: permissionsVal,
+        })
+        .where(eq(schema.roles.id, roleId));
+    });
   } catch (error) {
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
+    }
     console.error('Failed to update role', error);
     return { success: false, error: sanitizeDbError(error) };
   }
@@ -536,7 +701,30 @@ export async function deleteRole(roleId: string): Promise<{ success: boolean; er
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${ROLE_MUTATE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const freshActor = await getFreshActorAccess(admin.id, tx);
+
+      const [role] = await tx
+        .select()
+        .from(schema.roles)
+        .where(eq(schema.roles.id, roleId))
+        .limit(1);
+
+      if (!role) {
+        throw new ActionError('ROLE_NOT_FOUND', 'Role not found.');
+      }
+
+      if (role.isSystem) {
+        throw new ActionError('SYSTEM_ROLE', 'System-defined roles cannot be deleted.');
+      }
+
+      if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+        throw new ActionError(
+          'STAFF_HIERARCHY_CHANGED',
+          'You do not have permission to delete this role due to role hierarchy.'
+        );
+      }
 
       // Shifting position indexes of roles above the deleted one down to prevent index fragmentation
       await tx
@@ -552,6 +740,9 @@ export async function deleteRole(roleId: string): Promise<{ success: boolean; er
       await tx.delete(schema.roles).where(eq(schema.roles.id, roleId));
     });
   } catch (error) {
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
+    }
     console.error('Failed to delete role', error);
     return { success: false, error: 'Could not delete role. Please try again.' };
   }
@@ -570,7 +761,9 @@ export async function reorderRoles(orderedRoleIds: string[]): Promise<{ success:
 
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${ROLE_MUTATE_LOCK_KEY})`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
+
+      const freshActor = await getFreshActorAccess(admin.id, tx);
 
       // Fetch all roles to compare positions
       const allRoles = await tx.select().from(schema.roles);
@@ -585,8 +778,8 @@ export async function reorderRoles(orderedRoleIds: string[]): Promise<{ success:
         if (role.isOwner || role.name === '@everyone') {
           throw new ActionError('IMMUTABLE_ROLE', 'Cannot reorder Owner or @everyone roles.');
         }
-        if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
-          throw new ActionError('HIERARCHY_VIOLATION', `You do not have permission to reorder the role "${role.name}".`);
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+          throw new ActionError('STAFF_HIERARCHY_CHANGED', `You do not have permission to reorder the role "${role.name}".`);
         }
       }
 
@@ -598,9 +791,9 @@ export async function reorderRoles(orderedRoleIds: string[]): Promise<{ success:
 
         const role = rolesMap.get(roleId)!;
         // Verify that the new position doesn't exceed/equal the actor's own highest role position
-        if (!canManageRole(admin.highestRolePosition, admin.isOwner, newPosition)) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, newPosition)) {
           throw new ActionError(
-            'HIERARCHY_VIOLATION',
+            'STAFF_HIERARCHY_CHANGED',
             `You do not have permission to move "${role.name}" to position ${newPosition} (equals or exceeds your own highest role rank).`
           );
         }
@@ -690,8 +883,75 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})`);
 
+      const freshActor = await getFreshActorAccess(admin.id, tx);
+
+      const [lockedTargetRow] = await tx
+        .select()
+        .from(schema.staffMembers)
+        .where(eq(schema.staffMembers.userId, targetUserId))
+        .limit(1);
+
+      if (!lockedTargetRow) {
+        throw new ActionError('STAFF_CHANGED', 'That user is no longer a staff member.');
+      }
+
+      // Re-read target roles fresh under lock
+      const freshTargetInfo = await getUserRolesInfo(targetUserId, tx);
+
+      if (!canActOnMember(
+        freshActor.highestRolePosition,
+        freshActor.isOwner,
+        freshTargetInfo.highestPosition,
+        freshTargetInfo.isOwner,
+      )) {
+        throw new ActionError(
+          'STAFF_HIERARCHY_CHANGED',
+          'This staff member\'s role hierarchy changed. Refresh and try again.',
+        );
+      }
+
+      const lockedNewRoles = roleIds.length > 0
+        ? await tx.select().from(schema.roles).where(inArray(schema.roles.id, roleIds))
+        : [];
+
+      if (lockedNewRoles.length !== roleIds.length) {
+        throw new ActionError('INVALID_ROLE', 'One or more selected roles do not exist.');
+      }
+      if (lockedNewRoles.some((role) => role.name === '@everyone')) {
+        throw new ActionError('INVALID_ROLE', '@everyone is implicit and must not be assigned explicitly.');
+      }
+
+      const lockedCurrentRoleIds = freshTargetInfo.roles.map((r) => r.id);
+      const lockedAddedRoles = lockedNewRoles.filter((r) => !lockedCurrentRoleIds.includes(r.id));
+      const lockedTargetRoleIds = lockedNewRoles.map((r) => r.id);
+      const lockedRemovedRoles = freshTargetInfo.roles.filter((r) => !lockedTargetRoleIds.includes(r.id));
+
+      for (const role of lockedAddedRoles) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+          throw new ActionError(
+            'STAFF_HIERARCHY_CHANGED',
+            `You cannot add the role "${role.name}" because its rank equals or exceeds yours.`
+          );
+        }
+        if (!canGrantPermissions(freshActor.permissions, freshActor.isOwner, BigInt(role.permissions))) {
+          throw new ActionError(
+            'PRIVILEGE_ESCALATION',
+            `You cannot grant the role "${role.name}" because it contains permissions you do not possess.`
+          );
+        }
+      }
+
+      for (const role of lockedRemovedRoles) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+          throw new ActionError(
+            'STAFF_HIERARCHY_CHANGED',
+            `You cannot remove the role "${role.name}" because its rank equals or exceeds yours.`
+          );
+        }
+      }
+
       // If target currently has the Owner role but is being stripped of it, verify there's at least one other owner
-      const isLosingOwner = targetInfo.roles.some((r) => r.isOwner) && !newRoles.some((r) => r.isOwner);
+      const isLosingOwner = freshTargetInfo.roles.some((r) => r.isOwner) && !lockedNewRoles.some((r) => r.isOwner);
       if (isLosingOwner) {
         const owners = await tx
           .select({ count: sql<number>`count(*)::int` })
@@ -718,6 +978,9 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
       }
     });
   } catch (error) {
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
+    }
     console.error('Failed to update user roles', error);
     return { success: false, error: 'Could not update user roles. Please try again.' };
   }
