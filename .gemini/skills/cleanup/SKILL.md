@@ -15,4 +15,5 @@ anything still in progress.
 3. Pull `main` up to date, and if the merged branch included a database migration, run `npm run db:migrate` now that `main` has it.
 4. Delete the local branch, and delete the matching remote branch.
 5. Remove the worktree: use `git worktree remove` directly for any stale or completed worktree directories.
-6. Confirm the stash was restored (if one was created in step 2) and that `git status` is clean before finishing.
+6. Confirm `spec/` is up to date: ensure `spec/timeline.md` and any relevant spec files on `main` reflect the merged PR and its architectural or incident impact.
+7. Confirm the stash was restored (if one was created in step 2) and that `git status` is clean before finishing.

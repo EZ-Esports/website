@@ -23,5 +23,8 @@ anything still in progress.
 5. Remove the worktree: use `ExitWorktree` for a worktree this session
    entered, or `git worktree remove` directly for a stale worktree left by
    another session that's no longer tracked.
-6. Confirm the stash was restored (if one was created in step 2) and that
+6. Confirm `spec/` is up to date: ensure `spec/timeline.md` and any relevant
+   spec files on `main` reflect the merged PR and its architectural or incident
+   impact.
+7. Confirm the stash was restored (if one was created in step 2) and that
    `git status` is clean before finishing.
