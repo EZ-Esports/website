@@ -4,6 +4,7 @@
  * does the SQL and delegates the judgment calls here.
  */
 import type * as schema from './schema';
+import { formatNY } from '../dates';
 
 export type MatchStatus = (typeof schema.matchStatusEnum.enumValues)[number];
 export type MatchSort = 'asc' | 'desc';
@@ -241,6 +242,67 @@ export function toMatchesPageDto(page: MatchesPage): MatchPageResponse {
   return {
     items: page.items.map((item) => ({ ...item, scheduledAt: item.scheduledAt.toISOString() })),
     nextCursor: page.nextCursor,
+  };
+}
+
+export interface ScheduleCalendarItem {
+  id: string;
+  ts: number;
+  date: string;
+  time: string;
+  scheduledAt: string;
+  team1: string;
+  team2: string;
+  division: string;
+  status: string;
+  forfeit: boolean;
+  result?: string;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+/**
+ * Transforms a match query result into a calendar schedule item.
+ * Treats forfeits as completed (never upcoming) and computes results with 'D' for draws.
+ */
+export function toScheduleCalendarItem(m: {
+  id: string;
+  scheduledAt: Date;
+  homeTeam: string;
+  awayTeam: string;
+  division: string;
+  status: string;
+  homeScore: number | null;
+  awayScore: number | null;
+}): ScheduleCalendarItem {
+  const isCompleted = m.status === 'completed' || m.status === 'forfeit';
+  const isLive = m.status === 'live';
+  const isForfeit = m.status === 'forfeit';
+
+  let outcome: 'W' | 'L' | 'D' | undefined;
+  if (m.homeScore !== null && m.awayScore !== null) {
+    outcome = m.homeScore > m.awayScore ? 'W' : m.homeScore < m.awayScore ? 'L' : 'D';
+  }
+
+  const result =
+    isCompleted && outcome !== undefined && m.homeScore !== null && m.awayScore !== null
+      ? `${outcome} ${m.homeScore}-${m.awayScore}`
+      : undefined;
+
+  return {
+    id: m.id,
+    ts: m.scheduledAt.getTime(),
+    date: formatNY(m.scheduledAt, 'date-long'),
+    time: formatNY(m.scheduledAt, 'time'),
+    scheduledAt: m.scheduledAt.toISOString(),
+    team1: m.homeTeam,
+    team2: m.awayTeam,
+    division: m.division,
+    status: isCompleted ? 'Completed' : isLive ? 'Live' : 'Upcoming',
+    forfeit: isForfeit,
+    result,
+    homeScore: m.homeScore,
+    awayScore: m.awayScore,
   };
 }
 
