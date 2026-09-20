@@ -179,6 +179,8 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
             >
               <div>
                 <ImageUpload
+                  section="gallery"
+                  entityId={img.id}
                   name="src"
                   storageKeyName="storageKey"
                   currentSrc={img.src}

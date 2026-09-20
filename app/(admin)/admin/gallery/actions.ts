@@ -6,10 +6,8 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, sql, isNull } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { createServiceClient } from '@/app/lib/supabase/service';
 import { sanitizeDbError } from '@/app/lib/text-utils';
-
-const BUCKET = 'admin-uploads';
+import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 
 export async function addGalleryImage(formData: FormData) {
   await requirePermission(Permissions.MANAGE_GALLERY);
@@ -17,7 +15,11 @@ export async function addGalleryImage(formData: FormData) {
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
   const eventName = (formData.get('eventName') as string) ?? '';
-  const storageKey = (formData.get('storageKey') as string) || null;
+  const rawEntityId = (formData.get('entityId') || formData.get('id')) as string | null;
+  const entityId = sanitizeEntityId(rawEntityId);
+
+  const rawStorageKey = (formData.get('storageKey') as string) || null;
+  const storageKey = entityId && isKeyScopedToEntity(rawStorageKey, 'gallery', entityId) ? rawStorageKey : null;
 
   if (!src) return { success: false, error: 'Please upload an image first.' };
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
@@ -37,8 +39,24 @@ export async function addGalleryImage(formData: FormData) {
 
       const displayOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
 
-      await tx.insert(schema.galleryImages).values({ src, caption, schoolName, eventName, displayOrder, storageKey });
+      const insertValues: typeof schema.galleryImages.$inferInsert = {
+        src,
+        caption,
+        schoolName,
+        eventName,
+        displayOrder,
+        storageKey,
+      };
+      if (entityId) {
+        insertValues.id = entityId;
+      }
+
+      await tx.insert(schema.galleryImages).values(insertValues);
     });
+
+    if (entityId) {
+      await cleanupEntityStorage('gallery', entityId, storageKey);
+    }
   } catch (error) {
     console.error('Failed to add gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -55,24 +73,24 @@ export async function updateGalleryImage(id: string, formData: FormData) {
   const caption = (formData.get('caption') as string) ?? '';
   const schoolName = (formData.get('schoolName') as string) ?? '';
   const eventName = (formData.get('eventName') as string) ?? '';
-  const storageKey = (formData.get('storageKey') as string) || null;
+  const rawStorageKey = (formData.get('storageKey') as string) || null;
 
   if (!src) return { success: false, error: 'An image is required.' };
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
 
   try {
-    // If the image was changed, delete the old file from storage
-    if (storageKey) {
-      const [old] = await db
-        .select({ storageKey: schema.galleryImages.storageKey })
-        .from(schema.galleryImages)
-        .where(eq(schema.galleryImages.id, id))
-        .limit(1);
-      if (old?.storageKey && old.storageKey !== storageKey) {
-        const supabase = createServiceClient();
-        await supabase.storage.from(BUCKET).remove([old.storageKey]);
-      }
-    }
+    const [old] = await db
+      .select({ storageKey: schema.galleryImages.storageKey })
+      .from(schema.galleryImages)
+      .where(eq(schema.galleryImages.id, id))
+      .limit(1);
+
+    // Only accept storage keys strictly scoped to this entity folder
+    const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'gallery', id) ? rawStorageKey : null;
+    const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (old?.storageKey && isKeyScopedToEntity(old.storageKey, 'gallery', id) ? old.storageKey : null));
+
+    // Scope cleanup strictly to this entity folder, preserving the active key
+    await cleanupEntityStorage('gallery', id, storageKey);
 
     await db
       .update(schema.galleryImages)
@@ -139,20 +157,11 @@ export async function toggleGalleryImageActive(id: string, isActive: boolean) {
 
 export async function deleteGalleryImage(id: string) {
   const user = await requirePermission(Permissions.MANAGE_GALLERY);
-  // Fetch the row first to get storageKey for cleanup
-  const [row] = await db
-    .select({ storageKey: schema.galleryImages.storageKey })
-    .from(schema.galleryImages)
-    .where(eq(schema.galleryImages.id, id))
-    .limit(1);
 
   await db.update(schema.galleryImages).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.galleryImages.id, id));
 
-  // Remove from Supabase Storage if a key exists
-  if (row?.storageKey) {
-    const supabase = createServiceClient();
-    await supabase.storage.from(BUCKET).remove([row.storageKey]);
-  }
+  // Scope cleanup strictly to that entity's folder in Supabase Storage
+  await cleanupEntityStorage('gallery', id);
 
   revalidateTag('gallery-images', {});
   revalidatePath('/admin/gallery');

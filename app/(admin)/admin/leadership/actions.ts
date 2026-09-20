@@ -6,22 +6,9 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { createServiceClient } from '@/app/lib/supabase/service';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { classifyRole } from '@/db/backfill-leadership';
-
-const BUCKET = 'admin-uploads';
-
-async function cleanupStorageKey(oldKey: string | null | undefined, newKey: string | null | undefined) {
-  if (oldKey && oldKey !== newKey) {
-    try {
-      const supabase = createServiceClient();
-      await supabase.storage.from(BUCKET).remove([oldKey]);
-    } catch (err) {
-      console.error('Failed to cleanup old avatar file:', err);
-    }
-  }
-}
+import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 
 function revalidateLeadership(years: (string | undefined | null)[]) {
   revalidateTag('leadership', {});
@@ -36,7 +23,8 @@ function revalidateLeadership(years: (string | undefined | null)[]) {
 export async function createLeader(formData: FormData) {
   await requirePermission(Permissions.MANAGE_LEADERSHIP);
 
-  const personId = (formData.get('personId') as string)?.trim() || null;
+  const rawPersonId = (formData.get('personId') as string)?.trim() || (formData.get('entityId') as string)?.trim() || null;
+  const personId = sanitizeEntityId(rawPersonId);
   const name = ((formData.get('name') || formData.get('fullName')) as string)?.trim();
   const role = (formData.get('role') as string)?.trim();
   const year = (formData.get('year') as string)?.trim();
@@ -50,7 +38,7 @@ export async function createLeader(formData: FormData) {
   const bio = (formData.get('bio') as string)?.trim() || null;
   const memberId = (formData.get('memberId') as string)?.trim() || null;
   const avatarUrl = (formData.get('avatarUrl') as string)?.trim() || null;
-  const storageKey = (formData.get('storageKey') as string)?.trim() || null;
+  const rawStorageKey = (formData.get('storageKey') as string)?.trim() || null;
   const termBio = (formData.get('termBio') as string)?.trim() || null;
 
   if (!role || !year) {
@@ -79,9 +67,10 @@ export async function createLeader(formData: FormData) {
         .limit(1);
 
       if (existingPerson) {
-        if (storageKey && existingPerson.storageKey && existingPerson.storageKey !== storageKey) {
-          await cleanupStorageKey(existingPerson.storageKey, storageKey);
-        }
+        const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'leadership', resolvedPersonId) ? rawStorageKey : null;
+        const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (existingPerson.storageKey && isKeyScopedToEntity(existingPerson.storageKey, 'leadership', resolvedPersonId) ? existingPerson.storageKey : null));
+
+        await cleanupEntityStorage('leadership', resolvedPersonId, storageKey);
 
         const personUpdates: Partial<typeof schema.people.$inferInsert> = {};
         if (name && name !== existingPerson.fullName) personUpdates.fullName = name;
@@ -91,7 +80,7 @@ export async function createLeader(formData: FormData) {
         if (graduationYear !== undefined) personUpdates.graduationYear = graduationYear;
         if (bio !== undefined) personUpdates.bio = bio;
         if (avatarUrl !== undefined && avatarUrl) personUpdates.avatarUrl = avatarUrl;
-        if (storageKey !== undefined && storageKey) personUpdates.storageKey = storageKey;
+        if (storageKey !== undefined) personUpdates.storageKey = storageKey;
         if (memberId !== undefined) personUpdates.memberId = memberId;
 
         if (Object.keys(personUpdates).length > 0) {
@@ -100,16 +89,38 @@ export async function createLeader(formData: FormData) {
             .set(personUpdates)
             .where(eq(schema.people.id, resolvedPersonId));
         }
+      } else {
+        // Create new Person with the pre-allocated / draft UUID
+        const storageKey = isKeyScopedToEntity(rawStorageKey, 'leadership', resolvedPersonId) ? rawStorageKey : null;
+        await cleanupEntityStorage('leadership', resolvedPersonId, storageKey);
+
+        const [newPerson] = await db
+          .insert(schema.people)
+          .values({
+            id: resolvedPersonId,
+            fullName: name!,
+            handle,
+            avatarUrl,
+            storageKey,
+            highSchool,
+            university,
+            graduationYear,
+            bio,
+            memberId,
+            isActive: true,
+          })
+          .returning();
+        resolvedPersonId = newPerson.id;
       }
     } else {
-      // Create new Person
+      // Create new Person without client UUID
       const [newPerson] = await db
         .insert(schema.people)
         .values({
           fullName: name!,
           handle,
           avatarUrl,
-          storageKey,
+          storageKey: null,
           highSchool,
           university,
           graduationYear,
@@ -143,7 +154,8 @@ export async function createLeader(formData: FormData) {
 export async function updateLeader(id: string, year: string, formData: FormData) {
   await requirePermission(Permissions.MANAGE_LEADERSHIP);
 
-  const personId = (formData.get('personId') as string)?.trim() || null;
+  const rawPersonId = (formData.get('personId') as string)?.trim() || (formData.get('entityId') as string)?.trim() || null;
+  const personId = sanitizeEntityId(rawPersonId);
   const name = ((formData.get('name') || formData.get('fullName')) as string)?.trim();
   const handle = (formData.get('handle') as string)?.trim() || null;
   const role = (formData.get('role') as string)?.trim();
@@ -158,7 +170,7 @@ export async function updateLeader(id: string, year: string, formData: FormData)
   const graduationYear = gradYearRaw ? parseInt(gradYearRaw, 10) || null : null;
   const bio = (formData.get('bio') as string)?.trim() || null;
   const avatarUrl = (formData.get('avatarUrl') as string)?.trim() || null;
-  const storageKey = (formData.get('storageKey') as string)?.trim() || null;
+  const rawStorageKey = (formData.get('storageKey') as string)?.trim() || null;
   const termBio = (formData.get('termBio') as string)?.trim() || null;
 
   if (!role || !newYear) {
@@ -194,9 +206,10 @@ export async function updateLeader(id: string, year: string, formData: FormData)
           .limit(1);
 
         if (existingPerson) {
-          if (storageKey !== undefined && existingPerson.storageKey && existingPerson.storageKey !== storageKey) {
-            await cleanupStorageKey(existingPerson.storageKey, storageKey);
-          }
+          const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'leadership', targetPersonId) ? rawStorageKey : null;
+          const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (existingPerson.storageKey && isKeyScopedToEntity(existingPerson.storageKey, 'leadership', targetPersonId) ? existingPerson.storageKey : null));
+
+          await cleanupEntityStorage('leadership', targetPersonId, storageKey);
 
           const personUpdates: Partial<typeof schema.people.$inferInsert> = {};
           if (name) personUpdates.fullName = name;

@@ -83,6 +83,8 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
             </div>
             <div>
               <ImageUpload
+                section="sponsors"
+                entityId={sponsor.id}
                 name="logoUrl"
                 storageKeyName="storageKey"
                 currentSrc={sponsor.logoUrl ?? undefined}

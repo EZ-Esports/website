@@ -50,7 +50,7 @@ export default async function SponsorsAdminPage() {
             />
           </div>
           <div>
-            <ImageUpload name="logoUrl" storageKeyName="storageKey" label="Logo" />
+            <ImageUpload section="sponsors" name="logoUrl" storageKeyName="storageKey" label="Logo" />
           </div>
           <div>
             <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Tier</label>

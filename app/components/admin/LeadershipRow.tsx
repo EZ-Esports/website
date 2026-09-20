@@ -91,6 +91,8 @@ export default function LeadershipRow({
               {/* Left Column: Avatar Headshot Editor */}
               <div className="md:col-span-4 bg-surface-sunken/60 p-3 rounded-xl border border-line/60 space-y-2">
                 <ImageUpload
+                  section="leadership"
+                  entityId={leader.personId}
                   name="avatarUrl"
                   storageKeyName="storageKey"
                   currentSrc={leader.avatarUrl || ''}
