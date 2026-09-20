@@ -84,3 +84,5 @@ When executing a full audit, divide the investigation into eight orthogonal doma
 4. **Prioritize**:
    - `priority: high`: User-visible wrong results, data loss, security vulnerabilities, PII leaks, cache invalidation failures.
    - `priority: medium`: Hardening, a11y, design token unification, tooling hygiene.
+5. **Save Dated Report to `docs/audits/`**:
+   Save the final audit synthesis to `docs/audits/<YYYY-MM-DD>-codebase-quality-audit.md`, update the index in `docs/audits/README.md`, and record the audit milestone in `spec/timeline.md`.
