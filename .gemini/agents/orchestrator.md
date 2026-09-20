@@ -14,53 +14,45 @@ fanning out subagents for independent units of work.
 
 Before designing, planning, or implementing any feature or fix, consult `spec/`
 (`spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`,
-`spec/open-threads.md`) as the authoritative living memory of the repository. Do NOT
-spend tokens excavating multi-month git log history; git history is strictly the
-**last** point of reference when `spec/` has an explicit gap. Whenever work lands
-or a PR merges, ensure `spec/` is updated in the PR diff.
+`spec/open-threads.md`) as the primary authoritative source of repository memory.
+Reserve Git history strictly as an auxiliary fallback when researching a specific
+topic that `spec/` explicitly lacks. Ensure that every PR diff updates the relevant
+`spec/` files before merging.
 
-## Standing rule: the main checkout is read-only outside of `cleanup`
+## Standing rule: Isolated workspaces for all operations
 
-Every subagent spawned for implementation, review, or verification operates
-inside its own workspace (e.g. `Workspace: "share"`), or reads the diff purely through git plumbing
-(`git diff`, `git show`, `gh pr diff`) — both stay entirely clear of the main
-checkout (the repo root, not a `.gemini/worktrees/` path). The main checkout
-can hold the user's own unrelated uncommitted work at any time, so the only
-step in this whole loop that touches it is `cleanup`'s deliberate,
-stash-protected merge. When spawning a review or verify subagent, always
-state the exact workspace path (or commit range, if no workspace exists yet)
-in the prompt, so the subagent has everything it needs to know exactly
-where to look.
+Execute all implementation, file modifications, builds, and test runs inside dedicated
+workspaces (e.g. `Workspace: "share"`, or `.gemini/worktrees/<branch>`) or inspect code
+through read-only git plumbing (`git diff`, `git show`, `gh pr diff`). Reserve the main
+repository root exclusively for `cleanup`'s final, stash-protected merge step. When
+spawning a review or verify subagent, provide the exact workspace path (or commit range)
+in the prompt so the subagent targets the precise checkout.
 
 ## Loop
 
 1. **Consult `spec/` and scope work.** Read `spec/` first for historical milestones,
    invariants, and related features. Split the request into independent PR-sized
-   units where possible — independent units get their own workspace and can
-   run in parallel; units that touch the same files run sequentially to
-   avoid rebase churn.
+   units where possible — independent units get their own workspace and run in
+   parallel; units touching the same files run sequentially to maintain a clean rebase history.
 2. **Implement & update spec.** For each unit, load the `implement` skill and delegate the
-   build. The implementer must consult `spec/` first and update the relevant `spec/`
+   build. The implementer consults `spec/` first and updates the relevant `spec/`
    files (`spec/timeline.md`, `spec/architecture.md`, `spec/incidents.md`, `spec/product.md`,
-   `spec/open-threads.md`) directly in the PR diff. Spawn a subagent with `Workspace: "share"` when running
-   multiple units in parallel; work inline in the current workspace/worktree for a
-   single unit.
+   `spec/open-threads.md`) directly within the PR diff. Spawn a subagent with
+   `Workspace: "share"` when running multiple units in parallel; work inline in the
+   current workspace/worktree for a single unit.
 3. **Review.** Once a unit's implementation is complete, load the `review-loop`
-   skill and spawn an independent review pass, handing it the unit's workspace
-   path so it reads the change from there instead of the main checkout. Name
-   the specific files and risk areas to check based on what the
-   implementation touched, and verify that `spec/` was kept up to date in the PR diff.
+   skill and spawn an independent review pass, targeting the unit's workspace
+   path. Provide concrete review criteria: specify exact files touched, expected
+   invariants, failure scenarios, and spec updates to inspect.
 4. **Fix and verify.** If the review reports findings, delegate the fixes,
    then spawn a fresh subagent for the `review-loop` skill's verify pass —
-   again handed the workspace path — a different subagent from the one that
-   applied the fixes, so the same blind spot doesn't grade its own work.
-   Treat a unit as closed only once a review or verify pass comes back with
-   no findings.
+   again targeting the workspace path — using a different subagent from the one that
+   applied the fixes to ensure unbiased verification. Treat a unit as closed when
+   a review or verify pass reports zero remaining findings.
 5. **Repeat step 3–4** until every unit is clean.
 6. **Merge and clean up.** Once all units are clean, load the `cleanup`
    skill to merge, run any pending migration, remove finished branches
    and workspaces, and verify `spec/` is fully up to date on `main`.
-7. **Let notifications drive pacing.** When multiple subagents are running
-   in parallel, continue other orchestration work and let background
-   completion notifications signal when to move a unit to its next step,
-   rather than polling.
+7. **Event-driven pacing.** When multiple subagents are running in parallel,
+   continue other orchestration work and rely on background completion notifications
+   to advance units asynchronously.
