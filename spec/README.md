@@ -1,6 +1,12 @@
 # Project spec (agent memory)
 
-This folder is **historical context for agents**, not user-facing documentation. Load it to learn what this repo is, how it grew, which milestones actually landed, and which failures became standing rules. Do not treat these files as a product spec to implement, a style guide, or onboarding for human developers.
+This folder is **authoritative living memory for agents**, not user-facing documentation. Load it to learn what this repo is, how it grew, which milestones actually landed, and which failures became standing rules. Do not treat these files as a product spec to implement, a style guide, or onboarding for human developers.
+
+## Golden Rules for Agents
+
+1. **`spec/` is the 1ST point of reference.** Whenever an agent begins work (scoping, designing, debugging, or planning), read `spec/` first. It contains verified chronological context, architectural decisions, and active capabilities.
+2. **Git history is the LAST point of reference.** Never run costly multi-month git log excavating or blame archaeology from scratch. Git history is strictly a fallback if `spec/` has an explicit gap.
+3. **Keep `spec/` updated on every landed change.** Whenever an issue is solved or a PR merges, update `spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`, or `spec/open-threads.md` as part of the task completion (see the `spec-maintenance` skill).
 
 Operational hazards (production DB, Vercel cache, PII, seed gates) live in [`CLAUDE.md`](../CLAUDE.md). Mission lives in [`soul.md`](../soul.md). Implementation specs that already exist stay in [`specs/`](../specs/) — this folder does not duplicate them.
 
