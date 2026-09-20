@@ -26,6 +26,7 @@ The site is past "make it exist" and into "the CMS save, the public page, and th
 2. **Ship follow-ups as PR-sized issues**, not one issue per raw finding and not two mega-epics. `queries.ts` is not its own rewrite; notes land on the division and cache issues.
 3. **Prefer user-visible / data-loss / security work first** (implementation order in §7).
 4. **Do not duplicate open work** (#136, #135, #127, #126, #115, #114, #112, #109, #107, #106, #104, #103, #100). Privacy-policy copy gaps link [#115](https://github.com/EZ-Esports/website/issues/115) rather than competing as a second legal master. School apply field parity stays on [#127](https://github.com/EZ-Esports/website/issues/127).
+5. **Codify codebase audit capability as an agent skill & definition** (`.claude/skills/codebase-quality-audit/SKILL.md`, `.gemini/skills/codebase-quality-audit/SKILL.md`, and companion agent definitions) so future audits follow this verified multi-domain review and deduplication methodology.
 
 ### Non-Goals
 
