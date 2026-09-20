@@ -10,9 +10,16 @@ review.
 
 ## Steps
 
-1. **Isolate first.** Enter a dedicated worktree using git worktree commands or workspace isolation before making any edit, unless the working directory is already under `.gemini/worktrees/`. This keeps the change reviewable on its own branch and keeps unrelated uncommitted work on `main` untouched.
-2. **Load context before writing code.** If the work touches UI, load the `ui` skill for which primitive and styling convention to use, and check the `uiux` skill's case studies for a precedent on the page type being touched.
-3. **Look for an existing primitive first.** Grep `app/components/ui/` and the nearest sibling feature folder for a component, server action, or admin panel pattern that already does something close to this task, and mirror it. A new admin table, form, or CRUD action almost always has a sibling to copy the shape from — find it before writing one from scratch.
-4. **Database changes go through Drizzle.** If the change adds or modifies a table or column, generate the migration with `npm run db:generate` (drizzle-kit) rather than writing SQL by hand.
-5. **Verify before calling it done.** Run `npm run lint`, `npm run test`, and `npm run build`. For UI changes, follow the `uiux` skill's rule to screenshot the rendered page at desktop width and check it visually.
-6. **Hand off to review.** Once verification passes, load the `review-loop` skill to get an independent pass on the diff before it's considered mergeable.
+1. **Isolate first.** Enter a dedicated worktree or workspace before making any edit, unless the working directory is already under `.gemini/worktrees/`. This ensures the change remains isolated on its own branch while preserving the cleanliness of the main repository root.
+2. **Consult `spec/` first.** Before writing code, read `spec/` (`spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`, `spec/open-threads.md`) as the primary authoritative source for repository context, architectural standards, and past incident learnings. Reserve Git history strictly as an auxiliary fallback when researching a specific topic that `spec/` explicitly lacks.
+3. **Load context before writing code.** When the work touches UI, load the `ui` skill for primitive selection and styling conventions, and consult the `uiux` skill's case studies for precedents on the targeted page type.
+4. **Reuse existing primitives.** Grep `app/components/ui/` and the nearest sibling feature folder for existing components, server actions, or admin panel patterns that address similar requirements, and mirror their structure.
+5. **Database changes go through Drizzle.** When adding or modifying a table or column, always generate the migration with `npm run db:generate` (drizzle-kit) to produce tracked schema changes.
+6. **Update `spec/` as you build.** Keep `spec/` living by updating the relevant spec files in your workspace directly as part of the PR diff:
+   - `spec/timeline.md`: record your PR/feature milestone and summary.
+   - `spec/architecture.md`: record new tables, caching rules, or system patterns.
+   - `spec/incidents.md`: record root cause and fix when resolving a bug or failure mode.
+   - `spec/product.md`: update page routes, admin forms, or user flows.
+   - `spec/open-threads.md`: close completed threads or record new follow-ups.
+7. **Verify before calling it done.** Run `npm run lint`, `npm run test`, and `npm run build`. For UI changes, follow the `uiux` skill's rule to screenshot the rendered page at desktop width and inspect it visually.
+8. **Hand off to review.** Once verification passes, load the `review-loop` skill to obtain an independent pass on the diff before considering it mergeable.
