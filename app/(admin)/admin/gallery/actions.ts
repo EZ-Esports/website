@@ -8,6 +8,7 @@ import { eq, sql, isNull } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
+import { ActionError } from '@/app/lib/errors';
 
 export async function addGalleryImage(formData: FormData) {
   await requirePermission(Permissions.MANAGE_GALLERY);
@@ -108,17 +109,39 @@ export async function updateGalleryImage(id: string, formData: FormData) {
 }
 
 /**
- * Persists a full reorder in one shot: the incoming array is the complete,
- * already-deduplicated ordering, so display order is just its index + 1.
- * Rewriting every row in this list (rather than diffing) means the values
- * within this reorder are always sequential and duplicate-free, regardless
- * of what displayOrder those rows had before the call.
+ * Persists a full reorder in one shot: the incoming array must contain the
+ * exact set of non-deleted gallery image IDs, with no duplicates or missing IDs.
+ * The advisory lock serializes concurrent reorders and additions.
  */
 export async function updateGalleryImagesOrder(orderedIds: string[]) {
   await requirePermission(Permissions.MANAGE_GALLERY);
 
+  if (!Array.isArray(orderedIds)) {
+    return { success: false, error: 'Invalid payload: orderedIds must be an array.' };
+  }
+
   try {
     await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('gallery_images_display_order'))`);
+
+      const currentImages = await tx
+        .select({ id: schema.galleryImages.id })
+        .from(schema.galleryImages)
+        .where(isNull(schema.galleryImages.deletedAt));
+
+      const currentIdSet = new Set(currentImages.map((img) => img.id));
+
+      if (
+        orderedIds.length !== currentImages.length ||
+        new Set(orderedIds).size !== orderedIds.length ||
+        !orderedIds.every((id) => currentIdSet.has(id))
+      ) {
+        throw new ActionError(
+          'INVALID_ORDER_PAYLOAD',
+          'Image list is out of date or invalid. Please refresh and try again.'
+        );
+      }
+
       for (let i = 0; i < orderedIds.length; i++) {
         await tx
           .update(schema.galleryImages)
@@ -127,6 +150,9 @@ export async function updateGalleryImagesOrder(orderedIds: string[]) {
       }
     });
   } catch (error) {
+    if (error instanceof ActionError) {
+      return { success: false, error: error.message };
+    }
     console.error('Failed to reorder gallery images', error);
     return { success: false, error: 'Could not update order. Please try again.' };
   }
