@@ -1,16 +1,16 @@
 # Specification: Codebase Quality Audit (2026-09-13)
 
 **Status**: Ready for Implementation  
-**Target Path**: `specs/codebase-quality-audit.md`  
-**Related Components**: whole tree at `926b978` (auth, db, admin CMS, marketing, UI primitives, game domain, apply/forms, architecture). Code is **not** changed in this PR; follow-up work is the GitHub issues in §4.
+**Target Path**: `docs/audits/2026-09-13-codebase-quality-audit.md`  
+**Related Components**: whole tree at `926b978` (auth, db, admin CMS, marketing, UI primitives, game domain, apply/forms, architecture). Code is **not** changed in this audit pass; follow-up work is the GitHub issues in §4.
 
 ---
 
 ## 0. Spec History / Revision Note
 
-This spec is the history artifact for an orchestrated full-tree review: find slop, bad logic, architecture drift, and code habits on `origin/main` at `926b978`, worktree `docs/codebase-quality-audit`. Eight scoped Grok 4.6 reviews ran independently (auth, db, admin, marketing, UI, game domain, forms, architecture). A synthesis pass deduplicated overlapping IDs, grouped findings into PR-sized GitHub issues, and replaced the unsorted dump `specs/_audit-raw-findings.md`.
+This document is the historical audit artifact for an orchestrated full-tree review: find slop, bad logic, architecture drift, and code habits on `origin/main` at `926b978`, worktree `docs/codebase-quality-audit`. Eight scoped Grok 4.6 reviews ran independently (auth, db, admin, marketing, UI, game domain, forms, architecture). A synthesis pass deduplicated overlapping IDs, grouped findings into PR-sized GitHub issues, and replaced the unsorted dump `specs/_audit-raw-findings.md`.
 
-This revision files issues only. It does **not** implement fixes, open a product PR beyond this spec, run seeds/migrations, or read `.env`.
+This revision files issues only. It does **not** implement fixes, open a product PR beyond this report, run seeds/migrations, or read `.env`.
 
 Reviewer transcripts (for agents that need the raw pass): Auth `548fc432-4007-4e7d-969d-552c473ac201`, DB `8904db08-8d8c-4f18-a2d5-b794dbd3aacc`, Admin `696b2762-5e63-45b4-8873-d945417849ce`, Marketing `ded00e32-349f-4e50-b2e8-f40de6a82236`, UI `caa3edf7-b231-48c0-86f4-8fc8edbb8470`, Game `15036fa8-7feb-4f90-a1b5-5e1d6e83315f`, Forms `bc05bbbc-2120-472c-803c-2e5d4c513143`, Architecture `10918b5b-0fd4-46a8-9d75-7971ce008366`.
 
