@@ -106,7 +106,49 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
-## 10. Smaller scars
+---
+
+## 11. Stale authority TOCTOU in staff mutations (Issue #156 / PR #181)
+
+**Failure scenario.** Staff role assignment, role edits, and invite revocations authorized against a pre-lock snapshot. A manager could initiate an action, lose authority or have the target promoted concurrently, and the pre-lock snapshot check would still succeed.
+
+**Actual result.** Stale hierarchy mutations could silently overwrite newer administrative decisions.
+
+**Fix.** PR #181 (`37515cd`): Acquired `pg_advisory_xact_lock(STAFF_REVOCATION_LOCK_KEY)` at transaction start, re-read caller and target memberships fresh from the database inside `tx`, and aborted with `STAFF_HIERARCHY_CHANGED` if authority changed.
+
+---
+
+## 12. Client-controlled storage key deletion (Issue #152 / PR #182)
+
+**Failure scenario.** Admin mutation actions trusted client-supplied `storageKey` strings to delete files from Supabase Storage buckets.
+
+**Actual result.** Potential arbitrary file deletion or path traversal (`../../`) across other entities or sections.
+
+**Fix.** PR #182 (`bbae922`): Stopped trusting client keys entirely. Implemented deterministic scoped storage paths (`${section}/${entityId}/${timestamp}.${ext}`), enforced section permissions (`Permissions.MANAGE_*`), sanitized entity IDs against path traversal, derived deletions strictly server-side, and added `db/storage-clean.ts` for orphaned files.
+
+---
+
+## 13. Dual source-of-truth in reorderable UI (Issue #154 / PR #183)
+
+**Failure scenario.** `GalleryManagerClient.tsx` maintained a duplicate copy of `GalleryImage[]` in `useState` and synced it via a fragile 30-line `useEffect`.
+
+**Actual result.** Stale card metadata (`caption`, `isActive`, `storageKey`) during drag-and-drop reordering, with race conditions between server revalidations and client draft state.
+
+**Fix.** PR #183 (`1f694de`): Eradicated duplicate state and removed the `useEffect` entirely. Local state stores ONLY `draftOrder: string[] | null`. Card display is derived on the fly from authoritative server props `initialImages`. In server actions, acquired `pg_advisory_xact_lock` and validated the exact set of active IDs before updating sequence orders.
+
+---
+
+## 14. Server UTC drift on match kickoff times (Issue #148 / PR #184)
+
+**Failure scenario.** HTML `<input type="datetime-local">` outputs strings like `2026-09-20T19:00`. Passing this to `new Date()` on UTC servers interpreted 7:00 PM as 19:00Z (which is 3:00 PM EDT in New York).
+
+**Actual result.** Matches appeared on public calendars and schedules four hours earlier than scheduled kickoff.
+
+**Fix.** PR #184 (`41270c5`): Built `parseEastern(dateStr)` in `app/lib/dates.ts` using two-pass America/New_York wall-time relaxation. Standardized explicit "ET" UI labeling, anchored calendar month grids to America/New_York, and normalized forfeit/draw status representations.
+
+---
+
+## 15. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
 - **`6df7d59`:** one production `message` row unparseable; recovered via v1 parser after a live check, not declared lost. `details` is a versioned union because a single fixed shape strands redesigns.
@@ -114,3 +156,4 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 - **`2aece37`:** bronze refresh failed silently after ledger MAIN → Engineering; find the tab by columns, not name. People tab at PR #59 had three unusable rows (missing role/year) — refill the sheet, then ETL.
 - **`c35fc61`:** RAC SeasonSelect slugify broke filtering; reverted.
 - **`CLAUDE.md` vs gold:** header still says both seeds wipe. Gold does not, post-`9219ef5`. Hazard file is operator contract; `db/seed-gold.ts` is the mechanism.
+- **PR #146:** Applied `assertSeedTargetAllowed()` across `migrate.ts`, `drizzle.config.ts`, `seed-owner.ts`, `backfill-leadership.ts`, and `seed-phase2.ts` to prevent accidental non-loopback database mutations.

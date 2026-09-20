@@ -19,12 +19,12 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 | `/apply` | School **Submit Interest** form (Google Form parity). Header/heading `3afc647` / `f9eeabc`. Page `<title>` and `Navigation.tsx` dropdown still say “Apply to Play.” |
 | `/apply/staff` | Staff application (`d6518cc`). |
 | `/rules` | League Rulebook & Code of Conduct (`6732658`). Linked from apply consent. |
-| `/privacy` | Privacy policy (pre-era-3). **No `/terms` on this branch.** |
+| `/privacy` | Privacy policy + Privacy erasure intake modal/action (`a1aeca6` PR #142 / #103). **No `/terms` on this branch.** |
 | `/login` | Staff login (footer “Staff Login”). |
 | `/accept-invite` | Token landing for hashed staff invites (`0849963`, PR #8). Linked from `InviteStaffForm`; not in `ROUTES`; outside marketing layout (`force-dynamic`). |
 | `/{game}` | **308** to `/{game}/varsity` (`next.config.ts`, PR #46). Not a page. |
 | `/{game}/varsity`, `/junior-varsity` | Bento hub (`c759fa3`, `GameHubView`). Division is a path segment (`0b6adf7`). |
-| `/{game}/standings`, `/schedule` | Current + archived competition. Combined LoL seasons (`standings_format`) render one table on both division routes (`0dde508`, `19acf7d`) with `SeasonFormatNotice`. Form-guide chips `9ce5ed9`. Season badge “Latest” `bbd58d9`. |
+| `/{game}/standings`, `/schedule` | Current + archived competition. PR #184: explicit Eastern Time ("ET") labeling, America/New_York calendar month grid calculation, completed forfeit display, and draw score normalization. Combined LoL seasons (`standings_format`) render one table on both division routes (`0dde508`, `19acf7d`) with `SeasonFormatNotice`. Form-guide chips `9ce5ed9`. Season badge “Latest” `bbd58d9`. |
 | `/{game}/teams`, `/{game}/teams/[school]` | Filterable rosters (`6d4ce96`); school detail (`c2e86ee`). |
 
 Games in `app/lib/constants.ts`: Valorant, League of Legends, Teamfight Tactics (full archive/seasons), plus **osu!**, **Minecraft**, **TETR.IO** (slug `tetris`, display name `f04641b`). The last three have hubs only — no seasons, excluded from `getGamesForShowcase`, banners are placeholder `/images/hero-background.jpg`. Empty hubs are the same bento grid with a blank “This season” tile (`d047f99` removed the founding-season recruitment layout `c759fa3` had gated). `MigrationNotice` (`452073e`) still shows on competition pages.
@@ -41,12 +41,12 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 |------|----------------|
 | Dashboard | Counts / entry. |
 | League | Season/game setup. |
-| Matches, standings, roster, schools | Competition data. Standings editor exists because archives are snapshotted in `season_standings`, not only computed. |
+| Matches, standings, roster, schools | Competition data. Standings editor exists because archives are snapshotted in `season_standings`, not only computed. Matches parse kickoffs via `parseEastern` (PR #184). |
 | News | Draft / publish / archive. |
-| Leadership | People profiles, terms, avatars. |
-| Gallery, sponsors, content | CMS tables; saves call `revalidateTag`. |
+| Leadership | People profiles, terms, avatars. Scoped storage folders `${section}/${entityId}/` (PR #182). |
+| Gallery, sponsors, content | CMS tables; saves call `revalidateTag`. Scoped storage paths (PR #182). Gallery reorder uses derived state (`draftOrder`) and advisory-locked full ID list validation (PR #183). |
 | Applications | Detail modal, status via append-only events, CSV export (`9353bf5`). |
-| Team | Staff invites and roles. |
+| Team | Staff invites and roles. Role assign/edit/revoke guarded by transactional lock-then-re-read pattern against TOCTOU races (PR #181). |
 
 Server actions must authorize themselves. Middleware refreshes JWT on `/admin` and `/login` only — it does not protect `'use server'` dispatch (`dd934ef`).
 

@@ -18,7 +18,28 @@ Things a later agent must **not** assume are finished. Only items grounded in gi
 - **Historical match scores were never complete.** June import (`930299c`) was schedule-only. Gold pipeline skips derived standings when results are incomplete. Do not treat `roster_standings` as ground truth for every season.
 - **Leadership recovery after the July 30 cascade is not “the pipeline fixed it.”** Seventy destroyed rows needed an archived `staff_completeroster.csv` (gone from the repo; `CLAUDE.md` says ask the user before declaring it lost). The People tab at PR #59 had only 3 rows, unusable (missing role/year). ETL is wired (`2aece37`); sheet refill was still required. `npm run db:seed:leadership` merges into **legacy `leadership` only** — public `/leadership` reads `people` + `leadership_terms` via `getCachedLeadership()` and never that table, so a sheet refill + seed does **not** update the public page. The hop is `db/backfill-leadership.ts` (not in `package.json`); ongoing edits go through admin CMS. August’s `people` + `leadership_terms` backfill (`f14c7f4`, 201→112 profiles / 178 terms) is a *schema* recovery on whatever remained, not proof the wiped rows all came back. Merge still must not overwrite admin-edited bios.
 - **Gallery DB cleanup after set consolidation is pending.** `getCachedHomepageGallery` still defensively dedupes (`dc69fd4`). `set_id` is gone (`0022`); leftover duplicate rows were not a verified cleanup. **No public `/gallery`.** `feat/issue-100-view-full-gallery` exists locally and on origin; not merged.
-- **`db:seed` (non-gold) is still a wipe** of the nine tables it owns, UUID-regenerating, more destructive than `db:seed:gold`. It still expects two gitignored **root** CSVs. Prefer gold + leadership merge unless you know you need the old importer.
+- **`db:seed` (non-gold) is officially deprecated / retired (`2e3e5d8` #146 / PR #180).** The destructive delete-and-reinsert logic was eliminated to prevent UUID churn and foreign key cascades. All database scripts now enforce `assertSeedTargetAllowed()`.
+
+---
+
+## Resolved in September Hardening Sprint (PRs #142, #180–#184)
+
+The following items from the September 2026 Codebase Quality Audit have been implemented, reviewed with zero findings, and landed via dedicated PRs:
+
+- **[#103](https://github.com/EZ-Esports/website/issues/103) / PR #142**: Privacy erasure workflow implemented on `/privacy`, preflight database backup automated, and migration `0035_dazzling_omega_red.sql` applied.
+- **[#146](https://github.com/EZ-Esports/website/issues/146) / PR #180**: Database safety gates applied to `db/migrate.ts`, `drizzle.config.ts`, `db/seed-owner.ts`, `db/backfill-leadership.ts`, and `app/lib/db/seed-phase2.ts`. Retired UUID-churning `db/seed.ts` and gitignored `sharepoint/**/*.csv`.
+- **[#156](https://github.com/EZ-Esports/website/issues/156) / PR #181**: Staff role TOCTOU eliminated in `admin/team/actions.ts` using `pg_advisory_xact_lock` and re-reading fresh database roles inside `tx`.
+- **[#152](https://github.com/EZ-Esports/website/issues/152) / PR #182**: Client-controlled storage key deletion eliminated. Implemented section permissions (`Permissions.MANAGE_*`), deterministic scoped folders (`${section}/${entityId}/${timestamp}.${ext}`), server-derived deletes with path traversal protection, and `db/storage-clean.ts`.
+- **[#154](https://github.com/EZ-Esports/website/issues/154) / PR #183**: Dual source-of-truth bug in gallery reordering eradicated. Pure derived state (`draftOrder: string[] | null`) in `GalleryManagerClient.tsx`, removed 30-line `useEffect`, enforced `pg_advisory_xact_lock` and full ID set validation.
+- **[#148](https://github.com/EZ-Esports/website/issues/148) / PR #184**: America/New_York (ET) wall-time parsing standardized via `parseEastern` in `app/lib/dates.ts`, explicit "ET" schedule/calendar labeling, calendar month grid timezone anchoring, and forfeit/draw status normalization.
+
+---
+
+## Active Pipeline (Next Up)
+
+- **[#144](https://github.com/EZ-Esports/website/issues/144)**: Cache invalidation profile using Next.js 16 `updateTag` so CMS saves reliably invalidate public pages.
+- **[#143](https://github.com/EZ-Esports/website/issues/143)**: Canonicalize division filters (`A`/`B` vs `Varsity`/`JV`) across queries and forms.
+- **[#153](https://github.com/EZ-Esports/website/issues/153)**: Fix news View Live 404s (route ID vs slug).
 
 ---
 
