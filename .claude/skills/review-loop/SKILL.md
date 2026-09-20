@@ -50,7 +50,12 @@ Given a branch, worktree path, or diff to review:
    correct RAC primitive for the interaction type, `aria-disabled` vs
    `disabled` on elements that can go inert, `aria-live`/`role="status"` on
    async state changes, tap target size.
-4. Report findings with `ReportFindings`, one entry per real issue, each with
+4. Verify `spec/` was updated: Confirm the PR diff updates the appropriate
+   files in `spec/` (`spec/timeline.md`, `spec/architecture.md`, `spec/incidents.md`,
+   `spec/product.md`, `spec/open-threads.md`). If the PR introduces architectural
+   patterns, fixes a bug/incident, modifies user-facing surfaces, or hits a milestone
+   without reflecting it in `spec/`, flag it as a finding. `spec/` must stay living.
+5. Report findings with `ReportFindings`, one entry per real issue, each with
    a concrete failure scenario (specific input/state → specific wrong
    result). An empty findings list is a complete, valid outcome — report
    exactly what was checked and confirm it's clean, rather than filling the
