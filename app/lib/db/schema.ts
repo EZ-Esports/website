@@ -477,6 +477,26 @@ export const applicationStatusLogs = pgTable(
   ]
 ).enableRLS();
 
+// Audit trail for GDPR/CCPA privacy erasure and redaction on application tables.
+// Stores metadata only — never original PII values.
+export const privacyErasureEvents = pgTable(
+  'privacy_erasure_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tableName: text('table_name').notNull(),
+    rowId: uuid('row_id').notNull(),
+    operation: text('operation').notNull(),
+    actorIdentifier: text('actor_identifier'),
+    redactedColumns: text('redacted_columns').array(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    check('privacy_erasure_events_operation_check', sql`${table.operation} IN ('redact', 'delete')`),
+    index('privacy_erasure_events_row_id_idx').on(table.rowId),
+    index('privacy_erasure_events_created_at_idx').on(table.createdAt),
+  ]
+).enableRLS();
+
 // CMS key-value content blocks for editable page text
 export const pageContent = pgTable('page_content', {
   id: uuid('id').defaultRandom().primaryKey(),
