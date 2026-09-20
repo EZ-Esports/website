@@ -142,6 +142,23 @@ describe('GalleryManagerClient unit & integration tests', () => {
       expect(result.map((img) => img.id)).toEqual(['img-2', 'img-1', 'img-3', 'img-4']);
       expect(result[3].caption).toBe('New Image 4');
     });
+
+    it('handles duplicate IDs defensively without creating duplicate entries', () => {
+      const draftOrder = ['img-2', 'img-1', 'img-2', 'img-3'];
+      const result = deriveDisplayImages(sampleImages, draftOrder);
+      expect(result.map((img) => img.id)).toEqual(['img-2', 'img-1', 'img-3']);
+    });
+
+    it('resets to authoritative server state when draftOrder is cleared back to null after reordering', () => {
+      const draftOrder = ['img-3', 'img-1', 'img-2'];
+      const reordered = deriveDisplayImages(sampleImages, draftOrder);
+      expect(reordered.map((img) => img.id)).toEqual(['img-3', 'img-1', 'img-2']);
+
+      // Simulates handleReset / Discard restoring server state
+      const reset = deriveDisplayImages(sampleImages, null);
+      expect(reset).toBe(sampleImages);
+      expect(reset.map((img) => img.id)).toEqual(['img-1', 'img-2', 'img-3']);
+    });
   });
 
   describe('rendering', () => {

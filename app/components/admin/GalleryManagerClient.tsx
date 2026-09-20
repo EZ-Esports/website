@@ -40,7 +40,7 @@ export function deriveDisplayImages(
 
   for (const id of draftOrder) {
     const img = imageMap.get(id);
-    if (img) {
+    if (img && !seenIds.has(id)) {
       preserved.push(img);
       seenIds.add(id);
     }
@@ -65,7 +65,7 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
   );
 
   const handleMove = (currentIndex: number, newIndex: number) => {
-    if (newIndex < 0 || newIndex >= displayImages.length || newIndex === currentIndex) return;
+    if (pending || newIndex < 0 || newIndex >= displayImages.length || newIndex === currentIndex) return;
     setSuccess(false);
     setError(null);
     const currentOrder = displayImages.map((img) => img.id);
@@ -82,14 +82,18 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
     setError(null);
     setSuccess(false);
     startTransition(async () => {
-      const orderedIds = displayImages.map((img) => img.id);
-      const res = await updateGalleryImagesOrder(orderedIds);
-      if (res && !res.success) {
-        setError(res.error || 'Failed to update image order.');
-      } else {
-        setDraftOrder(null);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+      try {
+        const orderedIds = displayImages.map((img) => img.id);
+        const res = await updateGalleryImagesOrder(orderedIds);
+        if (res?.success) {
+          setDraftOrder(null);
+          setSuccess(true);
+          setTimeout(() => setSuccess(false), 3000);
+        } else {
+          setError(res?.error || 'Failed to update image order.');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update image order.');
       }
     });
   };
