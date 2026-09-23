@@ -40,12 +40,18 @@ Given a branch, worktree path, or diff to review:
    appropriate RAC primitive for the interaction type, `aria-disabled` vs
    `disabled` on inert elements, `aria-live`/`role="status"` on async updates,
    and adequate tap target size.
-4. Verify `spec/` was updated: Confirm the PR diff updates the appropriate
-   files in `spec/` (`spec/timeline.md`, `spec/architecture.md`, `spec/incidents.md`,
+4. Verify code comments: Confirm that code comments document permanent
+   architectural invariants, domain rules, and component roles rather than
+   transient issue notes or bug-fix changelogs, adhering to the few-shot examples
+   in the `implement` skill.
+5. Verify `spec/` was updated: Confirm the PR diff creates or updates an
+   incremental specification (`spec/spec-00x-<slug>.md`), registers it in
+   `spec/README.md`'s index table, and updates the relevant repo memory files
+   (`spec/timeline.md`, `spec/architecture.md`, `spec/incidents.md`,
    `spec/product.md`, `spec/open-threads.md`). Ensure that changes altering
    architecture, resolving incidents, modifying product surfaces, or hitting
    milestones are accurately recorded.
-5. Report findings with `ReportFindings`: provide concrete, actionable entries
+6. Report findings with `ReportFindings`: provide concrete, actionable entries
    backed by an exact failure scenario (specific input/state → specific wrong result).
    When all verification criteria pass, explicitly report a clean verdict detailing
    the verified invariants.

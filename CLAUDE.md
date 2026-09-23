@@ -5,7 +5,7 @@
 The `spec/` directory is the authoritative living memory of this project for all agents:
 - **1st point of reference:** Before designing, planning, or implementing any feature, bug fix, or refactor, always consult `spec/` (`spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`, `spec/open-threads.md`). It documents how the system arrived at its current state, active surface areas, architectural invariants, and why past decisions were made.
 - **Targeted fallback:** Use git history (`git log`, `git show`, `git blame`) strictly as an auxiliary fallback when researching a specific, documented gap in `spec/`.
-- **Keep it living:** Whenever you finish work, resolve an issue, or merge a PR, update `spec/` (record the milestone/PR in `spec/timeline.md`, update `spec/product.md` or `spec/architecture.md`, document failure modes in `spec/incidents.md`, or update `spec/open-threads.md`).
+- **Keep it living:** Whenever you finish work, resolve an issue, or merge a PR, update `spec/` (from September 2026 onwards, document architectural changes and features in an incremental `spec/spec-00x-<slug>.md` and register it in `spec/README.md`, record the milestone/PR in `spec/timeline.md`, update `spec/product.md` or `spec/architecture.md`, document failure modes in `spec/incidents.md`, or update `spec/open-threads.md`).
 
 ## `.env` points at live production
 

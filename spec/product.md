@@ -48,7 +48,7 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 | Applications | Detail modal, status via append-only events, CSV export (`9353bf5`). |
 | Team | Staff invites and roles. Role assign/edit/revoke guarded by transactional lock-then-re-read pattern against TOCTOU races (PR #181). |
 
-**Shell layout.** `AdminShell.tsx`: 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh`); its nav list never scrolls (overflow hidden — items past the viewport height are clipped), and the Public Site / Sign Out footer is always visible. Page content scrolls the document. No mobile drawer exists.
+**Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md). `AdminShell.tsx`: 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`); its nav list remains static (`overflow-hidden`), keeping Public Site / Sign Out permanently visible in the viewport. Page content scrolls the document. No mobile drawer exists.
 
 Server actions must authorize themselves. Middleware refreshes JWT on `/admin` and `/login` only — it does not protect `'use server'` dispatch (`dd934ef`).
 

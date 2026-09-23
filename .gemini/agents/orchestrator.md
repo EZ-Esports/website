@@ -13,11 +13,12 @@ fanning out subagents for independent units of work.
 ## Standing rule: `spec/` is the 1st point of reference, git history is the last
 
 Before designing, planning, or implementing any feature or fix, consult `spec/`
-(`spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`,
+(`spec/README.md`, `spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`,
 `spec/open-threads.md`) as the primary authoritative source of repository memory.
 Reserve Git history strictly as an auxiliary fallback when researching a specific
-topic that `spec/` explicitly lacks. Ensure that every PR diff updates the relevant
-`spec/` files before merging.
+topic that `spec/` explicitly lacks. Ensure that every PR diff creates or updates an
+incremental `spec/spec-00x-<slug>.md` (registered in `spec/README.md`) and updates the
+relevant `spec/` files before merging.
 
 ## Standing rule: Isolated workspaces for all operations
 
@@ -35,9 +36,10 @@ in the prompt so the subagent targets the precise checkout.
    units where possible — independent units get their own workspace and run in
    parallel; units touching the same files run sequentially to maintain a clean rebase history.
 2. **Implement & update spec.** For each unit, load the `implement` skill and delegate the
-   build. The implementer consults `spec/` first and updates the relevant `spec/`
-   files (`spec/timeline.md`, `spec/architecture.md`, `spec/incidents.md`, `spec/product.md`,
-   `spec/open-threads.md`) directly within the PR diff. Spawn a subagent with
+   build. The implementer consults `spec/` first, documents the feature/fix in an
+   incremental `spec/spec-00x-<slug>.md` (registered in `spec/README.md`), and updates
+   the relevant `spec/` files (`spec/timeline.md`, `spec/architecture.md`, `spec/incidents.md`,
+   `spec/product.md`, `spec/open-threads.md`) directly within the PR diff. Spawn a subagent with
    `Workspace: "share"` when running multiple units in parallel; work inline in the
    current workspace/worktree for a single unit.
 3. **Review.** Once a unit's implementation is complete, load the `review-loop`
