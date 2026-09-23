@@ -84,7 +84,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
         </div>
 
         {/* Sidebar Items */}
-        <nav className="flex-1 min-h-0 overflow-y-auto py-6 px-3 space-y-1">
+        <nav className="flex-1 min-h-0 overflow-y-auto no-scrollbar py-6 px-3 space-y-1">
           {sidebarItems.map((item) => {
             const isActive =
             item.href === '/admin'
