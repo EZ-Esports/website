@@ -73,8 +73,8 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
 
   return (
     <div className="min-h-screen bg-[#111111] flex text-foreground font-sans">
-      {/* Left Sidebar — pinned to the viewport height so footer links never follow page length; only the nav list scrolls if it overflows */}
-      <aside className="w-64 bg-[#1a1a1a] border-r border-line flex flex-col shrink-0 z-20 sticky top-0 h-screen self-start">
+      {/* Left Sidebar — pinned to the viewport height so footer links never follow page length; the nav never scrolls */}
+      <aside className="w-64 bg-[#1a1a1a] border-r border-line flex flex-col shrink-0 z-20 sticky top-0 h-dvh self-start">
         {/* Sidebar Header */}
         <div className="h-16 px-6 border-b border-line flex items-center">
           <Link href="/admin" className="font-extrabold text-xl tracking-tight flex items-center gap-2 cursor-pointer hover:opacity-90">
@@ -84,7 +84,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
         </div>
 
         {/* Sidebar Items */}
-        <nav className="flex-1 min-h-0 overflow-y-auto no-scrollbar py-6 px-3 space-y-1">
+        <nav className="flex-1 min-h-0 overflow-hidden py-6 px-3 space-y-1">
           {sidebarItems.map((item) => {
             const isActive =
             item.href === '/admin'
