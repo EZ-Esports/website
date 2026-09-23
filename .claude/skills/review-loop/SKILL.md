@@ -42,8 +42,7 @@ Given a branch, worktree path, or diff to review:
    and adequate tap target size.
 4. Verify code comments: Confirm that code comments document permanent
    architectural invariants, domain rules, and component roles rather than
-   transient issue notes or bug-fix changelogs, adhering to the few-shot examples
-   in the `implement` skill.
+   transient issue notes or bug-fix changelogs.
 5. Verify `spec/` was updated: Confirm the PR diff creates or updates an
    incremental specification (`spec/spec-00x-<slug>.md`), registers it in
    `spec/README.md`'s index table, and updates the relevant repo memory files
