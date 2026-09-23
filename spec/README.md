@@ -6,9 +6,11 @@ This folder is **authoritative living memory for agents**, not user-facing docum
 
 1. **`spec/` is the 1ST point of reference.** Whenever an agent begins work (scoping, designing, debugging, or planning), read `spec/` first. It contains verified chronological context, architectural decisions, and active capabilities.
 2. **Git history is strictly a targeted fallback.** Consult `spec/` for verified context, architectural rationale, and historical milestones. Consult Git history only when researching a specific, documented gap in `spec/`.
-3. **Keep `spec/` updated on every landed change.** Whenever an issue is solved or a PR merges, update `spec/timeline.md`, `spec/product.md`, `spec/architecture.md`, `spec/incidents.md`, or `spec/open-threads.md` directly in the PR diff (enforced by the `implement`, `review-loop`, and `orchestrator` agent workflows).
+3. **Structured incremental specs (`spec-00x`):** From this point on, all new feature additions, layout redesigns, and architectural changes must follow the structured incremental ID format (`spec-00x-<slug>.md`). Record every new spec in the [Specification Index](#specification-index--concise-history) table below, and link to it from `spec/timeline.md` and relevant topical spec files (`product.md`, `architecture.md`, `incidents.md`, `open-threads.md`).
 
 Operational hazards (production DB, Vercel cache, PII, seed gates) live in [`CLAUDE.md`](../CLAUDE.md). Mission lives in [`soul.md`](../soul.md). Implementation specs that already exist stay in [`specs/`](../specs/) — this folder does not duplicate them.
+
+## Repository Memory Files
 
 | File | What it is |
 |------|------------|
@@ -17,6 +19,26 @@ Operational hazards (production DB, Vercel cache, PII, seed gates) live in [`CLA
 | [architecture.md](architecture.md) | How data, auth, cache, and frontend evolved. Why the current shape exists. |
 | [incidents.md](incidents.md) | Cautionary history: failure → result → fix. Tied to `CLAUDE.md` standing rules. |
 | [open-threads.md](open-threads.md) | Unfinished business as of `926b978`. Do not assume these are done. |
+
+## Incremental Specifications (`spec-00x`)
+
+From September 2026 onwards, all new technical and feature specifications are tracked with incremental, zero-padded IDs (`spec-001`, `spec-002`, etc.) in files named `spec/spec-00x-<slug>.md`.
+
+### Spec Structure Requirements
+Every `spec-00x` document must follow this structure:
+- **Header:** Spec ID, Title, Status (Proposed / In Progress / Shipped), PR/Commit, Date, and Scope.
+- **Context & Motivation:** Underlying requirements, user needs, and architectural context.
+- **Design Decisions:** Concrete layout, data flow, component hierarchy, or schema choices.
+- **Invariants & Boundaries:** Permanent system rules, edge-case constraints, and non-goals.
+- **Verification:** Concrete verification commands and visual inspection steps.
+
+### Specification Index & Concise History
+
+| ID | Title | PR / Commit | Date | Status | Summary |
+|---|---|---|---|---|---|
+| [`spec-001`](spec-001-admin-sidebar-pinning.md) | Admin Sidebar Viewport Pinning | PR #187 (`875bf56`) | 2026-09-23 | Shipped | Pinned staff sidebar to viewport height (`sticky top-0 h-dvh`) with static nav and persistent footer links. |
+
+---
 
 Companion docs (read those, don’t copy them here):
 

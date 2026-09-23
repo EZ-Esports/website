@@ -15,7 +15,7 @@ review.
    `.claude/worktrees/`. This ensures the change remains isolated on its own branch
    while preserving the cleanliness of the main repository root.
 2. **Consult `spec/` first.** Before writing code, read `spec/`
-   (`spec/timeline.md`, `spec/product.md`, `spec/architecture.md`,
+   (`spec/README.md`, `spec/timeline.md`, `spec/product.md`, `spec/architecture.md`,
    `spec/incidents.md`, `spec/open-threads.md`) as the primary authoritative source
    for repository context, architectural standards, and past incident learnings.
    Reserve Git history strictly as an auxiliary fallback when researching a specific
@@ -29,15 +29,22 @@ review.
 5. **Database changes go through Drizzle.** When adding or modifying a
    table or column, always generate the migration with `npm run db:generate`
    (drizzle-kit) to produce tracked schema changes.
-6. **Update `spec/` as you build.** Keep `spec/` living by updating
-   the relevant spec files in your worktree directly as part of the PR diff:
-   - `spec/timeline.md`: record your PR/feature milestone and summary.
+6. **Write enduring, context-focused code comments.** Comments serve future
+   maintainers: explain *why* an invariant, layout constraint, or domain rule
+   exists in the permanent codebase. Reserve commit notes, issue numbers, and
+   bug-fix narratives for the PR description and `spec/spec-00x` files.
+7. **Update `spec/` as you build.** From this point forward, feature work and
+   architectural changes follow the structured incremental `spec-00x` layout
+   (`spec/spec-00x-<slug>.md`). Update `spec/` directly in your worktree as part of
+   the PR diff:
+   - `spec/README.md`: register the new spec in the Specification Index table.
+   - `spec/timeline.md`: record your PR milestone and summary linked to your spec.
    - `spec/architecture.md`: record new tables, caching rules, or system patterns.
    - `spec/incidents.md`: record root cause and fix when resolving a bug or failure mode.
    - `spec/product.md`: update page routes, admin forms, or user flows.
    - `spec/open-threads.md`: close completed threads or record new follow-ups.
-7. **Verify before calling it done.** Run `npm run lint`, `npm run test`, and
+8. **Verify before calling it done.** Run `npm run lint`, `npm run test`, and
    `npm run build`. For UI changes, follow the `uiux` skill's rule to
    screenshot the rendered page at desktop width and inspect it visually.
-8. **Hand off to review.** Once verification passes, load the `review-loop` skill
+9. **Hand off to review.** Once verification passes, load the `review-loop` skill
    to obtain an independent pass on the diff before considering it mergeable.
