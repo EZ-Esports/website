@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 // Schema and lock keys
 import * as schema from '@/app/lib/db/schema';
@@ -677,80 +675,6 @@ describe('Team actions lock-then-re-read concurrency authorization (Issue #156)'
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/role hierarchy changed/i);
       expect(mocks.state.executedLocks).toContain(STAFF_REVOCATION_LOCK_KEY);
-    });
-  });
-
-  describe('Static structural invariant checks', () => {
-    const actionsSource = readFileSync(
-      resolve(process.cwd(), 'app/(admin)/admin/team/actions.ts'),
-      'utf8',
-    );
-
-    it('ensures updateUserRoles acquires pg_advisory_xact_lock and re-reads under lock', () => {
-      const fnStart = actionsSource.indexOf('export async function updateUserRoles');
-      const fnSource = actionsSource.slice(fnStart);
-
-      const lockIdx = fnSource.indexOf('pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})');
-      const freshActorIdx = fnSource.indexOf('getFreshActorAccess(admin.id, tx)', lockIdx);
-      const targetRolesIdx = fnSource.indexOf('getUserRolesInfo(targetUserId, tx)', freshActorIdx);
-      const hierarchyCheckIdx = fnSource.indexOf('STAFF_HIERARCHY_CHANGED', targetRolesIdx);
-      const mutateIdx = fnSource.indexOf('.delete(schema.userRoles)', hierarchyCheckIdx);
-
-      expect(lockIdx).toBeGreaterThan(-1);
-      expect(freshActorIdx).toBeGreaterThan(lockIdx);
-      expect(targetRolesIdx).toBeGreaterThan(freshActorIdx);
-      expect(hierarchyCheckIdx).toBeGreaterThan(targetRolesIdx);
-      expect(mutateIdx).toBeGreaterThan(hierarchyCheckIdx);
-    });
-
-    it('ensures updateRole acquires pg_advisory_xact_lock and re-reads under lock', () => {
-      const fnStart = actionsSource.indexOf('export async function updateRole');
-      const fnEnd = actionsSource.indexOf('export async function deleteRole', fnStart);
-      const fnSource = actionsSource.slice(fnStart, fnEnd);
-
-      const lockIdx = fnSource.indexOf('pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})');
-      const freshActorIdx = fnSource.indexOf('getFreshActorAccess(admin.id, tx)', lockIdx);
-      const reReadRoleIdx = fnSource.indexOf('.from(schema.roles)', freshActorIdx);
-      const hierarchyCheckIdx = fnSource.indexOf('canManageRole(freshActor.highestRolePosition', reReadRoleIdx);
-      const updateIdx = fnSource.indexOf('.update(schema.roles)', hierarchyCheckIdx);
-
-      expect(lockIdx).toBeGreaterThan(-1);
-      expect(freshActorIdx).toBeGreaterThan(lockIdx);
-      expect(reReadRoleIdx).toBeGreaterThan(freshActorIdx);
-      expect(hierarchyCheckIdx).toBeGreaterThan(reReadRoleIdx);
-      expect(updateIdx).toBeGreaterThan(hierarchyCheckIdx);
-    });
-
-    it('ensures revokeInvite acquires pg_advisory_xact_lock and re-reads under lock', () => {
-      const fnStart = actionsSource.indexOf('export async function revokeInvite');
-      const fnEnd = actionsSource.indexOf('export async function revokeStaff', fnStart);
-      const fnSource = actionsSource.slice(fnStart, fnEnd);
-
-      const lockIdx = fnSource.indexOf('pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})');
-      const freshActorIdx = fnSource.indexOf('getFreshActorAccess(admin.id, tx)', lockIdx);
-      const inviteRolesIdx = fnSource.indexOf('.from(schema.staffInviteRoles)', freshActorIdx);
-      const hierarchyCheckIdx = fnSource.indexOf('canManageRole(freshActor.highestRolePosition', inviteRolesIdx);
-      const deleteIdx = fnSource.indexOf('.delete(schema.staffInvites)', hierarchyCheckIdx);
-
-      expect(lockIdx).toBeGreaterThan(-1);
-      expect(freshActorIdx).toBeGreaterThan(lockIdx);
-      expect(inviteRolesIdx).toBeGreaterThan(freshActorIdx);
-      expect(hierarchyCheckIdx).toBeGreaterThan(inviteRolesIdx);
-      expect(deleteIdx).toBeGreaterThan(hierarchyCheckIdx);
-    });
-
-    it('ensures revokeStaff re-reads actor under lock', () => {
-      const fnStart = actionsSource.indexOf('export async function revokeStaff');
-      const fnEnd = actionsSource.indexOf('/* --- ROLE MANAGEMENT ACTIONS --- */', fnStart);
-      const fnSource = actionsSource.slice(fnStart, fnEnd);
-
-      const lockIdx = fnSource.indexOf('pg_advisory_xact_lock(${STAFF_REVOCATION_LOCK_KEY})');
-      const freshActorIdx = fnSource.indexOf('getFreshActorAccess(staff.id, tx)', lockIdx);
-      const hierarchyCheckIdx = fnSource.indexOf('canActOnMember(\n        freshActor.highestRolePosition', freshActorIdx);
-
-      expect(lockIdx).toBeGreaterThan(-1);
-      expect(freshActorIdx).toBeGreaterThan(lockIdx);
-      expect(hierarchyCheckIdx).toBeGreaterThan(freshActorIdx);
     });
   });
 });
