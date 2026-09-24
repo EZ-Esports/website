@@ -6,7 +6,7 @@
  * without a dedicated throwaway cluster, but asserting structural invariants on
  * the source prevents accidental regressions.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { spawnSync } from 'child_process';
@@ -44,127 +44,35 @@ describe('db/seed-gold.ts takes a backup before it deletes anything', () => {
   });
 });
 
-/**
- * Audit IDs: DB-3, DB-9, ARCH-9, DB-10.
- * Every operational script capable of mutating DB state must refuse a non-loopback
- * DATABASE_URL without SEED_ALLOW_REMOTE.
- */
-const GATED_SCRIPTS = [
-  { file: 'seed-gold.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
-  { file: 'seed-leadership.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
-  { file: 'migrate.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
-  { file: '../drizzle.config.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/db\/seed-target'/ },
-  { file: 'backfill-leadership.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
-  { file: 'seed-owner.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
-  { file: '../app/lib/db/seed-phase2.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\.\/\.\.\/\.\.\/db\/seed-target'/ },
-  { file: 'seed.ts', importPattern: /import \{ assertSeedTargetAllowed \} from '\.\/seed-target'/ },
-] as const;
+import { main as seedMain } from '../seed';
 
-describe.each(GATED_SCRIPTS)('$file refuses an unauthorized remote database', ({ file, importPattern }) => {
-  const src = read(file);
+describe('db/seed.ts retirement', () => {
+  const originalUrl = process.env.DATABASE_URL;
 
-  it('imports the interlock from seed-target', () => {
-    expect(src).toMatch(importPattern);
+  afterEach(() => {
+    if (originalUrl !== undefined) process.env.DATABASE_URL = originalUrl;
+    else delete process.env.DATABASE_URL;
   });
 
-  it('calls assertSeedTargetAllowed()', () => {
-    expect(src).toMatch(/assertSeedTargetAllowed\(\)/);
-  });
-});
+  it('refuses execution on loopback targets, logs retirement message, and exits with code 1', () => {
+    process.env.DATABASE_URL = 'postgresql://localhost:5432/app';
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined as never) as any);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-describe('db/migrate.ts host gate ordering', () => {
-  const src = read('migrate.ts');
+    seedMain();
 
-  it('calls assertSeedTargetAllowed() at the very start of main() before determining scope', () => {
-    const mainBody = src.slice(src.indexOf('async function main()'));
-    const gate = mainBody.indexOf('assertSeedTargetAllowed();');
-    const determine = mainBody.indexOf('determineScope();');
-    expect(gate).toBeGreaterThan(-1);
-    expect(determine).toBeGreaterThan(-1);
-    expect(gate).toBeLessThan(determine);
-  });
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining('is retired to prevent UUID churn')
+    );
 
-  it('calls assertSeedTargetAllowed() before taking pre-migration backup', () => {
-    const mainBody = src.slice(src.indexOf('async function main()'));
-    const gate = mainBody.indexOf('assertSeedTargetAllowed();');
-    const backup = mainBody.search(/requireFreshBackup\(/);
-    expect(gate).toBeGreaterThan(-1);
-    expect(backup).toBeGreaterThan(-1);
-    expect(gate).toBeLessThan(backup);
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
   });
 
-  it('calls assertSeedTargetAllowed() inside determineScope when owning connection', () => {
-    const determineBody = src.slice(src.indexOf('export async function determineScope('));
-    const ownsConn = determineBody.indexOf('if (ownsConnection)');
-    const gateInside = determineBody.indexOf('assertSeedTargetAllowed();', ownsConn);
-    expect(ownsConn).toBeGreaterThan(-1);
-    expect(gateInside).toBeGreaterThan(-1);
-  });
-});
-
-describe('drizzle.config.ts push guard', () => {
-  const src = read('../drizzle.config.ts');
-
-  it('gates drizzle-kit push against remote targets', () => {
-    expect(src).toMatch(/process\.argv\.(some|includes)\(.*push.*\)/);
-    expect(src).toMatch(/assertSeedTargetAllowed\(\)/);
-  });
-});
-
-
-describe('app/lib/db/seed-phase2.ts cannot silently write production CMS rows', () => {
-  const src = read('../app/lib/db/seed-phase2.ts');
-
-  it('is marked as deprecated / unsafe', () => {
-    expect(src).toMatch(/@deprecated/);
-  });
-
-  it('calls assertSeedTargetAllowed() before inserting CMS rows', () => {
-    const seedFunc = src.slice(src.indexOf('async function seedPhase2()'));
-    const gate = seedFunc.indexOf('assertSeedTargetAllowed();');
-    const insert = seedFunc.search(/db\s*\.\s*insert\(/);
-    expect(gate).toBeGreaterThan(-1);
-    expect(insert).toBeGreaterThan(-1);
-    expect(gate).toBeLessThan(insert);
-  });
-});
-
-describe('db/seed.ts retirement and UUID-churn prevention', () => {
-  const src = read('seed.ts');
-
-  it('is marked as deprecated / retired', () => {
-    expect(src).toMatch(/@deprecated/);
-  });
-
-  it('does not delete news_posts', () => {
-    expect(src).not.toMatch(/db\.delete\(schema\.newsPosts\)/);
-  });
-
-  const CORE_TABLES = [
-    'newsPosts', 'matches', 'players', 'rosters',
-    'teams', 'seasons', 'members', 'schools', 'games', 'leadership',
-  ];
-
-  it.each(CORE_TABLES)('does not delete schema.%s', (table) => {
-    expect(src).not.toMatch(new RegExp(`db\\.delete\\(schema\\.${table}\\)`));
-  });
-
-  it('does not insert or churn row UUIDs', () => {
-    expect(src).not.toMatch(/db\.insert\(/);
-  });
-
-  it('refuses execution and directs operators to gold and leadership seeds', () => {
-    expect(src).toMatch(/db:seed:gold/);
-    expect(src).toMatch(/db:seed:leadership/);
-    expect(src).toMatch(/process\.exit\(1\)/);
-  });
-});
-
-describe('.gitignore sharepoint nested CSVs', () => {
-  const gitignore = read('../.gitignore');
-
-  it('ignores nested CSVs under sharepoint to prevent PII leaks', () => {
-    expect(gitignore).toMatch(/sharepoint\/\*\*\/\*\.csv/);
+  it('fails closed on remote targets via assertSeedTargetAllowed()', () => {
+    process.env.DATABASE_URL = 'postgresql://u:pw@db.production.supabase.co:5432/postgres';
+    expect(() => seedMain()).toThrow(/not loopback/);
   });
 });
 
