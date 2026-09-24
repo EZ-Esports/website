@@ -125,7 +125,7 @@ export default async function ApplicationsAdminPage({
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Submitted</th>
-                  <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3">Actions</th>
+                  <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
@@ -187,7 +187,7 @@ export default async function ApplicationsAdminPage({
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Submitted</th>
-                  <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3">Actions</th>
+                  <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">

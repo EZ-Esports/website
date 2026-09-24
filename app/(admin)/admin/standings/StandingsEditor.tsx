@@ -281,7 +281,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                         {row.notes ?? ''}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-2">
                           <button onClick={() => setEditingId(row.id)} className={iconBtn} aria-label={`Edit ${row.playerName ?? row.schoolName} standing`} title="Edit standing">
                             <FiEdit2 className="w-3.5 h-3.5" />
                           </button>

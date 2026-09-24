@@ -166,7 +166,7 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
         )}
       </td>
       <td className="py-3 pr-4 text-foreground-secondary">{sponsor.displayOrder}</td>
-      <td className="py-3 text-right">
+      <td className="py-3 pr-2 text-right">
         <div className="flex items-center justify-end gap-2">
           <button
             ref={editBtnRef}

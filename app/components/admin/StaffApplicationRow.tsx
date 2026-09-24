@@ -129,7 +129,7 @@ export default function StaffApplicationRow({ app, activeFilter = "all" }: { app
             year: "numeric",
           })}
         </td>
-        <td className="py-3 text-right whitespace-nowrap">
+        <td className="py-3 pr-2 text-right whitespace-nowrap">
           <ConfirmDeleteButton
             action={handleDelete}
             message="Are you sure you want to remove this application?"

@@ -593,7 +593,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                           type="button"
                           onClick={() => handleDeleteRole(activeRole.id)}
                           aria-label={`Delete role ${activeRole.name}`}
-                          title="Delete role"
+                          title={`Delete role ${activeRole.name}`}
                           className={deleteIconBtnDanger}
                         >
                           <FiTrash2 aria-hidden="true" className="h-4 w-4" />

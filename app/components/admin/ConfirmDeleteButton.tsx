@@ -9,10 +9,10 @@ interface ConfirmDeleteButtonProps {
   /** Confirmation prompt shown before the action runs. */
   message: string;
   /**
-   * Accessible name and tooltip for the icon-only trigger. Prefer naming the
+   * Required accessible name and tooltip for the icon-only trigger. Name the
    * target ("Delete school Foo") so a screen reader can tell rows apart.
    */
-  label?: string;
+  label: string;
   /** `danger` keeps the always-red tint used by the application "Remove" rows. */
   tone?: 'neutral' | 'danger';
 }
@@ -24,7 +24,7 @@ interface ConfirmDeleteButtonProps {
 export default function ConfirmDeleteButton({
   action,
   message,
-  label = 'Delete',
+  label,
   tone = 'neutral',
 }: ConfirmDeleteButtonProps) {
   return (

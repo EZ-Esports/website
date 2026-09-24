@@ -26,8 +26,11 @@ export const iconBtn =
 
 /**
  * Destructive trash-can icon button (delete / remove). A 32px square with the
- * hit area padded out to 44px by an invisible pseudo-element, so it stays
- * compact in dense admin tables but still meets the touch-target floor. Pair
+ * hit area padded out to ~42px by an invisible `after:-inset-1.5` pseudo-element
+ * (the inset is measured inside the 1px border), so it stays compact in dense
+ * admin tables. The overhang spills 6px past the button on every side, so its
+ * container needs at least 6px of padding/gap on each side (a bare `text-right`
+ * cell inside `overflow-x-auto` needs `pr-2`, or it adds a scrollbar). Pair
  * with an `aria-label` (icon-only) and a `title`. `deleteIconBtnDanger` is the
  * always-red-tinted variant for rows that already used a red remove button.
  */
