@@ -276,7 +276,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                         aria-label={`Status for ${match.homeTeam} vs ${match.awayTeam}`}
                         form={`form-${match.id}`}
                         defaultValue={match.status}
-                        className="px-2 py-1 bg-surface-sunken border border-line rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer font-medium"
+                        className="pl-2 py-1 [--select-chevron-inset:0.625rem] [--select-chevron-space:2rem] bg-surface-sunken border border-line rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer font-medium"
                       >
                         <option value="scheduled" className="bg-surface-raised text-white">Scheduled</option>
                         <option value="live" className="bg-surface-raised text-white">Live</option>

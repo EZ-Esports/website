@@ -320,7 +320,7 @@ export default function TeamsFilterClient({
                 <select
                   value={selectedSeason}
                   onChange={(e) => setSelectedSeason(e.target.value)}
-                  className="w-full sm:w-auto appearance-none rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
+                  className="w-full sm:w-auto rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
                   aria-label="Filter by season"
                 >
                   {availableSeasons.map((seasonName) => (
@@ -330,11 +330,6 @@ export default function TeamsFilterClient({
                   ))}
                   <option value="all">All Seasons</option>
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-foreground-muted">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
               </div>
             )}
 
@@ -344,7 +339,7 @@ export default function TeamsFilterClient({
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full sm:w-auto appearance-none rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 pr-8 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
+                  className="w-full sm:w-auto rounded-xl border border-line bg-surface-sunken py-2.5 sm:py-2 pl-3 text-xs font-bold text-foreground-secondary hover:text-foreground focus:border-accent focus:outline-none cursor-pointer min-h-[44px] sm:min-h-[38px] touch-manipulation"
                   aria-label="Filter by player role"
                 >
                   <option value="all">All Roles</option>
@@ -354,11 +349,6 @@ export default function TeamsFilterClient({
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-foreground-muted">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
               </div>
             )}
 
