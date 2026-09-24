@@ -202,10 +202,10 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#0b101d] border-b border-surface-raised text-xs font-bold text-foreground-secondary uppercase tracking-widest">
               <tr>
-                <th className="px-6 py-4">Season / Date</th>
-                <th className="px-6 py-4 text-center">Matchup & Scores</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-2 py-3">Season / Date</th>
+                <th className="px-2 py-3 text-center">Matchup & Scores</th>
+                <th className="px-2 py-3">Status</th>
+                <th className="px-2 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line text-sm">
@@ -217,7 +217,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
 
                 return (
                   <tr key={match.id} className="hover:bg-line/10 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-2 py-3">
                       <div className="font-bold text-foreground text-xs uppercase tracking-wider">
                         {game?.shortName} • {season?.name}
                       </div>
@@ -232,9 +232,9 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                       </div>
                     </td>
 
-                    <td className="px-6 py-4">
-                      <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-3">
-                        <div className="text-right w-28 truncate">
+                    <td className="px-2 py-3">
+                      <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-1.5">
+                        <div className="text-right w-16 2xl:w-28 truncate">
                           <span className="block font-semibold text-white text-sm truncate" title={match.homeTeam}>{match.homeTeam}</span>
                           <span className="text-[10px] text-foreground-muted font-semibold uppercase tracking-wider">{match.division}</span>
                         </div>
@@ -242,35 +242,38 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                         <div className="flex items-center gap-1">
                           <input
                             name="homeScore"
+                            aria-label={`${match.homeTeam} score`}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
                             defaultValue={match.homeScore ?? ''}
-                            className="w-10 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
+                            className="w-8 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
                             placeholder="-"
                           />
                           <span className="text-foreground-muted text-[10px] font-bold uppercase select-none">vs</span>
                           <input
                             name="awayScore"
+                            aria-label={`${match.awayTeam} score`}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
                             defaultValue={match.awayScore ?? ''}
-                            className="w-10 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
+                            className="w-8 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
                             placeholder="-"
                           />
                         </div>
 
-                        <div className="text-left w-28 truncate">
+                        <div className="text-left w-16 2xl:w-28 truncate">
                           <span className="block font-semibold text-white text-sm truncate" title={match.awayTeam}>{match.awayTeam}</span>
                           <span className="text-[10px] text-foreground-muted font-semibold uppercase tracking-wider">{match.division}</span>
                         </div>
                       </form>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-2 py-3">
                       <select
                         name="status"
+                        aria-label={`Status for ${match.homeTeam} vs ${match.awayTeam}`}
                         form={`form-${match.id}`}
                         defaultValue={match.status}
                         className="px-2 py-1 bg-surface-sunken border border-line rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer font-medium"
@@ -283,13 +286,13 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                       </select>
                     </td>
 
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-2 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="submit"
                           form={`form-${match.id}`}
                           disabled={isSaving}
-                          className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-2 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSaving ? 'Saving…' : 'Save'}
                         </button>
@@ -300,7 +303,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                           }}
                           message={`Permanently delete this match (${match.homeTeam} vs ${match.awayTeam})? This cannot be undone.`}
                           label="Delete"
-                          className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
+                          className="px-2 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
                         />
                       </div>
                     </td>
