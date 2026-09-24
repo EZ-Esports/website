@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import RowIconButton from '@/app/components/admin/RowIconButton';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import { updateLeader, deleteLeader } from '@/app/(admin)/admin/leadership/actions';
@@ -367,15 +368,13 @@ export default function LeadershipRow({
 
       {/* Actions */}
       <td className="px-3.5 py-3 text-right">
-        <div className="flex gap-1.5 justify-end">
-          <button
+        <div className="flex items-center gap-2 justify-end">
+          <RowIconButton
             ref={editBtnRef}
-            type="button"
+            kind="edit"
             onClick={() => setEditing(true)}
-            className="px-2.5 py-1 bg-surface-raised hover:bg-line font-bold text-[11px] uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
-          >
-            Edit
-          </button>
+            label={`Edit ${leader.name} (${leader.role}, ${leader.year})`}
+          />
           <ConfirmDeleteButton
             action={deleteAction}
             label={`Remove ${leader.name} (${leader.role}, ${leader.year})`}

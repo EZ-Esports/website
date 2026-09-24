@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  FiArrowLeft, FiAward, FiChevronRight, FiEdit2, FiExternalLink, FiHome, FiPlus,
+  FiArrowLeft, FiAward, FiChevronRight, FiExternalLink, FiHome, FiPlus,
   FiSearch, FiSettings, FiTrash2, FiUsers, FiX,
 } from 'react-icons/fi';
 import {
@@ -32,7 +32,8 @@ type RosterPlayerRow = Awaited<ReturnType<typeof listRosterPlayers>>[number];
 
 const ROLES = ['player', 'captain', 'coach', 'sub'] as const;
 
-import { input, primaryBtn, secondaryBtn, iconBtn, deleteIconBtnCompact } from '@/app/components/admin/styles';
+import { input, primaryBtn, secondaryBtn, iconBtn, saveBtn, cancelBtn, deleteIconBtn, deleteIconBtnCompact } from '@/app/components/admin/styles';
+import RowIconButton from '@/app/components/admin/RowIconButton';
 
 export default function RosterExplorer({
   games, teams, rosters, schools, seasons, playerCounts,
@@ -460,7 +461,7 @@ function RosterView({
         actions={
           <>
             <button className={secondaryBtn} onClick={() => toggle('player-add')} disabled={loading || eligible.length === 0}><FiPlus /> Add Player</button>
-            <button className={secondaryBtn} onClick={() => toggle('roster-edit')}><FiSettings /> Edit Roster</button>
+            <RowIconButton kind="edit" onClick={() => toggle('roster-edit')} aria-expanded={openForm === 'roster-edit'} label={`Edit roster ${roster.name}`} />
           </>
         }
       />
@@ -480,7 +481,7 @@ function RosterView({
                 <option value="B">Division B</option>
               </select>
             </Field>
-            <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
+            <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
           </form>
         </Panel>
       )}
@@ -563,8 +564,8 @@ function RosterView({
                               </select>
                             </Field>
                             <div className="flex gap-2 pb-0.5">
-                              <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
-                              <button type="button" onClick={() => setEditingId(null)} className={secondaryBtn}>Cancel</button>
+                              <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
+                              <button type="button" onClick={() => setEditingId(null)} className={cancelBtn}>Cancel</button>
                             </div>
                           </form>
                         </td>
@@ -582,12 +583,12 @@ function RosterView({
                       <td className="px-4 py-2.5 text-foreground-secondary font-mono italic">{p.ign || '—'}</td>
                       <td className="px-4 py-2.5 text-foreground-secondary capitalize">{p.role}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                          <button onClick={() => setEditingId(p.id)} className={iconBtn} aria-label="Edit player"><FiEdit2 className="w-3.5 h-3.5" /></button>
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                          <RowIconButton kind="edit" onClick={() => setEditingId(p.id)} label={`Edit player ${p.firstName} ${p.lastName}`} />
                           <button
                             onClick={() => confirmDelete(`Permanently remove ${p.firstName} ${p.lastName} from ${roster.name}? This cannot be undone.`, () => deleteRosterMember(p.id), 'Player removed.', refresh)}
-                            className={`${deleteIconBtnCompact} p-1.5`} aria-label="Remove player" title="Remove player"
-                          ><FiTrash2 className="w-3.5 h-3.5" /></button>
+                            type="button" className={deleteIconBtn} aria-label={`Remove player ${p.firstName} ${p.lastName}`} title={`Remove player ${p.firstName} ${p.lastName}`}
+                          ><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -667,8 +668,8 @@ function MemberManager({
                 >
                   <MemberFields schoolId={schoolId} m={m} />
                   <div className="flex justify-end gap-2">
-                    <button type="button" onClick={() => setEditingId(null)} className={secondaryBtn}>Cancel</button>
-                    <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
+                    <button type="button" onClick={() => setEditingId(null)} className={cancelBtn}>Cancel</button>
+                    <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
                   </div>
                 </form>
               ) : (
@@ -681,12 +682,12 @@ function MemberManager({
                       {m.email ? ` · ${m.email}` : ''}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
-                    <button onClick={() => setEditingId(m.id)} className={iconBtn} aria-label="Edit member"><FiEdit2 className="w-3.5 h-3.5" /></button>
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+                    <RowIconButton kind="edit" onClick={() => setEditingId(m.id)} label={`Edit member ${m.firstName} ${m.lastName}`} />
                     <button
                       onClick={() => confirmDelete(`Permanently delete ${m.firstName} ${m.lastName}? They will be removed from any rosters. This cannot be undone.`, () => deleteMember(m.id), 'Member deleted.', refresh)}
-                      className={`${deleteIconBtnCompact} p-1.5`} aria-label="Delete member" title="Delete member"
-                    ><FiTrash2 className="w-3.5 h-3.5" /></button>
+                      type="button" className={deleteIconBtn} aria-label={`Delete member ${m.firstName} ${m.lastName}`} title={`Delete member ${m.firstName} ${m.lastName}`}
+                    ><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
                   </div>
                 </div>
               )}

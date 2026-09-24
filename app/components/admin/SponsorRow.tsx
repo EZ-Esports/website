@@ -2,6 +2,8 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import RowIconButton from '@/app/components/admin/RowIconButton';
+import { saveBtn, cancelBtn } from '@/app/components/admin/styles';
 import { updateSponsor, toggleSponsorActive, deleteSponsor } from '@/app/(admin)/admin/sponsors/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 
@@ -105,20 +107,8 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
               <input name="displayOrder" type="number" defaultValue={sponsor.displayOrder ?? 0} className={inputClass} />
             </div>
             <div className="flex items-end gap-2">
-              <button
-                type="submit"
-                disabled={isPending}
-                className="px-4 py-2 bg-accent text-on-accent rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-accent/80 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isPending ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                type="button"
-                onClick={closeEditing}
-                className="px-4 py-2 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
+              <button type="submit" disabled={isPending} className={saveBtn}>{isPending ? 'Saving…' : 'Save'}</button>
+              <button type="button" onClick={closeEditing} className={cancelBtn}>Cancel</button>
             </div>
             {saveError && (
               <p role="alert" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
@@ -168,13 +158,12 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
       <td className="py-3 pr-4 text-foreground-secondary">{sponsor.displayOrder}</td>
       <td className="py-3 pr-2 text-right">
         <div className="flex items-center justify-end gap-2">
-          <button
+          <RowIconButton
             ref={editBtnRef}
+            kind="edit"
             onClick={() => setEditing(true)}
-            className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
-          >
-            Edit
-          </button>
+            label={`Edit sponsor ${sponsor.name}`}
+          />
           <ConfirmDeleteButton
             action={() => deleteSponsor(sponsor.id)}
             message={`Delete sponsor "${sponsor.name}"? This cannot be undone.`}

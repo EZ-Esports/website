@@ -2,10 +2,12 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { desc, isNull } from 'drizzle-orm';
 import Link from 'next/link';
+import { FiEdit2 } from 'react-icons/fi';
 import { deleteNewsPost, publishNewsPost, unpublishNewsPost, archiveNewsPost } from './actions';
 import Card from '@/app/components/ui/Card';
 import Button from '@/app/components/ui/Button';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import { editIconBtn } from '@/app/components/admin/styles';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
@@ -266,9 +268,11 @@ export default async function AdminNewsPage({
                               )}
                               <Link
                                 href={`/admin/news/${post.id}`}
-                                className="px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer"
+                                aria-label={`Edit article ${post.title}`}
+                                title={`Edit article ${post.title}`}
+                                className={editIconBtn}
                               >
-                                Edit
+                                <FiEdit2 aria-hidden="true" className="h-4 w-4" />
                               </Link>
                               <ConfirmDeleteButton
                                 action={deleteActionWithId}

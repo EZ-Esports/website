@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { saveBtn } from '@/app/components/admin/styles';
 import { updatePageContent, restorePageContent } from './actions';
 
 interface HistoryEntry {
@@ -76,13 +77,7 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
           className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all resize-y font-sans leading-relaxed"
         />
         <div className="flex items-center gap-3 mt-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-5 py-2 bg-accent text-on-accent rounded-lg font-bold text-xs hover:bg-accent/80 transition-all duration-300 cursor-pointer disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <button type="submit" disabled={saving} className={saveBtn}>{saving ? 'Saving…' : 'Save'}</button>
           {saved && (
             <span className="text-green-400 text-xs font-semibold">Saved!</span>
           )}

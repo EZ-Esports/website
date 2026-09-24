@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import { saveBtn } from '@/app/components/admin/styles';
 import { fetchMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { selectClass } from '@/app/components/admin/styles';
@@ -287,12 +288,13 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                     </td>
 
                     <td className="px-2 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           type="submit"
                           form={`form-${match.id}`}
                           disabled={isSaving}
-                          className="px-2 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label={`Save match ${match.homeTeam} vs ${match.awayTeam}`}
+                          className={saveBtn}
                         >
                           {isSaving ? 'Saving…' : 'Save'}
                         </button>

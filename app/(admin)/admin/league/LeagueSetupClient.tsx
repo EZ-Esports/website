@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiEdit2, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
-import { deleteIconBtnCompact } from '@/app/components/admin/styles';
+import { FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import RowIconButton from '@/app/components/admin/RowIconButton';
+import { deleteIconBtn, saveBtn, cancelBtn } from '@/app/components/admin/styles';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
@@ -29,10 +30,6 @@ const input =
   'w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 transition-all';
 const primaryBtn =
   'px-4 py-2 bg-white hover:bg-foreground text-surface-sunken text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
-const secondaryBtn =
-  'px-3.5 py-2 bg-surface-raised hover:bg-line border border-line text-foreground-secondary text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 cursor-pointer';
-const iconBtn =
-  'p-1.5 hover:bg-line rounded-lg text-foreground-secondary hover:text-foreground transition-all cursor-pointer';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -280,8 +277,8 @@ function GameRow({
             <input name="imageUrl" defaultValue={game.imageUrl ?? ''} className={input} />
           </Field>
           <div className="flex gap-2 pb-0.5">
-            <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
-            <button type="button" onClick={() => setEditing(false)} className={secondaryBtn}>Cancel</button>
+            <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
+            <button type="button" onClick={() => setEditing(false)} className={cancelBtn}>Cancel</button>
           </div>
         </form>
       ) : (
@@ -291,9 +288,9 @@ function GameRow({
             <span className="ml-2 text-[10px] bg-surface-raised border border-line text-foreground-secondary font-mono px-1.5 py-0.5 rounded uppercase">{game.shortName}</span>
             <div className="text-[11px] text-foreground-muted font-mono mt-0.5">/games/{game.slug}</div>
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => setEditing(true)} className={iconBtn} aria-label="Edit game"><FiEdit2 className="w-3.5 h-3.5" /></button>
-            <button onClick={onDelete} className={`${deleteIconBtnCompact} p-1.5`} aria-label="Delete game" title="Delete game"><FiTrash2 className="w-3.5 h-3.5" /></button>
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+            <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit game ${game.displayName}`} />
+            <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete game ${game.displayName}`} title={`Delete game ${game.displayName}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
           </div>
         </div>
       )}
@@ -345,8 +342,8 @@ function SeasonRow({
             </select>
           </Field>
           <div className="flex gap-2 pb-0.5">
-            <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
-            <button type="button" onClick={() => setEditing(false)} className={secondaryBtn}>Cancel</button>
+            <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
+            <button type="button" onClick={() => setEditing(false)} className={cancelBtn}>Cancel</button>
           </div>
         </form>
       ) : (
@@ -358,9 +355,9 @@ function SeasonRow({
               {season.isActive ? 'Active' : 'Inactive'}
             </span>
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => setEditing(true)} className={iconBtn} aria-label="Edit season"><FiEdit2 className="w-3.5 h-3.5" /></button>
-            <button onClick={onDelete} className={`${deleteIconBtnCompact} p-1.5`} aria-label="Delete season" title="Delete season"><FiTrash2 className="w-3.5 h-3.5" /></button>
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+            <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit season ${season.name}`} />
+            <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete season ${season.name}`} title={`Delete season ${season.name}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
           </div>
         </div>
       )}
