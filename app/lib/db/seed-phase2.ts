@@ -1,7 +1,19 @@
+/**
+ * @deprecated UNSAFE / LEGACY SCRIPT (DB-3, ARCH-9)
+ *
+ * Phase 2 CMS seed script (gallery images, sponsors, page content).
+ * WARNING: This script was an early bootstrap script and is unsafe to run
+ * against production because it mutates CMS content.
+ * It is fail-closed against non-loopback databases via assertSeedTargetAllowed().
+ * Production CMS content must be managed through the admin UI.
+ */
 import { loadEnvConfig } from '@next/env';
+import { assertSeedTargetAllowed } from '../../../db/seed-target';
+
 loadEnvConfig(process.cwd());
 
 async function seedPhase2() {
+  assertSeedTargetAllowed();
   // Dynamic imports ensure DATABASE_URL is set before the postgres client initializes
   const { db } = await import('./index');
   const schema = await import('./schema');
@@ -60,4 +72,8 @@ async function seedPhase2() {
   console.log('Phase 2 seed complete.');
 }
 
-seedPhase2().catch(console.error);
+seedPhase2().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+

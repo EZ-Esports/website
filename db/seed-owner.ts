@@ -17,10 +17,12 @@ import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
 import { createServiceClient } from '../app/lib/supabase/service';
 import { STAFF_REVOCATION_LOCK_KEY } from '../app/lib/staff-revocation';
+import { assertSeedTargetAllowed } from './seed-target';
 
 const ADMINISTRATOR = BigInt(1) << BigInt(0);
 
 async function main() {
+  assertSeedTargetAllowed();
   const email = process.argv[2]?.trim().toLowerCase();
   const restoreRevoked = process.argv.includes('--restore-revoked');
   if (!email) {

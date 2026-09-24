@@ -37,6 +37,7 @@ Every `spec-00x` document must follow this structure:
 | ID | Title | PR / Commit | Date | Status | Summary |
 |---|---|---|---|---|---|
 | [`spec-001`](spec-001-admin-sidebar-pinning.md) | Admin Sidebar Viewport Pinning | PR #187 (`875bf56`) | 2026-09-23 | Shipped | Pinned staff sidebar to viewport height (`sticky top-0 h-dvh`) with static nav and persistent footer links. |
+| [`spec-002`](spec-002-database-safety-gates.md) | Database Safety Gates & Seed Retirement | PR #180 | 2026-09-24 | Shipped | Gated all DB mutation scripts against remote targets, retired destructive UUID-churning seed.ts, and blocked SharePoint PII CSV leaks. |
 
 ---
 
