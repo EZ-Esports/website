@@ -302,8 +302,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                             setItems((prev) => prev.filter((m) => m.id !== match.id));
                           }}
                           message={`Permanently delete this match (${match.homeTeam} vs ${match.awayTeam})? This cannot be undone.`}
-                          label="Delete"
-                          className="px-2 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
+                          label={`Delete match ${match.homeTeam} vs ${match.awayTeam}`}
                         />
                       </div>
                     </td>

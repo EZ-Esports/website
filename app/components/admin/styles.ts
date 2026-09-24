@@ -24,5 +24,23 @@ export const secondaryBtn =
 export const iconBtn =
   'p-1.5 hover:bg-line rounded-lg text-foreground-secondary hover:text-foreground transition-all cursor-pointer';
 
+/**
+ * Destructive trash-can icon button (delete / remove). A 32px square with the
+ * hit area padded out to 44px by an invisible pseudo-element, so it stays
+ * compact in dense admin tables but still meets the touch-target floor. Pair
+ * with an `aria-label` (icon-only) and a `title`. `deleteIconBtnDanger` is the
+ * always-red-tinted variant for rows that already used a red remove button.
+ */
+const deleteIconBtnBase =
+  "relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 after:absolute after:-inset-1.5 after:content-['']";
+
+export const deleteIconBtn =
+  deleteIconBtnBase +
+  ' bg-surface-raised border-line text-foreground-secondary hover:bg-red-950/20 hover:border-red-900/40 hover:text-red-400 focus-visible:text-red-400';
+
+export const deleteIconBtnDanger =
+  deleteIconBtnBase +
+  ' bg-red-950/10 border-red-900/30 text-red-400 hover:bg-red-950/30 hover:border-red-900/60';
+
 export const selectClass =
   'px-3 py-1.5 bg-surface-sunken border border-line rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer';

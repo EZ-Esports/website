@@ -586,7 +586,7 @@ function RosterView({
                           <button onClick={() => setEditingId(p.id)} className={iconBtn} aria-label="Edit player"><FiEdit2 className="w-3.5 h-3.5" /></button>
                           <button
                             onClick={() => confirmDelete(`Permanently remove ${p.firstName} ${p.lastName} from ${roster.name}? This cannot be undone.`, () => deleteRosterMember(p.id), 'Player removed.', refresh)}
-                            className={iconBtn} aria-label="Remove player"
+                            className={iconBtn} aria-label="Remove player" title="Remove player"
                           ><FiTrash2 className="w-3.5 h-3.5 hover:text-red-400" /></button>
                         </div>
                       </td>
@@ -685,7 +685,7 @@ function MemberManager({
                     <button onClick={() => setEditingId(m.id)} className={iconBtn} aria-label="Edit member"><FiEdit2 className="w-3.5 h-3.5" /></button>
                     <button
                       onClick={() => confirmDelete(`Permanently delete ${m.firstName} ${m.lastName}? They will be removed from any rosters. This cannot be undone.`, () => deleteMember(m.id), 'Member deleted.', refresh)}
-                      className={iconBtn} aria-label="Delete member"
+                      className={iconBtn} aria-label="Delete member" title="Delete member"
                     ><FiTrash2 className="w-3.5 h-3.5 hover:text-red-400" /></button>
                   </div>
                 </div>

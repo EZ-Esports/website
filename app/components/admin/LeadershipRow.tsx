@@ -378,9 +378,8 @@ export default function LeadershipRow({
           </button>
           <ConfirmDeleteButton
             action={deleteAction}
-            label="Remove"
+            label={`Remove ${leader.name} (${leader.role}, ${leader.year})`}
             message={`Remove ${leader.name} (${leader.role}, ${leader.year}) from leadership terms?`}
-            className="px-2.5 py-1 bg-surface-raised hover:bg-red-950/20 font-bold text-[11px] uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer"
           />
         </div>
       </td>

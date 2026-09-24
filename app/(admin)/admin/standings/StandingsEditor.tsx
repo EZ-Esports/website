@@ -258,7 +258,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                     );
                   }
                   return (
-                    <tr key={row.id} className="hover:bg-line/10 transition-colors group">
+                    <tr key={row.id} className="hover:bg-line/10 transition-colors">
                       <td className="px-4 py-3 font-bold text-foreground-secondary">{row.rank ?? '—'}</td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-white">{row.playerName ?? row.schoolName}</div>
@@ -281,8 +281,8 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                         {row.notes ?? ''}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                          <button onClick={() => setEditingId(row.id)} className={iconBtn} aria-label="Edit standing">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setEditingId(row.id)} className={iconBtn} aria-label={`Edit ${row.playerName ?? row.schoolName} standing`} title="Edit standing">
                             <FiEdit2 className="w-3.5 h-3.5" />
                           </button>
                           <ConfirmDeleteButton
@@ -292,8 +292,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                               else setToast({ message: res?.error || 'Could not delete row.', type: 'error' });
                             }}
                             message={`Delete the ${row.playerName ?? row.schoolName} row from these standings? This cannot be undone.`}
-                            label="Delete"
-                            className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-[10px] uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line transition-all cursor-pointer"
+                            label={`Delete ${row.playerName ?? row.schoolName} standing`}
                           />
                         </div>
                       </td>
