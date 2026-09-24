@@ -73,3 +73,8 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 
 - Seed wording still says `db:seed` and `db:seed:gold` both delete-and-reinsert. Gold upserts since `9219ef5`. The file is still the operator law for production, cache, PII, and “ask before unrecoverable”; do not “fix” it casually in a drive-by, but do not implement a wipe because the first paragraph sounds like one.
 - Cache-tag list omits `people`, which `queries.ts` uses.
+---
+
+## Admin hover-gated row actions
+
+- Roster Explorer (team tiles, roster player rows, member rows) and League Setup (game and season rows) still hide their edit/trash icon buttons behind `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, so they are invisible on touch until focus. The Standings Archive was fixed to be always visible (Sep 2026); these were out of scope. See [architecture.md](architecture.md) (Frontend, destructive row actions).

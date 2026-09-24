@@ -121,12 +121,11 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
             year: "numeric",
           })}
         </td>
-        <td className="py-3 text-right whitespace-nowrap">
+        <td className="py-3 pr-2 text-right whitespace-nowrap">
           <ConfirmDeleteButton
             action={handleDelete}
             message="Are you sure you want to remove this application?"
-            label="Remove"
-            className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+            label={`Remove application from ${app.schoolName}`}
           />
         </td>
       </tr>

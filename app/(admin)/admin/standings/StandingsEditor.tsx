@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
+import { FiPlus, FiX } from 'react-icons/fi';
 import {
   listSeasonStandings,
   createStanding,
@@ -9,7 +9,8 @@ import {
   deleteStanding,
 } from './actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
-import { input, primaryBtn, secondaryBtn, iconBtn, selectClass } from '@/app/components/admin/styles';
+import RowIconButton from '@/app/components/admin/RowIconButton';
+import { input, primaryBtn, selectClass, saveBtn, cancelBtn } from '@/app/components/admin/styles';
 import { useActionData } from '@/app/lib/hooks/useActionData';
 import { DIVISIONS } from '@/app/lib/db/match-page';
 import type { DBGame, DBSchool, DBSeason } from '@/app/types';
@@ -247,10 +248,8 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                             <div className="text-xs font-bold text-foreground-secondary pb-2 w-full">{row.schoolName}</div>
                             <StandingFields row={row} division={division} />
                             <div className="flex gap-2 pb-0.5">
-                              <button type="submit" disabled={isPending} className={primaryBtn}>Save</button>
-                              <button type="button" onClick={() => setEditingId(null)} className={secondaryBtn}>
-                                Cancel
-                              </button>
+                              <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
+                              <button type="button" onClick={() => setEditingId(null)} className={cancelBtn}>Cancel</button>
                             </div>
                           </form>
                         </td>
@@ -258,7 +257,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                     );
                   }
                   return (
-                    <tr key={row.id} className="hover:bg-line/10 transition-colors group">
+                    <tr key={row.id} className="hover:bg-line/10 transition-colors">
                       <td className="px-4 py-3 font-bold text-foreground-secondary">{row.rank ?? '—'}</td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-white">{row.playerName ?? row.schoolName}</div>
@@ -281,10 +280,8 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                         {row.notes ?? ''}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                          <button onClick={() => setEditingId(row.id)} className={iconBtn} aria-label="Edit standing">
-                            <FiEdit2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <RowIconButton kind="edit" onClick={() => setEditingId(row.id)} label={`Edit ${row.playerName ?? row.schoolName} standing`} />
                           <ConfirmDeleteButton
                             action={async () => {
                               const res = await deleteStanding(row.id);
@@ -292,8 +289,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                               else setToast({ message: res?.error || 'Could not delete row.', type: 'error' });
                             }}
                             message={`Delete the ${row.playerName ?? row.schoolName} row from these standings? This cannot be undone.`}
-                            label="Delete"
-                            className="px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-[10px] uppercase tracking-wider rounded text-foreground-secondary hover:text-red-400 border border-line transition-all cursor-pointer"
+                            label={`Delete ${row.playerName ?? row.schoolName} standing`}
                           />
                         </div>
                       </td>

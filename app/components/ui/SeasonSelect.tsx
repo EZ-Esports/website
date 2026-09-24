@@ -38,7 +38,7 @@ export default function SeasonSelect({ basePath, seasons, selected, extraParams 
       className="flex items-center gap-2"
     >
       <Label className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Season</Label>
-      <Button className="px-3 py-2.5 min-h-[44px] text-sm font-bold rounded-lg bg-surface border border-line text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50 transition-all cursor-pointer disabled:opacity-60 flex items-center gap-2">
+      <Button className="pl-3 pr-4 py-2.5 min-h-[44px] text-sm font-bold rounded-lg bg-surface border border-line text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50 transition-all cursor-pointer disabled:opacity-60 flex items-center gap-2">
         <SelectValue />
         <FiChevronDown className="w-3.5 h-3.5 text-foreground-muted" aria-hidden="true" />
       </Button>

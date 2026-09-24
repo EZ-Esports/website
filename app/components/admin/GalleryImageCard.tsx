@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { HiChevronLeft, HiChevronRight } from 'react-icons/hi2';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import RowIconButton from '@/app/components/admin/RowIconButton';
 import { updateGalleryImage, toggleGalleryImageActive, deleteGalleryImage } from '@/app/(admin)/admin/gallery/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 
@@ -27,10 +28,6 @@ interface GalleryImageCardProps {
 
 const inputClass =
   'w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all';
-const editBtnClass =
-  'px-3 py-1.5 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground border border-line hover:border-line transition-all cursor-pointer';
-const deleteBtnClass =
-  'px-3 py-1.5 bg-surface-raised hover:bg-red-950/20 font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer';
 
 export default function GalleryImageCard({ img, index, totalCount, onOrderChange }: GalleryImageCardProps) {
   const [editOpen, setEditOpen] = useState(false);
@@ -144,15 +141,18 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
             >
               {img.isActive ? 'Active' : 'Inactive'}
             </button>
-            <div className="flex items-center gap-1">
-              <button ref={editBtnRef} onClick={toggleEdit} className={editBtnClass}>
-                {editOpen ? 'Cancel' : 'Edit'}
-              </button>
+            <div className="flex items-center gap-2">
+              <RowIconButton
+                ref={editBtnRef}
+                kind={editOpen ? 'cancel' : 'edit'}
+                onClick={toggleEdit}
+                aria-expanded={editOpen}
+                label={editOpen ? 'Cancel editing image' : 'Edit image'}
+              />
               <ConfirmDeleteButton
                 action={boundDelete}
                 message="Delete this image? This cannot be undone."
-                label="Delete"
-                className={deleteBtnClass}
+                label="Delete image"
               />
             </div>
           </div>
