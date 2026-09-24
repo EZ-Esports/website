@@ -142,7 +142,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
             >
               {img.isActive ? 'Active' : 'Inactive'}
             </button>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <button ref={editBtnRef} onClick={toggleEdit} className={editBtnClass}>
                 {editOpen ? 'Cancel' : 'Edit'}
               </button>
