@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { FiEdit2, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { deleteIconBtnCompact } from '@/app/components/admin/styles';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
@@ -292,7 +293,7 @@ function GameRow({
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
             <button onClick={() => setEditing(true)} className={iconBtn} aria-label="Edit game"><FiEdit2 className="w-3.5 h-3.5" /></button>
-            <button onClick={onDelete} className={`${iconBtn} hover:text-red-400`} aria-label="Delete game" title="Delete game"><FiTrash2 className="w-3.5 h-3.5" /></button>
+            <button onClick={onDelete} className={`${deleteIconBtnCompact} p-1.5`} aria-label="Delete game" title="Delete game"><FiTrash2 className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       )}
@@ -359,7 +360,7 @@ function SeasonRow({
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
             <button onClick={() => setEditing(true)} className={iconBtn} aria-label="Edit season"><FiEdit2 className="w-3.5 h-3.5" /></button>
-            <button onClick={onDelete} className={`${iconBtn} hover:text-red-400`} aria-label="Delete season" title="Delete season"><FiTrash2 className="w-3.5 h-3.5" /></button>
+            <button onClick={onDelete} className={`${deleteIconBtnCompact} p-1.5`} aria-label="Delete season" title="Delete season"><FiTrash2 className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       )}

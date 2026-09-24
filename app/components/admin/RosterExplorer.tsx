@@ -32,7 +32,7 @@ type RosterPlayerRow = Awaited<ReturnType<typeof listRosterPlayers>>[number];
 
 const ROLES = ['player', 'captain', 'coach', 'sub'] as const;
 
-import { input, primaryBtn, secondaryBtn, iconBtn } from '@/app/components/admin/styles';
+import { input, primaryBtn, secondaryBtn, iconBtn, deleteIconBtnCompact } from '@/app/components/admin/styles';
 
 export default function RosterExplorer({
   games, teams, rosters, schools, seasons, playerCounts,
@@ -586,8 +586,8 @@ function RosterView({
                           <button onClick={() => setEditingId(p.id)} className={iconBtn} aria-label="Edit player"><FiEdit2 className="w-3.5 h-3.5" /></button>
                           <button
                             onClick={() => confirmDelete(`Permanently remove ${p.firstName} ${p.lastName} from ${roster.name}? This cannot be undone.`, () => deleteRosterMember(p.id), 'Player removed.', refresh)}
-                            className={iconBtn} aria-label="Remove player" title="Remove player"
-                          ><FiTrash2 className="w-3.5 h-3.5 hover:text-red-400" /></button>
+                            className={`${deleteIconBtnCompact} p-1.5`} aria-label="Remove player" title="Remove player"
+                          ><FiTrash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </td>
                     </tr>
@@ -685,8 +685,8 @@ function MemberManager({
                     <button onClick={() => setEditingId(m.id)} className={iconBtn} aria-label="Edit member"><FiEdit2 className="w-3.5 h-3.5" /></button>
                     <button
                       onClick={() => confirmDelete(`Permanently delete ${m.firstName} ${m.lastName}? They will be removed from any rosters. This cannot be undone.`, () => deleteMember(m.id), 'Member deleted.', refresh)}
-                      className={iconBtn} aria-label="Delete member" title="Delete member"
-                    ><FiTrash2 className="w-3.5 h-3.5 hover:text-red-400" /></button>
+                      className={`${deleteIconBtnCompact} p-1.5`} aria-label="Delete member" title="Delete member"
+                    ><FiTrash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
               )}
@@ -864,7 +864,7 @@ function Tile({ children, onClick, onDelete, deleteLabel }: { children: React.Re
       <button onClick={onClick} className="text-left w-full cursor-pointer">{children}</button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="absolute top-3 right-3 p-1 rounded text-foreground-muted hover:text-red-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-all cursor-pointer"
+        className={`${deleteIconBtnCompact} absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100`}
         aria-label={deleteLabel} title={deleteLabel}
       ><FiTrash2 className="w-3.5 h-3.5" /></button>
     </div>

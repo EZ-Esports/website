@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Card from '@/app/components/ui/Card';
 import { FiTrash2 } from 'react-icons/fi';
-import { deleteIconBtnDanger } from '@/app/components/admin/styles';
+import { deleteIconBtn } from '@/app/components/admin/styles';
 import InviteStaffForm from '@/app/components/admin/InviteStaffForm';
 import { canActOnMember, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
 import StaffRow from '@/app/components/admin/StaffRow';
@@ -594,7 +594,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                           onClick={() => handleDeleteRole(activeRole.id)}
                           aria-label={`Delete role ${activeRole.name}`}
                           title={`Delete role ${activeRole.name}`}
-                          className={deleteIconBtnDanger}
+                          className={deleteIconBtn}
                         >
                           <FiTrash2 aria-hidden="true" className="h-4 w-4" />
                         </button>

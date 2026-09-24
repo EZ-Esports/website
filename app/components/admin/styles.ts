@@ -25,25 +25,31 @@ export const iconBtn =
   'p-1.5 hover:bg-line rounded-lg text-foreground-secondary hover:text-foreground transition-all cursor-pointer';
 
 /**
- * Destructive trash-can icon button (delete / remove). A 32px square with the
- * hit area padded out to ~42px by an invisible `after:-inset-1.5` pseudo-element
- * (the inset is measured inside the 1px border), so it stays compact in dense
- * admin tables. The overhang spills 6px past the button on every side, so its
- * container needs at least 6px of padding/gap on each side (a bare `text-right`
- * cell inside `overflow-x-auto` needs `pr-2`, or it adds a scrollbar). Pair
- * with an `aria-label` (icon-only) and a `title`. `deleteIconBtnDanger` is the
- * always-red-tinted variant for rows that already used a red remove button.
+ * Destructive trash-can icon buttons (delete / remove). Every trash button in
+ * the staff area shares one faint-red look (`deleteIconColors`), the same one
+ * the Applications tab uses. Always pair with an `aria-label` (icon-only) and a
+ * `title`.
+ *
+ * `deleteIconBtn` is the standard 32px square. Its hit area is padded out to
+ * ~42px by an invisible `after:-inset-1.5` pseudo-element (the inset is
+ * measured inside the 1px border), so it stays compact in dense admin tables.
+ * The overhang spills 6px past the button on every side, so its container needs
+ * at least 6px of padding/gap on each side (a bare `text-right` cell inside
+ * `overflow-x-auto` needs `pr-2`, or it adds a scrollbar).
+ *
+ * `deleteIconBtnCompact` is the same colours at a small size for dense,
+ * hover-revealed rows (roster, league, tiles). It has no overhang and no
+ * padding: add `p-1.5` (or `p-1`) and position it at the call site.
  */
-const deleteIconBtnBase =
-  "relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 after:absolute after:-inset-1.5 after:content-['']";
+const deleteIconColors =
+  'bg-red-950/10 border-red-900/30 text-red-400 hover:bg-red-950/30 hover:border-red-900/60';
 
-export const deleteIconBtn =
-  deleteIconBtnBase +
-  ' bg-surface-raised border-line text-foreground-secondary hover:bg-red-950/20 hover:border-red-900/40 hover:text-red-400 focus-visible:text-red-400';
+const deleteIconFocus =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60';
 
-export const deleteIconBtnDanger =
-  deleteIconBtnBase +
-  ' bg-red-950/10 border-red-900/30 text-red-400 hover:bg-red-950/30 hover:border-red-900/60';
+export const deleteIconBtn = `relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer ${deleteIconFocus} ${deleteIconColors} after:absolute after:-inset-1.5 after:content-['']`;
+
+export const deleteIconBtnCompact = `inline-flex items-center justify-center rounded-lg border transition-all cursor-pointer ${deleteIconFocus} ${deleteIconColors}`;
 
 export const selectClass =
   'px-3 py-1.5 bg-surface-sunken border border-line rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer';

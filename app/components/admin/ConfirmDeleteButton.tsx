@@ -1,7 +1,7 @@
 'use client';
 
 import { FiTrash2 } from 'react-icons/fi';
-import { deleteIconBtn, deleteIconBtnDanger } from '@/app/components/admin/styles';
+import { deleteIconBtn } from '@/app/components/admin/styles';
 
 interface ConfirmDeleteButtonProps {
   /** A bound server action that performs the deletion. */
@@ -13,8 +13,6 @@ interface ConfirmDeleteButtonProps {
    * target ("Delete school Foo") so a screen reader can tell rows apart.
    */
   label: string;
-  /** `danger` keeps the always-red tint used by the application "Remove" rows. */
-  tone?: 'neutral' | 'danger';
 }
 
 /**
@@ -25,7 +23,6 @@ export default function ConfirmDeleteButton({
   action,
   message,
   label,
-  tone = 'neutral',
 }: ConfirmDeleteButtonProps) {
   return (
     <form
@@ -39,7 +36,7 @@ export default function ConfirmDeleteButton({
         type="submit"
         aria-label={label}
         title={label}
-        className={tone === 'danger' ? deleteIconBtnDanger : deleteIconBtn}
+        className={deleteIconBtn}
       >
         <FiTrash2 aria-hidden="true" className="h-4 w-4" />
       </button>

@@ -126,7 +126,6 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
             action={handleDelete}
             message="Are you sure you want to remove this application?"
             label={`Remove application from ${app.schoolName}`}
-            tone="danger"
           />
         </td>
       </tr>
