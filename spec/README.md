@@ -37,7 +37,8 @@ Every `spec-00x` document must follow this structure:
 | ID | Title | PR / Commit | Date | Status | Summary |
 |---|---|---|---|---|---|
 | [`spec-001`](spec-001-admin-sidebar-pinning.md) | Admin Sidebar Viewport Pinning | PR #187 (`875bf56`) | 2026-09-23 | Shipped | Pinned staff sidebar to viewport height (`sticky top-0 h-dvh`) with static nav and persistent footer links. |
-| [`spec-002`](spec-002-database-safety-gates.md) | Database Safety Gates & Seed Retirement | PR #180 | 2026-09-24 | Shipped | Gated all DB mutation scripts against remote targets, retired destructive UUID-churning seed.ts, and blocked SharePoint PII CSV leaks. |
+| [`spec-002`](spec-002-database-safety-gates.md) | Database Safety Gates & Seed Retirement | PR #180 (`7b564e7`) | 2026-09-24 | Shipped | Gated all DB mutation scripts against remote targets, retired destructive UUID-churning seed.ts, and blocked SharePoint PII CSV leaks. |
+| [`spec-003`](spec-003-staff-role-lock-and-hierarchy.md) | Staff Role Lock-Then-Re-Read Concurrency Protection | PR #181 | 2026-09-24 | Shipped | Acquired advisory lock and re-read live actor permissions and target hierarchy under tx to prevent TOCTOU privilege escalation. |
 
 ---
 
