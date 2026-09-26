@@ -664,7 +664,7 @@ export default function StaffApplyForm() {
 
                 {/* LinkedIn (optional) */}
                 <div id="field-linkedin" className={fieldWrapperClass('linkedin', !!fieldErrors.linkedin)}>
-                  <label htmlFor="linkedin" className={labelClass}>LinkedIn profile link</label>
+                  <label htmlFor="linkedin" className={labelClass}>LinkedIn profile</label>
                   <input
                     id="linkedin"
                     name="linkedin"
