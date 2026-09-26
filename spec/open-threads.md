@@ -45,7 +45,7 @@ The following items from the September 2026 Codebase Quality Audit have been imp
   - a periodic sweep that deletes objects in `staff-resumes` with no matching `resume_storage_key`, to catch failures between the two steps.
 
   Decide whether decline deletes immediately or after a short grace period, and update the policy wording if it becomes a grace period.
-- **Division list vs recruiting copy: mostly reconciled.** The per-game divisions are now one "Game Regulations Division" with a director follow-up (spec-004 item 8). "Software Engineering Division" was not renamed to the post's "Software engineering & data science". The unmerged `feat/staff-application-divisions` (`9d78f35`) is superseded: it would reintroduce the retired "Games Division" and conflicts in the same files.
+- **Division list vs recruiting copy: reconciled.** The per-game divisions are one "Game Regulations Division" with a director follow-up, and "Systems Engineering Division" and "Data Science Division" now sit beside the kept "Software Engineering Division" (spec-004 item 8). The list is nine divisions and no longer mirrors the Discord post word for word. The unmerged `feat/staff-application-divisions` (`9d78f35`) is superseded: it would reintroduce the retired "Games Division" and conflicts in the same files.
 - **Deferred by the user (not started):** screen-reader refinements to the resume picker, and a copy tidy (Step 3 description and placeholder, placement of the unpaid acknowledgement, the hardcoded "5th year in 2026–27").
 
 ---

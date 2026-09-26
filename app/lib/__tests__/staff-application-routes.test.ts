@@ -155,6 +155,17 @@ describe('POST /api/apply/staff', () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
+  it('accepts the Systems Engineering and Data Science divisions without a director answer', async () => {
+    for (const role of ['Systems Engineering Division', 'Data Science Division']) {
+      mocks.insertValues.mockClear();
+      const res = await POST(submission({ fields: { role }, details: buildStaffApplicationDetails({ ...form, role }) }));
+      expect(res.status).toBe(201);
+      const row = mocks.insertValues.mock.calls[0][0];
+      expect(row.role).toBe(role);
+      expect(row.details.gameDirector).toBe('');
+    }
+  });
+
   it('rejects a retired per-game division as the role', async () => {
     const res = await POST(submission({ fields: { role: 'VALORANT Division' } }));
     expect(res.status).toBe(400);

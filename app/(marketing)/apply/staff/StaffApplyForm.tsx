@@ -667,8 +667,8 @@ export default function StaffApplyForm() {
                         Which game director position are you interested in? {requiredMark}
                       </Label>
                       <Text slot="description" className="block text-xs text-foreground-secondary mb-2">
-                        For example VALORANT, League of Legends, or Teamfight Tactics. Tell us which game(s) and any
-                        experience you have with them. {characterLimitNotice(GAME_DIRECTOR_MAX_LENGTH)}
+                        Tell us which game(s) and any experience you have with them.{' '}
+                        {characterLimitNotice(GAME_DIRECTOR_MAX_LENGTH)}
                       </Text>
                       <Textarea
                         rows={3}

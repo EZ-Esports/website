@@ -123,9 +123,11 @@ describe("Staff Application Details", () => {
     ]);
   });
 
-  it("offers exactly the seven divisions, in order", () => {
+  it("offers exactly the nine divisions, in order, with the engineering and data science divisions together", () => {
     expect([...STAFF_ROLES]).toEqual([
       "Software Engineering Division",
+      "Systems Engineering Division",
+      "Data Science Division",
       "Marketing Division",
       "Operations Division",
       "Development Division",
@@ -148,6 +150,9 @@ describe("Staff Application Details", () => {
   it("rejects retired role values and the old Other option", () => {
     const validRole: StaffRole = GAME_REGULATIONS_ROLE;
     expect(isStaffRole(validRole)).toBe(true);
+    expect(isStaffRole("Systems Engineering Division")).toBe(true);
+    expect(isStaffRole("Data Science Division")).toBe(true);
+    expect(isStaffRole("Systems Engineering")).toBe(false);
     expect(isStaffRole("VALORANT Division")).toBe(false);
     expect(isStaffRole("League of Legends Division")).toBe(false);
     expect(isStaffRole("Teamfight Tactics Division")).toBe(false);

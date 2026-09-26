@@ -8,6 +8,8 @@ export const GAME_REGULATIONS_ROLE = 'Game Regulations Division';
  */
 export const STAFF_ROLES = [
   'Software Engineering Division',
+  'Systems Engineering Division',
+  'Data Science Division',
   'Marketing Division',
   'Operations Division',
   'Development Division',
