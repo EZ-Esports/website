@@ -1,4 +1,4 @@
-# spec-004: Staff Application Resume Upload, Volunteer Acknowledgement, and Recruiting Intro
+# spec-006: Staff Application Resume Upload, Volunteer Acknowledgement, and Recruiting Intro
 
 - **Status:** In Progress (code on `fix/staff-apply-tidy`, not deployed; migration `0036` and the `staff-resumes` bucket are **live in production** as of 2026-09-26)
 - **PR:** not opened yet

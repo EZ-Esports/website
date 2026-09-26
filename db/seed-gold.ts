@@ -38,6 +38,7 @@ import { and, isNotNull, notInArray, sql } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
+import { parseEastern } from '../app/lib/dates';
 import { requireFreshBackup } from './backup';
 import { assertSeedTargetAllowed } from './seed-target';
 import { matchSourceKeys, memberKeyOf, standingSourceKeys } from './gold-keys';
@@ -56,42 +57,6 @@ const gold = (file: string) => readRecords(`${GOLD_DIR}/${file}`);
 const intOrNull = (v: string) => (v === '' ? null : parseInt(v, 10));
 const floatOrNull = (v: string) => (v === '' ? null : parseFloat(v));
 const orNull = (v: string) => (v === '' ? null : v);
-
-/** Milliseconds the given timezone is ahead of UTC at the given instant. */
-function tzOffsetMs(date: Date, timeZone: string): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour12: false,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    })
-      .formatToParts(date)
-      .map((p) => [p.type, p.value])
-  );
-  const asUtc = Date.UTC(
-    +parts.year, +parts.month - 1, +parts.day,
-    +parts.hour % 24, +parts.minute, +parts.second
-  );
-  return asUtc - date.getTime();
-}
-
-/**
- * "YYYY-MM-DD HH:MM:SS" (America/New_York wall time, as written in the
- * spreadsheets) -> UTC Date. Two passes so the DST offset is taken from the
- * instant itself, not from today.
- */
-function parseEastern(s: string): Date {
-  const [d, t] = s.split(' ');
-  const [y, m, day] = d.split('-').map(Number);
-  const [hh, mm, ss] = t.split(':').map(Number);
-  const wallUtc = Date.UTC(y, m - 1, day, hh, mm, ss ?? 0);
-  let instant = wallUtc;
-  for (let i = 0; i < 2; i++) {
-    instant = wallUtc - tzOffsetMs(new Date(instant), 'America/New_York');
-  }
-  return new Date(instant);
-}
 
 /**
  * Reads a season's standings_format, refusing to guess.

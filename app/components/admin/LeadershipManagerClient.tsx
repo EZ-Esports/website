@@ -406,6 +406,8 @@ export default function LeadershipManagerClient({
 
                 <div>
                   <ImageUpload
+                    section="leadership"
+                    entityIdName="personId"
                     name="avatarUrl"
                     storageKeyName="storageKey"
                     label="Headshot Avatar Photo"

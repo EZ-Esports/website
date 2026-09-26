@@ -2,10 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { HiArrowUpTray, HiPhoto, HiXMark, HiArrowPath } from 'react-icons/hi2';
+import type { UploadSection } from '@/app/lib/storage';
 
 interface ImageUploadProps {
   name: string;
   storageKeyName: string;
+  section: UploadSection;
+  entityId?: string;
+  entityIdName?: string;
   currentSrc?: string;
   currentStorageKey?: string;
   label?: string;
@@ -18,6 +22,9 @@ const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 export default function ImageUpload({
   name,
   storageKeyName,
+  section,
+  entityId,
+  entityIdName,
   currentSrc,
   currentStorageKey,
   label = 'Image',
@@ -25,6 +32,7 @@ export default function ImageUpload({
 }: ImageUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string>(currentSrc ?? '');
   const [storageKey, setStorageKey] = useState<string>(currentStorageKey ?? '');
+  const [draftId, setDraftId] = useState<string>(() => crypto.randomUUID());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -32,6 +40,8 @@ export default function ImageUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
+
+  const effectiveEntityId = entityId || draftId;
 
   // Sync state back to initial values when parent form is reset
   useEffect(() => {
@@ -44,6 +54,7 @@ export default function ImageUpload({
       setIsDragOver(false);
       dragCounterRef.current = 0;
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setDraftId(crypto.randomUUID());
     };
     form.addEventListener('reset', onReset);
     return () => form.removeEventListener('reset', onReset);
@@ -65,6 +76,8 @@ export default function ImageUpload({
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('section', section);
+      fd.append('entityId', effectiveEntityId);
 
       const res = await fetch('/api/upload', {
         method: 'POST',
@@ -85,7 +98,7 @@ export default function ImageUpload({
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [section, effectiveEntityId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,6 +175,7 @@ export default function ImageUpload({
       {/* Hidden form submission inputs */}
       <input type="hidden" name={name} value={previewUrl} required={required} />
       <input type="hidden" name={storageKeyName} value={storageKey} />
+      <input type="hidden" name={entityIdName ?? 'entityId'} value={effectiveEntityId} />
 
       {/* Hidden real file input */}
       <input
@@ -181,7 +195,6 @@ export default function ImageUpload({
           tabIndex={uploading ? -1 : 0}
           aria-label={`Upload ${label}. Drag and drop an image or press Enter to browse files`}
           aria-busy={uploading}
-          aria-invalid={!!error}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}

@@ -18,6 +18,7 @@
     "db:seed:leadership": "npx tsx --env-file-if-exists=.env db/seed-leadership.ts",
     "db:seed-owner": "npx tsx --env-file-if-exists=.env db/seed-owner.ts",
     "db:backup:clean": "npx tsx db/backup-clean.ts",
+    "db:storage:clean": "npx tsx --env-file-if-exists=.env db/storage-clean.ts",
     "prepare": "test -d .git && git config core.hooksPath .githooks || true"
   },
   "dependencies": {

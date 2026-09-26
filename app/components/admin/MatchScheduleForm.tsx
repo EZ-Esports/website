@@ -163,7 +163,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
 
       <div>
         <label htmlFor="scheduledAt" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
-          Date & Time
+          Date & Time (Eastern Time / ET)
         </label>
         <input
           id="scheduledAt"

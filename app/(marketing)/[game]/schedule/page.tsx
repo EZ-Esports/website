@@ -7,7 +7,7 @@ import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import FilterTabs from '@/app/components/ui/FilterTabs';
 import Button from '@/app/components/ui/Button';
 import { getMatchesPage, getSeasonMatches, getSeasonsWithGames } from '@/app/lib/db/queries';
-import { normalizeSort, resolveSelectedSeason, toMatchesPageDto } from '@/app/lib/db/match-page';
+import { normalizeSort, resolveSelectedSeason, toMatchesPageDto, toScheduleCalendarItem } from '@/app/lib/db/match-page';
 import CalendarSchedule from './CalendarSchedule';
 import ArchiveMatchList from './ArchiveMatchList';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
@@ -62,32 +62,9 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
     });
   }
 
-  const schedule = calendarMatches.map((m) => ({
-    id: m.id,
-    ts: m.scheduledAt.getTime(),
-    date: m.scheduledAt.toLocaleDateString('en-US', {
-      timeZone: 'America/New_York',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    }),
-    time: m.scheduledAt.toLocaleTimeString('en-US', {
-      timeZone: 'America/New_York',
-      hour: 'numeric',
-      minute: '2-digit',
-    }),
-    scheduledAt: m.scheduledAt.toISOString(),
-    team1: m.homeTeam,
-    team2: m.awayTeam,
-    division: m.division,
-    status: m.status === 'completed' ? 'Completed' : m.status === 'live' ? 'Live' : 'Upcoming',
-    result:
-      m.status === 'completed' && m.homeScore !== null && m.awayScore !== null
-        ? `${m.homeScore > m.awayScore ? 'W' : 'L'} ${m.homeScore}-${m.awayScore}`
-        : undefined,
-    homeScore: m.homeScore,
-    awayScore: m.awayScore,
-  }));
+  const schedule = calendarMatches
+    .filter((m) => m.status !== 'cancelled')
+    .map(toScheduleCalendarItem);
 
   const filterHref = (d: string, s: string) =>
     `/${game}/schedule?division=${d}${selectedSeason ? `&season=${encodeURIComponent(selectedSeason.name)}` : ''}&sort=${s}`;
@@ -104,6 +81,9 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
               : 'View all scheduled matches for the current season'
           }
         />
+        <p className="text-xs text-foreground-muted -mt-8 mb-8 text-center font-medium">
+          All match times are Eastern Time (ET).
+        </p>
         {/* A failed fetch now throws and hits the route's error boundary, so
             an empty schedule here is a real "nothing yet", the only case
             left where this notice is warranted. */}
