@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import GalleryManagerClient, {
   deriveDisplayImages,
   moveItem,
+  canMoveItem,
   GalleryImage,
 } from '../GalleryManagerClient';
 
@@ -158,6 +159,44 @@ describe('GalleryManagerClient unit & integration tests', () => {
       const reset = deriveDisplayImages(sampleImages, null);
       expect(reset).toBe(sampleImages);
       expect(reset.map((img) => img.id)).toEqual(['img-1', 'img-2', 'img-3']);
+    });
+
+    it('clears draft order and adopts new server state upon successful save', () => {
+      const draftOrder = ['img-3', 'img-1', 'img-2'];
+      const uncommitted = deriveDisplayImages(sampleImages, draftOrder);
+      expect(uncommitted.map((img) => img.id)).toEqual(['img-3', 'img-1', 'img-2']);
+
+      // Server returns freshly re-ordered list
+      const savedServerImages: GalleryImage[] = [
+        { ...sampleImages[2], displayOrder: 1 },
+        { ...sampleImages[0], displayOrder: 2 },
+        { ...sampleImages[1], displayOrder: 3 },
+      ];
+
+      // On save success, draftOrder is reset to null
+      const postSave = deriveDisplayImages(savedServerImages, null);
+      expect(postSave.map((img) => img.id)).toEqual(['img-3', 'img-1', 'img-2']);
+      expect(postSave[0].displayOrder).toBe(1);
+    });
+  });
+
+  describe('canMoveItem guard', () => {
+    it('blocks moves while a transition is pending', () => {
+      expect(canMoveItem({ pending: true, currentIndex: 0, newIndex: 1, totalCount: 3 })).toBe(false);
+    });
+
+    it('blocks moves out of bounds (below 0 or at/beyond totalCount)', () => {
+      expect(canMoveItem({ pending: false, currentIndex: 0, newIndex: -1, totalCount: 3 })).toBe(false);
+      expect(canMoveItem({ pending: false, currentIndex: 2, newIndex: 3, totalCount: 3 })).toBe(false);
+    });
+
+    it('blocks moves to the exact same position', () => {
+      expect(canMoveItem({ pending: false, currentIndex: 1, newIndex: 1, totalCount: 3 })).toBe(false);
+    });
+
+    it('allows valid moves within bounds when not pending', () => {
+      expect(canMoveItem({ pending: false, currentIndex: 0, newIndex: 1, totalCount: 3 })).toBe(true);
+      expect(canMoveItem({ pending: false, currentIndex: 2, newIndex: 1, totalCount: 3 })).toBe(true);
     });
   });
 

@@ -50,6 +50,20 @@ export function deriveDisplayImages(
   return [...preserved, ...added];
 }
 
+export function canMoveItem({
+  pending,
+  currentIndex,
+  newIndex,
+  totalCount,
+}: {
+  pending: boolean;
+  currentIndex: number;
+  newIndex: number;
+  totalCount: number;
+}): boolean {
+  return !pending && newIndex >= 0 && newIndex < totalCount && newIndex !== currentIndex;
+}
+
 export default function GalleryManagerClient({ initialImages }: GalleryManagerClientProps) {
   const [draftOrder, setDraftOrder] = useState<string[] | null>(null);
   const [pending, startTransition] = useTransition();
@@ -65,7 +79,7 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
   );
 
   const handleMove = (currentIndex: number, newIndex: number) => {
-    if (pending || newIndex < 0 || newIndex >= displayImages.length || newIndex === currentIndex) return;
+    if (!canMoveItem({ pending, currentIndex, newIndex, totalCount: displayImages.length })) return;
     setSuccess(false);
     setError(null);
     const currentOrder = displayImages.map((img) => img.id);

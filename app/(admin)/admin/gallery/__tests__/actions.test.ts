@@ -36,6 +36,11 @@ vi.mock('next/cache', () => ({
   revalidateTag: (...args: unknown[]) => mockRevalidateTag(...args),
 }));
 
+vi.mock('drizzle-orm', async (orig) => ({
+  ...(await orig<typeof import('drizzle-orm')>()),
+  eq: (_col: unknown, val: unknown) => val,
+}));
+
 vi.mock('@/app/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => ({
     storage: {
@@ -153,7 +158,11 @@ describe('updateGalleryImagesOrder', () => {
 
     expect(res).toEqual({ success: true });
     expect(mockTx.update).toHaveBeenCalledTimes(3);
-    expect(updates.map((u) => u.displayOrder)).toEqual([1, 2, 3]);
+    expect(updates).toEqual([
+      { id: 'id-3', displayOrder: 1 },
+      { id: 'id-1', displayOrder: 2 },
+      { id: 'id-2', displayOrder: 3 },
+    ]);
 
     expect(mockRevalidateTag).toHaveBeenCalledWith('gallery-images', {});
     expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/gallery');
