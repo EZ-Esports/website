@@ -6,6 +6,7 @@ import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import { saveBtn } from '@/app/components/admin/styles';
 import { fetchMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
+import { formatNY } from '@/app/lib/dates';
 import { selectClass } from '@/app/components/admin/styles';
 
 const PAGE_SIZE = 25;
@@ -223,13 +224,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                         {game?.shortName} • {season?.name}
                       </div>
                       <div className="text-[11px] text-foreground-muted font-semibold mt-0.5">
-                        {new Date(match.scheduledAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {formatNY(new Date(match.scheduledAt), 'date-short')} · {formatNY(new Date(match.scheduledAt), 'time')}
                       </div>
                     </td>
 

@@ -6,6 +6,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { parseEastern } from '@/app/lib/dates';
 
 export type MatchActionResult = { success: boolean; error?: string };
 
@@ -47,11 +48,16 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
       return { success: false, error: 'Both rosters must be from the same game.' };
     }
 
+    const scheduledAt = parseEastern(scheduledAtStr);
+    if (Number.isNaN(scheduledAt.getTime())) {
+      return { success: false, error: 'Invalid scheduled date and time.' };
+    }
+
     await db.insert(schema.matches).values({
       seasonId,
       homeRosterId,
       awayRosterId,
-      scheduledAt: new Date(scheduledAtStr),
+      scheduledAt,
       status: 'scheduled',
     });
   } catch (error) {
