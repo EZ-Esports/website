@@ -32,7 +32,7 @@ The form is public and unauthenticated, and a resume is PII (name, contact detai
    - `erase_staff_application_privacy()` is re-created with `"resume_storage_key" = NULL` on redact. This only drops the pointer: the PDF must be deleted from the `staff-resumes` bucket separately. Read the key before redacting.
 
 6. **Form UI.**
-   - Step 2 is "Role & Resume": a resume picker built on RAC `FileTrigger` + RAC `Button` (44px target, `aria-labelledby`/`aria-describedby` wired to the hint, the live filename/size status, and the error). Client-side type and size checks use the same `checkResumeFile` as the server. Below it: a LinkedIn `type="url"` input with an inline error, then an optional "Links to related work samples" input.
+   - Step 2 is "Role & Resume": a resume picker built on RAC `FileTrigger` + RAC `Button` (44px target, `aria-labelledby`/`aria-describedby` wired to the hint, the live filename/size status, and the error). Client-side type and size checks use the same `checkResumeFile` as the server. Below it: a LinkedIn `type="url"` input with an inline error, then an optional "Other links" input.
    - Step 3's label is "Why do you want to join EZ Esports? (approx. 4-7 sentences)". Both "3-6 sentences" strings are now "4-7".
    - Step 4 has a third required checkbox, `UNPAID_VOLUNTEER_ACK_TEXT`, with the same pattern as the Terms and Privacy boxes. It counts toward the progress bar.
    - 4xx error messages from the server (bad PDF, rate limit) are shown to the applicant. 5xx errors fall back to the generic message.

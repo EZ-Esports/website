@@ -106,7 +106,7 @@ export type StaffApplicationDetails =
   | StaffApplicationDetailsV2
   | StaffApplicationDetailsV3;
 
-/** Server-side cap on the optional work-samples text; generous for several links, small enough to keep `details` compact. */
+/** Server-side cap on the optional other-links text; generous for several links, small enough to keep `details` compact. */
 export const WORK_SAMPLES_MAX_LENGTH = 1000;
 
 export const UNPAID_VOLUNTEER_ACK_TEXT =
@@ -184,7 +184,7 @@ export function parseStaffApplicationDetails(raw: unknown): ParsedStaffApplicati
 
   const workSamples = asString(d.workSamples).trim();
   if (workSamples.length > WORK_SAMPLES_MAX_LENGTH) {
-    return { ok: false, error: `Work sample links must be ${WORK_SAMPLES_MAX_LENGTH} characters or fewer.` };
+    return { ok: false, error: `Other links must be ${WORK_SAMPLES_MAX_LENGTH} characters or fewer.` };
   }
 
   const backgroundMotivation = asString(d.backgroundMotivation).trim();
@@ -246,7 +246,7 @@ function formatStaffApplicationDetailsV2(d: StaffApplicationDetailsV2): { label:
 function formatStaffApplicationDetailsV3(d: StaffApplicationDetailsV3): { label: string; value: string }[] {
   return [
     { label: 'LinkedIn', value: d.linkedin || '—' },
-    { label: 'Work Samples', value: d.workSamples || '—' },
+    { label: 'Other Links', value: d.workSamples || '—' },
     { label: 'Weekly Availability', value: d.availability || '—' },
     { label: 'Terms of Service', value: agreed(d.consent?.agreedToTerms) },
     { label: 'Privacy Policy', value: agreed(d.consent?.agreedToPrivacy) },

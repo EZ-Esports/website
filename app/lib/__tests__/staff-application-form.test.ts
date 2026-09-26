@@ -51,7 +51,7 @@ describe("Staff Application Details", () => {
   it("formats v3 details into labeled rows, with a LinkedIn-only label", () => {
     expect(formatStaffApplicationDetails(buildStaffApplicationDetails(validForm))).toEqual([
       { label: "LinkedIn", value: "https://linkedin.com/in/janesmith" },
-      { label: "Work Samples", value: "https://github.com/janesmith" },
+      { label: "Other Links", value: "https://github.com/janesmith" },
       { label: "Weekly Availability", value: "10hrs" },
       { label: "Terms of Service", value: "Agreed" },
       { label: "Privacy Policy", value: "Agreed" },
@@ -66,7 +66,7 @@ describe("Staff Application Details", () => {
     );
     expect(rows).toContainEqual({ label: "Why EZ Esports", value: "—" });
     expect(rows).toContainEqual({ label: "LinkedIn", value: "—" });
-    expect(rows).toContainEqual({ label: "Work Samples", value: "—" });
+    expect(rows).toContainEqual({ label: "Other Links", value: "—" });
   });
 
   it("still formats v2 rows with their original LinkedIn / Portfolio label", () => {
@@ -224,7 +224,7 @@ describe("parseStaffApplicationDetails (server-side gate)", () => {
     });
   });
 
-  it("keeps optional work samples as trimmed free text, with a length cap", () => {
+  it("keeps optional other links as trimmed free text, with a length cap", () => {
     const ok = parseStaffApplicationDetails({ ...valid(), workSamples: "  github.com/jane, jane.design  " });
     expect(ok.ok && ok.details.workSamples).toBe("github.com/jane, jane.design");
 

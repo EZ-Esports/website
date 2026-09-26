@@ -685,9 +685,9 @@ export default function StaffApplyForm() {
                   )}
                 </div>
 
-                {/* Work samples (optional) */}
+                {/* Other links (optional) */}
                 <div id="field-workSamples" className={fieldWrapperClass('workSamples', false)}>
-                  <label htmlFor="workSamples" className={labelClass}>Links to related work samples</label>
+                  <label htmlFor="workSamples" className={labelClass}>Other links</label>
                   <p id="workSamples-hint" className="text-xs text-foreground-secondary mb-2">
                     Optional. GitHub, a portfolio, designs, videos, or anything else that shows your work.
                   </p>
