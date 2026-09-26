@@ -667,8 +667,7 @@ export default function StaffApplyForm() {
                         Which game director position are you interested in? {requiredMark}
                       </Label>
                       <Text slot="description" className="block text-xs text-foreground-secondary mb-2">
-                        Tell us which game(s) and any experience you have with them.{' '}
-                        {characterLimitNotice(GAME_DIRECTOR_MAX_LENGTH)}
+                        Tell us which game(s) and any experience you have with them.
                       </Text>
                       <Textarea
                         rows={3}
@@ -752,8 +751,7 @@ export default function StaffApplyForm() {
                 <div id="field-workSamples" className={fieldWrapperClass('workSamples', false)}>
                   <label htmlFor="workSamples" className={labelClass}>Other links</label>
                   <p id="workSamples-hint" className="text-xs text-foreground-secondary mb-2">
-                    Optional. GitHub, a portfolio, designs, videos, or anything else that shows your work.{' '}
-                    {characterLimitNotice(WORK_SAMPLES_MAX_LENGTH)}
+                    Optional. GitHub, a portfolio, designs, videos, or anything else that shows your work.
                   </p>
                   <input
                     id="workSamples"
