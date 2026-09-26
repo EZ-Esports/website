@@ -46,7 +46,7 @@ describe('Privacy erasure migration (0035)', () => {
     it('appends 0035_allow_authorized_privacy_erasure to the journal', () => {
       const tags = journal.entries.map((entry) => entry.tag);
       expect(tags).toContain('0035_allow_authorized_privacy_erasure');
-      expect(tags.at(-1)).toBe('0035_allow_authorized_privacy_erasure');
+      expect(tags.indexOf('0035_allow_authorized_privacy_erasure')).toBe(tags.indexOf('0034_guard_application_details_immutability') + 1);
     });
 
     it('links 0035 snapshot prevId to 0034 snapshot id', () => {

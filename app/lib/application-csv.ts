@@ -59,9 +59,12 @@ export interface StaffApplicationCsvSource {
   submittedAt: Date;
   message: string | null;
   details: StaffApplicationDetails | null;
+  hasResume?: boolean;
 }
 
-const STAFF_CSV_HEADER = ["Name", "Role", "Email", "Phone", "Status", "Submitted", "Details"];
+// "Resume" records only whether a PDF is on file: signed links expire within
+// a minute, so a URL in an exported spreadsheet would be dead on arrival.
+const STAFF_CSV_HEADER = ["Name", "Role", "Email", "Phone", "Status", "Submitted", "Resume", "Details"];
 
 /** See schoolApplicationsToCsv above for why a null `details` falls back to `message` rather than an empty column. */
 export function staffApplicationsToCsv(apps: StaffApplicationCsvSource[]): string {
@@ -72,6 +75,7 @@ export function staffApplicationsToCsv(apps: StaffApplicationCsvSource[]): strin
     app.phone,
     app.status,
     formatSubmittedDate(app.submittedAt),
+    app.hasResume ? "Attached" : "",
     app.details ? detailsColumn(formatStaffApplicationDetails(app.details)) : (app.message ?? ""),
   ]);
   return buildCsv(STAFF_CSV_HEADER, rows);

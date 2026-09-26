@@ -35,6 +35,22 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 
 ---
 
+## Staff application resume rollout (spec-007)
+
+- **Production setup done (2026-09-26):** the private `staff-resumes` bucket and migration `0036` are live. `fix/staff-apply-tidy` itself is not merged or deployed yet. Never edit `0036` in place; schema changes need a new migration.
+- **Unauthenticated resume uploads can be spammed.** Anyone can POST `/api/apply/staff` with a valid PDF, and each accepted request stores a file (up to 4 MB) plus a row. The only brake is `rateLimit()` (5 per IP per 10 min), an in-memory Map that is per serverless instance and resets on cold start, so a distributed or patient sender can fill Storage and the Applications tab. Options: Cloudflare Turnstile (or similar) verified server-side before upload; a durable shared rate limiter (e.g. Upstash, which `rate-limit.ts` already points at); and/or a cleanup job that removes objects in `staff-resumes` with no matching `resume_storage_key` plus a Storage usage alert. Not started.
+- **Privacy erasure does not delete the PDF.** `erase_staff_application_privacy` removes the row (`'delete'`) or nulls `resume_storage_key` (`'redact'`), but the object in `staff-resumes` has to be removed separately, and the key must be read first. The manual runbook is in [spec-007](spec-007-staff-application-resume.md) item 9.
+- **Automate deletion on decline. Needed to keep the published retention promise without manual work.** `/privacy` now says an application and its resume are deleted once we decide not to move forward with it. Today, declining in `/admin/applications` only writes a status log, so every decline needs the manual runbook. Build:
+  - a server action, gated by `MANAGE_APPLICATIONS`, that on decline (or an explicit "delete") reads `resume_storage_key`, removes the PDF from `staff-resumes`, and only then runs `erase_staff_application_privacy(id, actor, 'delete')`; and
+  - a periodic sweep that deletes objects in `staff-resumes` with no matching `resume_storage_key`, to catch failures between the two steps.
+
+  Decide whether decline deletes immediately or after a short grace period, and update the policy wording if it becomes a grace period.
+- **Applications declined before this deploys.** The `/privacy` retention wording ("if we decide not to move forward, we delete it, including any resume") also covers applications already declined or soft-deleted in production. Nothing removes those today. At deploy, list staff applications with status "rejected" or `deleted_at` set and process each one with the runbook in [spec-007](spec-007-staff-application-resume.md) item 9 (read `resume_storage_key`, delete the PDF, then erase the row). Also note that downloaded resumes, exported CSVs, and `db/backups` dumps can outlive a deletion; `/privacy` Section 9 says some information may need to be retained, and backup retention is not yet specified.
+- **Division list vs recruiting copy: reconciled.** The per-game divisions are one "Game Regulations Division" with a director follow-up, and "Systems Engineering Division" and "Data Science Division" now sit beside the kept "Software Engineering Division" (spec-007 item 8). The list is nine divisions and no longer mirrors the Discord post word for word. The unmerged `feat/staff-application-divisions` (`9d78f35`) is superseded: it would reintroduce the retired "Games Division" and conflicts in the same files.
+- **Deferred by the user (not started):** screen-reader refinements to the resume picker, and a copy tidy (Step 3 description and placeholder, placement of the unpaid acknowledgement, the hardcoded "5th year in 2026–27").
+
+---
+
 ## Active Pipeline (Next Up)
 
 - **[#144](https://github.com/EZ-Esports/website/issues/144)**: Cache invalidation profile using Next.js 16 `updateTag` so CMS saves reliably invalidate public pages.

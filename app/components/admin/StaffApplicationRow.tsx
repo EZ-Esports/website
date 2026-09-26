@@ -19,6 +19,7 @@ export interface StaffApplication {
   role: string;
   message: string | null;
   details: StaffApplicationDetails | null;
+  hasResume: boolean;
   status: Status;
   submittedAt: Date;
 }

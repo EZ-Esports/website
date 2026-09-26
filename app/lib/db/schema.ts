@@ -449,6 +449,11 @@ export const staffApplications = pgTable('staff_applications', {
   role: text('role').notNull(),
   message: text('message').default(''),
   details: jsonb('details').$type<StaffApplicationDetails | null>(),
+  // Object key inside the private STAFF_RESUME_BUCKET, never a URL: resumes
+  // are applicant PII, so admins only ever reach them through a short-lived
+  // signed URL minted after a permission check. Null for rows submitted
+  // before resumes were collected.
+  resumeStorageKey: text('resume_storage_key'),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),

@@ -42,6 +42,7 @@ Every `spec-00x` document must follow this structure:
 | [`spec-004`](spec-004-eastern-time-schedule-normalization.md) | Eastern Time Schedule Normalization & Status Mapping | PR #184 (`4264863`) | 2026-09-25 | Shipped | Canonicalized league competition to America/New_York via parseEastern, anchored calendar grid timezone, and normalized forfeit/tie status. |
 | [`spec-005`](spec-005-scoped-storage-keys-and-cleanup.md) | Scoped Storage Keys & Server-Derived Asset Cleanup | PR #182 (`2ef602f`) | 2026-09-25 | Shipped | Enforced section permissions, path traversal sanitization, deterministic key scoping `${section}/${entityId}/`, and automated abandoned storage cleanup. |
 | [`spec-006`](spec-006-gallery-reorder-derived-state.md) | Gallery Reorder Derived State & Full-List Advisory Locking | PR #183 | 2026-09-25 | Shipped | Derived display order from uncommitted draft IDs and server props, enforced advisory lock and full active-ID set validation. |
+| [`spec-007`](spec-007-staff-application-resume.md) | Staff Application Resume Upload, Volunteer Acknowledgement, and Recruiting Intro | PR #190 | 2026-09-25 | In Review | Required PDF resume in the private `staff-resumes` bucket (magic-byte checked, 4 MB cap, admin-only 60 s signed URL), optional LinkedIn (linkedin.com only) and "Other links", unpaid-volunteer acknowledgement, Game Regulations Division with an open-answer director follow-up (`details` v4), Privacy Policy coverage, recruiting intro with mission statement. Migration `0036` and bucket are live. |
 
 ---
 
