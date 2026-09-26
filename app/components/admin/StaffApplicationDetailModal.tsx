@@ -1,12 +1,13 @@
 "use client";
 
-import { FiX } from "react-icons/fi";
+import { FiFileText, FiX } from "react-icons/fi";
 import { Overlay, Modal, Dialog } from "@/app/components/ui/overlay";
 import { formatStaffApplicationDetails } from "@/app/lib/staff-application-form";
 import { staffApplicationsToCsv } from "@/app/lib/application-csv";
 import DownloadCsvButton from "@/app/components/admin/DownloadCsvButton";
 import { DetailSection, DetailField } from "@/app/components/admin/ApplicationDetailSections";
 import type { StaffApplication } from "@/app/components/admin/StaffApplicationRow";
+import { secondaryBtn } from "@/app/components/admin/styles";
 
 interface StaffApplicationDetailModalProps {
   app: StaffApplication;
@@ -58,7 +59,21 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto">
+          <div className="p-6 overflow-y-auto space-y-4">
+            {app.hasResume && (
+              // A plain link to the gated route, which redirects to a signed URL
+              // valid for about a minute: nothing long-lived reaches the page.
+              <a
+                href={`/admin/applications/staff/${app.id}/resume`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${secondaryBtn} w-fit min-h-[44px]`}
+              >
+                <FiFileText className="w-4 h-4" aria-hidden="true" />
+                View resume (PDF)
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            )}
             {app.details ? (
               <DetailSection title="Application Details">
                 {formatStaffApplicationDetails(app.details).map((row) => (

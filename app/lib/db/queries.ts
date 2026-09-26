@@ -727,6 +727,9 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
       role: schema.staffApplications.role,
       message: schema.staffApplications.message,
       details: schema.staffApplications.details,
+      // Only whether a resume exists: the storage key stays server-side and
+      // admins open the file through the signed-URL route.
+      hasResume: sql<boolean>`${schema.staffApplications.resumeStorageKey} IS NOT NULL`.as('has_resume'),
       submittedAt: schema.staffApplications.submittedAt,
       status: sql<ApplicationStatus>`COALESCE(${latestLogs.status}, 'pending')`.as('effective_status'),
     })

@@ -35,6 +35,14 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 
 ---
 
+## Staff application resume rollout (spec-004)
+
+- **Manual production setup is pending and must happen before `fix/staff-apply-tidy` deploys.** (1) Create the Supabase Storage bucket `staff-resumes`: **private**, 5 MB file-size limit, allowed MIME `application/pdf`. (2) Apply `db/migrations/0036_staff_application_resume.sql` (adds `staff_applications.resume_storage_key`, extends `prevent_application_mutation()` and `erase_staff_application_privacy()`). Until both are done, the new code makes every staff submission fail and `/admin/applications` error. See [spec-004](spec-004-staff-application-resume.md#rollout-order-manual-production).
+- **Privacy erasure does not delete the PDF.** `erase_staff_application_privacy` nulls `resume_storage_key`, but the object in `staff-resumes` has to be removed separately (read the key first). There is no app-level erasure tool that does both.
+- **Division list vs recruiting copy.** The Discord recruiting post names "Game regulations" and "Software engineering & data science". `STAFF_ROLES` has VALORANT/LoL/TFT divisions and "Software Engineering Division". This is not reconciled. The unmerged `feat/staff-application-divisions` (`9d78f35`) predates the current `STAFF_ROLES` (it would reintroduce the retired "Games Division") and conflicts with spec-004 in the same four files.
+
+---
+
 ## Active Pipeline (Next Up)
 
 - **[#144](https://github.com/EZ-Esports/website/issues/144)**: Cache invalidation profile using Next.js 16 `updateTag` so CMS saves reliably invalidate public pages.

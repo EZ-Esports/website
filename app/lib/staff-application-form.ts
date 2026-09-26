@@ -30,7 +30,11 @@ export interface StaffApplicationFormData {
   discordTag: string;
   role: string;
   message: string;
+  // Optional LinkedIn profile URL. Resumes are a separate, required PDF
+  // attachment stored outside `details` (see staff-resume.ts).
   linkedin: string;
+  // Optional free text: links to GitHub, a portfolio, designs, etc.
+  workSamples: string;
   availability: string;
   // Split from a single `agreedRules` checkbox into two independently-required
   // consents (issue #107) so an applicant explicitly agrees to each legal
@@ -39,6 +43,7 @@ export interface StaffApplicationFormData {
   // (issue #127, see school-application-form.ts).
   agreedToTerms: boolean;
   agreedToPrivacy: boolean;
+  acknowledgedUnpaidVolunteer: boolean;
 }
 
 // See the SchoolApplicationDetails union in school-application-form.ts for why this
@@ -76,20 +81,129 @@ export interface StaffApplicationDetailsV2 {
   backgroundMotivation: string;
 }
 
-export type StaffApplicationDetails = StaffApplicationDetailsV1 | StaffApplicationDetailsV2;
+// v3: `linkedin` narrowed to a LinkedIn-only link (the resume moved to a PDF
+// attachment in its own column), optional `workSamples` links were added, the
+// free-text prompt became "Why do you want to join EZ Esports?" (still stored
+// as `backgroundMotivation`), and a third required acknowledgement records
+// that the applicant understands the role is part-time, unpaid volunteering.
+export interface StaffApplicationDetailsV3 {
+  version: 3;
+  preferredFirstName: string;
+  discordTag: string;
+  linkedin: string;
+  workSamples: string;
+  availability: string;
+  consent: {
+    agreedToTerms: boolean;
+    agreedToPrivacy: boolean;
+    acknowledgedUnpaidVolunteer: boolean;
+  };
+  backgroundMotivation: string;
+}
 
-export function buildStaffApplicationDetails(form: StaffApplicationFormData): StaffApplicationDetailsV2 {
+export type StaffApplicationDetails =
+  | StaffApplicationDetailsV1
+  | StaffApplicationDetailsV2
+  | StaffApplicationDetailsV3;
+
+/** Server-side cap on the optional work-samples text; generous for several links, small enough to keep `details` compact. */
+export const WORK_SAMPLES_MAX_LENGTH = 1000;
+
+export const UNPAID_VOLUNTEER_ACK_TEXT =
+  'I understand this is currently a part-time, unpaid volunteer position.';
+
+/**
+ * Normalizes an optional link field. Blank stays blank; a bare host such as
+ * `linkedin.com/in/jane` gains `https://`; anything that still does not parse
+ * as an http(s) URL with a dotted hostname is rejected (returns null).
+ */
+export function normalizeOptionalUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/\s/.test(trimmed)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (!url.hostname.includes('.')) return null;
+  return url.toString();
+}
+
+export function buildStaffApplicationDetails(form: StaffApplicationFormData): StaffApplicationDetailsV3 {
   return {
-    version: 2,
+    version: 3,
     preferredFirstName: form.preferredFirstName.trim(),
     discordTag: form.discordTag.trim(),
     linkedin: form.linkedin.trim(),
+    workSamples: form.workSamples.trim(),
     availability: form.availability,
     consent: {
       agreedToTerms: !!form.agreedToTerms,
       agreedToPrivacy: !!form.agreedToPrivacy,
+      acknowledgedUnpaidVolunteer: !!form.acknowledgedUnpaidVolunteer,
     },
     backgroundMotivation: form.message.trim(),
+  };
+}
+
+export type ParsedStaffApplicationDetails =
+  | { ok: true; details: StaffApplicationDetailsV3 }
+  | { ok: false; error: string };
+
+const asString = (v: unknown) => (typeof v === 'string' ? v : '');
+
+/**
+ * Server-side gate for the untrusted `details` JSON posted by the public form.
+ * Rebuilds a fresh v3 object from known keys only (so stray client fields are
+ * never persisted), requires every consent to be strictly `true` (a missing or
+ * non-boolean value fails closed rather than passing as truthy), and
+ * validates the optional LinkedIn URL.
+ */
+export function parseStaffApplicationDetails(raw: unknown): ParsedStaffApplicationDetails {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'Missing application details.' };
+  }
+  const d = raw as Record<string, unknown>;
+  const consent = (d.consent && typeof d.consent === 'object' ? d.consent : {}) as Record<string, unknown>;
+
+  if (consent.agreedToTerms !== true || consent.agreedToPrivacy !== true) {
+    return { ok: false, error: 'You must agree to the Terms of Service and Privacy Policy to submit an application.' };
+  }
+  if (consent.acknowledgedUnpaidVolunteer !== true) {
+    return { ok: false, error: 'You must acknowledge that this is a part-time, unpaid volunteer position.' };
+  }
+
+  const linkedin = normalizeOptionalUrl(asString(d.linkedin));
+  if (linkedin === null) {
+    return { ok: false, error: 'Enter a valid LinkedIn profile URL, or leave it blank.' };
+  }
+
+  const workSamples = asString(d.workSamples).trim();
+  if (workSamples.length > WORK_SAMPLES_MAX_LENGTH) {
+    return { ok: false, error: `Work sample links must be ${WORK_SAMPLES_MAX_LENGTH} characters or fewer.` };
+  }
+
+  const backgroundMotivation = asString(d.backgroundMotivation).trim();
+  if (!backgroundMotivation) {
+    return { ok: false, error: 'Please tell us why you want to join EZ Esports.' };
+  }
+
+  return {
+    ok: true,
+    details: {
+      version: 3,
+      preferredFirstName: asString(d.preferredFirstName).trim(),
+      discordTag: asString(d.discordTag).trim(),
+      linkedin,
+      workSamples,
+      availability: asString(d.availability),
+      consent: { agreedToTerms: true, agreedToPrivacy: true, acknowledgedUnpaidVolunteer: true },
+      backgroundMotivation,
+    },
   };
 }
 
@@ -98,12 +212,18 @@ const UNKNOWN_SHAPE_ROW = [{ label: 'Details', value: 'Could not display — une
 /** Dispatches on `version` rather than trusting the shape, so a row with an unrecognized version degrades to a message instead of rendering garbage — see the school-application-form.ts counterpart. */
 export function formatStaffApplicationDetails(d: StaffApplicationDetails): { label: string; value: string }[] {
   switch (d?.version) {
+    case 3: return formatStaffApplicationDetailsV3(d);
     case 2: return formatStaffApplicationDetailsV2(d);
     case 1: return formatStaffApplicationDetailsV1(d);
     default: return UNKNOWN_SHAPE_ROW;
   }
 }
 
+const agreed = (v: boolean | undefined) => (v ? 'Agreed' : 'Disagreed');
+
+// v1 and v2 keep the "LinkedIn / Portfolio" label: those applicants answered a
+// question that also invited portfolio and resume links, so the stored value
+// may not be a LinkedIn URL at all.
 function formatStaffApplicationDetailsV1(d: StaffApplicationDetailsV1): { label: string; value: string }[] {
   return [
     { label: 'LinkedIn / Portfolio', value: d.linkedin || '—' },
@@ -114,12 +234,26 @@ function formatStaffApplicationDetailsV1(d: StaffApplicationDetailsV1): { label:
 }
 
 function formatStaffApplicationDetailsV2(d: StaffApplicationDetailsV2): { label: string; value: string }[] {
-  const agreed = (v: boolean) => (v ? 'Agreed' : 'Disagreed');
   return [
     { label: 'LinkedIn / Portfolio', value: d.linkedin || '—' },
     { label: 'Weekly Availability', value: d.availability || '—' },
     { label: 'Terms of Service', value: agreed(d.consent?.agreedToTerms) },
     { label: 'Privacy Policy', value: agreed(d.consent?.agreedToPrivacy) },
     { label: 'Background & Motivation', value: d.backgroundMotivation || '—' },
+  ];
+}
+
+function formatStaffApplicationDetailsV3(d: StaffApplicationDetailsV3): { label: string; value: string }[] {
+  return [
+    { label: 'LinkedIn', value: d.linkedin || '—' },
+    { label: 'Work Samples', value: d.workSamples || '—' },
+    { label: 'Weekly Availability', value: d.availability || '—' },
+    { label: 'Terms of Service', value: agreed(d.consent?.agreedToTerms) },
+    { label: 'Privacy Policy', value: agreed(d.consent?.agreedToPrivacy) },
+    {
+      label: 'Unpaid Volunteer Role',
+      value: d.consent?.acknowledgedUnpaidVolunteer ? 'Acknowledged' : 'Not acknowledged',
+    },
+    { label: 'Why EZ Esports', value: d.backgroundMotivation || '—' },
   ];
 }

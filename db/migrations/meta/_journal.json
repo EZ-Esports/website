@@ -253,6 +253,13 @@
       "when": 1789279685755,
       "tag": "0035_allow_authorized_privacy_erasure",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790391251537,
+      "tag": "0036_staff_application_resume",
+      "breakpoints": true
     }
   ]
 }

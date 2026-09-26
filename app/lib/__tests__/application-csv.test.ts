@@ -122,4 +122,22 @@ describe("staffApplicationsToCsv", () => {
     ]);
     expect(csv).toContain("an old, unbackfilled staff message");
   });
+
+  it("marks whether a resume is attached without exporting a link", () => {
+    const base = {
+      name: "Jamie Rivera",
+      role: "Marketing Division",
+      email: "jamie@example.com",
+      phone: "555-0100",
+      status: "pending",
+      submittedAt: new Date("2026-01-15"),
+      message: null,
+      details: staffDetails,
+    };
+    const csv = staffApplicationsToCsv([{ ...base, hasResume: true }, { ...base, hasResume: false }]);
+    const [header, withResume] = csv.split(/\r?\n/);
+    expect(header).toContain("Resume");
+    expect(withResume).toContain("Attached");
+    expect(csv).not.toMatch(/staff-resumes|supabase|token=/);
+  });
 });
