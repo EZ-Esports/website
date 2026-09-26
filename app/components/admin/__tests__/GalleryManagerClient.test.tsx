@@ -5,6 +5,7 @@ import GalleryManagerClient, {
   deriveDisplayImages,
   moveItem,
   canMoveItem,
+  isDraftDirty,
   GalleryImage,
 } from '../GalleryManagerClient';
 
@@ -197,6 +198,27 @@ describe('GalleryManagerClient unit & integration tests', () => {
     it('allows valid moves within bounds when not pending', () => {
       expect(canMoveItem({ pending: false, currentIndex: 0, newIndex: 1, totalCount: 3 })).toBe(true);
       expect(canMoveItem({ pending: false, currentIndex: 2, newIndex: 1, totalCount: 3 })).toBe(true);
+    });
+  });
+
+  describe('isDraftDirty', () => {
+    const initialIds = ['img-1', 'img-2', 'img-3'];
+
+    it('returns false when draftOrder is null', () => {
+      expect(isDraftDirty(initialIds, null)).toBe(false);
+    });
+
+    it('returns false when draftOrder matches initial order exactly', () => {
+      expect(isDraftDirty(initialIds, ['img-1', 'img-2', 'img-3'])).toBe(false);
+    });
+
+    it('returns true when draftOrder differs in sequence', () => {
+      expect(isDraftDirty(initialIds, ['img-2', 'img-1', 'img-3'])).toBe(true);
+    });
+
+    it('returns true when draftOrder length differs', () => {
+      expect(isDraftDirty(initialIds, ['img-1', 'img-2'])).toBe(true);
+      expect(isDraftDirty(initialIds, ['img-1', 'img-2', 'img-3', 'img-4'])).toBe(true);
     });
   });
 

@@ -50,6 +50,15 @@ export function deriveDisplayImages(
   return [...preserved, ...added];
 }
 
+export function isDraftDirty(
+  initialIds: string[],
+  draftOrder: string[] | null
+): boolean {
+  if (!draftOrder) return false;
+  if (draftOrder.length !== initialIds.length) return true;
+  return draftOrder.some((id, i) => id !== initialIds[i]);
+}
+
 export function canMoveItem({
   pending,
   currentIndex,
@@ -70,7 +79,8 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const isDirty = draftOrder !== null;
+  const initialIds = useMemo(() => initialImages.map((img) => img.id), [initialImages]);
+  const isDirty = isDraftDirty(initialIds, draftOrder);
   const reduceMotion = useReducedMotion();
 
   const displayImages = useMemo(
