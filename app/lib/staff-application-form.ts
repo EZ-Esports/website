@@ -23,21 +23,22 @@ export function isStaffRole(value: unknown): value is StaffRole {
 }
 
 /**
- * Follow-up for the Game Regulations Division: which per-game director seat
- * the applicant wants. One choice, mirroring the single "Primary Role of
- * Interest" pick. The role column keeps the division name, and this answer
- * lives in `details.gameDirector`.
+ * Follow-up for the Game Regulations Division: an open answer about which
+ * game director position(s) the applicant is interested in and their
+ * experience with those games. The role column keeps the division name, and
+ * this answer lives in `details.gameDirector` as plain text.
  */
-export const GAME_DIRECTOR_POSITIONS = [
-  'VALORANT Director',
-  'League of Legends Director',
-  'Teamfight Tactics Director',
-] as const;
+export const GAME_DIRECTOR_MAX_LENGTH = 500;
 
-export type GameDirectorPosition = (typeof GAME_DIRECTOR_POSITIONS)[number];
+export const GAME_DIRECTOR_REQUIRED_ERROR = 'Please tell us which game director position you are interested in.';
+export const GAME_DIRECTOR_TOO_LONG_ERROR = `Your game director answer must be ${GAME_DIRECTOR_MAX_LENGTH} characters or fewer.`;
 
-export function isGameDirectorPosition(value: unknown): value is GameDirectorPosition {
-  return typeof value === 'string' && (GAME_DIRECTOR_POSITIONS as readonly string[]).includes(value);
+/** Shared client/server check for the follow-up; returns an error message or null. */
+export function checkGameDirectorAnswer(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return GAME_DIRECTOR_REQUIRED_ERROR;
+  if (trimmed.length > GAME_DIRECTOR_MAX_LENGTH) return GAME_DIRECTOR_TOO_LONG_ERROR;
+  return null;
 }
 
 export function requiresGameDirector(role: string): boolean {
@@ -51,7 +52,7 @@ export interface StaffApplicationFormData {
   phone: string;
   discordTag: string;
   role: string;
-  // Only meaningful when `role` is the Game Regulations Division.
+  // Open answer, only meaningful when `role` is the Game Regulations Division.
   gameDirector: string;
   message: string;
   // Optional LinkedIn profile URL, restricted to linkedin.com hosts (see
@@ -127,8 +128,8 @@ export interface StaffApplicationDetailsV3 {
 }
 
 // v4: the three per-game divisions folded into one Game Regulations Division
-// with a required follow-up. `gameDirector` holds that answer ('' for every
-// other role); otherwise identical to v3.
+// with a required open-answer follow-up. `gameDirector` holds that free text
+// ('' for every other role); otherwise identical to v3.
 export interface StaffApplicationDetailsV4 extends Omit<StaffApplicationDetailsV3, 'version'> {
   version: 4;
   gameDirector: string;
@@ -187,7 +188,7 @@ export function normalizeOptionalUrl(value: string): string | null {
 export function buildStaffApplicationDetails(form: StaffApplicationFormData): StaffApplicationDetailsV4 {
   return {
     version: 4,
-    gameDirector: requiresGameDirector(form.role) ? form.gameDirector : '',
+    gameDirector: requiresGameDirector(form.role) ? form.gameDirector.trim() : '',
     preferredFirstName: form.preferredFirstName.trim(),
     discordTag: form.discordTag.trim(),
     linkedin: form.linkedin.trim(),
@@ -232,10 +233,10 @@ export function parseStaffApplicationDetails(raw: unknown, role: string): Parsed
 
   let gameDirector = '';
   if (requiresGameDirector(role)) {
-    if (!isGameDirectorPosition(d.gameDirector)) {
-      return { ok: false, error: 'Please choose which game director position you want.' };
-    }
-    gameDirector = d.gameDirector;
+    const answer = asString(d.gameDirector);
+    const problem = checkGameDirectorAnswer(answer);
+    if (problem) return { ok: false, error: problem };
+    gameDirector = answer.trim();
   }
 
   const linkedin = normalizeLinkedInUrl(asString(d.linkedin));
@@ -308,7 +309,8 @@ function formatStaffApplicationDetailsV2(d: StaffApplicationDetailsV2): { label:
 
 function formatStaffApplicationDetailsV4(d: StaffApplicationDetailsV4): { label: string; value: string }[] {
   const rows = formatStaffApplicationDetailsV3({ ...d, version: 3 });
-  return d.gameDirector ? [{ label: 'Game Director Position', value: d.gameDirector }, ...rows] : rows;
+  // Plain text: admin renders it as a text node and the CSV writer escapes it.
+  return d.gameDirector ? [{ label: 'Game Director Interest', value: d.gameDirector }, ...rows] : rows;
 }
 
 function formatStaffApplicationDetailsV3(d: StaffApplicationDetailsV3): { label: string; value: string }[] {

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildStaffApplicationDetails,
   formatStaffApplicationDetails,
-  GAME_DIRECTOR_POSITIONS,
+  checkGameDirectorAnswer,
+  GAME_DIRECTOR_MAX_LENGTH,
   GAME_REGULATIONS_ROLE,
-  isGameDirectorPosition,
   isStaffRole,
   normalizeLinkedInUrl,
   normalizeOptionalUrl,
@@ -132,15 +132,14 @@ describe("Staff Application Details", () => {
     ]);
   });
 
-  it("offers the three game director positions for the Game Regulations follow-up", () => {
-    expect([...GAME_DIRECTOR_POSITIONS]).toEqual([
-      "VALORANT Director",
-      "League of Legends Director",
-      "Teamfight Tactics Director",
-    ]);
-    expect(isGameDirectorPosition("VALORANT Director")).toBe(true);
-    expect(isGameDirectorPosition("VALORANT Division")).toBe(false);
-    expect(isGameDirectorPosition(undefined)).toBe(false);
+  it("checks the Game Regulations open answer: trimmed, non-empty, at most 500 characters", () => {
+    expect(GAME_DIRECTOR_MAX_LENGTH).toBe(500);
+    expect(checkGameDirectorAnswer("VALORANT, two seasons as a team captain")).toBeNull();
+    expect(checkGameDirectorAnswer("")).toBe("Please tell us which game director position you are interested in.");
+    expect(checkGameDirectorAnswer("   \n  ")).toBe("Please tell us which game director position you are interested in.");
+    expect(checkGameDirectorAnswer("x".repeat(500))).toBeNull();
+    expect(checkGameDirectorAnswer(`  ${"x".repeat(500)}  `)).toBeNull();
+    expect(checkGameDirectorAnswer("x".repeat(501))).toBe("Your game director answer must be 500 characters or fewer.");
   });
 
   it("rejects retired role values and the old Other option", () => {
@@ -251,20 +250,30 @@ describe("parseStaffApplicationDetails (server-side gate)", () => {
     expect(regional.ok && regional.details.linkedin).toBe("https://uk.linkedin.com/in/jane");
   });
 
-  it("requires a valid director position only for the Game Regulations Division", () => {
-    const missing = parse(valid(), GAME_REGULATIONS_ROLE);
-    expect(missing).toEqual({ ok: false, error: "Please choose which game director position you want." });
+  it("requires the game director answer only for the Game Regulations Division", () => {
+    const required = { ok: false, error: "Please tell us which game director position you are interested in." };
+    expect(parse(valid(), GAME_REGULATIONS_ROLE)).toEqual(required);
+    expect(parse({ ...valid(), gameDirector: "   " }, GAME_REGULATIONS_ROLE)).toEqual(required);
+    expect(parse({ ...valid(), gameDirector: ["VALORANT"] }, GAME_REGULATIONS_ROLE)).toEqual(required);
+    expect(parse({ ...valid(), gameDirector: 42 }, GAME_REGULATIONS_ROLE)).toEqual(required);
 
-    expect(parse({ ...valid(), gameDirector: "Overwatch Director" }, GAME_REGULATIONS_ROLE).ok).toBe(false);
-    expect(parse({ ...valid(), gameDirector: ["VALORANT Director"] }, GAME_REGULATIONS_ROLE).ok).toBe(false);
-
-    const ok = parse({ ...valid(), gameDirector: "League of Legends Director" }, GAME_REGULATIONS_ROLE);
-    expect(ok.ok && ok.details.gameDirector).toBe("League of Legends Director");
+    const ok = parse({ ...valid(), gameDirector: "  League of Legends; I ran my school's LoL club.  " }, GAME_REGULATIONS_ROLE);
+    expect(ok.ok && ok.details.gameDirector).toBe("League of Legends; I ran my school's LoL club.");
   });
 
-  it("drops a stray director answer for any other division", () => {
-    const result = parse({ ...valid(), gameDirector: "VALORANT Director" }, "Marketing Division");
+  it("caps the game director answer at 500 characters after trimming", () => {
+    expect(parse({ ...valid(), gameDirector: "x".repeat(500) }, GAME_REGULATIONS_ROLE).ok).toBe(true);
+    expect(parse({ ...valid(), gameDirector: "x".repeat(501) }, GAME_REGULATIONS_ROLE)).toEqual({
+      ok: false,
+      error: "Your game director answer must be 500 characters or fewer.",
+    });
+  });
+
+  it("ignores and clears a stray game director answer for any other division", () => {
+    const result = parse({ ...valid(), gameDirector: "VALORANT" }, "Marketing Division");
     expect(result.ok && result.details.gameDirector).toBe("");
+    const tooLong = parse({ ...valid(), gameDirector: "x".repeat(900) }, "Legal Division");
+    expect(tooLong.ok && tooLong.details.gameDirector).toBe("");
   });
 
   it("keeps optional other links as trimmed free text, with a length cap", () => {
@@ -312,22 +321,25 @@ describe("Game Regulations details (v4) and legacy rows", () => {
   const grForm: StaffApplicationFormData = {
     ...validForm,
     role: GAME_REGULATIONS_ROLE,
-    gameDirector: "Teamfight Tactics Director",
+    gameDirector: "  Teamfight Tactics, and some VALORANT. I help run our school's TFT ladder.  ",
   };
 
-  it("records the director choice only when Game Regulations is the role", () => {
-    expect(buildStaffApplicationDetails(grForm).gameDirector).toBe("Teamfight Tactics Director");
+  it("records the trimmed answer only when Game Regulations is the role", () => {
+    expect(buildStaffApplicationDetails(grForm).gameDirector).toBe(
+      "Teamfight Tactics, and some VALORANT. I help run our school's TFT ladder.",
+    );
     expect(buildStaffApplicationDetails({ ...grForm, role: "Legal Division" }).gameDirector).toBe("");
   });
 
-  it("shows the director position first in admin/CSV rows", () => {
-    const rows = formatStaffApplicationDetails(buildStaffApplicationDetails(grForm));
-    expect(rows[0]).toEqual({ label: "Game Director Position", value: "Teamfight Tactics Director" });
+  it("shows the answer first in admin/CSV rows as plain text", () => {
+    const answer = '<b>VALORANT</b>, "LoL" & TFT\nline two';
+    const rows = formatStaffApplicationDetails(buildStaffApplicationDetails({ ...grForm, gameDirector: answer }));
+    expect(rows[0]).toEqual({ label: "Game Director Interest", value: answer });
   });
 
-  it("omits the director row for other divisions", () => {
+  it("omits the game director row for other divisions", () => {
     const rows = formatStaffApplicationDetails(buildStaffApplicationDetails(validForm));
-    expect(rows.map((r) => r.label)).not.toContain("Game Director Position");
+    expect(rows.map((r) => r.label)).not.toContain("Game Director Interest");
   });
 
   it("still formats v3 rows (submitted before the Game Regulations change)", () => {
@@ -343,6 +355,6 @@ describe("Game Regulations details (v4) and legacy rows", () => {
     };
     const rows = formatStaffApplicationDetails(v3);
     expect(rows).toContainEqual({ label: "Why EZ Esports", value: "Love VALORANT." });
-    expect(rows.map((r) => r.label)).not.toContain("Game Director Position");
+    expect(rows.map((r) => r.label)).not.toContain("Game Director Interest");
   });
 });

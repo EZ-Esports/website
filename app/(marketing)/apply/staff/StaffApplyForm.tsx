@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button as AriaButton, FieldError, FileTrigger, Label, Radio, RadioGroup, Text } from 'react-aria-components';
+import { Button as AriaButton, FieldError, FileTrigger, Label, Text, TextField } from 'react-aria-components';
 import Button from '@/app/components/ui/Button';
 import { Input, Textarea } from '@/app/components/ui/form';
 import { ROUTES, SITE_CONFIG, SOCIAL_LINKS } from '@/app/lib/constants';
 import {
   buildStaffApplicationDetails,
-  GAME_DIRECTOR_POSITIONS,
+  checkGameDirectorAnswer,
+  GAME_DIRECTOR_MAX_LENGTH,
   GAME_REGULATIONS_ROLE,
   LINKEDIN_URL_ERROR,
   normalizeLinkedInUrl,
@@ -89,7 +90,7 @@ export default function StaffApplyForm() {
     applicant: [!!form.name.trim(), EMAIL_RE.test(form.email), !!form.phone.trim()],
     role: [
       !!form.role,
-      ...(requiresGameDirector(form.role) ? [!!form.gameDirector] : []),
+      ...(requiresGameDirector(form.role) ? [!checkGameDirectorAnswer(form.gameDirector)] : []),
       !!resume && !checkResumeFile(resume),
       !!form.availability,
     ],
@@ -112,8 +113,9 @@ export default function StaffApplyForm() {
     else if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
     if (!form.phone.trim()) errors.phone = 'Phone number is required.';
     if (!form.role) errors.role = 'Please select a primary role.';
-    else if (requiresGameDirector(form.role) && !form.gameDirector) {
-      errors.gameDirector = 'Please choose which game director position you want.';
+    else if (requiresGameDirector(form.role)) {
+      const gameDirectorError = checkGameDirectorAnswer(form.gameDirector);
+      if (gameDirectorError) errors.gameDirector = gameDirectorError;
     }
     const resumeError = checkResumeFile(resume);
     if (resumeError) errors.resume = resumeError;
@@ -192,11 +194,15 @@ export default function StaffApplyForm() {
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) {
+    // Leaving the Game Regulations Division discards its follow-up answer and
+    // error, so a hidden, stale answer is never submitted or flagged.
+    const dropsGameDirector = name === 'role' && !requiresGameDirector(value);
+    setForm((prev) => ({ ...prev, [name]: value, ...(dropsGameDirector ? { gameDirector: '' } : {}) }));
+    if (fieldErrors[name] || (dropsGameDirector && fieldErrors.gameDirector)) {
       setFieldErrors((prev) => {
         const next = { ...prev };
         delete next[name];
+        if (dropsGameDirector) delete next.gameDirector;
         return next;
       });
     }
@@ -296,7 +302,7 @@ export default function StaffApplyForm() {
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              Volunteer · Part-time
+              Unpaid volunteer · Part-time
             </span>
             <span className="inline-flex items-center gap-1.5">
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
@@ -640,36 +646,38 @@ export default function StaffApplyForm() {
                     keyboard and screen-reader users reach it next; the radio's
                     description tells them it is coming. */}
                 {requiresGameDirector(form.role) && (
-                  <RadioGroup
-                    id="field-gameDirector"
-                    value={form.gameDirector || null}
-                    onChange={(value) => handleSelectChange('gameDirector', value)}
-                    isRequired
-                    isInvalid={!!fieldErrors.gameDirector}
-                    validationBehavior="aria"
-                    className={`ml-3 rounded-xl border bg-accent/5 p-4 sm:p-5 ${fieldErrors.gameDirector ? 'border-danger' : 'border-line'}`}
-                  >
-                    <Label className={labelClass}>Which game director position? {requiredMark}</Label>
-                    <Text slot="description" className="block text-xs text-foreground-secondary mb-2">
-                      Pick the game you want to direct.
-                    </Text>
-                    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-6">
-                      {GAME_DIRECTOR_POSITIONS.map((position) => (
-                        <Radio
-                          key={position}
-                          value={position}
-                          className="group flex min-h-[44px] items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary outline-none transition-colors data-[hovered]:text-foreground data-[selected]:text-foreground"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="h-4.5 w-4.5 shrink-0 rounded-full border-2 border-foreground-muted bg-surface transition-all group-data-[selected]:border-[5px] group-data-[selected]:border-accent group-data-[focus-visible]:ring-2 group-data-[focus-visible]:ring-accent/40 group-data-[focus-visible]:ring-offset-1"
-                          />
-                          {position}
-                        </Radio>
-                      ))}
-                    </div>
-                    <FieldError className="mt-2 block text-xs text-danger font-semibold">{fieldErrors.gameDirector}</FieldError>
-                  </RadioGroup>
+                  <div id="field-gameDirector">
+                    <TextField
+                      id="gameDirector"
+                      value={form.gameDirector}
+                      onChange={(value) => handleSelectChange('gameDirector', value)}
+                      onFocus={() => setFocusedField('gameDirector')}
+                      onBlur={() => setFocusedField(null)}
+                      maxLength={GAME_DIRECTOR_MAX_LENGTH}
+                      isRequired
+                      isInvalid={!!fieldErrors.gameDirector}
+                      validationBehavior="aria"
+                      className={`ml-3 block rounded-xl border bg-accent/5 p-4 sm:p-5 ${fieldErrors.gameDirector ? 'border-danger' : 'border-line'}`}
+                    >
+                      <Label className={labelClass}>
+                        Which game director position are you interested in? {requiredMark}
+                      </Label>
+                      <Text slot="description" className="block text-xs text-foreground-secondary mb-2">
+                        For example VALORANT, League of Legends, or Teamfight Tactics. Tell us which game(s) and any
+                        experience you have with them.
+                      </Text>
+                      <Textarea
+                        rows={3}
+                        className={fieldErrors.gameDirector ? 'border-danger focus:ring-danger/20' : ''}
+                      />
+                      <div className="mt-1.5 flex items-start justify-between gap-3">
+                        <FieldError className="block text-xs text-danger font-semibold">{fieldErrors.gameDirector}</FieldError>
+                        <span className="ml-auto shrink-0 text-xs text-foreground-muted tabular-nums" aria-hidden="true">
+                          {form.gameDirector.length}/{GAME_DIRECTOR_MAX_LENGTH}
+                        </span>
+                      </div>
+                    </TextField>
+                  </div>
                 )}
 
                 {/* Resume (required PDF). FileTrigger keeps the native file input

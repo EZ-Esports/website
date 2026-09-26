@@ -169,19 +169,39 @@ describe('POST /api/apply/staff', () => {
       }),
     );
     expect(withoutDirector.status).toBe(400);
-    expect(await withoutDirector.json()).toEqual({ error: 'Please choose which game director position you want.' });
+    expect(await withoutDirector.json()).toEqual({
+      error: 'Please tell us which game director position you are interested in.',
+    });
     expect(mocks.upload).not.toHaveBeenCalled();
 
     const ok = await POST(
       submission({
         fields: { role: GAME_REGULATIONS_ROLE },
-        details: buildStaffApplicationDetails({ ...form, role: GAME_REGULATIONS_ROLE, gameDirector: 'VALORANT Director' }),
+        details: buildStaffApplicationDetails({ ...form, role: GAME_REGULATIONS_ROLE, gameDirector: 'VALORANT, and I have refereed scrims.' }),
       }),
     );
     expect(ok.status).toBe(201);
     const row = mocks.insertValues.mock.calls[0][0];
     expect(row.role).toBe(GAME_REGULATIONS_ROLE);
-    expect(row.details.gameDirector).toBe('VALORANT Director');
+    expect(row.details.gameDirector).toBe('VALORANT, and I have refereed scrims.');
+  });
+
+  it('rejects a game director answer over 500 characters', async () => {
+    const res = await POST(
+      submission({
+        fields: { role: GAME_REGULATIONS_ROLE },
+        details: { ...buildStaffApplicationDetails({ ...form, role: GAME_REGULATIONS_ROLE }), gameDirector: 'x'.repeat(501) },
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Your game director answer must be 500 characters or fewer.' });
+    expect(mocks.upload).not.toHaveBeenCalled();
+  });
+
+  it('does not store a game director answer sent with another division', async () => {
+    const res = await POST(submission({ details: { ...buildStaffApplicationDetails(form), gameDirector: 'VALORANT' } }));
+    expect(res.status).toBe(201);
+    expect(mocks.insertValues.mock.calls[0][0].details.gameDirector).toBe('');
   });
 
   it('refuses an oversized body by its declared length', async () => {
