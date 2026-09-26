@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useMemo, useTransition } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import GalleryImageCard from '@/app/components/admin/GalleryImageCard';
 import { updateGalleryImagesOrder } from '@/app/(admin)/admin/gallery/actions';
 
-interface GalleryImage {
+export interface GalleryImage {
   id: string;
   src: string;
   storageKey: string | null;
@@ -20,56 +20,84 @@ interface GalleryManagerClientProps {
   initialImages: GalleryImage[];
 }
 
-function moveItem(images: GalleryImage[], fromIndex: number, toIndex: number): GalleryImage[] {
-  const next = [...images];
+export function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const next = [...items];
   const [moved] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, moved);
   return next;
 }
 
+export function deriveDisplayImages(
+  initialImages: GalleryImage[],
+  draftOrder: string[] | null
+): GalleryImage[] {
+  if (!draftOrder) {
+    return initialImages;
+  }
+  const imageMap = new Map(initialImages.map((img) => [img.id, img]));
+  const preserved: GalleryImage[] = [];
+  const seenIds = new Set<string>();
+
+  for (const id of draftOrder) {
+    const img = imageMap.get(id);
+    if (img && !seenIds.has(id)) {
+      preserved.push(img);
+      seenIds.add(id);
+    }
+  }
+
+  const added = initialImages.filter((img) => !seenIds.has(img.id));
+  return [...preserved, ...added];
+}
+
+export function isDraftDirty(
+  initialIds: string[],
+  draftOrder: string[] | null
+): boolean {
+  if (!draftOrder) return false;
+  if (draftOrder.length !== initialIds.length) return true;
+  return draftOrder.some((id, i) => id !== initialIds[i]);
+}
+
+export function canMoveItem({
+  pending,
+  currentIndex,
+  newIndex,
+  totalCount,
+}: {
+  pending: boolean;
+  currentIndex: number;
+  newIndex: number;
+  totalCount: number;
+}): boolean {
+  return !pending && newIndex >= 0 && newIndex < totalCount && newIndex !== currentIndex;
+}
+
 export default function GalleryManagerClient({ initialImages }: GalleryManagerClientProps) {
-  const [images, setImages] = useState<GalleryImage[]>(initialImages);
+  const [draftOrder, setDraftOrder] = useState<string[] | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const isDirty = images.map((img) => img.id).join(',') !== initialImages.map((img) => img.id).join(',');
+  const initialIds = useMemo(() => initialImages.map((img) => img.id), [initialImages]);
+  const isDirty = isDraftDirty(initialIds, draftOrder);
   const reduceMotion = useReducedMotion();
 
-  // Keep in sync with server-side changes (new/deleted images, edited fields).
-  // With no unsaved reorder pending, there's nothing local to protect — always trust
-  // the latest server data and order outright. With a reorder pending, only step in if
-  // the id set actually changed (someone added or deleted an image while it was pending):
-  // merge by keeping the local order for images that still exist, refreshing their
-  // fields, dropping removed ones, and appending newly added ones to the end. If the id
-  // set is unchanged, leave the in-progress local reorder alone.
-  useEffect(() => {
-    if (!isDirty) {
-      setImages(initialImages);
-      return;
-    }
-
-    const incomingIds = new Set(initialImages.map((img) => img.id));
-    const idsMatch = images.length === initialImages.length && images.every((img) => incomingIds.has(img.id));
-    if (idsMatch) return;
-
-    const byId = new Map(initialImages.map((img) => [img.id, img]));
-    const preserved = images.filter((img) => byId.has(img.id)).map((img) => byId.get(img.id)!);
-    const preservedIds = new Set(preserved.map((img) => img.id));
-    const added = initialImages.filter((img) => !preservedIds.has(img.id));
-    setImages([...preserved, ...added]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialImages]);
+  const displayImages = useMemo(
+    () => deriveDisplayImages(initialImages, draftOrder),
+    [initialImages, draftOrder]
+  );
 
   const handleMove = (currentIndex: number, newIndex: number) => {
-    if (newIndex < 0 || newIndex >= images.length || newIndex === currentIndex) return;
+    if (!canMoveItem({ pending, currentIndex, newIndex, totalCount: displayImages.length })) return;
     setSuccess(false);
     setError(null);
-    setImages((current) => moveItem(current, currentIndex, newIndex));
+    const currentOrder = displayImages.map((img) => img.id);
+    setDraftOrder(moveItem(currentOrder, currentIndex, newIndex));
   };
 
   const handleReset = () => {
-    setImages(initialImages);
+    setDraftOrder(null);
     setError(null);
     setSuccess(false);
   };
@@ -78,13 +106,18 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
     setError(null);
     setSuccess(false);
     startTransition(async () => {
-      const orderedIds = images.map((img) => img.id);
-      const res = await updateGalleryImagesOrder(orderedIds);
-      if (res && !res.success) {
-        setError(res.error || 'Failed to update image order.');
-      } else {
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+      try {
+        const orderedIds = displayImages.map((img) => img.id);
+        const res = await updateGalleryImagesOrder(orderedIds);
+        if (res?.success) {
+          setDraftOrder(null);
+          setSuccess(true);
+          setTimeout(() => setSuccess(false), 3000);
+        } else {
+          setError(res?.error || 'Failed to update image order.');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update image order.');
       }
     });
   };
@@ -104,14 +137,14 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
-        {images.map((img, index) => (
+        {displayImages.map((img, index) => (
           <motion.div
             key={img.id}
             layout={reduceMotion ? false : 'position'}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="h-full"
           >
-            <GalleryImageCard img={img} index={index} totalCount={images.length} onOrderChange={handleMove} />
+            <GalleryImageCard img={img} index={index} totalCount={displayImages.length} onOrderChange={handleMove} />
           </motion.div>
         ))}
       </div>
