@@ -198,6 +198,13 @@ describe('POST /api/apply/staff', () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
+  it('rejects a why-join answer over 1,500 characters before touching storage', async () => {
+    const res = await POST(submission({ details: { ...buildStaffApplicationDetails(form), backgroundMotivation: 'x'.repeat(1501) } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Your answer must be 1,500 characters or fewer.' });
+    expect(mocks.upload).not.toHaveBeenCalled();
+  });
+
   it('does not store a game director answer sent with another division', async () => {
     const res = await POST(submission({ details: { ...buildStaffApplicationDetails(form), gameDirector: 'VALORANT' } }));
     expect(res.status).toBe(201);

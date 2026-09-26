@@ -144,6 +144,29 @@ export type StaffApplicationDetails =
 /** Server-side cap on the optional other-links text; generous for several links, small enough to keep `details` compact. */
 export const WORK_SAMPLES_MAX_LENGTH = 1000;
 
+/**
+ * Cap on the "Why do you want to join EZ Esports?" answer. The prompt asks for
+ * about 4-7 sentences (roughly 600-1,000 characters), so 1,500 leaves room for
+ * a long answer while keeping `details` bounded.
+ */
+export const WHY_JOIN_MAX_LENGTH = 1500;
+
+export const WHY_JOIN_REQUIRED_ERROR = 'Please tell us why you want to join EZ Esports.';
+export const WHY_JOIN_TOO_LONG_ERROR = `Your answer must be ${WHY_JOIN_MAX_LENGTH.toLocaleString('en-US')} characters or fewer.`;
+
+/** Shared client/server check for the why-join answer; returns an error message or null. */
+export function checkWhyJoinAnswer(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return WHY_JOIN_REQUIRED_ERROR;
+  if (trimmed.length > WHY_JOIN_MAX_LENGTH) return WHY_JOIN_TOO_LONG_ERROR;
+  return null;
+}
+
+/** Visible and screen-reader limit notice used in each free-text field's description. */
+export function characterLimitNotice(max: number): string {
+  return `Up to ${max.toLocaleString('en-US')} characters.`;
+}
+
 export const UNPAID_VOLUNTEER_ACK_TEXT =
   'I understand this is currently a part-time, unpaid volunteer position.';
 
@@ -249,10 +272,10 @@ export function parseStaffApplicationDetails(raw: unknown, role: string): Parsed
     return { ok: false, error: `Other links must be ${WORK_SAMPLES_MAX_LENGTH} characters or fewer.` };
   }
 
-  const backgroundMotivation = asString(d.backgroundMotivation).trim();
-  if (!backgroundMotivation) {
-    return { ok: false, error: 'Please tell us why you want to join EZ Esports.' };
-  }
+  const backgroundMotivationRaw = asString(d.backgroundMotivation);
+  const whyJoinError = checkWhyJoinAnswer(backgroundMotivationRaw);
+  if (whyJoinError) return { ok: false, error: whyJoinError };
+  const backgroundMotivation = backgroundMotivationRaw.trim();
 
   return {
     ok: true,

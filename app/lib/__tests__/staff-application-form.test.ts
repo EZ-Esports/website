@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildStaffApplicationDetails,
   formatStaffApplicationDetails,
+  characterLimitNotice,
   checkGameDirectorAnswer,
+  checkWhyJoinAnswer,
+  WHY_JOIN_MAX_LENGTH,
   GAME_DIRECTOR_MAX_LENGTH,
   GAME_REGULATIONS_ROLE,
   isStaffRole,
@@ -286,6 +289,15 @@ describe("parseStaffApplicationDetails (server-side gate)", () => {
     expect(parse({ ...valid(), workSamples: "x".repeat(1001) }).ok).toBe(false);
   });
 
+  it("caps the why-join answer at 1,500 characters after trimming", () => {
+    expect(parse({ ...valid(), backgroundMotivation: "x".repeat(1500) }).ok).toBe(true);
+    expect(parse({ ...valid(), backgroundMotivation: `  ${"x".repeat(1500)}  ` }).ok).toBe(true);
+    expect(parse({ ...valid(), backgroundMotivation: "x".repeat(1501) })).toEqual({
+      ok: false,
+      error: "Your answer must be 1,500 characters or fewer.",
+    });
+  });
+
   it("requires the why-join answer", () => {
     expect(parse({ ...valid(), backgroundMotivation: "   " })).toEqual({
       ok: false,
@@ -356,5 +368,21 @@ describe("Game Regulations details (v4) and legacy rows", () => {
     const rows = formatStaffApplicationDetails(v3);
     expect(rows).toContainEqual({ label: "Why EZ Esports", value: "Love VALORANT." });
     expect(rows.map((r) => r.label)).not.toContain("Game Director Interest");
+  });
+});
+
+describe("free-text limits", () => {
+  it("checks the why-join answer: trimmed, non-empty, at most 1,500 characters", () => {
+    expect(WHY_JOIN_MAX_LENGTH).toBe(1500);
+    expect(checkWhyJoinAnswer("I want to help run events.")).toBeNull();
+    expect(checkWhyJoinAnswer("  ")).toBe("Please tell us why you want to join EZ Esports.");
+    expect(checkWhyJoinAnswer("x".repeat(1500))).toBeNull();
+    expect(checkWhyJoinAnswer("x".repeat(1501))).toBe("Your answer must be 1,500 characters or fewer.");
+  });
+
+  it("formats the limit notice shown in each field's description", () => {
+    expect(characterLimitNotice(500)).toBe("Up to 500 characters.");
+    expect(characterLimitNotice(1000)).toBe("Up to 1,000 characters.");
+    expect(characterLimitNotice(WHY_JOIN_MAX_LENGTH)).toBe("Up to 1,500 characters.");
   });
 });

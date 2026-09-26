@@ -146,10 +146,10 @@ export default function PrivacyPage() {
               data by contacting us (see Section 9).
             </p>
             <p>
-              Staff applications, including any resume or other document uploaded with them, are not
-              deleted automatically after a set period. You can ask us to delete your application at
-              any time (see Section 9); when we act on that request, we remove both the application
-              record and the uploaded resume file.
+              For staff applications, that means we keep your application, including any resume you
+              uploaded, while we are considering it. If we decide not to move forward with your
+              application, we delete it, including any resume you uploaded. You can also ask us to
+              delete your application at any time (see Section 9).
             </p>
           </div>
 
@@ -164,8 +164,8 @@ export default function PrivacyPage() {
             </p>
             <p>
               Resumes and other documents uploaded with a staff application are kept in private
-              storage that is not publicly accessible. Only authorized staff who review applications
-              can open them, through links that expire shortly after they are created.
+              storage that is not publicly accessible. Only authorized EZ Esports staff and
+              administrators can open them, through links that expire shortly after they are created.
             </p>
           </div>
 

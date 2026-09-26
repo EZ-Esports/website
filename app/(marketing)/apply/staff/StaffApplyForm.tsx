@@ -8,7 +8,10 @@ import { Input, Textarea } from '@/app/components/ui/form';
 import { ROUTES, SITE_CONFIG, SOCIAL_LINKS } from '@/app/lib/constants';
 import {
   buildStaffApplicationDetails,
+  characterLimitNotice,
   checkGameDirectorAnswer,
+  checkWhyJoinAnswer,
+  WHY_JOIN_MAX_LENGTH,
   GAME_DIRECTOR_MAX_LENGTH,
   GAME_REGULATIONS_ROLE,
   LINKEDIN_URL_ERROR,
@@ -94,7 +97,7 @@ export default function StaffApplyForm() {
       !!resume && !checkResumeFile(resume),
       !!form.availability,
     ],
-    experience: [!!form.message.trim()],
+    experience: [!checkWhyJoinAnswer(form.message)],
     review: [form.agreedToTerms, form.agreedToPrivacy, form.acknowledgedUnpaidVolunteer],
   };
 
@@ -121,7 +124,8 @@ export default function StaffApplyForm() {
     if (resumeError) errors.resume = resumeError;
     if (normalizeLinkedInUrl(form.linkedin) === null) errors.linkedin = LINKEDIN_URL_ERROR;
     if (!form.availability) errors.availability = 'Please select your weekly availability.';
-    if (!form.message.trim()) errors.message = 'Please tell us why you want to join EZ Esports.';
+    const whyJoinError = checkWhyJoinAnswer(form.message);
+    if (whyJoinError) errors.message = whyJoinError;
     if (!form.agreedToTerms) errors.agreedToTerms = 'You must agree to the Terms of Service.';
     if (!form.agreedToPrivacy) errors.agreedToPrivacy = 'You must agree to the Privacy Policy.';
     if (!form.acknowledgedUnpaidVolunteer) {
@@ -664,7 +668,7 @@ export default function StaffApplyForm() {
                       </Label>
                       <Text slot="description" className="block text-xs text-foreground-secondary mb-2">
                         For example VALORANT, League of Legends, or Teamfight Tactics. Tell us which game(s) and any
-                        experience you have with them.
+                        experience you have with them. {characterLimitNotice(GAME_DIRECTOR_MAX_LENGTH)}
                       </Text>
                       <Textarea
                         rows={3}
@@ -748,7 +752,8 @@ export default function StaffApplyForm() {
                 <div id="field-workSamples" className={fieldWrapperClass('workSamples', false)}>
                   <label htmlFor="workSamples" className={labelClass}>Other links</label>
                   <p id="workSamples-hint" className="text-xs text-foreground-secondary mb-2">
-                    Optional. GitHub, a portfolio, designs, videos, or anything else that shows your work.
+                    Optional. GitHub, a portfolio, designs, videos, or anything else that shows your work.{' '}
+                    {characterLimitNotice(WORK_SAMPLES_MAX_LENGTH)}
                   </p>
                   <input
                     id="workSamples"
@@ -803,6 +808,9 @@ export default function StaffApplyForm() {
                   <label htmlFor="message" className={labelClass}>
                     Why do you want to join EZ Esports? (approx. 4-7 sentences) {requiredMark}
                   </label>
+                  <p id="message-hint" className="text-xs text-foreground-secondary mb-2">
+                    {characterLimitNotice(WHY_JOIN_MAX_LENGTH)}
+                  </p>
                   <Textarea
                     id="message"
                     name="message"
@@ -813,13 +821,19 @@ export default function StaffApplyForm() {
                     onFocus={() => setFocusedField('message')}
                     onBlur={() => setFocusedField(null)}
                     className={fieldErrors.message ? 'border-danger focus:ring-danger/20' : ''}
+                    maxLength={WHY_JOIN_MAX_LENGTH}
                     required
                     aria-invalid={!!fieldErrors.message}
-                    aria-describedby={fieldErrors.message ? 'message-error' : undefined}
+                    aria-describedby={fieldErrors.message ? 'message-hint message-error' : 'message-hint'}
                   />
-                  {fieldErrors.message && (
-                    <p id="message-error" className="mt-1.5 text-xs text-danger font-semibold">{fieldErrors.message}</p>
-                  )}
+                  <div className="mt-1.5 flex items-start justify-between gap-3">
+                    {fieldErrors.message && (
+                      <p id="message-error" className="text-xs text-danger font-semibold">{fieldErrors.message}</p>
+                    )}
+                    <span className="ml-auto shrink-0 text-xs text-foreground-muted tabular-nums" aria-hidden="true">
+                      {form.message.length}/{WHY_JOIN_MAX_LENGTH}
+                    </span>
+                  </div>
                 </div>
               </div>
 
