@@ -62,7 +62,9 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
     });
   }
 
-  const schedule = calendarMatches.map(toScheduleCalendarItem);
+  const schedule = calendarMatches
+    .filter((m) => m.status !== 'cancelled')
+    .map(toScheduleCalendarItem);
 
   const filterHref = (d: string, s: string) =>
     `/${game}/schedule?division=${d}${selectedSeason ? `&season=${encodeURIComponent(selectedSeason.name)}` : ''}&sort=${s}`;

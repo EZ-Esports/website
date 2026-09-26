@@ -41,6 +41,9 @@ describe('parseEastern', () => {
   });
 
   it('correctly handles DST fall-back boundary (November 1, 2026)', () => {
+    // Picks the first (EDT) occurrence for an ambiguous fall-back time (01:30 AM)
+    expect(parseEastern('2026-11-01T01:30').toISOString()).toBe('2026-11-01T05:30:00.000Z');
+
     // Noon on October 31 (EDT, UTC-4) -> 16:00 UTC
     const edtDate = parseEastern('2026-10-31T12:00');
     expect(edtDate.toISOString()).toBe('2026-10-31T16:00:00.000Z');
@@ -48,6 +51,17 @@ describe('parseEastern', () => {
     // Noon on November 2 (EST, UTC-5) -> 17:00 UTC
     const estDate = parseEastern('2026-11-02T12:00');
     expect(estDate.toISOString()).toBe('2026-11-02T17:00:00.000Z');
+  });
+
+  it('rejects non-existent wall times during spring-forward transition', () => {
+    // 2:30 AM does not exist on March 8, 2026 in America/New_York
+    expect(Number.isNaN(parseEastern('2026-03-08T02:30').getTime())).toBe(true);
+  });
+
+  it('rejects out-of-range or rolled over dates', () => {
+    expect(Number.isNaN(parseEastern('2026-02-30T10:00').getTime())).toBe(true);
+    expect(Number.isNaN(parseEastern('2026-07-15T25:00').getTime())).toBe(true);
+    expect(Number.isNaN(parseEastern('2026-04-31T12:00').getTime())).toBe(true);
   });
 
   it('returns invalid date for empty or malformed inputs', () => {

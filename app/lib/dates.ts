@@ -62,10 +62,27 @@ export function parseEastern(dateStr: string): Date {
     return new Date(NaN);
   }
 
+  const w = new Date(wallUtc);
+  if (
+    w.getUTCFullYear() !== y ||
+    w.getUTCMonth() !== m - 1 ||
+    w.getUTCDate() !== day ||
+    w.getUTCHours() !== hh ||
+    w.getUTCMinutes() !== mm ||
+    w.getUTCSeconds() !== ss
+  ) {
+    return new Date(NaN);
+  }
+
   let instant = wallUtc;
   for (let i = 0; i < 2; i++) {
     instant = wallUtc - tzOffsetMs(new Date(instant), NY);
   }
+
+  if (instant + tzOffsetMs(new Date(instant), NY) !== wallUtc) {
+    return new Date(NaN);
+  }
+
   return new Date(instant);
 }
 

@@ -277,6 +277,7 @@ export function toScheduleCalendarItem(m: {
 }): ScheduleCalendarItem {
   const isCompleted = m.status === 'completed' || m.status === 'forfeit';
   const isLive = m.status === 'live';
+  const isCancelled = m.status === 'cancelled';
   const isForfeit = m.status === 'forfeit';
 
   let outcome: 'W' | 'L' | 'D' | undefined;
@@ -298,7 +299,7 @@ export function toScheduleCalendarItem(m: {
     team1: m.homeTeam,
     team2: m.awayTeam,
     division: m.division,
-    status: isCompleted ? 'Completed' : isLive ? 'Live' : 'Upcoming',
+    status: isCompleted ? 'Completed' : isLive ? 'Live' : isCancelled ? 'Cancelled' : 'Upcoming',
     forfeit: isForfeit,
     result,
     homeScore: m.homeScore,

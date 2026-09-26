@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { FiChevronLeft, FiChevronRight, FiCalendar, FiClock, FiX, FiInfo } from 'react-icons/fi';
 import { formatNY } from '@/app/lib/dates';
 import type { ScheduleCalendarItem } from '@/app/lib/db/match-page';
+import { getInitialYearMonth, getMonthGrid } from '@/app/lib/schedule-calendar';
 import Badge from '@/app/components/ui/Badge';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
-
-type ScheduleItem = ScheduleCalendarItem;
 
 interface CalendarScheduleProps {
   matches: ScheduleCalendarItem[];
@@ -21,29 +20,6 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
-
-// NY-timezone formatting is shared league-wide; see app/lib/dates.ts.
-
-// Helper to determine initial calendar focus based on matches list
-function getInitialDate(matches: ScheduleItem[]) {
-  const upcoming = matches.filter(m => m.status !== 'Completed' && !m.forfeit && m.status !== 'Forfeit');
-  if (upcoming.length > 0) {
-    const sorted = [...upcoming].sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-    return new Date(sorted[0].scheduledAt);
-  }
-  if (matches.length > 0) {
-    const sorted = [...matches].sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
-    return new Date(sorted[0].scheduledAt);
-  }
-  return new Date();
-}
-
-function getInitialYearMonth(matches: ScheduleItem[]): { year: number; month: number } {
-  const date = getInitialDate(matches);
-  const ymd = formatNY(date, 'ymd');
-  const [y, m] = ymd.split('-').map(Number);
-  return { year: y, month: m - 1 };
-}
 
 export default function CalendarSchedule({ matches, gameSlug, division }: CalendarScheduleProps) {
   // Pre-process matches once to map them to America/New_York YYYY-MM-DD
@@ -66,19 +42,12 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
   const [selectedMatch, setSelectedMatch] = useState<typeof processedMatches[0] | null>(null);
 
   // Calendar Grid Calculation anchored to America/New_York calendar dates
-  const daysInMonth = useMemo(() => {
-    return new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
-  }, [currentYear, currentMonth]);
-
-  const firstDayOfWeek = useMemo(() => {
-    return new Date(Date.UTC(currentYear, currentMonth, 1)).getUTCDay();
+  const { daysInMonth, firstDayOfWeek, prevMonthDays } = useMemo(() => {
+    return getMonthGrid(currentYear, currentMonth);
   }, [currentYear, currentMonth]);
 
   const calendarCells = useMemo(() => {
     const cells = [];
-
-    // Padding days from previous month
-    const prevMonthDays = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate();
     for (let i = firstDayOfWeek - 1; i >= 0; i--) {
       const day = prevMonthDays - i;
       const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
@@ -122,7 +91,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
     }
 
     return cells;
-  }, [currentYear, currentMonth, daysInMonth, firstDayOfWeek]);
+  }, [currentYear, currentMonth, daysInMonth, firstDayOfWeek, prevMonthDays]);
 
   // Match Lookup mapping for dates
   const matchMapByDate = useMemo(() => {
@@ -276,7 +245,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                 <div className="hidden md:flex flex-col gap-1 mt-1.5 overflow-hidden">
                   {cellMatches.slice(0, 2).map((m) => {
                     const isLive = m.status === 'Live';
-                    const isCompleted = m.status === 'Completed' || m.forfeit || m.status === 'Forfeit';
+                    const isCompleted = m.status === 'Completed';
 
                     let badgeClass = 'bg-accent/5 border-accent/20 text-foreground-secondary hover:text-accent hover:bg-accent/10 hover:border-accent/40';
                     if (isLive) {
@@ -313,7 +282,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                       let dotColor = 'bg-accent shadow-[0_0_6px] shadow-accent/60';
                       if (m.status === 'Live') {
                         dotColor = 'bg-success shadow-[0_0_6px] shadow-success/60 animate-pulse';
-                      } else if (m.status === 'Completed' || m.forfeit || m.status === 'Forfeit') {
+                      } else if (m.status === 'Completed') {
                         dotColor = 'bg-foreground-muted';
                       }
                       return (
@@ -382,7 +351,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {listToShow.map((match) => {
                 const isLive = match.status === 'Live';
-                const isCompleted = match.status === 'Completed' || match.forfeit || match.status === 'Forfeit';
+                const isCompleted = match.status === 'Completed';
 
                 let accentBorder = 'border-l-accent';
                 if (isLive) {
@@ -498,7 +467,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
 
                   {/* VS / Score Hub */}
                   <div className="flex flex-col items-center justify-center shrink-0 min-w-[70px] z-10">
-                    {(selectedMatch.status === 'Completed' || selectedMatch.forfeit || selectedMatch.status === 'Forfeit') && selectedMatch.homeScore !== null && selectedMatch.awayScore !== null ? (
+                    {selectedMatch.status === 'Completed' && selectedMatch.homeScore !== null && selectedMatch.awayScore !== null ? (
                       <div className="flex items-center gap-2">
                         <span className={`text-2xl md:text-3xl font-black ${selectedMatch.homeScore > selectedMatch.awayScore ? 'text-accent' : 'text-foreground-secondary'}`}>
                           {selectedMatch.homeScore}
@@ -555,7 +524,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                 <div className="bg-surface-raised/30 border border-line/60 rounded-xl p-4 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className={`w-2.5 h-2.5 rounded-full ${
-                      selectedMatch.status === 'Completed' || selectedMatch.forfeit || selectedMatch.status === 'Forfeit'
+                      selectedMatch.status === 'Completed'
                         ? 'bg-foreground-muted'
                         : selectedMatch.status === 'Live'
                         ? 'bg-success animate-pulse'
@@ -567,7 +536,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                     </span>
                   </div>
 
-                  {(selectedMatch.status === 'Completed' || selectedMatch.forfeit || selectedMatch.status === 'Forfeit') && selectedMatch.result && (
+                  {selectedMatch.status === 'Completed' && selectedMatch.result && (
                     <span className="text-xs text-foreground-secondary font-bold bg-surface-raised border border-line rounded-lg px-3 py-1">
                       Result: <span className="text-accent font-black">{selectedMatch.result}</span>
                     </span>

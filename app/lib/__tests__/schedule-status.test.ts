@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseEastern, formatNY } from '../dates';
 import { toScheduleCalendarItem } from '../db/match-page';
+import { getInitialDate, getInitialYearMonth, getMonthGrid } from '../schedule-calendar';
 
 const mapMatchToScheduleItem = toScheduleCalendarItem;
 
@@ -138,6 +139,24 @@ describe('schedule match status and result mapping', () => {
     expect(item.forfeit).toBe(false);
     expect(item.result).toBeUndefined();
   });
+
+  it('maps cancelled matches to Cancelled, never Upcoming', () => {
+    const cancelledMatch = {
+      id: 'm-cancelled',
+      scheduledAt: parseEastern('2026-09-18T19:00'),
+      homeTeam: 'Team Alpha',
+      awayTeam: 'Team Beta',
+      division: 'Varsity',
+      status: 'cancelled' as const,
+      homeScore: null,
+      awayScore: null,
+    };
+
+    const item = mapMatchToScheduleItem(cancelledMatch);
+    expect(item.status).toBe('Cancelled');
+    expect(item.forfeit).toBe(false);
+    expect(item.result).toBeUndefined();
+  });
 });
 
 describe('calendar timezone and date alignment', () => {
@@ -151,24 +170,30 @@ describe('calendar timezone and date alignment', () => {
     expect(formatNY(earlyMorningMatchDate, 'ymd')).toBe('2026-10-01');
   });
 
-  it('calculates calendar month grid days cleanly without local timezone shifts', () => {
-    // Test February in a leap year (2024) vs non-leap year (2025)
-    const feb2024Days = new Date(Date.UTC(2024, 2, 0)).getUTCDate();
-    expect(feb2024Days).toBe(29);
+  it('calculates calendar month grid days cleanly without local timezone shifts via getMonthGrid', () => {
+    // February in a leap year (2024) vs non-leap year (2025)
+    expect(getMonthGrid(2024, 1).daysInMonth).toBe(29);
+    expect(getMonthGrid(2025, 1).daysInMonth).toBe(28);
 
-    const feb2025Days = new Date(Date.UTC(2025, 2, 0)).getUTCDate();
-    expect(feb2025Days).toBe(28);
-
-    // September has 30 days
-    const sept2026Days = new Date(Date.UTC(2026, 9, 0)).getUTCDate();
-    expect(sept2026Days).toBe(30);
-
-    // September 1, 2026 falls on a Tuesday (day of week index 2)
-    const sept1stDow = new Date(Date.UTC(2026, 8, 1)).getUTCDay();
-    expect(sept1stDow).toBe(2); // 0=Sun, 1=Mon, 2=Tue
+    // September 2026 (30 days, starts on Tuesday: day 2)
+    const sept2026 = getMonthGrid(2026, 8);
+    expect(sept2026.daysInMonth).toBe(30);
+    expect(sept2026.firstDayOfWeek).toBe(2);
+    expect(sept2026.prevMonthDays).toBe(31); // August has 31 days
   });
 
-  it('initial calendar focus does not treat forfeits as upcoming matches', () => {
+  it('focuses the next upcoming match ignoring completed, forfeit, and cancelled matches', () => {
+    const scheduledOct5 = mapMatchToScheduleItem({
+      id: 'm2-scheduled',
+      scheduledAt: parseEastern('2026-10-05T19:00'),
+      homeTeam: 'A',
+      awayTeam: 'C',
+      division: 'Varsity',
+      status: 'scheduled',
+      homeScore: null,
+      awayScore: null,
+    });
+
     const matches = [
       mapMatchToScheduleItem({
         id: 'm1-forfeit',
@@ -181,21 +206,44 @@ describe('calendar timezone and date alignment', () => {
         awayScore: 0,
       }),
       mapMatchToScheduleItem({
-        id: 'm2-scheduled',
-        scheduledAt: parseEastern('2026-10-05T19:00'),
+        id: 'm0-cancelled',
+        scheduledAt: parseEastern('2026-09-01T19:00'),
         homeTeam: 'A',
-        awayTeam: 'C',
+        awayTeam: 'D',
         division: 'Varsity',
-        status: 'scheduled',
+        status: 'cancelled',
         homeScore: null,
         awayScore: null,
       }),
+      scheduledOct5,
     ];
 
-    const upcoming = matches.filter(
-      (m) => m.status !== 'Completed' && !m.forfeit && m.status !== 'Forfeit'
-    );
-    expect(upcoming).toHaveLength(1);
-    expect(upcoming[0].id).toBe('m2-scheduled');
+    expect(getInitialDate(matches).toISOString()).toBe(scheduledOct5.scheduledAt);
+    expect(getInitialYearMonth(matches)).toEqual({ year: 2026, month: 9 }); // October is month 9 (0-indexed)
+  });
+
+  it('focuses the most recent match when all matches are completed', () => {
+    const olderCompleted = mapMatchToScheduleItem({
+      id: 'm1',
+      scheduledAt: parseEastern('2026-09-01T19:00'),
+      homeTeam: 'A',
+      awayTeam: 'B',
+      division: 'Varsity',
+      status: 'completed',
+      homeScore: 2,
+      awayScore: 1,
+    });
+    const newerCompleted = mapMatchToScheduleItem({
+      id: 'm2',
+      scheduledAt: parseEastern('2026-09-15T19:00'),
+      homeTeam: 'A',
+      awayTeam: 'C',
+      division: 'Varsity',
+      status: 'completed',
+      homeScore: 3,
+      awayScore: 0,
+    });
+
+    expect(getInitialDate([olderCompleted, newerCompleted]).toISOString()).toBe(newerCompleted.scheduledAt);
   });
 });
