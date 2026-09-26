@@ -72,6 +72,8 @@ export default function SchoolRow({ school }: { school: School }) {
             </div>
             <div>
               <ImageUpload
+                section="schools"
+                entityId={school.id}
                 name="logoUrl"
                 storageKeyName="storageKey"
                 currentSrc={school.logoUrl ?? undefined}

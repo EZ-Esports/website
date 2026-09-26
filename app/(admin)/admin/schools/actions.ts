@@ -5,14 +5,12 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { createServiceClient } from '@/app/lib/supabase/service';
 import { slugify, safeUrl, sanitizeDbError } from '@/app/lib/text-utils';
+import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 
 async function requireSchoolsPermission() {
   return requirePermission(Permissions.MANAGE_SCHOOLS);
 }
-
-const BUCKET = 'admin-uploads';
 
 function revalidateAll() {
   revalidateTag('schools', {});
@@ -24,7 +22,10 @@ export async function addSchool(formData: FormData) {
   await requireSchoolsPermission();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
-  const storageKey = (formData.get('storageKey') as string) || null;
+  const rawEntityId = (formData.get('entityId') || formData.get('id')) as string | null;
+  const entityId = sanitizeEntityId(rawEntityId);
+  const rawStorageKey = (formData.get('storageKey') as string) || null;
+  const storageKey = entityId && isKeyScopedToEntity(rawStorageKey, 'schools', entityId) ? rawStorageKey : null;
   const websiteUrl = safeUrl((formData.get('websiteUrl') as string) ?? '');
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
 
@@ -33,7 +34,22 @@ export async function addSchool(formData: FormData) {
   const slug = slugify(name);
 
   try {
-    await db.insert(schema.schools).values({ name, slug, logoUrl, storageKey, websiteUrl, displayOrder });
+    const insertValues: typeof schema.schools.$inferInsert = {
+      name,
+      slug,
+      logoUrl,
+      storageKey,
+      websiteUrl,
+      displayOrder,
+    };
+    if (entityId) {
+      insertValues.id = entityId;
+    }
+    await db.insert(schema.schools).values(insertValues);
+
+    if (entityId) {
+      await cleanupEntityStorage('schools', entityId, storageKey);
+    }
   } catch (error) {
     console.error('Failed to add school', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -46,7 +62,7 @@ export async function updateSchool(id: string, formData: FormData) {
   await requireSchoolsPermission();
   const name = formData.get('name') as string;
   const logoUrl = (formData.get('logoUrl') as string) ?? '';
-  const newStorageKey = (formData.get('storageKey') as string) || null;
+  const rawStorageKey = (formData.get('storageKey') as string) || null;
   const websiteUrl = safeUrl((formData.get('websiteUrl') as string) ?? '');
   const displayOrder = parseInt(formData.get('displayOrder') as string) || 0;
 
@@ -59,14 +75,12 @@ export async function updateSchool(id: string, formData: FormData) {
       .where(eq(schema.schools.id, id))
       .limit(1);
 
-    // Delete old file only if a new image was uploaded and differs from the old one
-    if (newStorageKey && old?.storageKey && old.storageKey !== newStorageKey) {
-      const supabase = createServiceClient();
-      await supabase.storage.from(BUCKET).remove([old.storageKey]);
-    }
+    // Only accept storage keys strictly scoped to this entity folder
+    const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'schools', id) ? rawStorageKey : null;
+    const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (old?.storageKey && isKeyScopedToEntity(old.storageKey, 'schools', id) ? old.storageKey : null));
 
-    // Preserve existing storageKey if no new upload was made
-    const storageKey = newStorageKey ?? old?.storageKey ?? null;
+    // Scope cleanup strictly to this entity folder
+    await cleanupEntityStorage('schools', id, storageKey);
 
     await db
       .update(schema.schools)
@@ -82,20 +96,11 @@ export async function updateSchool(id: string, formData: FormData) {
 
 export async function deleteSchool(id: string) {
   const user = await requireSchoolsPermission();
-  // Fetch the row first to get storageKey for cleanup
-  const [row] = await db
-    .select({ storageKey: schema.schools.storageKey })
-    .from(schema.schools)
-    .where(eq(schema.schools.id, id))
-    .limit(1);
 
   await db.update(schema.schools).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.schools.id, id));
 
-  // Remove from Supabase Storage if a key exists
-  if (row?.storageKey) {
-    const supabase = createServiceClient();
-    await supabase.storage.from(BUCKET).remove([row.storageKey]);
-  }
+  // Scope cleanup strictly to that entity's folder in Supabase Storage
+  await cleanupEntityStorage('schools', id);
 
   revalidateAll();
 }
