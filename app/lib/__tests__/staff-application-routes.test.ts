@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { buildStaffApplicationDetails, type StaffApplicationFormData } from '@/app/lib/staff-application-form';
+import {
+  buildStaffApplicationDetails,
+  GAME_REGULATIONS_ROLE,
+  type StaffApplicationFormData,
+} from '@/app/lib/staff-application-form';
 
 const mocks = vi.hoisted(() => ({
   insertValues: vi.fn(),
-  selectRows: vi.fn(),
+  getStaffResumeStorageKey: vi.fn(),
   upload: vi.fn(),
   remove: vi.fn(),
   createSignedUrl: vi.fn(),
@@ -14,10 +18,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/app/lib/db', () => ({
-  db: {
-    insert: () => ({ values: mocks.insertValues }),
-    select: () => ({ from: () => ({ where: () => ({ limit: mocks.selectRows }) }) }),
-  },
+  db: { insert: () => ({ values: mocks.insertValues }) },
+}));
+
+// The resume lookup's soft-delete filter is asserted on the real query
+// builder in app/lib/db/__tests__/staff-resume-query.test.ts; here only its
+// result matters.
+vi.mock('@/app/lib/db/queries', () => ({
+  getStaffResumeStorageKey: mocks.getStaffResumeStorageKey,
 }));
 
 vi.mock('@/app/lib/supabase/service', () => ({
@@ -50,6 +58,7 @@ const form: StaffApplicationFormData = {
   phone: '(555) 555-5555',
   discordTag: 'janesmith',
   role: 'Marketing Division',
+  gameDirector: '',
   message: 'I want to help run events.',
   linkedin: 'linkedin.com/in/janesmith',
   workSamples: '',
@@ -61,7 +70,9 @@ const form: StaffApplicationFormData = {
 
 const pdf = () => new File([new TextEncoder().encode('%PDF-1.7\n...')], 'resume.pdf', { type: 'application/pdf' });
 
-function submission(overrides: { details?: unknown; resume?: File | null; fields?: Record<string, string> } = {}) {
+function submission(
+  overrides: { details?: unknown; omitDetails?: boolean; resume?: File | null; fields?: Record<string, string> } = {},
+) {
   const body = new FormData();
   const fields = {
     name: form.name,
@@ -73,7 +84,9 @@ function submission(overrides: { details?: unknown; resume?: File | null; fields
     ...overrides.fields,
   };
   for (const [k, v] of Object.entries(fields)) body.set(k, v);
-  body.set('details', JSON.stringify(overrides.details ?? buildStaffApplicationDetails(form)));
+  if (!overrides.omitDetails) {
+    body.set('details', JSON.stringify(overrides.details ?? buildStaffApplicationDetails(form)));
+  }
   const resume = overrides.resume === undefined ? pdf() : overrides.resume;
   if (resume) body.set('resume', resume, resume.name);
   return new NextRequest('http://localhost/api/apply/staff', { method: 'POST', body });
@@ -99,9 +112,10 @@ describe('POST /api/apply/staff', () => {
 
     const row = mocks.insertValues.mock.calls[0][0];
     expect(row.resumeStorageKey).toBe(key);
-    expect(row.details.version).toBe(3);
+    expect(row.details.version).toBe(4);
     expect(row.details.linkedin).toBe('https://linkedin.com/in/janesmith');
     expect(row.details.consent.acknowledgedUnpaidVolunteer).toBe(true);
+    expect(row.details.gameDirector).toBe('');
   });
 
   it('rejects a missing resume without uploading or inserting', async () => {
@@ -119,6 +133,14 @@ describe('POST /api/apply/staff', () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
+  it('rejects a submission with no details part before touching storage', async () => {
+    const res = await POST(submission({ omitDetails: true }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Missing application details.' });
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+  });
+
   it('rejects a missing unpaid-volunteer acknowledgement before touching storage', async () => {
     const details = buildStaffApplicationDetails({ ...form, acknowledgedUnpaidVolunteer: false });
     const res = await POST(submission({ details }));
@@ -126,11 +148,40 @@ describe('POST /api/apply/staff', () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
-  it('rejects an invalid LinkedIn URL', async () => {
-    const details = buildStaffApplicationDetails({ ...form, linkedin: 'not a link' });
+  it('rejects a LinkedIn link on another host', async () => {
+    const details = buildStaffApplicationDetails({ ...form, linkedin: 'https://github.com/janesmith' });
     const res = await POST(submission({ details }));
     expect(res.status).toBe(400);
     expect(mocks.upload).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retired per-game division as the role', async () => {
+    const res = await POST(submission({ fields: { role: 'VALORANT Division' } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid role' });
+  });
+
+  it('requires a director position for Game Regulations, and stores it in details', async () => {
+    const withoutDirector = await POST(
+      submission({
+        fields: { role: GAME_REGULATIONS_ROLE },
+        details: buildStaffApplicationDetails({ ...form, role: GAME_REGULATIONS_ROLE, gameDirector: '' }),
+      }),
+    );
+    expect(withoutDirector.status).toBe(400);
+    expect(await withoutDirector.json()).toEqual({ error: 'Please choose which game director position you want.' });
+    expect(mocks.upload).not.toHaveBeenCalled();
+
+    const ok = await POST(
+      submission({
+        fields: { role: GAME_REGULATIONS_ROLE },
+        details: buildStaffApplicationDetails({ ...form, role: GAME_REGULATIONS_ROLE, gameDirector: 'VALORANT Director' }),
+      }),
+    );
+    expect(ok.status).toBe(201);
+    const row = mocks.insertValues.mock.calls[0][0];
+    expect(row.role).toBe(GAME_REGULATIONS_ROLE);
+    expect(row.details.gameDirector).toBe('VALORANT Director');
   });
 
   it('refuses an oversized body by its declared length', async () => {
@@ -148,6 +199,16 @@ describe('POST /api/apply/staff', () => {
     const res = await POST(submission());
     expect(res.status).toBe(429);
     expect(mocks.upload).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 and inserts nothing when the storage upload fails', async () => {
+    mocks.upload.mockResolvedValue({ data: null, error: { message: 'bucket unavailable' } });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await POST(submission());
+    expect(res.status).toBe(500);
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.remove).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it('removes the uploaded resume if the row cannot be saved', async () => {
@@ -173,29 +234,43 @@ describe('GET /admin/applications/staff/[id]/resume', () => {
     const res = await call();
     expect(res.status).toBe(403);
     expect(mocks.getStaffForAdminSection).toHaveBeenCalledWith('/admin/applications');
-    expect(mocks.selectRows).not.toHaveBeenCalled();
+    expect(mocks.getStaffResumeStorageKey).not.toHaveBeenCalled();
     expect(mocks.createSignedUrl).not.toHaveBeenCalled();
   });
 
   it('redirects to a short-lived signed URL for the stored key', async () => {
     mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff-1' });
-    mocks.selectRows.mockResolvedValue([{ resumeStorageKey: 'abc.pdf' }]);
+    mocks.getStaffResumeStorageKey.mockResolvedValue('abc.pdf');
     mocks.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://storage.example/signed?token=t' }, error: null });
 
     const res = await call();
     expect(res.status).toBe(303);
+    expect(mocks.getStaffResumeStorageKey).toHaveBeenCalledWith(id);
     expect(res.headers.get('location')).toBe('https://storage.example/signed?token=t');
     expect(res.headers.get('cache-control')).toContain('no-store');
     expect(mocks.bucket).toHaveBeenCalledWith('staff-resumes');
     expect(mocks.createSignedUrl).toHaveBeenCalledWith('abc.pdf', 60);
   });
 
-  it('404s for a malformed id or an application without a resume', async () => {
+  it('404s for a malformed id or an application without a resume (including soft-deleted ones)', async () => {
     mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff-1' });
     expect((await call('not-a-uuid')).status).toBe(404);
+    expect(mocks.getStaffResumeStorageKey).not.toHaveBeenCalled();
 
-    mocks.selectRows.mockResolvedValue([{ resumeStorageKey: null }]);
+    mocks.getStaffResumeStorageKey.mockResolvedValue(null);
     expect((await call()).status).toBe(404);
     expect(mocks.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when Storage cannot sign the URL', async () => {
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff-1' });
+    mocks.getStaffResumeStorageKey.mockResolvedValue('abc.pdf');
+    mocks.createSignedUrl.mockResolvedValue({ data: null, error: { message: 'object not found' } });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await call();
+    expect(res.status).toBe(502);
+    expect(res.headers.get('location')).toBeNull();
+    errorSpy.mockRestore();
   });
 });

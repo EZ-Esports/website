@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, isNull } from 'drizzle-orm';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
+import { getStaffResumeStorageKey } from '@/app/lib/db/queries';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { createServiceClient } from '@/app/lib/supabase/service';
 import { RESUME_SIGNED_URL_TTL_SECONDS, STAFF_RESUME_BUCKET } from '@/app/lib/staff-resume';
@@ -26,19 +24,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: noStore });
   }
 
-  const [row] = await db
-    .select({ resumeStorageKey: schema.staffApplications.resumeStorageKey })
-    .from(schema.staffApplications)
-    .where(and(eq(schema.staffApplications.id, id), isNull(schema.staffApplications.deletedAt)))
-    .limit(1);
-
-  if (!row?.resumeStorageKey) {
+  const resumeStorageKey = await getStaffResumeStorageKey(id);
+  if (!resumeStorageKey) {
     return NextResponse.json({ error: 'No resume on file for this application.' }, { status: 404, headers: noStore });
   }
 
   const { data, error } = await createServiceClient()
     .storage.from(STAFF_RESUME_BUCKET)
-    .createSignedUrl(row.resumeStorageKey, RESUME_SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(resumeStorageKey, RESUME_SIGNED_URL_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
     console.error('Failed to sign staff resume URL:', error?.message);

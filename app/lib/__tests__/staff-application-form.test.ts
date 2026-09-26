@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   buildStaffApplicationDetails,
   formatStaffApplicationDetails,
+  GAME_DIRECTOR_POSITIONS,
+  GAME_REGULATIONS_ROLE,
+  isGameDirectorPosition,
   isStaffRole,
+  normalizeLinkedInUrl,
   normalizeOptionalUrl,
   parseStaffApplicationDetails,
   STAFF_ROLES,
   type StaffRole,
   type StaffApplicationDetailsV1,
   type StaffApplicationDetailsV2,
+  type StaffApplicationDetailsV3,
   type StaffApplicationFormData,
 } from "@/app/lib/staff-application-form";
 
@@ -19,6 +24,7 @@ const validForm: StaffApplicationFormData = {
   phone: "(555) 555-5555",
   discordTag: "janesmith",
   role: "Marketing Division",
+  gameDirector: "",
   message: "I have run a Discord community of 500 members for two years.",
   linkedin: "https://linkedin.com/in/janesmith",
   workSamples: "https://github.com/janesmith",
@@ -32,7 +38,8 @@ describe("Staff Application Details", () => {
   it("builds structured details from the form", () => {
     const details = buildStaffApplicationDetails(validForm);
     expect(details).toEqual({
-      version: 3,
+      version: 4,
+      gameDirector: "",
       preferredFirstName: "Janie",
       discordTag: "janesmith",
       linkedin: "https://linkedin.com/in/janesmith",
@@ -48,7 +55,7 @@ describe("Staff Application Details", () => {
     expect(details.backgroundMotivation).toBe("Some padded answer.");
   });
 
-  it("formats v3 details into labeled rows, with a LinkedIn-only label", () => {
+  it("formats v4 details into labeled rows, with a LinkedIn-only label", () => {
     expect(formatStaffApplicationDetails(buildStaffApplicationDetails(validForm))).toEqual([
       { label: "LinkedIn", value: "https://linkedin.com/in/janesmith" },
       { label: "Other Links", value: "https://github.com/janesmith" },
@@ -113,7 +120,7 @@ describe("Staff Application Details", () => {
     ]);
   });
 
-  it("offers exactly the nine divisions, in order", () => {
+  it("offers exactly the seven divisions, in order", () => {
     expect([...STAFF_ROLES]).toEqual([
       "Software Engineering Division",
       "Marketing Division",
@@ -121,15 +128,27 @@ describe("Staff Application Details", () => {
       "Development Division",
       "Productions Crew",
       "Legal Division",
-      "VALORANT Division",
-      "League of Legends Division",
-      "Teamfight Tactics Division",
+      "Game Regulations Division",
     ]);
   });
 
+  it("offers the three game director positions for the Game Regulations follow-up", () => {
+    expect([...GAME_DIRECTOR_POSITIONS]).toEqual([
+      "VALORANT Director",
+      "League of Legends Director",
+      "Teamfight Tactics Director",
+    ]);
+    expect(isGameDirectorPosition("VALORANT Director")).toBe(true);
+    expect(isGameDirectorPosition("VALORANT Division")).toBe(false);
+    expect(isGameDirectorPosition(undefined)).toBe(false);
+  });
+
   it("rejects retired role values and the old Other option", () => {
-    const validRole: StaffRole = "VALORANT Division";
+    const validRole: StaffRole = GAME_REGULATIONS_ROLE;
     expect(isStaffRole(validRole)).toBe(true);
+    expect(isStaffRole("VALORANT Division")).toBe(false);
+    expect(isStaffRole("League of Legends Division")).toBe(false);
+    expect(isStaffRole("Teamfight Tactics Division")).toBe(false);
     expect(isStaffRole("Games Division")).toBe(false);
     expect(isStaffRole("Community Moderator")).toBe(false);
     expect(isStaffRole("Other: Something")).toBe(false);
@@ -160,25 +179,26 @@ describe("normalizeOptionalUrl", () => {
 
 describe("parseStaffApplicationDetails (server-side gate)", () => {
   const valid = () => JSON.parse(JSON.stringify(buildStaffApplicationDetails(validForm)));
+  const parse = (raw: unknown, role: string = validForm.role) => parseStaffApplicationDetails(raw, role);
 
-  it("accepts a well-formed v3 submission", () => {
-    const result = parseStaffApplicationDetails(valid());
+  it("accepts a well-formed v4 submission", () => {
+    const result = parse(valid());
     expect(result).toEqual({ ok: true, details: buildStaffApplicationDetails(validForm) });
   });
 
   it("rebuilds the object so unknown client keys are not persisted", () => {
-    const result = parseStaffApplicationDetails({ ...valid(), injected: "x", version: 99 });
+    const result = parse({ ...valid(), injected: "x", version: 99 });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.details).not.toHaveProperty("injected");
-      expect(result.details.version).toBe(3);
+      expect(result.details.version).toBe(4);
     }
   });
 
   it("rejects missing, null and array details", () => {
-    expect(parseStaffApplicationDetails(null).ok).toBe(false);
-    expect(parseStaffApplicationDetails(undefined).ok).toBe(false);
-    expect(parseStaffApplicationDetails([]).ok).toBe(false);
+    expect(parse(null).ok).toBe(false);
+    expect(parse(undefined).ok).toBe(false);
+    expect(parse([]).ok).toBe(false);
   });
 
   it("requires the Terms and Privacy consents to be strictly true", () => {
@@ -186,7 +206,7 @@ describe("parseStaffApplicationDetails (server-side gate)", () => {
       for (const bad of [false, "true", 1, undefined]) {
         const d = valid();
         d.consent[key] = bad;
-        expect(parseStaffApplicationDetails(d)).toEqual({
+        expect(parse(d)).toEqual({
           ok: false,
           error: "You must agree to the Terms of Service and Privacy Policy to submit an application.",
         });
@@ -198,7 +218,7 @@ describe("parseStaffApplicationDetails (server-side gate)", () => {
     for (const bad of [false, "true", 1, undefined, null]) {
       const d = valid();
       d.consent.acknowledgedUnpaidVolunteer = bad;
-      expect(parseStaffApplicationDetails(d)).toEqual({
+      expect(parse(d)).toEqual({
         ok: false,
         error: "You must acknowledge that this is a part-time, unpaid volunteer position.",
       });
@@ -208,36 +228,121 @@ describe("parseStaffApplicationDetails (server-side gate)", () => {
   it("rejects a pre-v3 payload that has no acknowledgement at all", () => {
     const d = valid();
     delete d.consent.acknowledgedUnpaidVolunteer;
-    expect(parseStaffApplicationDetails(d).ok).toBe(false);
+    expect(parse(d).ok).toBe(false);
   });
 
   it("treats LinkedIn as optional but validates it when given", () => {
-    const blank = parseStaffApplicationDetails({ ...valid(), linkedin: "" });
+    const blank = parse({ ...valid(), linkedin: "" });
     expect(blank.ok && blank.details.linkedin).toBe("");
 
-    const bare = parseStaffApplicationDetails({ ...valid(), linkedin: "linkedin.com/in/jane" });
+    const bare = parse({ ...valid(), linkedin: "linkedin.com/in/jane" });
     expect(bare.ok && bare.details.linkedin).toBe("https://linkedin.com/in/jane");
 
-    expect(parseStaffApplicationDetails({ ...valid(), linkedin: "not a url" })).toEqual({
+    expect(parse({ ...valid(), linkedin: "not a url" })).toEqual({
       ok: false,
-      error: "Enter a valid LinkedIn profile URL, or leave it blank.",
+      error: "Enter a LinkedIn profile link (linkedin.com/in/…), or leave it blank.",
     });
+  });
+
+  it("accepts only linkedin.com hosts for LinkedIn", () => {
+    expect(parse({ ...valid(), linkedin: "https://github.com/jane" }).ok).toBe(false);
+    expect(parse({ ...valid(), linkedin: "linkedin.com.evil.example/in/jane" }).ok).toBe(false);
+    const regional = parse({ ...valid(), linkedin: "uk.linkedin.com/in/jane" });
+    expect(regional.ok && regional.details.linkedin).toBe("https://uk.linkedin.com/in/jane");
+  });
+
+  it("requires a valid director position only for the Game Regulations Division", () => {
+    const missing = parse(valid(), GAME_REGULATIONS_ROLE);
+    expect(missing).toEqual({ ok: false, error: "Please choose which game director position you want." });
+
+    expect(parse({ ...valid(), gameDirector: "Overwatch Director" }, GAME_REGULATIONS_ROLE).ok).toBe(false);
+    expect(parse({ ...valid(), gameDirector: ["VALORANT Director"] }, GAME_REGULATIONS_ROLE).ok).toBe(false);
+
+    const ok = parse({ ...valid(), gameDirector: "League of Legends Director" }, GAME_REGULATIONS_ROLE);
+    expect(ok.ok && ok.details.gameDirector).toBe("League of Legends Director");
+  });
+
+  it("drops a stray director answer for any other division", () => {
+    const result = parse({ ...valid(), gameDirector: "VALORANT Director" }, "Marketing Division");
+    expect(result.ok && result.details.gameDirector).toBe("");
   });
 
   it("keeps optional other links as trimmed free text, with a length cap", () => {
-    const ok = parseStaffApplicationDetails({ ...valid(), workSamples: "  github.com/jane, jane.design  " });
+    const ok = parse({ ...valid(), workSamples: "  github.com/jane, jane.design  " });
     expect(ok.ok && ok.details.workSamples).toBe("github.com/jane, jane.design");
 
-    const none = parseStaffApplicationDetails({ ...valid(), workSamples: undefined });
+    const none = parse({ ...valid(), workSamples: undefined });
     expect(none.ok && none.details.workSamples).toBe("");
 
-    expect(parseStaffApplicationDetails({ ...valid(), workSamples: "x".repeat(1001) }).ok).toBe(false);
+    expect(parse({ ...valid(), workSamples: "x".repeat(1001) }).ok).toBe(false);
   });
 
   it("requires the why-join answer", () => {
-    expect(parseStaffApplicationDetails({ ...valid(), backgroundMotivation: "   " })).toEqual({
+    expect(parse({ ...valid(), backgroundMotivation: "   " })).toEqual({
       ok: false,
       error: "Please tell us why you want to join EZ Esports.",
     });
+  });
+});
+
+describe("normalizeLinkedInUrl", () => {
+  it("keeps blank as blank and adds https:// when the scheme is missing", () => {
+    expect(normalizeLinkedInUrl("")).toBe("");
+    expect(normalizeLinkedInUrl("linkedin.com/in/jane")).toBe("https://linkedin.com/in/jane");
+    expect(normalizeLinkedInUrl("www.linkedin.com/in/jane")).toBe("https://www.linkedin.com/in/jane");
+  });
+
+  it("accepts linkedin.com, www.linkedin.com and regional subdomains, in any case", () => {
+    expect(normalizeLinkedInUrl("https://www.linkedin.com/in/jane")).toBe("https://www.linkedin.com/in/jane");
+    expect(normalizeLinkedInUrl("https://uk.linkedin.com/in/jane")).toBe("https://uk.linkedin.com/in/jane");
+    expect(normalizeLinkedInUrl("HTTPS://WWW.LinkedIn.com/in/jane")).toBe("https://www.linkedin.com/in/jane");
+  });
+
+  it("rejects other hosts and look-alikes", () => {
+    expect(normalizeLinkedInUrl("https://github.com/jane")).toBeNull();
+    expect(normalizeLinkedInUrl("https://linkedin.com.evil.example/in/jane")).toBeNull();
+    expect(normalizeLinkedInUrl("https://notlinkedin.com/in/jane")).toBeNull();
+    expect(normalizeLinkedInUrl("https://evil.example/linkedin.com/in/jane")).toBeNull();
+    expect(normalizeLinkedInUrl("https://linkedin.com@evil.example/in/jane")).toBeNull();
+    expect(normalizeLinkedInUrl("javascript:alert(1)")).toBeNull();
+  });
+});
+
+describe("Game Regulations details (v4) and legacy rows", () => {
+  const grForm: StaffApplicationFormData = {
+    ...validForm,
+    role: GAME_REGULATIONS_ROLE,
+    gameDirector: "Teamfight Tactics Director",
+  };
+
+  it("records the director choice only when Game Regulations is the role", () => {
+    expect(buildStaffApplicationDetails(grForm).gameDirector).toBe("Teamfight Tactics Director");
+    expect(buildStaffApplicationDetails({ ...grForm, role: "Legal Division" }).gameDirector).toBe("");
+  });
+
+  it("shows the director position first in admin/CSV rows", () => {
+    const rows = formatStaffApplicationDetails(buildStaffApplicationDetails(grForm));
+    expect(rows[0]).toEqual({ label: "Game Director Position", value: "Teamfight Tactics Director" });
+  });
+
+  it("omits the director row for other divisions", () => {
+    const rows = formatStaffApplicationDetails(buildStaffApplicationDetails(validForm));
+    expect(rows.map((r) => r.label)).not.toContain("Game Director Position");
+  });
+
+  it("still formats v3 rows (submitted before the Game Regulations change)", () => {
+    const v3: StaffApplicationDetailsV3 = {
+      version: 3,
+      preferredFirstName: "",
+      discordTag: "",
+      linkedin: "",
+      workSamples: "",
+      availability: "5hrs",
+      consent: { agreedToTerms: true, agreedToPrivacy: true, acknowledgedUnpaidVolunteer: true },
+      backgroundMotivation: "Love VALORANT.",
+    };
+    const rows = formatStaffApplicationDetails(v3);
+    expect(rows).toContainEqual({ label: "Why EZ Esports", value: "Love VALORANT." });
+    expect(rows.map((r) => r.label)).not.toContain("Game Director Position");
   });
 });

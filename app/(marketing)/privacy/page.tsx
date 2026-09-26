@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = 'June 2025';
+  const lastUpdated = 'September 2026';
 
   return (
     <main>
@@ -42,8 +42,14 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 space-y-2">
               <li>
                 <strong className="text-foreground">Contact and identification information:</strong> name,
-                school name, email address, and role (e.g., student, coach, administrator) submitted
-                through application or contact forms.
+                school name, email address, phone number, Discord username, and role (e.g., student,
+                coach, administrator) submitted through application or contact forms.
+              </li>
+              <li>
+                <strong className="text-foreground">Staff application materials:</strong> if you apply
+                to join our volunteer staff, the resume you upload (as a PDF file), any LinkedIn profile
+                or other links you choose to share, the role you are interested in, your weekly
+                availability, and your written answers.
               </li>
               <li>
                 <strong className="text-foreground">Usage data:</strong> browser type, pages visited,
@@ -78,7 +84,7 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-bold text-foreground">3. How We Use Your Information</h2>
             <p>We use the information we collect to:</p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Process school applications and respond to inquiries.</li>
+              <li>Process school and staff applications and respond to inquiries.</li>
               <li>Operate, maintain, and improve league standings, schedules, and rosters.</li>
               <li>Send administrative communications about league events, schedule changes, or
                 important announcements.</li>
@@ -139,6 +145,12 @@ export default function PrivacyPage() {
               retained indefinitely for archival purposes. You may request deletion of your personal
               data by contacting us (see Section 9).
             </p>
+            <p>
+              Staff applications, including any resume or other document uploaded with them, are not
+              deleted automatically after a set period. You can ask us to delete your application at
+              any time (see Section 9); when we act on that request, we remove both the application
+              record and the uploaded resume file.
+            </p>
           </div>
 
           <div className="space-y-4">
@@ -149,6 +161,11 @@ export default function PrivacyPage() {
               encrypted connections (HTTPS), access controls on administrative functions, and
               periodic security reviews. No method of transmission over the internet is completely
               secure, and we cannot guarantee absolute security.
+            </p>
+            <p>
+              Resumes and other documents uploaded with a staff application are kept in private
+              storage that is not publicly accessible. Only authorized staff who review applications
+              can open them, through links that expire shortly after they are created.
             </p>
           </div>
 

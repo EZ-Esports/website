@@ -755,6 +755,23 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
 
 export const getStaffApplications = buildStaffApplicationsQuery;
 
+/**
+ * The resume key for one staff application, excluding soft-deleted rows so a
+ * removed application's resume can no longer be opened from the admin panel.
+ */
+export function buildStaffResumeKeyQuery(applicationId: string) {
+  return db
+    .select({ resumeStorageKey: schema.staffApplications.resumeStorageKey })
+    .from(schema.staffApplications)
+    .where(and(eq(schema.staffApplications.id, applicationId), isNull(schema.staffApplications.deletedAt)))
+    .limit(1);
+}
+
+export async function getStaffResumeStorageKey(applicationId: string): Promise<string | null> {
+  const [row] = await buildStaffResumeKeyQuery(applicationId);
+  return row?.resumeStorageKey ?? null;
+}
+
 /** Count of all scheduled matches (for dashboard). */
 export const countScheduledMatches = async (): Promise<number> => {
   const [row] = await db

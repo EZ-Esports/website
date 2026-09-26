@@ -17,9 +17,9 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 | `/archives` | Per-game “Command Deck” (`f6ea83c`). Header Competition menu **Past Seasons** (`70f0a11`, reverses `ced68c1` chrome) and footer Archives. |
 | `/sponsors` | Tiered sponsors + Embla marquee. |
 | `/apply` | School **Submit Interest** form (Google Form parity). Header/heading `3afc647` / `f9eeabc`. Page `<title>` and `Navigation.tsx` dropdown still say “Apply to Play.” |
-| `/apply/staff` | Staff application (`d6518cc`). Required PDF resume (private `staff-resumes` bucket), optional LinkedIn and "Other links", required unpaid-volunteer acknowledgement, recruiting intro with the mission statement ([spec-004](spec-004-staff-application-resume.md)). Admin opens resumes via a 60 s signed URL. |
+| `/apply/staff` | Staff application (`d6518cc`). Seven divisions, where Game Regulations Division asks a required follow-up (VALORANT / League of Legends / Teamfight Tactics Director). Required PDF resume (private `staff-resumes` bucket), optional LinkedIn (linkedin.com hosts only) and "Other links", required unpaid-volunteer acknowledgement, recruiting intro with the mission statement and no pay claims ([spec-004](spec-004-staff-application-resume.md)). Admin opens resumes via a 60 s signed URL. |
 | `/rules` | League Rulebook & Code of Conduct (`6732658`). Linked from apply consent. |
-| `/privacy` | Privacy policy + Privacy erasure intake modal/action (`a1aeca6` PR #142 / #103). **No `/terms` on this branch.** |
+| `/privacy` | Privacy policy + Privacy erasure intake modal/action (`a1aeca6` PR #142 / #103). Covers phone, Discord, and staff application resumes: private storage, reviewer-only expiring links, no automatic deletion, deletion on request ([spec-004](spec-004-staff-application-resume.md)). **No `/terms` on this branch.** |
 | `/login` | Staff login (footer “Staff Login”). |
 | `/accept-invite` | Token landing for hashed staff invites (`0849963`, PR #8). Linked from `InviteStaffForm`; not in `ROUTES`; outside marketing layout (`force-dynamic`). |
 | `/{game}` | **308** to `/{game}/varsity` (`next.config.ts`, PR #46). Not a page. |

@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return badRequest('Invalid application details.');
   }
-  const parsed = parseStaffApplicationDetails(rawDetails);
+  const parsed = parseStaffApplicationDetails(rawDetails, role);
   if (!parsed.ok) return badRequest(parsed.error);
 
   const resume = form.get('resume');

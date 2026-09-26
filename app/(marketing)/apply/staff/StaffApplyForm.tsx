@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Button as AriaButton, FileTrigger } from 'react-aria-components';
+import { Button as AriaButton, FieldError, FileTrigger, Label, Radio, RadioGroup, Text } from 'react-aria-components';
 import Button from '@/app/components/ui/Button';
 import { Input, Textarea } from '@/app/components/ui/form';
 import { ROUTES, SITE_CONFIG, SOCIAL_LINKS } from '@/app/lib/constants';
 import {
   buildStaffApplicationDetails,
-  normalizeOptionalUrl,
+  GAME_DIRECTOR_POSITIONS,
+  GAME_REGULATIONS_ROLE,
+  LINKEDIN_URL_ERROR,
+  normalizeLinkedInUrl,
+  requiresGameDirector,
   STAFF_ROLES,
   UNPAID_VOLUNTEER_ACK_TEXT,
   WORK_SAMPLES_MAX_LENGTH,
@@ -24,8 +28,9 @@ const initialForm = {
   phone: '',
   discordTag: '',
   role: '', // Primary role of interest
+  gameDirector: '', // Follow-up when role is the Game Regulations Division
   message: '', // Why you want to join
-  linkedin: '', // Optional LinkedIn profile URL
+  linkedin: '', // Optional; linkedin.com links only
   workSamples: '', // Optional links to GitHub, portfolio, designs
   availability: '', // hours per week
   agreedToTerms: false,
@@ -82,7 +87,12 @@ export default function StaffApplyForm() {
 
   const requiredChecks: Record<SectionId, boolean[]> = {
     applicant: [!!form.name.trim(), EMAIL_RE.test(form.email), !!form.phone.trim()],
-    role: [!!form.role, !!resume && !checkResumeFile(resume), !!form.availability],
+    role: [
+      !!form.role,
+      ...(requiresGameDirector(form.role) ? [!!form.gameDirector] : []),
+      !!resume && !checkResumeFile(resume),
+      !!form.availability,
+    ],
     experience: [!!form.message.trim()],
     review: [form.agreedToTerms, form.agreedToPrivacy, form.acknowledgedUnpaidVolunteer],
   };
@@ -102,11 +112,12 @@ export default function StaffApplyForm() {
     else if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
     if (!form.phone.trim()) errors.phone = 'Phone number is required.';
     if (!form.role) errors.role = 'Please select a primary role.';
+    else if (requiresGameDirector(form.role) && !form.gameDirector) {
+      errors.gameDirector = 'Please choose which game director position you want.';
+    }
     const resumeError = checkResumeFile(resume);
     if (resumeError) errors.resume = resumeError;
-    if (normalizeOptionalUrl(form.linkedin) === null) {
-      errors.linkedin = 'Enter a valid link, like https://linkedin.com/in/username, or leave it blank.';
-    }
+    if (normalizeLinkedInUrl(form.linkedin) === null) errors.linkedin = LINKEDIN_URL_ERROR;
     if (!form.availability) errors.availability = 'Please select your weekly availability.';
     if (!form.message.trim()) errors.message = 'Please tell us why you want to join EZ Esports.';
     if (!form.agreedToTerms) errors.agreedToTerms = 'You must agree to the Terms of Service.';
@@ -285,7 +296,7 @@ export default function StaffApplyForm() {
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              Unpaid volunteer · Part-time
+              Volunteer · Part-time
             </span>
             <span className="inline-flex items-center gap-1.5">
               <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
@@ -332,8 +343,7 @@ export default function StaffApplyForm() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               <span>
-                Unpaid, part-time, and remote-friendly. We&apos;re growing, so paid roles may become possible in the
-                future, but none are offered or promised today.
+                Part-time and remote-friendly.
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -611,6 +621,7 @@ export default function StaffApplyForm() {
                           checked={form.role === roleOption}
                           onChange={() => handleSelectChange('role', roleOption)}
                           className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                          aria-describedby={roleOption === GAME_REGULATIONS_ROLE ? 'game-regulations-note' : undefined}
                         />
                         <span>{roleOption}</span>
                       </label>
@@ -619,7 +630,47 @@ export default function StaffApplyForm() {
                   {fieldErrors.role && (
                     <p id="role-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.role}</p>
                   )}
+                  <span id="game-regulations-note" className="sr-only">
+                    Choosing this adds a follow-up question right after this list.
+                  </span>
                 </div>
+
+                {/* Game Regulations follow-up. Rendered only while that division
+                    is selected, directly after the role list in DOM order, so
+                    keyboard and screen-reader users reach it next; the radio's
+                    description tells them it is coming. */}
+                {requiresGameDirector(form.role) && (
+                  <RadioGroup
+                    id="field-gameDirector"
+                    value={form.gameDirector || null}
+                    onChange={(value) => handleSelectChange('gameDirector', value)}
+                    isRequired
+                    isInvalid={!!fieldErrors.gameDirector}
+                    validationBehavior="aria"
+                    className={`ml-3 rounded-xl border bg-accent/5 p-4 sm:p-5 ${fieldErrors.gameDirector ? 'border-danger' : 'border-line'}`}
+                  >
+                    <Label className={labelClass}>Which game director position? {requiredMark}</Label>
+                    <Text slot="description" className="block text-xs text-foreground-secondary mb-2">
+                      Pick the game you want to direct.
+                    </Text>
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:gap-x-6">
+                      {GAME_DIRECTOR_POSITIONS.map((position) => (
+                        <Radio
+                          key={position}
+                          value={position}
+                          className="group flex min-h-[44px] items-center gap-2.5 cursor-pointer text-sm font-semibold text-foreground-secondary outline-none transition-colors data-[hovered]:text-foreground data-[selected]:text-foreground"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="h-4.5 w-4.5 shrink-0 rounded-full border-2 border-foreground-muted bg-surface transition-all group-data-[selected]:border-[5px] group-data-[selected]:border-accent group-data-[focus-visible]:ring-2 group-data-[focus-visible]:ring-accent/40 group-data-[focus-visible]:ring-offset-1"
+                          />
+                          {position}
+                        </Radio>
+                      ))}
+                    </div>
+                    <FieldError className="mt-2 block text-xs text-danger font-semibold">{fieldErrors.gameDirector}</FieldError>
+                  </RadioGroup>
+                )}
 
                 {/* Resume (required PDF). FileTrigger keeps the native file input
                     hidden and lets an RAC Button open it, so the control is
