@@ -115,6 +115,7 @@ export default function SponsorMarquee({ sponsors }: { sponsors: MarqueeSponsor[
                   alt={`${item.name} logo`}
                   width={130}
                   height={40}
+                  sizes="130px"
                   className="h-8 w-auto object-contain opacity-90"
                 />
               ) : (

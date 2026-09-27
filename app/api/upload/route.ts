@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/app/lib/supabase/service';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
 import { requirePermission } from '@/app/lib/auth';
 import {
-  BUCKET,
   SECTION_PERMISSIONS,
   ALLOWED_MIME_TYPES,
   MIME_TO_EXT,
   MAX_FILE_SIZE_BYTES,
+  STORAGE_CACHE_CONTROL,
   isValidSection,
   sanitizeEntityId,
   buildStorageKey,
+  uploadToStorage,
 } from '@/app/lib/storage';
 
 // Authorized staff uploading images: 30 uploads per minute is a generous cap
@@ -84,24 +84,17 @@ export async function POST(req: NextRequest) {
   const storageKey = buildStorageKey(section, entityId, ext);
   const arrayBuffer = await file.arrayBuffer();
 
-  // Use secret key for storage to bypass RLS — safe because auth is already verified above
-  const supabaseStorage = createServiceClient();
-
-  const { error: uploadError } = await supabaseStorage.storage
-    .from(BUCKET)
-    .upload(storageKey, arrayBuffer, {
-      contentType: file.type,
-      upsert: false,
-    });
+  // Use secret key for storage via uploadToStorage helper with Cache-Control: 31536000
+  const { error: uploadError, publicUrl } = await uploadToStorage(storageKey, arrayBuffer, {
+    contentType: file.type,
+    upsert: false,
+    cacheControl: STORAGE_CACHE_CONTROL,
+  });
 
   if (uploadError) {
     console.error('Storage upload failed:', uploadError);
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
   }
-
-  const { data: { publicUrl } } = supabaseStorage.storage
-    .from(BUCKET)
-    .getPublicUrl(storageKey);
 
   return NextResponse.json({ url: publicUrl, storageKey }, { status: 201 });
 }

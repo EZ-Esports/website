@@ -2,7 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { HiArrowUpTray, HiPhoto, HiXMark, HiArrowPath } from 'react-icons/hi2';
-import type { UploadSection } from '@/app/lib/storage';
+import {
+  MAX_FILE_SIZE_BYTES,
+  MAX_RAW_INPUT_BYTES,
+  MAX_IMAGE_DIMENSION,
+  ALLOWED_MIME_TYPES,
+  type UploadSection,
+} from '@/app/lib/storage';
+import { compressImage } from '@/app/lib/image-compression';
 
 interface ImageUploadProps {
   name: string;
@@ -16,8 +23,7 @@ interface ImageUploadProps {
   required?: boolean;
 }
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_TYPES = ALLOWED_MIME_TYPES as readonly string[];
 
 export default function ImageUpload({
   name,
@@ -65,8 +71,8 @@ export default function ImageUpload({
       setError('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.');
       return;
     }
-    if (file.size > MAX_SIZE_BYTES) {
-      setError('File too large. Maximum size is 5 MB.');
+    if (file.size > MAX_RAW_INPUT_BYTES) {
+      setError('File too large. Maximum raw file size is 20 MB.');
       return;
     }
 
@@ -74,8 +80,20 @@ export default function ImageUpload({
     setError(null);
 
     try {
+      // Client-side compression to prevent multi-megabyte raw photos from entering storage
+      const fileToUpload = await compressImage(file, {
+        maxDimension: MAX_IMAGE_DIMENSION,
+        quality: 0.85,
+      });
+
+      if (fileToUpload.size > MAX_FILE_SIZE_BYTES) {
+        setError('File exceeds maximum upload limit of 5 MB even after compression.');
+        setUploading(false);
+        return;
+      }
+
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', fileToUpload);
       fd.append('section', section);
       fd.append('entityId', effectiveEntityId);
 

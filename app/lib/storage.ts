@@ -23,7 +23,41 @@ export const MIME_TO_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB hard upload cap
+export const MAX_RAW_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB client-side raw input limit before compression
+export const MAX_IMAGE_DIMENSION = 2048; // Max width/height for web-optimized assets
+export const STORAGE_CACHE_CONTROL = '31536000'; // 1 year cache duration (seconds)
+
+export interface StorageUploadOptions {
+  contentType?: string;
+  cacheControl?: string;
+  upsert?: boolean;
+}
+
+/**
+ * Uploads a file buffer to Supabase Storage with optimal cache-control headers.
+ * Sets Cache-Control max-age=31536000 by default so edge CDNs and browsers cache immutable assets.
+ */
+export async function uploadToStorage(
+  storageKey: string,
+  data: ArrayBuffer | Buffer,
+  options?: StorageUploadOptions,
+) {
+  const supabase = createServiceClient();
+  const cacheControl = options?.cacheControl ?? STORAGE_CACHE_CONTROL;
+  const result = await supabase.storage.from(BUCKET).upload(storageKey, data, {
+    contentType: options?.contentType,
+    upsert: options?.upsert ?? false,
+    cacheControl,
+  });
+
+  if (result.error) {
+    return { data: null, error: result.error, publicUrl: null };
+  }
+
+  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storageKey);
+  return { data: result.data, error: null, publicUrl };
+}
 
 const SAFE_ID_REGEX = /^[0-9a-fA-F-]{36}$|^[a-zA-Z0-9_-]+$/;
 
