@@ -18,6 +18,9 @@ export default function GameSubHeader() {
 
   const gameConfig = GAMES[gameSlug];
 
+  const teamsRoute = getGameSubRoute(gameSlug, 'teams');
+  const isTeamsActive = pathname === teamsRoute || pathname.startsWith(`${teamsRoute}/`);
+
   // Overview owns three paths, not one: the bare game URL redirects to a
   // division route, so an exact-path check would leave the tab unhighlighted
   // on every page it actually links to.
@@ -29,7 +32,11 @@ export default function GameSubHeader() {
     },
     { label: 'Schedule', href: getGameSubRoute(gameSlug, 'schedule') },
     { label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') },
-    { label: 'Teams & Rosters', href: getGameSubRoute(gameSlug, 'teams') },
+    {
+      label: 'Teams & Rosters',
+      href: teamsRoute,
+      isActive: isTeamsActive,
+    },
   ];
 
   return (
@@ -52,6 +59,7 @@ export default function GameSubHeader() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`px-3.5 min-h-[44px] flex items-center rounded-lg text-xs font-bold uppercase tracking-wider transition-all select-none cursor-pointer whitespace-nowrap ${
                     isActive
                       ? 'bg-accent text-on-accent shadow-sm'

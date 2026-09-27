@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Image as ImageType } from '@/app/types';
 import Badge from '@/app/components/ui/Badge';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
+import { usePrefersReducedMotion } from '@/app/lib/hooks/usePrefersReducedMotion';
 
 interface GalleryGridProps {
   items: ImageType[];
@@ -13,6 +14,7 @@ interface GalleryGridProps {
 
 export default function GalleryGrid({ items }: GalleryGridProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const closeLightbox = useCallback(() => setSelectedImageIndex(null), []);
 
@@ -23,22 +25,6 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
   const showPrev = useCallback(() => {
     setSelectedImageIndex((i) => (i === null ? null : (i - 1 + items.length) % items.length));
   }, [items.length]);
-
-  // Global keyboard navigation for the lightbox
-  useEffect(() => {
-    if (selectedImageIndex === null) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        showNext();
-      } else if (e.key === 'ArrowLeft') {
-        showPrev();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImageIndex, showNext, showPrev]);
 
   if (!items || items.length === 0) {
     return (
@@ -101,6 +87,10 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
             className="outline-none relative w-full flex flex-col items-center justify-center"
             aria-label={selectedImageIndex !== null ? items[selectedImageIndex]?.alt : 'Photo viewer'}
             aria-describedby={selectedImageIndex !== null ? 'lightbox-caption' : undefined}
+            onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+              if (e.key === 'ArrowRight') showNext();
+              if (e.key === 'ArrowLeft') showPrev();
+            }}
           >
             {selectedImageIndex !== null && (
               <>
@@ -149,12 +139,11 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={selectedImageIndex}
-                    initial={{ opacity: 0, scale: 0.98 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.15 }}
                     className="flex flex-col items-center max-w-full"
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <div className="relative max-h-[75vh] w-auto flex items-center justify-center">
                       <Image
