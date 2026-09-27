@@ -33,7 +33,10 @@ describe('protected admin pages', () => {
 
   it('guards the upload API before parsing or uploading a file', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/upload/route.ts'), 'utf8');
-    expect(source.indexOf('requireAnyPermission(')).toBeLessThan(source.indexOf('req.formData()'));
+    const requirePermIndex = source.indexOf('requirePermission(');
+    const storageIndex = source.indexOf('uploadToStorage(');
+    expect(requirePermIndex).toBeGreaterThan(-1);
+    expect(requirePermIndex).toBeLessThan(storageIndex);
     expect(source).toContain("{ status: 403 }");
   });
 });
