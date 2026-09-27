@@ -208,7 +208,7 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
       id: r.id,
       name: r.name,
       division: r.division,
-      record: standing ? `${standing.wins}-${standing.losses}` : '0-0',
+      record: standing ? `${standing.wins}-${standing.losses}` : 'Unpublished',
       players: playersByRoster.get(r.id) || [],
     });
     rostersByTeam.set(r.teamId, arr);
@@ -336,7 +336,7 @@ export async function getSchoolGameTeamsPageData(
       id: r.id,
       name: r.name,
       division: r.division,
-      record: standing ? `${standing.wins}-${standing.losses}` : '0-0',
+      record: standing ? `${standing.wins}-${standing.losses}` : 'Unpublished',
       players: playersByRoster.get(r.id) || [],
     });
     rostersByTeam.set(r.teamId, arr);
