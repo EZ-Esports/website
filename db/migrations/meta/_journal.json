@@ -274,6 +274,13 @@
       "when": 1790462000000,
       "tag": "0038_people_leadership_terms_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790463000000,
+      "tag": "0039_standings_format",
+      "breakpoints": true
     }
   ]
 }

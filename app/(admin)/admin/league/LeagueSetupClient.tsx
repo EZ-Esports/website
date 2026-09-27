@@ -22,6 +22,7 @@ interface DBSeason {
   gameId: string;
   name: string;
   isActive: boolean;
+  standingsFormat?: string;
 }
 
 type ActionResult = { success: boolean; error?: string };
@@ -183,7 +184,7 @@ export default function LeagueSetupClient({
               <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">Add Season</span>
               <form
                 onSubmit={(e) => runForm(e, createSeason, 'Season created.', { reset: true })}
-                className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_auto] gap-3 items-end"
+                className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-3 items-end"
               >
                 <Field label="Game">
                   <select name="gameId" required defaultValue="" className={input}>
@@ -200,6 +201,12 @@ export default function LeagueSetupClient({
                   <select name="isActive" defaultValue="true" className={input}>
                     <option value="true">Yes</option>
                     <option value="false">No</option>
+                  </select>
+                </Field>
+                <Field label="Standings Format">
+                  <select name="standingsFormat" defaultValue="divided" className={input}>
+                    <option value="divided">Divided</option>
+                    <option value="combined">Combined</option>
                   </select>
                 </Field>
                 <button type="submit" disabled={isPending} className={primaryBtn}>
@@ -226,7 +233,7 @@ export default function LeagueSetupClient({
                       onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), 'Season updated.')}
                       onDelete={() =>
                         confirmDelete(
-                          `Delete season "${s.name}"? All teams and matches in this season will also be deleted. This is permanent.`,
+                          `Delete season "${s.name}"? Seasons with existing matches cannot be deleted until those matches are removed or reassigned. This is permanent.`,
                           () => deleteSeason(s.id),
                           'Season deleted.',
                         )
@@ -322,7 +329,7 @@ function SeasonRow({
             const ok = await onUpdate(new FormData(e.currentTarget));
             if (ok) setEditing(false);
           }}
-          className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_auto] gap-3 items-end"
+          className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-3 items-end"
         >
           <Field label="Game">
             <div className={`${input} flex items-center text-foreground-secondary`} aria-readonly="true">
@@ -341,6 +348,12 @@ function SeasonRow({
               <option value="false">No</option>
             </select>
           </Field>
+          <Field label="Format">
+            <select name="standingsFormat" defaultValue={season.standingsFormat ?? 'divided'} className={input}>
+              <option value="divided">Divided</option>
+              <option value="combined">Combined</option>
+            </select>
+          </Field>
           <div className="flex gap-2 pb-0.5">
             <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
             <button type="button" onClick={() => setEditing(false)} className={cancelBtn}>Cancel</button>
@@ -353,6 +366,9 @@ function SeasonRow({
             <span className="ml-2 text-[10px] text-foreground-muted">· {gameName}</span>
             <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${season.isActive ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-surface-raised text-foreground-muted border-line'}`}>
               {season.isActive ? 'Active' : 'Inactive'}
+            </span>
+            <span className="ml-2 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border bg-surface-raised text-foreground-secondary border-line">
+              {season.standingsFormat ?? 'divided'}
             </span>
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">

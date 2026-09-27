@@ -1,28 +1,19 @@
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
 import LeagueSetupClient from './LeagueSetupClient';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
-
-async function getGamesAndSeasons() {
-  const [games, seasons] = await Promise.all([
-    db.select().from(schema.games).orderBy(schema.games.displayName),
-    db.select().from(schema.seasons).orderBy(schema.seasons.gameId, schema.seasons.name),
-  ]);
-  return { games, seasons };
-}
+import { getLeagueAdminData } from '@/app/lib/db/queries';
 
 export default async function LeagueSetupPage() {
   if (!(await getStaffForAdminSection('/admin/league'))) return <PermissionDenied />;
 
-  let games: Awaited<ReturnType<typeof getGamesAndSeasons>>['games'] = [];
-  let seasons: Awaited<ReturnType<typeof getGamesAndSeasons>>['seasons'] = [];
+  let games: Awaited<ReturnType<typeof getLeagueAdminData>>['games'] = [];
+  let seasons: Awaited<ReturnType<typeof getLeagueAdminData>>['seasons'] = [];
   let dbError = false;
 
   try {
     if (process.env.DATABASE_URL) {
-      const res = await getGamesAndSeasons();
+      const res = await getLeagueAdminData();
       games = res.games;
       seasons = res.seasons;
     } else {
