@@ -3,11 +3,11 @@ import Link from "next/link";
 import { getSchoolApplications, getStaffApplications } from "@/app/lib/db/queries";
 import ApplicationRow from "@/app/components/admin/ApplicationRow";
 import StaffApplicationRow from "@/app/components/admin/StaffApplicationRow";
-import DownloadCsvButton from "@/app/components/admin/DownloadCsvButton";
+import ExportCsvButton from "@/app/components/admin/ExportCsvButton";
 import DbErrorNotice from "@/app/components/admin/DbErrorNotice";
 import PermissionDenied from "@/app/components/admin/PermissionDenied";
 import { getStaffForAdminSection } from "@/app/lib/auth";
-import { schoolApplicationsToCsv, staffApplicationsToCsv } from "@/app/lib/application-csv";
+import { exportSchoolApplicationsCsv, exportStaffApplicationsCsv } from "./actions";
 
 type StatusFilter = "all" | "pending" | "accepted" | "rejected";
 
@@ -69,9 +69,6 @@ export default async function ApplicationsAdminPage({
     return qs ? `/admin/applications?${qs}` : "/admin/applications";
   };
 
-  const schoolCsv = dbConfigured ? schoolApplicationsToCsv(applications) : "";
-  const staffCsv = dbConfigured ? staffApplicationsToCsv(staffApplications) : "";
-
   return (
     <div className="space-y-8">
       {!dbConfigured && <DbErrorNotice />}
@@ -104,7 +101,10 @@ export default async function ApplicationsAdminPage({
               ))}
             </div>
             {dbConfigured && applications.length > 0 && (
-              <DownloadCsvButton content={schoolCsv} filename={`school-applications-${statusFilter}.csv`} />
+              <ExportCsvButton
+                fetchCsv={() => exportSchoolApplicationsCsv(statusFilter === "all" ? undefined : statusFilter)}
+                filename={`school-applications-${statusFilter}.csv`}
+              />
             )}
           </div>
         </div>
@@ -166,7 +166,10 @@ export default async function ApplicationsAdminPage({
               ))}
             </div>
             {dbConfigured && staffApplications.length > 0 && (
-              <DownloadCsvButton content={staffCsv} filename={`staff-applications-${staffStatusFilter}.csv`} />
+              <ExportCsvButton
+                fetchCsv={() => exportStaffApplicationsCsv(staffStatusFilter === "all" ? undefined : staffStatusFilter)}
+                filename={`staff-applications-${staffStatusFilter}.csv`}
+              />
             )}
           </div>
         </div>

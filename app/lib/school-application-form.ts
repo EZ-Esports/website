@@ -360,7 +360,93 @@ export function buildSchoolApplicationDetails(form: SchoolApplicationFormData): 
   };
 }
 
+function isStringArray(val: unknown): val is string[] {
+  return Array.isArray(val) && val.every((item) => typeof item === 'string');
+}
+
+function isStringRecord(val: unknown, requiredKeys: string[]): boolean {
+  if (!val || typeof val !== 'object' || Array.isArray(val)) return false;
+  const obj = val as Record<string, unknown>;
+  return requiredKeys.every((key) => typeof obj[key] === 'string');
+}
+
+export function validateSchoolApplicationDetails(details: unknown): details is SchoolApplicationDetails {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return false;
+  const d = details as Record<string, unknown>;
+
+  if (d.version === 3) {
+    if (typeof d.clubStatus !== 'string') return false;
+    if (!isStringRecord(d.president, ['firstName', 'lastName', 'gradYear', 'email', 'discord', 'preferredContact'])) return false;
+    if (!isStringRecord(d.vicePresident, ['firstName', 'lastName', 'gradYear', 'discord', 'email', 'preferredContact'])) return false;
+    if (!isStringRecord(d.thirdOfficer, ['firstName', 'lastName', 'gradYear', 'email', 'preferredContact'])) return false;
+
+    const club = d.club;
+    if (!club || typeof club !== 'object' || Array.isArray(club)) return false;
+    const c = club as Record<string, unknown>;
+    const clubStringKeys = ['instagramLink', 'discordLink', 'advisorName', 'advisorEmail', 'advisorConfirmed', 'activeStudentsCount', 'clubBarrier', 'separateGamingClubs'];
+    if (!clubStringKeys.every((k) => typeof c[k] === 'string')) return false;
+    if (!isStringArray(c.interestedGames)) return false;
+    if (!isStringArray(c.nonRosterOpportunities)) return false;
+    if (!isStringArray(c.inclusiveOpportunities)) return false;
+    if (!isStringArray(c.contributeBeyondSchool)) return false;
+
+    if (d.feedback !== undefined && typeof d.feedback !== 'string') return false;
+
+    const consent = d.consent;
+    if (!consent || typeof consent !== 'object' || Array.isArray(consent)) return false;
+    const cs = consent as Record<string, unknown>;
+    if (typeof cs.agreedToRules !== 'boolean' || typeof cs.agreedToTerms !== 'boolean' || typeof cs.agreedToPrivacy !== 'boolean') return false;
+
+    return true;
+  }
+
+  if (d.version === 2) {
+    if (typeof d.clubStatus !== 'string') return false;
+    if (!isStringRecord(d.president, ['firstName', 'lastName', 'gradYear', 'email', 'discord', 'preferredContact'])) return false;
+    if (!isStringRecord(d.vicePresident, ['firstName', 'lastName', 'gradYear', 'discord', 'email', 'preferredContact'])) return false;
+    if (!isStringRecord(d.thirdOfficer, ['firstName', 'lastName', 'gradYear', 'email', 'preferredContact'])) return false;
+
+    const club = d.club;
+    if (!club || typeof club !== 'object' || Array.isArray(club)) return false;
+    const c = club as Record<string, unknown>;
+    const clubStringKeys = ['instagramLink', 'discordLink', 'advisorName', 'advisorEmail', 'advisorConfirmed', 'activeStudentsCount', 'clubBarrier', 'separateGamingClubs'];
+    if (!clubStringKeys.every((k) => typeof c[k] === 'string')) return false;
+    if (!isStringArray(c.interestedGames)) return false;
+    if (!isStringArray(c.nonRosterOpportunities)) return false;
+    if (!isStringArray(c.inclusiveOpportunities)) return false;
+    if (!isStringArray(c.contributeBeyondSchool)) return false;
+
+    if (d.feedback !== undefined && typeof d.feedback !== 'string') return false;
+    if (typeof d.agreedRules !== 'boolean') return false;
+
+    return true;
+  }
+
+  if (d.version === 1) {
+    const v1StringKeys = [
+      'preferredFirstName', 'phone', 'discordTag', 'schoolCode', 'schoolLocation',
+      'howHeard', 'linkedin', 'captainsCoaches', 'teamNotes', 'needHelpFindingPlayers',
+      'preferredCommunicationPlatform', 'interestedDivisions', 'additionalNotes',
+    ];
+    if (!v1StringKeys.every((k) => typeof d[k] === 'string')) return false;
+    if (typeof d.agreedRules !== 'boolean') return false;
+    return true;
+  }
+
+  return false;
+}
+
 const UNKNOWN_SHAPE_ROW = [{ label: 'Details', value: 'Could not display — unexpected data shape.' }];
+
+function safeList(value: unknown): string {
+  if (Array.isArray(value)) {
+    const items = value
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map((item) => item.trim());
+    return items.length > 0 ? items.join(', ') : '—';
+  }
+  return typeof value === 'string' && value.trim() ? value.trim() : '—';
+}
 
 /** `details` comes straight off a public, unauthenticated POST body — dispatching on `version` (rather than trusting the shape) means a row with an unrecognized or missing version, or one whose write-time guard only checked `object && !Array.isArray`, degrades to a message instead of throwing when a staff member expands it. */
 export function formatSchoolApplicationDetails(d: SchoolApplicationDetails): { label: string; value: string }[] {
@@ -377,7 +463,6 @@ function formatSchoolApplicationDetailsV3(d: SchoolApplicationDetailsV3): { labe
     return UNKNOWN_SHAPE_ROW;
   }
 
-  const list = (value: unknown) => (Array.isArray(value) ? value.join(', ') : String(value ?? '')) || '—';
   const agreed = (v: boolean) => (v ? 'Agreed' : 'Disagreed');
 
   return [
@@ -389,12 +474,12 @@ function formatSchoolApplicationDetailsV3(d: SchoolApplicationDetailsV3): { labe
     { label: 'Discord', value: d.club.discordLink || '—' },
     { label: 'Faculty Advisor', value: `${d.club.advisorName} (${d.club.advisorEmail}) — ${d.club.advisorConfirmed}` },
     { label: 'Active Club Members', value: d.club.activeStudentsCount },
-    { label: 'Interested Games', value: list(d.club.interestedGames) },
+    { label: 'Interested Games', value: safeList(d.club.interestedGames) },
     { label: 'Biggest Barrier', value: d.club.clubBarrier },
-    { label: 'Non-Roster Opportunities', value: list(d.club.nonRosterOpportunities) },
-    { label: 'Inclusive Opportunities', value: list(d.club.inclusiveOpportunities) },
+    { label: 'Non-Roster Opportunities', value: safeList(d.club.nonRosterOpportunities) },
+    { label: 'Inclusive Opportunities', value: safeList(d.club.inclusiveOpportunities) },
     { label: 'Separate Gaming Clubs/Groups', value: d.club.separateGamingClubs },
-    { label: 'Contribute Beyond School', value: list(d.club.contributeBeyondSchool) },
+    { label: 'Contribute Beyond School', value: safeList(d.club.contributeBeyondSchool) },
     { label: 'Feedback', value: d.feedback || '—' },
     { label: 'League Rules & Code of Conduct', value: agreed(d.consent.agreedToRules) },
     { label: 'Terms of Service', value: agreed(d.consent.agreedToTerms) },
@@ -407,8 +492,6 @@ function formatSchoolApplicationDetailsV2(d: SchoolApplicationDetailsV2): { labe
     return UNKNOWN_SHAPE_ROW;
   }
 
-  const list = (value: unknown) => (Array.isArray(value) ? value.join(', ') : String(value ?? '')) || '—';
-
   return [
     { label: 'Club Status', value: d.clubStatus },
     { label: 'President', value: `${d.president.firstName} ${d.president.lastName} — ${d.president.email}, ${d.president.discord}, grad ${d.president.gradYear} (prefers ${d.president.preferredContact})` },
@@ -418,12 +501,12 @@ function formatSchoolApplicationDetailsV2(d: SchoolApplicationDetailsV2): { labe
     { label: 'Discord', value: d.club.discordLink || '—' },
     { label: 'Faculty Advisor', value: `${d.club.advisorName} (${d.club.advisorEmail}) — ${d.club.advisorConfirmed}` },
     { label: 'Active Club Members', value: d.club.activeStudentsCount },
-    { label: 'Interested Games', value: list(d.club.interestedGames) },
+    { label: 'Interested Games', value: safeList(d.club.interestedGames) },
     { label: 'Biggest Barrier', value: d.club.clubBarrier },
-    { label: 'Non-Roster Opportunities', value: list(d.club.nonRosterOpportunities) },
-    { label: 'Inclusive Opportunities', value: list(d.club.inclusiveOpportunities) },
+    { label: 'Non-Roster Opportunities', value: safeList(d.club.nonRosterOpportunities) },
+    { label: 'Inclusive Opportunities', value: safeList(d.club.inclusiveOpportunities) },
     { label: 'Separate Gaming Clubs/Groups', value: d.club.separateGamingClubs },
-    { label: 'Contribute Beyond School', value: list(d.club.contributeBeyondSchool) },
+    { label: 'Contribute Beyond School', value: safeList(d.club.contributeBeyondSchool) },
     { label: 'Feedback', value: d.feedback || '—' },
     { label: 'Rules Agreement', value: d.agreedRules ? 'Agreed' : 'Disagreed' },
   ];

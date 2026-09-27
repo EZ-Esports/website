@@ -18,6 +18,22 @@ function formatSubmittedDate(date: Date): string {
   return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function safeJoin(value: unknown): string {
+  if (Array.isArray(value)) {
+    const items = value
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim());
+    return items.length > 0 ? items.join(", ") : "—";
+  }
+  return typeof value === "string" && value.trim() ? value.trim() : "—";
+}
+
+function safeString(value: unknown, fallback = "—"): string {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
 function DetailsBody({ details, message }: { details: SchoolApplicationDetails | null; message: string }) {
   if (!details) {
     return message ? (
@@ -54,54 +70,54 @@ function DetailsBody({ details, message }: { details: SchoolApplicationDetails |
     details.club &&
     typeof details.agreedRules === "boolean"
   ) {
-    const games = details.club.interestedGames.join(", ") || "—";
-    const nonRoster = details.club.nonRosterOpportunities.join(", ") || "—";
-    const inclusive = details.club.inclusiveOpportunities.join(", ") || "—";
-    const contribute = details.club.contributeBeyondSchool.join(", ") || "—";
+    const games = safeJoin(details.club.interestedGames);
+    const nonRoster = safeJoin(details.club.nonRosterOpportunities);
+    const inclusive = safeJoin(details.club.inclusiveOpportunities);
+    const contribute = safeJoin(details.club.contributeBeyondSchool);
 
     return (
       <div className="space-y-4">
-        <DetailField label="Club Status" value={details.clubStatus} />
+        <DetailField label="Club Status" value={safeString(details.clubStatus)} />
 
         <DetailSection title="President">
-          <DetailField label="Name" value={`${details.president.firstName} ${details.president.lastName}`} />
-          <DetailField label="Email" value={details.president.email} />
-          <DetailField label="Discord" value={details.president.discord} />
-          <DetailField label="Graduation Year" value={details.president.gradYear} />
-          <DetailField label="Preferred Contact" value={details.president.preferredContact} />
+          <DetailField label="Name" value={`${safeString(details.president.firstName, "")} ${safeString(details.president.lastName, "")}`.trim() || "—"} />
+          <DetailField label="Email" value={safeString(details.president.email)} />
+          <DetailField label="Discord" value={safeString(details.president.discord)} />
+          <DetailField label="Graduation Year" value={safeString(details.president.gradYear)} />
+          <DetailField label="Preferred Contact" value={safeString(details.president.preferredContact)} />
         </DetailSection>
 
         <DetailSection title="Vice President">
-          <DetailField label="Name" value={`${details.vicePresident.firstName} ${details.vicePresident.lastName}`} />
-          <DetailField label="Email" value={details.vicePresident.email} />
-          <DetailField label="Discord" value={details.vicePresident.discord} />
-          <DetailField label="Graduation Year" value={details.vicePresident.gradYear} />
-          <DetailField label="Preferred Contact" value={details.vicePresident.preferredContact} />
+          <DetailField label="Name" value={`${safeString(details.vicePresident.firstName, "")} ${safeString(details.vicePresident.lastName, "")}`.trim() || "—"} />
+          <DetailField label="Email" value={safeString(details.vicePresident.email)} />
+          <DetailField label="Discord" value={safeString(details.vicePresident.discord)} />
+          <DetailField label="Graduation Year" value={safeString(details.vicePresident.gradYear)} />
+          <DetailField label="Preferred Contact" value={safeString(details.vicePresident.preferredContact)} />
         </DetailSection>
 
         <DetailSection title="3rd Club Officer">
-          <DetailField label="Name" value={`${details.thirdOfficer.firstName} ${details.thirdOfficer.lastName}`} />
-          <DetailField label="Email" value={details.thirdOfficer.email} />
-          <DetailField label="Graduation Year" value={details.thirdOfficer.gradYear} />
-          <DetailField label="Preferred Contact" value={details.thirdOfficer.preferredContact} />
+          <DetailField label="Name" value={`${safeString(details.thirdOfficer.firstName, "")} ${safeString(details.thirdOfficer.lastName, "")}`.trim() || "—"} />
+          <DetailField label="Email" value={safeString(details.thirdOfficer.email)} />
+          <DetailField label="Graduation Year" value={safeString(details.thirdOfficer.gradYear)} />
+          <DetailField label="Preferred Contact" value={safeString(details.thirdOfficer.preferredContact)} />
         </DetailSection>
 
         <DetailSection title="Club Info">
-          <DetailField label="Instagram" value={details.club.instagramLink} />
-          <DetailField label="Discord" value={details.club.discordLink} />
-          <DetailField label="Faculty Advisor" value={`${details.club.advisorName} (${details.club.advisorEmail})`} />
-          <DetailField label="Advisor Confirmed" value={details.club.advisorConfirmed} />
-          <DetailField label="Active Club Members" value={details.club.activeStudentsCount} />
+          <DetailField label="Instagram" value={safeString(details.club.instagramLink)} />
+          <DetailField label="Discord" value={safeString(details.club.discordLink)} />
+          <DetailField label="Faculty Advisor" value={`${safeString(details.club.advisorName, "")} (${safeString(details.club.advisorEmail, "")})`.trim() || "—"} />
+          <DetailField label="Advisor Confirmed" value={safeString(details.club.advisorConfirmed)} />
+          <DetailField label="Active Club Members" value={safeString(details.club.activeStudentsCount)} />
           <DetailField label="Interested Games" value={games} />
-          <DetailField label="Biggest Barrier" value={details.club.clubBarrier} />
+          <DetailField label="Biggest Barrier" value={safeString(details.club.clubBarrier)} />
           <DetailField label="Non-Roster Opportunities" value={nonRoster} />
           <DetailField label="Inclusive Opportunities" value={inclusive} />
-          <DetailField label="Separate Gaming Clubs/Groups" value={details.club.separateGamingClubs} />
+          <DetailField label="Separate Gaming Clubs/Groups" value={safeString(details.club.separateGamingClubs)} />
           <DetailField label="Contribute Beyond School" value={contribute} />
         </DetailSection>
 
         <DetailSection title="Feedback">
-          <DetailField label="Feedback / Notes" value={details.feedback} />
+          <DetailField label="Feedback / Notes" value={safeString(details.feedback)} />
           <DetailField label="Rules Agreement" value={details.agreedRules ? "Agreed" : "Disagreed"} />
         </DetailSection>
       </div>
@@ -119,55 +135,55 @@ function DetailsBody({ details, message }: { details: SchoolApplicationDetails |
     details.club &&
     details.consent
   ) {
-    const games = details.club.interestedGames.join(", ") || "—";
-    const nonRoster = details.club.nonRosterOpportunities.join(", ") || "—";
-    const inclusive = details.club.inclusiveOpportunities.join(", ") || "—";
-    const contribute = details.club.contributeBeyondSchool.join(", ") || "—";
-    const agreed = (v: boolean) => (v ? "Agreed" : "Disagreed");
+    const games = safeJoin(details.club.interestedGames);
+    const nonRoster = safeJoin(details.club.nonRosterOpportunities);
+    const inclusive = safeJoin(details.club.inclusiveOpportunities);
+    const contribute = safeJoin(details.club.contributeBeyondSchool);
+    const agreed = (v: unknown) => (v === true ? "Agreed" : "Disagreed");
 
     return (
       <div className="space-y-4">
-        <DetailField label="Club Status" value={details.clubStatus} />
+        <DetailField label="Club Status" value={safeString(details.clubStatus)} />
 
         <DetailSection title="President">
-          <DetailField label="Name" value={`${details.president.firstName} ${details.president.lastName}`} />
-          <DetailField label="Email" value={details.president.email} />
-          <DetailField label="Discord" value={details.president.discord} />
-          <DetailField label="Graduation Year" value={details.president.gradYear} />
-          <DetailField label="Preferred Contact" value={details.president.preferredContact} />
+          <DetailField label="Name" value={`${safeString(details.president.firstName, "")} ${safeString(details.president.lastName, "")}`.trim() || "—"} />
+          <DetailField label="Email" value={safeString(details.president.email)} />
+          <DetailField label="Discord" value={safeString(details.president.discord)} />
+          <DetailField label="Graduation Year" value={safeString(details.president.gradYear)} />
+          <DetailField label="Preferred Contact" value={safeString(details.president.preferredContact)} />
         </DetailSection>
 
         <DetailSection title="Vice President">
-          <DetailField label="Name" value={`${details.vicePresident.firstName} ${details.vicePresident.lastName}`} />
-          <DetailField label="Email" value={details.vicePresident.email} />
-          <DetailField label="Discord" value={details.vicePresident.discord} />
-          <DetailField label="Graduation Year" value={details.vicePresident.gradYear} />
-          <DetailField label="Preferred Contact" value={details.vicePresident.preferredContact} />
+          <DetailField label="Name" value={`${safeString(details.vicePresident.firstName, "")} ${safeString(details.vicePresident.lastName, "")}`.trim() || "—"} />
+          <DetailField label="Email" value={safeString(details.vicePresident.email)} />
+          <DetailField label="Discord" value={safeString(details.vicePresident.discord)} />
+          <DetailField label="Graduation Year" value={safeString(details.vicePresident.gradYear)} />
+          <DetailField label="Preferred Contact" value={safeString(details.vicePresident.preferredContact)} />
         </DetailSection>
 
         <DetailSection title="3rd Club Officer">
-          <DetailField label="Name" value={`${details.thirdOfficer.firstName} ${details.thirdOfficer.lastName}`} />
-          <DetailField label="Email" value={details.thirdOfficer.email} />
-          <DetailField label="Graduation Year" value={details.thirdOfficer.gradYear} />
-          <DetailField label="Preferred Contact" value={details.thirdOfficer.preferredContact} />
+          <DetailField label="Name" value={`${safeString(details.thirdOfficer.firstName, "")} ${safeString(details.thirdOfficer.lastName, "")}`.trim() || "—"} />
+          <DetailField label="Email" value={safeString(details.thirdOfficer.email)} />
+          <DetailField label="Graduation Year" value={safeString(details.thirdOfficer.gradYear)} />
+          <DetailField label="Preferred Contact" value={safeString(details.thirdOfficer.preferredContact)} />
         </DetailSection>
 
         <DetailSection title="Club Info">
-          <DetailField label="Instagram" value={details.club.instagramLink} />
-          <DetailField label="Discord" value={details.club.discordLink} />
-          <DetailField label="Faculty Advisor" value={`${details.club.advisorName} (${details.club.advisorEmail})`} />
-          <DetailField label="Advisor Confirmed" value={details.club.advisorConfirmed} />
-          <DetailField label="Active Club Members" value={details.club.activeStudentsCount} />
+          <DetailField label="Instagram" value={safeString(details.club.instagramLink)} />
+          <DetailField label="Discord" value={safeString(details.club.discordLink)} />
+          <DetailField label="Faculty Advisor" value={`${safeString(details.club.advisorName, "")} (${safeString(details.club.advisorEmail, "")})`.trim() || "—"} />
+          <DetailField label="Advisor Confirmed" value={safeString(details.club.advisorConfirmed)} />
+          <DetailField label="Active Club Members" value={safeString(details.club.activeStudentsCount)} />
           <DetailField label="Interested Games" value={games} />
-          <DetailField label="Biggest Barrier" value={details.club.clubBarrier} />
+          <DetailField label="Biggest Barrier" value={safeString(details.club.clubBarrier)} />
           <DetailField label="Non-Roster Opportunities" value={nonRoster} />
           <DetailField label="Inclusive Opportunities" value={inclusive} />
-          <DetailField label="Separate Gaming Clubs/Groups" value={details.club.separateGamingClubs} />
+          <DetailField label="Separate Gaming Clubs/Groups" value={safeString(details.club.separateGamingClubs)} />
           <DetailField label="Contribute Beyond School" value={contribute} />
         </DetailSection>
 
         <DetailSection title="Feedback">
-          <DetailField label="Feedback / Notes" value={details.feedback} />
+          <DetailField label="Feedback / Notes" value={safeString(details.feedback)} />
         </DetailSection>
 
         <DetailSection title="Consent">

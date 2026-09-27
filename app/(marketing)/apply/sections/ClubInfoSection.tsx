@@ -437,8 +437,9 @@ export default function ClubInfoSection({
 
           <button
             type="button"
+            disabled={loading}
             onClick={onClearForm}
-            className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200 cursor-pointer"
+            className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
           >
             Clear Form Responses
           </button>

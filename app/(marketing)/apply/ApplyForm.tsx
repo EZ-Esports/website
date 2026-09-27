@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   validateSchoolApplicationForm,
   compileApplicationPayload,
@@ -83,6 +83,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function ApplyForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -167,6 +168,7 @@ export default function ApplyForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || loading) return;
     const errors = validateSchoolApplicationForm(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -178,6 +180,7 @@ export default function ApplyForm() {
       return;
     }
     setFieldErrors({});
+    isSubmittingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -196,6 +199,7 @@ export default function ApplyForm() {
     } catch {
       setError('Something went wrong. Please try again or reach out to info@ezesports.org.');
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
@@ -244,6 +248,7 @@ export default function ApplyForm() {
   };
 
   const handleClearForm = () => {
+    if (isSubmittingRef.current || loading) return;
     setForm(initialForm);
     setFieldErrors({});
   };

@@ -12,6 +12,7 @@ import {
   normalizeLinkedInUrl,
   normalizeOptionalUrl,
   parseStaffApplicationDetails,
+  validateStaffApplicationForm,
   STAFF_ROLES,
   type StaffRole,
   type StaffApplicationDetailsV1,
@@ -36,6 +37,42 @@ const validForm: StaffApplicationFormData = {
   agreedToPrivacy: true,
   acknowledgedUnpaidVolunteer: true,
 };
+
+describe("Staff Application Form Validation", () => {
+  it("returns no errors for valid form data", () => {
+    const errors = validateStaffApplicationForm(validForm);
+    expect(Object.keys(errors)).toHaveLength(0);
+  });
+
+  it("validates required fields and email format", () => {
+    const errors = validateStaffApplicationForm({
+      name: "",
+      preferredFirstName: "",
+      email: "invalid-email",
+      phone: "",
+      discordTag: "",
+      role: "Invalid Role",
+      gameDirector: "",
+      message: "",
+      linkedin: "",
+      workSamples: "",
+      availability: "",
+      agreedToTerms: false,
+      agreedToPrivacy: false,
+      acknowledgedUnpaidVolunteer: false,
+    });
+
+    expect(errors.name).toBe("Full name is required.");
+    expect(errors.email).toBe("Enter a valid email address.");
+    expect(errors.phone).toBe("Phone number is required.");
+    expect(errors.role).toBe("Please select a primary role.");
+    expect(errors.availability).toBe("Please select your weekly availability.");
+    expect(errors.message).toBe("Please provide details about your background and experience.");
+    expect(errors.agreedToTerms).toBe("You must agree to the Terms of Service.");
+    expect(errors.agreedToPrivacy).toBe("You must agree to the Privacy Policy.");
+    expect(errors.acknowledgedUnpaidVolunteer).toBe("You must acknowledge that staff positions are volunteer, unpaid roles.");
+  });
+});
 
 describe("Staff Application Details", () => {
   it("builds structured details from the form", () => {
@@ -106,6 +143,8 @@ describe("Staff Application Details", () => {
       backgroundMotivation: "I have run a Discord community of 500 members for two years.",
     };
     expect(formatStaffApplicationDetails(legacy)).toEqual([
+      { label: "Preferred First Name", value: "Janie" },
+      { label: "Discord", value: "janesmith" },
       { label: "LinkedIn / Portfolio", value: "https://linkedin.com/in/janesmith" },
       { label: "Weekly Availability", value: "10hrs" },
       { label: "Rules Agreement", value: "Agreed" },
