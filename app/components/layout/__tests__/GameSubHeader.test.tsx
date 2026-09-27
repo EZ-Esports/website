@@ -12,17 +12,17 @@ function getSafeModalClassName(className?: string): string | undefined {
 
 describe('GameSubHeader Active State Logic', () => {
   it('marks teams route active for exact match /[game]/teams', () => {
-    expect(isTeamsRouteActive('/ssbm/teams', 'ssbm')).toBe(true);
+    expect(isTeamsRouteActive('/valorant/teams', 'valorant')).toBe(true);
   });
 
   it('marks teams route active for nested team routes /[game]/teams/[school]', () => {
-    expect(isTeamsRouteActive('/ssbm/teams/columbia', 'ssbm')).toBe(true);
-    expect(isTeamsRouteActive('/valorant/teams/nyu', 'valorant')).toBe(true);
+    expect(isTeamsRouteActive('/valorant/teams/columbia', 'valorant')).toBe(true);
+    expect(isTeamsRouteActive('/league-of-legends/teams/nyu', 'league-of-legends')).toBe(true);
   });
 
   it('returns false for unrelated game subroutes', () => {
-    expect(isTeamsRouteActive('/ssbm/schedule', 'ssbm')).toBe(false);
-    expect(isTeamsRouteActive('/ssbm/standings', 'ssbm')).toBe(false);
+    expect(isTeamsRouteActive('/valorant/schedule', 'valorant')).toBe(false);
+    expect(isTeamsRouteActive('/valorant/standings', 'valorant')).toBe(false);
   });
 });
 
