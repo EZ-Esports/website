@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ButtonHTMLAttributes, AnchorHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, AnchorHTMLAttributes, Ref } from 'react';
 import type { ButtonVariant, ButtonSize } from '@/app/types';
 import { cx } from '@/app/lib/cx';
 
@@ -12,16 +12,18 @@ type BaseProps = {
 
 type LinkProps = BaseProps & AnchorHTMLAttributes<HTMLAnchorElement> & {
   href: string;
+  ref?: Ref<HTMLAnchorElement>;
 };
 
 type HTMLButtonProps = BaseProps & ButtonHTMLAttributes<HTMLButtonElement> & {
   href?: never;
+  ref?: Ref<HTMLButtonElement>;
 };
 
-type ButtonProps = LinkProps | HTMLButtonProps;
+export type ButtonProps = LinkProps | HTMLButtonProps;
 
 const baseStyles =
-  'rounded-lg font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface active:scale-95 cursor-pointer inline-flex items-center justify-center';
+  'rounded-lg font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface active:scale-95 cursor-pointer inline-flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed';
 
 const sizeStyles: Record<ButtonSize, string> = {
   sm: 'px-4 py-1.5 text-xs md:text-sm',
@@ -42,19 +44,25 @@ export function buttonClasses(variant: ButtonVariant = 'primary', size: ButtonSi
 
 export default function Button({
   children,
-  variant = "primary",
+  variant,
   size = "md",
   className = "",
   href,
+  ref,
   ...props
 }: ButtonProps) {
-  const combinedClassName = cx(buttonClasses(variant, size), className);
+  const resolvedVariant = variant ?? (className ? undefined : 'primary');
+  const combinedClassName = cx(
+    resolvedVariant ? buttonClasses(resolvedVariant, size) : baseStyles,
+    className
+  );
 
   if (href) {
-    const linkProps = props as Omit<LinkProps, keyof BaseProps | 'href'>;
+    const linkProps = props as Omit<LinkProps, keyof BaseProps | 'href' | 'ref'>;
     return (
       <Link
         href={href}
+        ref={ref as Ref<HTMLAnchorElement>}
         className={combinedClassName}
         {...linkProps}
       >
@@ -63,11 +71,14 @@ export default function Button({
     );
   }
 
-  const buttonProps = props as Omit<HTMLButtonProps, keyof BaseProps | 'href'>;
+  const buttonProps = props as Omit<HTMLButtonProps, keyof BaseProps | 'href' | 'ref'>;
+  const { type = 'button', ...restButtonProps } = buttonProps;
   return (
     <button
+      ref={ref as Ref<HTMLButtonElement>}
+      type={type}
       className={combinedClassName}
-      {...buttonProps}
+      {...restButtonProps}
     >
       {children}
     </button>

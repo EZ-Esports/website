@@ -1,10 +1,8 @@
-import { fieldWrapperClass, labelClass, requiredMark, textInputClass } from './styles';
+import { Field } from '@/app/components/ui/form';
+import { fieldWrapperClass, textInputClass } from './styles';
 
-// The repeated "labeled text/email input" block used by every plain text
-// field across the President/VP/Officer/Club Info sections: label + input +
-// error message + focus/blur wiring, all keyed off the field's `name` (which
-// doubles as the input id, the `field-${name}` wrapper id, and the
-// `${name}-error` message id).
+// Labeled text/email input block using the shared form Field primitive:
+// label + input + error message + focus/blur wiring.
 export default function TextField({
   name,
   label,
@@ -30,26 +28,20 @@ export default function TextField({
 }) {
   return (
     <div id={`field-${name}`} className={fieldWrapperClass(isFocused, !!error)}>
-      <label htmlFor={name} className={labelClass}>
-        {label} {requiredMark}
-      </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        onFocus={onFocus}
-        onBlur={onBlur}
-        className={textInputClass(!!error)}
-        required
-        aria-invalid={!!error}
-        aria-describedby={error ? `${name}-error` : undefined}
-      />
-      {error && (
-        <p id={`${name}-error`} className="mt-1.5 text-xs text-danger font-semibold">{error}</p>
-      )}
+      <Field label={label} htmlFor={name} required error={error}>
+        <input
+          id={name}
+          name={name}
+          type={type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          className={textInputClass(!!error)}
+          required
+        />
+      </Field>
     </div>
   );
 }

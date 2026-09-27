@@ -47,10 +47,7 @@ export function Dialog({ className, ...props }: DialogBoxProps) {
   return <RACDialog className={className} {...props} />;
 }
 
-interface HeadingBoxProps extends Omit<HeadingProps, 'className'> {
-  className?: string;
-}
-
-export function Heading({ className, ...props }: HeadingBoxProps) {
-  return <RACHeading className={className} {...props} />;
+/** Heading slot wrapper for RAC dialog titles. */
+export function Heading({ className, ...props }: HeadingProps) {
+  return <RACHeading slot="title" className={className} {...props} />;
 }

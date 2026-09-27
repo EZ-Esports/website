@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button, Link as AriaLink } from 'react-aria-components';
-import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
+import { SITE_CONFIG, ROUTES, hasHeroRoute } from '@/app/lib/constants';
 import CutCTA from '@/app/components/ui/CutCTA';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 import Navigation from './Navigation';
@@ -15,17 +15,7 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
 
-  // Check if current page features a dark hero banner at the top. Game hub
-  // routes (/[game]) no longer do — they open on a compact identity row, so the
-  // header must stay solid over them from scroll position 0.
-  const hasHero = pathname === '/' ||
-                  pathname === '/about' ||
-                  pathname === '/gallery' ||
-                  pathname === '/news' ||
-                  pathname.startsWith('/news/') ||
-                  pathname === '/sponsors' ||
-                  pathname === '/privacy' ||
-                  pathname === '/rules';
+  const hasHero = hasHeroRoute(pathname);
 
   // Toggle solid dark background on scroll
   useEffect(() => {

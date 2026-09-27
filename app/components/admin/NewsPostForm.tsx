@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useActionState } from 'react';
+import { Field } from '@/app/components/ui/form';
+import Button from '@/app/components/ui/Button';
 
 const CATEGORIES = ['Announcement', 'Tournament', 'Partnership', 'Recognition', 'Update'];
 const inputClass =
@@ -29,10 +30,7 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
   return (
     <form action={formAction} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="md:col-span-2">
-          <label htmlFor="title" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
-            Article Title
-          </label>
+        <Field label="Article Title" htmlFor="title" required density="compact" className="md:col-span-2">
           <input
             id="title"
             name="title"
@@ -42,12 +40,9 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
             placeholder="e.g. Spring 2025 Playoffs Schedule"
             className={inputClass}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label htmlFor="category" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
-            Category
-          </label>
+        <Field label="Category" htmlFor="category" required density="compact">
           <select id="category" name="category" required defaultValue={defaults?.category} className={`${inputClass} cursor-pointer`}>
             {CATEGORIES.map((cat) => (
               <option key={cat} value={cat} className="bg-surface-raised text-white">
@@ -55,12 +50,9 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
               </option>
             ))}
           </select>
-        </div>
+        </Field>
 
-        <div className="md:col-span-2">
-          <label htmlFor="excerpt" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
-            Excerpt / Short Summary
-          </label>
+        <Field label="Excerpt / Short Summary" htmlFor="excerpt" density="compact" className="md:col-span-2">
           <input
             id="excerpt"
             name="excerpt"
@@ -69,12 +61,9 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
             placeholder="e.g. A brief overview displayed in lists..."
             className={inputClass}
           />
-        </div>
+        </Field>
 
-        <div className="md:col-span-2">
-          <label htmlFor="content" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
-            Content Body
-          </label>
+        <Field label="Content Body" htmlFor="content" required density="compact" className="md:col-span-2">
           <textarea
             id="content"
             name="content"
@@ -84,7 +73,7 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
             placeholder="Write your article content here..."
             className="w-full px-4 py-3 bg-surface-sunken border border-line/80 rounded-lg text-white placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all font-mono text-sm leading-relaxed"
           />
-        </div>
+        </Field>
       </div>
 
       {state?.error && (
@@ -92,34 +81,34 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
       )}
 
       <div className="flex justify-end gap-3 border-t border-surface-raised pt-6 flex-wrap">
-        <Link
+        <Button
           href="/admin/news"
           className="px-5 py-2.5 bg-surface-raised border border-line hover:border-line font-bold text-xs uppercase tracking-wider rounded-lg text-foreground-secondary hover:text-white transition-all cursor-pointer"
         >
           Cancel
-        </Link>
+        </Button>
 
         {(status === 'new' || status === 'draft') && (
           <>
-            <button type="submit" name="intent" value="draft" disabled={isPending} className={draftBtn}>
+            <Button type="submit" name="intent" value="draft" disabled={isPending} className={draftBtn}>
               {isPending ? 'Saving…' : status === 'new' ? 'Save as Draft' : 'Save Draft'}
-            </button>
-            <button type="submit" name="intent" value="publish" disabled={isPending} className={publishBtn}>
+            </Button>
+            <Button type="submit" name="intent" value="publish" disabled={isPending} className={publishBtn}>
               {isPending ? 'Publishing…' : 'Publish'}
-            </button>
+            </Button>
           </>
         )}
 
         {status === 'published' && (
-          <button type="submit" name="intent" value="publish" disabled={isPending} className={publishBtn}>
+          <Button type="submit" name="intent" value="publish" disabled={isPending} className={publishBtn}>
             {isPending ? 'Saving…' : 'Save & Keep Published'}
-          </button>
+          </Button>
         )}
 
         {status === 'archived' && (
-          <button type="submit" name="intent" value="draft" disabled={isPending} className={draftBtn}>
+          <Button type="submit" name="intent" value="draft" disabled={isPending} className={draftBtn}>
             {isPending ? 'Saving…' : 'Save as Draft'}
-          </button>
+          </Button>
         )}
       </div>
     </form>

@@ -31,6 +31,21 @@ export const ROUTES = {
 
 export const getLeadershipRoute = (year: string): string => `${ROUTES.leadership}/${year}`;
 
+export const HERO_ROUTES = [
+  ROUTES.home,
+  ROUTES.about,
+  ROUTES.gallery,
+  ROUTES.news,
+  ROUTES.sponsors,
+  ROUTES.privacy,
+  ROUTES.rules,
+];
+
+/** Check if current route features a full dark hero header section. */
+export function hasHeroRoute(pathname: string): boolean {
+  return HERO_ROUTES.some((route) => pathname === route) || pathname.startsWith('/news/');
+}
+
 // ============================================================================
 // Canonical Domain
 // ============================================================================

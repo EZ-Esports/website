@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { inviteStaff } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
+import { Field } from '@/app/components/ui/form';
+import Button from '@/app/components/ui/Button';
 
 interface InviteStaffFormProps {
   assignableRoles: {
@@ -49,10 +51,7 @@ export default function InviteStaffForm({ assignableRoles }: InviteStaffFormProp
     <div className="space-y-4">
       <form action={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1 font-sans">
-            <label htmlFor="invite-email" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-              Email
-            </label>
+          <Field label="Email" htmlFor="invite-email" density="compact" className="flex-1 font-sans">
             <input
               id="invite-email"
               name="email"
@@ -61,16 +60,16 @@ export default function InviteStaffForm({ assignableRoles }: InviteStaffFormProp
               placeholder="new.staff@ezesports.org"
               className="w-full px-4 py-2.5 bg-surface border border-line rounded-lg text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
             />
-          </div>
+          </Field>
 
-          <button
+          <Button
             type="submit"
             disabled={isPending}
             aria-busy={isPending}
-            className="px-6 py-2.5 bg-accent hover:bg-accent/80 text-on-accent font-semibold rounded-lg shadow-lg hover:shadow-accent/20 focus:outline-none focus:ring-2 focus:ring-accent transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap h-[46px]"
+            className="whitespace-nowrap h-[46px]"
           >
             {isPending ? 'Generating…' : 'Generate invite link'}
-          </button>
+          </Button>
         </div>
 
         {/* Roles Selection */}
