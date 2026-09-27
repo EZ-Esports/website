@@ -5,10 +5,18 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { parseEastern } from '@/app/lib/dates';
 
 export type MatchActionResult = { success: boolean; error?: string };
+
+function revalidateMatches() {
+  updateTag('matches');
+  updateTag('rosters');
+  updateTag('teams');
+  revalidatePath('/admin/matches');
+  revalidatePath('/');
+}
 
 export async function createMatch(formData: FormData): Promise<MatchActionResult> {
   await requirePermission(Permissions.MANAGE_MATCHES);
@@ -65,9 +73,7 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
     return { success: false, error: 'Could not schedule match. Please try again.' };
   }
 
-  revalidateTag('matches', {});
-  revalidatePath('/admin/matches');
-  revalidatePath('/');
+  revalidateMatches();
   return { success: true };
 }
 
@@ -107,10 +113,7 @@ export async function updateMatchScore(id: string, formData: FormData): Promise<
     return { success: false, error: 'Could not save match. Please try again.' };
   }
 
-  revalidateTag('matches', {});
-  revalidateTag('rosters', {});
-  revalidatePath('/admin/matches');
-  revalidatePath('/');
+  revalidateMatches();
   return { success: true };
 }
 
@@ -118,8 +121,5 @@ export async function deleteMatch(id: string) {
   await requirePermission(Permissions.MANAGE_MATCHES);
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
 
-  revalidateTag('matches', {});
-  revalidateTag('rosters', {});
-  revalidatePath('/admin/matches');
-  revalidatePath('/');
+  revalidateMatches();
 }

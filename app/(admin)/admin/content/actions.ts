@@ -5,7 +5,7 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 
 export async function updatePageContent(id: string, formData: FormData) {
   await requirePermission(Permissions.MANAGE_CONTENT);
@@ -29,7 +29,7 @@ export async function updatePageContent(id: string, formData: FormData) {
     await tx.update(schema.pageContent).set({ content }).where(eq(schema.pageContent.id, id));
   });
 
-  revalidateTag('page-content', {});
+  updateTag('page-content');
   revalidatePath('/admin/content');
   revalidatePath('/');
 }
@@ -69,7 +69,7 @@ export async function restorePageContent(id: string, historyId: string) {
       .where(eq(schema.pageContent.id, id));
   });
 
-  revalidateTag('page-content', {});
+  updateTag('page-content');
   revalidatePath('/admin/content');
   revalidatePath('/');
 }

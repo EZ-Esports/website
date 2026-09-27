@@ -1,6 +1,6 @@
 # Architecture
 
-Why the stack looks like this, not a tour of files. Next.js 16 here is not the Next.js in most training data — read `node_modules/next/dist/docs/` and the agent-rules block in [`CLAUDE.md`](../CLAUDE.md) (`cce733b`) before changing framework APIs. `revalidateTag` needs a profile argument (`98edc57`). The old `middleware.ts` convention became `proxy.ts` (`73d408b`). Firefox infinite-reload workaround: `experimental.reactDebugChannel: false` in `next.config.ts` (`f5e26ed`, added on Next ^16.2.6); still set at HEAD despite `next` ^16.3.5.
+Why the stack looks like this, not a tour of files. Next.js 16 here is not the Next.js in most training data — read `node_modules/next/dist/docs/` and the agent-rules block in [`CLAUDE.md`](../CLAUDE.md) (`cce733b`) before changing framework APIs. In Server Actions, immediate cache invalidation uses `updateTag(tag)` (`#144`), while `revalidateTag` requires a profile argument (`98edc57`). The old `middleware.ts` convention became `proxy.ts` (`73d408b`). Firefox infinite-reload workaround: `experimental.reactDebugChannel: false` in `next.config.ts` (`f5e26ed`, added on Next ^16.2.6); still set at HEAD despite `next` ^16.3.5.
 
 Onboarding for env vars: [`docs/dev/SUPABASE.md`](../docs/dev/SUPABASE.md). Do not use `.env`’s `DATABASE_URL` as a scratch database — it is production. See [`CLAUDE.md`](../CLAUDE.md).
 

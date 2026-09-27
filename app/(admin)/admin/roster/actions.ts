@@ -4,28 +4,20 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, eq } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 
 async function requireRosterPermission() {
   return requirePermission(Permissions.MANAGE_ROSTERS);
 }
 
-// Safe wrapper for cache revalidations to support testing/scripts outside Next.js runtime
+// Cache and path revalidations using Next 16 updateTag without swallowing errors
 function safeRevalidateTag(tag: string) {
-  try {
-    revalidateTag(tag, {});
-  } catch {
-    // Safely ignore when called outside Next.js server context (e.g. testing)
-  }
+  updateTag(tag);
 }
 
 function safeRevalidatePath(path: string) {
-  try {
-    revalidatePath(path);
-  } catch {
-    // Safely ignore when called outside Next.js server context (e.g. testing)
-  }
+  revalidatePath(path);
 }
 
 // School CRUD lives in app/(admin)/admin/schools/actions.ts (the canonical editor).
@@ -196,6 +188,7 @@ export async function createRoster(formData: FormData) {
     }).returning();
 
     safeRevalidateTag('rosters');
+    safeRevalidateTag('teams');
     safeRevalidatePath('/admin/roster');
     safeRevalidatePath('/');
     return { success: true, roster: res[0] };
@@ -221,6 +214,7 @@ export async function updateRoster(id: string, formData: FormData) {
       .returning();
 
     safeRevalidateTag('rosters');
+    safeRevalidateTag('teams');
     safeRevalidatePath('/admin/roster');
     safeRevalidatePath('/');
     return { success: true, roster: res[0] };
@@ -236,6 +230,7 @@ export async function deleteRoster(id: string) {
     await db.delete(schema.rosters).where(eq(schema.rosters.id, id));
     safeRevalidateTag('rosters');
     safeRevalidateTag('players');
+    safeRevalidateTag('teams');
     safeRevalidatePath('/admin/roster');
     safeRevalidatePath('/');
     return { success: true };
@@ -281,6 +276,7 @@ export async function createRosterMember(formData: FormData) {
     }).returning();
 
     safeRevalidateTag('players');
+    safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
     return { success: true, player: res[0] };
   } catch (error: unknown) {
@@ -306,6 +302,7 @@ export async function updateRosterMember(id: string, formData: FormData) {
       .returning();
 
     safeRevalidateTag('players');
+    safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
     return { success: true, player: res[0] };
   } catch (error: unknown) {
@@ -320,6 +317,7 @@ export async function deleteRosterMember(id: string) {
   try {
     await db.delete(schema.players).where(eq(schema.players.id, id));
     safeRevalidateTag('players');
+    safeRevalidateTag('rosters');
     safeRevalidatePath('/admin/roster');
     return { success: true };
   } catch (error: unknown) {

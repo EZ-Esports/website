@@ -4,8 +4,16 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
+
+function revalidateStandings() {
+  updateTag('rosters');
+  updateTag('teams');
+  updateTag('matches');
+  revalidatePath('/admin/standings');
+  revalidatePath('/');
+}
 
 async function requireMatchesPermission() {
   return requirePermission(Permissions.MANAGE_MATCHES);
@@ -95,7 +103,7 @@ export async function createStanding(formData: FormData) {
       .insert(schema.seasonStandings)
       .values({ seasonId, schoolId, ...standingValues(formData) })
       .returning();
-    revalidatePath('/admin/standings');
+    revalidateStandings();
     return { success: true, standing: res[0] };
   } catch (error: unknown) {
     console.error(error);
@@ -111,7 +119,7 @@ export async function updateStanding(id: string, formData: FormData) {
       .set(standingValues(formData))
       .where(eq(schema.seasonStandings.id, id))
       .returning();
-    revalidatePath('/admin/standings');
+    revalidateStandings();
     return { success: true, standing: res[0] };
   } catch (error: unknown) {
     console.error(error);
@@ -123,7 +131,7 @@ export async function deleteStanding(id: string) {
   await requireMatchesPermission();
   try {
     await db.delete(schema.seasonStandings).where(eq(schema.seasonStandings.id, id));
-    revalidatePath('/admin/standings');
+    revalidateStandings();
     return { success: true };
   } catch (error: unknown) {
     console.error(error);
@@ -143,7 +151,7 @@ export async function deleteDivisionStandings(seasonId: string, division: string
           eq(schema.seasonStandings.division, division)
         )
       );
-    revalidatePath('/admin/standings');
+    revalidateStandings();
     return { success: true };
   } catch (error: unknown) {
     console.error(error);

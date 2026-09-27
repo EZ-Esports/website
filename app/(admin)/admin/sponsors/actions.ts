@@ -4,7 +4,7 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { safeUrl, sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 
@@ -13,7 +13,7 @@ async function requireSponsorsPermission() {
 }
 
 function revalidateAll() {
-  revalidateTag('sponsors', {});
+  updateTag('sponsors');
   revalidatePath('/admin/sponsors');
   revalidatePath('/sponsors');
 }
