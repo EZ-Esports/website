@@ -8,7 +8,14 @@
  * That is the whole reason the table stopped being wiped.
  */
 import { describe, it, expect } from 'vitest';
-import { planRecord, dedupeRecords, leadershipKey, type LeadershipRecord } from '../leadership-merge';
+import {
+  planRecord,
+  dedupeRecords,
+  personKey,
+  termKey,
+  leadershipKey,
+  type LeadershipRecord,
+} from '../leadership-merge';
 
 const record = (over: Partial<LeadershipRecord> = {}): LeadershipRecord => ({
   name: 'Jane Doe',
@@ -18,7 +25,16 @@ const record = (over: Partial<LeadershipRecord> = {}): LeadershipRecord => ({
   ...over,
 });
 
-const row = (over: Partial<{ id: string; role?: string; bio: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }> = {}) => ({
+const row = (
+  over: Partial<{
+    id: string;
+    role?: string;
+    bio: string | null;
+    highSchool?: string | null;
+    university?: string | null;
+    deletedAt: Date | null;
+  }> = {}
+) => ({
   id: 'row-1',
   role: 'VALORANT Director',
   bio: null as string | null,
@@ -28,15 +44,35 @@ const row = (over: Partial<{ id: string; role?: string; bio: string | null; high
   ...over,
 });
 
-describe('leadershipKey', () => {
+describe('personKey', () => {
   it('is stable across casing and surrounding whitespace', () => {
-    expect(leadershipKey({ name: ' Jane Doe ', year: '2022' }))
-      .toBe(leadershipKey({ name: 'jane doe', year: '2022' }));
+    expect(personKey({ name: ' Jane Doe ' })).toBe(personKey({ name: 'jane doe' }));
+  });
+
+  it('groups the same person regardless of year or role', () => {
+    expect(personKey({ name: 'Jane Doe' })).toBe('jane doe');
+  });
+});
+
+describe('termKey and leadershipKey', () => {
+  it('is stable across casing and surrounding whitespace', () => {
+    expect(termKey({ name: ' Jane Doe ', year: '2022', role: 'President' })).toBe(
+      termKey({ name: 'jane doe', year: '2022', role: 'president' })
+    );
   });
 
   it('separates people who differ only by year', () => {
-    expect(leadershipKey({ name: 'Jane Doe', year: '2022' }))
-      .not.toBe(leadershipKey({ name: 'Jane Doe', year: '2023' }));
+    expect(leadershipKey({ name: 'Jane Doe', year: '2022' })).not.toBe(
+      leadershipKey({ name: 'Jane Doe', year: '2023' })
+    );
+  });
+
+  it('separates distinct roles held in the same year', () => {
+    expect(
+      termKey({ name: 'Jane Doe', year: '2025', role: 'President' })
+    ).not.toBe(
+      termKey({ name: 'Jane Doe', year: '2025', role: 'Game Director' })
+    );
   });
 });
 
@@ -45,20 +81,34 @@ describe('planRecord', () => {
     expect(planRecord(record(), [])).toEqual({ action: 'insert' });
   });
 
-  it('fills a blank bio', () => {
-    expect(planRecord(record({ bio: 'likes cats' }), [row({ bio: null })]))
-      .toEqual({ action: 'fill-bio', id: 'row-1', fillBio: 'likes cats' });
+  it('inserts a second distinct role for the same person in the same year', () => {
+    const plan = planRecord(record({ role: 'President' }), [
+      row({ id: 'a', role: 'Engineering Director', bio: 'existing' }),
+    ]);
+    expect(plan).toEqual({ action: 'insert' });
+  });
+
+  it('fills a blank bio for matching role', () => {
+    expect(planRecord(record({ bio: 'likes cats' }), [row({ bio: null })])).toEqual({
+      action: 'fill-bio',
+      id: 'row-1',
+      fillBio: 'likes cats',
+    });
   });
 
   it('treats a whitespace-only bio as blank', () => {
-    expect(planRecord(record({ bio: 'likes cats' }), [row({ bio: '   ' })]))
-      .toEqual({ action: 'fill-bio', id: 'row-1', fillBio: 'likes cats' });
+    expect(planRecord(record({ bio: 'likes cats' }), [row({ bio: '   ' })])).toEqual({
+      action: 'fill-bio',
+      id: 'row-1',
+      fillBio: 'likes cats',
+    });
   });
 
   it('never overwrites a bio that is already there', () => {
     // An admin edit is newer than the CSV by definition; a re-run must not undo it.
-    expect(planRecord(record({ bio: 'from the csv' }), [row({ bio: 'edited in the admin' })]))
-      .toEqual({ action: 'skip', note: '' });
+    expect(
+      planRecord(record({ bio: 'from the csv' }), [row({ bio: 'edited in the admin' })])
+    ).toEqual({ action: 'skip', note: '' });
   });
 
   it('fills missing high school and university fields', () => {
@@ -76,11 +126,13 @@ describe('planRecord', () => {
   });
 
   it('does nothing when the record has no bio or school info to contribute', () => {
-    expect(planRecord(record({ bio: null }), [row({ bio: null })]))
-      .toEqual({ action: 'skip', note: '' });
+    expect(planRecord(record({ bio: null }), [row({ bio: null })])).toEqual({
+      action: 'skip',
+      note: '',
+    });
   });
 
-  it('does not resurrect a soft-deleted row', () => {
+  it('does not resurrect a soft-deleted row for the same role', () => {
     const plan = planRecord(record(), [row({ deletedAt: new Date('2026-01-01') })]);
     expect(plan.action).toBe('skip');
     expect(plan).toHaveProperty('note', expect.stringMatching(/soft-deleted/));
@@ -103,17 +155,26 @@ describe('dedupeRecords', () => {
     expect(dedupeRecords(records).collapsed).toEqual([]);
   });
 
-  it('collapses records sharing an identity and reports them', () => {
+  it('preserves distinct roles for the same person in the same year without data loss', () => {
+    const records = [
+      record({ role: 'President', bio: 'Pres bio' }),
+      record({ role: 'Game Director', bio: 'Director bio' }),
+    ];
+    const { unique, collapsed } = dedupeRecords(records);
+    expect(unique).toHaveLength(2);
+    expect(collapsed).toEqual([]);
+    expect(unique.map((r) => r.role)).toEqual(['President', 'Game Director']);
+  });
+
+  it('collapses records sharing person, year, and role and reports them', () => {
     const { unique, collapsed } = dedupeRecords([record(), record()]);
     expect(unique).toHaveLength(1);
     expect(collapsed).toHaveLength(1);
+    expect(collapsed[0]).toContain('Jane Doe');
+    expect(collapsed[0]).toContain('2022');
+    expect(collapsed[0]).toContain('VALORANT Director');
   });
 
-  // Collapsing first is what lets the merge settle. The existing-rows map is
-  // built once, before the loop, so two identical source records would both see
-  // "nothing matches" and both insert. On the next run that pair matches two
-  // rows, which is ambiguous, so it is skipped forever with the duplicate left
-  // in the table.
   it('keeps a bio from a later duplicate when the first has none', () => {
     const { unique } = dedupeRecords([record({ bio: null }), record({ bio: 'likes cats' })]);
     expect(unique[0].bio).toBe('likes cats');

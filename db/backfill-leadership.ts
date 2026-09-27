@@ -13,62 +13,9 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { assertSeedTargetAllowed } from './seed-target';
 
-export function classifyRole(role: string): { displayOrder: number; department: string } {
-  const lower = role.toLowerCase().trim();
+import { classifyRole } from '@/app/lib/leadership';
+export { classifyRole };
 
-  // 1. Executive (President, Founder, CTO, VP, CEO)
-  if (
-    lower === 'president' ||
-    lower === 'founder' ||
-    lower === 'cto' ||
-    lower === 'ceo' ||
-    lower === 'co-founder' ||
-    lower.includes('vice president') ||
-    lower.includes('executive')
-  ) {
-    return { displayOrder: 1, department: 'Executive' };
-  }
-
-  // 4. Advisors & Special Thanks
-  if (
-    lower.includes('advisor') ||
-    lower.includes('special thanks') ||
-    lower.includes('consultant')
-  ) {
-    return { displayOrder: 4, department: 'Advisors' };
-  }
-
-  // 2. Directors / Leads
-  if (
-    lower.includes('director') ||
-    lower.includes('lead') ||
-    lower.includes('head')
-  ) {
-    let dept = role
-      .replace(/\b(Co-Director|Director|Co-Lead|Lead|Head)\b/gi, '')
-      .trim();
-    if (!dept) dept = 'Directors';
-    return { displayOrder: 2, department: dept };
-  }
-
-  // 3. Associates / Staff / Engineers / Coordinators
-  if (
-    lower.includes('associate') ||
-    lower.includes('staff') ||
-    lower.includes('engineer') ||
-    lower.includes('coordinator') ||
-    lower.includes('manager')
-  ) {
-    let dept = role
-      .replace(/\b(Associate|Staff|Software Engineer|Engineer|Coordinator|Manager)\b/gi, '')
-      .trim();
-    if (!dept) dept = 'Staff';
-    return { displayOrder: 3, department: dept };
-  }
-
-  // Default: Associates / Staff
-  return { displayOrder: 3, department: 'Staff' };
-}
 
 interface PersonAgg {
   fullName: string;

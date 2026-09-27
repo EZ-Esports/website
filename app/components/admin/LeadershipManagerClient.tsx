@@ -6,7 +6,6 @@ import LeadershipRow, { LeaderRowItem } from '@/app/components/admin/LeadershipR
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import { createLeader } from '@/app/(admin)/admin/leadership/actions';
-import type { DBMember, School } from '@/app/types';
 import { HiMagnifyingGlass, HiXMark, HiUserPlus, HiCheck, HiSparkles } from 'react-icons/hi2';
 
 export interface PersonItem {
@@ -27,8 +26,6 @@ export interface PersonItem {
 interface LeadershipManagerClientProps {
   initialLeadership: LeaderRowItem[];
   peopleList: PersonItem[];
-  membersList: DBMember[];
-  schoolsList: School[];
 }
 
 const inputClass =
@@ -37,8 +34,6 @@ const inputClass =
 export default function LeadershipManagerClient({
   initialLeadership,
   peopleList,
-  membersList,
-  schoolsList,
 }: LeadershipManagerClientProps) {
   // Available unique years sorted in DESCENDING order (latest first)
   const availableYears = useMemo(() => {
@@ -104,10 +99,6 @@ export default function LeadershipManagerClient({
       })
       .slice(0, 15);
   }, [peopleList, personSearch]);
-
-  const schoolMap = useMemo(() => {
-    return new Map(schoolsList.map((s) => [s.id, s.name]));
-  }, [schoolsList]);
 
   // Form submission wrapper
   async function handleAddLeader(formData: FormData) {
@@ -345,36 +336,17 @@ export default function LeadershipManagerClient({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label htmlFor="handle" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                      Handle / IGN
-                    </label>
-                    <input
-                      id="handle"
-                      name="handle"
-                      type="text"
-                      placeholder="e.g. eddyson."
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="memberId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                      League Member
-                    </label>
-                    <select id="memberId" name="memberId" className={inputClass} defaultValue="">
-                      <option value="">None</option>
-                      {membersList.map((m) => {
-                        const schoolName = schoolMap.get(m.schoolId) || 'Unknown School';
-                        const gradSuffix = m.graduationYear ? ` '${m.graduationYear.toString().slice(-2)}` : '';
-                        return (
-                          <option key={m.id} value={m.id}>
-                            {m.firstName} {m.lastName} ({schoolName}{gradSuffix})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+                <div>
+                  <label htmlFor="handle" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                    Handle / IGN
+                  </label>
+                  <input
+                    id="handle"
+                    name="handle"
+                    type="text"
+                    placeholder="e.g. eddyson."
+                    className={inputClass}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
@@ -582,8 +554,6 @@ export default function LeadershipManagerClient({
                       <LeadershipRow
                         key={leader.termId || leader.id}
                         leader={leader}
-                        members={membersList}
-                        schools={schoolsList}
                       />
                     ))}
                   </tbody>
