@@ -110,5 +110,9 @@ describe('Issue #143: Teams view snapshot W/L and explicit Unpublished state', (
 
     expect(getRecord('season-1', 'school-1', 'team-1', 'A')).toBe('7-1');
     expect(getRecord('season-2', 'school-2', 'team-2', 'B')).toBe('Unpublished');
+
+    // Live standing present (wins: 0, losses: 0) -> shows "0-0"
+    standingsMap.set('team-3-Varsity', { wins: 0, losses: 0 });
+    expect(getRecord('season-3', 'school-3', 'team-3', 'Varsity')).toBe('0-0');
   });
 });
