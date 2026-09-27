@@ -430,7 +430,6 @@ export const schoolApplications = pgTable('school_applications', {
   schoolName: text('school_name').notNull(),
   role: text('role').notNull(),
   email: text('email').notNull(),
-  message: text('message').default(''),
   details: jsonb('details').$type<SchoolApplicationDetails | null>(),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
@@ -448,7 +447,6 @@ export const staffApplications = pgTable('staff_applications', {
   phone: text('phone').notNull(),
   discordTag: text('discord_tag'),
   role: text('role').notNull(),
-  message: text('message').default(''),
   details: jsonb('details').$type<StaffApplicationDetails | null>(),
   // Object key inside the private STAFF_RESUME_BUCKET, never a URL: resumes
   // are applicant PII, so admins only ever reach them through a short-lived

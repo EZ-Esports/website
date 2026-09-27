@@ -21,11 +21,11 @@ export function DetailSection({ title, children }: DetailSectionProps) {
 
 interface DetailFieldProps {
   label: string;
-  value: string;
+  value: ReactNode;
 }
 
 export function DetailField({ label, value }: DetailFieldProps) {
-  const displayValue = typeof value === "string" ? value || "—" : typeof value === "number" || typeof value === "boolean" ? String(value) : "—";
+  const displayValue = value === null || value === undefined || value === "" ? "—" : value;
   return (
     <div>
       <dt className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">{label}</dt>

@@ -38,7 +38,7 @@ const staffDetails: StaffApplicationDetailsV1 = {
 };
 
 describe("schoolApplicationsToCsv", () => {
-  it("uses the formatted details text, not the raw message, when details is present", () => {
+  it("uses the formatted details text when details is present", () => {
     const csv = schoolApplicationsToCsv([
       {
         applicantName: "Jane Doe",
@@ -47,15 +47,14 @@ describe("schoolApplicationsToCsv", () => {
         email: "jane@example.com",
         status: "pending",
         submittedAt: new Date("2026-01-15"),
-        message: "raw legacy message text that should not appear",
         details: schoolDetails,
       },
     ]);
     expect(csv).toContain("President:");
-    expect(csv).not.toContain("raw legacy message text");
+    expect(csv).toContain("Jane Doe");
   });
 
-  it("falls back to the raw message when details is null", () => {
+  it("falls back to an empty details column when details is null", () => {
     const csv = schoolApplicationsToCsv([
       {
         applicantName: "Jane Doe",
@@ -64,23 +63,6 @@ describe("schoolApplicationsToCsv", () => {
         email: "jane@example.com",
         status: "pending",
         submittedAt: new Date("2026-01-15"),
-        message: "an old, unbackfilled message blob",
-        details: null,
-      },
-    ]);
-    expect(csv).toContain("an old, unbackfilled message blob");
-  });
-
-  it("falls back to an empty details column when both details and message are null", () => {
-    const csv = schoolApplicationsToCsv([
-      {
-        applicantName: "Jane Doe",
-        schoolName: "Brooklyn Tech",
-        role: "Esports Club President",
-        email: "jane@example.com",
-        status: "pending",
-        submittedAt: new Date("2026-01-15"),
-        message: null,
         details: null,
       },
     ]);
@@ -90,7 +72,7 @@ describe("schoolApplicationsToCsv", () => {
 });
 
 describe("staffApplicationsToCsv", () => {
-  it("uses the formatted details text, not the raw message, when details is present", () => {
+  it("uses the formatted details text when details is present", () => {
     const csv = staffApplicationsToCsv([
       {
         name: "Jamie Rivera",
@@ -99,15 +81,14 @@ describe("staffApplicationsToCsv", () => {
         phone: "555-0100",
         status: "pending",
         submittedAt: new Date("2026-01-15"),
-        message: "raw legacy staff message that should not appear",
         details: staffDetails,
       },
     ]);
     expect(csv).toContain("LinkedIn");
-    expect(csv).not.toContain("raw legacy staff message");
+    expect(csv).toContain("Jamie Rivera");
   });
 
-  it("falls back to the raw message when details is null", () => {
+  it("falls back to an empty details column when details is null", () => {
     const csv = staffApplicationsToCsv([
       {
         name: "Jamie Rivera",
@@ -116,11 +97,11 @@ describe("staffApplicationsToCsv", () => {
         phone: "555-0100",
         status: "pending",
         submittedAt: new Date("2026-01-15"),
-        message: "an old, unbackfilled staff message",
         details: null,
       },
     ]);
-    expect(csv).toContain("an old, unbackfilled staff message");
+    const lines = csv.split("\r\n");
+    expect(lines[1].endsWith(",")).toBe(true);
   });
 
   it("marks whether a resume is attached without exporting a link", () => {

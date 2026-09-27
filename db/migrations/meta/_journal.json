@@ -260,6 +260,13 @@
       "when": 1790391251537,
       "tag": "0036_staff_application_resume",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790461874008,
+      "tag": "0037_drop_application_message_column",
+      "breakpoints": true
     }
   ]
 }

@@ -25,9 +25,11 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(columns.createdAt).toBeDefined();
     });
 
-    it('ensures schoolApplications and staffApplications carry soft-delete columns but not legacy status columns', () => {
+    it('ensures schoolApplications and staffApplications carry soft-delete columns but not legacy status or message columns', () => {
       expect('status' in schema.schoolApplications).toBe(false);
       expect('status' in schema.staffApplications).toBe(false);
+      expect('message' in schema.schoolApplications).toBe(false);
+      expect('message' in schema.staffApplications).toBe(false);
       expect(schema.schoolApplications.deletedAt).toBeDefined();
       expect(schema.schoolApplications.deletedBy).toBeDefined();
       expect(schema.staffApplications.deletedAt).toBeDefined();
@@ -46,6 +48,7 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(sql).toContain('COALESCE("latest_logs"."status", \'pending\')');
       expect(sql).toContain('"rn" = 1');
       expect(sql).toContain('"school_applications"."deleted_at" is null');
+      expect(sql).not.toContain('"message"');
       expect(params).toContain('school');
     });
 
@@ -95,6 +98,7 @@ describe('Application Status Logs & Append-Only Schema', () => {
       expect(sql).toContain('COALESCE("latest_logs"."status", \'pending\')');
       expect(sql).toContain('"rn" = 1');
       expect(sql).toContain('"staff_applications"."deleted_at" is null');
+      expect(sql).not.toContain('"message"');
       expect(params).toContain('staff');
     });
 

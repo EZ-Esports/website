@@ -2,10 +2,13 @@
 
 import { FiFileText, FiX } from "react-icons/fi";
 import { Overlay, Modal, Dialog } from "@/app/components/ui/overlay";
-import { formatStaffApplicationDetails } from "@/app/lib/staff-application-form";
+import {
+  formatStaffApplicationDetails,
+  type StaffApplicationDetails,
+} from "@/app/lib/staff-application-form";
 import { staffApplicationsToCsv } from "@/app/lib/application-csv";
 import DownloadCsvButton from "@/app/components/admin/DownloadCsvButton";
-import { DetailSection, DetailField } from "@/app/components/admin/ApplicationDetailSections";
+import { DetailSection, DetailField, FlatDetailList } from "@/app/components/admin/ApplicationDetailSections";
 import type { StaffApplication } from "@/app/components/admin/StaffApplicationRow";
 import { secondaryBtn } from "@/app/components/admin/styles";
 
@@ -17,6 +20,80 @@ interface StaffApplicationDetailModalProps {
 
 function formatSubmittedDate(date: Date): string {
   return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function StaffDetailsBody({ details, app }: { details: StaffApplicationDetails | null; app: StaffApplication }) {
+  if (!details) {
+    return <p className="text-sm text-foreground-muted italic">No details were submitted with this application.</p>;
+  }
+
+  const linkedin = details.linkedin ? (
+    <a
+      href={details.linkedin.startsWith("http") ? details.linkedin : `https://${details.linkedin}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-accent hover:underline break-all"
+    >
+      {details.linkedin}
+    </a>
+  ) : (
+    "—"
+  );
+
+  const agreed = (v: boolean | undefined) => (v ? "Agreed" : "Disagreed");
+
+  if (details.version === 1) {
+    return (
+      <div className="space-y-4">
+        <DetailSection title="Applicant Profile">
+          <DetailField label="Preferred Name" value={details.preferredFirstName || app.preferredFirstName || "—"} />
+          <DetailField label="Discord Tag" value={details.discordTag || app.discordTag || "—"} />
+          <DetailField label="LinkedIn / Portfolio" value={linkedin} />
+        </DetailSection>
+
+        <DetailSection title="Role & Availability">
+          <DetailField label="Role Applied For" value={app.role} />
+          <DetailField label="Weekly Availability" value={details.availability || "—"} />
+        </DetailSection>
+
+        <DetailSection title="Background & Motivation">
+          <DetailField label="Motivation" value={details.backgroundMotivation || "—"} />
+        </DetailSection>
+
+        <DetailSection title="Consent">
+          <DetailField label="League Rules Agreement" value={agreed(details.agreedRules)} />
+        </DetailSection>
+      </div>
+    );
+  }
+
+  if (details.version === 2) {
+    return (
+      <div className="space-y-4">
+        <DetailSection title="Applicant Profile">
+          <DetailField label="Preferred Name" value={details.preferredFirstName || app.preferredFirstName || "—"} />
+          <DetailField label="Discord Tag" value={details.discordTag || app.discordTag || "—"} />
+          <DetailField label="LinkedIn / Portfolio" value={linkedin} />
+        </DetailSection>
+
+        <DetailSection title="Role & Availability">
+          <DetailField label="Role Applied For" value={app.role} />
+          <DetailField label="Weekly Availability" value={details.availability || "—"} />
+        </DetailSection>
+
+        <DetailSection title="Background & Motivation">
+          <DetailField label="Motivation" value={details.backgroundMotivation || "—"} />
+        </DetailSection>
+
+        <DetailSection title="Consent">
+          <DetailField label="Terms of Service" value={agreed(details.consent?.agreedToTerms)} />
+          <DetailField label="Privacy Policy" value={agreed(details.consent?.agreedToPrivacy)} />
+        </DetailSection>
+      </div>
+    );
+  }
+
+  return <FlatDetailList rows={formatStaffApplicationDetails(details)} />;
 }
 
 export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange }: StaffApplicationDetailModalProps) {
@@ -80,24 +157,7 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
             )}
-            {app.details ? (
-              <>
-                <DetailSection title="Application Details">
-                  {formatStaffApplicationDetails(app.details).map((row) => (
-                    <DetailField key={row.label} label={row.label} value={row.value} />
-                  ))}
-                </DetailSection>
-                {!((app.details as { backgroundMotivation?: string; essay?: string }).backgroundMotivation || (app.details as { backgroundMotivation?: string; essay?: string }).essay) && app.message ? (
-                  <DetailSection title="Background & Motivation">
-                    <p className="text-sm text-foreground-secondary whitespace-pre-line sm:col-span-2">{app.message}</p>
-                  </DetailSection>
-                ) : null}
-              </>
-            ) : app.message ? (
-              <p className="text-sm text-foreground-secondary whitespace-pre-line">{app.message}</p>
-            ) : (
-              <p className="text-sm text-foreground-muted italic">No details were submitted with this application.</p>
-            )}
+            <StaffDetailsBody details={app.details} app={app} />
           </div>
 
           <div className="bg-surface-raised/30 border-t border-line px-6 py-3 flex items-center justify-end shrink-0">

@@ -34,11 +34,9 @@ function safeString(value: unknown, fallback = "—"): string {
   return fallback;
 }
 
-function DetailsBody({ details, message }: { details: SchoolApplicationDetails | null; message: string }) {
+function DetailsBody({ details }: { details: SchoolApplicationDetails | null }) {
   if (!details) {
-    return message ? (
-      <p className="text-sm text-foreground-secondary whitespace-pre-line">{message}</p>
-    ) : (
+    return (
       <p className="text-sm text-foreground-muted italic">No details were submitted with this application.</p>
     );
   }
@@ -238,7 +236,7 @@ export default function ApplicationDetailModal({ app, isOpen, onOpenChange }: Ap
           </div>
 
           <div className="p-6 overflow-y-auto">
-            <DetailsBody details={app.details} message={app.message ?? ""} />
+            <DetailsBody details={app.details} />
           </div>
 
           <div className="bg-surface-raised/30 border-t border-line px-6 py-3 flex items-center justify-end shrink-0">

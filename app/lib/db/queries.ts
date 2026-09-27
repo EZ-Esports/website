@@ -746,7 +746,6 @@ export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 
       schoolName: schema.schoolApplications.schoolName,
       role: schema.schoolApplications.role,
       email: schema.schoolApplications.email,
-      message: schema.schoolApplications.message,
       details: schema.schoolApplications.details,
       submittedAt: schema.schoolApplications.submittedAt,
       status: sql<ApplicationStatus>`COALESCE(${latestLogs.status}, 'pending')`.as('effective_status'),
@@ -785,7 +784,6 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
       phone: schema.staffApplications.phone,
       discordTag: schema.staffApplications.discordTag,
       role: schema.staffApplications.role,
-      message: schema.staffApplications.message,
       details: schema.staffApplications.details,
       // Only whether a resume exists: the storage key stays server-side and
       // admins open the file through the signed-URL route.

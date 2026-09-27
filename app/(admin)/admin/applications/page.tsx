@@ -123,7 +123,7 @@ export default async function ApplicationsAdminPage({
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">School</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Role</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Email</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Details</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Submitted</th>
                   <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
@@ -188,7 +188,7 @@ export default async function ApplicationsAdminPage({
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Role</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Email</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Phone</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Message</th>
+                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Details</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Submitted</th>
                   <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
