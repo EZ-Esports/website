@@ -19,8 +19,14 @@ python3 main.py               # bronze: download every ledger sheet -> bronze_da
 python3 normalize_silver.py   # silver: flat matches/rosters/standings CSVs
 python3 normalize_gold.py     # gold:   DB-shaped CSVs for the loaders below
 cd ..
-npm run db:seed:gold          # archive -> db (upserts; row ids are preserved)
-npm run db:seed:leadership    # staff   -> db (merges; only adds and fills)
+
+# Dry-run inspection (inspects target DB, computes diff, zero mutations):
+npm run db:ingest:gold -- --dry-run
+npm run db:ingest:leadership -- --dry-run
+
+# Apply updates (upserts; row IDs preserved, human edits preserved):
+npm run db:ingest:gold
+npm run db:ingest:leadership
 ```
 
 `main.py` and `normalize_silver.py` need the venv (`uv sync`; pandas,

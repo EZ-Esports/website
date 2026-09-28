@@ -58,6 +58,422 @@ const intOrNull = (v: string) => (v === '' ? null : parseInt(v, 10));
 const floatOrNull = (v: string) => (v === '' ? null : parseFloat(v));
 const orNull = (v: string) => (v === '' ? null : v);
 
+export interface GoldDiffRow {
+  entity: string;
+  incoming: number;
+  toInsert: number;
+  toUpdate: number;
+  unchanged: number;
+  toPrune: number | null;
+}
+
+export function formatGoldDiffTable(rows: GoldDiffRow[]): string {
+  const header = ['Entity', 'Total CSV', 'To Insert', 'To Update', 'Unchanged', 'To Prune'];
+  const colWidths = [18, 11, 11, 11, 11, 10];
+  const pad = (s: string | number, w: number, right = false) => {
+    const str = String(s);
+    return right ? str.padStart(w) : str.padEnd(w);
+  };
+  const line = '='.repeat(colWidths.reduce((a, b) => a + b + 2, 0) - 2);
+  const div = '-'.repeat(colWidths.reduce((a, b) => a + b + 2, 0) - 2);
+
+  const out: string[] = [];
+  out.push('\n📋 Ingestion Plan (--dry-run):');
+  out.push(line);
+  out.push(
+    header.map((h, i) => (i === 0 ? pad(h, colWidths[i]) : pad(h, colWidths[i], true))).join('  ')
+  );
+  out.push(div);
+  for (const r of rows) {
+    out.push([
+      pad(r.entity, colWidths[0]),
+      pad(r.incoming, colWidths[1], true),
+      pad(r.toInsert, colWidths[2], true),
+      pad(r.toUpdate, colWidths[3], true),
+      pad(r.unchanged, colWidths[4], true),
+      pad(r.toPrune !== null ? r.toPrune : '-', colWidths[5], true),
+    ].join('  '));
+  }
+  out.push(line);
+  out.push('--dry-run: Database inspected. 0 mutations executed.');
+  out.push('To apply this ingestion to the database, run without --dry-run.\n');
+  return out.join('\n');
+}
+
+export async function calculateGoldDiff(
+  seasonRows: Record<string, string>[],
+  seasonFormats: string[]
+): Promise<GoldDiffRow[]> {
+  const diffs: GoldDiffRow[] = [];
+
+  // 1. Games
+  const gameRows = gold('gold_games.csv');
+  const existingGames = await db.select({
+    id: schema.games.id,
+    slug: schema.games.slug,
+    displayName: schema.games.displayName,
+    shortName: schema.games.shortName,
+    imageUrl: schema.games.imageUrl,
+  }).from(schema.games);
+  const existingGamesBySlug = new Map(existingGames.map((g) => [g.slug, g]));
+  let gamesInsert = 0, gamesUpdate = 0, gamesUnchanged = 0;
+  for (const g of gameRows) {
+    const ext = existingGamesBySlug.get(g.slug);
+    if (!ext) {
+      gamesInsert++;
+    } else if (
+      ext.displayName !== g.display_name ||
+      ext.shortName !== g.short_name ||
+      (!ext.imageUrl && g.image_url)
+    ) {
+      gamesUpdate++;
+    } else {
+      gamesUnchanged++;
+    }
+  }
+  diffs.push({
+    entity: 'games',
+    incoming: gameRows.length,
+    toInsert: gamesInsert,
+    toUpdate: gamesUpdate,
+    unchanged: gamesUnchanged,
+    toPrune: null,
+  });
+
+  // 2. Schools
+  const schoolRows = gold('gold_schools.csv');
+  const existingSchools = await db.select({
+    id: schema.schools.id,
+    slug: schema.schools.slug,
+    name: schema.schools.name,
+    displayOrder: schema.schools.displayOrder,
+  }).from(schema.schools);
+  const existingSchoolsBySlug = new Map(existingSchools.map((s) => [s.slug, s]));
+  let schoolsInsert = 0, schoolsUpdate = 0, schoolsUnchanged = 0;
+  for (const s of schoolRows) {
+    const ext = existingSchoolsBySlug.get(s.slug);
+    if (!ext) {
+      schoolsInsert++;
+    } else if (
+      ext.name !== s.name ||
+      ext.displayOrder !== parseInt(s.display_order, 10)
+    ) {
+      schoolsUpdate++;
+    } else {
+      schoolsUnchanged++;
+    }
+  }
+  diffs.push({
+    entity: 'schools',
+    incoming: schoolRows.length,
+    toInsert: schoolsInsert,
+    toUpdate: schoolsUpdate,
+    unchanged: schoolsUnchanged,
+    toPrune: null,
+  });
+
+  // 3. Seasons
+  const existingSeasons = await db.select({
+    id: schema.seasons.id,
+    gameId: schema.seasons.gameId,
+    name: schema.seasons.name,
+    isActive: schema.seasons.isActive,
+    standingsFormat: schema.seasons.standingsFormat,
+  }).from(schema.seasons);
+  const existingSeasonsByKey = new Map(
+    existingSeasons.map((s) => [`${s.gameId}|${s.name}`, s])
+  );
+  let seasonsInsert = 0, seasonsUpdate = 0, seasonsUnchanged = 0;
+  for (let i = 0; i < seasonRows.length; i++) {
+    const s = seasonRows[i];
+    const game = existingGamesBySlug.get(s.game_slug);
+    if (!game) {
+      seasonsInsert++;
+      continue;
+    }
+    const ext = existingSeasonsByKey.get(`${game.id}|${s.name}`);
+    if (!ext) {
+      seasonsInsert++;
+    } else if (
+      ext.isActive !== (s.is_active === 'True') ||
+      ext.standingsFormat !== seasonFormats[i]
+    ) {
+      seasonsUpdate++;
+    } else {
+      seasonsUnchanged++;
+    }
+  }
+  diffs.push({
+    entity: 'seasons',
+    incoming: seasonRows.length,
+    toInsert: seasonsInsert,
+    toUpdate: seasonsUpdate,
+    unchanged: seasonsUnchanged,
+    toPrune: null,
+  });
+
+  // 4. Teams
+  const rosterRows = gold('gold_rosters.csv');
+  const teamKeys = [...new Set(rosterRows.map((r) => `${r.season}|${r.game_slug}|${r.school_slug}`))];
+  const existingTeams = await db.select({
+    id: schema.teams.id,
+    schoolId: schema.teams.schoolId,
+    gameId: schema.teams.gameId,
+    seasonId: schema.teams.seasonId,
+  }).from(schema.teams);
+  const teamIdByKey = new Map(
+    existingTeams.map((t) => [`${t.schoolId}|${t.gameId}|${t.seasonId}`, t.id])
+  );
+  let teamsInsert = 0, teamsUnchanged = 0;
+  for (const key of teamKeys) {
+    const [season, gameSlug, schoolSlug] = key.split('|');
+    const school = existingSchoolsBySlug.get(schoolSlug);
+    const game = existingGamesBySlug.get(gameSlug);
+    const seasonObj = game ? existingSeasonsByKey.get(`${game.id}|${season}`) : undefined;
+    if (!school || !game || !seasonObj) {
+      teamsInsert++;
+    } else if (teamIdByKey.has(`${school.id}|${game.id}|${seasonObj.id}`)) {
+      teamsUnchanged++;
+    } else {
+      teamsInsert++;
+    }
+  }
+  diffs.push({
+    entity: 'teams',
+    incoming: teamKeys.length,
+    toInsert: teamsInsert,
+    toUpdate: 0,
+    unchanged: teamsUnchanged,
+    toPrune: null,
+  });
+
+  // 5. Rosters
+  const existingRosters = await db.select({
+    id: schema.rosters.id,
+    teamId: schema.rosters.teamId,
+    name: schema.rosters.name,
+    division: schema.rosters.division,
+  }).from(schema.rosters);
+  const existingRostersByKey = new Map(
+    existingRosters.map((r) => [`${r.teamId}|${r.name}`, r])
+  );
+  let rostersInsert = 0, rostersUpdate = 0, rostersUnchanged = 0;
+  for (const r of rosterRows) {
+    const school = existingSchoolsBySlug.get(r.school_slug);
+    const game = existingGamesBySlug.get(r.game_slug);
+    const seasonObj = game ? existingSeasonsByKey.get(`${game.id}|${r.season}`) : undefined;
+    const teamId = (school && game && seasonObj)
+      ? teamIdByKey.get(`${school.id}|${game.id}|${seasonObj.id}`)
+      : undefined;
+    if (!teamId) {
+      rostersInsert++;
+      continue;
+    }
+    const ext = existingRostersByKey.get(`${teamId}|${r.division}`);
+    if (!ext) {
+      rostersInsert++;
+    } else if (ext.division !== r.division) {
+      rostersUpdate++;
+    } else {
+      rostersUnchanged++;
+    }
+  }
+  diffs.push({
+    entity: 'rosters',
+    incoming: rosterRows.length,
+    toInsert: rostersInsert,
+    toUpdate: rostersUpdate,
+    unchanged: rostersUnchanged,
+    toPrune: null,
+  });
+
+  // 6. Members
+  const memberRows = gold('gold_members.csv');
+  const existingMembers = await db.select({
+    id: schema.members.id,
+    memberKey: schema.members.memberKey,
+    firstName: schema.members.firstName,
+    lastName: schema.members.lastName,
+    discord: schema.members.discord,
+    graduationYear: schema.members.graduationYear,
+    schoolId: schema.members.schoolId,
+  }).from(schema.members).where(isNotNull(schema.members.memberKey));
+  const existingMembersByKey = new Map(existingMembers.map((m) => [m.memberKey!, m]));
+  let membersInsert = 0, membersUpdate = 0, membersUnchanged = 0;
+  for (const m of memberRows) {
+    const key = memberKeyOf(m);
+    const ext = existingMembersByKey.get(key);
+    if (!ext) {
+      membersInsert++;
+    } else if (
+      ext.firstName !== m.first_name ||
+      ext.lastName !== m.last_name ||
+      ext.discord !== orNull(m.discord) ||
+      ext.graduationYear !== intOrNull(m.graduation_year)
+    ) {
+      membersUpdate++;
+    } else {
+      membersUnchanged++;
+    }
+  }
+  diffs.push({
+    entity: 'members',
+    incoming: memberRows.length,
+    toInsert: membersInsert,
+    toUpdate: membersUpdate,
+    unchanged: membersUnchanged,
+    toPrune: null,
+  });
+
+  // 7. Players
+  const playerRows = gold('gold_players.csv');
+  const existingPlayers = await db.select({
+    rosterId: schema.players.rosterId,
+    memberId: schema.players.memberId,
+    role: schema.players.role,
+    ign: schema.players.ign,
+    bio: schema.players.bio,
+    isCaptain: schema.players.isCaptain,
+  }).from(schema.players);
+  const existingPlayersByKey = new Map(
+    existingPlayers.map((p) => [`${p.rosterId}|${p.memberId}`, p])
+  );
+  let playersInsert = 0, playersUpdate = 0, playersUnchanged = 0;
+  for (const p of playerRows) {
+    const member = existingMembersByKey.get(p.member_key);
+    if (!member) {
+      playersInsert++;
+      continue;
+    }
+    // Search for roster key
+    const school = existingSchoolsBySlug.get(p.school_slug);
+    const game = existingGamesBySlug.get(p.game_slug);
+    const seasonObj = game ? existingSeasonsByKey.get(`${game.id}|${p.season}`) : undefined;
+    const teamId = (school && game && seasonObj)
+      ? teamIdByKey.get(`${school.id}|${game.id}|${seasonObj.id}`)
+      : undefined;
+    const roster = teamId ? existingRostersByKey.get(`${teamId}|${p.division}`) : undefined;
+    if (!roster) {
+      playersInsert++;
+      continue;
+    }
+    const ext = existingPlayersByKey.get(`${roster.id}|${member.id}`);
+    if (!ext) {
+      playersInsert++;
+    } else if (
+      ext.role !== p.role ||
+      ext.ign !== orNull(p.ign) ||
+      (!ext.bio && p.bio) ||
+      ext.isCaptain !== (p.is_captain === 'True')
+    ) {
+      playersUpdate++;
+    } else {
+      playersUnchanged++;
+    }
+  }
+  diffs.push({
+    entity: 'players',
+    incoming: playerRows.length,
+    toInsert: playersInsert,
+    toUpdate: playersUpdate,
+    unchanged: playersUnchanged,
+    toPrune: null,
+  });
+
+  // 8. Matches
+  const matchRows = gold('gold_matches.csv');
+  const sourceKeys = matchSourceKeys(matchRows);
+  const existingMatches = await db.select({
+    sourceKey: schema.matches.sourceKey,
+    homeScore: schema.matches.homeScore,
+    awayScore: schema.matches.awayScore,
+    status: schema.matches.status,
+    mvp: schema.matches.mvp,
+    notes: schema.matches.notes,
+  }).from(schema.matches).where(isNotNull(schema.matches.sourceKey));
+  const existingMatchesByKey = new Map(existingMatches.map((m) => [m.sourceKey!, m]));
+  let matchesInsert = 0, matchesUpdate = 0, matchesUnchanged = 0;
+  for (let i = 0; i < matchRows.length; i++) {
+    const m = matchRows[i];
+    const key = sourceKeys[i];
+    const ext = existingMatchesByKey.get(key);
+    if (!ext) {
+      matchesInsert++;
+    } else if (
+      ext.homeScore !== intOrNull(m.home_score) ||
+      ext.awayScore !== intOrNull(m.away_score) ||
+      ext.status !== m.status ||
+      ext.mvp !== orNull(m.mvp) ||
+      ext.notes !== orNull(m.notes)
+    ) {
+      matchesUpdate++;
+    } else {
+      matchesUnchanged++;
+    }
+  }
+  const incomingMatchKeySet = new Set(sourceKeys);
+  const matchesToPrune = existingMatches.filter((m) => !incomingMatchKeySet.has(m.sourceKey!)).length;
+  diffs.push({
+    entity: 'matches',
+    incoming: matchRows.length,
+    toInsert: matchesInsert,
+    toUpdate: matchesUpdate,
+    unchanged: matchesUnchanged,
+    toPrune: matchesToPrune,
+  });
+
+  // 9. Season Standings
+  const standingRows = gold('gold_standings.csv');
+  const standingKeys = standingSourceKeys(standingRows);
+  const existingStandings = await db.select({
+    sourceKey: schema.seasonStandings.sourceKey,
+    rank: schema.seasonStandings.rank,
+    wins: schema.seasonStandings.wins,
+    losses: schema.seasonStandings.losses,
+    gamesPlayed: schema.seasonStandings.gamesPlayed,
+    winPct: schema.seasonStandings.winPct,
+    points: schema.seasonStandings.points,
+    playerName: schema.seasonStandings.playerName,
+    playerIgn: schema.seasonStandings.playerIgn,
+    notes: schema.seasonStandings.notes,
+  }).from(schema.seasonStandings).where(isNotNull(schema.seasonStandings.sourceKey));
+  const existingStandingsByKey = new Map(existingStandings.map((s) => [s.sourceKey!, s]));
+  let standingsInsert = 0, standingsUpdate = 0, standingsUnchanged = 0;
+  for (let i = 0; i < standingRows.length; i++) {
+    const s = standingRows[i];
+    const key = standingKeys[i];
+    const ext = existingStandingsByKey.get(key);
+    if (!ext) {
+      standingsInsert++;
+    } else if (
+      ext.rank !== intOrNull(s.rank) ||
+      ext.wins !== intOrNull(s.wins) ||
+      ext.losses !== intOrNull(s.losses) ||
+      ext.gamesPlayed !== intOrNull(s.games_played) ||
+      ext.points !== floatOrNull(s.points) ||
+      ext.playerName !== orNull(s.player_name) ||
+      ext.playerIgn !== orNull(s.player_ign) ||
+      ext.notes !== orNull(s.notes)
+    ) {
+      standingsUpdate++;
+    } else {
+      standingsUnchanged++;
+    }
+  }
+  const incomingStandingKeySet = new Set(standingKeys);
+  const standingsToPrune = existingStandings.filter((s) => !incomingStandingKeySet.has(s.sourceKey!)).length;
+  diffs.push({
+    entity: 'season_standings',
+    incoming: standingRows.length,
+    toInsert: standingsInsert,
+    toUpdate: standingsUpdate,
+    unchanged: standingsUnchanged,
+    toPrune: standingsToPrune,
+  });
+
+  return diffs;
+}
+
 /**
  * Reads a season's standings_format, refusing to guess.
  *
@@ -118,21 +534,23 @@ async function pruneByKey(
 }
 
 async function main() {
-  console.log('Importing gold archive data...');
+  const dryRun = process.argv.includes('--dry-run');
 
-  // 0a. Refuse a database this seed has no business wiping. `.env` on the
-  //     machine this is usually run from holds the production connection
-  //     string, so production was the default target and the only safeguard was
-  //     the operator remembering. Loopback runs freely; anything else has to be
-  //     named in SEED_ALLOW_REMOTE. Checked before the backup so a refused run
-  //     does not first spend a minute dumping the database it will not touch.
-  assertSeedTargetAllowed();
+  if (!dryRun) {
+    // 0a. Refuse a database this seed has no business wiping. `.env` on the
+    //     machine this is usually run from holds the production connection
+    //     string, so production was the default target and the only safeguard was
+    //     the operator remembering. Loopback runs freely; anything else has to be
+    //     named in SEED_ALLOW_REMOTE. Checked before the backup so a refused run
+    //     does not first spend a minute dumping the database it will not touch.
+    assertSeedTargetAllowed();
 
-  // 0b. Back up. Step 1 touches nine tables; this has gone wrong against the
-  //     live database twice, and both times there was nothing to restore from.
-  //     requireFreshBackup throws unless a complete dump is on disk, which
-  //     aborts the seed here — before any write.
-  requireFreshBackup(GOLD_SEED_TABLES);
+    // 0b. Back up. Step 1 touches nine tables; this has gone wrong against the
+    //     live database twice, and both times there was nothing to restore from.
+    //     requireFreshBackup throws unless a complete dump is on disk, which
+    //     aborts the seed here — before any write.
+    requireFreshBackup(GOLD_SEED_TABLES);
+  }
 
   // 0c. Read and validate the one CSV this loader can reject, before anything is
   //    deleted. Step 1 wipes the whole archive, so a standings_format this
@@ -144,6 +562,15 @@ async function main() {
   //    keep in front of the deletes.
   const seasonRows = gold('gold_seasons.csv');
   const seasonFormats = seasonRows.map(standingsFormatOf);
+
+  if (dryRun) {
+    console.log('Inspecting database against gold archive (--dry-run)...');
+    const diffs = await calculateGoldDiff(seasonRows, seasonFormats);
+    console.log(formatGoldDiffTable(diffs));
+    return;
+  }
+
+  console.log('Importing gold archive data...');
 
   // 1. Nothing is wiped. Every step below upserts on a natural key and keeps the
   //    row's id, which is the whole point of this script's second life.
@@ -353,7 +780,7 @@ async function main() {
       set: {
         role: sql`excluded.role`,
         ign: sql`excluded.ign`,
-        bio: sql`excluded.bio`,
+        bio: sql`coalesce(${schema.players.bio}, excluded.bio)`,
         isCaptain: sql`excluded.is_captain`,
       },
     })
@@ -474,9 +901,11 @@ async function main() {
   console.log('Import complete.');
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error('Seed failed:', err);
-    process.exit(1);
-  });
+if (process.argv[1] && (process.argv[1].endsWith('seed-gold.ts') || process.argv[1].includes('seed-gold'))) {
+  main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Seed failed:', err);
+      process.exit(1);
+    });
+}
