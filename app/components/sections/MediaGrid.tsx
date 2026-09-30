@@ -89,9 +89,8 @@ function MarqueeRow({
                     src={item.src}
                     alt={item.alt}
                     fill
-                    unoptimized
                     loading="lazy"
-                    sizes="(max-width: 640px) 70vw, (max-width: 1024px) 45vw, 26vw"
+                    sizes="(max-width: 640px) 70vw, (max-width: 768px) 45vw, (max-width: 1024px) 32vw, (max-width: 1280px) 26vw, 300px"
                     className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
                   />
 
@@ -109,6 +108,7 @@ function MarqueeRow({
             </div>
           );
         })}
+
       </div>
     </div>
   );
@@ -265,8 +265,8 @@ export default function MediaGrid({
                     alt={items[selectedImageIndex].alt}
                     width={1200}
                     height={800}
-                    unoptimized
                     priority
+                    sizes="(max-width: 1024px) 100vw, 1024px"
                     className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
                   />
                   <div id="lightbox-caption" className="mt-3 text-center text-foreground-secondary text-sm">

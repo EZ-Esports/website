@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Permissions } from '@/app/lib/roles';
 import {
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
+  MAX_RAW_INPUT_BYTES,
+  MAX_IMAGE_DIMENSION,
+  STORAGE_CACHE_CONTROL,
   MIME_TO_EXT,
   SECTION_PERMISSIONS,
   ALLOWED_UPLOAD_SECTIONS,
@@ -10,7 +13,22 @@ import {
   sanitizeEntityId,
   buildStorageKey,
   isKeyScopedToEntity,
+  uploadToStorage,
 } from '@/app/lib/storage';
+
+const mockUpload = vi.fn().mockResolvedValue({ data: { path: 'test.jpg' }, error: null });
+const mockGetPublicUrl = vi.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/test.jpg' } });
+
+vi.mock('@/app/lib/supabase/service', () => ({
+  createServiceClient: () => ({
+    storage: {
+      from: vi.fn(() => ({
+        upload: mockUpload,
+        getPublicUrl: mockGetPublicUrl,
+      })),
+    },
+  }),
+}));
 
 describe('Image upload validation & constraints', () => {
   it('accepts standard web image MIME types', () => {
@@ -138,3 +156,73 @@ describe('Path traversal prevention & entity scoping', () => {
     expect(isKeyScopedToEntity(undefined, section, entityId)).toBe(false);
   });
 });
+
+describe('Storage cache control & bandwidth mitigation constraints', () => {
+  it('defines 1-year (31536000s) default cache-control header for immutable assets', () => {
+    expect(STORAGE_CACHE_CONTROL).toBe('31536000');
+  });
+
+  it('defines 2048px maximum dimension cap for web-optimized assets', () => {
+    expect(MAX_IMAGE_DIMENSION).toBe(2048);
+  });
+
+  it('defines 20 MB client-side raw input limit before compression', () => {
+    expect(MAX_RAW_INPUT_BYTES).toBe(20 * 1024 * 1024);
+  });
+
+  it('uploadToStorage attaches cacheControl header and returns publicUrl', async () => {
+    mockUpload.mockClear();
+    mockGetPublicUrl.mockClear();
+
+    const buffer = new Uint8Array([1, 2, 3]).buffer;
+    const result = await uploadToStorage('gallery/test/123.jpg', buffer, {
+      contentType: 'image/jpeg',
+    });
+
+    expect(mockUpload).toHaveBeenCalledWith(
+      'gallery/test/123.jpg',
+      buffer,
+      {
+        contentType: 'image/jpeg',
+        upsert: false,
+        cacheControl: '31536000',
+      },
+    );
+    expect(result.error).toBe(null);
+    expect(result.publicUrl).toBe('https://example.com/test.jpg');
+  });
+
+  it('uploadToStorage supports custom cacheControl and upsert flags', async () => {
+    mockUpload.mockClear();
+
+    const buffer = new Uint8Array([4, 5, 6]).buffer;
+    await uploadToStorage('sponsors/logo/456.png', buffer, {
+      contentType: 'image/png',
+      upsert: true,
+      cacheControl: '86400',
+    });
+
+    expect(mockUpload).toHaveBeenCalledWith(
+      'sponsors/logo/456.png',
+      buffer,
+      {
+        contentType: 'image/png',
+        upsert: true,
+        cacheControl: '86400',
+      },
+    );
+  });
+
+  it('uploadToStorage returns error when Supabase upload fails', async () => {
+    mockUpload.mockResolvedValueOnce({ data: null, error: { message: 'Network error' } });
+
+    const buffer = new Uint8Array([7, 8, 9]).buffer;
+    const result = await uploadToStorage('schools/school-1/error.jpg', buffer, {
+      contentType: 'image/jpeg',
+    });
+
+    expect(result.error).toEqual({ message: 'Network error' });
+    expect(result.publicUrl).toBe(null);
+  });
+});
+

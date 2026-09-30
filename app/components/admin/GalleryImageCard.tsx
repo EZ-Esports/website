@@ -73,8 +73,8 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
           alt={img.caption ?? ''}
           width={200}
           height={200}
+          sizes="(max-width: 640px) 100vw, 200px"
           className="w-full h-full object-cover"
-          unoptimized
         />
       </div>
       <div className="p-3 flex flex-col flex-grow gap-3">
