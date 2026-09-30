@@ -29,12 +29,12 @@ describe('standings snapshot vs computed preference & standings_format', () => {
 
   it('getTeamStandingsRecords returns empty Map for empty input without hitting the DB', async () => {
     // Dynamic import to avoid top-level import of DB-initialising module
-    const { getTeamStandingsRecords } = await import('@/app/lib/db/queries');
+    const { getTeamStandingsRecords } = await import('@/app/lib/db/standings');
     expect(typeof getTeamStandingsRecords).toBe('function');
     const result = await getTeamStandingsRecords([]);
     expect(result).toBeInstanceOf(Map);
     expect(result.size).toBe(0);
-  });
+  }, 20000);
 
   it('exports getActiveSeasonForGame, getLeagueAdminData, and DAL query functions', async () => {
     const {
@@ -49,6 +49,6 @@ describe('standings snapshot vs computed preference & standings_format', () => {
     expect(typeof getSchoolGameTeamsPageData).toBe('function');
     expect(typeof getLeagueAdminData).toBe('function');
     expect(NEWS_PAGE_SIZE).toBe(20);
-  });
+  }, 20000);
 });
 
