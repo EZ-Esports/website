@@ -183,7 +183,7 @@ const mocks = vi.hoisted(() => {
         }
 
         if (currentTable === schema.schoolManagers) {
-          let rows = state.schoolManagersStore.filter((m) => conds.every((c) => matchesRow(m, c)));
+          const rows = state.schoolManagersStore.filter((m) => conds.every((c) => matchesRow(m, c)));
 
           if (isJoin && joinTable === schema.staffMembers) {
             return rows.map((m) => {
