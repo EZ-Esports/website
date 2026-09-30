@@ -7,7 +7,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
-import { classifyRole } from '@/db/backfill-leadership';
+import { classifyRole } from '@/app/lib/leadership';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 import { softDeleteLeaderRecord } from '@/app/lib/db/queries';
 
@@ -82,7 +82,7 @@ export async function createLeader(formData: FormData) {
         if (bio !== undefined) personUpdates.bio = bio;
         if (avatarUrl !== undefined && avatarUrl) personUpdates.avatarUrl = avatarUrl;
         if (storageKey !== undefined) personUpdates.storageKey = storageKey;
-        if (memberId !== undefined) personUpdates.memberId = memberId;
+        if (formData.has('memberId')) personUpdates.memberId = memberId;
 
         if (Object.keys(personUpdates).length > 0) {
           await db
@@ -219,7 +219,7 @@ export async function updateLeader(id: string, year: string, formData: FormData)
           personUpdates.university = university;
           personUpdates.graduationYear = graduationYear;
           personUpdates.bio = bio;
-          personUpdates.memberId = memberId;
+          if (formData.has('memberId')) personUpdates.memberId = memberId;
           if (avatarUrl !== undefined) personUpdates.avatarUrl = avatarUrl;
           if (storageKey !== undefined) personUpdates.storageKey = storageKey;
 

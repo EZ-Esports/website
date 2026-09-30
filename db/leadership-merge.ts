@@ -1,31 +1,24 @@
 /**
- * Merging leadership records into the table instead of replacing it.
+ * Merging leadership records into normalized people and leadership_terms tables.
  *
- * `db/seed.ts` used to wipe `leadership` and re-insert it from
- * staff_completeroster.csv. That made the CSV the owner of a table it is only
- * one contributor to: rows are also authored and edited in the admin leadership
- * editor, and only the database ever held the bios and member links. When the
- * gold seed cascade-deleted 70 of those rows there was no CSV to restore them
- * from and no backup, and they are still gone.
+ * Each individual is mapped to a canonical profile in `people` keyed on their
+ * normalized full name (`personKey`).
+ * Each appointment is mapped to `leadership_terms` keyed on `(person_id, year, role)` (`termKey`).
  *
- * So this merges. `(name, role, year)` is the identity — it is unique across
- * every row in production today, and it is exactly the tuple the CSV can
- * reconstruct. Everything the CSV cannot speak to is left alone:
- *
- *   - `member_id` is never written. The CSV has no member column; the links
- *     were made in the admin editor and are the seed's to preserve, not to set.
- *   - a bio that is already there is never overwritten, only filled in when
- *     blank. The CSV's `fun_fact` is a 2021-2025 snapshot; an admin edit is
- *     newer by definition, and a re-run must not undo it.
- *   - soft-deleted rows are matched but never resurrected. Somebody removed
- *     them on purpose, and re-importing the CSV is not a decision to undo that.
- *
- * The same function backs the standalone recovery importer, so a recovered CSV
- * can be merged into the surviving rows without going near the rest of the seed.
+ * Rules:
+ *   - Multiple distinct roles held by the same person in the same year or contiguous
+ *     terms are preserved without data loss.
+ *   - Duplicate rows in the source sharing (person, year, role) are deduplicated,
+ *     preferring any present bio or profile details.
+ *   - Existing bios and custom details are never overwritten, only filled when blank.
+ *   - Soft-deleted rows are matched and respected (never resurrected).
+ *   - Seeded records populate `people` and `leadership_terms`, with a documented
+ *     compatibility write to legacy `leadership`.
  */
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '../app/lib/db';
 import * as schema from '../app/lib/db/schema';
+import { classifyRole } from '../app/lib/leadership';
 
 export type LeadershipRecord = {
   name: string;
@@ -46,19 +39,31 @@ export type MergeResult = {
   notes: string[];
 };
 
-/** The identity tuple, normalised so whitespace and casing cannot fork a row. */
-export function leadershipKey(r: { name: string; year: string }): string {
+/** The stable person identity, normalized so whitespace and casing cannot fork a profile. */
+export function personKey(r: { name: string }): string {
+  return r.name.trim().toLowerCase();
+}
+
+/** The term identity, unique per (person, year, role). */
+export function termKey(r: { name: string; year: string; role: string }): string {
+  return [r.name, r.year, r.role].map((v) => v.trim().toLowerCase()).join('|');
+}
+
+/**
+ * Backward-compatible identity helper. If role is provided, keys on (name, year, role);
+ * otherwise keys on (name, year).
+ */
+export function leadershipKey(r: { name: string; year: string; role?: string }): string {
+  if (r.role) {
+    return [r.name, r.year, r.role].map((v) => v.trim().toLowerCase()).join('|');
+  }
   return [r.name, r.year].map((v) => v.trim().toLowerCase()).join('|');
 }
 
 /**
- * Collapses records that share an identity, keeping the first and preferring any
- * bio among them.
- *
- * The CSV is an export of a spreadsheet people maintained by hand, so the same
- * person can appear twice for one year. Left alone that would insert a
- * row on the first pass and match ambiguously on every pass after, so the merge
- * would never settle.
+ * Collapses duplicate source records that share an exact (person, year, role) identity,
+ * keeping the first and preferring any bio or metadata among them.
+ * Records representing distinct roles for the same person in the same year are preserved.
  */
 export function dedupeRecords(records: LeadershipRecord[]): {
   unique: LeadershipRecord[];
@@ -68,13 +73,13 @@ export function dedupeRecords(records: LeadershipRecord[]): {
   const collapsed: string[] = [];
 
   for (const r of records) {
-    const key = leadershipKey(r);
+    const key = termKey(r);
     const seen = byKey.get(key);
     if (!seen) {
       byKey.set(key, { ...r });
       continue;
     }
-    collapsed.push(`${r.name} (${r.year})`);
+    collapsed.push(`${r.name} (${r.year} - ${r.role})`);
     if (!seen.bio && r.bio) seen.bio = r.bio;
     if (!seen.handle && r.handle) seen.handle = r.handle;
     if (!seen.highSchool && r.highSchool) seen.highSchool = r.highSchool;
@@ -85,27 +90,55 @@ export function dedupeRecords(records: LeadershipRecord[]): {
 }
 
 /**
- * Decides what a single record should do against the rows already present.
+ * Decides what a single record should do against the existing term rows for this person & year.
  *
- * Split out from the database work so the rules above are unit-testable without
- * a live table — they are the part that is easy to get subtly wrong.
+ * Multiple roles for the same person in the same year are cleanly supported: if no active
+ * or soft-deleted term exists for the specific role, an insert plan is returned.
  */
 export function planRecord(
   record: LeadershipRecord,
-  existing: { id: string; role?: string; bio: string | null; handle?: string | null; highSchool?: string | null; university?: string | null; deletedAt: Date | null }[]
-): { action: 'insert' } | { action: 'fill-bio'; id: string; fillBio?: string | null; fillHandle?: string | null; fillHighSchool?: string | null; fillUniversity?: string | null } | { action: 'skip'; note: string } {
+  existing: {
+    id: string;
+    role?: string;
+    bio: string | null;
+    handle?: string | null;
+    highSchool?: string | null;
+    university?: string | null;
+    deletedAt: Date | null;
+  }[]
+):
+  | { action: 'insert' }
+  | {
+      action: 'fill-bio';
+      id: string;
+      fillBio?: string | null;
+      fillHandle?: string | null;
+      fillHighSchool?: string | null;
+      fillUniversity?: string | null;
+    }
+  | { action: 'skip'; note: string } {
   if (existing.length === 0) return { action: 'insert' };
 
-  const active = existing.filter((r) => r.deletedAt === null);
+  // Match existing rows for this specific role
+  const matching = existing.filter(
+    (r) => r.role && r.role.trim().toLowerCase() === record.role.trim().toLowerCase()
+  );
+
+  // If no term with this role exists yet, insert the distinct role (even if other roles exist in this year)
+  if (matching.length === 0) {
+    return { action: 'insert' };
+  }
+
+  const active = matching.filter((r) => r.deletedAt === null);
 
   if (active.length === 0) {
     return {
       action: 'skip',
-      note: `${record.name} (${record.year}) is soft-deleted; not resurrecting it`,
+      note: `${record.name} (${record.year} - ${record.role}) is soft-deleted; not resurrecting it`,
     };
   }
 
-  const row = active.find((r) => r.role && r.role.trim().toLowerCase() === record.role.trim().toLowerCase()) ?? active[0];
+  const row = active[0];
 
   const hasBio = row.bio !== null && row.bio !== undefined && row.bio.trim() !== '';
   const needsBio = !hasBio && Boolean(record.bio && record.bio.trim() !== '');
@@ -133,33 +166,49 @@ export function planRecord(
   return { action: 'skip', note: '' };
 }
 
-/** Merges records into `leadership`, inserting what is missing and nothing else. */
+/** Merges records into `people` and `leadership_terms`, inserting what is missing and nothing else. */
 export async function mergeLeadership(records: LeadershipRecord[]): Promise<MergeResult> {
   const { unique, collapsed } = dedupeRecords(records);
   const notes = collapsed.map((c) => `collapsed duplicate in source: ${c}`);
 
-  // One read, then grouped in memory. Per-row lookups would be ~169 round trips
-  // for a table that fits in a single query.
-  const rows = await db
+  // 1. Fetch existing people
+  const existingPeople = await db
     .select({
-      id: schema.leadership.id,
-      name: schema.leadership.name,
-      handle: schema.leadership.handle,
-      role: schema.leadership.role,
-      year: schema.leadership.year,
-      bio: schema.leadership.bio,
-      highSchool: schema.leadership.highSchool,
-      university: schema.leadership.university,
-      deletedAt: schema.leadership.deletedAt,
+      id: schema.people.id,
+      fullName: schema.people.fullName,
+      handle: schema.people.handle,
+      bio: schema.people.bio,
+      highSchool: schema.people.highSchool,
+      university: schema.people.university,
+      deletedAt: schema.people.deletedAt,
     })
-    .from(schema.leadership);
+    .from(schema.people);
 
-  const byKey = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const key = leadershipKey(row);
-    const group = byKey.get(key);
-    if (group) group.push(row);
-    else byKey.set(key, [row]);
+  const peopleByKey = new Map<string, typeof existingPeople[0]>();
+  for (const p of existingPeople) {
+    peopleByKey.set(personKey({ name: p.fullName }), p);
+  }
+
+  // 2. Fetch existing leadership_terms
+  const existingTerms = await db
+    .select({
+      id: schema.leadershipTerms.id,
+      personId: schema.leadershipTerms.personId,
+      year: schema.leadershipTerms.year,
+      role: schema.leadershipTerms.role,
+      department: schema.leadershipTerms.department,
+      displayOrder: schema.leadershipTerms.displayOrder,
+      termBio: schema.leadershipTerms.termBio,
+      deletedAt: schema.leadershipTerms.deletedAt,
+    })
+    .from(schema.leadershipTerms);
+
+  const termsByPersonYear = new Map<string, typeof existingTerms>();
+  for (const t of existingTerms) {
+    const key = `${t.personId}|${t.year.trim()}`;
+    const group = termsByPersonYear.get(key);
+    if (group) group.push(t);
+    else termsByPersonYear.set(key, [t]);
   }
 
   let inserted = 0;
@@ -167,34 +216,96 @@ export async function mergeLeadership(records: LeadershipRecord[]): Promise<Merg
   let skipped = 0;
 
   for (const record of unique) {
-    const plan = planRecord(record, byKey.get(leadershipKey(record)) ?? []);
+    const pKey = personKey(record);
+    let person = peopleByKey.get(pKey);
+
+    if (!person) {
+      // Insert new person
+      const [newPerson] = await db
+        .insert(schema.people)
+        .values({
+          fullName: record.name.trim(),
+          handle: record.handle?.trim() || null,
+          bio: record.bio?.trim() || null,
+          highSchool: record.highSchool?.trim() || null,
+          university: record.university?.trim() || null,
+          isActive: true,
+        })
+        .returning();
+      person = newPerson;
+      peopleByKey.set(pKey, person);
+    } else {
+      // Fill blank details if record provides them
+      const personUpdates: Partial<typeof schema.people.$inferInsert> = {};
+      if (!person.bio && record.bio?.trim()) personUpdates.bio = record.bio.trim();
+      if (!person.handle && record.handle?.trim()) personUpdates.handle = record.handle.trim();
+      if (!person.highSchool && record.highSchool?.trim()) personUpdates.highSchool = record.highSchool.trim();
+      if (!person.university && record.university?.trim()) personUpdates.university = record.university.trim();
+
+      if (Object.keys(personUpdates).length > 0) {
+        await db
+          .update(schema.people)
+          .set(personUpdates)
+          .where(eq(schema.people.id, person.id));
+        Object.assign(person, personUpdates);
+      }
+    }
+
+    const termGroupKey = `${person.id}|${record.year.trim()}`;
+    const termsForPersonYear = termsByPersonYear.get(termGroupKey) ?? [];
+
+    const existingForPlan = termsForPersonYear.map((t) => ({
+      id: t.id,
+      role: t.role,
+      bio: t.termBio || person!.bio,
+      handle: person!.handle,
+      highSchool: person!.highSchool,
+      university: person!.university,
+      deletedAt: t.deletedAt,
+    }));
+
+    const plan = planRecord(record, existingForPlan);
 
     if (plan.action === 'insert') {
-      await db.insert(schema.leadership).values({
-        memberId: null,
-        name: record.name,
-        handle: record.handle ?? null,
-        role: record.role,
-        year: record.year,
-        bio: record.bio,
-        highSchool: record.highSchool ?? null,
-        university: record.university ?? null,
-      });
-      inserted++;
-    } else if (plan.action === 'fill-bio') {
-      const updates: Record<string, string | null> = {};
-      if (plan.fillBio) updates.bio = plan.fillBio;
-      if (plan.fillHandle) updates.handle = plan.fillHandle;
-      if (plan.fillHighSchool) updates.highSchool = plan.fillHighSchool;
-      if (plan.fillUniversity) updates.university = plan.fillUniversity;
+      const { displayOrder, department } = classifyRole(record.role);
+      const [newTerm] = await db
+        .insert(schema.leadershipTerms)
+        .values({
+          personId: person.id,
+          year: record.year.trim(),
+          role: record.role.trim(),
+          department,
+          displayOrder,
+          termBio: record.bio?.trim() || null,
+        })
+        .returning();
 
-      if (Object.keys(updates).length > 0) {
-        await db
-          .update(schema.leadership)
-          .set(updates)
-          .where(and(eq(schema.leadership.id, plan.id)));
-        updated++;
+      termsForPersonYear.push(newTerm);
+      termsByPersonYear.set(termGroupKey, termsForPersonYear);
+      inserted++;
+
+      // Backward-compatibility shim for legacy leadership table
+      try {
+        await db.insert(schema.leadership).values({
+          name: record.name.trim(),
+          handle: record.handle?.trim() || null,
+          role: record.role.trim(),
+          year: record.year.trim(),
+          bio: record.bio?.trim() || null,
+          highSchool: record.highSchool?.trim() || null,
+          university: record.university?.trim() || null,
+        });
+      } catch {
+        // Safe to ignore legacy sync errors
       }
+    } else if (plan.action === 'fill-bio') {
+      if (plan.fillBio) {
+        await db
+          .update(schema.leadershipTerms)
+          .set({ termBio: plan.fillBio })
+          .where(eq(schema.leadershipTerms.id, plan.id));
+      }
+      updated++;
     } else {
       skipped++;
       if (plan.note) notes.push(plan.note);

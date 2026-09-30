@@ -1,8 +1,6 @@
 import {
   getCachedLeadership,
   getCachedPeople,
-  getCachedMembers,
-  getCachedSchools,
 } from '@/app/lib/db/queries';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
@@ -14,31 +12,18 @@ export default async function AdminLeadershipPage() {
 
   let leadershipList: Awaited<ReturnType<typeof getCachedLeadership>> = [];
   let peopleList: Awaited<ReturnType<typeof getCachedPeople>> = [];
-  let membersList: Awaited<ReturnType<typeof getCachedMembers>> = [];
-  let schoolsList: Awaited<ReturnType<typeof getCachedSchools>> = [];
   let dbError = false;
 
   try {
-    const [leadership, people, members, schools] = await Promise.all([
+    const [leadership, people] = await Promise.all([
       getCachedLeadership(),
       getCachedPeople(),
-      getCachedMembers(),
-      getCachedSchools(),
     ]);
     leadershipList = leadership;
     peopleList = people;
-    membersList = members;
-    schoolsList = schools;
   } catch {
     dbError = true;
   }
-
-  // Sort members by last name then first name
-  const sortedMembers = [...membersList].sort((a, b) => {
-    const nameA = `${a.lastName || ''}, ${a.firstName || ''}`.toLowerCase();
-    const nameB = `${b.lastName || ''}, ${b.firstName || ''}`.toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
 
   return (
     <div className="space-y-8">
@@ -48,8 +33,6 @@ export default async function AdminLeadershipPage() {
         <LeadershipManagerClient
           initialLeadership={leadershipList}
           peopleList={peopleList}
-          membersList={sortedMembers}
-          schoolsList={schoolsList}
         />
       )}
     </div>

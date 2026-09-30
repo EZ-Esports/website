@@ -6,7 +6,6 @@ import RowIconButton from '@/app/components/admin/RowIconButton';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import { updateLeader, deleteLeader } from '@/app/(admin)/admin/leadership/actions';
-import type { DBMember, School } from '@/app/types';
 
 export interface LeaderRowItem {
   id: string; // termId
@@ -33,12 +32,8 @@ const inputClass =
 
 export default function LeadershipRow({
   leader,
-  members,
-  schools,
 }: {
   leader: LeaderRowItem;
-  members: DBMember[];
-  schools: School[];
 }) {
   const [editing, setEditing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -53,8 +48,6 @@ export default function LeadershipRow({
     setEditing(false);
     setTimeout(() => editBtnRef.current?.focus(), 0);
   };
-
-  const schoolMap = new Map(schools.map((s) => [s.id, s.name]));
 
   const termId = leader.termId || leader.id;
   const deleteAction = deleteLeader.bind(null, termId, leader.year);
@@ -229,28 +222,6 @@ export default function LeadershipRow({
                       className={inputClass}
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Associated League Member
-                  </label>
-                  <select
-                    name="memberId"
-                    className={inputClass}
-                    defaultValue={leader.memberId ?? ''}
-                  >
-                    <option value="">None (Custom Profile)</option>
-                    {members.map((m) => {
-                      const schoolName = schoolMap.get(m.schoolId) || 'Unknown School';
-                      const gradSuffix = m.graduationYear ? ` '${m.graduationYear.toString().slice(-2)}` : '';
-                      return (
-                        <option key={m.id} value={m.id}>
-                          {m.firstName} {m.lastName} ({schoolName}{gradSuffix})
-                        </option>
-                      );
-                    })}
-                  </select>
                 </div>
 
                 <div>

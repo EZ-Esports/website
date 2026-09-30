@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as schema from '../schema';
-import { classifyRole } from '@/db/backfill-leadership';
+import { classifyRole } from '@/app/lib/leadership';
 
 describe('Leadership Architecture & Schema Normalization', () => {
   describe('Schema Definitions', () => {
