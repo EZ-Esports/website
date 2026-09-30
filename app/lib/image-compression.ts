@@ -1,4 +1,4 @@
-import { MAX_IMAGE_DIMENSION } from './storage';
+import { MAX_IMAGE_DIMENSION } from './storage-constants';
 
 export interface CompressionOptions {
   /**

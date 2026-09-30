@@ -6,7 +6,13 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
-    exclude: [...configDefaults.exclude, '.gemini/**', '.claude/**'],
+    exclude: [
+      ...configDefaults.exclude,
+      '.gemini/**',
+      '.claude/**',
+      '.gemini/worktrees/**',
+      '.claude/worktrees/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
@@ -17,6 +23,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      'server-only': path.resolve(__dirname, './node_modules/server-only/empty.js'),
     },
   },
 });

@@ -48,6 +48,80 @@ const eslintConfig = defineConfig([
         }]
       }]
     }
+  },
+  // Disallow client components from importing server-only database, schema, or service modules.
+  {
+    plugins: {
+      "client-boundary": {
+        rules: {
+          "no-server-imports-in-client": {
+            meta: {
+              type: "problem",
+              docs: {
+                description: "Disallow client components from importing server-only database, schema, or service modules.",
+              },
+              messages: {
+                noServerImport:
+                  "Client components ('use client') must not import server/database module '{{source}}'. Move database operations to Server Components, Route Handlers, or Server Actions.",
+              },
+              schema: [],
+            },
+            create(context) {
+              let isClient = false;
+              return {
+                Program(node) {
+                  if (
+                    node.body &&
+                    node.body.some(
+                      (stmt) =>
+                        stmt.type === "ExpressionStatement" &&
+                        stmt.expression?.type === "Literal" &&
+                        stmt.expression?.value === "use client"
+                    )
+                  ) {
+                    isClient = true;
+                    return;
+                  }
+                  const text = context.sourceCode.getText();
+                  const leading = text.slice(0, 1024).replace(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g, "").trim();
+                  if (leading.startsWith('"use client"') || leading.startsWith("'use client'")) {
+                    isClient = true;
+                  }
+                },
+                ImportDeclaration(node) {
+                  if (!isClient) return;
+                  const source = node.source.value;
+                  if (typeof source !== "string") return;
+
+                  const isRestricted =
+                    source === "@/app/lib/db" ||
+                    source === "@/app/lib/db/index" ||
+                    source === "@/app/lib/db/schema" ||
+                    source === "@/app/lib/db/queries" ||
+                    source === "@/app/lib/supabase/service" ||
+                    source.startsWith("@/app/lib/db/schema") ||
+                    source.startsWith("@/app/lib/db/queries") ||
+                    source.startsWith("@/app/lib/supabase/service") ||
+                    /(?:^|[\\/])(?:app[\\/]lib[\\/])?db(?:[\\/](?:index|schema|queries))?$/.test(source) ||
+                    /(?:^|[\\/])(?:app[\\/]lib[\\/])?supabase[\\/]service$/.test(source);
+
+                  if (isRestricted) {
+                    context.report({
+                      node,
+                      messageId: "noServerImport",
+                      data: { source },
+                    });
+                  }
+                },
+              };
+            },
+          },
+        },
+      },
+    },
+    rules: {
+      "client-boundary/no-server-imports-in-client": "error",
+    },
   }
 ]);
 

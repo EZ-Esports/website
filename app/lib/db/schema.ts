@@ -1,3 +1,4 @@
+import 'server-only';
 import { pgTable, pgView, uuid, text, timestamp, integer, boolean, index, pgEnum, uniqueIndex, bigint, primaryKey, real, check, jsonb } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { SchoolApplicationDetails } from '@/app/lib/school-application-form';

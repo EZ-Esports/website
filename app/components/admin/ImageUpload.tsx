@@ -8,7 +8,7 @@ import {
   MAX_IMAGE_DIMENSION,
   ALLOWED_MIME_TYPES,
   type UploadSection,
-} from '@/app/lib/storage';
+} from '@/app/lib/storage-constants';
 import { compressImage } from '@/app/lib/image-compression';
 
 interface ImageUploadProps {
