@@ -8,6 +8,7 @@
  */
 import { getMatchesPage } from './db/queries';
 import {
+  COMBINED_DIVISION,
   DIVISIONS,
   toMatchesPageDto,
   type MatchCursor,
@@ -49,12 +50,16 @@ export async function fetchMatchesPage(request: MatchPageRequest): Promise<Match
       ? request.cursor
       : null;
 
+  const validDivision =
+    request.division === COMBINED_DIVISION ||
+    (request.division && ['A', 'B', ...DIVISIONS].includes(request.division))
+      ? request.division
+      : undefined;
+
   const page = await getMatchesPage({
     gameId: uuidOrUndefined(request.gameId),
     seasonId: uuidOrUndefined(request.seasonId),
-    division: (DIVISIONS as readonly string[]).includes(request.division ?? '')
-      ? request.division
-      : undefined,
+    division: validDivision,
     status: (schema.matchStatusEnum.enumValues as readonly string[]).includes(request.status ?? '')
       ? (request.status as MatchStatus)
       : undefined,

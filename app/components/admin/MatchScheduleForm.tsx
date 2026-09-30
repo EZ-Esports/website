@@ -20,6 +20,7 @@ interface Team {
   id: string;
   name: string;
   gameId: string;
+  seasonId?: string;
 }
 
 interface Game {
@@ -70,19 +71,15 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
 
   const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
   const gameMap = useMemo(() => new Map(games.map(g => [g.id, g])), [games]);
-  const seasonMap = useMemo(() => new Map(seasons.map(s => [s.id, s])), [seasons]);
 
-  const selectedSeason = seasonMap.get(selectedSeasonId);
-  const selectedGameId = selectedSeason?.gameId;
-
-  // Filter rosters based on the selected season's game
+  // Filter rosters based on the selected season
   const filteredRosters = useMemo(() => {
-    if (!selectedGameId) return rosters;
+    if (!selectedSeasonId) return rosters;
     return rosters.filter(r => {
       const team = teamMap.get(r.teamId);
-      return team?.gameId === selectedGameId;
+      return team?.seasonId === selectedSeasonId;
     });
-  }, [rosters, selectedGameId, teamMap]);
+  }, [rosters, selectedSeasonId, teamMap]);
 
   const inputClass = "w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent/50 transition-all";
 

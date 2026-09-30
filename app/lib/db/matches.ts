@@ -22,6 +22,7 @@ import {
 } from 'drizzle-orm';
 import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
+  COMBINED_DIVISION,
   canonicalDivision,
   clampPageLimit,
   normalizeSort,
@@ -68,14 +69,22 @@ const awaySchool = alias(schema.schools, 'away_school');
  * the previous page. Fetches one extra row to detect whether more remain.
  * Uncached: filter permutations are unbounded and admin edits must be fresh.
  */
-export async function getMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+export function buildMatchesPageQuery(params: MatchesPageParams) {
   const sort = normalizeSort(params.sort);
   const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
 
   const conditions = [];
   if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
-  if (params.division) conditions.push(eq(homeRoster.division, params.division));
+  if (params.division && params.division !== COMBINED_DIVISION) {
+    const targetDiv = canonicalDivision(params.division);
+    conditions.push(
+      or(
+        eq(canonicalDivisionSql(homeRoster.division), targetDiv),
+        eq(canonicalDivisionSql(awayRoster.division), targetDiv)
+      )
+    );
+  }
   if (params.status) conditions.push(eq(schema.matches.status, params.status));
   if (params.from) conditions.push(gte(schema.matches.scheduledAt, params.from));
   if (params.to) conditions.push(lte(schema.matches.scheduledAt, params.to));
@@ -100,7 +109,7 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
   }
 
   const direction = sort === 'desc' ? desc : asc;
-  const rows = await db
+  return db
     .select({
       id: schema.matches.id,
       seasonId: schema.matches.seasonId,
@@ -108,7 +117,7 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
       status: schema.matches.status,
       homeScore: schema.matches.homeScore,
       awayScore: schema.matches.awayScore,
-      division: homeRoster.division,
+      division: canonicalDivisionSql(homeRoster.division),
       homeTeam: homeSchool.name,
       awayTeam: awaySchool.name,
     })
@@ -123,6 +132,11 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(direction(schema.matches.scheduledAt), direction(schema.matches.id))
     .limit(limit + 1);
+}
+
+export async function getMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+  const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
+  const rows = await buildMatchesPageQuery({ ...params, limit });
 
   const items = rows.slice(0, limit);
   const last = items[items.length - 1];
@@ -135,13 +149,17 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
   };
 }
 
-/**
- * All matches of a season (optionally one division) with names joined in,
- * oldest first. Used by the calendar view, which needs the whole season.
- */
-export async function getSeasonMatches(seasonId: string, division?: string) {
+export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
   const conditions = [eq(schema.matches.seasonId, seasonId)];
-  if (division) conditions.push(eq(homeRoster.division, division));
+  if (division && division !== COMBINED_DIVISION) {
+    const targetDiv = canonicalDivision(division);
+    conditions.push(
+      or(
+        eq(canonicalDivisionSql(homeRoster.division), targetDiv),
+        eq(canonicalDivisionSql(awayRoster.division), targetDiv)
+      )!
+    );
+  }
   return db
     .select({
       id: schema.matches.id,
@@ -150,7 +168,7 @@ export async function getSeasonMatches(seasonId: string, division?: string) {
       status: schema.matches.status,
       homeScore: schema.matches.homeScore,
       awayScore: schema.matches.awayScore,
-      division: homeRoster.division,
+      division: canonicalDivisionSql(homeRoster.division),
       homeTeam: homeSchool.name,
       awayTeam: awaySchool.name,
     })
@@ -163,6 +181,14 @@ export async function getSeasonMatches(seasonId: string, division?: string) {
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(and(...conditions))
     .orderBy(asc(schema.matches.scheduledAt), asc(schema.matches.id));
+}
+
+/**
+ * All matches of a season (optionally one division) with names joined in,
+ * oldest first. Used by the calendar view, which needs the whole season.
+ */
+export async function getSeasonMatches(seasonId: string, division?: string) {
+  return buildSeasonMatchesQuery(seasonId, division);
 }
 
 /** Count of all scheduled matches (for dashboard). */
