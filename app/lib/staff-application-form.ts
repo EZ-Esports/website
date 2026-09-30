@@ -1,6 +1,17 @@
 export const GAME_REGULATIONS_ROLE = 'Game Regulations Division';
 
 /**
+ * The role label doubles as the stored value, so applications submitted before
+ * this rename still hold the bare 'Productions Crew' and render verbatim.
+ */
+export const PRODUCTIONS_CREW_ROLE = 'Productions Crew: Observer, shoutcaster, and/or graphics producer';
+
+/** Free-text cap for the optional "Referred by" name on the application. */
+export const REFERRAL_FIELD_MAX_LENGTH = 50;
+
+export const REFERRAL_FIELD_TOO_LONG_ERROR = `Must be ${REFERRAL_FIELD_MAX_LENGTH} characters or fewer.`;
+
+/**
  * Selectable "Primary Role of Interest" choices, in display order. Stored as-is
  * in `staff_applications.role` (a free-text column), so rows submitted before
  * a list change still hold old values (e.g. "Community Moderator",
@@ -13,9 +24,9 @@ export const STAFF_ROLES = [
   'Marketing Division',
   'Operations Division',
   'Development Division',
-  'Productions Crew',
   'Legal Division',
   GAME_REGULATIONS_ROLE,
+  PRODUCTIONS_CREW_ROLE,
 ] as const;
 
 export type StaffRole = (typeof STAFF_ROLES)[number];
@@ -63,6 +74,8 @@ export interface StaffApplicationFormData {
   linkedin: string;
   // Optional free text: links to GitHub, a portfolio, designs, etc.
   workSamples: string;
+  // Optional name of the current staff member who referred the applicant.
+  referredBy: string;
   availability: string;
   // Split from a single `agreedRules` checkbox into two independently-required
   // consents (issue #107) so an applicant explicitly agrees to each legal
@@ -154,6 +167,8 @@ export interface StaffApplicationDetailsV3 {
 export interface StaffApplicationDetailsV4 extends Omit<StaffApplicationDetailsV3, 'version'> {
   version: 4;
   gameDirector: string;
+  // Additive and optional (absent on rows saved before the referral field).
+  referredBy?: string;
 }
 
 export type StaffApplicationDetails =
@@ -237,6 +252,7 @@ export function buildStaffApplicationDetails(form: StaffApplicationFormData): St
     discordTag: form.discordTag.trim(),
     linkedin: form.linkedin.trim(),
     workSamples: form.workSamples.trim(),
+    referredBy: form.referredBy.trim(),
     availability: form.availability,
     consent: {
       agreedToTerms: !!form.agreedToTerms,
@@ -293,6 +309,11 @@ export function parseStaffApplicationDetails(raw: unknown, role: string): Parsed
     return { ok: false, error: `Other links must be ${WORK_SAMPLES_MAX_LENGTH} characters or fewer.` };
   }
 
+  const referredBy = asString(d.referredBy).trim();
+  if (referredBy.length > REFERRAL_FIELD_MAX_LENGTH) {
+    return { ok: false, error: `Referred by must be ${REFERRAL_FIELD_MAX_LENGTH} characters or fewer.` };
+  }
+
   const backgroundMotivationRaw = asString(d.backgroundMotivation);
   const whyJoinError = checkWhyJoinAnswer(backgroundMotivationRaw);
   if (whyJoinError) return { ok: false, error: whyJoinError };
@@ -307,6 +328,7 @@ export function parseStaffApplicationDetails(raw: unknown, role: string): Parsed
       discordTag: asString(d.discordTag).trim(),
       linkedin,
       workSamples,
+      referredBy,
       availability: asString(d.availability),
       consent: { agreedToTerms: true, agreedToPrivacy: true, acknowledgedUnpaidVolunteer: true },
       backgroundMotivation,
@@ -373,7 +395,11 @@ function formatStaffApplicationDetailsV2(d: StaffApplicationDetailsV2): { label:
 function formatStaffApplicationDetailsV4(d: StaffApplicationDetailsV4): { label: string; value: string }[] {
   const rows = formatStaffApplicationDetailsV3({ ...d, version: 3 });
   // Plain text: admin renders it as a text node and the CSV writer escapes it.
-  return d.gameDirector ? [{ label: 'Game Director Interest', value: d.gameDirector }, ...rows] : rows;
+  const extra = [
+    ...(d.gameDirector ? [{ label: 'Game Director Interest', value: d.gameDirector }] : []),
+    ...(d.referredBy ? [{ label: 'Referred By', value: d.referredBy }] : []),
+  ];
+  return [...extra, ...rows];
 }
 
 function formatStaffApplicationDetailsV3(d: StaffApplicationDetailsV3): { label: string; value: string }[] {

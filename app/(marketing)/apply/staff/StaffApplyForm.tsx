@@ -20,6 +20,7 @@ import {
   STAFF_ROLES,
   UNPAID_VOLUNTEER_ACK_TEXT,
   WORK_SAMPLES_MAX_LENGTH,
+  REFERRAL_FIELD_MAX_LENGTH,
   EMAIL_RE,
 } from '@/app/lib/staff-application-form';
 import { checkResumeFile, formatBytes, RESUME_ACCEPT, RESUME_MAX_BYTES } from '@/app/lib/staff-resume';
@@ -37,6 +38,7 @@ const initialForm = {
   message: '', // Why you want to join
   linkedin: '', // Optional; linkedin.com links only
   workSamples: '', // Optional links to GitHub, portfolio, designs
+  referredBy: '', // Optional: current staff member who referred the applicant
   availability: '', // hours per week
   agreedToTerms: false,
   agreedToPrivacy: false,
@@ -502,7 +504,8 @@ export default function StaffApplyForm() {
             </aside>
 
             {/* Right column: sectioned form */}
-            <form onSubmit={handleSubmit} className="lg:col-span-8 space-y-6" noValidate>
+            <div className="lg:col-span-8 space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
 
               {/* Step 1: Your Information */}
               <div id="section-applicant" className={sectionCardClass}>
@@ -633,7 +636,7 @@ export default function StaffApplyForm() {
                           value={roleOption}
                           checked={form.role === roleOption}
                           onChange={() => handleSelectChange('role', roleOption)}
-                          className="w-4.5 h-4.5 accent-accent cursor-pointer"
+                          className="w-4.5 h-4.5 shrink-0 accent-accent cursor-pointer"
                           aria-describedby={roleOption === GAME_REGULATIONS_ROLE ? 'game-regulations-note' : undefined}
                         />
                         <span>{roleOption}</span>
@@ -771,6 +774,7 @@ export default function StaffApplyForm() {
                   />
                 </div>
 
+
                 {/* Weekly availability */}
                 <div
                   id="field-availability"
@@ -798,6 +802,27 @@ export default function StaffApplyForm() {
                   {fieldErrors.availability && (
                     <p id="availability-error" className="mt-2 text-xs text-danger font-semibold">{fieldErrors.availability}</p>
                   )}
+                </div>
+
+                {/* Referred by */}
+                <div id="field-referredBy" className={fieldWrapperClass('referredBy', false)}>
+                  <label htmlFor="referredBy" className={labelClass}>Referred by (optional)</label>
+                  <p id="referredBy-hint" className="text-xs text-foreground-secondary mb-2">
+                    If a current EZ Esports staff member referred you, enter their name. You still need to complete the full application.{' '}
+                    {characterLimitNotice(REFERRAL_FIELD_MAX_LENGTH)}
+                  </p>
+                  <input
+                    id="referredBy"
+                    name="referredBy"
+                    type="text"
+                    value={form.referredBy}
+                    onChange={handleTextChange}
+                    onFocus={() => setFocusedField('referredBy')}
+                    onBlur={() => setFocusedField(null)}
+                    maxLength={REFERRAL_FIELD_MAX_LENGTH}
+                    className={textInputClass(false)}
+                    aria-describedby="referredBy-hint"
+                  />
                 </div>
               </div>
 
@@ -950,6 +975,7 @@ export default function StaffApplyForm() {
                   <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
                     <Button
                       type="submit"
+                      variant="primary"
                       disabled={loading}
                       className="w-full sm:w-auto min-h-[46px] shadow-lg shadow-accent/5 hover:shadow-accent/20 hover:scale-[1.02] transition-all"
                     >
@@ -975,6 +1001,8 @@ export default function StaffApplyForm() {
                 </div>
               </div>
             </form>
+
+            </div>
           </div>
         )}
       </div>
