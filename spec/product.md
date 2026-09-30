@@ -26,6 +26,7 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 | `/{game}/varsity`, `/junior-varsity` | Bento hub (`c759fa3`, `GameHubView`). Division is a path segment (`0b6adf7`). |
 | `/{game}/standings`, `/schedule` | Current + archived competition. PR #184: explicit Eastern Time ("ET") labeling, America/New_York calendar month grid calculation, completed forfeit display, and draw score normalization. Combined LoL seasons (`standings_format`) render one table on both division routes (`0dde508`, `19acf7d`) with `SeasonFormatNotice`. Form-guide chips `9ce5ed9`. Season badge “Latest” `bbd58d9`. |
 | `/{game}/teams`, `/{game}/teams/[school]` | Filterable rosters (`6d4ce96`); school detail (`c2e86ee`). |
+| `/join/[schoolSlug]/[gameSlug]` | Player onboarding wizard. Validates single-use cryptographic token, checks email, connects Discord with auto-guild membership validation, verifies Riot ID (`Name#Tag`) with tracker preview, saves drafts, and collects student demographic survey into encrypted vault ([spec-011](spec-011-player-onboarding-and-manager-portal.md)). |
 
 Games in `app/lib/constants.ts`: Valorant, League of Legends, Teamfight Tactics (full archive/seasons), plus **osu!**, **Minecraft**, **TETR.IO** (slug `tetris`, display name `f04641b`). The last three have hubs only — no seasons, excluded from `getGamesForShowcase`, banners are placeholder `/images/hero-background.jpg`. Empty hubs are the same bento grid with a blank “This season” tile (`d047f99` removed the founding-season recruitment layout `c759fa3` had gated). `MigrationNotice` (`452073e`) still shows on competition pages.
 
@@ -74,6 +75,19 @@ Apply-form copy still names Clash Royale / Smash as organized leagues and says �
 
 ---
 
+---
+
+## School Manager Portal (`/portal`)
+
+Dedicated portal for vetted school managers and staff administrators ([spec-011](spec-011-player-onboarding-and-manager-portal.md)).
+- Multi-tenancy scoped by academic year and game assignments with admin override.
+- Cryptographically secure single-use player invite token generation (`player_invites`).
+- Zero-PII Approve / Reject queue (hides minor demographic PII, protecting `student_demographics` behind `Permissions.VIEW_STUDENT_DEMOGRAPHICS`).
+- Live 5-Point Eligibility Validation Gate (roster caps, single captain, 100% Riot verified, 100% Discord connected and present in guild).
+- Match-day emergency substitute swapper with atomic role exchange.
+
+---
+
 ## How the map grew
 
 1. **Dec 2025** — Marketing MVP. Per-game standings/schedule/teams/roster, news, about, leadership — all hardcoded (`32b804d`).
@@ -81,5 +95,7 @@ Apply-form copy still names Clash Royale / Smash as organized leagues and says �
 3. **Jul 2026** — Archives become a first-class product (standings snapshots, Command Deck, combined LoL tables). Token + RAC rewrite. Bento hub. Three extra games; recruitment layout added then removed. Staff apply. `soul.md` states the nonprofit frame. Bare `/{game}` becomes a 308 to varsity.
 4. **Aug 2026** — Teams UX (filters, school pages). Apply form matches the canonical Google Form and stores structured JSON. Leadership becomes people + terms. Gallery rewritten four times in ~two weeks, landing on the marquee. CTA language moves to interest-capture; SEO/nav labels lag.
 5. **Sep 2026** — Legal and security catch up to a site that already collected applications: `/rules`, footer IP disclaimers, headers (no CSP), markdown XSS hardening, youtube-nocookie.
+6. **Sep 2026 (late)** — Player Onboarding & School Manager Portal (`/portal`, `/join/[schoolSlug]/[gameSlug]`, `spec-011`). Replaces external Google Forms with authenticated single-use invite workflows, automated Discord/Riot verification, FERPA-compliant demographic isolation (`Permissions.VIEW_STUDENT_DEMOGRAPHICS`), and live roster eligibility gates.
 
 [`docs/QUICKSTART.md`](../docs/QUICKSTART.md) still describes `constants.ts` as the data source, a public `/[game]/roster` route, and a `[game]/page.tsx` hub. Use this file + `app/(marketing)` for the current map.
+
