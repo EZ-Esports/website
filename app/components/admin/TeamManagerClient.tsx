@@ -291,7 +291,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-lg flex justify-between items-center" role="alert">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-lg flex justify-between items-center" role="alert" aria-live="polite">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 cursor-pointer">
             <HiOutlineXMark className="w-5 h-5" />

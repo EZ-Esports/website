@@ -21,6 +21,7 @@ import {
   type StandingsFormat,
 } from './match-page';
 import { FORM_LENGTH, buildFormGuide, type FormOutcome } from '@/app/lib/game-hub-form';
+import type { ApplicationStatus } from '@/app/lib/application-status';
 
 /** Default page size for public-facing paginated lists. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -610,6 +611,64 @@ export const getCachedHomepageContent = unstable_cache(
   { tags: ['page-content'] }
 );
 
+/**
+ * Updates a page content block and appends a history entry atomically.
+ */
+export async function savePageContentWithHistory(id: string, content: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ content: schema.pageContent.content, key: schema.pageContent.key })
+      .from(schema.pageContent)
+      .where(eq(schema.pageContent.id, id))
+      .limit(1);
+
+    if (current) {
+      await tx.insert(schema.pageContentHistory).values({
+        contentKey: current.key,
+        previousContent: current.content,
+      });
+    }
+
+    await tx.update(schema.pageContent).set({ content }).where(eq(schema.pageContent.id, id));
+  });
+}
+
+/**
+ * Restores a page content block from a history entry atomically.
+ */
+export async function restorePageContentFromHistory(id: string, historyId: string): Promise<void> {
+  const [entry] = await db
+    .select()
+    .from(schema.pageContentHistory)
+    .where(eq(schema.pageContentHistory.id, historyId))
+    .limit(1);
+
+  if (!entry) throw new Error('History entry not found.');
+
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ content: schema.pageContent.content, key: schema.pageContent.key })
+      .from(schema.pageContent)
+      .where(eq(schema.pageContent.id, id))
+      .limit(1);
+
+    if (!current) throw new Error('Content block not found.');
+    if (current.key !== entry.contentKey) {
+      throw new Error('History entry does not belong to this content block.');
+    }
+
+    await tx.insert(schema.pageContentHistory).values({
+      contentKey: current.key,
+      previousContent: current.content,
+    });
+
+    await tx
+      .update(schema.pageContent)
+      .set({ content: entry.previousContent })
+      .where(eq(schema.pageContent.id, id));
+  });
+}
+
 export const getCachedHomepageGallery = unstable_cache(
   async () => {
     const rows = await db
@@ -658,7 +717,7 @@ export const getCachedHomepageGallery = unstable_cache(
   { tags: ['gallery-images'] }
 );
 
-export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
+export type { ApplicationStatus };
 
 /** Subquery resolving the latest status log for each application */
 function getLatestStatusLogSubquery(type: 'school' | 'staff') {
@@ -771,6 +830,102 @@ export function buildStaffResumeKeyQuery(applicationId: string) {
 export async function getStaffResumeStorageKey(applicationId: string): Promise<string | null> {
   const [row] = await buildStaffResumeKeyQuery(applicationId);
   return row?.resumeStorageKey ?? null;
+}
+
+export interface ApplicationStatusRecord {
+  id: string;
+  isDeleted: boolean;
+  currentStatus: ApplicationStatus;
+}
+
+/**
+ * Retrieves the current status state of an application (school or staff)
+ * along with its deletion status, resolving the latest status log.
+ */
+export async function getApplicationStatusState(
+  id: string,
+  type: 'school' | 'staff'
+): Promise<ApplicationStatusRecord | null> {
+  const table = type === 'school' ? schema.schoolApplications : schema.staffApplications;
+  const [app] = await db
+    .select({ id: table.id, deletedAt: table.deletedAt })
+    .from(table)
+    .where(eq(table.id, id))
+    .limit(1);
+
+  if (!app) return null;
+
+  const [latestLog] = await db
+    .select({ status: schema.applicationStatusLogs.status })
+    .from(schema.applicationStatusLogs)
+    .where(
+      and(
+        eq(schema.applicationStatusLogs.applicationId, id),
+        eq(schema.applicationStatusLogs.applicationType, type)
+      )
+    )
+    .orderBy(desc(schema.applicationStatusLogs.createdAt), desc(schema.applicationStatusLogs.id))
+    .limit(1);
+
+  return {
+    id: app.id,
+    isDeleted: app.deletedAt !== null,
+    currentStatus: latestLog?.status ?? 'pending',
+  };
+}
+
+/**
+ * Records an application status transition log.
+ */
+export async function recordApplicationStatusChange(params: {
+  applicationId: string;
+  applicationType: 'school' | 'staff';
+  status: ApplicationStatus;
+  actorUserId: string;
+  actorEmail: string;
+  reason?: string | null;
+}) {
+  return db.insert(schema.applicationStatusLogs).values({
+    applicationId: params.applicationId,
+    applicationType: params.applicationType,
+    status: params.status,
+    actorUserId: params.actorUserId,
+    actorEmail: params.actorEmail,
+    reason: params.reason ?? null,
+  });
+}
+
+/**
+ * Soft deletes an application by marking deletedAt and deletedBy.
+ */
+export async function softDeleteApplicationRecord(
+  id: string,
+  type: 'school' | 'staff',
+  staffUserId: string
+) {
+  const table = type === 'school' ? schema.schoolApplications : schema.staffApplications;
+  return db
+    .update(table)
+    .set({
+      deletedAt: new Date(),
+      deletedBy: staffUserId,
+    })
+    .where(eq(table.id, id));
+}
+
+/**
+ * Soft deletes a leader term and any legacy leadership row.
+ */
+export async function softDeleteLeaderRecord(id: string, userId: string): Promise<void> {
+  await db
+    .update(schema.leadershipTerms)
+    .set({ deletedAt: new Date(), deletedBy: userId })
+    .where(eq(schema.leadershipTerms.id, id));
+
+  await db
+    .update(schema.leadership)
+    .set({ deletedAt: new Date(), deletedBy: userId })
+    .where(eq(schema.leadership.id, id));
 }
 
 /** Count of all scheduled matches (for dashboard). */

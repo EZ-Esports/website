@@ -113,7 +113,7 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
               <button type="button" onClick={closeEditing} className={cancelBtn}>Cancel</button>
             </div>
             {saveError && (
-              <p role="alert" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
+              <p role="alert" aria-live="polite" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
             )}
           </form>
         </td>
@@ -154,7 +154,7 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
           {sponsor.isActive ? 'Active' : 'Inactive'}
         </button>
         {toggleError && (
-          <p role="alert" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
+          <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
         )}
       </td>
       <td className="py-3 pr-4 text-foreground-secondary">{sponsor.displayOrder}</td>

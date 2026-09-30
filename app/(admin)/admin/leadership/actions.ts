@@ -9,6 +9,7 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { classifyRole } from '@/db/backfill-leadership';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
+import { softDeleteLeaderRecord } from '@/app/lib/db/queries';
 
 function revalidateLeadership(years: (string | undefined | null)[]) {
   updateTag('leadership');
@@ -253,24 +254,22 @@ export async function updateLeader(id: string, year: string, formData: FormData)
   return { success: true };
 }
 
-export async function deleteLeader(id: string, year: string) {
-  const user = await requirePermission(Permissions.MANAGE_LEADERSHIP);
+export async function deleteLeader(id: string, year: string): Promise<import('@/app/lib/result').ActionResult> {
+  let user;
+  try {
+    user = await requirePermission(Permissions.MANAGE_LEADERSHIP);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unauthorized' };
+  }
 
   try {
-    // 1. Try deleting leadership_terms
-    await db
-      .update(schema.leadershipTerms)
-      .set({ deletedAt: new Date(), deletedBy: user.id })
-      .where(eq(schema.leadershipTerms.id, id));
-
-    // 2. Also soft-delete in legacy leadership if present
-    await db
-      .update(schema.leadership)
-      .set({ deletedAt: new Date(), deletedBy: user.id })
-      .where(eq(schema.leadership.id, id));
+    await softDeleteLeaderRecord(id, user.id);
   } catch (error) {
     console.error('Failed to delete leader', error);
+    return { success: false, error: sanitizeDbError(error) };
   }
 
   revalidateLeadership([year]);
+  return { success: true };
 }
+

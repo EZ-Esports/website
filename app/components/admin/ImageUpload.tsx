@@ -311,7 +311,7 @@ export default function ImageUpload({
 
       {/* Error Message */}
       {error && (
-        <div role="alert" className="text-xs text-red-400 font-medium pt-0.5">
+        <div role="alert" aria-live="polite" className="text-xs text-red-400 font-medium pt-0.5">
           {error}
         </div>
       )}

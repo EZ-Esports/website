@@ -5,8 +5,9 @@ import { updateApplicationStatus, softDeleteSchoolApplication } from "@/app/(adm
 import ConfirmDeleteButton from "@/app/components/admin/ConfirmDeleteButton";
 import ApplicationDetailModal from "@/app/components/admin/ApplicationDetailModal";
 import type { SchoolApplicationDetails } from "@/app/lib/school-application-form";
+import { ApplicationStatus, isValidStatusTransition } from "@/app/lib/application-status";
 
-type Status = "pending" | "accepted" | "rejected";
+type Status = ApplicationStatus;
 type StatusFilter = "all" | Status;
 
 export interface Application {
@@ -23,6 +24,7 @@ export interface Application {
 
 const activeBadgeClass: Record<Status, string> = {
   pending: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+  reviewed: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
   accepted: "bg-green-500/10 text-green-400 border border-green-500/20",
   rejected: "bg-red-500/10 text-red-400 border border-red-500/20",
 };
@@ -45,25 +47,43 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
     setActionError(null);
     startTransition(async () => {
       try {
-        await updateApplicationStatus(app.id, s);
+        const res = await updateApplicationStatus(app.id, s);
+        if (res && !res.success) {
+          setStatus(prev);
+          setActionError(res.error || "Failed to update status. Please try again.");
+          return;
+        }
         if (activeFilter !== "all" && s !== activeFilter) setRemoved(true);
-      } catch {
+      } catch (err) {
         setStatus(prev);
-        setActionError("Failed to update status. Please try again.");
+        setActionError(err instanceof Error ? err.message : "Failed to update status. Please try again.");
       }
     });
   };
 
   const handleDelete = async () => {
     setActionError(null);
-    startTransition(async () => {
-      try {
-        await softDeleteSchoolApplication(app.id);
-        setRemoved(true);
-      } catch {
-        setActionError("Failed to delete application. Please try again.");
-      }
+    let result;
+    await new Promise<void>((resolve) => {
+      startTransition(async () => {
+        try {
+          const res = await softDeleteSchoolApplication(app.id);
+          result = res;
+          if (res && !res.success) {
+            setActionError(res.error || "Failed to delete application. Please try again.");
+          } else {
+            setRemoved(true);
+          }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : "Failed to delete application. Please try again.";
+          setActionError(errMsg);
+          result = { success: false, error: errMsg };
+        } finally {
+          resolve();
+        }
+      });
     });
+    return result;
   };
 
   return (
@@ -97,21 +117,32 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
         </td>
         <td className="py-3 pr-4">
           <div className="flex gap-1 items-center">
-            {(["pending", "accepted", "rejected"] as const).map((s) => (
-              <button
-                key={s}
-                disabled={isPending || status === s}
-                onClick={() => handleStatusChange(s)}
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-default ${
-                  status === s
-                    ? activeBadgeClass[s]
-                    : "bg-line/50 text-foreground-muted border border-line hover:bg-line/50"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-            {actionError && <span className="text-[10px] text-red-400 ml-1">{actionError}</span>}
+            {(["pending", "reviewed", "accepted", "rejected"] as const).map((s) => {
+              const isCurrent = status === s;
+              const canTransition = isCurrent || isValidStatusTransition(status, s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={isPending || isCurrent || !canTransition}
+                  onClick={() => handleStatusChange(s)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize transition-all cursor-pointer disabled:cursor-not-allowed ${
+                    isCurrent
+                      ? activeBadgeClass[s]
+                      : canTransition
+                      ? "bg-line/50 text-foreground-muted border border-line hover:bg-line/50"
+                      : "bg-line/20 text-foreground-muted/40 border border-line/30"
+                  }`}
+                >
+                  {s}
+                </button>
+              );
+            })}
+            {actionError && (
+              <span role="alert" aria-live="polite" className="text-[10px] text-red-400 ml-1 font-semibold">
+                {actionError}
+              </span>
+            )}
           </div>
         </td>
         <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">
