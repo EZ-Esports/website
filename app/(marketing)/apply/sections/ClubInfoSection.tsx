@@ -429,6 +429,7 @@ export default function ClubInfoSection({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             type="submit"
+            variant="primary"
             disabled={loading}
             className="w-full sm:w-auto min-h-[46px] shadow-lg shadow-accent/5 hover:shadow-accent/20 hover:scale-[1.02] transition-all"
           >
