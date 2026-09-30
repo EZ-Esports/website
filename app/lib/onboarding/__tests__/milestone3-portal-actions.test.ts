@@ -398,8 +398,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
   });
 
   describe('1. Secure Token Generation & Expiration', () => {
-    it('generates a 64-character (32-byte) hex token with an exact SHA-256 match', () => {
-      const { token, tokenHash } = generateInviteToken();
+    it('generates a 64-character (32-byte) hex token with an exact SHA-256 match', async () => {
+      const { token, tokenHash } = await generateInviteToken();
 
       expect(token).toHaveLength(64);
       expect(/^[0-9a-f]{64}$/.test(token)).toBe(true);
@@ -408,10 +408,10 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(tokenHash).toBe(computedHash);
     });
 
-    it('generates cryptographically unique tokens across successive calls', () => {
+    it('generates cryptographically unique tokens across successive calls', async () => {
       const tokens = new Set();
       for (let i = 0; i < 50; i++) {
-        const { token } = generateInviteToken();
+        const { token } = await generateInviteToken();
         tokens.add(token);
       }
       expect(tokens.size).toBe(50);

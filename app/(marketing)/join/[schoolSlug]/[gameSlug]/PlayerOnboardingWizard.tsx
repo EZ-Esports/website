@@ -690,7 +690,7 @@ export default function PlayerOnboardingWizard({
                   </span>
                 ) : (
                   <span className="text-foreground-muted">
-                    Format: 3-16 character name + '#' + 3-5 alphanumeric tagline (e.g. Player#NA1)
+                    Format: 3-16 character name + &#39;#&#39; + 3-5 alphanumeric tagline (e.g. Player#NA1)
                   </span>
                 )}
               </div>

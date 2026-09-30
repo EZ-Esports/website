@@ -27,7 +27,7 @@ export interface CreatePlayerInviteResult {
 /**
  * Utility to generate a cryptographic single-use invite token and its SHA-256 hash.
  */
-export function generateInviteToken(): { token: string; tokenHash: string } {
+export async function generateInviteToken(): Promise<{ token: string; tokenHash: string }> {
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   return { token, tokenHash };
@@ -51,7 +51,7 @@ export async function createPlayerInvite(
 
   const context = await assertManagerForSchool(schoolId, gameId);
 
-  const { token, tokenHash } = generateInviteToken();
+  const { token, tokenHash } = await generateInviteToken();
   const days = expiresInDays && expiresInDays > 0 ? expiresInDays : 7;
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 

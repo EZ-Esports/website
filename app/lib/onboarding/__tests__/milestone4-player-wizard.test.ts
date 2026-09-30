@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'node:crypto';
 import * as schema from '@/app/lib/db/schema';
-import { Permissions, hasPermission } from '@/app/lib/roles';
+import { Permissions } from '@/app/lib/roles';
 import { ForbiddenPiiAccessError } from '@/app/lib/db/queries';
 
 // --- HOISTED MOCKS ---

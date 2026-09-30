@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as schema from '@/app/lib/db/schema';
-import { Permissions, hasPermission } from '@/app/lib/roles';
+import { Permissions } from '@/app/lib/roles';
 import {
   getStudentDemographics,
   ForbiddenPiiAccessError,
@@ -136,7 +136,7 @@ const mocks = vi.hoisted(() => {
   }
 
   const mockDb = {
-    select: vi.fn((fields?: any) => {
+    select: vi.fn((_fields?: any) => {
       let currentTable: any = null;
       let joinTable: any = null;
       let whereClause: any = null;
@@ -147,7 +147,7 @@ const mocks = vi.hoisted(() => {
           currentTable = tbl;
           return builder;
         }),
-        leftJoin: vi.fn((tbl: any, onCondition: any) => {
+        leftJoin: vi.fn((tbl: any, _onCondition: any) => {
           isJoin = true;
           joinTable = tbl;
           return builder;
