@@ -193,10 +193,10 @@ export default function ApplicationDetailModal({ app, isOpen, onOpenChange }: Ap
       isDismissable
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
     >
-      <Modal className="contents">
+      <Modal className="w-full max-w-2xl outline-none">
         <Dialog
           aria-label={`Application details for ${app.applicantName}`}
-          className="bg-surface-sunken border border-line rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none flex flex-col"
+          className="bg-surface-sunken border border-line rounded-2xl w-full max-h-[90vh] overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none flex flex-col"
         >
           <div className="bg-gradient-to-r from-accent/15 to-transparent border-b border-line px-6 py-5 flex items-start justify-between gap-4 shrink-0">
             <div className="min-w-0">

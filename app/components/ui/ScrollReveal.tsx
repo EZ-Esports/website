@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { ReactNode } from 'react';
 import { usePrefersReducedMotion } from '@/app/lib/hooks/usePrefersReducedMotion';
+import { EASE_REVEAL, DUR } from '@/app/lib/motion';
 
 interface ScrollRevealProps {
   children: ReactNode;
@@ -30,9 +31,9 @@ export default function ScrollReveal({
       y: 0,
       x: 0,
       transition: {
-        duration: prefersReducedMotion ? 0 : 0.8,
+        duration: prefersReducedMotion ? 0 : DUR.slow,
         delay: prefersReducedMotion ? 0 : delay,
-        ease: [0.21, 0.47, 0.32, 0.98] as any // Apple-style cubic bezier
+        ease: EASE_REVEAL as any
       }
     }
   };

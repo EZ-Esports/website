@@ -34,12 +34,12 @@ interface ModalProps extends Omit<ModalOverlayProps, 'className'> {
 
 /** Content box rendered inside an Overlay. Bring your own sizing/surface classes. */
 export function Modal({ className, ...props }: ModalProps) {
-  return <RACModal className={className} {...props} />;
+  // Never allow `contents` which strips RAC Modal layout and scroll-lock behavior
+  const safeClassName = className?.replace(/\bcontents\b/g, '').trim() || undefined;
+  return <RACModal className={safeClassName} {...props} />;
 }
 
-interface DialogBoxProps extends Omit<DialogProps, 'className'> {
-  className?: string;
-}
+type DialogBoxProps = DialogProps & Omit<React.HTMLAttributes<HTMLElement>, keyof DialogProps>;
 
 /** Dialog box. Renders with role="dialog" by default; pass role="alertdialog" for
  *  prompts that require an explicit user response (e.g. confirm-before-delete). */

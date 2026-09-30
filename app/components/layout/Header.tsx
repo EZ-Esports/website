@@ -3,10 +3,10 @@
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { FocusScope } from 'react-aria';
-import { Dialog, Button, Link as AriaLink } from 'react-aria-components';
+import { Button, Link as AriaLink } from 'react-aria-components';
 import { SITE_CONFIG, ROUTES } from '@/app/lib/constants';
 import CutCTA from '@/app/components/ui/CutCTA';
+import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
 
@@ -108,14 +108,34 @@ export default function Header() {
           </Button>
         </div>
 
-        {/* Mobile Navigation Drawer. React Aria's FocusScope traps Tab within the panel and restores focus on close. */}
-        <FocusScope contain={isOpen} restoreFocus={true}>
-          {isOpen && (
-            <Dialog aria-label="Mobile navigation" className="outline-none">
+        {/* Mobile Navigation Drawer: Routed through overlay primitives for focus trapping, scroll locking, Escape-to-close, and outside-click dismissal. */}
+        <Overlay
+          isOpen={isOpen}
+          onOpenChange={setIsOpen}
+          isDismissable
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden flex flex-col justify-start"
+        >
+          <Modal className="w-full outline-none">
+            <Dialog aria-label="Mobile navigation" className="outline-none w-full">
               <div
                 id="mobile-nav"
-                className="md:hidden py-4 border-t border-line/40 rounded-b-xl px-4 bg-surface-raised/95 backdrop-blur-md"
+                className="py-4 border-b border-line/40 rounded-b-2xl px-6 bg-[#111111]/98 backdrop-blur-xl shadow-2xl"
               >
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-line/30">
+                  <span className="text-xs font-black uppercase tracking-widest text-foreground-secondary">
+                    Menu
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCloseMenu}
+                    aria-label="Close navigation menu"
+                    className="p-1.5 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/90 hover:text-accent cursor-pointer transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
                 <Navigation onNavigate={handleCloseMenu} />
                 <div className="mt-4 pt-4 border-t border-line/30">
                   <CutCTA
@@ -129,8 +149,8 @@ export default function Header() {
                 </div>
               </div>
             </Dialog>
-          )}
-        </FocusScope>
+          </Modal>
+        </Overlay>
       </nav>
       <GameSubHeader />
     </header>

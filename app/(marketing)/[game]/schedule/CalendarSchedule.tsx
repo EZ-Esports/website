@@ -216,13 +216,19 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
             return (
               <div
                 key={index}
-                onClick={() => cell.isCurrentMonth && setSelectedDateYmd(isSelected ? null : cell.ymd)}
-                className={`min-h-[55px] md:min-h-[110px] rounded-xl border p-1 md:p-2.5 flex flex-col justify-between transition-all duration-300 relative select-none ${
-                  cell.isCurrentMonth ? 'cursor-pointer' : ''
-                } ${borderClass} ${bgClass}`}
+                className={`min-h-[55px] md:min-h-[110px] rounded-xl border p-1 md:p-2.5 flex flex-col justify-between transition-all duration-300 relative select-none ${borderClass} ${bgClass}`}
               >
+                {cell.isCurrentMonth && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDateYmd(isSelected ? null : cell.ymd)}
+                    aria-label={`${isSelected ? 'Deselect' : 'Filter by'} ${cell.ymd}`}
+                    aria-pressed={isSelected}
+                    className="absolute inset-0 w-full h-full rounded-xl cursor-pointer z-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  />
+                )}
                 {/* Cell Header: Day Number */}
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start relative z-10 pointer-events-none">
                   {isToday && cell.isCurrentMonth && (
                     <span className="hidden md:inline-block text-[9px] font-black uppercase tracking-wider text-foreground-secondary bg-surface-raised border border-line/50 rounded px-1.5 py-0.5">
                       Today
@@ -242,7 +248,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                 </div>
 
                 {/* Cell Matches (Desktop View) */}
-                <div className="hidden md:flex flex-col gap-1 mt-1.5 overflow-hidden">
+                <div className="hidden md:flex flex-col gap-1 mt-1.5 overflow-hidden relative z-10">
                   {cellMatches.slice(0, 2).map((m) => {
                     const isLive = m.status === 'Live';
                     const isCompleted = m.status === 'Completed';
@@ -257,6 +263,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                     return (
                       <button
                         key={m.id}
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedMatch(m);
@@ -277,7 +284,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
 
                 {/* Cell Indicators (Mobile View - Dots instead of list tags) */}
                 {hasMatches && cell.isCurrentMonth && (
-                  <div className="md:hidden flex justify-center gap-1 mt-1">
+                  <div className="md:hidden flex justify-center gap-1 mt-1 relative z-10 pointer-events-none">
                     {cellMatches.slice(0, 3).map((m) => {
                       let dotColor = 'bg-accent shadow-[0_0_6px] shadow-accent/60';
                       if (m.status === 'Live') {
@@ -426,10 +433,10 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
         isDismissable
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
       >
-        <Modal className="contents">
+        <Modal className="w-full max-w-xl outline-none">
           <Dialog
             aria-label="Match details"
-            className="bg-surface-sunken border border-line rounded-2xl w-full max-w-xl overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none"
+            className="bg-surface-sunken border border-line rounded-2xl w-full overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none"
           >
             {selectedMatch && (
               <>

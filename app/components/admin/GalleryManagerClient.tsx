@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo, useTransition } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import GalleryImageCard from '@/app/components/admin/GalleryImageCard';
 import { updateGalleryImagesOrder } from '@/app/(admin)/admin/gallery/actions';
+import { usePrefersReducedMotion } from '@/app/lib/hooks/usePrefersReducedMotion';
 
 export interface GalleryImage {
   id: string;
@@ -81,7 +82,7 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
 
   const initialIds = useMemo(() => initialImages.map((img) => img.id), [initialImages]);
   const isDirty = isDraftDirty(initialIds, draftOrder);
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
 
   const displayImages = useMemo(
     () => deriveDisplayImages(initialImages, draftOrder),
