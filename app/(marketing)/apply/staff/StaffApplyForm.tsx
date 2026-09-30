@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Button as AriaButton, FieldError, FileTrigger, Label, Text, TextField } from 'react-aria-components';
 import Button from '@/app/components/ui/Button';
@@ -20,6 +20,7 @@ import {
   STAFF_ROLES,
   UNPAID_VOLUNTEER_ACK_TEXT,
   WORK_SAMPLES_MAX_LENGTH,
+  EMAIL_RE,
 } from '@/app/lib/staff-application-form';
 import { checkResumeFile, formatBytes, RESUME_ACCEPT, RESUME_MAX_BYTES } from '@/app/lib/staff-resume';
 
@@ -53,11 +54,10 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id'];
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export default function StaffApplyForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -137,6 +137,7 @@ export default function StaffApplyForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || loading) return;
     const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -149,6 +150,7 @@ export default function StaffApplyForm() {
       return;
     }
     setFieldErrors({});
+    isSubmittingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -181,6 +183,7 @@ export default function StaffApplyForm() {
           : 'Something went wrong. Please try again or email us at info@ezesports.org.',
       );
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
@@ -955,8 +958,12 @@ export default function StaffApplyForm() {
 
                     <button
                       type="button"
-                      onClick={resetForm}
-                      className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200"
+                      disabled={loading}
+                      onClick={() => {
+                        if (isSubmittingRef.current || loading) return;
+                        resetForm();
+                      }}
+                      className="text-xs text-foreground-muted hover:text-foreground hover:underline font-semibold focus:outline-none transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
                     >
                       Clear Form Response
                     </button>

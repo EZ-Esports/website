@@ -25,10 +25,11 @@ interface DetailFieldProps {
 }
 
 export function DetailField({ label, value }: DetailFieldProps) {
+  const displayValue = typeof value === "string" ? value || "—" : typeof value === "number" || typeof value === "boolean" ? String(value) : "—";
   return (
     <div>
       <dt className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">{label}</dt>
-      <dd className="text-sm text-foreground-secondary break-words">{value || "—"}</dd>
+      <dd className="text-sm text-foreground-secondary break-words">{displayValue}</dd>
     </div>
   );
 }

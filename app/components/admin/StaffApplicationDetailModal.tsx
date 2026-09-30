@@ -23,6 +23,10 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
   const csvContent = staffApplicationsToCsv([app]);
   const csvFilename = `staff-application-${app.name.toLowerCase().replace(/\s+/g, "-")}.csv`;
 
+  const preferredName =
+    app.preferredFirstName || (app.details as { preferredFirstName?: string } | null)?.preferredFirstName;
+  const discord = app.discordTag || (app.details as { discordTag?: string } | null)?.discordTag;
+
   return (
     <Overlay
       isOpen={isOpen}
@@ -39,14 +43,16 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
             <div className="min-w-0">
               <h4 className="text-lg font-black text-foreground uppercase tracking-tight truncate">
                 {app.name}
-                {app.preferredFirstName ? ` (goes by ${app.preferredFirstName})` : ""}
+                {preferredName ? ` (goes by ${preferredName})` : ""}
               </h4>
               <p className="text-sm text-foreground-secondary mt-0.5 truncate capitalize">{app.role}</p>
               <p className="text-xs text-foreground-muted mt-1">
                 <a href={`mailto:${app.email}`} className="hover:text-foreground transition-colors">
                   {app.email}
                 </a>
-                {" · " + app.phone + " · Submitted " + formatSubmittedDate(app.submittedAt) + " · "}
+                {" · " + app.phone}
+                {discord && <span>{" · Discord: " + discord}</span>}
+                {" · Submitted " + formatSubmittedDate(app.submittedAt) + " · "}
                 <span className="capitalize">{app.status}</span>
               </p>
             </div>
@@ -75,11 +81,18 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
               </a>
             )}
             {app.details ? (
-              <DetailSection title="Application Details">
-                {formatStaffApplicationDetails(app.details).map((row) => (
-                  <DetailField key={row.label} label={row.label} value={row.value} />
-                ))}
-              </DetailSection>
+              <>
+                <DetailSection title="Application Details">
+                  {formatStaffApplicationDetails(app.details).map((row) => (
+                    <DetailField key={row.label} label={row.label} value={row.value} />
+                  ))}
+                </DetailSection>
+                {!((app.details as { backgroundMotivation?: string; essay?: string }).backgroundMotivation || (app.details as { backgroundMotivation?: string; essay?: string }).essay) && app.message ? (
+                  <DetailSection title="Background & Motivation">
+                    <p className="text-sm text-foreground-secondary whitespace-pre-line sm:col-span-2">{app.message}</p>
+                  </DetailSection>
+                ) : null}
+              </>
             ) : app.message ? (
               <p className="text-sm text-foreground-secondary whitespace-pre-line">{app.message}</p>
             ) : (

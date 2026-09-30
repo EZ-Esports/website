@@ -74,13 +74,31 @@ export interface StaffApplicationFormData {
   acknowledgedUnpaidVolunteer: boolean;
 }
 
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function validateStaffApplicationForm(form: StaffApplicationFormData): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!form.name?.trim()) errors.name = 'Full name is required.';
+  if (!form.email?.trim()) errors.email = 'Email address is required.';
+  else if (!EMAIL_RE.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+  if (!form.phone?.trim()) errors.phone = 'Phone number is required.';
+  if (!form.role || !isStaffRole(form.role)) errors.role = 'Please select a primary role.';
+  if (!form.availability?.trim()) errors.availability = 'Please select your weekly availability.';
+  if (!form.message?.trim()) errors.message = 'Please provide details about your background and experience.';
+  if (!form.agreedToTerms) errors.agreedToTerms = 'You must agree to the Terms of Service.';
+  if (!form.agreedToPrivacy) errors.agreedToPrivacy = 'You must agree to the Privacy Policy.';
+  if (!form.acknowledgedUnpaidVolunteer) errors.acknowledgedUnpaidVolunteer = 'You must acknowledge that staff positions are volunteer, unpaid roles.';
+
+  return errors;
+}
+
 // See the SchoolApplicationDetails union in school-application-form.ts for why this
 // is versioned rather than a single fixed shape — a form redesign becomes a new
 // union member, not a migration of old rows.
 export interface StaffApplicationDetailsV1 {
   version: 1;
-  preferredFirstName: string;
-  discordTag: string;
+  preferredFirstName?: string;
+  discordTag?: string;
   linkedin: string;
   availability: string;
   agreedRules: boolean;
@@ -89,7 +107,8 @@ export interface StaffApplicationDetailsV1 {
   // DB `message` column/blob). Previously this answer only ever made it into
   // the compiled `message` blob; now that new submissions stop writing that
   // blob, it has to live in `details` or it would be silently lost.
-  backgroundMotivation: string;
+  backgroundMotivation?: string;
+  essay?: string;
 }
 
 // v2 (issue #107): the single `agreedRules` boolean became two
@@ -314,22 +333,41 @@ const agreed = (v: boolean | undefined) => (v ? 'Agreed' : 'Disagreed');
 // question that also invited portfolio and resume links, so the stored value
 // may not be a LinkedIn URL at all.
 function formatStaffApplicationDetailsV1(d: StaffApplicationDetailsV1): { label: string; value: string }[] {
-  return [
+  const rows: { label: string; value: string }[] = [];
+  if (d.preferredFirstName && d.preferredFirstName.trim()) {
+    rows.push({ label: 'Preferred First Name', value: d.preferredFirstName.trim() });
+  }
+  if (d.discordTag && d.discordTag.trim()) {
+    rows.push({ label: 'Discord', value: d.discordTag.trim() });
+  }
+  rows.push(
     { label: 'LinkedIn / Portfolio', value: d.linkedin || '—' },
     { label: 'Weekly Availability', value: d.availability || '—' },
     { label: 'Rules Agreement', value: d.agreedRules ? 'Agreed' : 'Disagreed' },
-    { label: 'Background & Motivation', value: d.backgroundMotivation || '—' },
-  ];
+  );
+  const essay = (d.backgroundMotivation || d.essay)?.trim();
+  if (essay !== undefined) {
+    rows.push({ label: 'Background & Motivation', value: essay || '—' });
+  }
+  return rows;
 }
 
 function formatStaffApplicationDetailsV2(d: StaffApplicationDetailsV2): { label: string; value: string }[] {
-  return [
+  const rows: { label: string; value: string }[] = [];
+  if (d.preferredFirstName && d.preferredFirstName.trim()) {
+    rows.push({ label: 'Preferred First Name', value: d.preferredFirstName.trim() });
+  }
+  if (d.discordTag && d.discordTag.trim()) {
+    rows.push({ label: 'Discord', value: d.discordTag.trim() });
+  }
+  rows.push(
     { label: 'LinkedIn / Portfolio', value: d.linkedin || '—' },
     { label: 'Weekly Availability', value: d.availability || '—' },
     { label: 'Terms of Service', value: agreed(d.consent?.agreedToTerms) },
     { label: 'Privacy Policy', value: agreed(d.consent?.agreedToPrivacy) },
     { label: 'Background & Motivation', value: d.backgroundMotivation || '—' },
-  ];
+  );
+  return rows;
 }
 
 function formatStaffApplicationDetailsV4(d: StaffApplicationDetailsV4): { label: string; value: string }[] {

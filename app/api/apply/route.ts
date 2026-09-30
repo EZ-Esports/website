@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { validateSchoolApplicationDetails } from '@/app/lib/school-application-form';
 import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
 
 // 5 submissions per IP per 10 minutes — generous enough for legitimate use,
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { applicantName, schoolName, role, email, details } = body;
+    const { applicantName, schoolName, role, email, details } = body ?? {};
 
     if (!applicantName || !schoolName || !role || !email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -30,12 +31,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    // Type-check school details on write so the modal cannot be crashed later
+    if (!validateSchoolApplicationDetails(details)) {
+      return NextResponse.json({ error: 'Invalid application details' }, { status: 400 });
+    }
+
     // Legal consent (issue #127) is the one gate that has to hold even though
     // the rest of the hand-rolled validation was reverted: `details` is
     // unauthenticated JSON, so every step here is optional-chained and
     // strictly `=== true` rather than truthy, since a missing/null `details`
     // or a non-boolean value must fail closed instead of throwing or passing.
-    const consent = details?.consent;
+    const consent = (details as { consent?: { agreedToRules?: boolean; agreedToTerms?: boolean; agreedToPrivacy?: boolean } } | null)?.consent;
     if (consent?.agreedToRules !== true || consent?.agreedToTerms !== true || consent?.agreedToPrivacy !== true) {
       return NextResponse.json(
         { error: 'You must agree to the league rules, Terms of Service, and Privacy Policy to submit an application.' },
@@ -44,11 +50,11 @@ export async function POST(request: NextRequest) {
     }
 
     await db.insert(schema.schoolApplications).values({
-      applicantName,
-      schoolName,
-      role,
-      email,
-      details: details && typeof details === 'object' && !Array.isArray(details) ? details : null,
+      applicantName: String(applicantName).trim(),
+      schoolName: String(schoolName).trim(),
+      role: String(role).trim(),
+      email: String(email).trim(),
+      details,
     });
 
     return NextResponse.json({ success: true }, { status: 201 });
