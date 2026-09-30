@@ -148,15 +148,15 @@ export default async function AboutPage() {
           </h2>
         </ScrollReveal>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <Card interactive className="text-center">
+          <Card className="text-center">
             <div className="text-4xl font-black text-accent mb-2">47%</div>
             <p className="text-foreground-secondary font-medium">First-generation college students</p>
           </Card>
-          <Card interactive className="text-center">
+          <Card className="text-center">
             <div className="text-4xl font-black text-accent mb-2">71%</div>
             <p className="text-foreground-secondary font-medium">Enrolled in Honors, IB, or AP courses</p>
           </Card>
-          <Card interactive className="text-center">
+          <Card className="text-center">
             <div className="text-4xl font-black text-accent mb-2">85%</div>
             <p className="text-foreground-secondary font-medium">Student-run operations (no paid staff)</p>
           </Card>

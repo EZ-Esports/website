@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ElementType, HTMLAttributes, ReactNode } from 'react';
 import { cx } from '@/app/lib/cx';
 
@@ -15,6 +16,7 @@ interface CardProps extends HTMLAttributes<HTMLElement> {
   interactive?: boolean;
   padding?: CardPadding;
   className?: string;
+  href?: string;
 }
 
 /**
@@ -37,26 +39,31 @@ const paddingStyles: Record<CardPadding, string> = {
 };
 
 export default function Card({
-  as: Component = 'div',
+  as,
   children,
   variant = 'raised',
   accent = false,
   interactive = false,
   padding = 'md',
   className = '',
+  href,
   ...props
 }: CardProps) {
+  const isInteractive = interactive || Boolean(href);
+  const Component = href ? Link : (as || 'div');
+
   return (
     <Component
+      {...(href ? { href } : {})}
       className={cx(
         panelShell,
         panelSurfaces[variant],
         paddingStyles[padding],
         accent && 'border-l-4 border-l-accent',
-        interactive && 'hover:border-accent/50 hover:-translate-y-0.5 cursor-pointer',
+        isInteractive && 'hover:border-accent/50 hover:-translate-y-0.5 cursor-pointer',
         className
       )}
-      {...props}
+      {...(props as any)}
     >
       {children}
     </Component>

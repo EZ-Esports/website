@@ -96,9 +96,9 @@ export default async function AdminNewsPage({
             Write articles, publish announcements, and edit blog posts displayed on the homepage.
           </p>
         </div>
-        <Link href="/admin/news/new" className="shrink-0">
-          <Button variant="primary">+ Write Article</Button>
-        </Link>
+        <Button href="/admin/news/new" variant="primary" className="shrink-0">
+          + Write Article
+        </Button>
       </Card>
 
       {dbError && <DbErrorNotice variant="error" />}

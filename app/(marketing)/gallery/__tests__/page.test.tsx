@@ -110,20 +110,22 @@ describe('Community Gallery Page & Showcase Integration (/gallery)', () => {
       expect(galleryEntry?.changeFrequency).toBe('weekly');
     });
 
-    it('ensures MainContentWrapper recognizes /gallery in hasHero', () => {
+    it('ensures MainContentWrapper and Header consume single hasHeroRoute helper with /gallery', () => {
       const wrapperSource = readFileSync(
         resolve(process.cwd(), 'app/(marketing)/MainContentWrapper.tsx'),
         'utf8'
       );
-      expect(wrapperSource).toContain("pathname === '/gallery'");
-    });
-
-    it('ensures Header recognizes /gallery in hasHero', () => {
       const headerSource = readFileSync(
         resolve(process.cwd(), 'app/components/layout/Header.tsx'),
         'utf8'
       );
-      expect(headerSource).toContain("pathname === '/gallery'");
+      const constantsSource = readFileSync(
+        resolve(process.cwd(), 'app/lib/constants.ts'),
+        'utf8'
+      );
+      expect(wrapperSource).toContain('hasHeroRoute(');
+      expect(headerSource).toContain('hasHeroRoute(');
+      expect(constantsSource).toContain('ROUTES.gallery');
     });
   });
 });

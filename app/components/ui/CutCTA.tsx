@@ -1,6 +1,6 @@
 'use client';
 
-import { Link } from 'react-aria-components';
+import Button from '@/app/components/ui/Button';
 import type { ReactNode } from 'react';
 import { cx } from '@/app/lib/cx';
 
@@ -13,17 +13,18 @@ interface CutCTAProps {
   className?: string;
   children: ReactNode;
   onPress?: () => void;
+  onClick?: () => void;
 }
 
 /**
- * Shared clipped-corner CTA button (RAC Link) used by the hero and the nav's
- * Apply to Play, so every "action" button on the site reads as one coherent
- * shape/weight/casing. A plain CSS `border` only draws along an element's
- * rectangular box edges — once `clip-path` shaves off the diagonal corners,
- * the border has no edge left to follow there, leaving the cut looking
- * open. So the border is a second, 1px-larger clipped layer stacked behind
- * the fill layer instead of a `border` property, which draws all the way
- * around the hexagon including the diagonal cuts.
+ * Shared clipped-corner CTA button built on the unified `Button` primitive used
+ * by the hero and the nav's Apply to Play, so every "action" button on the site
+ * reads as one coherent shape/weight/casing while preserving client-side Link routing.
+ * A plain CSS `border` only draws along an element's rectangular box edges — once
+ * `clip-path` shaves off the diagonal corners, the border has no edge left to
+ * follow there, leaving the cut looking open. So the border is a second,
+ * 1px-larger clipped layer stacked behind the fill layer instead of a `border`
+ * property, which draws all the way around the hexagon including the diagonal cuts.
  */
 const CLIP = '[clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]';
 
@@ -56,13 +57,17 @@ export default function CutCTA({
   className = '',
   children,
   onPress,
+  onClick,
 }: CutCTAProps) {
   return (
-    <Link
+    <Button
       href={href}
-      onPress={onPress}
+      onClick={onClick ?? onPress}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-      className={cx('group relative inline-flex cursor-pointer focus:outline-none', className)}
+      className={cx(
+        'group relative inline-flex cursor-pointer focus:outline-none !bg-transparent !p-0 !border-0 active:scale-100',
+        className,
+      )}
     >
       {/* Edge layer: the full clipped hexagon, in the border color. Also carries
           the focus ring (inset, so it survives clip-path — see HomeHero CTA fix). */}
@@ -91,6 +96,6 @@ export default function CutCTA({
         {icon}
         {children}
       </span>
-    </Link>
+    </Button>
   );
 }

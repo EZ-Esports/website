@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormStatus } from 'react-dom';
+import Button from '@/app/components/ui/Button';
 
 interface SubmitButtonProps {
   label: string;
@@ -15,12 +16,13 @@ interface SubmitButtonProps {
 export default function SubmitButton({ label, pendingLabel, className }: SubmitButtonProps) {
   const { pending } = useFormStatus();
   return (
-    <button
+    <Button
       type="submit"
       disabled={pending}
+      aria-busy={pending}
       className={className}
     >
       {pending ? (pendingLabel ?? `${label}…`) : label}
-    </button>
+    </Button>
   );
 }
