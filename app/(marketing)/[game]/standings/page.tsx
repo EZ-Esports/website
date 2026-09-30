@@ -184,7 +184,12 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
     standingsFormat = effective.standingsFormat;
   }
 
-  const isIndividual = standings.some((row) => row.playerName !== null);
+  // Individual standings layout only applies to games that are inherently individual
+  // competitions (no JV split) where player-level results/points are recorded.
+  // A single playerName on a team snapshot row will not flip team seasons.
+  const isIndividual =
+    !gameConfig.hasJvSplit &&
+    standings.some((row) => row.playerName !== null || row.points !== null);
   const isArchived = Boolean(selectedSeason && !selectedSeason.isActive);
   /**
    * Derived rows live in `season_standings` and so come back as

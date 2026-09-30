@@ -7,6 +7,7 @@ import {
   createStanding,
   updateStanding,
   deleteStanding,
+  updateSeasonStandingsFormat,
 } from './actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
@@ -165,6 +166,30 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
             <option key={s.id} value={s.id}>{s.name}{s.isActive ? ' (current)' : ''}</option>
           ))}
         </select>
+
+        {seasonId && (
+          <select
+            value={gameSeasons.find((s) => s.id === seasonId)?.standingsFormat ?? 'divided'}
+            onChange={async (e) => {
+              const newFormat = e.target.value as 'divided' | 'combined';
+              const res = await updateSeasonStandingsFormat(seasonId, newFormat);
+              if (res?.success) {
+                const s = gameSeasons.find((s) => s.id === seasonId);
+                if (s) s.standingsFormat = newFormat;
+                setToast({ message: `Format set to ${newFormat}.`, type: 'success' });
+                refresh();
+              } else {
+                setToast({ message: res?.error || 'Failed to update format.', type: 'error' });
+              }
+            }}
+            disabled={isPending}
+            className={selectClass}
+            title="Standings format (divided or combined)"
+          >
+            <option value="divided">Divided (Varsity/JV)</option>
+            <option value="combined">Combined table</option>
+          </select>
+        )}
 
         <div className="flex gap-1">
           {DIVISIONS.map((d) => (

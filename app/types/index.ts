@@ -244,6 +244,8 @@ export interface DBSeason {
   gameId: string;
   name: string;
   isActive: boolean;
+  /** Raw DB value – always 'divided' | 'combined'; use toStandingsFormat() to narrow safely. */
+  standingsFormat: string;
   createdAt: Date;
   updatedAt: Date;
 }

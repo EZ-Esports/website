@@ -2,11 +2,16 @@
 
 import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
+import {
+  createGameInDb,
+  updateGameInDb,
+  deleteGameInDb,
+  createSeasonInDb,
+  updateSeasonInDb,
+  deleteSeasonInDb,
+} from '@/app/lib/db/queries';
 
 function slugify(value: string): string {
   return value
@@ -41,13 +46,10 @@ export async function createGame(formData: FormData) {
     }
 
     const slug = slugify(displayName);
-    const res = await db
-      .insert(schema.games)
-      .values({ displayName, shortName, slug, imageUrl })
-      .returning();
+    const game = await createGameInDb({ displayName, shortName, slug, imageUrl });
 
     revalidateLeague();
-    return { success: true, game: res[0] };
+    return { success: true, game };
   } catch (error) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
@@ -65,14 +67,10 @@ export async function updateGame(id: string, formData: FormData) {
       return { success: false, error: 'Display name and short name are required.' };
     }
 
-    const res = await db
-      .update(schema.games)
-      .set({ displayName, shortName, imageUrl })
-      .where(eq(schema.games.id, id))
-      .returning();
+    const game = await updateGameInDb(id, { displayName, shortName, imageUrl });
 
     revalidateLeague();
-    return { success: true, game: res[0] };
+    return { success: true, game };
   } catch (error) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
@@ -82,7 +80,7 @@ export async function updateGame(id: string, formData: FormData) {
 export async function deleteGame(id: string) {
   await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
-    await db.delete(schema.games).where(eq(schema.games.id, id));
+    await deleteGameInDb(id);
     revalidateLeague();
     return { success: true };
   } catch (error) {
@@ -99,18 +97,17 @@ export async function createSeason(formData: FormData) {
     const gameId = (formData.get('gameId') as string)?.trim();
     const name = (formData.get('name') as string)?.trim();
     const isActive = formData.get('isActive') === 'true';
+    const standingsFormatRaw = (formData.get('standingsFormat') as string)?.trim();
+    const standingsFormat = standingsFormatRaw === 'combined' ? 'combined' : 'divided';
 
     if (!gameId || !name) {
       return { success: false, error: 'Game and season name are required.' };
     }
 
-    const res = await db
-      .insert(schema.seasons)
-      .values({ gameId, name, isActive })
-      .returning();
+    const season = await createSeasonInDb({ gameId, name, isActive, standingsFormat });
 
     revalidateLeague();
-    return { success: true, season: res[0] };
+    return { success: true, season };
   } catch (error) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
@@ -122,19 +119,17 @@ export async function updateSeason(id: string, formData: FormData) {
   try {
     const name = (formData.get('name') as string)?.trim();
     const isActive = formData.get('isActive') === 'true';
+    const standingsFormatRaw = (formData.get('standingsFormat') as string)?.trim();
+    const standingsFormat = standingsFormatRaw ? (standingsFormatRaw === 'combined' ? 'combined' : 'divided') : undefined;
 
     if (!name) {
       return { success: false, error: 'Season name is required.' };
     }
 
-    const res = await db
-      .update(schema.seasons)
-      .set({ name, isActive })
-      .where(eq(schema.seasons.id, id))
-      .returning();
+    const season = await updateSeasonInDb(id, { name, isActive, standingsFormat });
 
     revalidateLeague();
-    return { success: true, season: res[0] };
+    return { success: true, season };
   } catch (error) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
@@ -144,11 +139,11 @@ export async function updateSeason(id: string, formData: FormData) {
 export async function deleteSeason(id: string) {
   await requirePermission(Permissions.MANAGE_LEAGUE);
   try {
-    await db.delete(schema.seasons).where(eq(schema.seasons.id, id));
+    await deleteSeasonInDb(id);
     revalidateLeague();
     return { success: true };
   } catch (error) {
     console.error(error);
-    return { success: false, error: 'Cannot delete season — it may have active teams or matches linked to it.' };
+    return { success: false, error: sanitizeDbError(error) };
   }
 }

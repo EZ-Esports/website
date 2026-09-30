@@ -1,11 +1,16 @@
 'use server';
 import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { and, asc, eq, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
+import {
+  getSeasonStandingsForEditor,
+  createSeasonStandingInDb,
+  updateSeasonStandingInDb,
+  deleteSeasonStandingInDb,
+  deleteDivisionStandingsInDb,
+  updateSeasonStandingsFormatInDb,
+} from '@/app/lib/db/queries';
 
 function revalidateStandings() {
   updateTag('rosters');
@@ -64,31 +69,7 @@ function standingValues(formData: FormData) {
 /** All snapshot rows of one season with school names, for the editor. */
 export async function listSeasonStandings(seasonId: string) {
   await requireMatchesPermission();
-  return db
-    .select({
-      id: schema.seasonStandings.id,
-      seasonId: schema.seasonStandings.seasonId,
-      schoolId: schema.seasonStandings.schoolId,
-      schoolName: schema.schools.name,
-      division: schema.seasonStandings.division,
-      rank: schema.seasonStandings.rank,
-      wins: schema.seasonStandings.wins,
-      losses: schema.seasonStandings.losses,
-      gamesPlayed: schema.seasonStandings.gamesPlayed,
-      winPct: schema.seasonStandings.winPct,
-      points: schema.seasonStandings.points,
-      playerName: schema.seasonStandings.playerName,
-      playerIgn: schema.seasonStandings.playerIgn,
-      notes: schema.seasonStandings.notes,
-    })
-    .from(schema.seasonStandings)
-    .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-    .where(eq(schema.seasonStandings.seasonId, seasonId))
-    .orderBy(
-      asc(schema.seasonStandings.division),
-      sql`${schema.seasonStandings.rank} asc nulls last`,
-      asc(schema.schools.name)
-    );
+  return getSeasonStandingsForEditor(seasonId);
 }
 
 export async function createStanding(formData: FormData) {
@@ -99,12 +80,13 @@ export async function createStanding(formData: FormData) {
     if (!seasonId || !schoolId) {
       return { success: false, error: 'Season and school are required.' };
     }
-    const res = await db
-      .insert(schema.seasonStandings)
-      .values({ seasonId, schoolId, ...standingValues(formData) })
-      .returning();
+    const standing = await createSeasonStandingInDb({
+      seasonId,
+      schoolId,
+      ...standingValues(formData),
+    });
     revalidateStandings();
-    return { success: true, standing: res[0] };
+    return { success: true, standing };
   } catch (error: unknown) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
@@ -114,13 +96,9 @@ export async function createStanding(formData: FormData) {
 export async function updateStanding(id: string, formData: FormData) {
   await requireMatchesPermission();
   try {
-    const res = await db
-      .update(schema.seasonStandings)
-      .set(standingValues(formData))
-      .where(eq(schema.seasonStandings.id, id))
-      .returning();
+    const standing = await updateSeasonStandingInDb(id, standingValues(formData));
     revalidateStandings();
-    return { success: true, standing: res[0] };
+    return { success: true, standing };
   } catch (error: unknown) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
@@ -130,7 +108,7 @@ export async function updateStanding(id: string, formData: FormData) {
 export async function deleteStanding(id: string) {
   await requireMatchesPermission();
   try {
-    await db.delete(schema.seasonStandings).where(eq(schema.seasonStandings.id, id));
+    await deleteSeasonStandingInDb(id);
     revalidateStandings();
     return { success: true };
   } catch (error: unknown) {
@@ -143,15 +121,24 @@ export async function deleteStanding(id: string) {
 export async function deleteDivisionStandings(seasonId: string, division: string) {
   await requireMatchesPermission();
   try {
-    await db
-      .delete(schema.seasonStandings)
-      .where(
-        and(
-          eq(schema.seasonStandings.seasonId, seasonId),
-          eq(schema.seasonStandings.division, division)
-        )
-      );
+    await deleteDivisionStandingsInDb(seasonId, division);
     revalidateStandings();
+    return { success: true };
+  } catch (error: unknown) {
+    console.error(error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+export async function updateSeasonStandingsFormat(seasonId: string, format: 'divided' | 'combined') {
+  await requireMatchesPermission();
+  try {
+    if (format !== 'divided' && format !== 'combined') {
+      return { success: false, error: 'Invalid standings format. Must be divided or combined.' };
+    }
+    await updateSeasonStandingsFormatInDb(seasonId, format);
+    revalidatePath('/admin/standings');
+    revalidatePath('/admin/league');
     return { success: true };
   } catch (error: unknown) {
     console.error(error);

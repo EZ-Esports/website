@@ -84,6 +84,16 @@ export function divisionLabel(division: string): string {
 export type StandingsFormat = 'divided' | 'combined';
 
 /**
+ * Narrows a raw `seasons.standings_format` DB string to the two known values,
+ * defaulting to `'divided'` for any unknown/null/undefined input. This is the
+ * single authoritative narrowing point; callers should never widen back to string.
+ */
+export function toStandingsFormat(value: string | null | undefined): StandingsFormat {
+  if (value === 'combined') return 'combined';
+  return 'divided';
+}
+
+/**
  * The single pseudo-division a combined season offers.
  *
  * Deliberately *not* a member of `DIVISIONS` and never returned by

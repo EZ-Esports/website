@@ -110,6 +110,11 @@ export const seasons = pgTable('seasons', {
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),
   uniqueIndex('seasons_game_id_name_unique_idx').on(table.gameId, table.name),
+  // Enforce DB-level invariant: at most one active season per game.
+  uniqueIndex('seasons_one_active_per_game_idx')
+    .on(table.gameId)
+    .where(sql`is_active = true`),
+  check('seasons_standings_format_check', sql`${table.standingsFormat} IN ('divided', 'combined')`),
 ]).enableRLS();
 
 // --- TEAMS & ROSTERS ---
@@ -172,6 +177,10 @@ export const players = pgTable('players', {
   uniqueIndex('players_roster_one_captain_idx')
     .on(table.rosterId)
     .where(sql`is_captain = true`),
+  check(
+    'players_captain_role_check',
+    sql`(${table.isCaptain} = true AND ${table.role} = 'captain') OR (${table.isCaptain} = false AND ${table.role} <> 'captain')`
+  ),
 ]).enableRLS();
 
 // --- MATCHES ---
@@ -180,7 +189,7 @@ export const players = pgTable('players', {
 export const matches = pgTable('matches', {
   id: uuid('id').defaultRandom().primaryKey(),
   seasonId: uuid('season_id')
-    .references(() => seasons.id)
+    .references(() => seasons.id, { onDelete: 'restrict' })
     .notNull(),
   homeRosterId: uuid('home_roster_id')
     .references(() => rosters.id, { onDelete: 'cascade' })
