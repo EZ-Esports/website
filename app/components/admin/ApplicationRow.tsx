@@ -16,7 +16,6 @@ export interface Application {
   schoolName: string;
   role: string;
   email: string;
-  message: string | null;
   details: SchoolApplicationDetails | null;
   status: Status;
   submittedAt: Date;
@@ -29,15 +28,81 @@ const activeBadgeClass: Record<Status, string> = {
   rejected: "bg-red-500/10 text-red-400 border border-red-500/20",
 };
 
+export function SchoolDetailsChips({ details }: { details: SchoolApplicationDetails | null }) {
+  if (!details) {
+    return <span className="text-foreground-muted italic text-xs">—</span>;
+  }
+
+  if (details.version === 2 || details.version === 3) {
+    const rawGames = details.club?.interestedGames;
+    const games = Array.isArray(rawGames)
+      ? rawGames.filter((g): g is string => typeof g === "string" && g.trim().length > 0)
+      : [];
+    const rawActive = details.club?.activeStudentsCount;
+    const activeStudents = typeof rawActive === "string" ? rawActive.trim() : typeof rawActive === "number" ? String(rawActive) : undefined;
+    const rawAdvisor = details.club?.advisorConfirmed;
+    const advisorConfirmed = typeof rawAdvisor === "string" ? rawAdvisor.trim() : typeof rawAdvisor === "boolean" ? (rawAdvisor ? "Yes" : "No") : undefined;
+    const rawGradYear = details.president?.gradYear;
+    const gradYear = typeof rawGradYear === "string" ? rawGradYear.trim() : typeof rawGradYear === "number" ? String(rawGradYear) : undefined;
+
+    return (
+      <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+        {gradYear && (
+          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-raised text-foreground-secondary border border-line">
+            Class &apos;{gradYear.replace(/^20/, "")}
+          </span>
+        )}
+        {activeStudents && (
+          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            {activeStudents} {activeStudents.toLowerCase().includes("student") || activeStudents.toLowerCase().includes("member") ? "" : "students"}
+          </span>
+        )}
+        {advisorConfirmed && (
+          <span
+            className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+              advisorConfirmed.toLowerCase() === "yes" || advisorConfirmed.toLowerCase() === "confirmed"
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+            }`}
+          >
+            Advisor: {advisorConfirmed}
+          </span>
+        )}
+        {games.map((game) => (
+          <span
+            key={game}
+            className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20"
+          >
+            {game}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  // Version 1 fallback
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+      {details.interestedDivisions && (
+        <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+          {details.interestedDivisions}
+        </span>
+      )}
+      {details.schoolCode && (
+        <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-raised text-foreground-secondary border border-line">
+          Code: {details.schoolCode}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function ApplicationRow({ app, activeFilter = "all" }: { app: Application; activeFilter?: StatusFilter }) {
   const [status, setStatus] = useState<Status>(app.status);
   const [detailOpen, setDetailOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
-
-  const message = app.message ?? "";
-  const isLong = message.length > 80;
 
   if (removed) return null;
 
@@ -97,23 +162,17 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
             {app.email}
           </a>
         </td>
-        <td className="py-3 pr-4 text-foreground-secondary max-w-[320px]">
-          {message || app.details ? (
-            <>
-              {message && (
-                <span className="whitespace-pre-line">{isLong ? `${message.slice(0, 80)}…` : message}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => setDetailOpen(true)}
-                className="ml-1 text-accent hover:text-accent/80 transition-colors text-xs font-semibold cursor-pointer"
-              >
-                View
-              </button>
-            </>
-          ) : (
-            <span className="text-foreground-muted italic">—</span>
-          )}
+        <td className="py-3 pr-4 text-foreground-secondary min-w-[240px] max-w-[360px]">
+          <div className="flex items-start justify-between gap-2">
+            <SchoolDetailsChips details={app.details} />
+            <button
+              type="button"
+              onClick={() => setDetailOpen(true)}
+              className="mt-0.5 text-accent hover:text-accent/80 transition-colors text-xs font-semibold cursor-pointer shrink-0"
+            >
+              View
+            </button>
+          </div>
         </td>
         <td className="py-3 pr-4">
           <div className="flex gap-1 items-center">

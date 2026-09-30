@@ -24,6 +24,16 @@ describe('extractTablesFromSql', () => {
     expect(extractTablesFromSql(sql, new Set())).toEqual(new Set(['leadership_terms', 'people']));
   });
 
+  it('matches migration 0037_drop_application_message_column.sql (school_applications, staff_applications)', () => {
+    const sql = readFileSync(
+      resolve(__dirname, '..', 'migrations', '0037_drop_application_message_column.sql'),
+      'utf8'
+    );
+    expect(extractTablesFromSql(sql, new Set())).toEqual(
+      new Set(['school_applications', 'staff_applications'])
+    );
+  });
+
   it('does not anchor on a schema-qualified FK REFERENCES target', () => {
     const sql = `ALTER TABLE "people" ADD CONSTRAINT "x" FOREIGN KEY ("member_id") REFERENCES "public"."members"("id");`;
     // "people" is the anchored ALTER TABLE target; "members" only appears

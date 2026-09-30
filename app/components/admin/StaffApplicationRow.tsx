@@ -18,7 +18,6 @@ export interface StaffApplication {
   phone: string;
   discordTag: string | null;
   role: string;
-  message: string | null;
   details: StaffApplicationDetails | null;
   hasResume: boolean;
   status: Status;
@@ -32,15 +31,56 @@ const activeBadgeClass: Record<Status, string> = {
   rejected: "bg-red-500/10 text-red-400 border border-red-500/20",
 };
 
+export function StaffDetailsChips({ details }: { details: StaffApplicationDetails | null }) {
+  if (!details) {
+    return <span className="text-foreground-muted italic text-xs">—</span>;
+  }
+
+  const availability = typeof details.availability === "string" ? details.availability.trim() : null;
+  const linkedin = typeof details.linkedin === "string" && details.linkedin.trim() ? details.linkedin.trim() : null;
+  const discordTag = typeof details.discordTag === "string" ? details.discordTag.trim() : null;
+  const motivation = typeof details.backgroundMotivation === "string" ? details.backgroundMotivation.trim() : null;
+
+  return (
+    <div className="space-y-1 py-0.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {availability && (
+          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            {availability}
+          </span>
+        )}
+        {linkedin && (
+          <a
+            href={linkedin.startsWith("http") ? linkedin : `https://${linkedin}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:text-blue-300 transition-colors"
+          >
+            LinkedIn ↗
+          </a>
+        )}
+        {discordTag && (
+          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            {discordTag}
+          </span>
+        )}
+      </div>
+      {motivation && (
+        <p className="text-xs text-foreground-secondary line-clamp-1 italic max-w-[280px]">
+          &ldquo;{motivation}&rdquo;
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function StaffApplicationRow({ app, activeFilter = "all" }: { app: StaffApplication; activeFilter?: StatusFilter }) {
   const [status, setStatus] = useState<Status>(app.status);
   const [detailOpen, setDetailOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
-
-  const message = app.message ?? "";
-  const isLong = message.length > 80;
 
   if (removed) return null;
 
@@ -106,23 +146,17 @@ export default function StaffApplicationRow({ app, activeFilter = "all" }: { app
           </a>
         </td>
         <td className="py-3 pr-4 text-foreground-secondary whitespace-nowrap">{app.phone}</td>
-        <td className="py-3 pr-4 text-foreground-secondary max-w-[320px]">
-          {message || app.details ? (
-            <>
-              {message && (
-                <span className="whitespace-pre-line">{isLong ? `${message.slice(0, 80)}…` : message}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => setDetailOpen(true)}
-                className="ml-1 text-accent hover:text-accent/80 transition-colors text-xs font-semibold cursor-pointer"
-              >
-                View
-              </button>
-            </>
-          ) : (
-            <span className="text-foreground-muted italic">—</span>
-          )}
+        <td className="py-3 pr-4 text-foreground-secondary min-w-[240px] max-w-[360px]">
+          <div className="flex items-start justify-between gap-2">
+            <StaffDetailsChips details={app.details} />
+            <button
+              type="button"
+              onClick={() => setDetailOpen(true)}
+              className="mt-0.5 text-accent hover:text-accent/80 transition-colors text-xs font-semibold cursor-pointer shrink-0"
+            >
+              View
+            </button>
+          </div>
         </td>
         <td className="py-3 pr-4">
           <div className="flex gap-1 items-center">
