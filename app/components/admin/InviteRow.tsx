@@ -100,7 +100,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
               })}`
             )}
           </span>
-          {error && <p className="text-[10px] text-red-400 mt-1">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{error}</p>}
         </div>
       </div>
 

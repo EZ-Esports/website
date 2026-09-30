@@ -126,7 +126,7 @@ export default function GalleryManagerClient({ initialImages }: GalleryManagerCl
   return (
     <div className="space-y-6 relative pb-24">
       {error && (
-        <div role="alert" className="p-4 bg-red-950/20 border border-red-900/40 rounded-xl text-red-400 text-sm">
+        <div role="alert" aria-live="polite" className="p-4 bg-red-950/20 border border-red-900/40 rounded-xl text-red-400 text-sm">
           {error}
         </div>
       )}

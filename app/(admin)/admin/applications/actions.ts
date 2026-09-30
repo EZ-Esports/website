@@ -2,20 +2,46 @@
 
 import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import type { ApplicationStatus } from '@/app/lib/db/queries';
+import type { ActionResult } from '@/app/lib/result';
+import { ApplicationStatus, isValidStatusTransition } from '@/app/lib/application-status';
+import {
+  getApplicationStatusState,
+  recordApplicationStatusChange,
+  softDeleteApplicationRecord,
+  getSchoolApplications,
+  getStaffApplications,
+} from '@/app/lib/db/queries';
+import {
+  schoolApplicationsTableToCsv,
+  staffApplicationsTableToCsv,
+} from '@/app/lib/application-csv';
 
 export async function updateApplicationStatus(
   id: string,
-  status: 'pending' | 'accepted' | 'rejected',
+  status: ApplicationStatus,
   reason?: string
-) {
+): Promise<ActionResult> {
   const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
 
-  await db.insert(schema.applicationStatusLogs).values({
+  const app = await getApplicationStatusState(id, 'school');
+
+  if (!app) {
+    return { success: false, error: 'Application not found.' };
+  }
+
+  if (app.isDeleted) {
+    return { success: false, error: 'Cannot update status of a deleted application.' };
+  }
+
+  if (!isValidStatusTransition(app.currentStatus, status)) {
+    return {
+      success: false,
+      error: `Invalid status transition from '${app.currentStatus}' to '${status}'.`,
+    };
+  }
+
+  await recordApplicationStatusChange({
     applicationId: id,
     applicationType: 'school',
     status,
@@ -25,16 +51,34 @@ export async function updateApplicationStatus(
   });
 
   revalidatePath('/admin/applications');
+  return { success: true };
 }
 
 export async function updateStaffApplicationStatus(
   id: string,
-  status: 'pending' | 'accepted' | 'rejected',
+  status: ApplicationStatus,
   reason?: string
-) {
+): Promise<ActionResult> {
   const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
 
-  await db.insert(schema.applicationStatusLogs).values({
+  const app = await getApplicationStatusState(id, 'staff');
+
+  if (!app) {
+    return { success: false, error: 'Application not found.' };
+  }
+
+  if (app.isDeleted) {
+    return { success: false, error: 'Cannot update status of a deleted application.' };
+  }
+
+  if (!isValidStatusTransition(app.currentStatus, status)) {
+    return {
+      success: false,
+      error: `Invalid status transition from '${app.currentStatus}' to '${status}'.`,
+    };
+  }
+
+  await recordApplicationStatusChange({
     applicationId: id,
     applicationType: 'staff',
     status,
@@ -44,59 +88,52 @@ export async function updateStaffApplicationStatus(
   });
 
   revalidatePath('/admin/applications');
+  return { success: true };
 }
 
-export async function softDeleteSchoolApplication(id: string) {
+export async function softDeleteSchoolApplication(id: string): Promise<ActionResult> {
   const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
 
-  await db
-    .update(schema.schoolApplications)
-    .set({
-      deletedAt: new Date(),
-      deletedBy: staff.id,
-    })
-    .where(eq(schema.schoolApplications.id, id));
+  const app = await getApplicationStatusState(id, 'school');
 
-  await db.insert(schema.applicationStatusLogs).values({
-    applicationId: id,
-    applicationType: 'school',
-    status: 'rejected',
-    actorUserId: staff.id,
-    actorEmail: staff.email,
-    reason: 'Application soft-deleted by staff',
-  });
+  if (!app) {
+    return { success: false, error: 'Application not found.' };
+  }
 
+  if (app.isDeleted) {
+    return { success: false, error: 'Application is already deleted.' };
+  }
+
+  await softDeleteApplicationRecord(id, 'school', staff.id);
+
+  // Soft delete must NOT append a 'rejected' status log.
   revalidatePath('/admin/applications');
+  return { success: true };
 }
 
-export async function softDeleteStaffApplication(id: string) {
+export async function softDeleteStaffApplication(id: string): Promise<ActionResult> {
   const staff = await requirePermission(Permissions.MANAGE_APPLICATIONS);
 
-  await db
-    .update(schema.staffApplications)
-    .set({
-      deletedAt: new Date(),
-      deletedBy: staff.id,
-    })
-    .where(eq(schema.staffApplications.id, id));
+  const app = await getApplicationStatusState(id, 'staff');
 
-  await db.insert(schema.applicationStatusLogs).values({
-    applicationId: id,
-    applicationType: 'staff',
-    status: 'rejected',
-    actorUserId: staff.id,
-    actorEmail: staff.email,
-    reason: 'Application soft-deleted by staff',
-  });
+  if (!app) {
+    return { success: false, error: 'Application not found.' };
+  }
 
+  if (app.isDeleted) {
+    return { success: false, error: 'Application is already deleted.' };
+  }
+
+  await softDeleteApplicationRecord(id, 'staff', staff.id);
+
+  // Soft delete must NOT append a 'rejected' status log.
   revalidatePath('/admin/applications');
+  return { success: true };
 }
 
 export async function exportSchoolApplicationsCsv(status?: string): Promise<string> {
   await requirePermission(Permissions.MANAGE_APPLICATIONS);
   const statusFilter = status === 'pending' || status === 'accepted' || status === 'rejected' ? status : undefined;
-  const { getSchoolApplications } = await import('@/app/lib/db/queries');
-  const { schoolApplicationsTableToCsv } = await import('@/app/lib/application-csv');
   const applications = await getSchoolApplications(statusFilter as ApplicationStatus | undefined);
   return schoolApplicationsTableToCsv(applications);
 }
@@ -104,8 +141,6 @@ export async function exportSchoolApplicationsCsv(status?: string): Promise<stri
 export async function exportStaffApplicationsCsv(status?: string): Promise<string> {
   await requirePermission(Permissions.MANAGE_APPLICATIONS);
   const statusFilter = status === 'pending' || status === 'accepted' || status === 'rejected' ? status : undefined;
-  const { getStaffApplications } = await import('@/app/lib/db/queries');
-  const { staffApplicationsTableToCsv } = await import('@/app/lib/application-csv');
   const applications = await getStaffApplications(statusFilter as ApplicationStatus | undefined);
   return staffApplicationsTableToCsv(applications);
 }

@@ -158,7 +158,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
           </div>
 
           {toggleError && (
-            <p role="alert" className="text-[10px] text-red-400">{toggleError}</p>
+            <p role="alert" aria-live="polite" className="text-[10px] text-red-400">{toggleError}</p>
           )}
 
           {editOpen && (
@@ -207,7 +207,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
                 {pending ? 'Saving…' : 'Save Changes'}
               </button>
               {editError && (
-                <p role="alert" className="text-[10px] text-red-400">{editError}</p>
+                <p role="alert" aria-live="polite" className="text-[10px] text-red-400">{editError}</p>
               )}
             </form>
           )}

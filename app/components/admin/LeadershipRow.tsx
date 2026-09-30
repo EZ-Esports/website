@@ -269,7 +269,7 @@ export default function LeadershipRow({
             </div>
 
             {saveError && (
-              <p role="alert" className="text-xs text-red-400">
+              <p role="alert" aria-live="polite" className="text-xs text-red-400">
                 {saveError}
               </p>
             )}

@@ -77,7 +77,7 @@ export default function NewsPostForm({ action, status, defaults }: NewsPostFormP
       </div>
 
       {state?.error && (
-        <p role="alert" className="text-sm text-red-400">{state.error}</p>
+        <p role="alert" aria-live="polite" className="text-sm text-red-400">{state.error}</p>
       )}
 
       <div className="flex justify-end gap-3 border-t border-surface-raised pt-6 flex-wrap">

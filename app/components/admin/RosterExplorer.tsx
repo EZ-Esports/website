@@ -438,7 +438,7 @@ function RosterView({
   confirmDelete: (message: string, action: () => Promise<ActionResult>, successMsg: string, onSuccess?: () => void) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { data: view, refresh } = useActionData(
+  const { data: view, fetchError: viewFetchError, refresh } = useActionData(
     () => listRosterView(roster.id, schoolId),
     `${roster.id}|${schoolId}`,
     { players: [] as RosterPlayerRow[], members: [] as DBMember[] },
@@ -460,13 +460,13 @@ function RosterView({
         onBack={onBack}
         actions={
           <>
-            <button className={secondaryBtn} onClick={() => toggle('player-add')} disabled={loading || eligible.length === 0}><FiPlus /> Add Player</button>
-            <RowIconButton kind="edit" onClick={() => toggle('roster-edit')} aria-expanded={openForm === 'roster-edit'} label={`Edit roster ${roster.name}`} />
+            <button className={secondaryBtn} onClick={() => toggle('player-add')} disabled={loading || viewFetchError || eligible.length === 0}><FiPlus /> Add Player</button>
+            <RowIconButton kind="edit" disabled={viewFetchError} onClick={() => toggle('roster-edit')} aria-expanded={openForm === 'roster-edit'} label={`Edit roster ${roster.name}`} />
           </>
         }
       />
 
-      {openForm === 'roster-edit' && (
+      {openForm === 'roster-edit' && !viewFetchError && (
         <Panel title="Edit Roster" onClose={() => setOpenForm(null)}>
           <form
             onSubmit={(e) => runForm(e, (fd) => updateRoster(roster.id, fd), 'Roster updated.', { onSuccess: () => setOpenForm(null) })}
@@ -486,7 +486,7 @@ function RosterView({
         </Panel>
       )}
 
-      {openForm === 'player-add' && (
+      {openForm === 'player-add' && !viewFetchError && (
         <Panel title="Add Player" onClose={() => setOpenForm(null)}>
           {eligible.length === 0 ? (
             <p className="text-xs text-foreground-muted italic">Every school member is already on this roster. Add more members from the school page first.</p>
@@ -527,10 +527,15 @@ function RosterView({
         </Panel>
       )}
 
-      <Section title={loading ? 'Players' : `Players (${players.length})`} icon={<FiUsers />}>
+      <Section title={loading ? 'Players' : `Players (${(players ?? []).length})`} icon={<FiUsers />}>
+        {viewFetchError && (
+          <div role="alert" aria-live="polite" className="p-3 bg-red-950/30 border border-red-900/50 rounded-xl text-red-300 text-xs font-semibold mb-3">
+            Failed to load players. Displaying last known data. Please refresh to try again.
+          </div>
+        )}
         {loading ? (
           <Empty>Loading players…</Empty>
-        ) : players.length === 0 ? (
+        ) : (players ?? []).length === 0 ? (
           <Empty>No players on this roster yet.</Empty>
         ) : (
           <div className="overflow-x-auto border border-surface-raised rounded-xl">
@@ -544,9 +549,9 @@ function RosterView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-raised">
-                {players.map(p => {
+                {(players ?? []).map(p => {
                   const editing = editingId === p.id;
-                  if (editing) {
+                  if (editing && !viewFetchError) {
                     return (
                       <tr key={p.id} className="bg-surface-raised/40">
                         <td colSpan={4} className="px-4 py-3">
@@ -584,10 +589,11 @@ function RosterView({
                       <td className="px-4 py-2.5 text-foreground-secondary capitalize">{p.role}</td>
                       <td className="px-4 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                          <RowIconButton kind="edit" onClick={() => setEditingId(p.id)} label={`Edit player ${p.firstName} ${p.lastName}`} />
+                          <RowIconButton kind="edit" disabled={viewFetchError} onClick={() => setEditingId(p.id)} label={`Edit player ${p.firstName} ${p.lastName}`} />
                           <button
                             onClick={() => confirmDelete(`Permanently remove ${p.firstName} ${p.lastName} from ${roster.name}? This cannot be undone.`, () => deleteRosterMember(p.id), 'Player removed.', refresh)}
-                            type="button" className={deleteIconBtn} aria-label={`Remove player ${p.firstName} ${p.lastName}`} title={`Remove player ${p.firstName} ${p.lastName}`}
+                            disabled={viewFetchError}
+                            type="button" className={`${deleteIconBtn} ${viewFetchError ? 'opacity-50 cursor-not-allowed' : ''}`} aria-label={`Remove player ${p.firstName} ${p.lastName}`} title={`Remove player ${p.firstName} ${p.lastName}`}
                           ><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
                         </div>
                       </td>
@@ -618,7 +624,7 @@ function MemberManager({
 }) {
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { data: members, refresh } = useActionData(
+  const { data: members, fetchError: membersFetchError, refresh } = useActionData(
     () => listSchoolMembers(schoolId),
     schoolId,
     [] as DBMember[],
@@ -634,11 +640,24 @@ function MemberManager({
 
   return (
     <Section
-      title={loading ? 'School Members' : `School Members (${members.length})`}
+      title={loading ? 'School Members' : `School Members (${(members ?? []).length})`}
       icon={<FiUsers />}
-      action={<button className="text-[11px] font-bold text-foreground-secondary hover:text-white uppercase" onClick={() => setOpenForm(adding ? null : 'member-add')}>{adding ? 'Cancel' : '+ Add member'}</button>}
+      action={
+        <button
+          className="text-[11px] font-bold text-foreground-secondary hover:text-white uppercase disabled:opacity-40"
+          disabled={membersFetchError}
+          onClick={() => setOpenForm(adding ? null : 'member-add')}
+        >
+          {adding ? 'Cancel' : '+ Add member'}
+        </button>
+      }
     >
-      {adding && (
+      {membersFetchError && (
+        <div role="alert" aria-live="polite" className="p-3 bg-red-950/30 border border-red-900/50 rounded-xl text-red-300 text-xs font-semibold mb-3">
+          Failed to load members. Displaying last known data. Please refresh to try again.
+        </div>
+      )}
+      {adding && !membersFetchError && (
         <form
           onSubmit={(e) => runForm(e, createMember, 'Member added.', { reset: true, onSuccess: () => { setOpenForm(null); refresh(); } })}
           className="bg-surface-sunken/60 border border-line rounded-xl p-3 space-y-2 mb-3"
@@ -656,12 +675,12 @@ function MemberManager({
       {loading ? (
         <Empty>Loading members…</Empty>
       ) : filtered.length === 0 ? (
-        <Empty>{members.length === 0 ? 'No members yet. Add students to build the roster pool.' : 'No members match your filter.'}</Empty>
+        <Empty>{(members ?? []).length === 0 ? 'No members yet. Add students to build the roster pool.' : 'No members match your filter.'}</Empty>
       ) : (
         <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised max-h-[420px] overflow-y-auto">
           {filtered.map(m => (
             <div key={m.id} className="p-3 text-sm group">
-              {editingId === m.id ? (
+              {editingId === m.id && !membersFetchError ? (
                 <form
                   onSubmit={(e) => runForm(e, (fd) => updateMember(m.id, fd), 'Member updated.', { onSuccess: () => { setEditingId(null); refresh(); } })}
                   className="space-y-2"
@@ -683,10 +702,11 @@ function MemberManager({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
-                    <RowIconButton kind="edit" onClick={() => setEditingId(m.id)} label={`Edit member ${m.firstName} ${m.lastName}`} />
+                    <RowIconButton kind="edit" disabled={membersFetchError} onClick={() => setEditingId(m.id)} label={`Edit member ${m.firstName} ${m.lastName}`} />
                     <button
                       onClick={() => confirmDelete(`Permanently delete ${m.firstName} ${m.lastName}? They will be removed from any rosters. This cannot be undone.`, () => deleteMember(m.id), 'Member deleted.', refresh)}
-                      type="button" className={deleteIconBtn} aria-label={`Delete member ${m.firstName} ${m.lastName}`} title={`Delete member ${m.firstName} ${m.lastName}`}
+                      disabled={membersFetchError}
+                      type="button" className={`${deleteIconBtn} ${membersFetchError ? 'opacity-50 cursor-not-allowed' : ''}`} aria-label={`Delete member ${m.firstName} ${m.lastName}`} title={`Delete member ${m.firstName} ${m.lastName}`}
                     ><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
                   </div>
                 </div>

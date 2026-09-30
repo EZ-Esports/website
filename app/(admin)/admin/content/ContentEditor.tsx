@@ -37,6 +37,8 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [currentContent, setCurrentContent] = useState(initialContent);
 
@@ -44,14 +46,40 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
     setSaving(true);
     setSaved(false);
     setSaveError(null);
+    setRestoreError(null);
     try {
-      await updatePageContent(id, formData);
+      const res = await updatePageContent(id, formData);
+      if (res && !res.success) {
+        setSaveError(res.error || 'Save failed. Please try again.');
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Save failed. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRestore = async (entry: HistoryEntry) => {
+    setRestoringId(entry.id);
+    setRestoreError(null);
+    setSaveError(null);
+    try {
+      const res = await restorePageContent(id, entry.id);
+      if (res && !res.success) {
+        setRestoreError(res.error || 'Restore failed. Please try again.');
+        return;
+      }
+      setCurrentContent(entry.previousContent);
+      setShowHistory(false);
+      setRestored(true);
+      setTimeout(() => setRestored(false), 2000);
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'Restore failed. Please try again.');
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -82,7 +110,10 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
             <span className="text-green-400 text-xs font-semibold">Saved!</span>
           )}
           {saveError && (
-            <span className="text-red-400 text-xs font-semibold">{saveError}</span>
+            <span role="alert" aria-live="polite" className="text-red-400 text-xs font-semibold">{saveError}</span>
+          )}
+          {restoreError && (
+            <span role="alert" aria-live="polite" className="text-red-400 text-xs font-semibold">{restoreError}</span>
           )}
           {restored && (
             <span className="text-green-400 text-xs font-semibold">Restored!</span>
@@ -110,20 +141,6 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
                 ? entry.previousContent.slice(0, 120) + '…'
                 : entry.previousContent;
 
-            const restoreBound = restorePageContent.bind(null, id, entry.id);
-
-            const handleRestore = async () => {
-              try {
-                await restoreBound();
-                setCurrentContent(entry.previousContent);
-                setShowHistory(false);
-                setRestored(true);
-                setTimeout(() => setRestored(false), 2000);
-              } catch {
-                // Server action failed — don't update UI state
-              }
-            };
-
             return (
               <div
                 key={entry.id}
@@ -132,13 +149,21 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
                 <p className="text-foreground-secondary font-mono leading-relaxed line-clamp-2">{preview}</p>
                 <div className="flex items-center justify-between">
                   <span className="text-foreground-muted">{formatDate(entry.savedAt)}</span>
-                  <button
-                    type="button"
-                    onClick={handleRestore}
-                    className="px-2.5 py-1 bg-surface-raised border border-line hover:border-accent/40 hover:text-accent text-foreground-secondary rounded text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Restore
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {restoreError && restoringId === null && (
+                      <span role="alert" aria-live="polite" className="text-red-400 text-xs font-semibold">
+                        {restoreError}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRestore(entry)}
+                      disabled={restoringId !== null}
+                      className="px-2.5 py-1 bg-surface-raised border border-line hover:border-accent/40 hover:text-accent text-foreground-secondary rounded text-xs font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {restoringId === entry.id ? 'Restoring…' : 'Restore'}
+                    </button>
+                  </div>
                 </div>
               </div>
             );

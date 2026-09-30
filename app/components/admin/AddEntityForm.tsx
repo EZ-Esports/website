@@ -36,7 +36,7 @@ export default function AddEntityForm({
     <form ref={formRef} action={formAction} className={className}>
       {children}
       {state?.error && (
-        <p role="alert" className="text-xs text-red-400 sm:col-span-2">{state.error}</p>
+        <p role="alert" aria-live="polite" className="text-xs text-red-400 sm:col-span-2">{state.error}</p>
       )}
     </form>
   );

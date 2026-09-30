@@ -96,7 +96,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
     setSeasonId(seasons.find((s) => s.gameId === id)?.id ?? '');
   };
 
-  const { data, refresh } = useActionData(
+  const { data, fetchError, refresh } = useActionData(
     () => (seasonId ? listSeasonStandings(seasonId) : Promise.resolve([] as StandingRow[])),
     seasonId,
     [] as StandingRow[],
@@ -184,7 +184,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
 
         <button
           onClick={() => setAdding((v) => !v)}
-          disabled={!seasonId}
+          disabled={!seasonId || fetchError}
           className={`${selectClass} font-bold flex items-center gap-1.5 disabled:opacity-40`}
         >
           {adding ? <><FiX className="w-3.5 h-3.5" /> Cancel</> : <><FiPlus className="w-3.5 h-3.5" /> Add row</>}
@@ -192,7 +192,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
       </div>
 
       {/* Add-row form */}
-      {adding && seasonId && (
+      {adding && seasonId && !fetchError && (
         <form
           onSubmit={(e) => runForm(e, createStanding, 'Standing added.', () => setAdding(false))}
           className="bg-surface-sunken/60 border border-line rounded-xl p-4 flex flex-wrap items-end gap-3"
@@ -214,6 +214,15 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
 
       {/* Standings table */}
       <div className="bg-[#1c1c1c]/60 border border-line rounded-2xl overflow-hidden shadow-xl shadow-black/20">
+        {fetchError && (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="p-3.5 bg-red-950/40 border-b border-red-900/60 text-red-300 text-xs font-semibold"
+          >
+            Failed to load standings. Displaying last known data. Please refresh to try again.
+          </div>
+        )}
         {rows === null ? (
           <div className="text-center p-12 text-foreground-muted text-sm">Loading standings…</div>
         ) : divisionRows.length === 0 ? (
@@ -237,7 +246,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
               </thead>
               <tbody className="divide-y divide-line">
                 {divisionRows.map((row) => {
-                  if (editingId === row.id) {
+                  if (editingId === row.id && !fetchError) {
                     return (
                       <tr key={row.id} className="bg-surface-raised/40">
                         <td colSpan={8} className="px-4 py-3">
@@ -281,7 +290,7 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <RowIconButton kind="edit" onClick={() => setEditingId(row.id)} label={`Edit ${row.playerName ?? row.schoolName} standing`} />
+                          <RowIconButton kind="edit" disabled={fetchError} onClick={() => setEditingId(row.id)} label={`Edit ${row.playerName ?? row.schoolName} standing`} />
                           <ConfirmDeleteButton
                             action={async () => {
                               const res = await deleteStanding(row.id);
