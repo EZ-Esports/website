@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockDb, mockTx, mockRequirePermission, mockRevalidatePath, mockRevalidateTag } = vi.hoisted(() => {
+const { mockDb, mockTx, mockRequirePermission, mockRevalidatePath, mockRevalidateTag, mockUpdateTag } = vi.hoisted(() => {
   const mockTx = {
     execute: vi.fn(),
     select: vi.fn(),
@@ -19,8 +19,9 @@ const { mockDb, mockTx, mockRequirePermission, mockRevalidatePath, mockRevalidat
   const mockRequirePermission = vi.fn();
   const mockRevalidatePath = vi.fn();
   const mockRevalidateTag = vi.fn();
+  const mockUpdateTag = vi.fn();
 
-  return { mockDb, mockTx, mockRequirePermission, mockRevalidatePath, mockRevalidateTag };
+  return { mockDb, mockTx, mockRequirePermission, mockRevalidatePath, mockRevalidateTag, mockUpdateTag };
 });
 
 vi.mock('@/app/lib/db', () => ({
@@ -34,6 +35,7 @@ vi.mock('@/app/lib/auth', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
   revalidateTag: (...args: unknown[]) => mockRevalidateTag(...args),
+  updateTag: (...args: unknown[]) => mockUpdateTag(...args),
 }));
 
 vi.mock('drizzle-orm', async (orig) => ({
@@ -164,7 +166,7 @@ describe('updateGalleryImagesOrder', () => {
       { id: 'id-2', displayOrder: 3 },
     ]);
 
-    expect(mockRevalidateTag).toHaveBeenCalledWith('gallery-images', {});
+    expect(mockUpdateTag).toHaveBeenCalledWith('gallery-images');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/gallery');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/');
   });

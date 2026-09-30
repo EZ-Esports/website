@@ -5,14 +5,14 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { classifyRole } from '@/db/backfill-leadership';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 
 function revalidateLeadership(years: (string | undefined | null)[]) {
-  revalidateTag('leadership', {});
-  revalidateTag('people', {});
+  updateTag('leadership');
+  updateTag('people');
   revalidatePath('/admin/leadership');
   revalidatePath('/leadership');
   for (const y of years) {

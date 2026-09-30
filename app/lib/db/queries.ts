@@ -540,7 +540,7 @@ export const getCachedLeadership = unstable_cache(
       );
   },
   ['leadership-list'],
-  { tags: ['leadership', 'people'] }
+  { tags: ['leadership', 'people', 'schools'] }
 );
 
 export const getCachedPeople = unstable_cache(

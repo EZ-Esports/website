@@ -31,20 +31,20 @@ an explicit `DATABASE_URL` — never by relying on `.env`.
 ## The Vercel Data Cache survives redeploys
 
 `unstable_cache` entries (tags: `games`, `schools`, `members`, `teams`,
-`seasons`, `matches`, `rosters`, `players`, `news`, `leadership`, `sponsors`,
-`page-content`, `gallery-images`, `recent-results`) are **infrastructure**, not
+`seasons`, `matches`, `rosters`, `players`, `news`, `leadership`, `people`, `sponsors`,
+`page-content`, `gallery-images`) are **infrastructure**, not
 build output. Redeploying does **not** clear them.
 
 This matters specifically after anything that changes row UUIDs (a
 delete-and-reinsert seed, a migration that regenerates ids): cached queries
 keep handing out ids that no longer exist, queries succeed and match nothing,
 and pages render empty while the database itself is fine. The fix is an
-explicit `revalidateTag(...)` call or a manual cache purge from the Vercel
+explicit `updateTag(...)` call or a manual cache purge from the Vercel
 dashboard — not a redeploy.
 
 A cheap way to force one without new tooling: edit any row through the
 relevant admin page and save with its existing values. Every admin action
-calls `revalidateTag` on save.
+calls `updateTag` on save.
 
 ## PII lives in `sharepoint/` and in pre-seed backups
 

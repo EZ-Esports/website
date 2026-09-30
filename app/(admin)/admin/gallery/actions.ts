@@ -5,7 +5,7 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, sql, isNull } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 import { ActionError } from '@/app/lib/errors';
@@ -62,7 +62,7 @@ export async function addGalleryImage(formData: FormData) {
     console.error('Failed to add gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
   }
-  revalidateTag('gallery-images', {});
+  updateTag('gallery-images');
   revalidatePath('/admin/gallery');
   revalidatePath('/');
   return { success: true };
@@ -102,7 +102,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
     return { success: false, error: sanitizeDbError(error) };
   }
 
-  revalidateTag('gallery-images', {});
+  updateTag('gallery-images');
   revalidatePath('/admin/gallery');
   revalidatePath('/');
   return { success: true };
@@ -157,7 +157,7 @@ export async function updateGalleryImagesOrder(orderedIds: string[]) {
     return { success: false, error: 'Could not update order. Please try again.' };
   }
 
-  revalidateTag('gallery-images', {});
+  updateTag('gallery-images');
   revalidatePath('/admin/gallery');
   revalidatePath('/');
   return { success: true };
@@ -175,7 +175,7 @@ export async function toggleGalleryImageActive(id: string, isActive: boolean) {
     return { success: false, error: 'Could not update status. Please try again.' };
   }
 
-  revalidateTag('gallery-images', {});
+  updateTag('gallery-images');
   revalidatePath('/admin/gallery');
   revalidatePath('/');
   return { success: true };
@@ -189,7 +189,7 @@ export async function deleteGalleryImage(id: string) {
   // Scope cleanup strictly to that entity's folder in Supabase Storage
   await cleanupEntityStorage('gallery', id);
 
-  revalidateTag('gallery-images', {});
+  updateTag('gallery-images');
   revalidatePath('/admin/gallery');
   revalidatePath('/');
 }

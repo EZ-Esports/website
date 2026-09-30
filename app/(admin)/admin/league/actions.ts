@@ -5,7 +5,7 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 
 function slugify(value: string): string {
@@ -18,8 +18,9 @@ function slugify(value: string): string {
 }
 
 function revalidateLeague() {
-  revalidateTag('games', {});
-  revalidateTag('seasons', {});
+  updateTag('games');
+  updateTag('seasons');
+  updateTag('teams');
   revalidatePath('/admin/league');
   revalidatePath('/admin/matches');
   revalidatePath('/admin/roster');
