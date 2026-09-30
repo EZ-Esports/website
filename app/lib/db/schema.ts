@@ -726,10 +726,13 @@ export const playerInvites = pgTable('player_invites', {
   submittedAt: timestamp('submitted_at'),
   reviewedAt: timestamp('reviewed_at'),
   rejectionReason: text('rejection_reason'),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  submissionDraft: jsonb('submission_draft'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('player_invites_school_game_idx').on(t.schoolId, t.gameId),
   uniqueIndex('player_invites_token_hash_idx').on(t.tokenHash),
+  index('player_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
 // 3. Player Game & Community Identities
