@@ -10,12 +10,27 @@ const LOGIN_WINDOW_MS = 15 * 60_000;
 const LOGIN_ACCOUNT_LIMIT = 5;
 const LOGIN_IP_LIMIT = 20;
 
-export async function login(formData: FormData) {
+export type LoginState = {
+  error?: string;
+} | null;
+
+export async function login(
+  prevStateOrFormData: LoginState | FormData,
+  formDataMaybe?: FormData
+): Promise<LoginState> {
+  const formData = formDataMaybe instanceof FormData
+    ? formDataMaybe
+    : (prevStateOrFormData instanceof FormData ? prevStateOrFormData : null);
+
+  if (!formData) {
+    return { error: 'Invalid form submission.' };
+  }
+
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
   if (!email || !password) {
-    return redirect('/login?error=' + encodeURIComponent('Email and password are required.'));
+    return { error: 'Email and password are required.' };
   }
 
   const headerList = await headers();
@@ -28,10 +43,9 @@ export async function login(formData: FormData) {
   // Rate limit on IP alone to prevent distributed credential stuffing
   const ipLimit = rateLimit(`login:ip:${ip}`, LOGIN_IP_LIMIT, LOGIN_WINDOW_MS);
   if (!ipLimit.allowed) {
-    return redirect(
-      '/login?error=' +
-        encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')
-    );
+    return {
+      error: 'Too many login attempts. Please try again in 15 minutes.',
+    };
   }
 
   // Rate limit per IP + account to protect against targeted password guessing / lockout attacks
@@ -41,10 +55,9 @@ export async function login(formData: FormData) {
     LOGIN_WINDOW_MS
   );
   if (!accountLimit.allowed) {
-    return redirect(
-      '/login?error=' +
-        encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')
-    );
+    return {
+      error: 'Too many login attempts. Please try again in 15 minutes.',
+    };
   }
 
   const supabase = await createClient();
@@ -55,10 +68,9 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    // Supabase auth messages are user-facing by design; pass them through.
-    // Fall back to a generic message if the error somehow has no message.
-    const msg = error.message || 'Sign-in failed. Please try again.';
-    return redirect('/login?error=' + encodeURIComponent(msg));
+    return {
+      error: error.message || 'Sign in failed. Please try again.',
+    };
   }
 
   // Clear caches and enter the staff portal. Permission assignment is not a
@@ -66,4 +78,3 @@ export async function login(formData: FormData) {
   revalidatePath('/', 'layout');
   return redirect('/admin');
 }
-

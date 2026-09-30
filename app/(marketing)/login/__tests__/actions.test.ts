@@ -58,20 +58,20 @@ describe('login server action', () => {
   });
 
   describe('validation', () => {
-    it('redirects with error if email is missing', async () => {
+    it('returns error if email is missing', async () => {
       const fd = createFormData({ password: 'secretpassword' });
-      await expect(login(fd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent('Email and password are required.')}`
-      );
+      const result = await login(null, fd);
+      expect(result).toEqual({ error: 'Email and password are required.' });
       expect(mockSignInWithPassword).not.toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
     });
 
-    it('redirects with error if password is missing', async () => {
+    it('returns error if password is missing', async () => {
       const fd = createFormData({ email: 'staff@example.com' });
-      await expect(login(fd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent('Email and password are required.')}`
-      );
+      const result = await login(null, fd);
+      expect(result).toEqual({ error: 'Email and password are required.' });
       expect(mockSignInWithPassword).not.toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
     });
   });
 
@@ -82,7 +82,7 @@ describe('login server action', () => {
         password: 'correctpassword',
       });
 
-      await expect(login(fd)).rejects.toThrow('REDIRECT:/admin');
+      await expect(login(null, fd)).rejects.toThrow('REDIRECT:/admin');
       expect(mockSignInWithPassword).toHaveBeenCalledWith({
         email: 'staff@example.com',
         password: 'correctpassword',
@@ -93,7 +93,7 @@ describe('login server action', () => {
   });
 
   describe('supabase auth error', () => {
-    it('redirects back to login with supabase error message', async () => {
+    it('returns supabase error message in action state', async () => {
       mockSignInWithPassword.mockResolvedValueOnce({
         error: { message: 'Invalid login credentials' },
       });
@@ -103,10 +103,10 @@ describe('login server action', () => {
         password: 'wrongpassword',
       });
 
-      await expect(login(fd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent('Invalid login credentials')}`
-      );
+      const result = await login(null, fd);
+      expect(result).toEqual({ error: 'Invalid login credentials' });
       expect(mockRevalidatePath).not.toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
     });
 
     it('falls back to generic error message if error has no message', async () => {
@@ -119,9 +119,9 @@ describe('login server action', () => {
         password: 'wrongpassword',
       });
 
-      await expect(login(fd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent('Sign-in failed. Please try again.')}`
-      );
+      const result = await login(null, fd);
+      expect(result).toEqual({ error: 'Sign in failed. Please try again.' });
+      expect(mockRedirect).not.toHaveBeenCalled();
     });
   });
 
@@ -138,19 +138,16 @@ describe('login server action', () => {
 
       // 5 attempts should pass through to Supabase
       for (let i = 1; i <= 5; i++) {
-        await expect(login(fd)).rejects.toThrow(
-          `REDIRECT:/login?error=${encodeURIComponent('Invalid login credentials')}`
-        );
+        const result = await login(null, fd);
+        expect(result).toEqual({ error: 'Invalid login credentials' });
       }
       expect(mockSignInWithPassword).toHaveBeenCalledTimes(5);
 
       // 6th attempt must be rate limited WITHOUT calling Supabase
-      await expect(login(fd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent(
-          'Too many login attempts. Please try again in 15 minutes.'
-        )}`
-      );
-      // Ensure supabase auth is not called for the blocked attempt
+      const result = await login(null, fd);
+      expect(result).toEqual({
+        error: 'Too many login attempts. Please try again in 15 minutes.',
+      });
       expect(mockSignInWithPassword).toHaveBeenCalledTimes(5);
     });
 
@@ -169,7 +166,8 @@ describe('login server action', () => {
 
       for (const email of variations) {
         const fd = createFormData({ email, password: 'wrong' });
-        await expect(login(fd)).rejects.toThrow('Invalid%20login%20credentials');
+        const result = await login(null, fd);
+        expect(result).toEqual({ error: 'Invalid login credentials' });
       }
 
       // 6th attempt with another variation of the same email should be locked out
@@ -177,11 +175,10 @@ describe('login server action', () => {
         email: '  uSeR@eXaMpLe.CoM  ',
         password: 'wrong',
       });
-      await expect(login(blockedFd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent(
-          'Too many login attempts. Please try again in 15 minutes.'
-        )}`
-      );
+      const result = await login(null, blockedFd);
+      expect(result).toEqual({
+        error: 'Too many login attempts. Please try again in 15 minutes.',
+      });
       expect(mockSignInWithPassword).toHaveBeenCalledTimes(5);
     });
   });
@@ -198,7 +195,8 @@ describe('login server action', () => {
           email: `user${i}@example.com`,
           password: 'password',
         });
-        await expect(login(fd)).rejects.toThrow('Invalid%20login%20credentials');
+        const result = await login(null, fd);
+        expect(result).toEqual({ error: 'Invalid login credentials' });
       }
       expect(mockSignInWithPassword).toHaveBeenCalledTimes(20);
 
@@ -207,11 +205,10 @@ describe('login server action', () => {
         email: 'brand-new-user@example.com',
         password: 'password',
       });
-      await expect(login(blockedFd)).rejects.toThrow(
-        `REDIRECT:/login?error=${encodeURIComponent(
-          'Too many login attempts. Please try again in 15 minutes.'
-        )}`
-      );
+      const result = await login(null, blockedFd);
+      expect(result).toEqual({
+        error: 'Too many login attempts. Please try again in 15 minutes.',
+      });
       expect(mockSignInWithPassword).toHaveBeenCalledTimes(20);
     });
 
@@ -227,7 +224,8 @@ describe('login server action', () => {
           email: 'admin@example.com',
           password: 'pass',
         });
-        await expect(login(fd)).rejects.toThrow('Invalid%20login%20credentials');
+        const result = await login(null, fd);
+        expect(result).toEqual({ error: 'Invalid login credentials' });
       }
 
       // 6th attempt from IP 1 is blocked
@@ -235,9 +233,10 @@ describe('login server action', () => {
         email: 'admin@example.com',
         password: 'pass',
       });
-      await expect(login(blockedFd)).rejects.toThrow(
-        encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')
-      );
+      const blockedResult = await login(null, blockedFd);
+      expect(blockedResult).toEqual({
+        error: 'Too many login attempts. Please try again in 15 minutes.',
+      });
 
       // Same account attempted from IP 2 is allowed
       mockHeaderValues({ 'x-forwarded-for': '198.51.100.2' });
@@ -246,7 +245,7 @@ describe('login server action', () => {
         email: 'admin@example.com',
         password: 'correct-pass',
       });
-      await expect(login(allowedFd)).rejects.toThrow('REDIRECT:/admin');
+      await expect(login(null, allowedFd)).rejects.toThrow('REDIRECT:/admin');
     });
   });
 
@@ -257,7 +256,7 @@ describe('login server action', () => {
         email: 'user@example.com',
         password: 'pass',
       });
-      await expect(login(fd)).rejects.toThrow('REDIRECT:/admin');
+      await expect(login(null, fd)).rejects.toThrow('REDIRECT:/admin');
     });
 
     it('falls back to x-real-ip if x-forwarded-for is not present', async () => {
@@ -266,7 +265,7 @@ describe('login server action', () => {
         email: 'user@example.com',
         password: 'pass',
       });
-      await expect(login(fd)).rejects.toThrow('REDIRECT:/admin');
+      await expect(login(null, fd)).rejects.toThrow('REDIRECT:/admin');
     });
 
     it('falls back to unknown if no IP headers are present', async () => {
@@ -275,7 +274,7 @@ describe('login server action', () => {
         email: 'user@example.com',
         password: 'pass',
       });
-      await expect(login(fd)).rejects.toThrow('REDIRECT:/admin');
+      await expect(login(null, fd)).rejects.toThrow('REDIRECT:/admin');
     });
   });
 });
