@@ -288,6 +288,13 @@
       "when": 1790836642760,
       "tag": "0040_workable_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790802255037,
+      "tag": "0041_bright_scrambler",
+      "breakpoints": true
     }
   ]
 }
