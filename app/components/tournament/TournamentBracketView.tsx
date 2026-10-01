@@ -2,9 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createBracket } from 'bracketry';
-import type { TournamentSeasonStructure, TournamentStageData, BracketMatch } from '@/app/lib/bracket';
+import type {
+  TournamentStructure,
+  TournamentStage,
+  TournamentMatch,
+} from '@/app/types/tournament';
 import { transformStageToBracketry } from '@/app/lib/bracket';
-import { BracketNode, BracketMatchModal } from './BracketNode';
+import { BracketMatchModal, GroupFixtureCard } from './BracketMatchModal';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
 
 function escapeHtml(str: string): string {
@@ -17,8 +21,8 @@ function escapeHtml(str: string): string {
 }
 
 interface BracketryCanvasProps {
-  stage: TournamentStageData;
-  onSelectMatch: (match: BracketMatch) => void;
+  stage: TournamentStage;
+  onSelectMatch: (match: TournamentMatch) => void;
 }
 
 function BracketryCanvas({ stage, onSelectMatch }: BracketryCanvasProps) {
@@ -99,26 +103,23 @@ function BracketryCanvas({ stage, onSelectMatch }: BracketryCanvasProps) {
 }
 
 interface TournamentBracketViewProps {
-  structure: TournamentSeasonStructure;
+  structure: TournamentStructure;
 }
 
 export default function TournamentBracketView({ structure }: TournamentBracketViewProps) {
-  // Determine available tabs
   const tabs: { id: string; label: string }[] = [];
 
-  // Stage tabs
   for (const stage of structure.stages) {
     tabs.push({ id: `stage-${stage.stage}`, label: stage.label });
   }
 
-  // Group tabs
   for (let i = 0; i < structure.groups.length; i++) {
     const group = structure.groups[i];
     tabs.push({ id: `group-${i}`, label: group.name });
   }
 
   const [activeTabId, setActiveTabId] = useState(tabs[0]?.id || '');
-  const [selectedMatch, setSelectedMatch] = useState<BracketMatch | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<TournamentMatch | null>(null);
 
   if (tabs.length === 0) {
     return (
@@ -128,7 +129,6 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
     );
   }
 
-  // Active stage or group
   const activeStage = structure.stages.find((s) => `stage-${s.stage}` === activeTabId);
   const activeGroup = structure.groups.find((_, i) => `group-${i}` === activeTabId);
 
@@ -227,10 +227,10 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
                 </thead>
                 <tbody>
                   {activeGroup.standings.map((row, idx) => (
-                    <Tr key={row.name}>
+                    <Tr key={row.playerTitle}>
                       <Td className="text-center font-bold">{idx + 1}</Td>
                       <Td>
-                        <div className="font-black text-foreground">{row.name}</div>
+                        <div className="font-black text-foreground">{row.playerTitle}</div>
                         <div className="text-[11px] text-foreground-muted">{row.schoolName}</div>
                       </Td>
                       <Td className="text-center font-bold tabular-nums">{row.played}</Td>
@@ -251,7 +251,7 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeGroup.matches.map((m) => (
-                <BracketNode
+                <GroupFixtureCard
                   key={m.id}
                   match={m}
                   onSelect={(match) => setSelectedMatch(match)}

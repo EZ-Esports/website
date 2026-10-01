@@ -4,6 +4,7 @@ import { asc, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from './index';
 import * as schema from './schema';
+import type { TournamentMatch, TournamentStageType } from '@/app/types/tournament';
 
 const homeSchool = alias(schema.schools, 'home_school');
 const awaySchool = alias(schema.schools, 'away_school');
@@ -80,8 +81,34 @@ export function buildTournamentMatchesQuery(tournamentId: string) {
 }
 
 /**
- * Retrieves all matches for a specific tournament with joined school details.
+ * Retrieves all matches for a specific tournament, mapped directly to domain TournamentMatch entities.
  */
-export async function getTournamentMatches(tournamentId: string) {
-  return buildTournamentMatchesQuery(tournamentId);
+export async function getTournamentMatches(tournamentId: string): Promise<TournamentMatch[]> {
+  const rows = await buildTournamentMatchesQuery(tournamentId);
+  return rows.map((row) => ({
+    id: row.id,
+    tournamentId: row.tournamentId,
+    stage: (row.stage as TournamentStageType) || 'other',
+    roundName: row.roundName,
+    roundOrder: row.roundOrder ?? 1,
+    matchOrder: row.matchOrder ?? 1,
+    bracketGroup: row.bracketGroup,
+    scheduledAt: row.scheduledAt,
+    status: row.status,
+    isForfeit: row.isForfeit,
+    home: {
+      playerTitle: row.homePlayerTitle || row.homeSchoolName || 'TBD',
+      schoolName: row.homeSchoolName || '',
+      score: row.homeScore,
+      isWinner: row.winnerSide === 'home',
+    },
+    away: {
+      playerTitle: row.awayPlayerTitle || row.awaySchoolName || 'TBD',
+      schoolName: row.awaySchoolName || '',
+      score: row.awayScore,
+      isWinner: row.winnerSide === 'away',
+    },
+    winnerSide: (row.winnerSide as 'home' | 'away' | 'draw' | null) ?? null,
+    notes: row.notes,
+  }));
 }

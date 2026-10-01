@@ -48,30 +48,8 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
     ? tournaments.find((t) => t.slug === targetSlug) || tournaments[tournaments.length - 1]
     : tournaments[tournaments.length - 1];
 
-  let rawMatches: Awaited<ReturnType<typeof getTournamentMatches>> = [];
-  if (selectedTournament) {
-    rawMatches = await getTournamentMatches(selectedTournament.id);
-  }
-
-  const structure = buildTournamentStructure(
-    rawMatches.map((m) => ({
-      id: m.id,
-      scheduledAt: m.scheduledAt.toISOString(),
-      homeTeam: m.homeSchoolName || 'TBD',
-      awayTeam: m.awaySchoolName || 'TBD',
-      homeScore: m.homeScore,
-      awayScore: m.awayScore,
-      status: m.status,
-      notes: m.notes,
-      stage: m.stage,
-      roundName: m.roundName,
-      roundOrder: m.roundOrder,
-      matchOrder: m.matchOrder,
-      bracketGroup: m.bracketGroup,
-      homeParticipantName: m.homePlayerTitle,
-      awayParticipantName: m.awayPlayerTitle,
-    }))
-  );
+  const matches = selectedTournament ? await getTournamentMatches(selectedTournament.id) : [];
+  const structure = buildTournamentStructure(matches);
 
   return (
     <main>
@@ -89,7 +67,7 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
           All match times are Eastern Time (ET).
         </p>
 
-        {(!selectedTournament || rawMatches.length === 0) && <MigrationNotice />}
+        {(!selectedTournament || matches.length === 0) && <MigrationNotice />}
 
         {/* Filters: tournament / season picker */}
         {tournaments.length > 1 && selectedTournament && (
