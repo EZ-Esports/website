@@ -17,10 +17,14 @@ Database mutating scripts (`db:migrate`, `db:push`, `db:seed:gold`,
 `db:seed:leadership`, `db:seed-owner`, leadership backfill) are gated by
 `assertSeedTargetAllowed()` (`db/seed-target.ts`), which refuses to run
 against anything but a loopback host unless
-`SEED_ALLOW_REMOTE=<exact-hostname>` is set. `npm run db:seed` has been
-retired because its legacy delete-and-reinsert pattern churned UUIDs and
+`SEED_ALLOW_REMOTE=<exact-hostname>` is set. Both gold archive ingestion
+(`npm run db:ingest:gold` / `db:seed:gold`) and leadership backfill
+(`npm run db:backfill:leadership` / `db:ingest:leadership`) support
+`--dry-run` to inspect the target database and print an entity-by-entity
+diff table without taking a backup or executing any mutations. `npm run db:seed`
+has been retired because its legacy delete-and-reinsert pattern churned UUIDs and
 caused stale-cache empty pages; canonical archive loads must use
-`npm run db:seed:gold` (which upserts without UUID churn).
+`npm run db:ingest:gold` (which upserts without UUID churn).
 **Do not treat that gate as permission.** It stops an accident; it does not
 substitute for asking the user before running a seed or a migration against
 production. Confirm first, every time, even though the code would technically allow it.

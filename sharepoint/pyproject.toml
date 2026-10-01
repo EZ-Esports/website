@@ -1,11 +1,16 @@
 [project]
-name = "test"
+name = "sharepoint"
 version = "0.1.0"
-description = "Add your description here"
+description = "EZ Esports historical data pipeline"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pandas",
     "openpyxl",
     "requests",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
 ]

@@ -19,8 +19,14 @@ python3 main.py               # bronze: download every ledger sheet -> bronze_da
 python3 normalize_silver.py   # silver: flat matches/rosters/standings CSVs
 python3 normalize_gold.py     # gold:   DB-shaped CSVs for the loaders below
 cd ..
-npm run db:seed:gold          # archive -> db (upserts; row ids are preserved)
-npm run db:seed:leadership    # staff   -> db (merges; only adds and fills)
+
+# Dry-run inspection (inspects target DB, computes diff, zero mutations):
+npm run db:ingest:gold -- --dry-run
+npm run db:ingest:leadership -- --dry-run
+
+# Apply updates (upserts; row IDs preserved, human edits preserved):
+npm run db:ingest:gold
+npm run db:ingest:leadership
 ```
 
 `main.py` and `normalize_silver.py` need the venv (`uv sync`; pandas,
@@ -54,19 +60,19 @@ openpyxl, requests). `normalize_gold.py` is stdlib-only.
   skipped while a season still has scheduled or unrecorded matches, so
   partial data never publishes a wrong champion.
 
-## Coverage (2026-07)
+## Coverage (2026-09)
 
-| Season | Valorant | LoL | TFT |
-|---|---|---|---|
-| 2021-22 | matches A/B, rosters, standings | matches, rosters, standings | rosters, standings |
-| 2022-23 | matches, rosters, standings | matches, rosters, standings | rosters, standings |
-| 2023-24 | matches, rosters, standings | matches (winner+MVP), rosters, derived standings | rosters, points standings |
-| 2024-25 | matches A/B (winner+MVP), standings+points — **no rosters** | — | — (see open items) |
-| 2025-26 | matches A/B (scores via bold-winner), rosters — ongoing | — | — |
+| Season | Valorant | LoL | TFT | TETR.IO |
+|---|---|---|---|---|
+| 2021-22 | matches A/B, rosters, standings | matches, rosters, standings | rosters, standings | — |
+| 2022-23 | matches, rosters, standings | matches, rosters, standings | rosters, standings | matches (Challonge a3h1ptdm), rosters, standings |
+| 2023-24 | matches, rosters, standings | matches (winner+MVP), rosters, derived standings | rosters, points standings | matches (Challonge ezesportstetrio), rosters, standings |
+| 2024-25 | matches A/B (winner+MVP), standings+points — **no rosters** | — | — (see open items) | matches (Challonge 5w6o4ch2), rosters, standings |
+| 2025-26 | matches A/B (scores via bold-winner), rosters — ongoing | — | — | matches (Challonge vtcrm8qc, bdywy3mg, rt1myii0), rosters, standings |
 
-Tetris and Minecraft are **deferred**: their results live on Challonge
-brackets (2022-23 pages on the old site; challonge.com/ezesportstetrio for
-2023-24) which block scraping. Only a 2023-24 Tetris lineup sheet exists.
+TETR.IO match results and tournament brackets were reconstructed from historical Challonge tournaments
+and registration archives across all four active seasons into `bronze_data/tetrio_<season>_*/`.
+Pipeline processors in `normalize_silver.py` ingest rosters, matches, and standings into silver and gold.
 
 ## Staff / leadership
 
