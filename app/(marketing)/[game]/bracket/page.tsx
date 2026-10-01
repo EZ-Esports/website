@@ -60,6 +60,13 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
       awayScore: m.awayScore,
       status: m.status,
       notes: m.notes,
+      stage: m.stage,
+      roundName: m.roundName,
+      roundOrder: m.roundOrder,
+      matchOrder: m.matchOrder,
+      bracketGroup: m.bracketGroup,
+      homeParticipantName: m.homeParticipantName,
+      awayParticipantName: m.awayParticipantName,
     }))
   );
 

@@ -203,6 +203,14 @@ export const matches = pgTable('matches', {
   status: matchStatusEnum('status').default('scheduled').notNull(),
   mvp: text('mvp'), // match MVP as recorded in season sheets, e.g. 'Kyle "Kuli" Ng'
   notes: text('notes'), // reschedules, DQs, data-quality caveats
+  // Tournament bracket metadata (nullable for non-tournament / regular season matches)
+  stage: text('stage'), // 'winners' | 'losers' | 'grand_finals' | 'knockout' | 'group'
+  roundName: text('round_name'), // e.g. 'Winners Pilot Round', 'Quarterfinals', 'Grand Finals'
+  roundOrder: integer('round_order'), // 1-based ordering for round progression
+  matchOrder: integer('match_order'), // 1-based ordering within a round
+  bracketGroup: text('bracket_group'), // e.g. 'Legends Group', 'Challengers Group'
+  homeParticipantName: text('home_participant_name'), // In tournament games, individual player IGN or squad label
+  awayParticipantName: text('away_participant_name'),
   // Natural key for the gold archive. Format:
   //   `${season}|${game_slug}|${home_school_slug}|${home_division}` +
   //   `|${away_school_slug}|${away_division}|${scheduled_at}#${n}`
@@ -229,6 +237,7 @@ export const matches = pgTable('matches', {
   index('matches_season_id_idx').on(table.seasonId),
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
+  index('matches_stage_idx').on(table.stage),
   uniqueIndex('matches_source_key_unique_idx').on(table.sourceKey),
 ]).enableRLS();
 

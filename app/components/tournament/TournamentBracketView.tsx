@@ -1,17 +1,108 @@
 'use client';
 
-import { useState } from 'react';
-import type { TournamentSeasonStructure, BracketMatch } from '@/app/lib/bracket';
+import { useState, useRef, useEffect } from 'react';
+import { createBracket } from 'bracketry';
+import type { TournamentSeasonStructure, TournamentStageData, BracketMatch } from '@/app/lib/bracket';
+import { transformStageToBracketry } from '@/app/lib/bracket';
 import { BracketNode, BracketMatchModal } from './BracketNode';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+interface BracketryCanvasProps {
+  stage: TournamentStageData;
+  onSelectMatch: (match: BracketMatch) => void;
+}
+
+function BracketryCanvas({ stage, onSelectMatch }: BracketryCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const { data, matchLookup } = transformStageToBracketry(stage);
+
+    // Calculate dynamic height based on match density
+    const maxMatchesInRound = Math.max(1, ...stage.rounds.map((r) => r.matches.length));
+    const calculatedHeight = Math.max(480, maxMatchesInRound * 130);
+
+    const bracketInstance = createBracket(data, containerRef.current, {
+      width: '100%',
+      height: `${calculatedHeight}px`,
+      rootBgColor: 'transparent',
+      rootBorderColor: 'transparent',
+      wrapperBorderColor: 'transparent',
+      connectionLinesColor: 'rgba(255, 255, 255, 0.18)',
+      connectionLinesWidth: 2,
+      highlightedConnectionLinesColor: '#EC3556',
+      hoveredMatchBorderColor: '#EC3556',
+      roundTitlesBorderColor: 'rgba(255, 255, 255, 0.1)',
+      roundTitleColor: '#F8FAFC',
+      matchTextColor: '#F8FAFC',
+      roundTitlesFontSize: 13,
+      roundTitlesVerticalPadding: 10,
+      matchMaxWidth: 260,
+      matchMinVerticalGap: 24,
+      matchHorMargin: 36,
+      useClassicalLayout: true,
+      scrollButtonSvgColor: '#EC3556',
+      navButtonSvgColor: '#EC3556',
+      getPlayerTitleHTML: (player) => {
+        const ign = player.title || 'TBD';
+        const school = player.nationality || '';
+        return `
+          <div style="display: flex; flex-direction: column; justify-content: center; line-height: 1.25; overflow: hidden; padding-right: 6px;">
+            <span style="font-weight: 700; font-size: 13px; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${escapeHtml(ign)}
+            </span>
+            ${
+              school
+                ? `<span style="font-size: 10px; font-weight: 500; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
+                    ${escapeHtml(school)}
+                  </span>`
+                : ''
+            }
+          </div>
+        `;
+      },
+      onMatchClick: (match) => {
+        if (typeof match.roundIndex === 'number' && typeof match.order === 'number') {
+          const original = matchLookup.get(`${match.roundIndex}_${match.order}`);
+          if (original) {
+            onSelectMatch(original);
+          }
+        }
+      },
+    });
+
+    return () => {
+      try {
+        bracketInstance?.uninstall();
+      } catch {
+        // no-op if already uninstalled
+      }
+    };
+  }, [stage, onSelectMatch]);
+
+  return (
+    <div className="bracketry-container w-full overflow-hidden rounded-2xl border border-line bg-surface-raised/40 p-4 shadow-xl">
+      <div ref={containerRef} className="w-full" />
+    </div>
+  );
+}
 
 interface TournamentBracketViewProps {
   structure: TournamentSeasonStructure;
 }
 
-export default function TournamentBracketView({
-  structure,
-}: TournamentBracketViewProps) {
+export default function TournamentBracketView({ structure }: TournamentBracketViewProps) {
   // Determine available tabs
   const tabs: { id: string; label: string }[] = [];
 
@@ -43,6 +134,37 @@ export default function TournamentBracketView({
 
   return (
     <div className="space-y-8">
+      {/* Global styling for bracketry matches to fit dark design tokens */}
+      <style jsx global>{`
+        .bracketry-container .match-body {
+          background: #14161b;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+          cursor: pointer;
+        }
+        .bracketry-container .match-body:hover {
+          border-color: #ec3556;
+          box-shadow: 0 6px 20px rgba(236, 53, 86, 0.3);
+          transform: translateY(-2px);
+        }
+        .bracketry-container .side-wrapper {
+          padding: 8px 12px;
+          background: #181b22;
+        }
+        .bracketry-container .side-wrapper:first-child {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .bracketry-container .round-titles-wrapper .round-title {
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #f8fafc;
+        }
+      `}</style>
+
       {/* Stage / Group Navigation Tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-line/60 pb-4">
         {tabs.map((tab) => {
@@ -63,9 +185,9 @@ export default function TournamentBracketView({
         })}
       </div>
 
-      {/* Bracket Rounds View */}
+      {/* Bracket Stage Visualization (Rendered with bracketry library) */}
       {activeStage && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg md:text-xl font-black text-foreground uppercase tracking-tight flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-accent" />
@@ -76,35 +198,10 @@ export default function TournamentBracketView({
             </span>
           </div>
 
-          {/* Horizontal scrollable rounds layout */}
-          <div className="overflow-x-auto pb-6 pt-2 no-scrollbar">
-            <div className="flex items-start gap-8 min-w-max px-1">
-              {activeStage.rounds.map((round) => (
-                <div key={round.name} className="flex flex-col gap-4">
-                  {/* Round Header */}
-                  <div className="bg-surface-raised/80 border border-line rounded-xl px-4 py-2 text-center shadow-sm">
-                    <span className="text-xs font-black uppercase tracking-wider text-foreground">
-                      {round.name}
-                    </span>
-                    <span className="block text-[10px] text-foreground-muted font-bold mt-0.5">
-                      {round.matches.length} {round.matches.length === 1 ? 'Match' : 'Matches'}
-                    </span>
-                  </div>
-
-                  {/* Matches Column with Vertical Spacing */}
-                  <div className="flex flex-col justify-around gap-6">
-                    {round.matches.map((m) => (
-                      <BracketNode
-                        key={m.id}
-                        match={m}
-                        onSelect={(match) => setSelectedMatch(match)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <BracketryCanvas
+            stage={activeStage}
+            onSelectMatch={(match) => setSelectedMatch(match)}
+          />
         </div>
       )}
 

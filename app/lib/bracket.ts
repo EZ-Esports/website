@@ -1,6 +1,6 @@
 /**
  * Pure parsing utilities and types for tournament structures (Brackets, Groups, Stages).
- * Deconstructs match notes, school/player pairs, and scores into structured bracket trees.
+ * Deconstructs structured database columns or match notes, school/player pairs, and scores into structured bracket trees.
  */
 
 export interface BracketParticipant {
@@ -13,6 +13,8 @@ export interface BracketParticipant {
 export interface BracketMatch {
   id: string;
   roundName: string;
+  roundOrder?: number | null;
+  matchOrder?: number | null;
   stage: 'winners' | 'losers' | 'grand_finals' | 'knockout' | 'group' | 'other';
   groupName?: string;  // e.g. "Legends Group", "Challengers Group"
   scheduledAt: string;
@@ -50,62 +52,71 @@ export interface TournamentSeasonStructure {
   groups: { name: string; standings: GroupTableStanding[]; matches: BracketMatch[] }[];
 }
 
+export interface RawMatchInput {
+  id: string;
+  scheduledAt: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  status: string;
+  notes?: string | null;
+  stage?: string | null;
+  roundName?: string | null;
+  roundOrder?: number | null;
+  matchOrder?: number | null;
+  bracketGroup?: string | null;
+  homeParticipantName?: string | null;
+  awayParticipantName?: string | null;
+}
+
 /**
- * Parses match note strings like:
- * - "Winners Pilot Round: Midwood#1 (Apersan & Shlare) vs Stuyvesant #5 (Ppnore & Jaytep)"
- * - "Grand Finals: Hunter #1 [BADGOBLIN & EPICGAMERMAN2] vs John Dewey [WOLFYAKUZA & KPLOVER]"
- * - "Knockout Semifinals: Quitekewl vs thedarksoar"
- * - "Legends Group Round 1: SloppyPotatoes vs YEKINDAR"
+ * Normalizes stage string to canonical type
  */
-export function parseMatchDetails(
-  match: {
-    id: string;
-    scheduledAt: string;
-    homeTeam: string;
-    awayTeam: string;
-    homeScore: number | null;
-    awayScore: number | null;
-    status: string;
-    notes?: string | null;
-  }
-): BracketMatch {
-  const notes = (match.notes || '').trim();
-  let roundName = 'Match';
-  let stage: BracketMatch['stage'] = 'other';
-  let groupName: string | undefined = undefined;
-  let p1Name = match.homeTeam;
-  let p2Name = match.awayTeam;
+function normalizeStage(stageStr: string): BracketMatch['stage'] {
+  const s = stageStr.toLowerCase();
+  if (s.includes('winner')) return 'winners';
+  if (s.includes('loser')) return 'losers';
+  if (s.includes('grand final')) return 'grand_finals';
+  if (s.includes('knockout') || s.includes('playoff')) return 'knockout';
+  if (s.includes('group')) return 'group';
+  return 'other';
+}
 
-  if (notes.includes(':')) {
-    const colonIndex = notes.indexOf(':');
-    roundName = notes.substring(0, colonIndex).trim();
-    const matchupStr = notes.substring(colonIndex + 1).trim();
+/**
+ * Parses match details prioritizing structured database columns,
+ * falling back gracefully to legacy colon-prefixed notes when columns are unset.
+ */
+export function parseMatchDetails(match: RawMatchInput): BracketMatch {
+  let roundName = match.roundName?.trim() || 'Match';
+  let stage: BracketMatch['stage'] = match.stage ? normalizeStage(match.stage) : 'other';
+  let groupName: string | undefined = match.bracketGroup?.trim() || undefined;
+  let p1Name = match.homeParticipantName?.trim() || match.homeTeam;
+  let p2Name = match.awayParticipantName?.trim() || match.awayTeam;
 
-    // Check stage type
-    const lowerRound = roundName.toLowerCase();
-    if (lowerRound.includes('winner')) {
-      stage = 'winners';
-    } else if (lowerRound.includes('loser')) {
-      stage = 'losers';
-    } else if (lowerRound.includes('grand final')) {
-      stage = 'grand_finals';
-    } else if (lowerRound.includes('knockout') || lowerRound.includes('playoff')) {
-      stage = 'knockout';
-    } else if (lowerRound.includes('group')) {
-      stage = 'group';
+  // Legacy fallback: parse free-text notes if structured columns are empty
+  if (!match.stage && !match.roundName) {
+    const notes = (match.notes || '').trim();
+    if (notes.includes(':')) {
+      const colonIndex = notes.indexOf(':');
+      roundName = notes.substring(0, colonIndex).trim();
+      const matchupStr = notes.substring(colonIndex + 1).trim();
+
+      stage = normalizeStage(roundName);
+      const lowerRound = roundName.toLowerCase();
       if (lowerRound.includes('legend')) {
         groupName = 'Legends Group';
       } else if (lowerRound.includes('challenger')) {
         groupName = 'Challengers Group';
       }
-    }
 
-    // Try extracting player IGNs if available: "SideA vs SideB"
-    if (matchupStr.toLowerCase().includes(' vs ')) {
-      const parts = matchupStr.split(/\s+vs\s+/i);
-      if (parts.length === 2) {
-        p1Name = parts[0].trim();
-        p2Name = parts[1].trim();
+      // Try extracting player IGNs if available: "SideA vs SideB"
+      if (matchupStr.toLowerCase().includes(' vs ')) {
+        const parts = matchupStr.split(/\s+vs\s+/i);
+        if (parts.length === 2) {
+          p1Name = parts[0].trim();
+          p2Name = parts[1].trim();
+        }
       }
     }
   }
@@ -121,6 +132,8 @@ export function parseMatchDetails(
   return {
     id: match.id,
     roundName,
+    roundOrder: match.roundOrder,
+    matchOrder: match.matchOrder,
     stage,
     groupName,
     scheduledAt: match.scheduledAt,
@@ -145,18 +158,7 @@ export function parseMatchDetails(
 /**
  * Builds full tournament stage & bracket structure from an array of matches.
  */
-export function buildTournamentStructure(
-  rawMatches: {
-    id: string;
-    scheduledAt: string;
-    homeTeam: string;
-    awayTeam: string;
-    homeScore: number | null;
-    awayScore: number | null;
-    status: string;
-    notes?: string | null;
-  }[]
-): TournamentSeasonStructure {
+export function buildTournamentStructure(rawMatches: RawMatchInput[]): TournamentSeasonStructure {
   const matches = rawMatches.map(parseMatchDetails);
 
   // Group by stages
@@ -199,7 +201,7 @@ export function buildTournamentStructure(
 
     const rounds: BracketRound[] = Array.from(roundMap.entries()).map(([name, rMatches]) => ({
       name,
-      matches: rMatches,
+      matches: rMatches.sort((a, b) => (a.matchOrder ?? 0) - (b.matchOrder ?? 0)),
     }));
 
     stages.push({
@@ -269,5 +271,118 @@ export function buildTournamentStructure(
     hasBrackets: stages.length > 0,
     stages,
     groups,
+  };
+}
+
+/**
+ * Adapter interface for the bracketry library
+ */
+export interface BracketryRound {
+  name: string;
+}
+
+export interface BracketrySide {
+  contestantId?: string;
+  scores?: { mainScore: number | string; isWinner?: boolean }[];
+  isWinner?: boolean;
+}
+
+export interface BracketryMatch {
+  roundIndex: number;
+  order: number;
+  sides: BracketrySide[];
+  matchStatus?: string;
+}
+
+export interface BracketryContestant {
+  players: {
+    title: string;
+    nationality?: string;
+  }[];
+}
+
+export interface BracketryData {
+  rounds: BracketryRound[];
+  matches: BracketryMatch[];
+  contestants: Record<string, BracketryContestant>;
+}
+
+/**
+ * Transforms a TournamentStageData structure into data suitable for the bracketry library,
+ * alongside a map to look up the original BracketMatch on click.
+ */
+export function transformStageToBracketry(stage: TournamentStageData): {
+  data: BracketryData;
+  matchLookup: Map<string, BracketMatch>;
+} {
+  const rounds: BracketryRound[] = [];
+  const matches: BracketryMatch[] = [];
+  const contestants: Record<string, BracketryContestant> = {};
+  const matchLookup = new Map<string, BracketMatch>();
+
+  stage.rounds.forEach((round, roundIndex) => {
+    rounds.push({ name: round.name });
+
+    round.matches.forEach((m, matchIndex) => {
+      const p1 = m.participant1;
+      const p2 = m.participant2;
+
+      // Unique contestant keys combining name and school
+      const c1Id = `${p1.schoolName}:::${p1.name}`;
+      const c2Id = `${p2.schoolName}:::${p2.name}`;
+
+      if (!contestants[c1Id]) {
+        contestants[c1Id] = {
+          players: [
+            {
+              title: p1.name,
+              nationality: p1.schoolName,
+            },
+          ],
+        };
+      }
+
+      if (!contestants[c2Id]) {
+        contestants[c2Id] = {
+          players: [
+            {
+              title: p2.name,
+              nationality: p2.schoolName,
+            },
+          ],
+        };
+      }
+
+      const sides: BracketrySide[] = [
+        {
+          contestantId: c1Id,
+          isWinner: p1.isWinner,
+          scores: p1.score !== null ? [{ mainScore: p1.score, isWinner: p1.isWinner }] : [],
+        },
+        {
+          contestantId: c2Id,
+          isWinner: p2.isWinner,
+          scores: p2.score !== null ? [{ mainScore: p2.score, isWinner: p2.isWinner }] : [],
+        },
+      ];
+
+      matches.push({
+        roundIndex,
+        order: matchIndex,
+        sides,
+        matchStatus: m.status,
+      });
+
+      matchLookup.set(`${roundIndex}_${matchIndex}`, m);
+    });
+  });
+
+  return {
+    data: {
+      rounds,
+      matches,
+      contestants,
+    },
+    matchLookup,
   };
 }

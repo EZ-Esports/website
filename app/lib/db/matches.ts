@@ -123,6 +123,13 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
       awayTeam: awaySchool.name,
       notes: schema.matches.notes,
       mvp: schema.matches.mvp,
+      stage: schema.matches.stage,
+      roundName: schema.matches.roundName,
+      roundOrder: schema.matches.roundOrder,
+      matchOrder: schema.matches.matchOrder,
+      bracketGroup: schema.matches.bracketGroup,
+      homeParticipantName: schema.matches.homeParticipantName,
+      awayParticipantName: schema.matches.awayParticipantName,
     })
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
@@ -176,6 +183,13 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
       awayTeam: awaySchool.name,
       notes: schema.matches.notes,
       mvp: schema.matches.mvp,
+      stage: schema.matches.stage,
+      roundName: schema.matches.roundName,
+      roundOrder: schema.matches.roundOrder,
+      matchOrder: schema.matches.matchOrder,
+      bracketGroup: schema.matches.bracketGroup,
+      homeParticipantName: schema.matches.homeParticipantName,
+      awayParticipantName: schema.matches.awayParticipantName,
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
