@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { createBracket } from 'bracketry';
 import type {
   TournamentStructure,
   TournamentStage,
@@ -29,66 +28,80 @@ function BracketryCanvas({ stage, onSelectMatch }: BracketryCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    let bracketInstance: { uninstall?: () => void } | null = null;
+    let isCancelled = false;
 
-    const { data, matchLookup } = transformStageToBracketry(stage);
+    async function initBracket() {
+      if (!containerRef.current) return;
 
-    // Calculate dynamic height based on match density
-    const maxMatchesInRound = Math.max(1, ...stage.rounds.map((r) => r.matches.length));
-    const calculatedHeight = Math.max(480, maxMatchesInRound * 130);
+      const { createBracket } = await import('bracketry');
+      if (isCancelled || !containerRef.current) return;
 
-    const bracketInstance = createBracket(data, containerRef.current, {
-      width: '100%',
-      height: `${calculatedHeight}px`,
-      rootBgColor: 'transparent',
-      rootBorderColor: 'transparent',
-      wrapperBorderColor: 'transparent',
-      connectionLinesColor: 'rgba(255, 255, 255, 0.18)',
-      connectionLinesWidth: 2,
-      highlightedConnectionLinesColor: '#EC3556',
-      hoveredMatchBorderColor: '#EC3556',
-      roundTitlesBorderColor: 'rgba(255, 255, 255, 0.1)',
-      roundTitleColor: '#F8FAFC',
-      matchTextColor: '#F8FAFC',
-      roundTitlesFontSize: 13,
-      roundTitlesVerticalPadding: 10,
-      matchMaxWidth: 260,
-      matchMinVerticalGap: 24,
-      matchHorMargin: 36,
-      useClassicalLayout: true,
-      scrollButtonSvgColor: '#EC3556',
-      navButtonSvgColor: '#EC3556',
-      getPlayerTitleHTML: (player) => {
-        const ign = player.title || 'TBD';
-        const school = player.nationality || '';
-        return `
-          <div style="display: flex; flex-direction: column; justify-content: center; line-height: 1.25; overflow: hidden; padding-right: 6px;">
-            <span style="font-weight: 700; font-size: 13px; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${escapeHtml(ign)}
-            </span>
-            ${
-              school
-                ? `<span style="font-size: 10px; font-weight: 500; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
-                    ${escapeHtml(school)}
-                  </span>`
-                : ''
+      containerRef.current.innerHTML = '';
+
+      const { data, matchLookup } = transformStageToBracketry(stage);
+
+      // Calculate dynamic height based on match density
+      const maxMatchesInRound = Math.max(1, ...stage.rounds.map((r) => r.matches.length));
+      const calculatedHeight = Math.max(480, maxMatchesInRound * 130);
+
+      bracketInstance = createBracket(data, containerRef.current, {
+        width: '100%',
+        height: `${calculatedHeight}px`,
+        rootBgColor: 'transparent',
+        rootBorderColor: 'transparent',
+        wrapperBorderColor: 'transparent',
+        connectionLinesColor: 'rgba(255, 255, 255, 0.18)',
+        connectionLinesWidth: 2,
+        highlightedConnectionLinesColor: '#EC3556',
+        hoveredMatchBorderColor: '#EC3556',
+        roundTitlesBorderColor: 'rgba(255, 255, 255, 0.1)',
+        roundTitleColor: '#F8FAFC',
+        matchTextColor: '#F8FAFC',
+        roundTitlesFontSize: 13,
+        roundTitlesVerticalPadding: 10,
+        matchMaxWidth: 260,
+        matchMinVerticalGap: 24,
+        matchHorMargin: 36,
+        useClassicalLayout: true,
+        scrollButtonSvgColor: '#EC3556',
+        navButtonSvgColor: '#EC3556',
+        getNationalityHTML: () => '',
+        getPlayerTitleHTML: (player) => {
+          const ign = player.title || 'TBD';
+          const school = player.nationality || '';
+          return `
+            <div style="display: flex; flex-direction: column; justify-content: center; line-height: 1.25; overflow: hidden; padding-right: 6px;">
+              <span style="font-weight: 700; font-size: 13px; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(ign)}
+              </span>
+              ${
+                school
+                  ? `<span style="font-size: 10px; font-weight: 500; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
+                      ${escapeHtml(school)}
+                    </span>`
+                  : ''
+              }
+            </div>
+          `;
+        },
+        onMatchClick: (match) => {
+          if (typeof match.roundIndex === 'number' && typeof match.order === 'number') {
+            const original = matchLookup.get(`${match.roundIndex}_${match.order}`);
+            if (original) {
+              onSelectMatch(original);
             }
-          </div>
-        `;
-      },
-      onMatchClick: (match) => {
-        if (typeof match.roundIndex === 'number' && typeof match.order === 'number') {
-          const original = matchLookup.get(`${match.roundIndex}_${match.order}`);
-          if (original) {
-            onSelectMatch(original);
           }
-        }
-      },
-    });
+        },
+      });
+    }
+
+    initBracket();
 
     return () => {
+      isCancelled = true;
       try {
-        bracketInstance?.uninstall();
+        bracketInstance?.uninstall?.();
       } catch {
         // no-op if already uninstalled
       }
@@ -156,6 +169,20 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
         }
         .bracketry-container .side-wrapper:first-child {
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .bracketry-container .match-status {
+          display: none !important;
+        }
+        .bracketry-container .main-score {
+          font-weight: 800;
+          font-size: 13px;
+          color: #f8fafc;
+        }
+        .bracketry-container .side-wrapper.winner .main-score {
+          color: #ec3556;
+        }
+        .bracketry-container .side-wrapper.winner {
+          background: #1e222b;
         }
         .bracketry-container .round-titles-wrapper .round-title {
           font-weight: 800;

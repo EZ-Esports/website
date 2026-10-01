@@ -6,7 +6,7 @@ import { Tabs, TabList, Tab, TabPanel } from 'react-aria-components';
 import { cx } from '@/app/lib/cx';
 import Card from '@/app/components/ui/Card';
 import type { GameAccent, GameSlug } from '@/app/types';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
+import { GAMES } from '@/app/lib/constants';
 
 export interface ArchiveSeason {
   id: string;
@@ -30,6 +30,7 @@ export interface ArchiveGameGroup {
 
 interface ArchiveCommandDeckProps {
   games: ArchiveGameGroup[];
+  defaultGame?: GameSlug;
 }
 
 /** CSS custom properties threaded through as inline style so Tailwind arbitrary-value utilities (bg-[var(--game)], etc.) can consume them. */
@@ -143,6 +144,7 @@ function GameDashboard({ game }: { game: ArchiveGameGroup }) {
   const maxMatches = Math.max(1, ...seasons.map((s) => s.matchCount));
   const totalMatches = seasons.reduce((sum, s) => sum + s.matchCount, 0);
   const championSchools = new Set(seasons.map((s) => s.championSchool).filter((s): s is string => Boolean(s)));
+  const isTournament = GAMES[game.slug]?.competitionModel === 'tournament';
 
   return (
     <div style={gameThemeStyle(game)}>
@@ -239,18 +241,29 @@ function GameDashboard({ game }: { game: ArchiveGameGroup }) {
                 {season.matchCount}
               </span>
               <div role="cell" className="flex gap-1.5 justify-start sm:justify-end">
-                <Link
-                  href={scheduleHref}
-                  className="px-2.5 py-1.5 rounded-md border border-line text-foreground-secondary text-[10.5px] font-black uppercase tracking-wide whitespace-nowrap transition-colors hover:border-[var(--game)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                >
-                  Schedule
-                </Link>
-                <Link
-                  href={standingsHref}
-                  className="px-2.5 py-1.5 rounded-md border border-line text-foreground-secondary text-[10.5px] font-black uppercase tracking-wide whitespace-nowrap transition-colors hover:border-[var(--game)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                >
-                  Standings
-                </Link>
+                {isTournament ? (
+                  <Link
+                    href={`/${season.gameSlug}/bracket?season=${encodeURIComponent(season.name)}`}
+                    className="px-3 py-1.5 rounded-md border border-line text-foreground-secondary text-[10.5px] font-black uppercase tracking-wide whitespace-nowrap transition-colors hover:border-[var(--game)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  >
+                    Bracket
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href={scheduleHref}
+                      className="px-2.5 py-1.5 rounded-md border border-line text-foreground-secondary text-[10.5px] font-black uppercase tracking-wide whitespace-nowrap transition-colors hover:border-[var(--game)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                    >
+                      Schedule
+                    </Link>
+                    <Link
+                      href={standingsHref}
+                      className="px-2.5 py-1.5 rounded-md border border-line text-foreground-secondary text-[10.5px] font-black uppercase tracking-wide whitespace-nowrap transition-colors hover:border-[var(--game)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                    >
+                      Standings
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           );
@@ -260,11 +273,15 @@ function GameDashboard({ game }: { game: ArchiveGameGroup }) {
   );
 }
 
-export default function ArchiveCommandDeck({ games }: ArchiveCommandDeckProps) {
+export default function ArchiveCommandDeck({ games, defaultGame }: ArchiveCommandDeckProps) {
   if (games.length === 0) return null;
 
+  const validDefault = defaultGame && games.some((g) => g.slug === defaultGame)
+    ? defaultGame
+    : games[0]!.slug;
+
   return (
-    <Tabs defaultSelectedKey={games[0]!.slug}>
+    <Tabs defaultSelectedKey={validDefault}>
       {/* Game switcher: GameSubHeader idiom (accent dot + label, divider, pill tabs) driven by real Tabs selection state. */}
       <div className="flex items-center gap-3 sm:gap-4 px-4 py-2.5 bg-surface-raised border border-line rounded-xl mb-5 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-2 shrink-0 select-none">
@@ -300,9 +317,11 @@ export default function ArchiveCommandDeck({ games }: ArchiveCommandDeckProps) {
       {games.map((game) => (
         <TabPanel key={game.slug} id={game.slug} className="outline-none">
           {game.seasons.length === 0 ? (
-            <div className="py-6">
-              <MigrationNotice />
-            </div>
+            <Card className="text-center py-12 my-6">
+              <p className="text-foreground-secondary text-sm font-medium">
+                No archived seasons recorded for {game.displayName} yet.
+              </p>
+            </Card>
           ) : (
             <GameDashboard game={game} />
           )}

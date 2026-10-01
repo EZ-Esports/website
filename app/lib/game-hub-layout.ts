@@ -17,6 +17,7 @@
 export type GameHubTileId =
   | 'season-summary'
   | 'next-match'
+  | 'bracket'
   | 'standings'
   | 'last-result'
   | 'recent-results'
@@ -28,6 +29,8 @@ export interface GameHubLayoutInput {
   hasNextMatch: boolean;
   /** Completed matches available; the first becomes "last result", the rest "recent results". */
   recentResultsCount: number;
+  /** Tournament bracket available (for tournament games) */
+  hasBracket?: boolean;
 }
 
 export interface GameHubTileLayout {
@@ -133,11 +136,7 @@ interface TileCandidate {
    * Whether this tile reads acceptably at half the tablet width (~300px).
    *
    * A content judgement, deliberately independent of the desktop span: the
-   * tablet grid is two columns of its own, not a scaled-down desktop. Tiles
-   * carrying display-size type (`next-match`, `season-summary`), a four-column
-   * table (`standings`) or a list of rows with a trailing badge
-   * (`recent-results`) need both columns; a single score and a short blurb do
-   * not.
+   * tablet grid is two columns of its own, not a scaled-down desktop.
    */
   tabletHalf: boolean;
 }
@@ -145,21 +144,19 @@ interface TileCandidate {
 /**
  * Which tiles the page renders, in DOM order, for a given data state.
  *
- * `season-summary` appears exactly when the division has nothing renderable —
- * whether or not a season is on record. There is one grid for every state.
+ * `season-summary` appears exactly when the division has nothing renderable.
  */
 function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
-  const { hasStandings, hasNextMatch, recentResultsCount } = input;
-  const hasSeasonData = hasStandings || hasNextMatch || recentResultsCount > 0;
+  const { hasStandings, hasNextMatch, recentResultsCount, hasBracket } = input;
+  const hasSeasonData = hasStandings || hasNextMatch || recentResultsCount > 0 || !!hasBracket;
   const candidates: TileCandidate[] = [];
 
   if (!hasSeasonData) {
     candidates.push({
       id: 'season-summary',
       variants: [
-        { colSpan: 2, rowSpan: 1 },
         { colSpan: 4, rowSpan: 1 },
-        { colSpan: 3, rowSpan: 1 },
+        { colSpan: 2, rowSpan: 1 },
       ],
       weight: 2,
       tabletHalf: false,
@@ -172,20 +169,31 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
       variants: [
         { colSpan: 4, rowSpan: 1 },
         { colSpan: 2, rowSpan: 1 },
-        { colSpan: 3, rowSpan: 1 },
+      ],
+      weight: 3,
+      tabletHalf: false,
+    });
+  }
+  if (hasBracket) {
+    candidates.push({
+      id: 'bracket',
+      variants: [
+        { colSpan: 2, rowSpan: 1 },
+        { colSpan: 4, rowSpan: 1 },
       ],
       weight: 3,
       tabletHalf: false,
     });
   }
   if (hasStandings) {
+    // When paired with recent results, double-height on the left cleanly balances
+    // stacked results on the right. When alone or paired with bracket, 2x1 or 4x1 packs.
     candidates.push({
       id: 'standings',
       variants: [
         { colSpan: 2, rowSpan: 2 },
         { colSpan: 2, rowSpan: 1 },
         { colSpan: 4, rowSpan: 1 },
-        { colSpan: 3, rowSpan: 1 },
       ],
       weight: 3,
       tabletHalf: false,
@@ -195,8 +203,9 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
     candidates.push({
       id: 'last-result',
       variants: [
-        { colSpan: 1, rowSpan: 1 },
         { colSpan: 2, rowSpan: 1 },
+        { colSpan: 4, rowSpan: 1 },
+        { colSpan: 1, rowSpan: 1 },
       ],
       weight: 1,
       tabletHalf: true,
@@ -207,26 +216,12 @@ function buildCandidates(input: GameHubLayoutInput): TileCandidate[] {
       id: 'recent-results',
       variants: [
         { colSpan: 2, rowSpan: 1 },
-        { colSpan: 3, rowSpan: 1 },
         { colSpan: 4, rowSpan: 1 },
       ],
       weight: 2,
       tabletHalf: false,
     });
   }
-  // Always present, and the most elastic tile: it closes the grid, so it takes
-  // whatever width the rows above leave for it.
-  candidates.push({
-    id: 'archives',
-    variants: [
-      { colSpan: 4, rowSpan: 1 },
-      { colSpan: 3, rowSpan: 1 },
-      { colSpan: 2, rowSpan: 1 },
-      { colSpan: 1, rowSpan: 1 },
-    ],
-    weight: 1,
-    tabletHalf: true,
-  });
 
   return candidates;
 }

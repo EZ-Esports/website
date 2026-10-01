@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   GAMES,
+  ROUTES,
   getGameFromPath,
   getGameSubRoute,
   getGameRoute,
@@ -38,11 +39,15 @@ export default function GameSubHeader() {
       isActive: isGameOverviewPath(pathname, gameSlug),
     },
     { label: competitionLabel, href: competitionRoute },
-    { label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') },
+    ...(!isTournament ? [{ label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') }] : []),
     {
       label: teamsLabel,
       href: teamsRoute,
       isActive: isTeamsActive,
+    },
+    {
+      label: 'Archives',
+      href: `${ROUTES.archives}?game=${gameSlug}`,
     },
   ];
 

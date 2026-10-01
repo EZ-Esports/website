@@ -3,13 +3,22 @@ import { buildGameTournamentsQuery, buildTournamentMatchesQuery } from '@/app/li
 import * as schema from '@/app/lib/db/schema';
 
 describe('Tournaments and Tournament Matches DAL Architecture', () => {
-  it('builds getGameTournaments query joining games and filtering by slug', () => {
+  it('builds getGameTournaments query joining games and seasons, filtering by DB slug', () => {
     const query = buildGameTournamentsQuery('tetr-io');
     const { sql, params } = query.toSQL();
 
     expect(sql).toContain('"tournaments"');
     expect(sql).toContain('"games"');
+    expect(sql).toContain('"seasons"');
     expect(sql.toLowerCase()).toContain('where "games"."slug" = $1');
+    expect(sql.toLowerCase()).toContain('order by "tournaments"."slug" desc');
+    expect(params).toEqual(['tetr-io']);
+  });
+
+  it('maps canonical route slug "tetris" to DB slug "tetr-io"', () => {
+    const query = buildGameTournamentsQuery('tetris');
+    const { params } = query.toSQL();
+
     expect(params).toEqual(['tetr-io']);
   });
 

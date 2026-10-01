@@ -201,7 +201,6 @@ export function transformStageToBracketry(stage: TournamentStage): {
             scores: m.away.score !== null ? [{ mainScore: m.away.score, isWinner: m.away.isWinner }] : [],
           },
         ],
-        matchStatus: m.status,
       });
 
       matchLookup.set(`${roundIndex}_${matchIndex}`, m);

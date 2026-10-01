@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { GAMES, GAME_SLUGS, ROUTES, getGameDivisionRoute, getGameSubRoute } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
@@ -8,14 +9,13 @@ import Badge, { resultVariant } from '@/app/components/ui/Badge';
 import FilterTabs from '@/app/components/ui/FilterTabs';
 import Button from '@/app/components/ui/Button';
 import { Table, Th, Td, Tr } from '@/app/components/ui/Table';
-import { getGameHubData } from '@/app/lib/db/queries';
+import { getGameHubData, getGameTournaments } from '@/app/lib/db/queries';
 import {
   COMBINED_DIVISION,
   HUB_DIVISIONS,
   divisionLabel,
   type HubDivision,
 } from '@/app/lib/db/match-page';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
 import { cx } from '@/app/lib/cx';
 import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
@@ -106,6 +106,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
   const { game } = await params;
   const gameConfig = GAMES[game as GameSlug];
   const slug = game as GameSlug;
+  const isTournament = gameConfig.competitionModel === 'tournament';
 
   // The division is a route segment, so it is one of exactly two values and
   // needs no validation. The router 404s anything else before this runs.
@@ -156,6 +157,12 @@ export default async function GameHubView({ params, division }: GameHubViewProps
    */
   const lacksJvSplit = division === 'JV' && !gameConfig.hasJvSplit;
 
+  let latestTournament = null;
+  if (isTournament) {
+    const tournaments = await getGameTournaments(slug);
+    latestTournament = tournaments[0] ?? null;
+  }
+
   /**
    * Tile spans are planned by simulating CSS grid's row-flow auto-placement
    * (see `app/lib/game-hub-layout.ts`), because "cells consumed so far" says
@@ -166,6 +173,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
     hasStandings: topTeams.length > 0,
     hasNextMatch: nextMatch !== null,
     recentResultsCount: recentResults.length,
+    hasBracket: isTournament && latestTournament !== null,
   });
 
   /**
@@ -182,10 +190,10 @@ export default async function GameHubView({ params, division }: GameHubViewProps
   };
   const seasonSummarySpan = spanClass('season-summary');
   const nextMatchSpan = spanClass('next-match');
+  const bracketSpan = spanClass('bracket');
   const standingsSpan = spanClass('standings');
   const lastResultSpan = spanClass('last-result');
   const recentResultsSpan = spanClass('recent-results');
-  const archivesSpan = spanClass('archives');
 
   const themeStyle: GameThemeStyle = {
     '--game-accent': gameConfig.accent.color,
@@ -242,22 +250,14 @@ export default async function GameHubView({ params, division }: GameHubViewProps
           </div>
         </div>
 
-        <FilterTabs
-          tabs={divisionTabs}
-          active={division}
-          ariaLabel="Division"
-          className="mb-5 flex-wrap"
-        />
-
-        {/* A failed fetch now throws and hits the route's error boundary, so
-            what's left here is a real gap: no active season resolved, or one
-            resolved with nothing in it yet, the only case this notice is
-            warranted for. Never on a `lacksJvSplit` route: that page is empty
-            by design, forever, not because data is still being migrated in. */}
-        {!lacksJvSplit &&
-          (!seasonName || (topTeams.length === 0 && !nextMatch && recentResults.length === 0)) && (
-            <MigrationNotice />
-          )}
+        {!isTournament && (
+          <FilterTabs
+            tabs={divisionTabs}
+            active={division}
+            ariaLabel="Division"
+            className="mb-5 flex-wrap"
+          />
+        )}
 
         {/* Page level, alongside the other notice, rather than inside the
             standings tile: the fact is about the season, not about one tile, and
@@ -316,18 +316,18 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               {seasonName && (
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button
-                    href={getGameSubRoute(slug, 'standings')}
+                    href={isTournament ? getGameSubRoute(slug, 'bracket') : getGameSubRoute(slug, 'standings')}
                     variant="outline"
                     className="min-h-[44px]"
                   >
-                    Standings
+                    {isTournament ? 'Bracket' : 'Standings'}
                   </Button>
                   <Button
                     href={getGameSubRoute(slug, 'teams')}
                     variant="outline"
                     className="min-h-[44px]"
                   >
-                    Teams &amp; rosters
+                    {isTournament ? 'Participants & rosters' : 'Teams & rosters'}
                   </Button>
                 </div>
               )}
@@ -376,6 +376,46 @@ export default async function GameHubView({ params, division }: GameHubViewProps
             </Tile>
           )}
 
+          {bracketSpan && latestTournament && (
+            <Tile
+              title="Tournament Bracket"
+              href={getGameSubRoute(slug, 'bracket')}
+              linkLabel="View Bracket"
+              className={bracketSpan}
+            >
+              <div className="flex flex-col h-full justify-between gap-5">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <Badge variant="accent" size="sm">
+                      {latestTournament.format.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </Badge>
+                    {latestTournament.isSeasonActive && (
+                      <Badge variant="success" size="sm" dot>
+                        Active Season
+                      </Badge>
+                    )}
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+                    {latestTournament.name}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-foreground-secondary">
+                    Follow match progression, live bracket rounds, and stage results as competitors advance to the championship.
+                  </p>
+                </div>
+                <div>
+                  <Button
+                    href={getGameSubRoute(slug, 'bracket')}
+                    variant="primary"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                  >
+                    Open Interactive Bracket →
+                  </Button>
+                </div>
+              </div>
+            </Tile>
+          )}
+
           {standingsSpan && (
             <Tile
               // Named for the division on screen: this table was always
@@ -385,14 +425,24 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               // would be the lie instead: `${divisionLabel(division)} standings`
               // asserts a Varsity-only table that this competition never
               // produced, and the JV route asserts the same about the other half.
-              title={combinedStandings ? 'Season standings' : `${divisionLabel(division)} standings`}
+              title={
+                isTournament
+                  ? 'Group Stage Standings'
+                  : combinedStandings
+                    ? 'Season standings'
+                    : `${divisionLabel(division)} standings`
+              }
               // Likewise the link: `?division=Varsity` names a division the
               // season does not have, and the standings page's only tab is
               // `Combined`.
-              href={`${getGameSubRoute(slug, 'standings')}?division=${
-                combinedStandings ? COMBINED_DIVISION : division
-              }`}
-              linkLabel="Full table"
+              href={
+                isTournament
+                  ? getGameSubRoute(slug, 'bracket')
+                  : `${getGameSubRoute(slug, 'standings')}?division=${
+                      combinedStandings ? COMBINED_DIVISION : division
+                    }`
+              }
+              linkLabel={isTournament ? 'View in Bracket' : 'Full table'}
               flush
               className={standingsSpan}
             >
@@ -534,17 +584,18 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               </ul>
             </Tile>
           )}
+        </div>
 
-          <Tile
-            title="Season archives"
-            href={ROUTES.archives}
-            linkLabel="Archives"
-            className={archivesSpan}
+        {/* Subtle historical archives link: contextual and clean, not a giant empty bento box */}
+        <div className="mt-10 pt-6 border-t border-line/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm text-foreground-secondary">
+          <p>Looking for previous seasons, past match history, or champion schools?</p>
+          <Link
+            href={`${ROUTES.archives}?game=${slug}`}
+            className="inline-flex items-center gap-1.5 font-bold text-foreground hover:text-accent transition-colors shrink-0"
           >
-            <p className="text-sm leading-relaxed text-foreground-secondary">
-              {`Every past ${gameConfig.displayName} season in one place: final standings, champion schools, and the full match history behind them.`}
-            </p>
-          </Tile>
+            <span>Browse {gameConfig.displayName} Archives</span>
+            <span aria-hidden="true">→</span>
+          </Link>
         </div>
       </Section>
     </div>

@@ -3,16 +3,25 @@ import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Card from '@/app/components/ui/Card';
 import { getArchiveIndex } from '@/app/lib/db/queries';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import ArchiveCommandDeck, { type ArchiveGameGroup } from '@/app/components/sections/ArchiveCommandDeck';
 import { GAMES, GAME_SLUGS, canonicalGameSlug } from '@/app/lib/constants';
+import type { GameSlug } from '@/app/types';
 
 export const metadata: Metadata = {
   title: 'Archives | EZ Esports',
   description: 'Explore past EZ Esports match results, standings, and seasonal records from previous league seasons.',
 };
 
-export default async function ArchivesPage() {
+interface ArchivesPageProps {
+  searchParams: Promise<{ game?: string }>;
+}
+
+export default async function ArchivesPage({ searchParams }: ArchivesPageProps) {
+  const { game: gameParam } = await searchParams;
+  const defaultGame = gameParam && GAME_SLUGS.includes(canonicalGameSlug(gameParam) as GameSlug)
+    ? (canonicalGameSlug(gameParam) as GameSlug)
+    : undefined;
+
   // No try/catch here: a failed query should surface as a real error, not
   // silently collapse into an empty archive. The marketing route's error
   // boundary (`app/(marketing)/error.tsx`) handles it instead.
@@ -48,10 +57,6 @@ export default async function ArchivesPage() {
           title="Archives"
           lead="Every season at a glance: matches played, champion schools, and a shape of the league's history across every game."
         />
-        {/* A failed fetch now throws and hits the route's error boundary, so
-            an empty archive here is a real "nothing archived yet", the only
-            case left where this notice is warranted. */}
-        {seasons.length === 0 && <MigrationNotice />}
 
         {seasons.length === 0 ? (
           <Card className="max-w-2xl mx-auto text-center py-12">
@@ -60,7 +65,7 @@ export default async function ArchivesPage() {
             </p>
           </Card>
         ) : (
-          <ArchiveCommandDeck games={games} />
+          <ArchiveCommandDeck games={games} defaultGame={defaultGame} />
         )}
       </Section>
     </main>

@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
@@ -11,7 +11,6 @@ import { normalizeSort, resolveSelectedSeason, toMatchesPageDto, toScheduleCalen
 import CalendarSchedule from './CalendarSchedule';
 import ArchiveMatchList from './ArchiveMatchList';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 
 
 interface SchedulePageProps {
@@ -40,7 +39,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
 
   const gameConfig = GAMES[game as GameSlug];
   if (gameConfig.competitionModel === 'tournament') {
-    notFound();
+    redirect(`/${game}/bracket${seasonParam ? `?season=${encodeURIComponent(seasonParam)}` : ''}`);
   }
 
   // No try/catch here: a failed query should surface as a real error, not
@@ -87,12 +86,6 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
         <p className="text-xs text-foreground-muted -mt-8 mb-8 text-center font-medium">
           All match times are Eastern Time (ET).
         </p>
-        {/* A failed fetch now throws and hits the route's error boundary, so
-            an empty schedule here is a real "nothing yet", the only case
-            left where this notice is warranted. */}
-        {(!selectedSeason || (calendarMatches.length === 0 && archivePage.items.length === 0)) && (
-          <MigrationNotice />
-        )}
 
         {/* Filters: division tabs, season picker, sort (archive only) */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
