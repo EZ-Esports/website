@@ -1237,7 +1237,536 @@ def process_standings_2024_25_val(records):
                 'notes': ' | '.join(note_parts) if note_parts else None
             })
 
+
+# ---------------------------------------------------------------------------
+# TETR.IO processors
+#
+# TETR.IO match results live on Challonge brackets, which block scraping.
+# When source data is available it should be placed at the paths noted in each
+# processor below, as a CSV with the columns described in that function's
+# docstring.  Each processor is a no-op (returns immediately) when its source
+# file is absent, so dropping a file in automatically activates it on the next
+# silver run.
+#
+# game_id used throughout: 'tetrio'
+# standings_format: 'all' (single-bracket tournament, no A/B division split)
+# ---------------------------------------------------------------------------
+
+def process_rosters_2022_23_tetrio(records):
+    """Rosters for 2022-23 TETR.IO tournament.
+
+    Drop rosters at:
+      bronze_data/tetrio_2022-23_rosters/rosters.csv
+    """
+    path = 'bronze_data/tetrio_2022-23_rosters/rosters.csv'
+    if not os.path.exists(path):
+        return
+    df = pd.read_csv(path)
+    n = 0
+    for idx, row in df.iterrows():
+        school = row.get('school_id') or row.get('School')
+        name   = row.get('player_name') or row.get('Player Name') or row.get('Name')
+        ign    = row.get('ign') or row.get('IGN')
+        discord = row.get('discord') or row.get('Discord')
+        grade   = row.get('grade') or row.get('Grade')
+
+        if pd.isna(school) and pd.isna(name) and pd.isna(ign):
+            continue
+
+        s_id = clean_school_id(school) if pd.notna(school) else ''
+        name_str = str(name).strip() if pd.notna(name) else ''
+        parts = name_str.split(None, 1)
+        first = parts[0] if parts else ''
+        last  = parts[1] if len(parts) > 1 else ''
+        n += 1
+        records.append({
+            'player_id': f'tetrio2223_{n:04d}',
+            'season_id': '2022-23',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'first_name': first or None,
+            'last_name': last or None,
+            'full_name': name_str or None,
+            'ign': str(ign).strip() if pd.notna(ign) else None,
+            'discord_username': str(discord).strip() if pd.notna(discord) else None,
+            'pronouns': None,
+            'role': 'Player',
+            'mvp_count': 0,
+            'tracker_url': None,
+            'notes': f'Grade: {grade}' if pd.notna(grade) and str(grade).strip() else None,
+        })
+
+
+def process_matches_2022_23_tetrio(records):
+    """Matches for 2022-23 TETR.IO Challonge bracket.
+
+    Drop results at:
+      bronze_data/tetrio_2022-23_matches/matches.csv
+    """
+    path = 'bronze_data/tetrio_2022-23_matches/matches.csv'
+    if not os.path.exists(path):
+        return
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        records.append({
+            'match_id': row.get('match_id', f'tetrio2223_auto_{idx+1:04d}'),
+            'season_id': '2022-23',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'match_date': str(row.get('match_date', '')).split(' ')[0],
+            'match_time': str(row.get('match_time', '')).strip() if pd.notna(row.get('match_time')) and str(row.get('match_time')).strip() else None,
+            'home_team_id': clean_school_id(row.get('home_team_id', '')),
+            'away_team_id': clean_school_id(row.get('away_team_id', '')),
+            'home_score': row.get('home_score'),
+            'away_score': row.get('away_score'),
+            'winner_id': clean_school_id(row.get('winner_id', '')) or None,
+            'is_forfeit': str(row.get('is_forfeit', '')).lower() == 'true',
+            'mvp': None,
+            'notes': row.get('notes'),
+        })
+
+
+def process_standings_2022_23_tetrio(records):
+    """Standings for 2022-23 TETR.IO tournament.
+
+    Drop results at:
+      bronze_data/tetrio_2022-23_standings/standings.csv
+    """
+    path = 'bronze_data/tetrio_2022-23_standings/standings.csv'
+    if not os.path.exists(path):
+        return
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        s_id = clean_school_id(row.get('school_id', ''))
+        records.append({
+            'standing_id': f"std_2223_tetrio_all_{s_id}_{idx+1}",
+            'season_id': '2022-23',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'rank': row.get('rank'),
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'wins': row.get('wins'),
+            'losses': row.get('losses'),
+            'games_played': row.get('games_played'),
+            'win_pct': row.get('win_pct'),
+            'points': row.get('points'),
+            'player_name': row.get('player_name'),
+            'player_ign': row.get('player_ign'),
+            'notes': row.get('notes'),
+        })
+
+
+def process_rosters_2023_24_tetrio(records):
+    """Read the 2023-24 TETR.IO lineup sheet that already exists in bronze.
+
+    Source: bronze_data/EzEsports Tetris Division 2023-24 Roster/Sheet1.csv
+
+    The sheet uses a paired-row layout: the first column (unnamed, read as an
+    empty string or NaN) carries the school/team label on the first player of
+    each school block, then is blank for subsequent rows.  Column layout:
+      col[0] — school/team label (e.g. "Stuyvesant #1", blank for continuation)
+      col[1] — First Name  (header: "First Name")
+      col[2] — Last Name   (header: "Last Name")
+      col[3] — Grade       (header: "Grade")
+      col[4] — In-Game Name (TETR.IO username)
+
+    This is the only TETR.IO season for which a roster sheet exists.
+    """
+    path = 'bronze_data/EzEsports Tetris Division 2023-24 Roster/Sheet1.csv'
+    if not os.path.exists(path):
+        alt = 'bronze_data/EzEsports Tetris Division 2023-24 Roster/.csv'
+        if os.path.exists(alt):
+            path = alt
+        else:
+            return
+    # Read with header so we can detect blank/placeholder dumps.
+    df = pd.read_csv(path)
+    # The __bold.csv companion has no real data (all zeros); skip if this looks
+    # like a phantom dump (columns are '0','0.1',... with no named headers).
+    col_names = list(df.columns)
+    if not col_names or all(c.startswith('0') for c in col_names):
+        return
+
+    # The real dump's first column is unnamed ("Unnamed: 0" in pandas terms);
+    # remaining columns are "First Name", "Last Name", "Grade", "In-Game Name".
+    school_col = col_names[0]   # unnamed / team-label column
+    first_col  = col_names[1] if len(col_names) > 1 else None
+    last_col   = col_names[2] if len(col_names) > 2 else None
+    grade_col  = col_names[3] if len(col_names) > 3 else None
+    ign_col    = col_names[4] if len(col_names) > 4 else None
+
+    current_school = ''
+    n = 0
+    for idx, row in df.iterrows():
+        school_raw = row.get(school_col)
+        if pd.notna(school_raw) and str(school_raw).strip():
+            # Strip team number suffixes like "#1", "#2" before slug lookup.
+            current_school = re.sub(r'\s*#\d+$', '', str(school_raw)).strip()
+
+        first = str(row.get(first_col, '')).strip() if first_col and pd.notna(row.get(first_col)) else ''
+        last  = str(row.get(last_col, '')).strip() if last_col and pd.notna(row.get(last_col)) else ''
+        ign   = str(row.get(ign_col, '')).strip() if ign_col and pd.notna(row.get(ign_col)) else ''
+        grade = str(row.get(grade_col, '')).strip() if grade_col and pd.notna(row.get(grade_col)) else ''
+
+        if not first and not last and not ign:
+            continue
+
+        s_id = clean_school_id(current_school) if current_school else ''
+        full_name = ' '.join(p for p in [first, last] if p) or None
+        n += 1
+        records.append({
+            'player_id': f'tetrio2324_{n:04d}',
+            'season_id': '2023-24',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'first_name': first or None,
+            'last_name': last or None,
+            'full_name': full_name,
+            'ign': ign or None,
+            'discord_username': None,
+            'pronouns': None,
+            'role': 'Player',
+            'mvp_count': 0,
+            'tracker_url': None,
+            'notes': f'Grade: {grade}' if grade else None,
+        })
+
+
+def process_matches_2023_24_tetrio(records):
+    """Placeholder for 2023-24 TETR.IO Challonge match results.
+
+    Pipeline-ready; awaiting source data.
+
+    When results are available, export them to:
+      bronze_data/tetrio_2023-24_matches/matches.csv
+
+    Expected CSV columns:
+      match_id        — unique string per match, e.g. "tetrio2324_001"
+      match_date      — ISO date, e.g. "2024-03-15"
+      home_team_id    — school slug (see SCHOOL_NAMES keys)
+      away_team_id    — school slug
+      home_score      — integer games won by home side (bracket round wins)
+      away_score      — integer games won by away side
+      winner_id       — school slug of winner (or empty for no-contest)
+      is_forfeit      — True/False
+      notes           — free text, e.g. Challonge bracket link or round name
+
+    Division should always be "all" (single bracket, no A/B split).
+    """
+    path = 'bronze_data/tetrio_2023-24_matches/matches.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        records.append({
+            'match_id': row.get('match_id', f'tetrio2324_auto_{idx+1:04d}'),
+            'season_id': '2023-24',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'match_date': str(row.get('match_date', '')).split(' ')[0],
+            'match_time': str(row.get('match_time', '')).strip() if pd.notna(row.get('match_time')) and str(row.get('match_time')).strip() else None,
+            'home_team_id': clean_school_id(row.get('home_team_id', '')),
+            'away_team_id': clean_school_id(row.get('away_team_id', '')),
+            'home_score': row.get('home_score'),
+            'away_score': row.get('away_score'),
+            'winner_id': clean_school_id(row.get('winner_id', '')) or None,
+            'is_forfeit': str(row.get('is_forfeit', '')).lower() == 'true',
+            'mvp': None,
+            'notes': row.get('notes'),
+        })
+
+
+def process_standings_2023_24_tetrio(records):
+    """Placeholder for 2023-24 TETR.IO standings.
+
+    Pipeline-ready; awaiting source data.
+
+    When Challonge final placements are available, export them to:
+      bronze_data/tetrio_2023-24_standings/standings.csv
+
+    Expected CSV columns:
+      rank            — integer (1 = champion)
+      school_id       — school slug
+      player_name     — full name of individual player (TETR.IO is per-player)
+      player_ign      — TETR.IO username
+      points          — cumulative Challonge bracket points or round wins
+
+    wins/losses/games_played are optional and can be left blank for
+    bracket-format events where only final placement is recorded.
+    """
+    path = 'bronze_data/tetrio_2023-24_standings/standings.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        s_id = clean_school_id(row.get('school_id', ''))
+        records.append({
+            'standing_id': f"std_2324_tetrio_all_{s_id}_{idx+1}",
+            'season_id': '2023-24',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'rank': row.get('rank'),
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'wins': row.get('wins'),
+            'losses': row.get('losses'),
+            'games_played': row.get('games_played'),
+            'win_pct': row.get('win_pct'),
+            'points': row.get('points'),
+            'player_name': row.get('player_name'),
+            'player_ign': row.get('player_ign'),
+            'notes': row.get('notes'),
+        })
+
+
+def process_rosters_2024_25_tetrio(records):
+    """Placeholder for 2024-25 TETR.IO rosters.
+
+    Pipeline-ready; awaiting source data.
+
+    When rosters are available, export them to:
+      bronze_data/tetrio_2024-25_rosters/rosters.csv
+
+    Expected CSV columns (same schema as other roster sheets):
+      school_id, player_name, ign, discord, grade
+
+    See process_rosters_2023_24_tetrio for the exact field mapping.
+    """
+    path = 'bronze_data/tetrio_2024-25_rosters/rosters.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    n = 0
+    for idx, row in df.iterrows():
+        school = row.get('school_id') or row.get('School')
+        name   = row.get('player_name') or row.get('Player Name') or row.get('Name')
+        ign    = row.get('ign') or row.get('IGN')
+        discord = row.get('discord') or row.get('Discord')
+        grade   = row.get('grade') or row.get('Grade')
+
+        if pd.isna(school) and pd.isna(name) and pd.isna(ign):
+            continue
+
+        s_id = clean_school_id(school) if pd.notna(school) else ''
+        name_str = str(name).strip() if pd.notna(name) else ''
+        parts = name_str.split(None, 1)
+        first = parts[0] if parts else ''
+        last  = parts[1] if len(parts) > 1 else ''
+        n += 1
+        records.append({
+            'player_id': f'tetrio2425_{n:04d}',
+            'season_id': '2024-25',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'first_name': first or None,
+            'last_name': last or None,
+            'full_name': name_str or None,
+            'ign': str(ign).strip() if pd.notna(ign) else None,
+            'discord_username': str(discord).strip() if pd.notna(discord) else None,
+            'pronouns': None,
+            'role': 'Player',
+            'mvp_count': 0,
+            'tracker_url': None,
+            'notes': f'Grade: {grade}' if pd.notna(grade) and str(grade).strip() else None,
+        })
+
+
+def process_matches_2024_25_tetrio(records):
+    """Placeholder for 2024-25 TETR.IO Challonge match results.
+
+    Pipeline-ready; awaiting source data.
+
+    Drop results at:
+      bronze_data/tetrio_2024-25_matches/matches.csv
+
+    Same column schema as process_matches_2023_24_tetrio.
+    """
+    path = 'bronze_data/tetrio_2024-25_matches/matches.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        records.append({
+            'match_id': row.get('match_id', f'tetrio2425_auto_{idx+1:04d}'),
+            'season_id': '2024-25',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'match_date': str(row.get('match_date', '')).split(' ')[0],
+            'match_time': str(row.get('match_time', '')).strip() if pd.notna(row.get('match_time')) and str(row.get('match_time')).strip() else None,
+            'home_team_id': clean_school_id(row.get('home_team_id', '')),
+            'away_team_id': clean_school_id(row.get('away_team_id', '')),
+            'home_score': row.get('home_score'),
+            'away_score': row.get('away_score'),
+            'winner_id': clean_school_id(row.get('winner_id', '')) or None,
+            'is_forfeit': str(row.get('is_forfeit', '')).lower() == 'true',
+            'mvp': None,
+            'notes': row.get('notes'),
+        })
+
+
+def process_standings_2024_25_tetrio(records):
+    """Placeholder for 2024-25 TETR.IO standings.
+
+    Pipeline-ready; awaiting source data.
+
+    Drop results at:
+      bronze_data/tetrio_2024-25_standings/standings.csv
+
+    Same column schema as process_standings_2023_24_tetrio.
+    """
+    path = 'bronze_data/tetrio_2024-25_standings/standings.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        s_id = clean_school_id(row.get('school_id', ''))
+        records.append({
+            'standing_id': f"std_2425_tetrio_all_{s_id}_{idx+1}",
+            'season_id': '2024-25',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'rank': row.get('rank'),
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'wins': row.get('wins'),
+            'losses': row.get('losses'),
+            'games_played': row.get('games_played'),
+            'win_pct': row.get('win_pct'),
+            'points': row.get('points'),
+            'player_name': row.get('player_name'),
+            'player_ign': row.get('player_ign'),
+            'notes': row.get('notes'),
+        })
+
+
+def process_rosters_2025_26_tetrio(records):
+    """Placeholder for 2025-26 TETR.IO rosters.
+
+    Pipeline-ready; awaiting source data.
+
+    Drop rosters at:
+      bronze_data/tetrio_2025-26_rosters/rosters.csv
+
+    Same column schema as process_rosters_2024_25_tetrio.
+    """
+    path = 'bronze_data/tetrio_2025-26_rosters/rosters.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    n = 0
+    for idx, row in df.iterrows():
+        school = row.get('school_id') or row.get('School')
+        name   = row.get('player_name') or row.get('Player Name') or row.get('Name')
+        ign    = row.get('ign') or row.get('IGN')
+        discord = row.get('discord') or row.get('Discord')
+        grade   = row.get('grade') or row.get('Grade')
+
+        if pd.isna(school) and pd.isna(name) and pd.isna(ign):
+            continue
+
+        s_id = clean_school_id(school) if pd.notna(school) else ''
+        name_str = str(name).strip() if pd.notna(name) else ''
+        parts = name_str.split(None, 1)
+        first = parts[0] if parts else ''
+        last  = parts[1] if len(parts) > 1 else ''
+        n += 1
+        records.append({
+            'player_id': f'tetrio2526_{n:04d}',
+            'season_id': '2025-26',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'first_name': first or None,
+            'last_name': last or None,
+            'full_name': name_str or None,
+            'ign': str(ign).strip() if pd.notna(ign) else None,
+            'discord_username': str(discord).strip() if pd.notna(discord) else None,
+            'pronouns': None,
+            'role': 'Player',
+            'mvp_count': 0,
+            'tracker_url': None,
+            'notes': f'Grade: {grade}' if pd.notna(grade) and str(grade).strip() else None,
+        })
+
+
+def process_matches_2025_26_tetrio(records):
+    """Placeholder for 2025-26 TETR.IO Challonge match results.
+
+    Pipeline-ready; awaiting source data.
+
+    Drop results at:
+      bronze_data/tetrio_2025-26_matches/matches.csv
+
+    Same column schema as process_matches_2023_24_tetrio.
+    """
+    path = 'bronze_data/tetrio_2025-26_matches/matches.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        records.append({
+            'match_id': row.get('match_id', f'tetrio2526_auto_{idx+1:04d}'),
+            'season_id': '2025-26',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'match_date': str(row.get('match_date', '')).split(' ')[0],
+            'match_time': str(row.get('match_time', '')).strip() if pd.notna(row.get('match_time')) and str(row.get('match_time')).strip() else None,
+            'home_team_id': clean_school_id(row.get('home_team_id', '')),
+            'away_team_id': clean_school_id(row.get('away_team_id', '')),
+            'home_score': row.get('home_score'),
+            'away_score': row.get('away_score'),
+            'winner_id': clean_school_id(row.get('winner_id', '')) or None,
+            'is_forfeit': str(row.get('is_forfeit', '')).lower() == 'true',
+            'mvp': None,
+            'notes': row.get('notes'),
+        })
+
+
+def process_standings_2025_26_tetrio(records):
+    """Placeholder for 2025-26 TETR.IO standings.
+
+    Pipeline-ready; awaiting source data.
+
+    Drop results at:
+      bronze_data/tetrio_2025-26_standings/standings.csv
+
+    Same column schema as process_standings_2023_24_tetrio.
+    """
+    path = 'bronze_data/tetrio_2025-26_standings/standings.csv'
+    if not os.path.exists(path):
+        return  # no-op until source data is dropped in
+    df = pd.read_csv(path)
+    for idx, row in df.iterrows():
+        s_id = clean_school_id(row.get('school_id', ''))
+        records.append({
+            'standing_id': f"std_2526_tetrio_all_{s_id}_{idx+1}",
+            'season_id': '2025-26',
+            'game_id': 'tetrio',
+            'division': 'all',
+            'rank': row.get('rank'),
+            'school_id': s_id,
+            'school_name': get_school_name(s_id),
+            'wins': row.get('wins'),
+            'losses': row.get('losses'),
+            'games_played': row.get('games_played'),
+            'win_pct': row.get('win_pct'),
+            'points': row.get('points'),
+            'player_name': row.get('player_name'),
+            'player_ign': row.get('player_ign'),
+            'notes': row.get('notes'),
+        })
+
+
 def main():
+
     print("🚀 Starting Silver Tier data normalization...")
     os.makedirs('silver_data', exist_ok=True)
 
@@ -1252,6 +1781,10 @@ def main():
     process_matches_2023_24_lol(matches_records)
     process_matches_2024_25_val(matches_records)
     process_matches_2025_26_val(matches_records)
+    process_matches_2022_23_tetrio(matches_records)
+    process_matches_2023_24_tetrio(matches_records)
+    process_matches_2024_25_tetrio(matches_records)
+    process_matches_2025_26_tetrio(matches_records)
 
     matches_df = pd.DataFrame(matches_records)
     # Older processors emit a single 'division'; newer ones emit per-side
@@ -1286,7 +1819,11 @@ def main():
     process_rosters_2023_24_val(rosters_records)
     process_rosters_2023_24_lol(rosters_records)
     process_rosters_2023_24_tft(rosters_records)
+    process_rosters_2022_23_tetrio(rosters_records)
+    process_rosters_2023_24_tetrio(rosters_records)
     process_rosters_2025_26_val(rosters_records)
+    process_rosters_2024_25_tetrio(rosters_records)
+    process_rosters_2025_26_tetrio(rosters_records)
 
     rosters_df = pd.DataFrame(rosters_records)
     if len(rosters_df) > 0:
@@ -1303,7 +1840,11 @@ def main():
     process_standings_2022_23_tft(standings_records)
     process_standings_2023_24_val(standings_records)
     process_standings_2023_24_tft(standings_records)
+    process_standings_2022_23_tetrio(standings_records)
+    process_standings_2023_24_tetrio(standings_records)
     process_standings_2024_25_val(standings_records)
+    process_standings_2024_25_tetrio(standings_records)
+    process_standings_2025_26_tetrio(standings_records)
 
     standings_df = pd.DataFrame(standings_records)
     if 'points' not in standings_df.columns:

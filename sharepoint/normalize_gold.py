@@ -37,12 +37,14 @@ GAME_SLUGS = {
     'valorant': 'valorant',
     'league_of_legends': 'league-of-legends',
     'teamfight_tactics': 'team-fight-tactics',
+    'tetrio': 'tetr-io',
 }
 
 GAMES = [
     ('valorant', 'Valorant', 'VAL', '/images/games/val-banner.png'),
     ('league-of-legends', 'League of Legends', 'LoL', '/images/games/lol-banner.png'),
     ('team-fight-tactics', 'Teamfight Tactics', 'TFT', '/images/games/tft-banner.png'),
+    ('tetr-io', 'TETR.IO', 'TETR', '/images/games/tetrio-banner.png'),
 ]
 
 SCHOOL_NAMES = {

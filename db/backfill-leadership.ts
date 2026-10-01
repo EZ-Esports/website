@@ -28,7 +28,11 @@ interface PersonAgg {
 }
 
 async function backfill() {
-  assertSeedTargetAllowed();
+  const dryRun = process.argv.includes('--dry-run');
+
+  if (!dryRun) {
+    assertSeedTargetAllowed();
+  }
   console.log('🚀 Starting Leadership Normalization & Backfill...');
 
   // 1. Fetch all rows from legacy leadership
@@ -90,6 +94,7 @@ async function backfill() {
     if (existing) {
       personIdByName.set(key, existing.id);
     } else {
+      personIdByName.set(key, `pending-${key}`);
       toInsertPeople.push({
         fullName: agg.fullName,
         handle: agg.handle,
@@ -102,8 +107,8 @@ async function backfill() {
     }
   }
 
-  // Batch insert new people
-  if (toInsertPeople.length > 0) {
+  // Batch insert new people (skipped in dryRun)
+  if (!dryRun && toInsertPeople.length > 0) {
     console.log(`Batch inserting ${toInsertPeople.length} new people...`);
     const inserted = await db.insert(schema.people).values(toInsertPeople).returning();
     for (const p of inserted) {
@@ -154,6 +159,25 @@ async function backfill() {
     });
   }
 
+  if (dryRun) {
+    console.log('\n📋 Leadership Backfill Plan (--dry-run):');
+    console.log('========================================================================');
+    console.log(`Legacy Leadership Rows:    ${legacyRows.length}`);
+    console.log(`Unique Individuals:        ${peopleMap.size}`);
+    console.log('');
+    console.log('Target Table: `people`');
+    console.log(`  Existing Profiles:       ${existingByName.size}`);
+    console.log(`  To Insert:               ${toInsertPeople.length}`);
+    console.log('');
+    console.log('Target Table: `leadership_terms`');
+    console.log(`  Existing Terms:          ${existingTerms.length}`);
+    console.log(`  To Insert:               ${toInsertTerms.length}`);
+    console.log('========================================================================');
+    console.log('--dry-run: Database inspected. 0 mutations executed.');
+    console.log('To apply this backfill, run without --dry-run.\n');
+    return;
+  }
+
   if (toInsertTerms.length > 0) {
     console.log(`Batch inserting ${toInsertTerms.length} leadership terms...`);
     // Insert in chunks of 50 to stay well under query size limits
@@ -172,7 +196,10 @@ async function backfill() {
 }
 
 if (process.argv[1] && process.argv[1].includes('backfill-leadership')) {
-  assertSeedTargetAllowed();
+  const dryRun = process.argv.includes('--dry-run');
+  if (!dryRun) {
+    assertSeedTargetAllowed();
+  }
   backfill()
     .then(() => process.exit(0))
     .catch((err) => {
