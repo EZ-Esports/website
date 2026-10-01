@@ -5,7 +5,9 @@ import { downloadCsv } from "@/app/lib/csv-download";
 
 interface ExportCsvButtonProps {
   /** Server action that returns CSV text on-demand (called only when clicked). */
-  fetchCsv: () => Promise<string>;
+  action?: (status?: string) => Promise<string>;
+  status?: string;
+  fetchCsv?: () => Promise<string>;
   filename: string;
   label?: string;
   className?: string;
@@ -19,6 +21,8 @@ const defaultClassName =
  * so no bulk PII is embedded in the RSC page payload at render time.
  */
 export default function ExportCsvButton({
+  action,
+  status,
   fetchCsv,
   filename,
   label = "Export CSV",
@@ -31,7 +35,7 @@ export default function ExportCsvButton({
     setError(null);
     startTransition(async () => {
       try {
-        const csv = await fetchCsv();
+        const csv = action ? await action(status) : await fetchCsv!();
         downloadCsv(filename, csv);
       } catch {
         setError("Export failed. Please try again.");
