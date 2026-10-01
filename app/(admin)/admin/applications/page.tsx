@@ -103,7 +103,8 @@ export default async function ApplicationsAdminPage({
             </div>
             {dbConfigured && applications.length > 0 && (
               <ExportCsvButton
-                fetchCsv={() => exportSchoolApplicationsCsv(statusFilter === "all" ? undefined : statusFilter)}
+                action={exportSchoolApplicationsCsv}
+                status={queryStatus}
                 filename={`school-applications-${statusFilter}.csv`}
               />
             )}
@@ -168,7 +169,8 @@ export default async function ApplicationsAdminPage({
             </div>
             {dbConfigured && staffApplications.length > 0 && (
               <ExportCsvButton
-                fetchCsv={() => exportStaffApplicationsCsv(staffStatusFilter === "all" ? undefined : staffStatusFilter)}
+                action={exportStaffApplicationsCsv}
+                status={staffQueryStatus}
                 filename={`staff-applications-${staffStatusFilter}.csv`}
               />
             )}
