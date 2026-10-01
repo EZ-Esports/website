@@ -145,4 +145,20 @@ WHERE "season_id" IN (
   SELECT s.id FROM "seasons" s
   JOIN "games" g ON s.game_id = g.id
   WHERE g.slug = 'tetr-io'
-);
+);--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'tournaments' AND policyname = 'tournaments_public_select'
+  ) THEN
+    CREATE POLICY "tournaments_public_select" ON "public"."tournaments"
+    FOR SELECT TO "anon", "authenticated" USING (true);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'tournament_matches' AND policyname = 'tournament_matches_public_select'
+  ) THEN
+    CREATE POLICY "tournament_matches_public_select" ON "public"."tournament_matches"
+    FOR SELECT TO "anon", "authenticated" USING (true);
+  END IF;
+END $$;
