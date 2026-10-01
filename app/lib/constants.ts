@@ -110,13 +110,29 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     slug: 'tetris',
     displayName: 'TETR.IO',
     shortName: 'TETR.IO',
-    imageUrl: '/images/hero-background.jpg',
+    imageUrl: '/images/games/tetrio-banner.png',
     accent: { color: '#0099FF', on: '#FFFFFF' },
     hasJvSplit: false,
   },
 } as const;
 
 export const GAME_SLUGS: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends', 'osu', 'minecraft', 'tetris'];
+
+/**
+ * Maps any alias (e.g. 'tetr-io' or 'tetrio') to the canonical route slug ('tetris').
+ */
+export function canonicalGameSlug(slug: string): GameSlug | string {
+  if (slug === 'tetr-io' || slug === 'tetrio') return 'tetris';
+  return slug;
+}
+
+/**
+ * Maps a canonical route slug to the database slug if different (e.g. 'tetris' -> 'tetr-io').
+ */
+export function dbGameSlug(slug: string): string {
+  if (slug === 'tetris') return 'tetr-io';
+  return slug;
+}
 
 // ============================================================================
 // Game Route Helpers
@@ -191,7 +207,7 @@ const gameSlugToId: Record<GameSlug, string> = {
  * Converts GAMES constant to Game[] format for use in GameShowcase component
  */
 export const getGamesForShowcase = (): Game[] => {
-  const activeSlugs: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends'];
+  const activeSlugs: GameSlug[] = ['valorant', 'team-fight-tactics', 'league-of-legends', 'tetris'];
   return activeSlugs.map((slug) => {
     const gameConfig = GAMES[slug];
     return {

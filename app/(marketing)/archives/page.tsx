@@ -5,7 +5,7 @@ import Card from '@/app/components/ui/Card';
 import { getArchiveIndex } from '@/app/lib/db/queries';
 import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import ArchiveCommandDeck, { type ArchiveGameGroup } from '@/app/components/sections/ArchiveCommandDeck';
-import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
+import { GAMES, GAME_SLUGS, canonicalGameSlug } from '@/app/lib/constants';
 
 export const metadata: Metadata = {
   title: 'Archives | EZ Esports',
@@ -21,9 +21,10 @@ export default async function ArchivesPage() {
   // Group seasons under their game, newest first (getArchiveIndex pre-sorts).
   const byGame = new Map<string, typeof seasons>();
   for (const season of seasons) {
-    const entry = byGame.get(season.gameSlug) ?? [];
-    entry.push(season);
-    byGame.set(season.gameSlug, entry);
+    const slug = canonicalGameSlug(season.gameSlug);
+    const entry = byGame.get(slug) ?? [];
+    entry.push({ ...season, gameSlug: slug });
+    byGame.set(slug, entry);
   }
 
   // Present games in the league's canonical order, including games with no archived seasons yet.

@@ -4,6 +4,7 @@ import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 import { getCachedRecentResults } from '@/app/lib/db/queries';
+import { canonicalGameSlug } from '@/app/lib/constants';
 
 /**
  * Homepage entry point into league data: the latest recorded results across
@@ -48,10 +49,14 @@ export default async function LeaguePulse() {
   if (results.length === 0) return null;
 
   const games = Array.from(
-    new Map(results.map((match) => [
-      match.gameSlug,
-      { slug: match.gameSlug, label: match.gameShortName },
-    ])).values()
+    new Map(results.map((match) => {
+      const slug = canonicalGameSlug(match.gameSlug);
+      const label =
+        match.gameShortName === 'TETR'
+          ? 'TETR.IO'
+          : match.gameShortName;
+      return [slug, { slug, label }];
+    })).values()
   );
 
   return (
@@ -59,24 +64,28 @@ export default async function LeaguePulse() {
       <SectionHeader eyebrow="League Pulse" title="Latest Results" />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {results.map((match) => (
-          <Link
-            key={match.id}
-            href={`/${match.gameSlug}/schedule?season=${encodeURIComponent(match.seasonName)}&division=${encodeURIComponent(match.division)}`}
-            className="block h-full"
-          >
-            <Card accent interactive className="group h-full flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <Badge size="sm" className="shrink-0">
-                    {match.gameShortName === 'VAL'
-                      ? 'Valorant'
-                      : match.gameShortName === 'LoL'
-                      ? 'League of Legends'
-                      : match.gameShortName === 'TFT'
-                      ? 'Teamfight Tactics'
-                      : match.gameShortName} · {match.division === 'JV' ? 'Junior Varsity' : match.division}
-                  </Badge>
+        {results.map((match) => {
+          const gameSlug = canonicalGameSlug(match.gameSlug);
+          return (
+            <Link
+              key={match.id}
+              href={`/${gameSlug}/schedule?season=${encodeURIComponent(match.seasonName)}&division=${encodeURIComponent(match.division)}`}
+              className="block h-full"
+            >
+              <Card accent interactive className="group h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <Badge size="sm" className="shrink-0">
+                      {match.gameShortName === 'VAL'
+                        ? 'Valorant'
+                        : match.gameShortName === 'LoL'
+                        ? 'League of Legends'
+                        : match.gameShortName === 'TFT'
+                        ? 'Teamfight Tactics'
+                        : match.gameShortName === 'TETR'
+                        ? 'TETR.IO'
+                        : match.gameShortName} · {match.division === 'JV' ? 'Junior Varsity' : match.division}
+                    </Badge>
                   <span className="text-xs font-bold text-foreground-muted shrink-0">
                     {new Date(match.scheduledAt).toLocaleDateString('en-US', {
                       timeZone: 'America/New_York',
@@ -101,7 +110,8 @@ export default async function LeaguePulse() {
               </div>
             </Card>
           </Link>
-        ))}
+        );
+      })}
       </div>
 
       <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm font-bold">

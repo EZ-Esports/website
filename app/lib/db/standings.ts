@@ -301,14 +301,18 @@ export async function getGameSeasonSummary(seasonId: string) {
   const [varsityRows, jvRows] = combined
     ? [combinedRows, combinedRows]
     : await Promise.all([divisionRows('Varsity'), divisionRows('JV')]);
-  const varsityTeams = varsityRows.filter((r) => r.playerName === null);
-  const jvTeams = jvRows.filter((r) => r.playerName === null);
+  const teamOrParticipant = (rows: typeof varsityRows) => {
+    const teams = rows.filter((r) => r.playerName === null);
+    return teams.length > 0 ? teams : rows;
+  };
+  const varsityTeams = teamOrParticipant(varsityRows);
+  const jvTeams = teamOrParticipant(jvRows);
 
   const topFive = (rows: typeof varsityTeams) =>
     rows.slice(0, 5).map((r, i) => ({
       rank: r.rank ?? i + 1,
       team: r.schoolName,
-      teamLabel: standingsTeamLabel(r, standingsFormat),
+      teamLabel: r.playerName ? `${r.playerName} (${r.schoolName})` : standingsTeamLabel(r, standingsFormat),
       division: canonicalDivision(r.division),
       wins: r.wins ?? 0,
       losses: r.losses ?? 0,

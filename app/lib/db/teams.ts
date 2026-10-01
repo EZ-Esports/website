@@ -2,10 +2,11 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, count, desc, eq, inArray, isNull, notExists } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, notExists, or } from 'drizzle-orm';
 import { canonicalDivision } from './match-page';
 import { slugify } from '@/app/lib/text-utils';
 import { getTeamStandingsRecords } from './standings';
+import { dbGameSlug } from '../constants';
 
 export const getCachedSchools = unstable_cache(
   async () => {
@@ -131,7 +132,12 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
   const gameRow = await db
     .select()
     .from(schema.games)
-    .where(eq(schema.games.slug, gameSlug))
+    .where(
+      or(
+        eq(schema.games.slug, gameSlug),
+        eq(schema.games.slug, dbGameSlug(gameSlug))
+      )
+    )
     .limit(1);
 
   if (!gameRow[0]) return null;
@@ -249,7 +255,12 @@ export async function getSchoolGameTeamsPageData(
   const gameRow = await db
     .select()
     .from(schema.games)
-    .where(eq(schema.games.slug, gameSlug))
+    .where(
+      or(
+        eq(schema.games.slug, gameSlug),
+        eq(schema.games.slug, dbGameSlug(gameSlug))
+      )
+    )
     .limit(1);
 
   if (!gameRow[0]) return null;

@@ -35,6 +35,7 @@ import {
 import { FORM_LENGTH, buildFormGuide, type FormOutcome } from '@/app/lib/game-hub-form';
 import { getActiveSeasonForGame, getSeasonsWithGames } from './league';
 import { canonicalDivisionSql, hubDivisionSql, getGameSeasonSummary } from './standings';
+import { canonicalGameSlug, dbGameSlug } from '../constants';
 
 /** Default page size for public-facing paginated lists. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -256,7 +257,11 @@ export const getCachedRecentResults = unstable_cache(
       )
       .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
       .limit(3);
-    return rows.map((r) => ({ ...r, scheduledAt: r.scheduledAt.toISOString() }));
+    return rows.map((r) => ({
+      ...r,
+      gameSlug: canonicalGameSlug(r.gameSlug),
+      scheduledAt: r.scheduledAt.toISOString(),
+    }));
   },
   ['recent-results'],
   { tags: ['matches', 'schools', 'rosters', 'teams', 'games', 'seasons'] }
@@ -469,7 +474,12 @@ export async function getGameHubData(
   const gameRow = await db
     .select()
     .from(schema.games)
-    .where(eq(schema.games.slug, gameSlug))
+    .where(
+      or(
+        eq(schema.games.slug, gameSlug),
+        eq(schema.games.slug, dbGameSlug(gameSlug))
+      )
+    )
     .limit(1);
 
   if (gameRow[0]) {
