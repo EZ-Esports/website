@@ -55,4 +55,14 @@ describe('TETR.IO forward-facing configuration and slug aliasing', () => {
   it('GAME_SLUGS includes tetris', () => {
     expect(GAME_SLUGS).toContain('tetris');
   });
+
+  it('getShowcaseLayoutClass adapts grid width for 3 vs 4 games', async () => {
+    const { getShowcaseLayoutClass } = await import('@/app/lib/hooks/useShowcaseLayout');
+    // 3 games -> 3 columns on lg
+    expect(getShowcaseLayoutClass(3)).toBe('sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]');
+    // 4 games (including TETR.IO) -> balanced 2x2 grid
+    expect(getShowcaseLayoutClass(4)).toBe('sm:w-[calc(50%_-_1rem)] lg:w-[calc(50%_-_1rem)]');
+    // fallback for empty
+    expect(getShowcaseLayoutClass(0)).toBe('w-full');
+  });
 });

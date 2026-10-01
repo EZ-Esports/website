@@ -1,7 +1,10 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Game, GameSlug } from '@/app/types';
 import { getGameRoute } from '@/app/lib/constants';
+import { useShowcaseLayout } from '@/app/lib/hooks/useShowcaseLayout';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 
@@ -21,10 +24,7 @@ const gameIdToSlug: Record<string, GameSlug> = {
 };
 
 export default function GameShowcase({ title, games }: GameShowcaseProps) {
-  const itemWidthClass =
-    games.length % 3 === 0
-      ? 'sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]'
-      : 'sm:w-[calc(50%_-_1rem)] lg:w-[calc(50%_-_1rem)]';
+  const itemWidthClass = useShowcaseLayout(games.length);
 
   return (
     <Section>
