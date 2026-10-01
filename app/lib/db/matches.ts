@@ -121,6 +121,8 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
       division: canonicalDivisionSql(homeRoster.division),
       homeTeam: homeSchool.name,
       awayTeam: awaySchool.name,
+      notes: schema.matches.notes,
+      mvp: schema.matches.mvp,
     })
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
@@ -172,6 +174,8 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
       division: canonicalDivisionSql(homeRoster.division),
       homeTeam: homeSchool.name,
       awayTeam: awaySchool.name,
+      notes: schema.matches.notes,
+      mvp: schema.matches.mvp,
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))

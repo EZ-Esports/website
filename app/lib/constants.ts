@@ -69,6 +69,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/games/val-banner.png',
     accent: { color: '#FF4655', on: '#FFFFFF' },
     hasJvSplit: true,
+    competitionModel: 'team',
   },
   'league-of-legends': {
     slug: 'league-of-legends',
@@ -77,6 +78,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/games/lol-banner.png',
     accent: { color: '#C8AA6E', on: '#1C1508' },
     hasJvSplit: true,
+    competitionModel: 'team',
   },
   // Teamfight Tactics, osu!, Minecraft, and TETR.IO run one undivided field
   // per season (rosters/standings are written with division 'All'), so
@@ -89,6 +91,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/games/tft-banner.png',
     accent: { color: '#9D7FE0', on: '#1A1330' },
     hasJvSplit: false,
+    competitionModel: 'tournament',
   },
   osu: {
     slug: 'osu',
@@ -97,6 +100,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/hero-background.jpg',
     accent: { color: '#FF66AA', on: '#FFFFFF' },
     hasJvSplit: false,
+    competitionModel: 'tournament',
   },
   minecraft: {
     slug: 'minecraft',
@@ -105,6 +109,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/hero-background.jpg',
     accent: { color: '#478A3A', on: '#FFFFFF' },
     hasJvSplit: false,
+    competitionModel: 'team',
   },
   tetris: {
     slug: 'tetris',
@@ -113,6 +118,7 @@ export const GAMES: Record<GameSlug, GameConfig> = {
     imageUrl: '/images/games/tetrio-banner.png',
     accent: { color: '#0099FF', on: '#FFFFFF' },
     hasJvSplit: false,
+    competitionModel: 'tournament',
   },
 } as const;
 
@@ -140,7 +146,10 @@ export function dbGameSlug(slug: string): string {
 
 export const getGameRoute = (gameSlug: GameSlug): string => `/${gameSlug}`;
 
-export const getGameSubRoute = (gameSlug: GameSlug, subRoute: 'schedule' | 'standings' | 'teams' | 'roster'): string => {
+export const getGameSubRoute = (
+  gameSlug: GameSlug,
+  subRoute: 'schedule' | 'bracket' | 'standings' | 'teams' | 'roster'
+): string => {
   return `/${gameSlug}/${subRoute}`;
 };
 

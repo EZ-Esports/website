@@ -23,6 +23,13 @@ describe('GameSubHeader Active State Logic', () => {
   it('returns false for unrelated game subroutes', () => {
     expect(isTeamsRouteActive('/valorant/schedule', 'valorant')).toBe(false);
     expect(isTeamsRouteActive('/valorant/standings', 'valorant')).toBe(false);
+    expect(isTeamsRouteActive('/tetris/bracket', 'tetris')).toBe(false);
+  });
+
+  it('generates valid competition subroutes for team and tournament models', () => {
+    expect(getGameSubRoute('valorant', 'schedule')).toBe('/valorant/schedule');
+    expect(getGameSubRoute('tetris', 'bracket')).toBe('/tetris/bracket');
+    expect(getGameSubRoute('team-fight-tactics', 'bracket')).toBe('/team-fight-tactics/bracket');
   });
 });
 

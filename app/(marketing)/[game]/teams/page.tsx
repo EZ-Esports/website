@@ -36,13 +36,21 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
     notFound();
   }
 
+  const isTournament = gameConfig.competitionModel === 'tournament';
+  const pageTitle = isTournament
+    ? `${gameConfig.displayName} Participants & Rosters`
+    : `${gameConfig.displayName} School Teams & Rosters`;
+  const pageLead = isTournament
+    ? "Explore member schools, season player rosters, and participant profiles"
+    : "Explore member schools, season team snapshots, division squads, and player rosters";
+
   return (
     <main>
       <Section className="pt-20 md:pt-24">
         <SectionHeader
           as="h1"
-          title={`${gameConfig.displayName} School Teams & Rosters`}
-          lead="Explore member schools, season team snapshots, division squads, and player rosters"
+          title={pageTitle}
+          lead={pageLead}
         />
         {/* A failed fetch now throws and hits the route's error boundary, so
             an empty school list here is a real "nothing published yet", the
