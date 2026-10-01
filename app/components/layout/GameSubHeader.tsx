@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   GAMES,
+  ROUTES,
   getGameFromPath,
   getGameSubRoute,
   getGameRoute,
@@ -43,6 +44,10 @@ export default function GameSubHeader() {
       label: teamsLabel,
       href: teamsRoute,
       isActive: isTeamsActive,
+    },
+    {
+      label: 'Archives',
+      href: `${ROUTES.archives}?game=${gameSlug}`,
     },
   ];
 

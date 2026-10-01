@@ -57,29 +57,31 @@ const mobileStack = (layout: GameHubTileLayout[]) =>
 const DOM_ORDER: GameHubTileId[] = [
   'season-summary',
   'next-match',
+  'bracket',
   'standings',
   'last-result',
   'recent-results',
-  'archives',
 ];
 
 function expectedTiles(input: GameHubLayoutInput): GameHubTileId[] {
-  const hasSeasonData = input.hasStandings || input.hasNextMatch || input.recentResultsCount > 0;
+  const hasSeasonData = input.hasStandings || input.hasNextMatch || input.recentResultsCount > 0 || !!input.hasBracket;
   const ids: GameHubTileId[] = [];
   if (!hasSeasonData) ids.push('season-summary');
   if (input.hasNextMatch) ids.push('next-match');
+  if (input.hasBracket) ids.push('bracket');
   if (input.hasStandings) ids.push('standings');
   if (input.recentResultsCount >= 1) ids.push('last-result');
   if (input.recentResultsCount >= 2) ids.push('recent-results');
-  ids.push('archives');
   return ids;
 }
 
 const allInputs: GameHubLayoutInput[] = [];
-for (const hasStandings of [false, true]) {
-  for (const hasNextMatch of [false, true]) {
-    for (const recentResultsCount of [0, 1, 2, 3]) {
-      allInputs.push({ hasStandings, hasNextMatch, recentResultsCount });
+for (const hasBracket of [false, true]) {
+  for (const hasStandings of [false, true]) {
+    for (const hasNextMatch of [false, true]) {
+      for (const recentResultsCount of [0, 1, 2, 3]) {
+        allInputs.push({ hasStandings, hasNextMatch, recentResultsCount, hasBracket });
+      }
     }
   }
 }
@@ -170,12 +172,12 @@ describe('packRowFlow', () => {
 // planGameHubLayout — every reachable data state
 // ---------------------------------------------------------------------------
 describe('planGameHubLayout', () => {
-  it('covers all 16 combinations of the input space', () => {
-    expect(allInputs).toHaveLength(16);
+  it('covers all 32 combinations of the input space', () => {
+    expect(allInputs).toHaveLength(32);
   });
 
   it.each(allInputs)(
-    'packs without holes: standings=$hasStandings nextMatch=$hasNextMatch results=$recentResultsCount',
+    'packs without holes: bracket=$hasBracket standings=$hasStandings nextMatch=$hasNextMatch results=$recentResultsCount',
     (input) => {
       const layout = planGameHubLayout(input);
 
@@ -222,6 +224,7 @@ describe('planGameHubLayout', () => {
       hasStandings: true,
       hasNextMatch: true,
       recentResultsCount: 3,
+      hasBracket: false,
     });
     const byId = Object.fromEntries(layout.map((tile) => [tile.id, tile]));
     expect(byId['standings'].rowSpan).toBe(2);
@@ -230,20 +233,33 @@ describe('planGameHubLayout', () => {
     expect(byId['next-match'].colSpan).toBe(DESKTOP_COLUMNS);
   });
 
-  it('closes state A (standings only, no matches) without a dead quarter', () => {
+  it('packs tournament state (bracket and standings) side by side cleanly', () => {
     const layout = planGameHubLayout({
       hasStandings: true,
       hasNextMatch: false,
       recentResultsCount: 0,
+      hasBracket: true,
     });
-    // Standings gives up its double height here: at 2x2 it strands the two
-    // columns beside it, because archives is the only tile left to fill them
-    // and one tile cannot cover two rows of a 2-wide gap.
     expect(layout.map((tile) => [tile.id, tile.colSpan, tile.rowSpan])).toEqual([
+      ['bracket', 2, 1],
       ['standings', 2, 1],
-      ['archives', 2, 1],
     ]);
     expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).rows).toBe(1);
+    expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).empty).toBe(0);
+  });
+
+  it('closes state A (standings only, no matches) full-width without dead space', () => {
+    const layout = planGameHubLayout({
+      hasStandings: true,
+      hasNextMatch: false,
+      recentResultsCount: 0,
+      hasBracket: false,
+    });
+    expect(layout.map((tile) => [tile.id, tile.colSpan, tile.rowSpan])).toEqual([
+      ['standings', 4, 1],
+    ]);
+    expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).rows).toBe(1);
+    expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).empty).toBe(0);
   });
 
   it('closes state B (per-player division with a scheduled match and results)', () => {
@@ -251,84 +267,49 @@ describe('planGameHubLayout', () => {
       hasStandings: false,
       hasNextMatch: true,
       recentResultsCount: 2,
+      hasBracket: false,
     });
     expect(layout.map((tile) => tile.id)).toEqual([
       'next-match',
       'last-result',
       'recent-results',
-      'archives',
     ]);
     expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).empty).toBe(0);
   });
 
-  it('gives the empty-season state a summary tile and a closing archives tile', () => {
+  it('gives the empty-season state a full-width summary tile', () => {
     const layout = planGameHubLayout({
       hasStandings: false,
       hasNextMatch: false,
       recentResultsCount: 0,
+      hasBracket: false,
     });
-    expect(layout.map((tile) => tile.id)).toEqual(['season-summary', 'archives']);
+    expect(layout.map((tile) => tile.id)).toEqual(['season-summary']);
     expect(coverage(desktopSpans(layout), DESKTOP_COLUMNS).empty).toBe(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// The tablet (`sm`) grid — the breakpoint that used to be a no-op
+// The tablet (`sm`) grid
 // ---------------------------------------------------------------------------
 describe('planGameHubLayout — tablet packing', () => {
-  it('uses both tablet columns somewhere in the input space', () => {
-    // Previously every tile was 2 columns wide in all 16 states, so
-    // `sm:grid-cols-2` rendered as one column and the page's `sm:col-span-1`
-    // class was unreachable. This is the assertion that would have caught it:
-    // the old planner fails it, the new one passes.
-    const halfWidth = allInputs.flatMap((input) =>
-      planGameHubLayout(input).filter((tile) => tile.smColSpan === 1)
-    );
-    expect(halfWidth.length).toBeGreaterThan(0);
-  });
-
-  it('pairs the two small tiles side by side when they are DOM-adjacent', () => {
-    // One completed result means no "recent results" list, so "last result"
-    // and "archives" — the two tiles that read fine at ~300px — sit next to
-    // each other and share a row instead of each taking the full width.
-    const layout = planGameHubLayout({
-      hasStandings: true,
-      hasNextMatch: true,
-      recentResultsCount: 1,
-    });
-    const byId = Object.fromEntries(layout.map((tile) => [tile.id, tile]));
-    expect(byId['last-result'].smColSpan).toBe(1);
-    expect(byId['archives'].smColSpan).toBe(1);
-
-    const { placements } = packRowFlow(tabletSpans(layout), TABLET_COLUMNS);
-    const last = placements[layout.findIndex((t) => t.id === 'last-result')];
-    const archives = placements[layout.findIndex((t) => t.id === 'archives')];
-    expect(last.row).toBe(archives.row);
-    expect(last.column).toBe(0);
-    expect(archives.column).toBe(1);
+  it('ensures every layout packs without holes on tablet', () => {
+    for (const input of allInputs) {
+      const layout = planGameHubLayout(input);
+      const tablet = coverage(tabletSpans(layout), TABLET_COLUMNS);
+      expect(tablet.empty).toBe(0);
+      expect(tablet.overlapping).toBe(0);
+      expect(tablet.outOfBounds).toBe(0);
+    }
   });
 
   it('keeps the wide tiles full-width at tablet', () => {
-    // A four-column standings table and the display-type hero do not survive
-    // being halved, whatever the packer would prefer.
     for (const input of allInputs) {
       for (const tile of planGameHubLayout(input)) {
-        if (['standings', 'next-match', 'recent-results', 'season-summary'].includes(tile.id)) {
+        if (['bracket', 'standings', 'next-match', 'recent-results', 'season-summary'].includes(tile.id)) {
           expect(tile.smColSpan).toBe(TABLET_COLUMNS);
         }
       }
     }
-  });
-
-  it('falls back to full width when a small tile has no partner', () => {
-    // Three results puts "recent results" between "last result" and
-    // "archives", so neither can halve without stranding a column.
-    const layout = planGameHubLayout({
-      hasStandings: true,
-      hasNextMatch: true,
-      recentResultsCount: 3,
-    });
-    expect(layout.every((tile) => tile.smColSpan === TABLET_COLUMNS)).toBe(true);
-    expect(coverage(tabletSpans(layout), TABLET_COLUMNS).empty).toBe(0);
   });
 });
