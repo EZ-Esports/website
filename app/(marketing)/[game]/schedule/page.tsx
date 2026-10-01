@@ -39,6 +39,9 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
   }
 
   const gameConfig = GAMES[game as GameSlug];
+  if (gameConfig.competitionModel === 'tournament') {
+    notFound();
+  }
 
   // No try/catch here: a failed query should surface as a real error, not
   // silently collapse into these same empty-state defaults. The marketing

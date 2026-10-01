@@ -363,11 +363,15 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                 </span>
               </div>
               <Button
-                href={getGameSubRoute(slug, 'schedule')}
+                href={
+                  gameConfig.competitionModel === 'tournament'
+                    ? getGameSubRoute(slug, 'bracket')
+                    : getGameSubRoute(slug, 'schedule')
+                }
                 variant="outline"
                 className="mt-5 min-h-[44px]"
               >
-                Full schedule
+                {gameConfig.competitionModel === 'tournament' ? 'Tournament bracket' : 'Full schedule'}
               </Button>
             </Tile>
           )}
@@ -497,8 +501,12 @@ export default async function GameHubView({ params, division }: GameHubViewProps
           {recentResultsSpan && (
             <Tile
               title="Recent results"
-              href={getGameSubRoute(slug, 'schedule')}
-              linkLabel="All matches"
+              href={
+                gameConfig.competitionModel === 'tournament'
+                  ? getGameSubRoute(slug, 'bracket')
+                  : getGameSubRoute(slug, 'schedule')
+              }
+              linkLabel={gameConfig.competitionModel === 'tournament' ? 'Bracket' : 'All matches'}
               className={recentResultsSpan}
             >
               <ul className="divide-y divide-line">

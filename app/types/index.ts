@@ -78,6 +78,12 @@ export interface GameConfig {
    * unpublished, so this flag lets the JV hub and the sitemap say so.
    */
   hasJvSplit: boolean;
+  /**
+   * The structural competition model this game operates under.
+   * - 'team': League-style competition with multi-week schedules, Varsity/JV divisions (Valorant, LoL).
+   * - 'tournament': Tournament-style competition with bracket progression, stages, and player matches (TETR.IO, TFT).
+   */
+  competitionModel: 'team' | 'tournament';
 }
 
 export type NavigationState = 'league' | 'game';

@@ -21,6 +21,13 @@ export default function GameSubHeader() {
   const teamsRoute = getGameSubRoute(gameSlug, 'teams');
   const isTeamsActive = pathname === teamsRoute || pathname.startsWith(`${teamsRoute}/`);
 
+  const isTournament = gameConfig.competitionModel === 'tournament';
+  const competitionRoute = isTournament
+    ? getGameSubRoute(gameSlug, 'bracket')
+    : getGameSubRoute(gameSlug, 'schedule');
+  const competitionLabel = isTournament ? 'Bracket' : 'Schedule';
+  const teamsLabel = isTournament ? 'Participants & Rosters' : 'Teams & Rosters';
+
   // Overview owns three paths, not one: the bare game URL redirects to a
   // division route, so an exact-path check would leave the tab unhighlighted
   // on every page it actually links to.
@@ -30,10 +37,10 @@ export default function GameSubHeader() {
       href: getGameRoute(gameSlug),
       isActive: isGameOverviewPath(pathname, gameSlug),
     },
-    { label: 'Schedule', href: getGameSubRoute(gameSlug, 'schedule') },
+    { label: competitionLabel, href: competitionRoute },
     { label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') },
     {
-      label: 'Teams & Rosters',
+      label: teamsLabel,
       href: teamsRoute,
       isActive: isTeamsActive,
     },

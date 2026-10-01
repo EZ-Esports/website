@@ -32,6 +32,7 @@ describe('TETR.IO forward-facing configuration and slug aliasing', () => {
     expect(config.displayName).toBe('TETR.IO');
     expect(config.shortName).toBe('TETR.IO');
     expect(config.hasJvSplit).toBe(false);
+    expect(config.competitionModel).toBe('tournament');
     expect(config.imageUrl).toBe('/images/games/tetrio-banner.png');
 
     const assetPath = resolve(process.cwd(), 'public/images/games/tetrio-banner.png');

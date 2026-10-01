@@ -121,6 +121,8 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
       division: canonicalDivisionSql(homeRoster.division),
       homeTeam: homeSchool.name,
       awayTeam: awaySchool.name,
+      notes: schema.matches.notes,
+      mvp: schema.matches.mvp,
     })
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
@@ -172,6 +174,8 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
       division: canonicalDivisionSql(homeRoster.division),
       homeTeam: homeSchool.name,
       awayTeam: awaySchool.name,
+      notes: schema.matches.notes,
+      mvp: schema.matches.mvp,
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
@@ -221,7 +225,7 @@ export const countPendingResults = async (): Promise<number> => {
 /** Latest matches with recorded results across all games (homepage pulse). */
 export const getCachedRecentResults = unstable_cache(
   async () => {
-    const rows = await db
+    const leagueRows = await db
       .select({
         id: schema.matches.id,
         scheduledAt: schema.matches.scheduledAt,
@@ -257,14 +261,48 @@ export const getCachedRecentResults = unstable_cache(
       )
       .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
       .limit(3);
-    return rows.map((r) => ({
+
+    const tournamentRows = await db
+      .select({
+        id: schema.tournamentMatches.id,
+        scheduledAt: schema.tournamentMatches.scheduledAt,
+        status: schema.tournamentMatches.status,
+        homeScore: schema.tournamentMatches.homeScore,
+        awayScore: schema.tournamentMatches.awayScore,
+        division: sql<string>`'All'`,
+        homeTeam: sql<string>`COALESCE(${homeSchool.name}, ${schema.tournamentMatches.homePlayerTitle})`,
+        awayTeam: sql<string>`COALESCE(${awaySchool.name}, ${schema.tournamentMatches.awayPlayerTitle})`,
+        gameSlug: schema.games.slug,
+        gameShortName: schema.games.shortName,
+        seasonName: schema.tournaments.name,
+      })
+      .from(schema.tournamentMatches)
+      .innerJoin(schema.tournaments, eq(schema.tournamentMatches.tournamentId, schema.tournaments.id))
+      .innerJoin(schema.games, eq(schema.tournaments.gameId, schema.games.id))
+      .leftJoin(homeSchool, eq(schema.tournamentMatches.homeSchoolId, homeSchool.id))
+      .leftJoin(awaySchool, eq(schema.tournamentMatches.awaySchoolId, awaySchool.id))
+      .where(
+        and(
+          inArray(schema.tournamentMatches.status, ['completed', 'forfeit']),
+          isNotNull(schema.tournamentMatches.homeScore),
+          isNotNull(schema.tournamentMatches.awayScore)
+        )
+      )
+      .orderBy(desc(schema.tournamentMatches.scheduledAt), desc(schema.tournamentMatches.id))
+      .limit(3);
+
+    const combined = [...leagueRows, ...tournamentRows]
+      .sort((a, b) => b.scheduledAt.getTime() - a.scheduledAt.getTime())
+      .slice(0, 3);
+
+    return combined.map((r) => ({
       ...r,
       gameSlug: canonicalGameSlug(r.gameSlug),
       scheduledAt: r.scheduledAt.toISOString(),
     }));
   },
   ['recent-results'],
-  { tags: ['matches', 'schools', 'rosters', 'teams', 'games', 'seasons'] }
+  { tags: ['matches', 'tournament_matches', 'schools', 'rosters', 'teams', 'games', 'seasons', 'tournaments'] }
 );
 
 interface ArchiveChampionRow {

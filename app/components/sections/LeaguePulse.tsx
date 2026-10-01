@@ -4,7 +4,8 @@ import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
 import { getCachedRecentResults } from '@/app/lib/db/queries';
-import { canonicalGameSlug } from '@/app/lib/constants';
+import { canonicalGameSlug, GAMES } from '@/app/lib/constants';
+import type { GameSlug } from '@/app/types';
 
 /**
  * Homepage entry point into league data: the latest recorded results across
@@ -66,10 +67,16 @@ export default async function LeaguePulse() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {results.map((match) => {
           const gameSlug = canonicalGameSlug(match.gameSlug);
+          const gameConfig = GAMES[gameSlug as GameSlug];
+          const isTournament = gameConfig?.competitionModel === 'tournament';
+          const matchHref = isTournament
+            ? `/${gameSlug}/bracket?season=${encodeURIComponent(match.seasonName)}`
+            : `/${gameSlug}/schedule?season=${encodeURIComponent(match.seasonName)}&division=${encodeURIComponent(match.division)}`;
+
           return (
             <Link
               key={match.id}
-              href={`/${gameSlug}/schedule?season=${encodeURIComponent(match.seasonName)}&division=${encodeURIComponent(match.division)}`}
+              href={matchHref}
               className="block h-full"
             >
               <Card accent interactive className="group h-full flex flex-col justify-between">
@@ -115,11 +122,17 @@ export default async function LeaguePulse() {
       </div>
 
       <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm font-bold">
-        {games.map((game) => (
-          <Link key={`${game.slug}-schedule`} href={`/${game.slug}/schedule`} className="text-foreground-secondary hover:text-accent transition-colors">
-            {game.label} Schedule →
-          </Link>
-        ))}
+        {games.map((game) => {
+          const gameConfig = GAMES[game.slug as GameSlug];
+          const isTournament = gameConfig?.competitionModel === 'tournament';
+          const linkHref = isTournament ? `/${game.slug}/bracket` : `/${game.slug}/schedule`;
+          const linkText = isTournament ? `${game.label} Bracket →` : `${game.label} Schedule →`;
+          return (
+            <Link key={`${game.slug}-comp`} href={linkHref} className="text-foreground-secondary hover:text-accent transition-colors">
+              {linkText}
+            </Link>
+          );
+        })}
         {games.map((game) => (
           <Link key={`${game.slug}-standings`} href={`/${game.slug}/standings`} className="text-foreground-secondary hover:text-accent transition-colors">
             {game.label} Standings →

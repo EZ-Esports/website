@@ -232,6 +232,8 @@ export interface MatchPageItem {
   division: string;
   homeTeam: string;
   awayTeam: string;
+  notes?: string | null;
+  mvp?: string | null;
 }
 
 export interface MatchesPage {
