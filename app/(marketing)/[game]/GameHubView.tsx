@@ -15,7 +15,6 @@ import {
   divisionLabel,
   type HubDivision,
 } from '@/app/lib/db/match-page';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
 import { cx } from '@/app/lib/cx';
 import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
@@ -106,6 +105,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
   const { game } = await params;
   const gameConfig = GAMES[game as GameSlug];
   const slug = game as GameSlug;
+  const isTournament = gameConfig.competitionModel === 'tournament';
 
   // The division is a route segment, so it is one of exactly two values and
   // needs no validation. The router 404s anything else before this runs.
@@ -242,22 +242,14 @@ export default async function GameHubView({ params, division }: GameHubViewProps
           </div>
         </div>
 
-        <FilterTabs
-          tabs={divisionTabs}
-          active={division}
-          ariaLabel="Division"
-          className="mb-5 flex-wrap"
-        />
-
-        {/* A failed fetch now throws and hits the route's error boundary, so
-            what's left here is a real gap: no active season resolved, or one
-            resolved with nothing in it yet, the only case this notice is
-            warranted for. Never on a `lacksJvSplit` route: that page is empty
-            by design, forever, not because data is still being migrated in. */}
-        {!lacksJvSplit &&
-          (!seasonName || (topTeams.length === 0 && !nextMatch && recentResults.length === 0)) && (
-            <MigrationNotice />
-          )}
+        {!isTournament && (
+          <FilterTabs
+            tabs={divisionTabs}
+            active={division}
+            ariaLabel="Division"
+            className="mb-5 flex-wrap"
+          />
+        )}
 
         {/* Page level, alongside the other notice, rather than inside the
             standings tile: the fact is about the season, not about one tile, and
@@ -316,18 +308,18 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               {seasonName && (
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button
-                    href={getGameSubRoute(slug, 'standings')}
+                    href={isTournament ? getGameSubRoute(slug, 'bracket') : getGameSubRoute(slug, 'standings')}
                     variant="outline"
                     className="min-h-[44px]"
                   >
-                    Standings
+                    {isTournament ? 'Bracket' : 'Standings'}
                   </Button>
                   <Button
                     href={getGameSubRoute(slug, 'teams')}
                     variant="outline"
                     className="min-h-[44px]"
                   >
-                    Teams &amp; rosters
+                    {isTournament ? 'Participants & rosters' : 'Teams & rosters'}
                   </Button>
                 </div>
               )}
@@ -537,7 +529,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
 
           <Tile
             title="Season archives"
-            href={ROUTES.archives}
+            href={`${ROUTES.archives}?game=${slug}`}
             linkLabel="Archives"
             className={archivesSpan}
           >

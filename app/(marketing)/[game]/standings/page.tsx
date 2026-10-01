@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
@@ -17,7 +17,6 @@ import {
   type StandingsFormat,
 } from '@/app/lib/db/match-page';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
 
 
@@ -146,6 +145,11 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
 
   const gameConfig = GAMES[game as GameSlug];
 
+  // Tournament games manage stages, groups, and standings directly on the bracket view
+  if (gameConfig.competitionModel === 'tournament') {
+    redirect(`/${game}/bracket${seasonParam ? `?season=${encodeURIComponent(seasonParam)}` : ''}`);
+  }
+
   // No try/catch here: a failed query should surface as a real error, not
   // silently collapse into these same empty-state defaults. The marketing
   // route's error boundary (`app/(marketing)/error.tsx`) handles it instead.
@@ -212,10 +216,6 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               : 'Current season standings for all teams'
           }
         />
-        {/* A failed fetch now throws and hits the route's error boundary, so
-            an empty table here is a real "nothing recorded yet", the only
-            case left where this notice is warranted. */}
-        {standings.length === 0 && <MigrationNotice />}
 
         {/* Filters: division tabs + season picker */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">

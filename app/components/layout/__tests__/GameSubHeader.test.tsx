@@ -30,6 +30,8 @@ describe('GameSubHeader Active State Logic', () => {
     expect(getGameSubRoute('valorant', 'schedule')).toBe('/valorant/schedule');
     expect(getGameSubRoute('tetris', 'bracket')).toBe('/tetris/bracket');
     expect(getGameSubRoute('team-fight-tactics', 'bracket')).toBe('/team-fight-tactics/bracket');
+    expect(GAMES.tetris.competitionModel).toBe('tournament');
+    expect(GAMES.valorant.competitionModel).toBe('team');
   });
 });
 

@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from './index';
 import * as schema from './schema';
+import { dbGameSlug } from '@/app/lib/constants';
 import type { TournamentMatch, TournamentStageType } from '@/app/types/tournament';
 
 const homeSchool = alias(schema.schools, 'home_school');
@@ -11,8 +12,11 @@ const awaySchool = alias(schema.schools, 'away_school');
 
 /**
  * Builds the query to retrieve all tournaments configured under a specific game slug.
+ * Resolves canonical route slugs to DB slugs (e.g. 'tetris' -> 'tetr-io') and
+ * joins seasons to surface `isSeasonActive` for the season selector.
  */
 export function buildGameTournamentsQuery(gameSlug: string) {
+  const dbSlug = dbGameSlug(gameSlug);
   return db
     .select({
       id: schema.tournaments.id,
@@ -27,11 +31,13 @@ export function buildGameTournamentsQuery(gameSlug: string) {
       notes: schema.tournaments.notes,
       gameSlug: schema.games.slug,
       gameDisplayName: schema.games.displayName,
+      isSeasonActive: schema.seasons.isActive,
     })
     .from(schema.tournaments)
     .innerJoin(schema.games, eq(schema.tournaments.gameId, schema.games.id))
-    .where(eq(schema.games.slug, gameSlug))
-    .orderBy(asc(schema.tournaments.slug));
+    .leftJoin(schema.seasons, eq(schema.tournaments.seasonId, schema.seasons.id))
+    .where(eq(schema.games.slug, dbSlug))
+    .orderBy(desc(schema.tournaments.slug));
 }
 
 /**

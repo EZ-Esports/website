@@ -8,7 +8,6 @@ import { getGameTournaments, getTournamentMatches } from '@/app/lib/db/queries';
 import { buildTournamentStructure } from '@/app/lib/bracket';
 import TournamentBracketView from '@/app/components/tournament/TournamentBracketView';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 
 interface BracketPageProps {
   params: Promise<{ game: string }>;
@@ -42,11 +41,11 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
 
   const tournaments = await getGameTournaments(game);
 
-  // Resolve selected tournament by slug (defaults to latest tournament if unspecified)
+  // Resolve selected tournament by slug (defaults to latest tournament, first in desc order)
   const targetSlug = tournamentParam || seasonParam;
   const selectedTournament = targetSlug
-    ? tournaments.find((t) => t.slug === targetSlug) || tournaments[tournaments.length - 1]
-    : tournaments[tournaments.length - 1];
+    ? tournaments.find((t) => t.slug === targetSlug) || tournaments[0]
+    : tournaments[0];
 
   const matches = selectedTournament ? await getTournamentMatches(selectedTournament.id) : [];
   const structure = buildTournamentStructure(matches);
@@ -67,16 +66,23 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
           All match times are Eastern Time (ET).
         </p>
 
-        {(!selectedTournament || matches.length === 0) && <MigrationNotice />}
-
         {/* Filters: tournament / season picker */}
         {tournaments.length > 1 && selectedTournament && (
-          <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-4 bg-surface-raised/40 border border-line rounded-2xl p-4">
             <SeasonSelect
               basePath={`/${game}/bracket`}
-              seasons={tournaments.map((t) => ({ name: t.slug, isActive: t.status === 'completed' }))}
+              seasons={tournaments.map((t) => ({
+                name: t.slug,
+                isActive: Boolean(t.isSeasonActive),
+              }))}
               selected={selectedTournament.slug}
             />
+            <div className="text-xs font-semibold text-foreground-muted flex items-center gap-2">
+              <span>Format:</span>
+              <span className="text-foreground capitalize bg-surface px-2.5 py-1 rounded-md border border-line/60">
+                {selectedTournament.format.replace(/_/g, ' ')}
+              </span>
+            </div>
           </div>
         )}
 

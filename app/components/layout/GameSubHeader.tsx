@@ -38,7 +38,7 @@ export default function GameSubHeader() {
       isActive: isGameOverviewPath(pathname, gameSlug),
     },
     { label: competitionLabel, href: competitionRoute },
-    { label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') },
+    ...(!isTournament ? [{ label: 'Standings', href: getGameSubRoute(gameSlug, 'standings') }] : []),
     {
       label: teamsLabel,
       href: teamsRoute,

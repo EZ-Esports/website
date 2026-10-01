@@ -5,7 +5,6 @@ import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import { getGameTeamsPageData } from '@/app/lib/db/queries';
-import MigrationNotice from '@/app/components/ui/MigrationNotice';
 import TeamsFilterClient from './TeamsFilterClient';
 
 interface TeamsPageProps {
@@ -52,10 +51,6 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
           title={pageTitle}
           lead={pageLead}
         />
-        {/* A failed fetch now throws and hits the route's error boundary, so
-            an empty school list here is a real "nothing published yet", the
-            only case left where this notice is warranted. */}
-        {schoolGroups.length === 0 && <MigrationNotice />}
 
         <TeamsFilterClient
           schoolGroups={schoolGroups}
