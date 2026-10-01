@@ -203,14 +203,6 @@ export const matches = pgTable('matches', {
   status: matchStatusEnum('status').default('scheduled').notNull(),
   mvp: text('mvp'), // match MVP as recorded in season sheets, e.g. 'Kyle "Kuli" Ng'
   notes: text('notes'), // reschedules, DQs, data-quality caveats
-  // Tournament bracket metadata (nullable for non-tournament / regular season matches)
-  stage: text('stage'), // 'winners' | 'losers' | 'grand_finals' | 'knockout' | 'group'
-  roundName: text('round_name'), // e.g. 'Winners Pilot Round', 'Quarterfinals', 'Grand Finals'
-  roundOrder: integer('round_order'), // 1-based ordering for round progression
-  matchOrder: integer('match_order'), // 1-based ordering within a round
-  bracketGroup: text('bracket_group'), // e.g. 'Legends Group', 'Challengers Group'
-  homeParticipantName: text('home_participant_name'), // In tournament games, individual player IGN or squad label
-  awayParticipantName: text('away_participant_name'),
   // Natural key for the gold archive. Format:
   //   `${season}|${game_slug}|${home_school_slug}|${home_division}` +
   //   `|${away_school_slug}|${away_division}|${scheduled_at}#${n}`
@@ -237,8 +229,74 @@ export const matches = pgTable('matches', {
   index('matches_season_id_idx').on(table.seasonId),
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
-  index('matches_stage_idx').on(table.stage),
   uniqueIndex('matches_source_key_unique_idx').on(table.sourceKey),
+]).enableRLS();
+
+// --- TOURNAMENTS ---
+
+export const tournamentFormatEnum = pgEnum('tournament_format', [
+  'single_elimination',
+  'double_elimination',
+  'groups_and_knockout',
+  'swiss',
+  'round_robin',
+]);
+
+// Tournaments hosted under a game (e.g. TETR.IO, TFT)
+export const tournaments = pgTable('tournaments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  gameId: uuid('game_id')
+    .references(() => games.id, { onDelete: 'restrict' })
+    .notNull(),
+  seasonId: uuid('season_id')
+    .references(() => seasons.id, { onDelete: 'set null' }),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(),
+  format: tournamentFormatEnum('format').default('double_elimination').notNull(),
+  status: matchStatusEnum('status').default('completed').notNull(),
+  startDate: timestamp('start_date'),
+  endDate: timestamp('end_date'),
+  notes: text('notes'),
+  ...auditColumns,
+}, (table) => [
+  index('tournaments_game_id_idx').on(table.gameId),
+  index('tournaments_season_id_idx').on(table.seasonId),
+  uniqueIndex('tournaments_game_slug_unique_idx').on(table.gameId, table.slug),
+]).enableRLS();
+
+// Matches within a tournament bracket or group stage
+export const tournamentMatches = pgTable('tournament_matches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tournamentId: uuid('tournament_id')
+    .references(() => tournaments.id, { onDelete: 'cascade' })
+    .notNull(),
+  stage: text('stage').notNull(), // 'winners', 'losers', 'grand_finals', 'knockout', 'group', 'other'
+  roundName: text('round_name').notNull(), // 'Winners Pilot Round', 'Quarterfinals', 'Round 1'
+  roundOrder: integer('round_order').default(1).notNull(),
+  matchOrder: integer('match_order').default(1).notNull(),
+  bracketGroup: text('bracket_group'), // e.g. 'Legends Group', 'Challengers Group'
+  scheduledAt: timestamp('scheduled_at').notNull(),
+  status: matchStatusEnum('status').default('completed').notNull(),
+  isForfeit: boolean('is_forfeit').default(false).notNull(),
+  homePlayerTitle: text('home_player_title').notNull(),
+  awayPlayerTitle: text('away_player_title').notNull(),
+  homeSchoolId: uuid('home_school_id')
+    .references(() => schools.id, { onDelete: 'set null' }),
+  awaySchoolId: uuid('away_school_id')
+    .references(() => schools.id, { onDelete: 'set null' }),
+  homeScore: integer('home_score'),
+  awayScore: integer('away_score'),
+  winnerSide: text('winner_side'), // 'home' | 'away'
+  notes: text('notes'),
+  sourceKey: text('source_key'),
+  ...auditColumns,
+}, (table) => [
+  index('tournament_matches_tournament_id_idx').on(table.tournamentId),
+  index('tournament_matches_stage_idx').on(table.stage),
+  index('tournament_matches_scheduled_at_idx').on(table.scheduledAt),
+  index('tournament_matches_home_school_id_idx').on(table.homeSchoolId),
+  index('tournament_matches_away_school_id_idx').on(table.awaySchoolId),
+  uniqueIndex('tournament_matches_source_key_unique_idx').on(table.sourceKey),
 ]).enableRLS();
 
 // --- CMS & LEADERSHIP ---

@@ -4,8 +4,7 @@ import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
-import { getSeasonMatches, getSeasonsWithGames } from '@/app/lib/db/queries';
-import { resolveSelectedSeason } from '@/app/lib/db/match-page';
+import { getGameTournaments, getTournamentMatches } from '@/app/lib/db/queries';
 import { buildTournamentStructure } from '@/app/lib/bracket';
 import TournamentBracketView from '@/app/components/tournament/TournamentBracketView';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
@@ -13,7 +12,7 @@ import MigrationNotice from '@/app/components/ui/MigrationNotice';
 
 interface BracketPageProps {
   params: Promise<{ game: string }>;
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; tournament?: string }>;
 }
 
 export async function generateMetadata({ params }: BracketPageProps): Promise<Metadata> {
@@ -28,7 +27,7 @@ export async function generateMetadata({ params }: BracketPageProps): Promise<Me
 
 export default async function BracketPage({ params, searchParams }: BracketPageProps) {
   const { game } = await params;
-  const { season: seasonParam } = await searchParams;
+  const { season: seasonParam, tournament: tournamentParam } = await searchParams;
 
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();
@@ -41,21 +40,25 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
     notFound();
   }
 
-  const seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
-  const selectedSeason = resolveSelectedSeason(seasons, seasonParam);
+  const tournaments = await getGameTournaments(game);
 
-  let rawMatches: Awaited<ReturnType<typeof getSeasonMatches>> = [];
-  if (selectedSeason) {
-    // For tournament games, matches run undivided
-    rawMatches = await getSeasonMatches(selectedSeason.id, 'All');
+  // Resolve selected tournament by slug (defaults to latest tournament if unspecified)
+  const targetSlug = tournamentParam || seasonParam;
+  const selectedTournament = targetSlug
+    ? tournaments.find((t) => t.slug === targetSlug) || tournaments[tournaments.length - 1]
+    : tournaments[tournaments.length - 1];
+
+  let rawMatches: Awaited<ReturnType<typeof getTournamentMatches>> = [];
+  if (selectedTournament) {
+    rawMatches = await getTournamentMatches(selectedTournament.id);
   }
 
   const structure = buildTournamentStructure(
     rawMatches.map((m) => ({
       id: m.id,
       scheduledAt: m.scheduledAt.toISOString(),
-      homeTeam: m.homeTeam,
-      awayTeam: m.awayTeam,
+      homeTeam: m.homeSchoolName || 'TBD',
+      awayTeam: m.awaySchoolName || 'TBD',
       homeScore: m.homeScore,
       awayScore: m.awayScore,
       status: m.status,
@@ -65,8 +68,8 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
       roundOrder: m.roundOrder,
       matchOrder: m.matchOrder,
       bracketGroup: m.bracketGroup,
-      homeParticipantName: m.homeParticipantName,
-      awayParticipantName: m.awayParticipantName,
+      homeParticipantName: m.homePlayerTitle,
+      awayParticipantName: m.awayPlayerTitle,
     }))
   );
 
@@ -77,8 +80,8 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
           as="h1"
           title={`${gameConfig.displayName} Tournament Bracket`}
           lead={
-            selectedSeason
-              ? `Official tournament bracket and stage results for the ${selectedSeason.name} season`
+            selectedTournament
+              ? `Official tournament bracket and stage results for the ${selectedTournament.name}`
               : `Official tournament bracket for ${gameConfig.displayName}`
           }
         />
@@ -86,22 +89,22 @@ export default async function BracketPage({ params, searchParams }: BracketPageP
           All match times are Eastern Time (ET).
         </p>
 
-        {(!selectedSeason || rawMatches.length === 0) && <MigrationNotice />}
+        {(!selectedTournament || rawMatches.length === 0) && <MigrationNotice />}
 
-        {/* Filters: season picker */}
-        {seasons.length > 1 && selectedSeason && (
+        {/* Filters: tournament / season picker */}
+        {tournaments.length > 1 && selectedTournament && (
           <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
             <SeasonSelect
               basePath={`/${game}/bracket`}
-              seasons={seasons.map((s) => ({ name: s.name, isActive: s.isActive }))}
-              selected={selectedSeason.name}
+              seasons={tournaments.map((t) => ({ name: t.slug, isActive: t.status === 'completed' }))}
+              selected={selectedTournament.slug}
             />
           </div>
         )}
 
-        {!selectedSeason ? (
+        {!selectedTournament ? (
           <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 border border-line rounded-2xl">
-            No seasons found for {gameConfig.displayName} yet.
+            No tournaments found for {gameConfig.displayName} yet.
           </div>
         ) : (
           <TournamentBracketView structure={structure} />
