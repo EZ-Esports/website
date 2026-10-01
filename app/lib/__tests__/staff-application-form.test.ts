@@ -9,6 +9,8 @@ import {
   GAME_DIRECTOR_MAX_LENGTH,
   GAME_REGULATIONS_ROLE,
   isStaffRole,
+  PRODUCTIONS_CREW_ROLE,
+  REFERRAL_FIELD_MAX_LENGTH,
   normalizeLinkedInUrl,
   normalizeOptionalUrl,
   parseStaffApplicationDetails,
@@ -32,6 +34,7 @@ const validForm: StaffApplicationFormData = {
   message: "I have run a Discord community of 500 members for two years.",
   linkedin: "https://linkedin.com/in/janesmith",
   workSamples: "https://github.com/janesmith",
+  referredBy: "",
   availability: "10hrs",
   agreedToTerms: true,
   agreedToPrivacy: true,
@@ -56,6 +59,7 @@ describe("Staff Application Form Validation", () => {
       message: "",
       linkedin: "",
       workSamples: "",
+      referredBy: "",
       availability: "",
       agreedToTerms: false,
       agreedToPrivacy: false,
@@ -84,6 +88,7 @@ describe("Staff Application Details", () => {
       discordTag: "janesmith",
       linkedin: "https://linkedin.com/in/janesmith",
       workSamples: "https://github.com/janesmith",
+      referredBy: "",
       availability: "10hrs",
       consent: { agreedToTerms: true, agreedToPrivacy: true, acknowledgedUnpaidVolunteer: true },
       backgroundMotivation: "I have run a Discord community of 500 members for two years.",
@@ -170,9 +175,9 @@ describe("Staff Application Details", () => {
       "Marketing Division",
       "Operations Division",
       "Development Division",
-      "Productions Crew",
       "Legal Division",
       "Game Regulations Division",
+      PRODUCTIONS_CREW_ROLE,
     ]);
   });
 
@@ -391,6 +396,32 @@ describe("Game Regulations details (v4) and legacy rows", () => {
     const answer = '<b>VALORANT</b>, "LoL" & TFT\nline two';
     const rows = formatStaffApplicationDetails(buildStaffApplicationDetails({ ...grForm, gameDirector: answer }));
     expect(rows[0]).toEqual({ label: "Game Director Interest", value: answer });
+  });
+
+  it("labels the Productions Crew option with its description and still rejects the legacy bare label", () => {
+    expect(PRODUCTIONS_CREW_ROLE).toBe("Productions Crew: Observer, shoutcaster, and/or graphics producer");
+    expect(isStaffRole(PRODUCTIONS_CREW_ROLE)).toBe(true);
+    expect(isStaffRole("Productions Crew")).toBe(false);
+  });
+
+  it("carries an optional, trimmed referral name into details and shows it in the admin rows", () => {
+    const details = buildStaffApplicationDetails({ ...validForm, referredBy: "  Alex Kim " });
+    expect(details.referredBy).toBe("Alex Kim");
+    expect(formatStaffApplicationDetails(details)).toContainEqual({ label: "Referred By", value: "Alex Kim" });
+    expect(formatStaffApplicationDetails(buildStaffApplicationDetails(validForm)).map((r) => r.label)).not.toContain("Referred By");
+  });
+
+  it("server-side caps referredBy at 50 characters and treats it as optional", () => {
+    const base = {
+      consent: { agreedToTerms: true, agreedToPrivacy: true, acknowledgedUnpaidVolunteer: true },
+      backgroundMotivation: "Because.",
+    };
+    const ok = parseStaffApplicationDetails({ ...base, referredBy: "x".repeat(REFERRAL_FIELD_MAX_LENGTH) }, "Marketing Division");
+    expect(ok.ok && ok.details.referredBy).toBe("x".repeat(50));
+    const missing = parseStaffApplicationDetails(base, "Marketing Division");
+    expect(missing.ok && missing.details.referredBy).toBe("");
+    const tooLong = parseStaffApplicationDetails({ ...base, referredBy: "x".repeat(51) }, "Marketing Division");
+    expect(tooLong.ok).toBe(false);
   });
 
   it("omits the game director row for other divisions", () => {

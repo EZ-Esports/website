@@ -62,6 +62,7 @@ const form: StaffApplicationFormData = {
   message: 'I want to help run events.',
   linkedin: 'linkedin.com/in/janesmith',
   workSamples: '',
+  referredBy: '',
   availability: '10hrs',
   agreedToTerms: true,
   agreedToPrivacy: true,
