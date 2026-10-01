@@ -12,12 +12,20 @@ interface GameShowcaseProps {
 
 // Map game IDs to game slugs
 const gameIdToSlug: Record<string, GameSlug> = {
-  'lol': 'league-of-legends',
-  'val': 'valorant',
-  'tft': 'team-fight-tactics',
+  lol: 'league-of-legends',
+  val: 'valorant',
+  tft: 'team-fight-tactics',
+  tetris: 'tetris',
+  osu: 'osu',
+  mc: 'minecraft',
 };
 
 export default function GameShowcase({ title, games }: GameShowcaseProps) {
+  const itemWidthClass =
+    games.length % 3 === 0
+      ? 'sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]'
+      : 'sm:w-[calc(50%_-_1rem)] lg:w-[calc(50%_-_1rem)]';
+
   return (
     <Section>
       <SectionHeader eyebrow="Competition" title={title} />
@@ -51,14 +59,14 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
 
           if (gameSlug) {
             return (
-              <Link key={game.id || index} href={href} className="block w-full sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
+              <Link key={game.id || index} href={href} className={`block w-full ${itemWidthClass}`}>
                 {content}
               </Link>
             );
           }
 
           return (
-            <div key={game.id || index} className="block w-full sm:w-[calc(50%_-_1rem)] lg:w-[calc(33.333%_-_1.333rem)]">
+            <div key={game.id || index} className={`block w-full ${itemWidthClass}`}>
               {content}
             </div>
           );

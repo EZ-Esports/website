@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation';
-import { GAME_SLUGS } from '@/app/lib/constants';
+import { notFound, redirect } from 'next/navigation';
+import { GAME_SLUGS, canonicalGameSlug } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 
 interface GameLayoutProps {
@@ -9,7 +9,12 @@ interface GameLayoutProps {
 
 export default async function GameLayout({ children, params }: GameLayoutProps) {
   const { game } = await params;
-  
+  const canonical = canonicalGameSlug(game);
+
+  if (canonical !== game && GAME_SLUGS.includes(canonical as GameSlug)) {
+    redirect(`/${canonical}`);
+  }
+
   // Validate game slug
   if (!GAME_SLUGS.includes(game as GameSlug)) {
     notFound();

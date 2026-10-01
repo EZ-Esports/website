@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { canonicalGameSlug } from '../constants';
 
 export const getCachedGames = unstable_cache(
   async () => {
@@ -34,8 +35,8 @@ export async function getLeagueAdminData() {
 
 /** Seasons joined with their game, newest season first within each game. */
 export const getSeasonsWithGames = unstable_cache(
-  async () =>
-    db
+  async () => {
+    const rows = await db
       .select({
         id: schema.seasons.id,
         name: schema.seasons.name,
@@ -46,7 +47,13 @@ export const getSeasonsWithGames = unstable_cache(
       })
       .from(schema.seasons)
       .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
-      .orderBy(asc(schema.games.slug), desc(schema.seasons.name)),
+      .orderBy(asc(schema.games.slug), desc(schema.seasons.name));
+
+    return rows.map((r) => ({
+      ...r,
+      gameSlug: canonicalGameSlug(r.gameSlug),
+    }));
+  },
   ['seasons-with-games'],
   { tags: ['seasons', 'games'] }
 );
