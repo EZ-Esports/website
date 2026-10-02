@@ -123,9 +123,16 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
         .from(schema.staffInviteRoles)
         .where(eq(schema.staffInviteRoles.inviteId, invite.id));
 
+      const [existingMember] = await tx
+        .select({ id: schema.members.id })
+        .from(schema.members)
+        .where(sql`lower(${schema.members.email}) = lower(${inviteEmail})`)
+        .limit(1);
+
       await tx.insert(schema.staffMembers).values({
         userId: created.user.id,
         email: inviteEmail,
+        memberId: existingMember?.id ?? null,
         invitedBy: invite.invitedBy,
       });
 

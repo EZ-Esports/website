@@ -23,12 +23,14 @@ const mocks = vi.hoisted(() => {
   interface StaffMemberRecord {
     userId: string;
     email: string;
+    memberId?: string | null;
   }
 
   interface SchoolManagerRecord {
     id: string;
     schoolId: string;
     userId: string;
+    memberId?: string | null;
     managedGames: string[] | null;
     academicYear: string;
     isPrimaryContact: boolean;

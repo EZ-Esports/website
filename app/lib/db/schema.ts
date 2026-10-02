@@ -604,11 +604,13 @@ export const pageContentHistory = pgTable('page_content_history', {
 export const staffMembers = pgTable('staff_members', {
   userId: uuid('user_id').primaryKey(),
   email: text('email').notNull().unique(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
   // user_id of the staff member who invited this one; null for the bootstrapped Owner.
   invitedBy: uuid('invited_by'),
   ...auditColumns,
 }, (table) => [
   index('staff_members_email_idx').on(table.email),
+  index('staff_members_member_id_idx').on(table.memberId),
 ]).enableRLS();
 
 // Pending, single-use staff invitations. We store only the SHA-256 hash of the
