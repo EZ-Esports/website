@@ -99,7 +99,7 @@ export async function createPlayerInvite(
 export interface SchoolInviteItem {
   id: string;
   schoolId: string;
-  gameId: string;
+  gameId: string | null;
   intendedFirstName: string;
   intendedLastName: string;
   status: string;
@@ -156,7 +156,7 @@ export async function getSchoolInvites(
 export interface PendingSubmission {
   id: string;
   schoolId: string;
-  gameId: string;
+  gameId: string | null;
   gameName: string;
   gameSlug: string;
   intendedFirstName: string;
@@ -323,7 +323,7 @@ export async function reviewPlayerInvite(
     throw new Error(`Invite ${inviteId} not found`);
   }
 
-  await assertManagerForSchool(invite.schoolId, invite.gameId);
+  await assertManagerForSchool(invite.schoolId, invite.gameId ?? undefined);
 
   if (action === 'approve') {
     await db
@@ -337,7 +337,7 @@ export async function reviewPlayerInvite(
     if (invite.memberId) {
       let targetRosterId = rosterId;
 
-      if (!targetRosterId) {
+      if (!targetRosterId && invite.gameId) {
         // Find existing team & roster for this school and game
         const [team] = await db
           .select({ id: schema.teams.id })

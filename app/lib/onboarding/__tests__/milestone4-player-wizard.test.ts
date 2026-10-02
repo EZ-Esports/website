@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => {
     membersStore: [] as any[],
     playerIdentitiesStore: [] as any[],
     studentDemographicsStore: [] as any[],
+    schoolManagersStore: [] as any[],
+    staffMembersStore: [] as any[],
   };
 
   function extractConditions(clause: any): Array<{ col: string; op: 'eq' | 'in' | 'isNull'; val?: any }> {
@@ -83,6 +85,8 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.members) return state.membersStore;
     if (tbl === schema.playerIdentities) return state.playerIdentitiesStore;
     if (tbl === schema.studentDemographics) return state.studentDemographicsStore;
+    if (tbl === schema.schoolManagers) return state.schoolManagersStore;
+    if (tbl === schema.staffMembers) return state.staffMembersStore;
     return null;
   }
 
@@ -129,14 +133,15 @@ const mocks = vi.hoisted(() => {
             return matchingInvites.map((inv) => {
               const school = state.schoolsStore.find((s) => s.id === inv.schoolId);
               const game = state.gamesStore.find((g) => g.id === inv.gameId);
+              const isManager = inv.role === 'manager';
               return {
                 invite: inv,
                 schoolId: school?.id ?? inv.schoolId,
                 schoolName: school?.name ?? 'Stuyvesant High School',
                 schoolSlug: school?.slug ?? 'stuyvesant',
-                gameId: game?.id ?? inv.gameId,
-                gameName: game?.displayName ?? 'VALORANT',
-                gameSlug: game?.slug ?? 'valorant',
+                gameId: game?.id ?? (isManager ? null : inv.gameId),
+                gameName: game?.displayName ?? (isManager ? 'School Manager' : 'VALORANT'),
+                gameSlug: game?.slug ?? (isManager ? 'manager' : 'valorant'),
               };
             });
           }
@@ -221,6 +226,7 @@ vi.mock('@/app/lib/cache', () => ({
     PLAYERS: 'players',
     MEMBERS: 'members',
     TEAMS: 'teams',
+    SCHOOLS: 'schools',
   },
   updateCacheTags: mocks.mockUpdateCacheTags,
 }));
@@ -279,6 +285,8 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     mocks.state.membersStore = [];
     mocks.state.playerIdentitiesStore = [];
     mocks.state.studentDemographicsStore = [];
+    mocks.state.schoolManagersStore = [];
+    mocks.state.staffMembersStore = [];
   });
 
   describe('1. Token Hashing & Verification', () => {
@@ -714,6 +722,133 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       for (const pii of sensitivePiiFields) {
         expect(managerAllowedFields).not.toContain(pii);
       }
+    });
+  });
+
+  describe('6. Manager Onboarding & Provisioning Flow', () => {
+    const managerToken = 'manager_test_token_secret_999';
+    const managerTokenHash = crypto.createHash('sha256').update(managerToken).digest('hex');
+
+    beforeEach(() => {
+      mocks.state.playerInvitesStore.push({
+        id: 'manager-invite-1',
+        schoolId,
+        gameId: null,
+        role: 'manager',
+        tokenHash: managerTokenHash,
+        intendedFirstName: 'Sam',
+        intendedLastName: 'Miller',
+        invitedByUserId: 'staff-admin-id',
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        submissionDraft: {
+          email: 'smiller@stuy.edu',
+          academicYear: '2025-2026',
+          managedGames: null,
+          isPrimaryContact: true,
+        },
+        memberId: null,
+      });
+    });
+
+    it('successfully validates a manager invite token matching gameSlug=manager', async () => {
+      const result = await validateInviteToken({
+        schoolSlug: 'stuyvesant',
+        gameSlug: 'manager',
+        token: managerToken,
+      });
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.role).toBe('manager');
+        expect(result.gameSlug).toBe('manager');
+        expect(result.gameName).toBe('School Manager');
+        expect(result.gameId).toBeNull();
+        expect(result.intendedFirstName).toBe('Sam');
+        expect(result.intendedLastName).toBe('Miller');
+      }
+    });
+
+    it('completes manager onboarding, provisions school_managers record, and transitions invite to accepted', async () => {
+      const managerSubmission: PlayerOnboardingSubmission = {
+        legalFirstName: 'Samuel',
+        legalLastName: 'Miller',
+        email: 'smiller@stuy.edu',
+        password: 'securePassword123!',
+        graduationYear: 2026,
+        riotId: 'CoachSam#NA1',
+        discordUsername: 'coach_sam',
+        discordUserId: 'discord-sam-999',
+        inGuild: true,
+        birthDate: '1988-08-20',
+        gender: 'Male',
+        codeOfConductAccepted: true,
+      };
+
+      const result = await submitPlayerOnboarding({
+        token: managerToken,
+        submission: managerSubmission,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('accepted');
+      expect(result.role).toBe('manager');
+      expect(result.memberId).toBeDefined();
+
+      // 1. Verify member row created
+      const member = mocks.state.membersStore.find((m) => m.id === result.memberId);
+      expect(member).toBeDefined();
+      expect(member.email).toBe('smiller@stuy.edu');
+
+      // 2. Verify school_managers assignment row created
+      const managerRow = mocks.state.schoolManagersStore.find(
+        (sm) => sm.schoolId === schoolId
+      );
+      expect(managerRow).toBeDefined();
+      expect(managerRow.isActive).toBe(true);
+      expect(managerRow.academicYear).toBe('2025-2026');
+      expect(managerRow.isPrimaryContact).toBe(true);
+
+      // 3. Verify invite status transitioned to accepted
+      const invite = mocks.state.playerInvitesStore.find((i) => i.id === 'manager-invite-1');
+      expect(invite.status).toBe('accepted');
+      expect(invite.memberId).toBe(result.memberId);
+      expect(invite.reviewedAt).toBeDefined();
+
+      // 4. Verify cache tags invalidation includes schools
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('players', 'members', 'schools');
+    });
+
+    it('links manager assignment to existing staff account when email matches', async () => {
+      const existingStaffUserId = 'staff-user-uuid-456';
+      mocks.state.staffMembersStore.push({
+        id: 'staff-rec-1',
+        userId: existingStaffUserId,
+        email: 'smiller@stuy.edu',
+      });
+
+      const managerSubmission: PlayerOnboardingSubmission = {
+        legalFirstName: 'Samuel',
+        legalLastName: 'Miller',
+        email: 'smiller@stuy.edu',
+        graduationYear: 2026,
+        riotId: 'CoachSam#NA1',
+        discordUsername: 'coach_sam',
+        inGuild: true,
+        birthDate: '1988-08-20',
+        codeOfConductAccepted: true,
+      };
+
+      await submitPlayerOnboarding({
+        token: managerToken,
+        submission: managerSubmission,
+      });
+
+      const managerRow = mocks.state.schoolManagersStore.find(
+        (sm) => sm.schoolId === schoolId
+      );
+      expect(managerRow).toBeDefined();
+      expect(managerRow.userId).toBe(existingStaffUserId);
     });
   });
 });

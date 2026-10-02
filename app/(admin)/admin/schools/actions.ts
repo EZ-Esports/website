@@ -380,3 +380,172 @@ export async function getSchoolManagers(schoolId: string) {
     .orderBy(desc(schema.schoolManagers.isPrimaryContact), asc(schema.schoolManagers.createdAt));
 }
 
+export interface GenerateManagerInviteParams {
+  schoolId: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  academicYear?: string;
+  managedGames?: string[] | null;
+  isPrimaryContact?: boolean;
+}
+
+export interface GenerateManagerInviteResult {
+  success: boolean;
+  token?: string;
+  inviteUrl?: string;
+  inviteId?: string;
+  error?: string;
+}
+
+/**
+ * Generates a single-use onboarding invite link for a School Manager.
+ * Requires Permissions.MANAGE_SCHOOLS.
+ */
+export async function generateManagerInvite(
+  params: GenerateManagerInviteParams
+): Promise<GenerateManagerInviteResult> {
+  const actor = await requireSchoolsPermission();
+
+  const {
+    schoolId,
+    firstName,
+    lastName,
+    email,
+    academicYear = '2025-2026',
+    managedGames = null,
+    isPrimaryContact = false,
+  } = params;
+
+  if (!schoolId) {
+    return { success: false, error: 'School ID is required.' };
+  }
+  if (!firstName?.trim() || !lastName?.trim()) {
+    return { success: false, error: 'First name and last name are required.' };
+  }
+
+  try {
+    const [school] = await db
+      .select({ id: schema.schools.id, name: schema.schools.name, slug: schema.schools.slug })
+      .from(schema.schools)
+      .where(eq(schema.schools.id, schoolId))
+      .limit(1);
+
+    if (!school) {
+      return { success: false, error: 'School not found.' };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 days TTL
+
+    const [invite] = await db
+      .insert(schema.playerInvites)
+      .values({
+        schoolId,
+        gameId: null,
+        role: 'manager',
+        tokenHash,
+        intendedFirstName: firstName.trim(),
+        intendedLastName: lastName.trim(),
+        invitedByUserId: actor.id,
+        status: 'pending',
+        expiresAt,
+        submissionDraft: {
+          email: email?.trim() || undefined,
+          academicYear: academicYear.trim(),
+          managedGames: managedGames ?? null,
+          isPrimaryContact: Boolean(isPrimaryContact),
+        },
+      })
+      .returning();
+
+    try {
+      await db.insert(schema.staffAuditLogs).values({
+        event: 'generate_manager_invite',
+        userId: actor.id,
+        email: actor.email,
+        details: JSON.stringify({
+          schoolId,
+          inviteId: invite.id,
+          intendedName: `${firstName.trim()} ${lastName.trim()}`,
+          academicYear,
+        }),
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit event for manager invite', auditErr);
+    }
+
+    const inviteUrl = `/join/${school.slug}/manager?token=${token}`;
+
+    return {
+      success: true,
+      token,
+      inviteUrl,
+      inviteId: invite.id,
+    };
+  } catch (error) {
+    console.error('Failed to generate manager invite', error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+/**
+ * Retrieves all manager invite tokens for a given school.
+ */
+export async function getSchoolManagerInvites(schoolId: string) {
+  if (!schoolId) return [];
+
+  return db
+    .select({
+      id: schema.playerInvites.id,
+      schoolId: schema.playerInvites.schoolId,
+      intendedFirstName: schema.playerInvites.intendedFirstName,
+      intendedLastName: schema.playerInvites.intendedLastName,
+      status: schema.playerInvites.status,
+      expiresAt: schema.playerInvites.expiresAt,
+      createdAt: schema.playerInvites.createdAt,
+      submittedAt: schema.playerInvites.submittedAt,
+      submissionDraft: schema.playerInvites.submissionDraft,
+    })
+    .from(schema.playerInvites)
+    .where(
+      and(
+        eq(schema.playerInvites.schoolId, schoolId),
+        eq(schema.playerInvites.role, 'manager')
+      )
+    )
+    .orderBy(desc(schema.playerInvites.createdAt));
+}
+
+/**
+ * Revokes a pending manager invite token.
+ */
+export async function revokeManagerInvite(inviteId: string) {
+  const actor = await requireSchoolsPermission();
+  if (!inviteId) return { success: false, error: 'Invite ID required' };
+
+  try {
+    await db
+      .update(schema.playerInvites)
+      .set({
+        status: 'rejected',
+        rejectionReason: 'Revoked by staff administrator',
+      })
+      .where(eq(schema.playerInvites.id, inviteId));
+
+    try {
+      await db.insert(schema.staffAuditLogs).values({
+        event: 'revoke_manager_invite',
+        userId: actor.id,
+        email: actor.email,
+        details: JSON.stringify({ inviteId }),
+      });
+    } catch {}
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+

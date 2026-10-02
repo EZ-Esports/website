@@ -17,7 +17,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
 
   const context = await getSchoolManagerContext(paramSchoolId);
   if (!context) {
-    redirect('/login');
+    redirect('/portal/login');
   }
 
   const activeSchool =

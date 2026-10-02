@@ -22,12 +22,13 @@ import {
 
 export interface InviteData {
   inviteId: string;
+  role?: 'player' | 'manager';
   intendedFirstName: string;
   intendedLastName: string;
   schoolId: string;
   schoolName: string;
   schoolSlug: string;
-  gameId: string;
+  gameId: string | null;
   gameName: string;
   gameSlug: string;
   submissionDraft: Record<string, any> | null;
@@ -73,8 +74,9 @@ export default function PlayerOnboardingWizard({
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const isManager = inviteData.role === 'manager';
 
-  // Step 1: Student Information
+  // Step 1: Account Information
   const [legalFirstName, setLegalFirstName] = useState(
     initialDraft.legalFirstName || inviteData.intendedFirstName || ''
   );
@@ -82,6 +84,7 @@ export default function PlayerOnboardingWizard({
     initialDraft.legalLastName || inviteData.intendedLastName || ''
   );
   const [email, setEmail] = useState(initialDraft.email || '');
+  const [password, setPassword] = useState(initialDraft.password || '');
   const [graduationYear, setGraduationYear] = useState<number>(
     initialDraft.graduationYear ? Number(initialDraft.graduationYear) : 2026
   );
@@ -160,6 +163,7 @@ export default function PlayerOnboardingWizard({
       legalFirstName,
       legalLastName,
       email,
+      password: isManager ? password : undefined,
       graduationYear,
       discordUsername,
       discordJoinedConfirmed,
@@ -217,11 +221,21 @@ export default function PlayerOnboardingWizard({
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      setErrorMessage('Please enter a valid student email address.');
+      setErrorMessage(
+        isManager
+          ? 'Please enter a valid email address.'
+          : 'Please enter a valid student email address.'
+      );
+      return false;
+    }
+    if (isManager && (!password || password.length < 8)) {
+      setErrorMessage(
+        'Please enter a password with at least 8 characters to access the School Manager Portal.'
+      );
       return false;
     }
     if (!graduationYear || graduationYear < 2024 || graduationYear > 2035) {
-      setErrorMessage('Please select a valid expected graduation year.');
+      setErrorMessage('Please select a valid expected graduation or academic year.');
       return false;
     }
     return true;
@@ -286,6 +300,7 @@ export default function PlayerOnboardingWizard({
           legalFirstName: legalFirstName.trim(),
           legalLastName: legalLastName.trim(),
           email: email.trim().toLowerCase(),
+          password: isManager ? password : undefined,
           graduationYear,
           riotId: riotId.trim(),
           discordUsername: discordUsername.trim(),
@@ -343,6 +358,76 @@ export default function PlayerOnboardingWizard({
 
   // Success Confirmation Screen
   if (isSubmitted) {
+    if (isManager) {
+      return (
+        <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6">
+          <div className="bg-surface-elevated border border-border rounded-2xl p-8 sm:p-10 shadow-xl text-center space-y-6">
+            <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto ring-8 ring-emerald-500/5">
+              <FiCheck className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                Manager Onboarding Complete!
+              </h1>
+              <p className="text-foreground-muted text-sm sm:text-base">
+                Welcome aboard,{' '}
+                <span className="text-foreground font-semibold">
+                  {legalFirstName} {legalLastName}
+                </span>
+                ! Your School Manager account for{' '}
+                <span className="text-accent font-semibold">
+                  {inviteData.schoolName}
+                </span>{' '}
+                is now active.
+              </p>
+            </div>
+
+            <div className="bg-surface rounded-xl border border-border p-6 text-left space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-accent flex items-center gap-2">
+                <FiShield className="w-4 h-4" /> Manager Portal Privileges Active
+              </h2>
+              <ul className="space-y-3 text-sm text-foreground-muted">
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                    ✓
+                  </span>
+                  <span>
+                    <strong className="text-foreground">Official Community Access:</strong>{' '}
+                    Your Discord account ({discordUsername}) is registered for league announcements, referee comms, and manager channels.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                    ✓
+                  </span>
+                  <span>
+                    <strong className="text-foreground">Player Invites & Roster Review:</strong>{' '}
+                    Generate player invite links for students at {inviteData.schoolName} and approve student submissions for tournament rosters.
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/portal"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-accent text-on-accent font-semibold text-sm hover:bg-accent/90 transition-colors shadow-sm"
+              >
+                Enter School Manager Portal &rarr;
+              </Link>
+              <Link
+                href="/portal/login"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg border border-border text-foreground font-semibold text-sm hover:bg-surface transition-colors"
+              >
+                Sign In Page
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6">
         <div className="bg-surface-elevated border border-border rounded-2xl p-8 sm:p-10 shadow-xl text-center space-y-6">
@@ -422,20 +507,31 @@ export default function PlayerOnboardingWizard({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent mb-2">
-              Official Player Registration
+              {isManager ? 'School Manager Onboarding' : 'Official Player Registration'}
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">
               Welcome, {inviteData.intendedFirstName} {inviteData.intendedLastName}!
             </h1>
             <p className="text-foreground-muted text-sm mt-1">
-              Complete your player onboarding for{' '}
-              <span className="text-foreground font-semibold">
-                {inviteData.schoolName}
-              </span>{' '}
-              —{' '}
-              <span className="text-accent font-semibold">
-                {inviteData.gameName}
-              </span>
+              {isManager ? (
+                <>
+                  Complete your School Manager verification for{' '}
+                  <span className="text-foreground font-semibold">
+                    {inviteData.schoolName}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Complete your player onboarding for{' '}
+                  <span className="text-foreground font-semibold">
+                    {inviteData.schoolName}
+                  </span>{' '}
+                  —{' '}
+                  <span className="text-accent font-semibold">
+                    {inviteData.gameName}
+                  </span>
+                </>
+              )}
             </p>
           </div>
 
@@ -535,35 +631,73 @@ export default function PlayerOnboardingWizard({
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
-                Student Email Address *
+                {isManager ? 'Manager Email Address *' : 'Student Email Address *'}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                placeholder="e.g. achen@nycstudents.net or student@gmail.com"
+                placeholder={
+                  isManager
+                    ? 'e.g. coach@school.edu'
+                    : 'e.g. achen@nycstudents.net or student@gmail.com'
+                }
                 required
               />
               <p className="text-xs text-foreground-muted mt-1">
-                Used for tournament notifications, official roster verification, and bracket updates.
+                {isManager
+                  ? 'Used to sign in to your School Manager Portal account and receive league updates.'
+                  : 'Used for tournament notifications, official roster verification, and bracket updates.'}
               </p>
             </div>
 
+            {isManager && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
+                  Create Portal Account Password *
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  placeholder="At least 8 characters"
+                  required
+                />
+                <p className="text-xs text-foreground-muted mt-1">
+                  Required to sign in to the School Manager Portal at /portal/login.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
-                Anticipated High School Graduation Year *
+                {isManager
+                  ? 'Affiliation / Academic Year *'
+                  : 'Anticipated High School Graduation Year *'}
               </label>
               <select
                 value={graduationYear}
                 onChange={(e) => setGraduationYear(Number(e.target.value))}
                 className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
-                <option value={2025}>Class of 2025 (12th Grade / Senior)</option>
-                <option value={2026}>Class of 2026 (11th Grade / Junior)</option>
-                <option value={2027}>Class of 2027 (10th Grade / Sophomore)</option>
-                <option value={2028}>Class of 2028 (9th Grade / Freshman)</option>
-                <option value={2029}>Class of 2029 (8th Grade)</option>
+                {isManager ? (
+                  <>
+                    <option value={2025}>2024-2025</option>
+                    <option value={2026}>2025-2026 (Current Academic Year)</option>
+                    <option value={2027}>2026-2027</option>
+                    <option value={2028}>2027-2028</option>
+                  </>
+                ) : (
+                  <>
+                    <option value={2025}>Class of 2025 (12th Grade / Senior)</option>
+                    <option value={2026}>Class of 2026 (11th Grade / Junior)</option>
+                    <option value={2027}>Class of 2027 (10th Grade / Sophomore)</option>
+                    <option value={2028}>Class of 2028 (9th Grade / Freshman)</option>
+                    <option value={2029}>Class of 2029 (8th Grade)</option>
+                  </>
+                )}
               </select>
             </div>
           </div>
@@ -662,7 +796,9 @@ export default function PlayerOnboardingWizard({
                 Step 3: Riot Games Identity
               </h2>
               <p className="text-xs sm:text-sm text-foreground-muted mt-1">
-                Link your active Riot ID for {inviteData.gameName}. This identifier is used for lobby invites and automatic comp ops stats.
+                {isManager
+                  ? 'Link your Riot Games ID for tournament operations, custom match hosting, and referee verification.'
+                  : `Link your active Riot ID for ${inviteData.gameName}. This identifier is used for lobby invites and automatic comp ops stats.`}
               </p>
             </div>
 

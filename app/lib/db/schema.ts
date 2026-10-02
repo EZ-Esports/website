@@ -712,11 +712,12 @@ export const schoolManagers = pgTable('school_managers', {
   index('school_managers_user_id_idx').on(t.userId),
 ]).enableRLS();
 
-// 2. Single-Use Player Invite Tokens
+// 2. Single-Use Player & Manager Invite Tokens
 export const playerInvites = pgTable('player_invites', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
-  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }).notNull(),
+  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }),
+  role: text('role').default('player').notNull(), // 'player' | 'manager'
   tokenHash: text('token_hash').notNull().unique(), // SHA-256
   intendedFirstName: text('intended_first_name').notNull(),
   intendedLastName: text('intended_last_name').notNull(),
@@ -731,6 +732,7 @@ export const playerInvites = pgTable('player_invites', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('player_invites_school_game_idx').on(t.schoolId, t.gameId),
+  index('player_invites_school_role_idx').on(t.schoolId, t.role),
   uniqueIndex('player_invites_token_hash_idx').on(t.tokenHash),
   index('player_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();

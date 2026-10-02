@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { ManualRiotIdAdapter } from './adapters/riot-manual';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
@@ -19,12 +19,13 @@ export type ValidateInviteTokenResult =
       valid: true;
       status: 'pending';
       inviteId: string;
+      role: 'player' | 'manager';
       intendedFirstName: string;
       intendedLastName: string;
       schoolId: string;
       schoolName: string;
       schoolSlug: string;
-      gameId: string;
+      gameId: string | null;
       gameName: string;
       gameSlug: string;
       submissionDraft: Record<string, any> | null;
@@ -89,7 +90,7 @@ export async function validateInviteToken(
     })
     .from(schema.playerInvites)
     .innerJoin(schema.schools, eq(schema.playerInvites.schoolId, schema.schools.id))
-    .innerJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
+    .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
     .where(eq(schema.playerInvites.tokenHash, tokenHash))
     .limit(1);
 
@@ -101,6 +102,11 @@ export async function validateInviteToken(
     };
   }
 
+  const isManager = row.invite.role === 'manager';
+  const resolvedGameId = row.gameId ?? null;
+  const resolvedGameSlug = row.gameSlug || (isManager ? 'manager' : 'all');
+  const resolvedGameName = row.gameName || (isManager ? 'School Manager' : 'All Games');
+
   if (schoolSlug && row.schoolSlug.toLowerCase() !== schoolSlug.toLowerCase()) {
     return {
       valid: false,
@@ -109,12 +115,17 @@ export async function validateInviteToken(
     };
   }
 
-  if (gameSlug && row.gameSlug.toLowerCase() !== gameSlug.toLowerCase()) {
-    return {
-      valid: false,
-      status: 'invalid',
-      message: 'Invite link does not match the requested game.',
-    };
+  if (gameSlug) {
+    const slugLower = gameSlug.toLowerCase();
+    const matchesGame = resolvedGameSlug.toLowerCase() === slugLower;
+    const matchesManager = isManager && slugLower === 'manager';
+    if (!matchesGame && !matchesManager) {
+      return {
+        valid: false,
+        status: 'invalid',
+        message: 'Invite link does not match the requested game or role.',
+      };
+    }
   }
 
   const invite = row.invite;
@@ -158,14 +169,15 @@ export async function validateInviteToken(
       valid: true,
       status: 'pending',
       inviteId: invite.id,
+      role: (row.invite.role as 'player' | 'manager') || 'player',
       intendedFirstName: invite.intendedFirstName,
       intendedLastName: invite.intendedLastName,
       schoolId: row.schoolId,
       schoolName: row.schoolName,
       schoolSlug: row.schoolSlug,
-      gameId: row.gameId,
-      gameName: row.gameName,
-      gameSlug: row.gameSlug,
+      gameId: resolvedGameId,
+      gameName: resolvedGameName,
+      gameSlug: resolvedGameSlug,
       submissionDraft: (invite.submissionDraft as Record<string, any> | null) ?? null,
       expiresAt: invite.expiresAt,
     };
@@ -234,6 +246,7 @@ export interface PlayerOnboardingSubmission {
   legalFirstName: string;
   legalLastName: string;
   graduationYear: number;
+  password?: string;
   riotId: string;
   discordUsername: string;
   discordUserId?: string;
@@ -273,7 +286,8 @@ export interface SubmitPlayerOnboardingResult {
   success: boolean;
   inviteId: string;
   memberId: string;
-  status: 'submitted';
+  status: 'submitted' | 'accepted';
+  role?: 'player' | 'manager';
 }
 
 /**
@@ -301,7 +315,7 @@ export async function submitPlayerOnboarding(
       schoolId: schema.playerInvites.schoolId,
     })
     .from(schema.playerInvites)
-    .innerJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
+    .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
     .where(eq(schema.playerInvites.tokenHash, tokenHash))
     .limit(1);
 
@@ -310,6 +324,7 @@ export async function submitPlayerOnboarding(
   }
 
   const invite = inviteRow.invite;
+  const isManager = invite.role === 'manager';
 
   if (invite.status !== 'pending') {
     throw new Error(`Cannot submit application: invite is already ${invite.status}.`);
@@ -346,8 +361,9 @@ export async function submitPlayerOnboarding(
   }
 
   // 2. Validate Riot ID using GameIdentityPort adapter
+  const effectiveGameSlug = inviteRow.gameSlug || (isManager ? 'valorant' : 'valorant');
   const riotAdapter = options?.riotAdapter ?? new ManualRiotIdAdapter({ isVerified: true });
-  const resolvedRiot = await riotAdapter.resolveIdentity(inviteRow.gameSlug, submission.riotId);
+  const resolvedRiot = await riotAdapter.resolveIdentity(effectiveGameSlug, submission.riotId);
 
   // 3. Validate Discord handle (honor system: trusted that they provided handle and joined server)
   const discordUsername = (submission.discordUsername || '').trim();
@@ -503,16 +519,119 @@ export async function submitPlayerOnboarding(
         });
     }
 
-    // 4e. Update playerInvites to submitted
-    await tx
-      .update(schema.playerInvites)
-      .set({
-        memberId: createdOrUpdatedMemberId,
-        status: 'submitted',
-        submittedAt: new Date(),
-      })
-      .where(eq(schema.playerInvites.id, invite.id));
+    // 4e. Handle role-specific finalization
+    if (isManager) {
+      // Resolve or link userId
+      let resolvedUserId: string | null = null;
+      const [staff] = await tx
+        .select({ userId: schema.staffMembers.userId })
+        .from(schema.staffMembers)
+        .where(sql`lower(${schema.staffMembers.email}) = ${email}`)
+        .limit(1);
+
+      if (staff) {
+        resolvedUserId = staff.userId;
+      } else {
+        try {
+          if (process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+            const { createServiceClient } = await import('@/app/lib/supabase/service');
+            const supabase = createServiceClient();
+            const { data: created, error: createError } = await supabase.auth.admin.createUser({
+              email,
+              password: submission.password || crypto.randomBytes(16).toString('hex'),
+              email_confirm: true,
+            });
+            if (created?.user) {
+              resolvedUserId = created.user.id;
+            } else if (createError) {
+              const { data: list } = await supabase.auth.admin.listUsers();
+              const existingAuthUser = list?.users?.find((u) => u.email?.toLowerCase() === email);
+              if (existingAuthUser) {
+                resolvedUserId = existingAuthUser.id;
+              }
+            }
+          }
+        } catch (authErr) {
+          console.warn('Could not provision Supabase Auth user for manager:', authErr);
+        }
+      }
+
+      if (!resolvedUserId) {
+        resolvedUserId = crypto.randomUUID();
+      }
+
+      const draft = (invite.submissionDraft as Record<string, any>) || {};
+      const academicYear = draft.academicYear || '2025-2026';
+      const managedGames = draft.managedGames ?? null;
+      const isPrimaryContact = Boolean(draft.isPrimaryContact);
+
+      // Upsert school_managers row
+      const [existingManager] = await tx
+        .select()
+        .from(schema.schoolManagers)
+        .where(
+          and(
+            eq(schema.schoolManagers.schoolId, invite.schoolId),
+            eq(schema.schoolManagers.userId, resolvedUserId),
+            eq(schema.schoolManagers.academicYear, academicYear)
+          )
+        )
+        .limit(1);
+
+      if (existingManager) {
+        await tx
+          .update(schema.schoolManagers)
+          .set({
+            isActive: true,
+            managedGames: managedGames ?? existingManager.managedGames,
+            isPrimaryContact: isPrimaryContact ?? existingManager.isPrimaryContact,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.schoolManagers.id, existingManager.id));
+      } else {
+        await tx.insert(schema.schoolManagers).values({
+          schoolId: invite.schoolId,
+          userId: resolvedUserId,
+          managedGames,
+          academicYear,
+          isPrimaryContact,
+          isActive: true,
+        });
+      }
+
+      // Transition manager invite to accepted
+      await tx
+        .update(schema.playerInvites)
+        .set({
+          memberId: createdOrUpdatedMemberId,
+          status: 'accepted',
+          submittedAt: new Date(),
+          reviewedAt: new Date(),
+        })
+        .where(eq(schema.playerInvites.id, invite.id));
+    } else {
+      // 4e. Update playerInvites to submitted
+      await tx
+        .update(schema.playerInvites)
+        .set({
+          memberId: createdOrUpdatedMemberId,
+          status: 'submitted',
+          submittedAt: new Date(),
+        })
+        .where(eq(schema.playerInvites.id, invite.id));
+    }
   });
+
+  if (isManager) {
+    updateCacheTags(CACHE_TAGS.PLAYERS, CACHE_TAGS.MEMBERS, CACHE_TAGS.SCHOOLS);
+    return {
+      success: true,
+      inviteId: invite.id,
+      memberId: createdOrUpdatedMemberId,
+      status: 'accepted',
+      role: 'manager',
+    };
+  }
 
   updateCacheTags(CACHE_TAGS.PLAYERS, CACHE_TAGS.MEMBERS);
 
@@ -521,5 +640,6 @@ export async function submitPlayerOnboarding(
     inviteId: invite.id,
     memberId: createdOrUpdatedMemberId,
     status: 'submitted',
+    role: 'player',
   };
 }

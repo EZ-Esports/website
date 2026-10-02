@@ -67,11 +67,11 @@ describe('Content-Security-Policy (CSP)', () => {
     it('includes unsafe-eval in development mode for React dev tools and callstack reconstruction', () => {
       const originalEnv = process.env.NODE_ENV;
       try {
-        process.env.NODE_ENV = 'development';
+        (process.env as any).NODE_ENV = 'development';
         const csp = buildCsp('dev-nonce');
         expect(csp).toContain("'unsafe-eval'");
       } finally {
-        process.env.NODE_ENV = originalEnv;
+        (process.env as any).NODE_ENV = originalEnv;
       }
     });
   });
