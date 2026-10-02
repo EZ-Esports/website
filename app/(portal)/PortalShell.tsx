@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from 'react-aria-components';
-import { logout } from '@/app/(admin)/admin/actions';
+import { portalLogout } from '@/app/(portal)/portal/login/actions';
 import type { SchoolManagerContext } from '@/app/lib/onboarding/manager-auth';
 import {
   HiOutlineAcademicCap,
@@ -82,16 +82,6 @@ export default function PortalShell({ children, context }: PortalShellProps) {
 
           {/* Right Header Navigation & User Profile */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {context.isStaffAdmin && (
-              <Link
-                href="/admin"
-                className="hidden md:inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 px-2.5 py-1 rounded bg-indigo-950/40 border border-indigo-800/50 transition-colors"
-              >
-                <HiOutlineShieldCheck className="w-3.5 h-3.5" />
-                <span>Staff CMS</span>
-              </Link>
-            )}
-
             <Link
               href="/"
               target="_blank"
@@ -108,15 +98,15 @@ export default function PortalShell({ children, context }: PortalShellProps) {
                   {context.email}
                 </span>
                 <span className="text-[10px] font-semibold text-zinc-500 uppercase">
-                  {context.isStaffAdmin ? 'Staff Admin' : 'School Manager'}
+                  School Manager
                 </span>
               </div>
 
-              <form action={logout}>
+              <form action={portalLogout}>
                 <Button
                   type="submit"
-                  aria-label="Sign out"
-                  className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+                  aria-label="Sign out of School Manager Portal"
+                  className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors cursor-pointer"
                 >
                   <HiArrowRightOnRectangle className="w-4 h-4" />
                 </Button>

@@ -9,11 +9,11 @@ export const metadata: Metadata = {
 };
 
 interface PortalLoginPageProps {
-  searchParams: Promise<{ message?: string }>;
+  searchParams: Promise<{ message?: string; email?: string }>;
 }
 
 export default async function PortalLoginPage({ searchParams }: PortalLoginPageProps) {
-  const { message } = await searchParams;
+  const { message, email } = await searchParams;
 
   return (
     <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
@@ -41,7 +41,7 @@ export default async function PortalLoginPage({ searchParams }: PortalLoginPageP
         )}
 
         {/* Login Form */}
-        <PortalLoginForm />
+        <PortalLoginForm defaultEmail={email} />
 
         {/* Footer Links */}
         <div className="pt-2 text-center border-t border-border/60">

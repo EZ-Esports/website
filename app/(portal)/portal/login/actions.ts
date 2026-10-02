@@ -65,7 +65,7 @@ export async function portalLogin(
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -76,7 +76,64 @@ export async function portalLogin(
     };
   }
 
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: 'Authentication failed.' };
+  }
+
+  // Verify that this user is registered as an active school manager
+  const { db } = await import('@/app/lib/db');
+  const schema = await import('@/app/lib/db/schema');
+  const { eq, and, sql } = await import('drizzle-orm');
+
+  const [managerRow] = await db
+    .select({ id: schema.schoolManagers.id })
+    .from(schema.schoolManagers)
+    .where(
+      and(
+        eq(schema.schoolManagers.userId, userId),
+        eq(schema.schoolManagers.isActive, true)
+      )
+    )
+    .limit(1);
+
+  if (!managerRow) {
+    const [member] = await db
+      .select({ id: schema.members.id })
+      .from(schema.members)
+      .where(sql`lower(${schema.members.email}) = ${normalizedEmail}`)
+      .limit(1);
+
+    const [managerByMember] = member
+      ? await db
+          .select({ id: schema.schoolManagers.id })
+          .from(schema.schoolManagers)
+          .where(
+            and(
+              eq(schema.schoolManagers.memberId, member.id),
+              eq(schema.schoolManagers.isActive, true)
+            )
+          )
+          .limit(1)
+      : [null];
+
+    if (!managerByMember) {
+      await supabase.auth.signOut();
+      return {
+        error:
+          'This account does not have access to the School Manager Portal. If you are a league staff member, please use the Staff CMS login.',
+      };
+    }
+  }
+
   // Clear caches and enter the school manager portal
   revalidatePath('/', 'layout');
   return redirect('/portal');
+}
+
+export async function portalLogout(): Promise<never> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath('/', 'layout');
+  redirect('/portal/login');
 }

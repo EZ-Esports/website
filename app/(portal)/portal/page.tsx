@@ -7,6 +7,7 @@ import {
 } from '@/app/lib/onboarding/portal-actions';
 import { getCachedGames } from '@/app/lib/db/queries';
 import SchoolPortalClient from './SchoolPortalClient';
+import PortalShell from '../PortalShell';
 
 interface PortalPageProps {
   searchParams: Promise<{ schoolId?: string; gameId?: string }>;
@@ -15,7 +16,7 @@ interface PortalPageProps {
 export default async function PortalPage({ searchParams }: PortalPageProps) {
   const { schoolId: paramSchoolId, gameId: paramGameId } = await searchParams;
 
-  const context = await getSchoolManagerContext(paramSchoolId);
+  const context = await getSchoolManagerContext(paramSchoolId, { allowStaffAdmin: false });
   if (!context) {
     redirect('/portal/login');
   }
@@ -26,13 +27,15 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
 
   if (!activeSchool) {
     return (
-      <div className="p-8 text-center border border-zinc-800 rounded-xl bg-zinc-900/50">
-        <h2 className="text-xl font-bold text-white mb-2">No Managed Schools Assigned</h2>
-        <p className="text-sm text-zinc-400">
-          Your account is not assigned as a manager for any active schools. Please contact an EZ
-          Esports administrator.
-        </p>
-      </div>
+      <PortalShell context={context}>
+        <div className="p-8 text-center border border-zinc-800 rounded-xl bg-zinc-900/50">
+          <h2 className="text-xl font-bold text-white mb-2">No Managed Schools Assigned</h2>
+          <p className="text-sm text-zinc-400">
+            Your account is not assigned as a manager for any active schools. Please contact an EZ
+            Esports administrator.
+          </p>
+        </div>
+      </PortalShell>
     );
   }
 
@@ -47,14 +50,16 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
   ]);
 
   return (
-    <SchoolPortalClient
-      context={context}
-      activeSchool={activeSchool}
-      games={allGames}
-      initialInvites={initialInvites}
-      initialSubmissions={initialSubmissions}
-      initialRosters={initialRosters}
-      selectedGameId={paramGameId}
-    />
+    <PortalShell context={context}>
+      <SchoolPortalClient
+        context={context}
+        activeSchool={activeSchool}
+        games={allGames}
+        initialInvites={initialInvites}
+        initialSubmissions={initialSubmissions}
+        initialRosters={initialRosters}
+        selectedGameId={paramGameId}
+      />
+    </PortalShell>
   );
 }

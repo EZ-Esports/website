@@ -70,7 +70,7 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
   if (editing) {
     return (
       <tr className="bg-surface-raised/60">
-        <td colSpan={5} className="py-4 px-3">
+        <td colSpan={4} className="py-4 px-3">
           <form action={handleSave} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
@@ -93,10 +93,7 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Website URL</label>
               <input name="websiteUrl" defaultValue={school.websiteUrl ?? ''} placeholder="https://…" className={inputClass} />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
-              <input name="displayOrder" type="number" defaultValue={school.displayOrder ?? 0} className={inputClass} />
-            </div>
+            <input type="hidden" name="displayOrder" defaultValue={school.displayOrder ?? 0} />
             <div className="flex items-end gap-2">
               <button type="submit" disabled={isPending} className={saveBtn}>{isPending ? 'Saving…' : 'Save'}</button>
               <button type="button" onClick={closeEditing} className={cancelBtn}>Cancel</button>
@@ -157,7 +154,6 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
           <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
         )}
       </td>
-      <td className="py-3 pr-4 text-foreground-secondary">{school.displayOrder}</td>
       <td className="py-3 pr-2 text-right">
         <div className="flex items-center justify-end gap-2">
           <button

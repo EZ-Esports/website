@@ -22,7 +22,7 @@ function SubmitButton() {
   );
 }
 
-export default function PortalLoginForm() {
+export default function PortalLoginForm({ defaultEmail = '' }: { defaultEmail?: string }) {
   const [state, formAction] = useActionState(portalLogin, null);
 
   return (
@@ -58,6 +58,7 @@ export default function PortalLoginForm() {
           type="email"
           required
           autoComplete="email"
+          defaultValue={defaultEmail}
           placeholder="manager@school.edu"
         />
       </Field>

@@ -379,7 +379,7 @@ export default function PlayerOnboardingWizard({
                 <span className="text-accent font-semibold">
                   {inviteData.schoolName}
                 </span>{' '}
-                is active. You can use the portal now.
+                has been created. Please sign in to access your school portal.
               </p>
             </div>
 
@@ -411,16 +411,16 @@ export default function PlayerOnboardingWizard({
 
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
-                href="/portal"
+                href={`/portal/login?email=${encodeURIComponent(email)}`}
                 className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-accent text-on-accent font-semibold text-sm hover:bg-accent/90 transition-colors shadow-sm"
               >
-                Enter School Manager Portal &rarr;
+                Sign In to School Manager Portal &rarr;
               </Link>
               <Link
-                href="/portal/login"
+                href="/"
                 className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg border border-border text-foreground font-semibold text-sm hover:bg-surface transition-colors"
               >
-                Sign In Page
+                Return to Homepage
               </Link>
             </div>
           </div>

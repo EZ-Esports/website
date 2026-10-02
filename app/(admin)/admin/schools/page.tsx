@@ -69,15 +69,7 @@ export default async function SchoolsAdminPage() {
               className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
             />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
-            <input
-              name="displayOrder"
-              type="number"
-              defaultValue="0"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
-            />
-          </div>
+          <input type="hidden" name="displayOrder" value="0" />
           <div className="sm:col-span-2">
             <SubmitButton
               label="Add School"
@@ -105,7 +97,6 @@ export default async function SchoolsAdminPage() {
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Name</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Website</th>
                   <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Order</th>
                   <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
                 </tr>
               </thead>

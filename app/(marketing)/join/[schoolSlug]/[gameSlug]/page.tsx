@@ -99,7 +99,7 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
                 </h1>
                 <p className="text-sm text-foreground-muted leading-relaxed">
                   {validation.role === 'manager' || gameSlug === 'manager'
-                    ? 'Your School Manager account has been activated and your school portal access is active. You can use the portal now.'
+                    ? 'Your School Manager account has been activated. Please sign in to access your school portal.'
                     : 'This invite link has already been used and approved by your team manager. You are already registered on the active roster.'}
                 </p>
               </div>
@@ -107,16 +107,16 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
               {(validation.role === 'manager' || gameSlug === 'manager') && (
                 <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <Link
-                    href="/portal"
+                    href="/portal/login"
                     className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-accent text-on-accent font-semibold text-sm hover:bg-accent/90 transition-colors shadow-sm"
                   >
-                    Enter School Manager Portal &rarr;
+                    Sign In to School Manager Portal &rarr;
                   </Link>
                   <Link
-                    href="/portal/login"
+                    href="/"
                     className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg border border-border text-foreground font-semibold text-sm hover:bg-surface transition-colors"
                   >
-                    Portal Sign In
+                    Return to Homepage
                   </Link>
                 </div>
               )}

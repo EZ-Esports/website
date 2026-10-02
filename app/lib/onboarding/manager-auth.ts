@@ -3,7 +3,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { Permissions, hasPermission, calculateEffectiveStaffAccess } from '@/app/lib/roles';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 export interface ManagedSchoolInfo {
   schoolId: string;
@@ -22,12 +22,13 @@ export interface SchoolManagerContext {
 
 /**
  * Resolves user from Supabase auth and determines their school management tenancy.
- * - If staff admin (has Permissions.ADMINISTRATOR or isOwner), returns context with access to all active schools.
- * - Otherwise, queries `schoolManagers` for active rows linked to the user's ID.
+ * - Prioritizes `schoolManagers` active rows linked to the user's ID or member record.
  * - If optional `schoolId` is specified, ensures the user has authorization for that specific school (or returns null).
+ * - Only evaluates staff admin fallback if explicitly enabled via `options.allowStaffAdmin` (defaults to false for portal UI isolation).
  */
 export async function getSchoolManagerContext(
-  schoolId?: string
+  schoolId?: string,
+  options?: { allowStaffAdmin?: boolean }
 ): Promise<SchoolManagerContext | null> {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
@@ -35,94 +36,10 @@ export async function getSchoolManagerContext(
   const email = claimsData?.claims?.email as string | undefined;
 
   if (!userId) {
-    if (process.env.NODE_ENV === 'development') {
-      const activeSchools = await db
-        .select({
-          schoolId: schema.schools.id,
-          schoolName: schema.schools.name,
-          schoolSlug: schema.schools.slug,
-        })
-        .from(schema.schools)
-        .where(eq(schema.schools.isActive, true));
-
-      if (activeSchools.length > 0) {
-        return {
-          userId: '00000000-0000-0000-0000-000000000001',
-          email: 'manager@stuy.edu',
-          isStaffAdmin: true,
-          managedSchools: activeSchools.map((s) => ({
-            schoolId: s.schoolId,
-            schoolName: s.schoolName,
-            schoolSlug: s.schoolSlug,
-            managedGames: null,
-            isPrimaryContact: true,
-          })),
-        };
-      }
-    }
     return null;
   }
 
-  // 1. Check if user is staff admin (Permissions.ADMINISTRATOR or isOwner)
-  const assignedRoles = await db
-    .select({
-      permissions: schema.roles.permissions,
-      position: schema.roles.position,
-      isOwner: schema.roles.isOwner,
-    })
-    .from(schema.userRoles)
-    .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
-    .where(eq(schema.userRoles.userId, userId));
-
-  const [everyoneRole] = await db
-    .select({
-      permissions: schema.roles.permissions,
-      position: schema.roles.position,
-      isOwner: schema.roles.isOwner,
-    })
-    .from(schema.roles)
-    .where(eq(schema.roles.name, '@everyone'))
-    .limit(1);
-
-  const { isOwner, permissions } = calculateEffectiveStaffAccess(
-    assignedRoles,
-    everyoneRole ?? null
-  );
-
-  const isStaffAdmin = hasPermission(permissions, isOwner, Permissions.ADMINISTRATOR);
-
-  if (isStaffAdmin) {
-    const allSchools = await db
-      .select({
-        id: schema.schools.id,
-        name: schema.schools.name,
-        slug: schema.schools.slug,
-      })
-      .from(schema.schools)
-      .where(isNull(schema.schools.deletedAt))
-      .orderBy(schema.schools.name);
-
-    const managedSchools: ManagedSchoolInfo[] = allSchools.map((s) => ({
-      schoolId: s.id,
-      schoolName: s.name,
-      schoolSlug: s.slug,
-      managedGames: null,
-      isPrimaryContact: false,
-    }));
-
-    if (schoolId && !managedSchools.some((s) => s.schoolId === schoolId)) {
-      return null;
-    }
-
-    return {
-      userId,
-      email: email ?? '',
-      isStaffAdmin: true,
-      managedSchools,
-    };
-  }
-
-  // 2. Query schoolManagers for active management assignments
+  // 1. Primary check: Query schoolManagers for active management assignments
   const managerRows = await db
     .select({
       schoolId: schema.schoolManagers.schoolId,
@@ -141,16 +58,111 @@ export async function getSchoolManagerContext(
       )
     );
 
-  if (schoolId && !managerRows.some((s) => s.schoolId === schoolId)) {
-    return null;
+  // If no rows found by auth userId, check if linked via members table by email
+  if (managerRows.length === 0 && email) {
+    const [member] = await db
+      .select({ id: schema.members.id })
+      .from(schema.members)
+      .where(sql`lower(${schema.members.email}) = ${email.toLowerCase().trim()}`)
+      .limit(1);
+
+    if (member) {
+      const rowsByMember = await db
+        .select({
+          schoolId: schema.schoolManagers.schoolId,
+          schoolName: schema.schools.name,
+          schoolSlug: schema.schools.slug,
+          managedGames: schema.schoolManagers.managedGames,
+          isPrimaryContact: schema.schoolManagers.isPrimaryContact,
+        })
+        .from(schema.schoolManagers)
+        .innerJoin(schema.schools, eq(schema.schoolManagers.schoolId, schema.schools.id))
+        .where(
+          and(
+            eq(schema.schoolManagers.memberId, member.id),
+            eq(schema.schoolManagers.isActive, true),
+            isNull(schema.schools.deletedAt)
+          )
+        );
+      managerRows.push(...rowsByMember);
+    }
   }
 
-  return {
-    userId,
-    email: email ?? '',
-    isStaffAdmin: false,
-    managedSchools: managerRows,
-  };
+  if (managerRows.length > 0) {
+    if (schoolId && !managerRows.some((s) => s.schoolId === schoolId)) {
+      return null;
+    }
+
+    return {
+      userId,
+      email: email ?? '',
+      isStaffAdmin: false,
+      managedSchools: managerRows,
+    };
+  }
+
+  // 2. Staff admin fallback only if explicitly permitted (defaults to true for backend/DAL, false for portal UI)
+  if (options?.allowStaffAdmin ?? true) {
+    const assignedRoles = await db
+      .select({
+        permissions: schema.roles.permissions,
+        position: schema.roles.position,
+        isOwner: schema.roles.isOwner,
+      })
+      .from(schema.userRoles)
+      .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+      .where(eq(schema.userRoles.userId, userId));
+
+    const [everyoneRole] = await db
+      .select({
+        permissions: schema.roles.permissions,
+        position: schema.roles.position,
+        isOwner: schema.roles.isOwner,
+      })
+      .from(schema.roles)
+      .where(eq(schema.roles.name, '@everyone'))
+      .limit(1);
+
+    const { isOwner, permissions } = calculateEffectiveStaffAccess(
+      assignedRoles,
+      everyoneRole ?? null
+    );
+
+    const isStaffAdmin = hasPermission(permissions, isOwner, Permissions.ADMINISTRATOR);
+
+    if (isStaffAdmin) {
+      const allSchools = await db
+        .select({
+          id: schema.schools.id,
+          name: schema.schools.name,
+          slug: schema.schools.slug,
+        })
+        .from(schema.schools)
+        .where(isNull(schema.schools.deletedAt))
+        .orderBy(schema.schools.name);
+
+      const managedSchools: ManagedSchoolInfo[] = allSchools.map((s) => ({
+        schoolId: s.id,
+        schoolName: s.name,
+        schoolSlug: s.slug,
+        managedGames: null,
+        isPrimaryContact: false,
+      }));
+
+      if (schoolId && !managedSchools.some((s) => s.schoolId === schoolId)) {
+        return null;
+      }
+
+      return {
+        userId,
+        email: email ?? '',
+        isStaffAdmin: true,
+        managedSchools,
+      };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -159,9 +171,12 @@ export async function getSchoolManagerContext(
  */
 export async function assertManagerForSchool(
   schoolId: string,
-  gameId?: string
+  gameId?: string,
+  options?: { allowStaffAdmin?: boolean }
 ): Promise<SchoolManagerContext> {
-  const context = await getSchoolManagerContext();
+  const context = await getSchoolManagerContext(undefined, {
+    allowStaffAdmin: options?.allowStaffAdmin ?? true,
+  });
   if (!context) {
     throw new Error('Unauthorized');
   }
