@@ -65,12 +65,21 @@ const mocks = vi.hoisted(() => {
     createdAt: Date;
   }
 
+  interface MemberRecord {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    schoolId: string;
+  }
+
   const state = {
     schoolsStore: [] as SchoolRecord[],
     staffMembersStore: [] as StaffMemberRecord[],
     schoolManagersStore: [] as SchoolManagerRecord[],
     staffAuditLogsStore: [] as StaffAuditLogRecord[],
     studentDemographicsStore: [] as StudentDemographicsRecord[],
+    membersStore: [] as MemberRecord[],
   };
 
   function extractConditions(clause: any): Array<{ col: string; op: 'eq' | 'in' | 'isNull'; val?: any }> {
@@ -152,6 +161,11 @@ const mocks = vi.hoisted(() => {
           joinTable = tbl;
           return builder;
         }),
+        innerJoin: vi.fn((tbl: any, _onCondition: any) => {
+          isJoin = true;
+          joinTable = tbl;
+          return builder;
+        }),
         where: vi.fn((clause: any) => {
           whereClause = clause;
           return builder;
@@ -185,16 +199,36 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.schoolManagers) {
           const rows = state.schoolManagersStore.filter((m) => conds.every((c) => matchesRow(m, c)));
 
-          if (isJoin && joinTable === schema.staffMembers) {
+          if (isJoin) {
             return rows.map((m) => {
               const staff = state.staffMembersStore.find((s) => s.userId === m.userId);
+              const member = state.membersStore.find((mb) => mb.id === (m as any).memberId);
+              const school = state.schoolsStore.find((s) => s.id === m.schoolId);
               return {
                 ...m,
-                email: staff ? staff.email : null,
+                firstName: member?.firstName || null,
+                lastName: member?.lastName || null,
+                email: member?.email || staff?.email || null,
+                schoolName: school?.name || null,
               };
             });
           }
 
+          return rows;
+        }
+
+        if (currentTable === schema.members) {
+          const rows = state.membersStore.filter((mb) => Boolean(mb.email));
+          if (isJoin) {
+            return rows.map((mb) => {
+              const school = state.schoolsStore.find((s) => s.id === mb.schoolId);
+              return {
+                ...mb,
+                memberId: mb.id,
+                schoolName: school?.name || null,
+              };
+            });
+          }
           return rows;
         }
 
@@ -310,6 +344,8 @@ import {
   provisionSchoolManager,
   removeSchoolManager,
   getSchoolManagers,
+  getRegisteredManagers,
+  assignExistingManager,
 } from '@/app/(admin)/admin/schools/actions';
 
 describe('Milestone 2: Demographic Data Querying & Privacy Protection', () => {
@@ -724,6 +760,106 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
       expect(managers[0].id).toBe('mgr-active-1');
       expect(managers[0].email).toBe('coach@stuy.edu');
       expect(managers[0].isPrimaryContact).toBe(true);
+    });
+  });
+
+  describe('getRegisteredManagers', () => {
+    it('returns registered managers aggregated by email and filters by search query', async () => {
+      mocks.mockRequirePermission.mockResolvedValueOnce({
+        id: staffActor.id,
+        email: staffActor.email,
+        isOwner: false,
+      });
+
+      mocks.state.schoolsStore = [
+        { id: 'school-1', name: 'Stuyvesant High School', slug: 'stuy', isActive: true },
+        { id: 'school-2', name: 'Bronx Science', slug: 'bxsci', isActive: true },
+      ];
+
+      mocks.state.membersStore = [
+        {
+          id: 'member-alex',
+          firstName: 'Alex',
+          lastName: 'Chen',
+          email: 'alex.chen@nycstudents.net',
+          schoolId: 'school-1',
+        },
+        {
+          id: 'member-sarah',
+          firstName: 'Sarah',
+          lastName: 'Connor',
+          email: 'sarah.c@terminator.edu',
+          schoolId: 'school-2',
+        },
+      ];
+
+      mocks.state.schoolManagersStore = [
+        {
+          id: 'mgr-1',
+          schoolId: 'school-1',
+          userId: 'user-alex-uuid',
+          memberId: 'member-alex',
+          managedGames: null,
+          academicYear: '2025-2026',
+          isPrimaryContact: true,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      const allRegistered = await getRegisteredManagers();
+      expect(allRegistered.length).toBeGreaterThanOrEqual(2);
+      expect(allRegistered.some((m) => m.email === 'alex.chen@nycstudents.net')).toBe(true);
+      expect(allRegistered.some((m) => m.email === 'sarah.c@terminator.edu')).toBe(true);
+
+      // Search filter
+      mocks.mockRequirePermission.mockResolvedValueOnce({
+        id: staffActor.id,
+        email: staffActor.email,
+        isOwner: false,
+      });
+
+      const filtered = await getRegisteredManagers('Sarah');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].email).toBe('sarah.c@terminator.edu');
+    });
+  });
+
+  describe('assignExistingManager', () => {
+    it('assigns an existing manager to a target school and logs staff audit', async () => {
+      mocks.mockRequirePermission.mockResolvedValueOnce({
+        id: staffActor.id,
+        email: staffActor.email,
+        isOwner: false,
+      });
+
+      mocks.state.schoolsStore = [
+        { id: 'school-target', name: 'Brooklyn Tech', slug: 'btech', isActive: true },
+      ];
+
+      const res = await assignExistingManager({
+        schoolId: 'school-target',
+        userId: 'existing-user-uuid',
+        memberId: 'existing-member-uuid',
+        email: 'alex.chen@nycstudents.net',
+        academicYear: '2025-2026',
+        managedGames: ['valorant'],
+        isPrimaryContact: true,
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.manager).toBeDefined();
+      expect(res.manager?.schoolId).toBe('school-target');
+      expect(res.manager?.userId).toBe('existing-user-uuid');
+      expect(res.manager?.isPrimaryContact).toBe(true);
+
+      const auditLog = mocks.state.staffAuditLogsStore.find(
+        (log) => log.event === 'assign_existing_manager'
+      );
+      expect(auditLog).toBeDefined();
+      expect(auditLog?.userId).toBe(staffActor.id);
+      expect(auditLog?.details).toContain('school-target');
     });
   });
 });

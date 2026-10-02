@@ -701,6 +701,7 @@ export const schoolManagers = pgTable('school_managers', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
   userId: uuid('user_id').notNull(), // Supabase auth.users.id
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
   managedGames: text('managed_games').array(), // null = all games; ['valorant'] = scoped
   academicYear: text('academic_year').notNull(), // e.g. "2025-2026"
   isPrimaryContact: boolean('is_primary_contact').default(false).notNull(),
@@ -710,6 +711,7 @@ export const schoolManagers = pgTable('school_managers', {
 }, (t) => [
   uniqueIndex('school_managers_school_user_year_idx').on(t.schoolId, t.userId, t.academicYear),
   index('school_managers_user_id_idx').on(t.userId),
+  index('school_managers_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
 // 2. Single-Use Player & Manager Invite Tokens

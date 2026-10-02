@@ -14,14 +14,17 @@ import {
   FiCopy,
   FiClock,
   FiCheckCircle,
+  FiSearch,
 } from 'react-icons/fi';
 import {
-  provisionSchoolManager,
   removeSchoolManager,
   getSchoolManagers,
   generateManagerInvite,
   getSchoolManagerInvites,
   revokeManagerInvite,
+  getRegisteredManagers,
+  assignExistingManager,
+  type RegisteredManagerAccount,
 } from '@/app/(admin)/admin/schools/actions';
 import { input } from '@/app/components/admin/styles';
 
@@ -47,12 +50,15 @@ interface ManagerItem {
   id: string;
   schoolId: string;
   userId: string;
+  memberId?: string | null;
   managedGames: string[] | null;
   academicYear: string;
   isPrimaryContact: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string | null;
 }
 
@@ -74,7 +80,7 @@ export default function SchoolManagersModal({
   isOpen,
   onOpenChange,
 }: SchoolManagersModalProps) {
-  const [activeTab, setActiveTab] = useState<'invites' | 'active' | 'direct'>('invites');
+  const [activeTab, setActiveTab] = useState<'invites' | 'active' | 'existing'>('invites');
 
   // Managers & Invites State
   const [managers, setManagers] = useState<ManagerItem[]>([]);
@@ -93,12 +99,14 @@ export default function SchoolManagersModal({
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Direct Assign Form State
-  const [directEmail, setDirectEmail] = useState('');
-  const [directYear, setDirectYear] = useState('2025-2026');
-  const [directIsPrimary, setDirectIsPrimary] = useState(false);
-  const [directAllGames, setDirectAllGames] = useState(true);
-  const [directSelectedGames, setDirectSelectedGames] = useState<string[]>([]);
+  // Existing Registered Managers Search & Assign State
+  const [registeredManagers, setRegisteredManagers] = useState<RegisteredManagerAccount[]>([]);
+  const [managerSearchQuery, setManagerSearchQuery] = useState('');
+  const [selectedManager, setSelectedManager] = useState<RegisteredManagerAccount | null>(null);
+  const [assignYear, setAssignYear] = useState('2025-2026');
+  const [assignIsPrimary, setAssignIsPrimary] = useState(false);
+  const [assignAllGames, setAssignAllGames] = useState(true);
+  const [assignSelectedGames, setAssignSelectedGames] = useState<string[]>([]);
 
   // Action feedback
   const [formError, setFormError] = useState<string | null>(null);
@@ -107,18 +115,20 @@ export default function SchoolManagersModal({
   const [isRemovingId, setIsRemovingId] = useState<string | null>(null);
   const [isRevokingId, setIsRevokingId] = useState<string | null>(null);
 
-  // Load managers & invites
+  // Load managers, invites & registered accounts
   const loadData = useCallback(async () => {
     if (!school.id) return;
     setLoading(true);
     setFetchError(null);
     try {
-      const [mgrs, invs] = await Promise.all([
+      const [mgrs, invs, regMgrs] = await Promise.all([
         getSchoolManagers(school.id),
         getSchoolManagerInvites(school.id),
+        getRegisteredManagers(),
       ]);
       setManagers(mgrs);
       setInvites(invs);
+      setRegisteredManagers(regMgrs);
     } catch (err: any) {
       setFetchError(err.message || 'Failed to load school manager records.');
     } finally {
@@ -133,6 +143,8 @@ export default function SchoolManagersModal({
       setFormSuccess(null);
       setGeneratedUrl(null);
       setCopiedUrl(false);
+      setSelectedManager(null);
+      setManagerSearchQuery('');
     }
   }, [isOpen, loadData]);
 
@@ -142,8 +154,8 @@ export default function SchoolManagersModal({
     );
   };
 
-  const handleToggleDirectGame = (slug: string) => {
-    setDirectSelectedGames((prev) =>
+  const handleToggleAssignGame = (slug: string) => {
+    setAssignSelectedGames((prev) =>
       prev.includes(slug) ? prev.filter((g) => g !== slug) : [...prev, slug]
     );
   };
@@ -190,25 +202,27 @@ export default function SchoolManagersModal({
     });
   };
 
-  // Direct Assign
-  const handleDirectAssign = (e: React.FormEvent) => {
+  // Assign Existing Manager
+  const handleAssignExistingManager = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
 
-    if (!directEmail.trim()) {
-      setFormError('Manager email address is required.');
+    if (!selectedManager) {
+      setFormError('Please select a registered manager account.');
       return;
     }
 
     startSubmitting(async () => {
       try {
-        const res = await provisionSchoolManager({
+        const res = await assignExistingManager({
           schoolId: school.id,
-          email: directEmail.trim(),
-          academicYear: directYear.trim(),
-          isPrimaryContact: directIsPrimary,
-          managedGames: directAllGames ? undefined : directSelectedGames,
+          userId: selectedManager.userId || undefined,
+          memberId: selectedManager.memberId ?? undefined,
+          email: selectedManager.email,
+          academicYear: assignYear.trim(),
+          isPrimaryContact: assignIsPrimary,
+          managedGames: assignAllGames ? null : assignSelectedGames,
         });
 
         if (!res.success) {
@@ -216,11 +230,13 @@ export default function SchoolManagersModal({
           return;
         }
 
-        setFormSuccess(`Successfully assigned ${directEmail.trim()} as manager.`);
-        setDirectEmail('');
-        setDirectIsPrimary(false);
-        setDirectAllGames(true);
-        setDirectSelectedGames([]);
+        setFormSuccess(
+          `Successfully assigned ${selectedManager.fullName} (${selectedManager.email}) as manager for ${school.name}.`
+        );
+        setSelectedManager(null);
+        setAssignIsPrimary(false);
+        setAssignAllGames(true);
+        setAssignSelectedGames([]);
         await loadData();
       } catch (err: any) {
         setFormError(err.message || 'Unexpected error while assigning manager.');
@@ -343,18 +359,18 @@ export default function SchoolManagersModal({
             <button
               type="button"
               onClick={() => {
-                setActiveTab('direct');
+                setActiveTab('existing');
                 setFormError(null);
                 setFormSuccess(null);
               }}
               className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeTab === 'direct'
+                activeTab === 'existing'
                   ? 'border-accent text-accent font-bold'
                   : 'border-transparent text-foreground-muted hover:text-foreground'
               }`}
             >
               <FiUserPlus className="w-3.5 h-3.5" />
-              Direct Assign
+              Assign Existing Manager
             </button>
           </div>
 
@@ -655,6 +671,7 @@ export default function SchoolManagersModal({
                 ) : (
                   <div className="divide-y divide-line/40 rounded-xl border border-line/60 bg-surface-raised/20 overflow-hidden">
                     {managers.map((m) => {
+                      const displayName = [m.firstName, m.lastName].filter(Boolean).join(' ').trim();
                       const displayEmail = m.email || `User: ${m.userId.slice(0, 8)}...`;
                       return (
                         <div
@@ -662,10 +679,21 @@ export default function SchoolManagersModal({
                           className="p-3.5 flex items-center justify-between gap-3 text-xs"
                         >
                           <div className="min-w-0 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground truncate">
-                                {displayEmail}
-                              </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {displayName ? (
+                                <>
+                                  <span className="font-semibold text-foreground">
+                                    {displayName}
+                                  </span>
+                                  <span className="text-[11px] text-foreground-muted">
+                                    &bull; {displayEmail}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="font-semibold text-foreground truncate">
+                                  {displayEmail}
+                                </span>
+                              )}
                               {m.isPrimaryContact && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                                   <FiStar className="w-2.5 h-2.5 fill-current" /> Primary
@@ -697,11 +725,11 @@ export default function SchoolManagersModal({
 
                           <button
                             type="button"
-                            onClick={() => handleRemove(m.id, displayEmail)}
+                            onClick={() => handleRemove(m.id, displayName || displayEmail)}
                             disabled={isRemovingId === m.id}
                             className="p-1.5 rounded-lg border border-red-900/30 text-red-400 hover:bg-red-950/30 hover:border-red-900/60 transition-colors cursor-pointer shrink-0 disabled:opacity-40"
                             title="Remove manager access"
-                            aria-label={`Remove manager ${displayEmail}`}
+                            aria-label={`Remove manager ${displayName || displayEmail}`}
                           >
                             <FiTrash2 className="w-4 h-4" />
                           </button>
@@ -713,118 +741,255 @@ export default function SchoolManagersModal({
               </div>
             )}
 
-            {/* TAB 3: DIRECT ASSIGN */}
-            {activeTab === 'direct' && (
-              <div className="p-4 rounded-xl border border-line bg-surface-raised/40 space-y-4">
-                <div className="flex items-center gap-2">
-                  <FiUserPlus className="w-4 h-4 text-accent" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    Direct Email Assignment
-                  </h3>
-                </div>
-
-                <form onSubmit={handleDirectAssign} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                        Manager Email <span className="text-accent">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        value={directEmail}
-                        onChange={(e) => setDirectEmail(e.target.value)}
-                        placeholder="coach@school.edu"
-                        required
-                        className={input}
-                      />
+            {/* TAB 3: ASSIGN EXISTING MANAGER */}
+            {activeTab === 'existing' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-line bg-surface-raised/40 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FiUserPlus className="w-4 h-4 text-accent" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                        Assign Existing Registered Manager
+                      </h3>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                        Academic Year
-                      </label>
-                      <input
-                        type="text"
-                        value={directYear}
-                        onChange={(e) => setDirectYear(e.target.value)}
-                        placeholder="2025-2026"
-                        required
-                        className={input}
-                      />
-                    </div>
+                    <span className="text-[11px] text-foreground-muted">
+                      {registeredManagers.length} registered {registeredManagers.length === 1 ? 'account' : 'accounts'}
+                    </span>
                   </div>
 
-                  {/* Scoped Games Selection */}
-                  <div>
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
-                      Game Permissions
-                    </label>
-                    <div className="flex items-center gap-4 text-xs mb-2">
-                      <label className="flex items-center gap-2 cursor-pointer text-foreground">
-                        <input
-                          type="radio"
-                          name="directGameScope"
-                          checked={directAllGames}
-                          onChange={() => setDirectAllGames(true)}
-                          className="text-accent focus:ring-accent"
-                        />
-                        <span>All Games (Full School Access)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-foreground">
-                        <input
-                          type="radio"
-                          name="directGameScope"
-                          checked={!directAllGames}
-                          onChange={() => setDirectAllGames(false)}
-                          className="text-accent focus:ring-accent"
-                        />
-                        <span>Specific Games Only</span>
-                      </label>
-                    </div>
-
-                    {!directAllGames && games.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-lg border border-line bg-surface-sunken">
-                        {games.map((g) => (
-                          <label
-                            key={g.id}
-                            className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={directSelectedGames.includes(g.slug)}
-                              onChange={() => handleToggleDirectGame(g.slug)}
-                              className="rounded border-line text-accent focus:ring-accent"
-                            />
-                            <span>{g.displayName || g.name || g.slug}</span>
-                          </label>
-                        ))}
-                      </div>
+                  {/* Search bar */}
+                  <div className="relative">
+                    <FiSearch className="absolute left-3.5 top-3 w-4 h-4 text-foreground-muted pointer-events-none" />
+                    <input
+                      type="text"
+                      value={managerSearchQuery}
+                      onChange={(e) => setManagerSearchQuery(e.target.value)}
+                      placeholder="Search registered accounts by name, email, or school..."
+                      className={`${input} pl-10 pr-8 text-xs`}
+                    />
+                    {managerSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setManagerSearchQuery('')}
+                        className="absolute right-3 top-3 text-foreground-muted hover:text-foreground text-xs"
+                      >
+                        <FiX className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
 
-                  {/* Primary Contact Checkbox */}
-                  <div>
-                    <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={directIsPrimary}
-                        onChange={(e) => setDirectIsPrimary(e.target.checked)}
-                        className="rounded border-line text-accent focus:ring-accent"
-                      />
-                      <span>Designate as primary school contact for this academic year</span>
-                    </label>
-                  </div>
+                  {/* Selected Manager Highlight */}
+                  {selectedManager ? (
+                    <div className="p-3.5 rounded-xl border border-accent/40 bg-accent/10 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-accent text-on-accent font-bold text-xs flex items-center justify-center shrink-0">
+                          {(selectedManager.firstName?.[0] || selectedManager.fullName?.[0] || 'M').toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-foreground text-xs truncate">
+                              {selectedManager.fullName}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/20 text-accent font-medium">
+                              Selected
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-foreground-muted truncate">
+                            {selectedManager.email}
+                          </p>
+                          {selectedManager.schools.length > 0 && (
+                            <p className="text-[10px] text-foreground-muted/80 truncate">
+                              Current Schools: {selectedManager.schools.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedManager(null)}
+                        className="px-2.5 py-1 text-xs text-foreground-muted hover:text-foreground border border-line rounded-lg hover:bg-surface transition-colors shrink-0 cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    /* Search results list */
+                    <div className="space-y-2">
+                      <label className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider">
+                        Select a Manager Account:
+                      </label>
 
-                  <div className="pt-1 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !directEmail.trim()}
-                      className="px-4 py-2 bg-accent text-on-accent text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-accent/90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      <FiUserPlus className="w-3.5 h-3.5" />
-                      {isSubmitting ? 'Assigning...' : 'Assign Manager Directly'}
-                    </button>
-                  </div>
-                </form>
+                      {(() => {
+                        const filtered = registeredManagers.filter((m) => {
+                          if (!managerSearchQuery.trim()) return true;
+                          const q = managerSearchQuery.toLowerCase().trim();
+                          return (
+                            m.fullName.toLowerCase().includes(q) ||
+                            m.email.toLowerCase().includes(q) ||
+                            m.schools.some((s) => s.toLowerCase().includes(q))
+                          );
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="p-4 rounded-xl border border-line/60 bg-surface-raised/20 text-center text-xs text-foreground-muted space-y-1">
+                              <p>
+                                {managerSearchQuery
+                                  ? `No registered managers found matching "${managerSearchQuery}".`
+                                  : 'No registered manager accounts available.'}
+                              </p>
+                              <p className="text-[11px] text-foreground-muted/70">
+                                To invite a new manager, use the{' '}
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab('invites')}
+                                  className="text-accent underline font-semibold cursor-pointer"
+                                >
+                                  Provision Invite Link
+                                </button>{' '}
+                                tab.
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="max-h-56 overflow-y-auto divide-y divide-line/40 rounded-xl border border-line/60 bg-surface-raised/20">
+                            {filtered.map((m) => (
+                              <div
+                                key={m.email}
+                                onClick={() => setSelectedManager(m)}
+                                className="p-3 flex items-center justify-between gap-3 hover:bg-surface-raised/60 transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-full bg-surface-sunken border border-line text-foreground-secondary font-bold text-xs flex items-center justify-center shrink-0">
+                                    {(m.firstName?.[0] || m.fullName?.[0] || 'M').toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-foreground text-xs truncate">
+                                      {m.fullName}
+                                    </p>
+                                    <p className="text-[11px] text-foreground-muted truncate">
+                                      {m.email}
+                                    </p>
+                                    {m.schools.length > 0 && (
+                                      <p className="text-[10px] text-foreground-muted/70 truncate">
+                                        {m.schools.join(', ')}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedManager(m);
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface border border-line text-foreground hover:border-accent hover:text-accent transition-colors shrink-0 cursor-pointer"
+                                >
+                                  Select
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Form configuration fields for selected manager */}
+                  {selectedManager && (
+                    <form onSubmit={handleAssignExistingManager} className="space-y-4 pt-2 border-t border-line/50">
+                      <div>
+                        <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
+                          Academic Year
+                        </label>
+                        <input
+                          type="text"
+                          value={assignYear}
+                          onChange={(e) => setAssignYear(e.target.value)}
+                          placeholder="2025-2026"
+                          required
+                          className={input}
+                        />
+                      </div>
+
+                      {/* Scoped Games Selection */}
+                      <div>
+                        <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+                          Game Permissions
+                        </label>
+                        <div className="flex items-center gap-4 text-xs mb-2">
+                          <label className="flex items-center gap-2 cursor-pointer text-foreground">
+                            <input
+                              type="radio"
+                              name="assignGameScope"
+                              checked={assignAllGames}
+                              onChange={() => setAssignAllGames(true)}
+                              className="text-accent focus:ring-accent"
+                            />
+                            <span>All Games (Full School Access)</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer text-foreground">
+                            <input
+                              type="radio"
+                              name="assignGameScope"
+                              checked={!assignAllGames}
+                              onChange={() => setAssignAllGames(false)}
+                              className="text-accent focus:ring-accent"
+                            />
+                            <span>Specific Games Only</span>
+                          </label>
+                        </div>
+
+                        {!assignAllGames && games.length > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-lg border border-line bg-surface-sunken">
+                            {games.map((g) => (
+                              <label
+                                key={g.id}
+                                className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={assignSelectedGames.includes(g.slug)}
+                                  onChange={() => handleToggleAssignGame(g.slug)}
+                                  className="rounded border-line text-accent focus:ring-accent"
+                                />
+                                <span>{g.displayName || g.name || g.slug}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Primary Contact Checkbox */}
+                      <div>
+                        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={assignIsPrimary}
+                            onChange={(e) => setAssignIsPrimary(e.target.checked)}
+                            className="rounded border-line text-accent focus:ring-accent"
+                          />
+                          <span>Designate as primary school contact for this academic year</span>
+                        </label>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="px-4 py-2 bg-accent text-on-accent text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-accent/90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          <FiUserPlus className="w-3.5 h-3.5" />
+                          {isSubmitting
+                            ? 'Assigning...'
+                            : `Assign ${selectedManager.firstName || selectedManager.fullName} to School`}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               </div>
             )}
           </div>

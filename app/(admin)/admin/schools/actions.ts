@@ -351,7 +351,7 @@ export async function removeSchoolManager(
 
 /**
  * Retrieves all active school managers for a given school,
- * joining their staff directory email when available.
+ * joining their member name and directory email when available.
  */
 export async function getSchoolManagers(schoolId: string) {
   if (!schoolId) return [];
@@ -361,15 +361,19 @@ export async function getSchoolManagers(schoolId: string) {
       id: schema.schoolManagers.id,
       schoolId: schema.schoolManagers.schoolId,
       userId: schema.schoolManagers.userId,
+      memberId: schema.schoolManagers.memberId,
       managedGames: schema.schoolManagers.managedGames,
       academicYear: schema.schoolManagers.academicYear,
       isPrimaryContact: schema.schoolManagers.isPrimaryContact,
       isActive: schema.schoolManagers.isActive,
       createdAt: schema.schoolManagers.createdAt,
       updatedAt: schema.schoolManagers.updatedAt,
-      email: schema.staffMembers.email,
+      firstName: schema.members.firstName,
+      lastName: schema.members.lastName,
+      email: sql<string | null>`coalesce(${schema.members.email}, ${schema.staffMembers.email})`,
     })
     .from(schema.schoolManagers)
+    .leftJoin(schema.members, eq(schema.schoolManagers.memberId, schema.members.id))
     .leftJoin(schema.staffMembers, eq(schema.schoolManagers.userId, schema.staffMembers.userId))
     .where(
       and(
@@ -378,6 +382,306 @@ export async function getSchoolManagers(schoolId: string) {
       )
     )
     .orderBy(desc(schema.schoolManagers.isPrimaryContact), asc(schema.schoolManagers.createdAt));
+}
+
+export interface RegisteredManagerAccount {
+  userId: string;
+  memberId: string | null;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  schools: string[];
+}
+
+/**
+ * Retrieves all registered manager accounts across the platform.
+ * Enables staff to search existing managers rather than typing raw emails.
+ */
+export async function getRegisteredManagers(
+  searchQuery?: string
+): Promise<RegisteredManagerAccount[]> {
+  await requireSchoolsPermission();
+
+  try {
+    // 1. Fetch managers from schoolManagers joined with members, staffMembers, and schools
+    const managerRows = await db
+      .select({
+        userId: schema.schoolManagers.userId,
+        memberId: schema.schoolManagers.memberId,
+        firstName: schema.members.firstName,
+        lastName: schema.members.lastName,
+        email: sql<string | null>`coalesce(${schema.members.email}, ${schema.staffMembers.email})`,
+        schoolName: schema.schools.name,
+      })
+      .from(schema.schoolManagers)
+      .leftJoin(schema.members, eq(schema.schoolManagers.memberId, schema.members.id))
+      .leftJoin(schema.staffMembers, eq(schema.schoolManagers.userId, schema.staffMembers.userId))
+      .leftJoin(schema.schools, eq(schema.schoolManagers.schoolId, schema.schools.id));
+
+    // 2. Also fetch members who have an email address (onboarded users)
+    const memberRows = await db
+      .select({
+        memberId: schema.members.id,
+        firstName: schema.members.firstName,
+        lastName: schema.members.lastName,
+        email: schema.members.email,
+        schoolName: schema.schools.name,
+      })
+      .from(schema.members)
+      .leftJoin(schema.schools, eq(schema.members.schoolId, schema.schools.id))
+      .where(sql`${schema.members.email} IS NOT NULL AND ${schema.members.email} != ''`);
+
+    const managerMap = new Map<string, RegisteredManagerAccount>();
+
+    for (const row of managerRows) {
+      if (!row.email) continue;
+      const normalizedEmail = row.email.toLowerCase().trim();
+      const existing = managerMap.get(normalizedEmail);
+      const schoolName = row.schoolName?.trim();
+
+      if (existing) {
+        if (schoolName && !existing.schools.includes(schoolName)) {
+          existing.schools.push(schoolName);
+        }
+        if (!existing.memberId && row.memberId) {
+          existing.memberId = row.memberId;
+        }
+      } else {
+        const fn = (row.firstName || '').trim();
+        const ln = (row.lastName || '').trim();
+        const fullName = `${fn} ${ln}`.trim() || normalizedEmail;
+        managerMap.set(normalizedEmail, {
+          userId: row.userId,
+          memberId: row.memberId ?? null,
+          firstName: fn,
+          lastName: ln,
+          fullName,
+          email: row.email,
+          schools: schoolName ? [schoolName] : [],
+        });
+      }
+    }
+
+    for (const row of memberRows) {
+      if (!row.email) continue;
+      const normalizedEmail = row.email.toLowerCase().trim();
+      const existing = managerMap.get(normalizedEmail);
+      const schoolName = row.schoolName?.trim();
+
+      if (existing) {
+        if (schoolName && !existing.schools.includes(schoolName)) {
+          existing.schools.push(schoolName);
+        }
+        if (!existing.memberId && row.memberId) {
+          existing.memberId = row.memberId;
+        }
+      } else {
+        const fn = (row.firstName || '').trim();
+        const ln = (row.lastName || '').trim();
+        const fullName = `${fn} ${ln}`.trim() || normalizedEmail;
+        managerMap.set(normalizedEmail, {
+          userId: '',
+          memberId: row.memberId,
+          firstName: fn,
+          lastName: ln,
+          fullName,
+          email: row.email,
+          schools: schoolName ? [schoolName] : [],
+        });
+      }
+    }
+
+    let results = Array.from(managerMap.values());
+
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      results = results.filter(
+        (m) =>
+          m.fullName.toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q) ||
+          m.schools.some((s) => s.toLowerCase().includes(q))
+      );
+    }
+
+    results.sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return results;
+  } catch (error) {
+    console.error('Failed to get registered managers', error);
+    return [];
+  }
+}
+
+export interface AssignExistingManagerParams {
+  schoolId: string;
+  userId?: string;
+  memberId?: string | null;
+  email?: string;
+  academicYear?: string;
+  managedGames?: string[] | null;
+  isPrimaryContact?: boolean;
+}
+
+export interface AssignExistingManagerResult {
+  success: boolean;
+  error?: string;
+  manager?: typeof schema.schoolManagers.$inferSelect;
+  message?: string;
+}
+
+/**
+ * Assigns an existing registered manager to a school for an academic year.
+ */
+export async function assignExistingManager(
+  params: AssignExistingManagerParams
+): Promise<AssignExistingManagerResult> {
+  const actor = await requireSchoolsPermission();
+
+  const {
+    schoolId,
+    userId: rawUserId,
+    memberId,
+    email,
+    academicYear = '2025-2026',
+    managedGames = null,
+    isPrimaryContact = false,
+  } = params;
+
+  if (!schoolId) {
+    return { success: false, error: 'School ID is required.' };
+  }
+
+  try {
+    const [school] = await db
+      .select({ id: schema.schools.id, name: schema.schools.name })
+      .from(schema.schools)
+      .where(eq(schema.schools.id, schoolId))
+      .limit(1);
+
+    if (!school) {
+      return { success: false, error: 'School not found.' };
+    }
+
+    let resolvedUserId = rawUserId?.trim();
+
+    if (!resolvedUserId) {
+      if (memberId) {
+        const [sm] = await db
+          .select({ userId: schema.schoolManagers.userId })
+          .from(schema.schoolManagers)
+          .where(eq(schema.schoolManagers.memberId, memberId))
+          .limit(1);
+        if (sm?.userId) {
+          resolvedUserId = sm.userId;
+        }
+      }
+
+      if (!resolvedUserId && email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const [staff] = await db
+          .select({ userId: schema.staffMembers.userId })
+          .from(schema.staffMembers)
+          .where(sql`lower(${schema.staffMembers.email}) = ${normalizedEmail}`)
+          .limit(1);
+        if (staff?.userId) {
+          resolvedUserId = staff.userId;
+        }
+      }
+
+      if (!resolvedUserId) {
+        resolvedUserId = crypto.randomUUID();
+      }
+    }
+
+    const resolvedAcademicYear = academicYear.trim() || '2025-2026';
+
+    if (isPrimaryContact) {
+      await db
+        .update(schema.schoolManagers)
+        .set({ isPrimaryContact: false })
+        .where(
+          and(
+            eq(schema.schoolManagers.schoolId, schoolId),
+            eq(schema.schoolManagers.academicYear, resolvedAcademicYear)
+          )
+        );
+    }
+
+    const [existing] = await db
+      .select()
+      .from(schema.schoolManagers)
+      .where(
+        and(
+          eq(schema.schoolManagers.schoolId, schoolId),
+          eq(schema.schoolManagers.userId, resolvedUserId),
+          eq(schema.schoolManagers.academicYear, resolvedAcademicYear)
+        )
+      )
+      .limit(1);
+
+    let managerRecord: typeof schema.schoolManagers.$inferSelect;
+
+    if (existing) {
+      const [updated] = await db
+        .update(schema.schoolManagers)
+        .set({
+          isActive: true,
+          memberId: memberId ?? existing.memberId,
+          managedGames: managedGames !== undefined ? managedGames : existing.managedGames,
+          isPrimaryContact:
+            isPrimaryContact !== undefined ? isPrimaryContact : existing.isPrimaryContact,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.schoolManagers.id, existing.id))
+        .returning();
+      managerRecord = updated;
+    } else {
+      const [inserted] = await db
+        .insert(schema.schoolManagers)
+        .values({
+          schoolId,
+          userId: resolvedUserId,
+          memberId: memberId ?? null,
+          managedGames: managedGames ?? null,
+          academicYear: resolvedAcademicYear,
+          isPrimaryContact: Boolean(isPrimaryContact),
+          isActive: true,
+        })
+        .returning();
+      managerRecord = inserted;
+    }
+
+    try {
+      await db.insert(schema.staffAuditLogs).values({
+        event: 'assign_existing_manager',
+        userId: actor.id,
+        email: actor.email,
+        details: JSON.stringify({
+          schoolId,
+          schoolName: school.name,
+          managerId: managerRecord.id,
+          userId: resolvedUserId,
+          memberId: memberId ?? null,
+          academicYear: resolvedAcademicYear,
+          managedGames: managedGames ?? null,
+          isPrimaryContact: Boolean(isPrimaryContact),
+        }),
+      });
+    } catch (auditErr) {
+      console.error('Failed to log staff audit event for assign_existing_manager', auditErr);
+    }
+
+    revalidateAll();
+
+    return {
+      success: true,
+      manager: managerRecord,
+      message: `Successfully assigned manager to ${school.name}`,
+    };
+  } catch (error) {
+    console.error('Failed to assign existing manager', error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
 }
 
 export interface GenerateManagerInviteParams {

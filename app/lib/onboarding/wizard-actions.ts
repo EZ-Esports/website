@@ -583,6 +583,7 @@ export async function submitPlayerOnboarding(
           .update(schema.schoolManagers)
           .set({
             isActive: true,
+            memberId: createdOrUpdatedMemberId,
             managedGames: managedGames ?? existingManager.managedGames,
             isPrimaryContact: isPrimaryContact ?? existingManager.isPrimaryContact,
             updatedAt: new Date(),
@@ -592,6 +593,7 @@ export async function submitPlayerOnboarding(
         await tx.insert(schema.schoolManagers).values({
           schoolId: invite.schoolId,
           userId: resolvedUserId,
+          memberId: createdOrUpdatedMemberId,
           managedGames,
           academicYear,
           isPrimaryContact,
