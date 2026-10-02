@@ -11,6 +11,7 @@ export const Permissions = {
   MANAGE_APPLICATIONS: BigInt(1) << BigInt(9), // View and accept school and staff applications
   MANAGE_SCHOOLS: BigInt(1) << BigInt(10),     // Manage registered schools
   MANAGE_CONTENT: BigInt(1) << BigInt(11),     // Edit public page CMS text blocks
+  VIEW_STUDENT_DEMOGRAPHICS: BigInt(1) << BigInt(12), // Dedicated gate for minor student demographic & equity PII
 } as const;
 
 /**

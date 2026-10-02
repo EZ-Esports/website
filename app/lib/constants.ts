@@ -270,6 +270,7 @@ export const FOOTER_LINKS = [
   { label: 'League Rules', href: '/rules' },
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Terms of Service', href: '/terms' },
+  { label: 'Manager Portal', href: '/portal' },
   { label: 'Staff Login', href: '/login' },
 ] as const;
 

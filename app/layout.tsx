@@ -71,7 +71,7 @@ export default async function RootLayout({
   await headers();
 
   return (
-    <html lang="en">
+    <html lang="en" className="notranslate" translate="no">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

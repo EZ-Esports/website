@@ -604,11 +604,13 @@ export const pageContentHistory = pgTable('page_content_history', {
 export const staffMembers = pgTable('staff_members', {
   userId: uuid('user_id').primaryKey(),
   email: text('email').notNull().unique(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
   // user_id of the staff member who invited this one; null for the bootstrapped Owner.
   invitedBy: uuid('invited_by'),
   ...auditColumns,
 }, (table) => [
   index('staff_members_email_idx').on(table.email),
+  index('staff_members_member_id_idx').on(table.memberId),
 ]).enableRLS();
 
 // Pending, single-use staff invitations. We store only the SHA-256 hash of the
@@ -693,3 +695,95 @@ export const staffAuditLogs = pgTable('staff_audit_logs', {
   index('staff_audit_logs_created_at_idx').on(table.createdAt),
   index('staff_audit_logs_user_id_idx').on(table.userId),
 ]).enableRLS();
+
+// --- PLAYER ONBOARDING & SCHOOL MANAGER PORTAL ---
+
+// 1. School Managers (Scoped tenancy)
+export const schoolManagers = pgTable('school_managers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').notNull(), // Supabase auth.users.id
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  managedGames: text('managed_games').array(), // null = all games; ['valorant'] = scoped
+  academicYear: text('academic_year').notNull(), // e.g. "2025-2026"
+  isPrimaryContact: boolean('is_primary_contact').default(false).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  uniqueIndex('school_managers_school_user_year_idx').on(t.schoolId, t.userId, t.academicYear),
+  index('school_managers_user_id_idx').on(t.userId),
+  index('school_managers_member_id_idx').on(t.memberId),
+]).enableRLS();
+
+// 2. Single-Use Player & Manager Invite Tokens
+export const playerInvites = pgTable('player_invites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
+  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }),
+  role: text('role').default('player').notNull(), // 'player' | 'manager'
+  tokenHash: text('token_hash').notNull().unique(), // SHA-256
+  intendedFirstName: text('intended_first_name').notNull(),
+  intendedLastName: text('intended_last_name').notNull(),
+  invitedByUserId: uuid('invited_by_user_id').notNull(),
+  status: text('status').default('pending').notNull(), // 'pending' | 'submitted' | 'accepted' | 'rejected' | 'expired'
+  expiresAt: timestamp('expires_at').notNull(),
+  submittedAt: timestamp('submitted_at'),
+  reviewedAt: timestamp('reviewed_at'),
+  rejectionReason: text('rejection_reason'),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  submissionDraft: jsonb('submission_draft'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('player_invites_school_game_idx').on(t.schoolId, t.gameId),
+  index('player_invites_school_role_idx').on(t.schoolId, t.role),
+  uniqueIndex('player_invites_token_hash_idx').on(t.tokenHash),
+  index('player_invites_member_id_idx').on(t.memberId),
+]).enableRLS();
+
+// 3. Player Game & Community Identities
+export const playerIdentities = pgTable('player_identities', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  provider: text('provider').notNull(), // 'discord' | 'riot'
+  providerUserId: text('provider_user_id').notNull(), // Discord snowflake or Riot Name#Tag
+  providerUsername: text('provider_username').notNull(),
+  inGuild: boolean('in_guild').default(false).notNull(),
+  lastVerifiedAt: timestamp('last_verified_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('player_identities_provider_user_idx').on(t.provider, t.providerUserId),
+  index('player_identities_member_id_idx').on(t.memberId),
+]).enableRLS();
+
+// 4. Student Demographics & Survey Vault (Strict RLS)
+export const studentDemographics = pgTable('student_demographics', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull().unique(),
+  legalFirstName: text('legal_first_name').notNull(),
+  legalLastName: text('legal_last_name').notNull(),
+  birthDate: timestamp('birth_date').notNull(),
+  gender: text('gender'),
+  race: text('race').array(),
+  ethnicity: text('ethnicity').array(),
+  countryOfBirth: text('country_of_birth'),
+  parentsCountryOfBirth: text('parents_country_of_birth'),
+  primaryLanguageAtHome: text('primary_language_at_home'),
+  isFreeOrReducedLunch: boolean('is_free_or_reduced_lunch'),
+  isFirstGenCollege: boolean('is_first_gen_college'),
+  doePetitionConsent: boolean('doe_petition_consent').default(false).notNull(),
+  surveyDetails: jsonb('survey_details'), // gaming sentiment, ping, hours, career interests
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('student_demographics_member_id_idx').on(t.memberId),
+]).enableRLS();
+
+export type SchoolManager = typeof schoolManagers.$inferSelect;
+export type NewSchoolManager = typeof schoolManagers.$inferInsert;
+export type PlayerInvite = typeof playerInvites.$inferSelect;
+export type NewPlayerInvite = typeof playerInvites.$inferInsert;
+export type PlayerIdentity = typeof playerIdentities.$inferSelect;
+export type NewPlayerIdentity = typeof playerIdentities.$inferInsert;
+export type StudentDemographics = typeof studentDemographics.$inferSelect;
+export type NewStudentDemographics = typeof studentDemographics.$inferInsert;
+

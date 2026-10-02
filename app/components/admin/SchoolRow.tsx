@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useTransition, useRef, useEffect } from 'react';
+import { FiUsers } from 'react-icons/fi';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { saveBtn, cancelBtn } from '@/app/components/admin/styles';
 import { updateSchool, toggleSchoolActive, deleteSchool } from '@/app/(admin)/admin/schools/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
+import SchoolManagersModal from '@/app/components/admin/SchoolManagersModal';
 
 interface School {
   id: string;
@@ -17,11 +19,17 @@ interface School {
   displayOrder: number | null;
 }
 
+interface SchoolRowProps {
+  school: School;
+  games?: Array<{ id: string; displayName: string; slug: string; name?: string }>;
+}
+
 const inputClass =
   'w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all';
 
-export default function SchoolRow({ school }: { school: School }) {
+export default function SchoolRow({ school, games }: SchoolRowProps) {
   const [editing, setEditing] = useState(false);
+  const [managersModalOpen, setManagersModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -62,7 +70,7 @@ export default function SchoolRow({ school }: { school: School }) {
   if (editing) {
     return (
       <tr className="bg-surface-raised/60">
-        <td colSpan={5} className="py-4 px-3">
+        <td colSpan={4} className="py-4 px-3">
           <form action={handleSave} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
@@ -85,10 +93,7 @@ export default function SchoolRow({ school }: { school: School }) {
               <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Website URL</label>
               <input name="websiteUrl" defaultValue={school.websiteUrl ?? ''} placeholder="https://…" className={inputClass} />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
-              <input name="displayOrder" type="number" defaultValue={school.displayOrder ?? 0} className={inputClass} />
-            </div>
+            <input type="hidden" name="displayOrder" defaultValue={school.displayOrder ?? 0} />
             <div className="flex items-end gap-2">
               <button type="submit" disabled={isPending} className={saveBtn}>{isPending ? 'Saving…' : 'Save'}</button>
               <button type="button" onClick={closeEditing} className={cancelBtn}>Cancel</button>
@@ -149,9 +154,17 @@ export default function SchoolRow({ school }: { school: School }) {
           <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
         )}
       </td>
-      <td className="py-3 pr-4 text-foreground-secondary">{school.displayOrder}</td>
       <td className="py-3 pr-2 text-right">
         <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setManagersModalOpen(true)}
+            aria-label={`Manage portal managers for ${school.name}`}
+            title={`Manage portal managers for ${school.name}`}
+            className="inline-flex items-center justify-center rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 relative h-8 w-8 shrink-0 bg-surface-raised hover:bg-line border-line text-foreground-secondary hover:text-accent focus-visible:ring-accent/60 after:absolute after:-inset-1.5 after:content-['']"
+          >
+            <FiUsers aria-hidden="true" className="h-4 w-4" />
+          </button>
           <RowIconButton
             ref={editBtnRef}
             kind="edit"
@@ -164,6 +177,12 @@ export default function SchoolRow({ school }: { school: School }) {
             label={`Delete school ${school.name}`}
           />
         </div>
+        <SchoolManagersModal
+          school={school}
+          games={games}
+          isOpen={managersModalOpen}
+          onOpenChange={setManagersModalOpen}
+        />
       </td>
     </tr>
   );
