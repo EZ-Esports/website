@@ -94,3 +94,7 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 ## Admin hover-gated row actions
 
 - Roster Explorer (team tiles, roster player rows, member rows) and League Setup (game and season rows) still hide their edit/trash icon buttons behind `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, so they are invisible on touch until focus. The Standings Archive was fixed to be always visible (Sep 2026); these were out of scope. See [architecture.md](architecture.md) (Frontend, destructive row actions).
+
+## Dependency drift
+
+- `eslint-config-next` is pinned at `16.1.0` in `package.json` while `next` is `^16.3.8`. Lint passes, but the two should be aligned in a separate dependency pass (left untouched in the Dependabot #71 security bump to keep the diff minimal).

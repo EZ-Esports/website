@@ -49,6 +49,7 @@ Conduct 8 deep, structured review passes (fanning out subagents or executing seq
    - Ensure all migration, seed, and maintenance scripts enforce `assertSeedTargetAllowed()`.
    - Ensure seed operations perform upserts with deterministic primary keys.
    - Verify cache tag invalidation (`updateTag` in Next.js 16 or `revalidateTag`) pairs with `queries.ts`.
+   - Reject string/regex parsing over unvalidated free-text database fields (e.g. `notes`) where relational columns or enums are appropriate.
 3. **Admin CMS & Mutations**:
    - Verify storage paths are derived deterministically on the server (`${section}/${entityId}/${timestamp}.${ext}`).
    - Audit server actions for explicit error propagation: verify mutations return descriptive ActionError payloads on failure.
@@ -56,6 +57,7 @@ Conduct 8 deep, structured review passes (fanning out subagents or executing seq
 4. **Marketing & Public Surfaces**:
    - Verify all match kickoffs and calendar calculations use Eastern Time (`America/New_York`) via `parseEastern`.
    - Verify empty and error states render honest, explicit fallback UI rather than fabricated metrics.
+   - Reject dummy filler cards, fake placeholder tiles, and temporary migration banners; verify native sparse layouts and clean empty states.
    - Verify match status semantics: ensure forfeits map to completed matches and tied scores render as explicit draws (`D`).
 5. **UI & Accessibility (a11y)**:
    - Check interactive components for proper primitives (React Aria Components / Radix).
@@ -72,7 +74,8 @@ Conduct 8 deep, structured review passes (fanning out subagents or executing seq
    - Check that applicant essay responses and notes are preserved across the full lifecycle.
    - Verify CSV export formula-injection sanitization (`=`, `+`, `-`, `@`).
 8. **Architecture & Tooling**:
-   - Check `server-only` boundary guards on database utilities.
+   - Hexagonal Architecture integrity: verify core domain types in `app/types/` are decoupled from DB persistence adapters in `app/lib/db/` and UI; reject regex parsing on free-text database columns.
+   - SSR & client boundary checks: flag browser API leaks (e.g. `window`, `document`) during server rendering; verify dynamic imports (`ssr: false`) for browser-only libraries and `import 'server-only'` for DB utilities.
    - Audit test suites to ensure tests verify real invariants and failure scenarios.
    - Check for unified data access patterns across sibling components.
 
