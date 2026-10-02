@@ -35,6 +35,31 @@ export async function getSchoolManagerContext(
   const email = claimsData?.claims?.email as string | undefined;
 
   if (!userId) {
+    if (process.env.NODE_ENV === 'development') {
+      const activeSchools = await db
+        .select({
+          schoolId: schema.schools.id,
+          schoolName: schema.schools.name,
+          schoolSlug: schema.schools.slug,
+        })
+        .from(schema.schools)
+        .where(eq(schema.schools.isActive, true));
+
+      if (activeSchools.length > 0) {
+        return {
+          userId: '00000000-0000-0000-0000-000000000001',
+          email: 'manager@stuy.edu',
+          isStaffAdmin: true,
+          managedSchools: activeSchools.map((s) => ({
+            schoolId: s.schoolId,
+            schoolName: s.schoolName,
+            schoolSlug: s.schoolSlug,
+            managedGames: null,
+            isPrimaryContact: true,
+          })),
+        };
+      }
+    }
     return null;
   }
 
