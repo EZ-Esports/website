@@ -20,6 +20,7 @@ export type ValidateInviteTokenResult =
       status: 'pending';
       inviteId: string;
       role: 'player' | 'manager';
+      isManager: boolean;
       intendedFirstName: string;
       intendedLastName: string;
       schoolId: string;
@@ -176,6 +177,7 @@ export async function validateInviteToken(
       status: 'pending',
       inviteId: invite.id,
       role: (row.invite.role as 'player' | 'manager') || 'player',
+      isManager,
       intendedFirstName: invite.intendedFirstName,
       intendedLastName: invite.intendedLastName,
       schoolId: row.schoolId,
