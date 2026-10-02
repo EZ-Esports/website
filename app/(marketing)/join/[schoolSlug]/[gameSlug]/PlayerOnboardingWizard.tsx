@@ -90,8 +90,12 @@ export default function PlayerOnboardingWizard({
   const [discordUsername, setDiscordUsername] = useState(
     initialDraft.discordUsername || ''
   );
-  const [discordConnected, setDiscordConnected] = useState<boolean>(
-    Boolean(initialDraft.discordConnected || initialDraft.discordUsername)
+  const [discordJoinedConfirmed, setDiscordJoinedConfirmed] = useState<boolean>(
+    Boolean(
+      initialDraft.discordJoinedConfirmed ??
+        initialDraft.discordConnected ??
+        (initialDraft.discordUsername ? true : false)
+    )
   );
 
   // Step 3: Riot Games Identity
@@ -158,7 +162,8 @@ export default function PlayerOnboardingWizard({
       email,
       graduationYear,
       discordUsername,
-      discordConnected,
+      discordJoinedConfirmed,
+      discordConnected: Boolean(discordUsername && discordJoinedConfirmed),
       riotId,
       ignConfirmed,
       birthDate,
@@ -229,9 +234,9 @@ export default function PlayerOnboardingWizard({
       setErrorMessage('Please enter your Discord handle or username.');
       return false;
     }
-    if (!discordConnected) {
+    if (!discordJoinedConfirmed) {
       setErrorMessage(
-        'Please verify your Discord connection and server membership before proceeding.'
+        'Please confirm that you have joined the official EZ Esports Discord server.'
       );
       return false;
     }
@@ -608,7 +613,6 @@ export default function PlayerOnboardingWizard({
                   value={discordUsername}
                   onChange={(e) => {
                     setDiscordUsername(e.target.value);
-                    if (!e.target.value.trim()) setDiscordConnected(false);
                   }}
                   className="w-full px-3.5 py-2.5 rounded-lg bg-surface-elevated border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   placeholder="e.g. @alexchen or alex#1234"
@@ -616,35 +620,33 @@ export default function PlayerOnboardingWizard({
                 />
               </div>
 
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (discordUsername.trim()) {
-                      setDiscordConnected(true);
-                      setErrorMessage(null);
-                    } else {
-                      setErrorMessage('Please enter your Discord handle first.');
-                    }
-                  }}
-                  className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
-                    discordConnected
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                      : 'bg-[#5865F2] text-white hover:bg-[#4752C4]'
-                  }`}
-                >
-                  <SiDiscord className="w-4 h-4" />
-                  {discordConnected
-                    ? 'Connected & Verified in EZ Esports Server'
-                    : 'Connect Discord Account'}
-                </button>
-              </div>
+              <label className="flex items-start gap-3 p-3.5 rounded-lg border border-border bg-surface-elevated/40 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={discordJoinedConfirmed}
+                  onChange={(e) => setDiscordJoinedConfirmed(e.target.checked)}
+                  className="mt-0.5 rounded border-border text-accent focus:ring-accent"
+                />
+                <span className="text-xs text-foreground-muted leading-relaxed">
+                  I confirm that I have joined the official EZ Esports Discord server (
+                  <a
+                    href="https://discord.gg/ezesports"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent underline inline-flex items-center gap-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    discord.gg/ezesports <FiExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                  ) with this account.
+                </span>
+              </label>
 
-              {discordConnected && (
+              {discordUsername.trim() && discordJoinedConfirmed && (
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
                   <FiCheck className="w-4 h-4 shrink-0" />
                   <span>
-                    Verified: <strong>{discordUsername}</strong> is joined to EZ Esports Discord
+                    Linked: <strong>{discordUsername}</strong> will be registered on the EZ Esports Discord roster
                   </span>
                 </div>
               )}

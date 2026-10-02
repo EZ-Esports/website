@@ -144,11 +144,11 @@ The student opens the link. The wizard renders 4 streamlined steps:
 * **Header / Greeting**: *"Welcome Alex Chen! Complete your player onboarding for Stuyvesant Valorant."*
 * **Step 1: Account Authentication**:
   - Student logs in via Email Magic Link / OTP or Google (ensuring access across NYC DOE school Wi-Fi and Chromebooks).
-* **Step 2: Discord Connection (Comms & Voice Gate)**:
-  - Student clicks **"Connect Discord"**.
-  - OAuth exchanges `identify` and `guilds.join`.
-  - Bot automatically joins student to official EZ Esports Discord server and verifies membership.
-  - Display: `✅ Connected as Alex#1234 & Joined EZ Esports Server`.
+* **Step 2: Discord Connection (Comms & Voice Gate - Honor System)**:
+  - Student inputs their Discord username / handle (e.g. `@alexchen` or `alex#1234`).
+  - Student is provided the direct EZ Esports Discord invite link (`discord.gg/ezesports`).
+  - Confirmation checkbox: *"I confirm that I have joined the official EZ Esports Discord server with this account."*
+  - Eliminates external bot dependency and live OAuth friction during onboarding while preserving server membership expectations.
 * **Step 3: Riot Games Identity**:
   - Student inputs Riot ID (`Demon1#LFT1`).
   - Checkbox: *"I confirm this IGN matches my in-game account. I agree to notify my manager and staff before changing my IGN."*

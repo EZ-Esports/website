@@ -5,7 +5,6 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { ManualRiotIdAdapter } from './adapters/riot-manual';
-import { DiscordRestAdapter } from './adapters/discord-rest';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 
@@ -350,22 +349,15 @@ export async function submitPlayerOnboarding(
   const riotAdapter = options?.riotAdapter ?? new ManualRiotIdAdapter({ isVerified: true });
   const resolvedRiot = await riotAdapter.resolveIdentity(inviteRow.gameSlug, submission.riotId);
 
-  // 3. Validate Discord using CommunityPlatformPort adapter
+  // 3. Validate Discord handle (honor system: trusted that they provided handle and joined server)
   const discordUsername = (submission.discordUsername || '').trim();
   if (!discordUsername) {
     throw new Error('Discord username or handle is required.');
   }
 
   const discordUserId = submission.discordUserId?.trim() || discordUsername;
-  const discordAdapter = options?.discordAdapter ?? new DiscordRestAdapter();
-  let inGuild = submission.inGuild ?? true;
-  if (submission.discordUserId) {
-    try {
-      inGuild = await discordAdapter.isMemberInGuild(submission.discordUserId);
-    } catch {
-      inGuild = true;
-    }
-  }
+  // Trust that player provided their Discord handle and joined the server
+  const inGuild = true;
 
   let createdOrUpdatedMemberId = '';
 
