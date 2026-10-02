@@ -4,6 +4,7 @@ import {
   getSchoolInvites,
   getPendingSubmissions,
   getSchoolRosters,
+  getSchoolPlayerPool,
 } from '@/app/lib/onboarding/portal-actions';
 import { getCachedGames } from '@/app/lib/db/queries';
 import SchoolPortalClient from './SchoolPortalClient';
@@ -42,11 +43,12 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
   // Load games from database cache
   const allGames = await getCachedGames();
 
-  // Load initial invites, submissions, and rosters for the active school
-  const [initialInvites, initialSubmissions, initialRosters] = await Promise.all([
+  // Load initial invites, submissions, rosters, and eligible player pool for the active school
+  const [initialInvites, initialSubmissions, initialRosters, initialPlayerPool] = await Promise.all([
     getSchoolInvites(activeSchool.schoolId, paramGameId),
     getPendingSubmissions(activeSchool.schoolId, paramGameId),
     getSchoolRosters(activeSchool.schoolId, paramGameId),
+    getSchoolPlayerPool(activeSchool.schoolId, paramGameId),
   ]);
 
   return (
@@ -58,6 +60,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialInvites={initialInvites}
         initialSubmissions={initialSubmissions}
         initialRosters={initialRosters}
+        initialPlayerPool={initialPlayerPool}
         selectedGameId={paramGameId}
       />
     </PortalShell>

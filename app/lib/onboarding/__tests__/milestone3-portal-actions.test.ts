@@ -194,12 +194,15 @@ const mocks = vi.hoisted(() => {
           return store.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
 
-        // 4. Players join Members
+        // 4. Players join Members, Rosters, Teams, Games
         if (currentTable === schema.players) {
           const matchingPlayers = store.filter((p) => conds.every((c) => matchesRow(p, c)));
-          if (joins.length > 0 && joins[0].table === schema.members) {
+          if (joins.length > 0) {
             return matchingPlayers.map((p) => {
               const member = state.membersStore.find((m) => m.id === p.memberId);
+              const roster = state.rostersStore.find((r) => r.id === p.rosterId);
+              const team = state.teamsStore.find((t) => t.id === roster?.teamId);
+              const game = state.gamesStore.find((g) => g.id === team?.gameId);
               return {
                 id: p.id,
                 rosterId: p.rosterId,
@@ -210,6 +213,8 @@ const mocks = vi.hoisted(() => {
                 firstName: member?.firstName ?? '',
                 lastName: member?.lastName ?? '',
                 discord: member?.discord ?? '',
+                rosterName: roster?.name ?? '',
+                gameName: game?.displayName ?? '',
               };
             });
           }
@@ -286,6 +291,25 @@ const mocks = vi.hoisted(() => {
       };
     }),
 
+    delete: vi.fn((tbl: any) => {
+      const store = getStore(tbl);
+      return {
+        where: vi.fn((clause: any) => {
+          const conds = extractConditions(clause);
+          if (store) {
+            for (let i = store.length - 1; i >= 0; i--) {
+              if (conds.every((c) => matchesRow(store[i], c))) {
+                store.splice(i, 1);
+              }
+            }
+          }
+          return {
+            then: (resolve: (v: any) => void) => resolve([]),
+          };
+        }),
+      };
+    }),
+
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => {
       return cb(mockDb);
     }),
@@ -338,6 +362,10 @@ import {
   reviewPlayerInvite,
   getRosterEligibility,
   emergencySwapSub,
+  enrollPlayerToRoster,
+  removePlayerFromRoster,
+  updateRosterPlayerRole,
+  getSchoolPlayerPool,
 } from '@/app/lib/onboarding/portal-actions';
 
 describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
@@ -950,6 +978,207 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           inPlayerId: starterId,
         })
       ).rejects.toThrow(/Cannot swap a player with themselves/);
+    });
+  });
+
+  describe('7. Direct Roster Enrollment & Player Pool Management', () => {
+    const teamId = 'team-val-stuy';
+    const rosterId = 'roster-val-varsity';
+    const memberId = 'member-new-stuy';
+    const otherSchoolMemberId = 'member-bxsci-1';
+
+    beforeEach(() => {
+      mocks.state.schoolManagersStore = [
+        {
+          id: 'sm-1',
+          schoolId,
+          userId: 'manager-user-1',
+          managedGames: null,
+          isPrimaryContact: true,
+          isActive: true,
+        },
+      ];
+
+      mocks.state.teamsStore = [
+        {
+          id: teamId,
+          schoolId,
+          gameId: valGameId,
+          seasonId: 'season-1',
+        },
+      ];
+
+      mocks.state.rostersStore = [
+        {
+          id: rosterId,
+          teamId,
+          name: 'Varsity',
+          division: 'A',
+        },
+      ];
+
+      mocks.state.membersStore = [
+        {
+          id: memberId,
+          schoolId,
+          firstName: 'Justin',
+          lastName: 'Wong',
+          discord: 'jwong#0001',
+          graduationYear: 2026,
+        },
+        {
+          id: 'member-cap',
+          schoolId,
+          firstName: 'Original',
+          lastName: 'Captain',
+          discord: 'cap#0001',
+          graduationYear: 2025,
+        },
+        {
+          id: otherSchoolMemberId,
+          schoolId: otherSchoolId,
+          firstName: 'Bronx',
+          lastName: 'Student',
+          discord: 'bx#0001',
+          graduationYear: 2026,
+        },
+      ];
+
+      mocks.state.playersStore = [
+        {
+          id: 'player-cap',
+          rosterId,
+          memberId: 'member-cap',
+          role: 'captain',
+          ign: 'OldCap',
+          isCaptain: true,
+        },
+      ];
+
+      mocks.state.playerIdentitiesStore = [
+        {
+          id: 'ident-riot-1',
+          memberId,
+          provider: 'riot',
+          providerUserId: 'JWong#NA1',
+          providerUsername: 'JWong#NA1',
+          inGuild: true,
+        },
+        {
+          id: 'ident-discord-1',
+          memberId,
+          provider: 'discord',
+          providerUserId: 'disc-jwong',
+          providerUsername: 'jwong',
+          inGuild: true,
+        },
+      ];
+    });
+
+    it('enrolls an eligible school member onto a roster as a starter', async () => {
+      const result = await enrollPlayerToRoster({
+        rosterId,
+        memberId,
+        role: 'player',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.player.memberId).toBe(memberId);
+      expect(result.player.playerName).toBe('Justin Wong');
+      expect(result.player.ign).toBe('JWong#NA1');
+      expect(result.player.role).toBe('player');
+      expect(result.player.isCaptain).toBe(false);
+      expect(result.player.riotVerified).toBe(true);
+      expect(result.player.inGuild).toBe(true);
+
+      const inDb = mocks.state.playersStore.find((p) => p.memberId === memberId && p.rosterId === rosterId);
+      expect(inDb).toBeDefined();
+      expect(inDb.role).toBe('player');
+      expect(inDb.isCaptain).toBe(false);
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'teams');
+    });
+
+    it('enrolls a player as team captain, transferring captaincy from existing captain atomically', async () => {
+      const result = await enrollPlayerToRoster({
+        rosterId,
+        memberId,
+        role: 'captain',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.player.role).toBe('captain');
+      expect(result.player.isCaptain).toBe(true);
+
+      // Old captain demoted to player
+      const oldCap = mocks.state.playersStore.find((p) => p.id === 'player-cap');
+      expect(oldCap.role).toBe('player');
+      expect(oldCap.isCaptain).toBe(false);
+
+      // New captain active
+      const newCap = mocks.state.playersStore.find((p) => p.memberId === memberId);
+      expect(newCap.role).toBe('captain');
+      expect(newCap.isCaptain).toBe(true);
+    });
+
+    it('rejects enrollment if member belongs to a different school (Anti-IDOR / Tenancy check)', async () => {
+      await expect(
+        enrollPlayerToRoster({
+          rosterId,
+          memberId: otherSchoolMemberId,
+          role: 'player',
+        })
+      ).rejects.toThrow(/Member does not belong to the school managing this roster/);
+    });
+
+    it('updates player role between starter, sub, and captain via updateRosterPlayerRole', async () => {
+      // Demote current captain to sub
+      const result = await updateRosterPlayerRole({
+        rosterId,
+        playerId: 'player-cap',
+        role: 'sub',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.role).toBe('sub');
+      expect(result.isCaptain).toBe(false);
+
+      const updated = mocks.state.playersStore.find((p) => p.id === 'player-cap');
+      expect(updated.role).toBe('sub');
+      expect(updated.isCaptain).toBe(false);
+    });
+
+    it('removes a player from a roster via removePlayerFromRoster', async () => {
+      const result = await removePlayerFromRoster({
+        rosterId,
+        playerId: 'player-cap',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.playerId).toBe('player-cap');
+
+      const found = mocks.state.playersStore.find((p) => p.id === 'player-cap');
+      expect(found).toBeUndefined();
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'teams');
+    });
+
+    it('retrieves school player pool with Zero-PII Invariant maintained', async () => {
+      const pool = await getSchoolPlayerPool(schoolId);
+
+      expect(pool.length).toBeGreaterThanOrEqual(2);
+      const justin = pool.find((p) => p.memberId === memberId);
+      expect(justin).toBeDefined();
+      expect(justin?.playerName).toBe('Justin Wong');
+      expect(justin?.ign).toBe('JWong#NA1');
+      expect(justin?.discordUsername).toBe('jwong');
+      expect(justin?.riotVerified).toBe(true);
+
+      // Verify Zero-PII Invariant: No demographic data fields present
+      for (const p of pool) {
+        expect((p as any).birthDate).toBeUndefined();
+        expect((p as any).race).toBeUndefined();
+        expect((p as any).ethnicity).toBeUndefined();
+        expect((p as any).freeReducedLunch).toBeUndefined();
+      }
     });
   });
 });

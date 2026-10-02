@@ -288,6 +288,7 @@ export interface ReviewPlayerInviteParams {
   inviteId: string;
   action: 'approve' | 'reject';
   rosterId?: string;
+  role?: 'player' | 'sub' | 'captain';
   rejectionReason?: string;
 }
 
@@ -296,6 +297,8 @@ export interface ReviewPlayerInviteResult {
   status: 'accepted' | 'rejected';
   inviteId: string;
   rejectionReason?: string;
+  enrolledPlayer?: SchoolRosterPlayer;
+  targetRosterId?: string;
 }
 
 /**
@@ -307,7 +310,7 @@ export interface ReviewPlayerInviteResult {
 export async function reviewPlayerInvite(
   params: ReviewPlayerInviteParams
 ): Promise<ReviewPlayerInviteResult> {
-  const { inviteId, action, rosterId, rejectionReason } = params;
+  const { inviteId, action, rosterId, role = 'player', rejectionReason } = params;
 
   if (!inviteId) {
     throw new Error('Invite ID is required');
@@ -334,9 +337,10 @@ export async function reviewPlayerInvite(
       })
       .where(eq(schema.playerInvites.id, inviteId));
 
-    if (invite.memberId) {
-      let targetRosterId = rosterId;
+    let enrolledPlayer: SchoolRosterPlayer | undefined = undefined;
+    let targetRosterId = rosterId;
 
+    if (invite.memberId) {
       if (!targetRosterId && invite.gameId) {
         // Find existing team & roster for this school and game
         const [team] = await db
@@ -361,6 +365,9 @@ export async function reviewPlayerInvite(
       }
 
       if (targetRosterId) {
+        const isCaptain = role === 'captain';
+
+        // Check if existing player on this roster
         const [existingPlayer] = await db
           .select()
           .from(schema.players)
@@ -372,34 +379,110 @@ export async function reviewPlayerInvite(
           )
           .limit(1);
 
-        if (!existingPlayer) {
-          const [riotIdentity] = await db
-            .select({ providerUserId: schema.playerIdentities.providerUserId })
-            .from(schema.playerIdentities)
-            .where(
-              and(
-                eq(schema.playerIdentities.memberId, invite.memberId),
-                eq(schema.playerIdentities.provider, 'riot')
-              )
+        const [riotIdentity] = await db
+          .select({ providerUserId: schema.playerIdentities.providerUserId })
+          .from(schema.playerIdentities)
+          .where(
+            and(
+              eq(schema.playerIdentities.memberId, invite.memberId),
+              eq(schema.playerIdentities.provider, 'riot')
             )
-            .limit(1);
+          )
+          .limit(1);
 
-          const draft = invite.submissionDraft as Record<string, any> | null;
-          const ign = riotIdentity?.providerUserId ?? draft?.ign ?? null;
+        const draft = invite.submissionDraft as Record<string, any> | null;
+        const ign = riotIdentity?.providerUserId ?? draft?.ign ?? null;
 
-          await db.insert(schema.players).values({
-            rosterId: targetRosterId,
-            memberId: invite.memberId,
-            role: 'player',
-            ign,
-            isCaptain: false,
-          });
-        }
+        let playerId: string;
+
+        await db.transaction(async (tx) => {
+          if (isCaptain) {
+            // Demote any existing captain on this roster
+            const otherCaptains = await tx
+              .select()
+              .from(schema.players)
+              .where(
+                and(
+                  eq(schema.players.rosterId, targetRosterId!),
+                  eq(schema.players.isCaptain, true)
+                )
+              );
+
+            for (const cap of otherCaptains) {
+              if (cap.memberId !== invite.memberId) {
+                await tx
+                  .update(schema.players)
+                  .set({
+                    role: 'player',
+                    isCaptain: false,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(schema.players.id, cap.id));
+              }
+            }
+          }
+
+          if (!existingPlayer) {
+            const [inserted] = await tx
+              .insert(schema.players)
+              .values({
+                rosterId: targetRosterId!,
+                memberId: invite.memberId!,
+                role,
+                ign,
+                isCaptain,
+              })
+              .returning();
+            playerId = inserted.id;
+          } else {
+            playerId = existingPlayer.id;
+            await tx
+              .update(schema.players)
+              .set({
+                role,
+                isCaptain,
+                ign: ign ?? existingPlayer.ign,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.players.id, existingPlayer.id));
+          }
+        });
+
+        const [member] = await db
+          .select()
+          .from(schema.members)
+          .where(eq(schema.members.id, invite.memberId))
+          .limit(1);
+
+        const identities = await db
+          .select()
+          .from(schema.playerIdentities)
+          .where(eq(schema.playerIdentities.memberId, invite.memberId));
+
+        const discord = identities.find((i) => i.provider === 'discord');
+
+        enrolledPlayer = {
+          id: playerId!,
+          memberId: invite.memberId,
+          playerName: member ? `${member.firstName} ${member.lastName}` : `${invite.intendedFirstName} ${invite.intendedLastName}`,
+          ign: ign || 'Unlinked',
+          role,
+          isCaptain,
+          discordUsername: discord?.providerUsername || member?.discord || 'Unlinked',
+          inGuild: discord?.inGuild ?? false,
+          riotVerified: !!riotIdentity,
+        };
       }
     }
 
     updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
-    return { success: true, status: 'accepted', inviteId };
+    return {
+      success: true,
+      status: 'accepted',
+      inviteId,
+      enrolledPlayer,
+      targetRosterId: targetRosterId ?? undefined,
+    };
   }
 
   if (action === 'reject') {
@@ -804,4 +887,416 @@ export async function getSchoolRosters(
       players: rPlayers,
     };
   });
+}
+
+export interface SchoolPoolPlayer {
+  memberId: string;
+  firstName: string;
+  lastName: string;
+  playerName: string;
+  ign: string;
+  discordUsername: string;
+  inGuild: boolean;
+  riotVerified: boolean;
+  graduationYear: number | null;
+  enrolledRosters: Array<{
+    rosterId: string;
+    rosterName: string;
+    gameName: string;
+    role: string;
+    isCaptain: boolean;
+  }>;
+}
+
+/**
+ * Returns the pool of all verified/onboarded players belonging to the school.
+ * Maintains Zero-PII Invariant: does NOT expose any sensitive demographics.
+ */
+export async function getSchoolPlayerPool(
+  schoolId: string,
+  gameId?: string
+): Promise<SchoolPoolPlayer[]> {
+  await assertManagerForSchool(schoolId, gameId);
+
+  const schoolMembers = await db
+    .select({
+      id: schema.members.id,
+      firstName: schema.members.firstName,
+      lastName: schema.members.lastName,
+      discord: schema.members.discord,
+      graduationYear: schema.members.graduationYear,
+    })
+    .from(schema.members)
+    .where(eq(schema.members.schoolId, schoolId))
+    .orderBy(desc(schema.members.createdAt));
+
+  if (schoolMembers.length === 0) {
+    return [];
+  }
+
+  const memberIds = schoolMembers.map((m) => m.id);
+
+  const identities = await db
+    .select()
+    .from(schema.playerIdentities)
+    .where(inArray(schema.playerIdentities.memberId, memberIds));
+
+  // Query roster enrollments
+  const playerRows = await db
+    .select({
+      memberId: schema.players.memberId,
+      rosterId: schema.players.rosterId,
+      role: schema.players.role,
+      isCaptain: schema.players.isCaptain,
+      rosterName: schema.rosters.name,
+      gameName: schema.games.displayName,
+    })
+    .from(schema.players)
+    .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
+    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
+    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
+    .where(inArray(schema.players.memberId, memberIds));
+
+  // Fetch invite drafts for fallback IGNs
+  const invites = await db
+    .select({
+      memberId: schema.playerInvites.memberId,
+      draft: schema.playerInvites.submissionDraft,
+    })
+    .from(schema.playerInvites)
+    .where(
+      and(
+        eq(schema.playerInvites.schoolId, schoolId),
+        inArray(schema.playerInvites.memberId, memberIds)
+      )
+    );
+
+  const invitesDraftMap = new Map<string, any>();
+  for (const inv of invites) {
+    if (inv.memberId && inv.draft) {
+      invitesDraftMap.set(inv.memberId, inv.draft);
+    }
+  }
+
+  return schoolMembers.map((m) => {
+    const memberIdentities = identities.filter((i) => i.memberId === m.id);
+    const riot = memberIdentities.find((i) => i.provider === 'riot');
+    const discord = memberIdentities.find((i) => i.provider === 'discord');
+    const draft = invitesDraftMap.get(m.id);
+
+    const ign = riot?.providerUserId || riot?.providerUsername || draft?.ign || 'Unlinked';
+    const discordUsername = discord?.providerUsername || m.discord || draft?.discord || 'Unlinked';
+
+    const memberRosters = playerRows
+      .filter((p) => p.memberId === m.id)
+      .map((p) => ({
+        rosterId: p.rosterId,
+        rosterName: p.rosterName,
+        gameName: p.gameName,
+        role: p.role,
+        isCaptain: p.isCaptain,
+      }));
+
+    return {
+      memberId: m.id,
+      firstName: m.firstName,
+      lastName: m.lastName,
+      playerName: `${m.firstName} ${m.lastName}`,
+      ign,
+      discordUsername,
+      inGuild: discord?.inGuild ?? false,
+      riotVerified: !!riot,
+      graduationYear: m.graduationYear,
+      enrolledRosters: memberRosters,
+    };
+  });
+}
+
+export interface EnrollPlayerToRosterParams {
+  rosterId: string;
+  memberId: string;
+  role?: 'player' | 'sub' | 'captain';
+  ign?: string;
+}
+
+export interface EnrollPlayerToRosterResult {
+  success: boolean;
+  player: SchoolRosterPlayer;
+  message?: string;
+}
+
+/**
+ * Enrolls an existing school player/member directly onto a specific team roster.
+ * Enforces manager authorization, school tenancy, role assignment, and captain uniqueness.
+ */
+export async function enrollPlayerToRoster(
+  params: EnrollPlayerToRosterParams
+): Promise<EnrollPlayerToRosterResult> {
+  const { rosterId, memberId, ign: customIgn } = params;
+  const role = params.role || 'player';
+
+  if (!rosterId || !memberId) {
+    throw new Error('rosterId and memberId are required');
+  }
+
+  // 1. Manager authorization check
+  const { roster, team } = await assertManagerForRoster(rosterId);
+
+  // 2. Tenancy check: Verify member belongs to this school
+  const [member] = await db
+    .select()
+    .from(schema.members)
+    .where(eq(schema.members.id, memberId))
+    .limit(1);
+
+  if (!member) {
+    throw new Error(`Member ${memberId} not found`);
+  }
+
+  if (member.schoolId !== team.schoolId) {
+    throw new Error('Member does not belong to the school managing this roster');
+  }
+
+  // 3. Resolve IGN from Riot identity or draft if not passed
+  let ign = customIgn?.trim();
+  if (!ign) {
+    const [riotIdentity] = await db
+      .select({ providerUserId: schema.playerIdentities.providerUserId })
+      .from(schema.playerIdentities)
+      .where(
+        and(
+          eq(schema.playerIdentities.memberId, memberId),
+          eq(schema.playerIdentities.provider, 'riot')
+        )
+      )
+      .limit(1);
+
+    if (riotIdentity?.providerUserId) {
+      ign = riotIdentity.providerUserId;
+    } else {
+      // Check playerInvites submissionDraft
+      const [invite] = await db
+        .select({ draft: schema.playerInvites.submissionDraft })
+        .from(schema.playerInvites)
+        .where(eq(schema.playerInvites.memberId, memberId))
+        .orderBy(desc(schema.playerInvites.createdAt))
+        .limit(1);
+
+      const draft = invite?.draft as Record<string, any> | null;
+      ign = draft?.ign ?? `${member.firstName} ${member.lastName}`;
+    }
+  }
+
+  const isCaptain = role === 'captain';
+
+  // 4. Handle Captain constraint or role conflicts
+  const [existingPlayer] = await db
+    .select()
+    .from(schema.players)
+    .where(
+      and(
+        eq(schema.players.rosterId, rosterId),
+        eq(schema.players.memberId, memberId)
+      )
+    )
+    .limit(1);
+
+  let playerId: string;
+
+  await db.transaction(async (tx) => {
+    if (isCaptain) {
+      // Demote existing captain on this roster (if another player was captain)
+      const otherCaptains = await tx
+        .select()
+        .from(schema.players)
+        .where(
+          and(
+            eq(schema.players.rosterId, rosterId),
+            eq(schema.players.isCaptain, true)
+          )
+        );
+
+      for (const cap of otherCaptains) {
+        if (cap.memberId !== memberId) {
+          await tx
+            .update(schema.players)
+            .set({
+              role: 'player',
+              isCaptain: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.players.id, cap.id));
+        }
+      }
+    }
+
+    if (existingPlayer) {
+      playerId = existingPlayer.id;
+      await tx
+        .update(schema.players)
+        .set({
+          role,
+          isCaptain,
+          ign: ign || existingPlayer.ign,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.players.id, existingPlayer.id));
+    } else {
+      const [inserted] = await tx
+        .insert(schema.players)
+        .values({
+          rosterId,
+          memberId,
+          role,
+          ign: ign || null,
+          isCaptain,
+        })
+        .returning();
+      playerId = inserted.id;
+    }
+  });
+
+  // 5. Build SchoolRosterPlayer return object
+  const identities = await db
+    .select()
+    .from(schema.playerIdentities)
+    .where(eq(schema.playerIdentities.memberId, memberId));
+
+  const riot = identities.find((i) => i.provider === 'riot');
+  const discord = identities.find((i) => i.provider === 'discord');
+
+  const rosterPlayer: SchoolRosterPlayer = {
+    id: playerId!,
+    memberId: member.id,
+    playerName: `${member.firstName} ${member.lastName}`,
+    ign: ign || riot?.providerUserId || 'Unlinked',
+    role,
+    isCaptain,
+    discordUsername: discord?.providerUsername || member.discord || 'Unlinked',
+    inGuild: discord?.inGuild ?? false,
+    riotVerified: !!riot,
+  };
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+
+  return {
+    success: true,
+    player: rosterPlayer,
+    message: `${member.firstName} ${member.lastName} enrolled to ${roster.name} as ${
+      role === 'captain' ? 'Captain' : role === 'sub' ? 'Substitute' : 'Starter'
+    }`,
+  };
+}
+
+export interface RemovePlayerFromRosterParams {
+  rosterId: string;
+  playerId: string;
+}
+
+/**
+ * Removes a player from a roster.
+ */
+export async function removePlayerFromRoster(
+  params: RemovePlayerFromRosterParams
+): Promise<{ success: boolean; playerId: string }> {
+  const { rosterId, playerId } = params;
+
+  if (!rosterId || !playerId) {
+    throw new Error('rosterId and playerId are required');
+  }
+
+  await assertManagerForRoster(rosterId);
+
+  await db
+    .delete(schema.players)
+    .where(
+      and(
+        eq(schema.players.id, playerId),
+        eq(schema.players.rosterId, rosterId)
+      )
+    );
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+
+  return { success: true, playerId };
+}
+
+export interface UpdateRosterPlayerRoleParams {
+  rosterId: string;
+  playerId: string;
+  role: 'player' | 'sub' | 'captain';
+}
+
+/**
+ * Updates a player's role on a roster (Starter, Sub, or Captain).
+ * Safely handles single-captain constraint with automatic promotion/demotion.
+ */
+export async function updateRosterPlayerRole(
+  params: UpdateRosterPlayerRoleParams
+): Promise<{ success: boolean; playerId: string; role: string; isCaptain: boolean }> {
+  const { rosterId, playerId, role } = params;
+
+  if (!rosterId || !playerId || !role) {
+    throw new Error('rosterId, playerId, and role are required');
+  }
+
+  await assertManagerForRoster(rosterId);
+
+  const [targetPlayer] = await db
+    .select()
+    .from(schema.players)
+    .where(and(eq(schema.players.id, playerId), eq(schema.players.rosterId, rosterId)))
+    .limit(1);
+
+  if (!targetPlayer) {
+    throw new Error(`Player ${playerId} not found on roster`);
+  }
+
+  const isCaptain = role === 'captain';
+
+  await db.transaction(async (tx) => {
+    if (isCaptain) {
+      // Demote any existing captain on this roster
+      const currentCaptains = await tx
+        .select()
+        .from(schema.players)
+        .where(
+          and(
+            eq(schema.players.rosterId, rosterId),
+            eq(schema.players.isCaptain, true)
+          )
+        );
+
+      for (const cap of currentCaptains) {
+        if (cap.id !== playerId) {
+          await tx
+            .update(schema.players)
+            .set({
+              role: 'player',
+              isCaptain: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.players.id, cap.id));
+        }
+      }
+    }
+
+    await tx
+      .update(schema.players)
+      .set({
+        role,
+        isCaptain,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.players.id, playerId));
+  });
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+
+  return {
+    success: true,
+    playerId,
+    role,
+    isCaptain,
+  };
 }

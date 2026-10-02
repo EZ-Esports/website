@@ -8,9 +8,13 @@ import {
   reviewPlayerInvite,
   getRosterEligibility,
   emergencySwapSub,
+  enrollPlayerToRoster,
+  removePlayerFromRoster,
+  updateRosterPlayerRole,
   type SchoolInviteItem,
   type PendingSubmission,
   type SchoolRosterDetails,
+  type SchoolPoolPlayer,
   type RosterEligibilityResult,
 } from '@/app/lib/onboarding/portal-actions';
 import {
@@ -25,6 +29,8 @@ import {
   HiOutlineUsers,
   HiOutlineSparkles,
   HiOutlineXMark,
+  HiOutlineTrash,
+  HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2';
 
 interface GameItem {
@@ -41,6 +47,7 @@ interface SchoolPortalClientProps {
   initialInvites: SchoolInviteItem[];
   initialSubmissions: PendingSubmission[];
   initialRosters: SchoolRosterDetails[];
+  initialPlayerPool?: SchoolPoolPlayer[];
   selectedGameId?: string;
 }
 
@@ -51,6 +58,7 @@ export default function SchoolPortalClient({
   initialInvites,
   initialSubmissions,
   initialRosters,
+  initialPlayerPool = [],
   selectedGameId: initialGameId,
 }: SchoolPortalClientProps) {
   // --- Game Selection Tab ---
@@ -60,6 +68,7 @@ export default function SchoolPortalClient({
   const [invites, setInvites] = useState<SchoolInviteItem[]>(initialInvites);
   const [submissions, setSubmissions] = useState<PendingSubmission[]>(initialSubmissions);
   const [rosters, setRosters] = useState<SchoolRosterDetails[]>(initialRosters);
+  const [playerPool, setPlayerPool] = useState<SchoolPoolPlayer[]>(initialPlayerPool);
 
   // --- Invite Generator State ---
   const [firstName, setFirstName] = useState('');
@@ -82,6 +91,7 @@ export default function SchoolPortalClient({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string>('');
   const [selectedRosterMap, setSelectedRosterMap] = useState<Record<string, string>>({});
+  const [selectedRoleMap, setSelectedRoleMap] = useState<Record<string, 'player' | 'sub' | 'captain'>>({});
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
 
   // --- Roster Gate Evaluation State ---
@@ -96,6 +106,15 @@ export default function SchoolPortalClient({
   const [inPlayerId, setInPlayerId] = useState<string>('');
   const [swapError, setSwapError] = useState<string | null>(null);
   const [isSwapping, startSwapping] = useTransition();
+
+  // --- Enroll Player Modal State ---
+  const [activeEnrollRoster, setActiveEnrollRoster] = useState<SchoolRosterDetails | null>(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('');
+  const [enrollRole, setEnrollRole] = useState<'player' | 'sub' | 'captain'>('player');
+  const [enrollCustomIgn, setEnrollCustomIgn] = useState<string>('');
+  const [enrollSearchQuery, setEnrollSearchQuery] = useState<string>('');
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [isEnrolling, startEnrolling] = useTransition();
 
   // --- Filtered Data ---
   const filteredInvites =
@@ -190,11 +209,19 @@ export default function SchoolPortalClient({
     setApprovingId(inviteId);
     setApprovalFeedback(null);
     try {
-      const rosterId = selectedRosterMap[inviteId];
+      const sub = submissions.find((s) => s.id === inviteId);
+      const gameRosters = rosters.filter((r) => r.gameId === sub?.gameId);
+      const chosenRosterId =
+        selectedRosterMap[inviteId] !== undefined
+          ? selectedRosterMap[inviteId]
+          : (gameRosters[0]?.id || '');
+      const chosenRole = (selectedRoleMap[inviteId] as 'player' | 'sub' | 'captain') || 'player';
+
       const result = await reviewPlayerInvite({
         inviteId,
         action: 'approve',
-        rosterId,
+        rosterId: chosenRosterId || undefined,
+        role: chosenRole,
       });
 
       if (result.success) {
@@ -202,13 +229,224 @@ export default function SchoolPortalClient({
         setInvites((prev) =>
           prev.map((inv) => (inv.id === inviteId ? { ...inv, status: 'accepted' } : inv))
         );
-        setApprovalFeedback('Application approved! Player has been added to the roster pool.');
-        setTimeout(() => setApprovalFeedback(null), 4000);
+
+        if (result.enrolledPlayer && result.targetRosterId) {
+          const enrolled = result.enrolledPlayer;
+          const targetId = result.targetRosterId;
+          setRosters((prev) =>
+            prev.map((r) => {
+              if (r.id !== targetId) return r;
+              const updatedPlayers = r.players.map((p) =>
+                enrolled.isCaptain && p.isCaptain ? { ...p, isCaptain: false, role: 'player' } : p
+              );
+              return {
+                ...r,
+                players: [
+                  ...updatedPlayers.filter(
+                    (p) => p.id !== enrolled.id && p.memberId !== enrolled.memberId
+                  ),
+                  enrolled,
+                ],
+              };
+            })
+          );
+        }
+
+        // Add to or update playerPool in client state
+        if (sub && sub.memberId) {
+          setPlayerPool((prev) => {
+            const existing = prev.find((p) => p.memberId === sub.memberId);
+            if (existing) {
+              if (result.targetRosterId) {
+                return prev.map((p) =>
+                  p.memberId === sub.memberId
+                    ? {
+                        ...p,
+                        enrolledRosters: [
+                          ...p.enrolledRosters.filter((er) => er.rosterId !== result.targetRosterId),
+                          {
+                            rosterId: result.targetRosterId!,
+                            rosterName: rosters.find((r) => r.id === result.targetRosterId)?.name || 'Roster',
+                            gameName: sub.gameName,
+                            role: chosenRole,
+                            isCaptain: chosenRole === 'captain',
+                          },
+                        ],
+                      }
+                    : p
+                );
+              }
+              return prev;
+            }
+            const newPoolPlayer: SchoolPoolPlayer = {
+              memberId: sub.memberId!,
+              firstName: sub.intendedFirstName,
+              lastName: sub.intendedLastName,
+              playerName: sub.playerName,
+              ign: sub.ign,
+              discordUsername: sub.discord,
+              inGuild: true,
+              riotVerified: true,
+              graduationYear: null,
+              enrolledRosters: result.targetRosterId
+                ? [
+                    {
+                      rosterId: result.targetRosterId,
+                      rosterName: rosters.find((r) => r.id === result.targetRosterId)?.name || 'Roster',
+                      gameName: sub.gameName,
+                      role: chosenRole,
+                      isCaptain: chosenRole === 'captain',
+                    },
+                  ]
+                : [],
+            };
+            return [newPoolPlayer, ...prev];
+          });
+        }
+
+        const enrolledRoster = result.targetRosterId ? rosters.find((r) => r.id === result.targetRosterId) : null;
+        setApprovalFeedback(
+          enrolledRoster
+            ? `Application approved! Player enrolled to ${enrolledRoster.name} (${enrolledRoster.gameName}) as ${chosenRole === 'captain' ? 'Captain' : chosenRole === 'sub' ? 'Substitute' : 'Starter'}.`
+            : 'Application approved! Player added to school pool.'
+        );
+        setTimeout(() => setApprovalFeedback(null), 5000);
       }
     } catch (err: any) {
       setApprovalFeedback(`Approval failed: ${err.message}`);
     } finally {
       setApprovingId(null);
+    }
+  };
+
+  const handleOpenEnrollModal = (roster: SchoolRosterDetails) => {
+    setActiveEnrollRoster(roster);
+    setSelectedMemberId('');
+    setEnrollRole('player');
+    setEnrollCustomIgn('');
+    setEnrollSearchQuery('');
+    setEnrollError(null);
+  };
+
+  const handleConfirmEnroll = () => {
+    if (!activeEnrollRoster) return;
+    if (!selectedMemberId) {
+      setEnrollError('Please select a player to enroll.');
+      return;
+    }
+
+    setEnrollError(null);
+    startEnrolling(async () => {
+      try {
+        const result = await enrollPlayerToRoster({
+          rosterId: activeEnrollRoster.id,
+          memberId: selectedMemberId,
+          role: enrollRole,
+          ign: enrollCustomIgn.trim() || undefined,
+        });
+
+        if (result.success) {
+          const enrolled = result.player;
+          // Update rosters state
+          setRosters((prev) =>
+            prev.map((r) => {
+              if (r.id !== activeEnrollRoster.id) return r;
+              const updatedPlayers = r.players.map((p) =>
+                enrolled.isCaptain && p.isCaptain ? { ...p, isCaptain: false, role: 'player' } : p
+              );
+              return {
+                ...r,
+                players: [
+                  ...updatedPlayers.filter(
+                    (p) => p.id !== enrolled.id && p.memberId !== enrolled.memberId
+                  ),
+                  enrolled,
+                ],
+              };
+            })
+          );
+
+          // Update playerPool state
+          setPlayerPool((prev) =>
+            prev.map((p) => {
+              if (p.memberId !== selectedMemberId) return p;
+              const otherRosters = p.enrolledRosters.filter(
+                (er) => er.rosterId !== activeEnrollRoster.id
+              );
+              return {
+                ...p,
+                enrolledRosters: [
+                  ...otherRosters,
+                  {
+                    rosterId: activeEnrollRoster.id,
+                    rosterName: activeEnrollRoster.name,
+                    gameName: activeEnrollRoster.gameName,
+                    role: enrollRole,
+                    isCaptain: enrollRole === 'captain',
+                  },
+                ],
+              };
+            })
+          );
+
+          setActiveEnrollRoster(null);
+        }
+      } catch (err: any) {
+        setEnrollError(err.message || 'Failed to enroll player to roster');
+      }
+    });
+  };
+
+  const handleRemovePlayer = async (rosterId: string, playerId: string) => {
+    try {
+      await removePlayerFromRoster({ rosterId, playerId });
+      setRosters((prev) =>
+        prev.map((r) => {
+          if (r.id !== rosterId) return r;
+          return {
+            ...r,
+            players: r.players.filter((p) => p.id !== playerId),
+          };
+        })
+      );
+      // Update playerPool
+      setPlayerPool((prev) =>
+        prev.map((p) => ({
+          ...p,
+          enrolledRosters: p.enrolledRosters.filter((er) => er.rosterId !== rosterId),
+        }))
+      );
+    } catch (err: any) {
+      alert(`Failed to remove player: ${err.message}`);
+    }
+  };
+
+  const handleUpdateRole = async (
+    rosterId: string,
+    playerId: string,
+    newRole: 'player' | 'sub' | 'captain'
+  ) => {
+    try {
+      await updateRosterPlayerRole({ rosterId, playerId, role: newRole });
+      setRosters((prev) =>
+        prev.map((r) => {
+          if (r.id !== rosterId) return r;
+          return {
+            ...r,
+            players: r.players.map((p) => {
+              if (p.id === playerId) {
+                return { ...p, role: newRole, isCaptain: newRole === 'captain' };
+              }
+              if (newRole === 'captain' && p.isCaptain) {
+                return { ...p, role: 'player', isCaptain: false };
+              }
+              return p;
+            }),
+          };
+        })
+      );
+    } catch (err: any) {
+      alert(`Failed to update role: ${err.message}`);
     }
   };
 
@@ -592,13 +830,17 @@ export default function SchoolPortalClient({
                       </div>
                     </div>
 
-                    {/* Actions: Assign Roster + Approve / Reject */}
+                    {/* Actions: Assign Roster + Role + Approve / Reject */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-                      {gameRosters.length > 0 ? (
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-1.5">
                           <span className="text-xs text-zinc-400 shrink-0">Roster:</span>
                           <select
-                            value={selectedRosterMap[sub.id] || gameRosters[0]?.id || ''}
+                            value={
+                              selectedRosterMap[sub.id] !== undefined
+                                ? selectedRosterMap[sub.id]
+                                : (gameRosters[0]?.id || '')
+                            }
                             onChange={(e) =>
                               setSelectedRosterMap((prev) => ({
                                 ...prev,
@@ -607,16 +849,50 @@ export default function SchoolPortalClient({
                             }
                             className="px-2.5 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
                           >
-                            {gameRosters.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name} ({r.division})
-                              </option>
-                            ))}
+                            {gameRosters.length > 0 && (
+                              <optgroup label={`${sub.gameName} Rosters`}>
+                                {gameRosters.map((r) => (
+                                  <option key={r.id} value={r.id}>
+                                    {r.name} ({r.division})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {rosters.filter((r) => r.gameId !== sub.gameId).length > 0 && (
+                              <optgroup label="Other Rosters">
+                                {rosters
+                                  .filter((r) => r.gameId !== sub.gameId)
+                                  .map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.gameName} &bull; {r.name} ({r.division})
+                                    </option>
+                                  ))}
+                              </optgroup>
+                            )}
+                            <option value="">None (School Pool only)</option>
                           </select>
                         </div>
-                      ) : (
-                        <span className="text-xs text-zinc-500">Adds to active player pool</span>
-                      )}
+
+                        {(selectedRosterMap[sub.id] || (selectedRosterMap[sub.id] === undefined && gameRosters[0]?.id)) && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-zinc-400 shrink-0">Role:</span>
+                            <select
+                              value={selectedRoleMap[sub.id] || 'player'}
+                              onChange={(e) =>
+                                setSelectedRoleMap((prev) => ({
+                                  ...prev,
+                                  [sub.id]: e.target.value as 'player' | 'sub' | 'captain',
+                                }))
+                              }
+                              className="px-2 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
+                            >
+                              <option value="player">Starter</option>
+                              <option value="sub">Substitute</option>
+                              <option value="captain">Captain</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-2 self-end sm:self-auto">
                         <Button
@@ -631,7 +907,7 @@ export default function SchoolPortalClient({
                           isDisabled={isApproving || isRejecting}
                           className="px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                         >
-                          {isApproving ? 'Approving...' : 'Approve Application'}
+                          {isApproving ? 'Approving...' : 'Approve & Enroll'}
                         </Button>
                       </div>
                     </div>
@@ -684,6 +960,13 @@ export default function SchoolPortalClient({
 
                     <div className="flex items-center gap-2">
                       <Button
+                        onPress={() => handleOpenEnrollModal(roster)}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <HiOutlineUserPlus className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Enroll Player</span>
+                      </Button>
+                      <Button
                         onPress={() => handleOpenSwapModal(roster)}
                         className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
@@ -709,45 +992,71 @@ export default function SchoolPortalClient({
                           <th className="pb-2 font-semibold">Role</th>
                           <th className="pb-2 font-semibold">In-Game Name</th>
                           <th className="pb-2 font-semibold">Discord</th>
-                          <th className="pb-2 font-semibold text-right">In Server</th>
+                          <th className="pb-2 font-semibold">Server</th>
+                          <th className="pb-2 font-semibold text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-800/40">
-                        {roster.players.map((p) => (
-                          <tr key={p.id} className="hover:bg-zinc-800/20">
-                            <td className="py-2.5 font-medium text-white">{p.playerName}</td>
-                            <td className="py-2.5">
-                              {p.isCaptain || p.role === 'captain' ? (
-                                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-400/10 text-amber-400 border border-amber-400/20">
-                                  Captain
-                                </span>
-                              ) : p.role === 'sub' ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-zinc-800 text-zinc-400">
-                                  Sub
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-indigo-950/40 text-indigo-300 border border-indigo-800/30">
-                                  Starter
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 font-mono text-zinc-300">{p.ign}</td>
-                            <td className="py-2.5 font-mono text-zinc-400">{p.discordUsername}</td>
-                            <td className="py-2.5 text-right">
-                              {p.inGuild ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
-                                  <HiOutlineCheckCircle className="w-3.5 h-3.5" />
-                                  <span>In Server</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
-                                  <HiOutlineExclamationTriangle className="w-3.5 h-3.5" />
-                                  <span>Missing</span>
-                                </span>
-                              )}
+                        {roster.players.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-6 text-center text-zinc-500">
+                              No competitors enrolled on this roster yet. Click &quot;Enroll Player&quot; above to assign students.
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          roster.players.map((p) => (
+                            <tr key={p.id} className="hover:bg-zinc-800/20">
+                              <td className="py-2.5 font-medium text-white">{p.playerName}</td>
+                              <td className="py-2.5">
+                                <select
+                                  value={p.isCaptain ? 'captain' : p.role}
+                                  onChange={(e) =>
+                                    handleUpdateRole(
+                                      roster.id,
+                                      p.id,
+                                      e.target.value as 'player' | 'sub' | 'captain'
+                                    )
+                                  }
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded border cursor-pointer focus:outline-none ${
+                                    p.isCaptain || p.role === 'captain'
+                                      ? 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+                                      : p.role === 'sub'
+                                      ? 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                                      : 'bg-indigo-950/40 text-indigo-300 border-indigo-800/30'
+                                  }`}
+                                >
+                                  <option value="player">Starter</option>
+                                  <option value="sub">Sub</option>
+                                  <option value="captain">★ Captain</option>
+                                </select>
+                              </td>
+                              <td className="py-2.5 font-mono text-zinc-300">{p.ign}</td>
+                              <td className="py-2.5 font-mono text-zinc-400">{p.discordUsername}</td>
+                              <td className="py-2.5">
+                                {p.inGuild ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
+                                    <HiOutlineCheckCircle className="w-3.5 h-3.5" />
+                                    <span>In Server</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
+                                    <HiOutlineExclamationTriangle className="w-3.5 h-3.5" />
+                                    <span>Missing</span>
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 text-right">
+                                <Button
+                                  onPress={() => handleRemovePlayer(roster.id, p.id)}
+                                  aria-label={`Remove ${p.playerName} from ${roster.name}`}
+                                  className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                >
+                                  <HiOutlineTrash className="w-3.5 h-3.5" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1013,6 +1322,202 @@ export default function SchoolPortalClient({
                 className="px-4 py-2 text-xs font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer shadow-sm"
               >
                 {isSwapping ? 'Swapping...' : 'Confirm Emergency Swap'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enroll Player to Roster Modal */}
+      {activeEnrollRoster && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-400/10 text-emerald-400">
+                  <HiOutlineUserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Enroll Player to Roster</h3>
+                  <p className="text-xs text-zinc-400">
+                    {activeEnrollRoster.name} &bull; {activeEnrollRoster.gameName} (Div {activeEnrollRoster.division})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveEnrollRoster(null)}
+                className="text-zinc-500 hover:text-zinc-300"
+              >
+                <HiOutlineXMark className="w-5 h-5" />
+              </button>
+            </div>
+
+            {enrollError && (
+              <div className="p-3 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 rounded-lg flex items-center gap-2">
+                <HiOutlineExclamationTriangle className="w-4 h-4 shrink-0" />
+                <span>{enrollError}</span>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Select Player from School Pool */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  Select Player from School Pool
+                </label>
+                {playerPool.length > 5 && (
+                  <div className="relative mb-2">
+                    <HiOutlineMagnifyingGlass className="w-4 h-4 absolute left-3 top-2.5 text-zinc-500" />
+                    <input
+                      type="text"
+                      placeholder="Search by student name or IGN..."
+                      value={enrollSearchQuery}
+                      onChange={(e) => setEnrollSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
+                    />
+                  </div>
+                )}
+
+                <select
+                  value={selectedMemberId}
+                  onChange={(e) => {
+                    const memberId = e.target.value;
+                    setSelectedMemberId(memberId);
+                    const selected = playerPool.find((p) => p.memberId === memberId);
+                    if (selected && selected.ign && selected.ign !== 'Unlinked') {
+                      setEnrollCustomIgn(selected.ign);
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
+                >
+                  <option value="">-- Choose a student ({playerPool.length} available) --</option>
+                  {playerPool
+                    .filter((p) => {
+                      if (!enrollSearchQuery.trim()) return true;
+                      const q = enrollSearchQuery.toLowerCase();
+                      return (
+                        p.playerName.toLowerCase().includes(q) ||
+                        p.ign.toLowerCase().includes(q) ||
+                        p.discordUsername.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((p) => {
+                      const isOnThisRoster = activeEnrollRoster.players.some(
+                        (rp) => rp.memberId === p.memberId
+                      );
+                      const currentEnrollment = p.enrolledRosters.find(
+                        (er) => er.rosterId === activeEnrollRoster.id
+                      );
+                      const otherEnrollment = p.enrolledRosters.find(
+                        (er) => er.rosterId !== activeEnrollRoster.id
+                      );
+
+                      const labelSuffix = isOnThisRoster
+                        ? ` (Already on this roster: ${currentEnrollment?.role || 'enrolled'})`
+                        : otherEnrollment
+                        ? ` (Currently on ${otherEnrollment.rosterName})`
+                        : '';
+
+                      return (
+                        <option
+                          key={p.memberId}
+                          value={p.memberId}
+                          disabled={isOnThisRoster}
+                        >
+                          {p.playerName} — IGN: {p.ign} | Discord: {p.discordUsername}{labelSuffix}
+                        </option>
+                      );
+                    })}
+                </select>
+
+                {playerPool.length === 0 && (
+                  <p className="text-xs text-amber-400/80 mt-1">
+                    No approved players found in your school pool yet. Generate an invite link or approve pending onboarding applications first.
+                  </p>
+                )}
+              </div>
+
+              {/* Role selection */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  Roster Role
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEnrollRole('player')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg border text-center transition-colors cursor-pointer ${
+                      enrollRole === 'player'
+                        ? 'bg-indigo-950/60 border-indigo-500 text-indigo-200'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    Starter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnrollRole('sub')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg border text-center transition-colors cursor-pointer ${
+                      enrollRole === 'sub'
+                        ? 'bg-zinc-800 border-zinc-500 text-white'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    Substitute
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnrollRole('captain')}
+                    className={`py-2 px-3 text-xs font-semibold rounded-lg border text-center transition-colors cursor-pointer ${
+                      enrollRole === 'captain'
+                        ? 'bg-amber-950/60 border-amber-500 text-amber-200'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    ★ Captain
+                  </button>
+                </div>
+                {enrollRole === 'captain' &&
+                  activeEnrollRoster.players.some((p) => p.isCaptain) && (
+                    <p className="text-[11px] text-amber-400/90 mt-1.5">
+                      Note: This roster already has a captain (
+                      {activeEnrollRoster.players.find((p) => p.isCaptain)?.playerName}). Enrolling as captain will transfer captaincy to this player.
+                    </p>
+                  )}
+              </div>
+
+              {/* In-Game Name (IGN) */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  In-Game Name (IGN)
+                </label>
+                <input
+                  type="text"
+                  value={enrollCustomIgn}
+                  onChange={(e) => setEnrollCustomIgn(e.target.value)}
+                  placeholder="Auto-detected from Riot verification"
+                  className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
+                />
+              </div>
+
+              <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 text-[11px] text-zinc-400 leading-relaxed">
+                Enrolling assigns this player to the official competition roster. Their Riot verification and Discord status will immediately count toward the 5-point tournament validation gate.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                onPress={() => setActiveEnrollRoster(null)}
+                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                onPress={handleConfirmEnroll}
+                isDisabled={isEnrolling || !selectedMemberId}
+                className="px-4 py-2 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                {isEnrolling ? 'Enrolling...' : 'Confirm Enrollment'}
               </Button>
             </div>
           </div>
