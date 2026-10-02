@@ -345,7 +345,7 @@ import {
   getSchoolManagers,
   getRegisteredManagers,
   assignExistingManager,
-} from '@/app/(admin)/admin/schools/actions';
+} from '@/app/(admin)/admin/schools/manager-actions';
 
 describe('Milestone 2: Demographic Data Querying & Privacy Protection', () => {
   const memberId = 'member-12345';

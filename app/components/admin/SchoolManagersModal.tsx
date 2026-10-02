@@ -24,7 +24,7 @@ import {
   getRegisteredManagers,
   assignExistingManager,
   type RegisteredManagerAccount,
-} from '@/app/(admin)/admin/schools/actions';
+} from '@/app/(admin)/admin/schools/manager-actions';
 import { input } from '@/app/components/admin/styles';
 
 interface GameItem {
@@ -67,9 +67,9 @@ interface ManagerInviteItem {
   intendedFirstName: string;
   intendedLastName: string;
   status: string;
-  expiresAt: Date;
-  createdAt: Date;
-  submittedAt: Date | null;
+  expiresAt: Date | string | null;
+  createdAt: Date | string;
+  submittedAt: Date | string | null;
   submissionDraft: any;
 }
 
@@ -592,7 +592,7 @@ export default function SchoolManagersModal({
                   ) : (
                     <div className="divide-y divide-line/40 rounded-xl border border-line/60 bg-surface-raised/20 overflow-hidden">
                       {invites.map((inv) => {
-                        const isExpired = new Date(inv.expiresAt).getTime() < Date.now();
+                        const isExpired = inv.expiresAt ? new Date(inv.expiresAt).getTime() < Date.now() : false;
                         const statusColor =
                           inv.status === 'accepted'
                             ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
@@ -620,7 +620,7 @@ export default function SchoolManagersModal({
                               </div>
                               <p className="text-[11px] text-foreground-muted">
                                 Created {new Date(inv.createdAt).toLocaleDateString()} &bull; Expires{' '}
-                                {new Date(inv.expiresAt).toLocaleDateString()}
+                                {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : 'Never'}
                               </p>
                             </div>
 

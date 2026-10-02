@@ -382,7 +382,7 @@ import {
   getRegisteredManagers,
   assignExistingManager,
   getSchoolManagers,
-} from '@/app/(admin)/admin/schools/actions';
+} from '@/app/(admin)/admin/schools/manager-actions';
 import {
   createPlayerInvite,
   getPendingSubmissions,

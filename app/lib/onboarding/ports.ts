@@ -1,34 +1,13 @@
 // ============================================================================
-// HEXAGONAL ARCHITECTURE PORTS: ONBOARDING & TENANCY DOMAIN
+// HEXAGONAL ARCHITECTURE PORTS & INTERFACES
 // ============================================================================
 
-// --- OUTBOUND (DRIVEN) INFRASTRUCTURE PORTS ---
+export * from './core/domain/types';
+export * from './core/ports/external-ports';
+export * from './core/ports/repository-port';
+export * from './core/ports/use-cases';
 
-export interface ResolvedGameIdentity {
-  gameId: string;
-  displayName: string;
-  rawIdentifier: string;
-  isVerified: boolean;
-  trackerUrl?: string;
-}
-
-export interface GameIdentityPort {
-  resolveIdentity(gameSlug: string, identifier: string): Promise<ResolvedGameIdentity>;
-}
-
-export interface GuildJoinResult {
-  joined: boolean;
-  alreadyMember: boolean;
-}
-
-export interface CommunityPlatformPort {
-  addMemberToGuild(discordUserId: string, accessToken: string): Promise<GuildJoinResult>;
-  isMemberInGuild(discordUserId: string): Promise<boolean>;
-  syncMemberRoles(discordUserId: string, roleIds: string[]): Promise<void>;
-}
-
-// --- INBOUND (DRIVING) APPLICATION USE CASE PORTS ---
-
+// Backward-compatible generic aliases
 export interface CandidateOnboardingPort<
   TValidateParams = any,
   TValidateResult = any,
@@ -73,4 +52,3 @@ export interface SchoolManagerContextPort<TContext = any> {
   getSchoolManagerContext(schoolId?: string): Promise<TContext | null>;
   assertManagerForSchool(schoolId: string, gameId?: string): Promise<TContext>;
 }
-
