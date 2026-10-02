@@ -663,6 +663,9 @@ export default function PlayerOnboardingWizard({
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                   required
                 />
                 <p className="text-xs text-foreground-muted mt-1">
