@@ -12,7 +12,6 @@ import {
   FiStar,
   FiLink,
   FiCopy,
-  FiClock,
   FiCheckCircle,
   FiSearch,
 } from 'react-icons/fi';

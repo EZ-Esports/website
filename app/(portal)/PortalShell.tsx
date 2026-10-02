@@ -8,7 +8,6 @@ import { portalLogout } from '@/app/(portal)/portal/login/actions';
 import type { SchoolManagerContext } from '@/app/lib/onboarding/manager-auth';
 import {
   HiOutlineAcademicCap,
-  HiOutlineShieldCheck,
   HiArrowRightOnRectangle,
   HiOutlineArrowTopRightOnSquare,
 } from 'react-icons/hi2';

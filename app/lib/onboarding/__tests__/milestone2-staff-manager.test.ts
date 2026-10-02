@@ -149,7 +149,6 @@ const mocks = vi.hoisted(() => {
   const mockDb = {
     select: vi.fn((_fields?: any) => {
       let currentTable: any = null;
-      let joinTable: any = null;
       let whereClause: any = null;
       let isJoin = false;
 

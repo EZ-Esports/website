@@ -25,7 +25,7 @@ async function seed() {
   `;
   console.log(`Upserted ${games.length} games.`);
   const valGame = games.find((g) => g.slug === 'valorant') || games[0];
-  const lolGame = games.find((g) => g.slug === 'league-of-legends') || games[1];
+  const _lolGame = games.find((g) => g.slug === 'league-of-legends') || games[1];
 
   // 2. Seed Schools
   console.log('Seeding schools...');

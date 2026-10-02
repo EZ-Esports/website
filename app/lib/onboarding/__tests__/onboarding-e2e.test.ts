@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import crypto from 'node:crypto';
 import * as schema from '@/app/lib/db/schema';
 import { Permissions } from '@/app/lib/roles';
 import type {
   CandidateOnboardingPort,
-  SchoolManagerPortalPort,
   StaffManagerProvisioningPort,
   SchoolManagerContextPort,
 } from '../ports';
@@ -98,9 +96,9 @@ const mocks = vi.hoisted(() => {
   }
 
   const mockDb = {
-    select: vi.fn((fields?: any) => {
+    select: vi.fn((_fields?: any) => {
       let currentTable: any = null;
-      let joins: Array<{ table: any; on: any }> = [];
+      const joins: Array<{ table: any; on: any }> = [];
       let whereClause: any = null;
 
       const builder = {
