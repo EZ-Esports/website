@@ -10,6 +10,7 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { getCachedGames } from '@/app/lib/db/queries';
 
 async function getAllSchools() {
   return db
@@ -23,11 +24,15 @@ export default async function SchoolsAdminPage() {
   if (!(await getStaffForAdminSection('/admin/schools'))) return <PermissionDenied />;
 
   let schools: Awaited<ReturnType<typeof getAllSchools>> = [];
+  let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let dbConfigured = false;
 
   try {
     if (process.env.DATABASE_URL) {
-      schools = await getAllSchools();
+      [schools, games] = await Promise.all([
+        getAllSchools(),
+        getCachedGames().catch(() => []),
+      ]);
       dbConfigured = true;
     }
   } catch {
@@ -106,7 +111,7 @@ export default async function SchoolsAdminPage() {
               </thead>
               <tbody className="divide-y divide-line/60">
                 {schools.map((school) => (
-                  <SchoolRow key={school.id} school={school} />
+                  <SchoolRow key={school.id} school={school} games={games} />
                 ))}
               </tbody>
             </table>
