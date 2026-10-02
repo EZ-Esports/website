@@ -157,14 +157,12 @@ const mocks = vi.hoisted(() => {
           currentTable = tbl;
           return builder;
         }),
-        leftJoin: vi.fn((tbl: any, _onCondition: any) => {
+        leftJoin: vi.fn((_tbl: any, _onCondition: any) => {
           isJoin = true;
-          joinTable = tbl;
           return builder;
         }),
-        innerJoin: vi.fn((tbl: any, _onCondition: any) => {
+        innerJoin: vi.fn((_tbl: any, _onCondition: any) => {
           isJoin = true;
-          joinTable = tbl;
           return builder;
         }),
         where: vi.fn((clause: any) => {
