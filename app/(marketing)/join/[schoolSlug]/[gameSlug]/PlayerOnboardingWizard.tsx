@@ -368,7 +368,7 @@ export default function PlayerOnboardingWizard({
 
             <div className="space-y-2">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                Manager Onboarding Complete!
+                You have successfully signed up!
               </h1>
               <p className="text-foreground-muted text-sm sm:text-base">
                 Welcome aboard,{' '}
@@ -379,7 +379,7 @@ export default function PlayerOnboardingWizard({
                 <span className="text-accent font-semibold">
                   {inviteData.schoolName}
                 </span>{' '}
-                is now active.
+                is active. You can use the portal now.
               </p>
             </div>
 

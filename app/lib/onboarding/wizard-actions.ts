@@ -45,6 +45,8 @@ export type ValidateInviteTokenResult =
   | {
       valid: false;
       status: 'accepted';
+      role?: 'player' | 'manager';
+      schoolName?: string;
       message: string;
     }
   | {
@@ -134,7 +136,11 @@ export async function validateInviteToken(
     return {
       valid: false,
       status: 'accepted',
-      message: 'Invite already accepted.',
+      role: row.invite.role as 'player' | 'manager',
+      schoolName: row.schoolName,
+      message: isManager
+        ? 'You have successfully signed up! Your School Manager portal account is active.'
+        : 'Invite already accepted.',
     };
   }
 
