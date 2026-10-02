@@ -116,6 +116,13 @@ export class PortalService implements SchoolManagerPortalUseCase {
       return { success: false, error: 'Candidate has not submitted onboarding information.' };
     }
 
+    if (targetRosterId) {
+      const roster = await this.repo.findRosterById(targetRosterId);
+      if (!roster || roster.schoolId !== invite.schoolId) {
+        return { success: false, error: 'Target roster does not belong to authorized school.' };
+      }
+    }
+
     const result = await this.repo.approveInviteAndEnroll({
       inviteId,
       schoolId: invite.schoolId,

@@ -328,6 +328,13 @@ export async function reviewPlayerInvite(
 
   await assertManagerForSchool(invite.schoolId, invite.gameId ?? undefined);
 
+  if (rosterId) {
+    const { team } = await assertManagerForRoster(rosterId);
+    if (team.schoolId !== invite.schoolId) {
+      throw new Error('Target roster does not belong to authorized school');
+    }
+  }
+
   if (action === 'approve') {
     await db
       .update(schema.playerInvites)

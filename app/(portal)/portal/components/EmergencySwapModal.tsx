@@ -30,7 +30,12 @@ export function EmergencySwapModal({
   if (!roster) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="emergency-swap-modal-title"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4"
+    >
       <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
           <div className="flex items-center gap-2">
@@ -38,13 +43,17 @@ export function EmergencySwapModal({
               <HiOutlineArrowsRightLeft className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-base">Match-Day Emergency Sub</h3>
+              <h3 id="emergency-swap-modal-title" className="font-bold text-white text-base">
+                Match-Day Emergency Sub
+              </h3>
               <p className="text-xs text-zinc-400">{roster.name}</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+            aria-label="Close dialog"
+            className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-1 rounded-lg"
           >
             <HiOutlineXMark className="w-5 h-5" />
           </button>
@@ -58,10 +67,14 @@ export function EmergencySwapModal({
 
         <div className="space-y-3.5">
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+            <label
+              htmlFor="swap-out-player-select"
+              className="block text-xs font-semibold text-zinc-300 mb-1"
+            >
               Starter / Captain to Bench (Swap Out)
             </label>
             <select
+              id="swap-out-player-select"
               value={outPlayerId}
               onChange={(e) => setOutPlayerId(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
@@ -77,10 +90,14 @@ export function EmergencySwapModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+            <label
+              htmlFor="swap-in-player-select"
+              className="block text-xs font-semibold text-zinc-300 mb-1"
+            >
               Substitute to Activate (Swap In)
             </label>
             <select
+              id="swap-in-player-select"
               value={inPlayerId}
               onChange={(e) => setInPlayerId(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"

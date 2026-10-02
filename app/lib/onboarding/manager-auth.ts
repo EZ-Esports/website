@@ -58,8 +58,9 @@ export async function getSchoolManagerContext(
       )
     );
 
-  // If no rows found by auth userId, check if linked via members table by email
-  if (managerRows.length === 0 && email) {
+  // If no rows found by auth userId, check if linked via members table by verified email
+  const isEmailUnverified = claimsData?.claims?.email_verified === false;
+  if (managerRows.length === 0 && email && !isEmailUnverified) {
     const [member] = await db
       .select({ id: schema.members.id })
       .from(schema.members)

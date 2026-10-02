@@ -115,6 +115,37 @@ export interface SubmitPlayerOnboardingResult {
   role?: 'player' | 'manager';
 }
 
+const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
+  'gender',
+  'race',
+  'ethnicity',
+  'countryOfBirth',
+  'primaryLanguageAtHome',
+  'isFreeOrReducedLunch',
+  'isFirstGenCollege',
+  'doePetitionConsent',
+  'surveyDetails',
+  'birthDate',
+  'password',
+]);
+
+/**
+ * Sanitizes in-progress onboarding drafts to strictly exclude sensitive FERPA / PII
+ * demographics from being read via invite tokens or persisted in unauthenticated draft slots.
+ */
+function sanitizeDraftData(
+  draft: Record<string, any> | null
+): Record<string, any> | null {
+  if (!draft || typeof draft !== 'object') return null;
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(draft)) {
+    if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 /**
  * Validates a player invite token against school and game parameters.
  * Computes the SHA-256 hash of the token and checks status and expiration.
@@ -239,7 +270,7 @@ export async function validateInviteToken(
       gameId: resolvedGameId,
       gameName: resolvedGameName,
       gameSlug: resolvedGameSlug,
-      submissionDraft: (invite.submissionDraft as Record<string, any> | null) ?? null,
+      submissionDraft: sanitizeDraftData(invite.submissionDraft as Record<string, any> | null),
       expiresAt: invite.expiresAt,
     };
   }
@@ -287,7 +318,7 @@ export async function saveOnboardingDraft(
   await db
     .update(schema.playerInvites)
     .set({
-      submissionDraft: draftData,
+      submissionDraft: sanitizeDraftData(draftData),
     })
     .where(eq(schema.playerInvites.id, invite.id));
 

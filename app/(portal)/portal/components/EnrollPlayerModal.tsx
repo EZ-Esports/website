@@ -48,7 +48,12 @@ export function EnrollPlayerModal({
   if (!roster) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="enroll-player-modal-title"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4"
+    >
       <div className="w-full max-w-lg rounded-2xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
           <div className="flex items-center gap-2">
@@ -56,15 +61,19 @@ export function EnrollPlayerModal({
               <HiOutlineUserPlus className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-base">Enroll Player to Roster</h3>
+              <h3 id="enroll-player-modal-title" className="font-bold text-white text-base">
+                Enroll Player to Roster
+              </h3>
               <p className="text-xs text-zinc-400">
                 {roster.name} &bull; {roster.gameName} (Div {roster.division})
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+            aria-label="Close dialog"
+            className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-1 rounded-lg"
           >
             <HiOutlineXMark className="w-5 h-5" />
           </button>
@@ -80,7 +89,10 @@ export function EnrollPlayerModal({
         <div className="space-y-4">
           {/* Select Player from School Pool */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+            <label
+              htmlFor="enroll-player-pool-select"
+              className="block text-xs font-semibold text-zinc-300 mb-1"
+            >
               Select Player from School Pool
             </label>
             {playerPool.length > 5 && (
@@ -89,6 +101,7 @@ export function EnrollPlayerModal({
                 <input
                   type="text"
                   placeholder="Search by student name or IGN..."
+                  aria-label="Search by student name or IGN"
                   value={enrollSearchQuery}
                   onChange={(e) => setEnrollSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
@@ -97,6 +110,7 @@ export function EnrollPlayerModal({
             )}
 
             <select
+              id="enroll-player-pool-select"
               value={selectedMemberId}
               onChange={(e) => {
                 const memberId = e.target.value;
@@ -206,10 +220,14 @@ export function EnrollPlayerModal({
 
           {/* In-Game Name (IGN) */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+            <label
+              htmlFor="enroll-custom-ign"
+              className="block text-xs font-semibold text-zinc-300 mb-1"
+            >
               In-Game Name (IGN)
             </label>
             <input
+              id="enroll-custom-ign"
               type="text"
               value={enrollCustomIgn}
               onChange={(e) => setEnrollCustomIgn(e.target.value)}

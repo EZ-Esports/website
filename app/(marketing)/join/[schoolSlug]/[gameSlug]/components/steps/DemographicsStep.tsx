@@ -94,10 +94,14 @@ export function DemographicsStep({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-birthdate"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Date of Birth *
             </label>
             <input
+              id="demo-birthdate"
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
@@ -107,10 +111,14 @@ export function DemographicsStep({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-gender"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Gender Identity
             </label>
             <select
+              id="demo-gender"
               value={gender}
               onChange={(e) => setGender(e.target.value)}
               className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
@@ -164,10 +172,14 @@ export function DemographicsStep({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-country-of-birth"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Country of Birth
             </label>
             <input
+              id="demo-country-of-birth"
               type="text"
               value={countryOfBirth}
               onChange={(e) => setCountryOfBirth(e.target.value)}
@@ -177,10 +189,14 @@ export function DemographicsStep({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-primary-language"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Primary Language Spoken at Home
             </label>
             <input
+              id="demo-primary-language"
               type="text"
               value={primaryLanguageAtHome}
               onChange={(e) => setPrimaryLanguageAtHome(e.target.value)}
@@ -192,10 +208,14 @@ export function DemographicsStep({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-free-lunch"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Free or Reduced-Price Lunch Eligible (Title I Metric)
             </label>
             <select
+              id="demo-free-lunch"
               value={
                 isFreeOrReducedLunch === undefined
                   ? ''
@@ -219,10 +239,14 @@ export function DemographicsStep({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-first-gen"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               First-Generation College Student
             </label>
             <select
+              id="demo-first-gen"
               value={
                 isFirstGenCollege === undefined
                   ? ''
@@ -269,10 +293,14 @@ export function DemographicsStep({
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-ping"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Average Home Ping
             </label>
             <select
+              id="demo-ping"
               value={ping}
               onChange={(e) => setPing(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-accent"
@@ -285,10 +313,14 @@ export function DemographicsStep({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-hours-per-week"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Gaming Hours / Week
             </label>
             <select
+              id="demo-hours-per-week"
               value={hoursPerWeek}
               onChange={(e) => setHoursPerWeek(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-accent"
@@ -301,10 +333,14 @@ export function DemographicsStep({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+            <label
+              htmlFor="demo-internet-reliability"
+              className="block text-xs font-semibold text-foreground-muted mb-1.5"
+            >
               Internet Reliability
             </label>
             <select
+              id="demo-internet-reliability"
               value={internetReliability}
               onChange={(e) => setInternetReliability(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-accent"
@@ -318,9 +354,9 @@ export function DemographicsStep({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+          <span className="block text-xs font-semibold text-foreground-muted mb-1.5">
             Future Career Interests (Select all that apply)
-          </label>
+          </span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             {CAREER_INTEREST_OPTIONS.map((interest) => {
               const checked = careerInterests.includes(interest);
@@ -355,10 +391,14 @@ export function DemographicsStep({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+          <label
+            htmlFor="demo-feedback"
+            className="block text-xs font-semibold text-foreground-muted mb-1.5"
+          >
             Anything else staff should know? (Optional)
           </label>
           <textarea
+            id="demo-feedback"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={2}

@@ -40,10 +40,14 @@ export function AccountInfoStep({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
+          <label
+            htmlFor="account-legal-first-name"
+            className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+          >
             Legal First Name *
           </label>
           <input
+            id="account-legal-first-name"
             type="text"
             value={legalFirstName}
             onChange={(e) => setLegalFirstName(e.target.value)}
@@ -54,10 +58,14 @@ export function AccountInfoStep({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
+          <label
+            htmlFor="account-legal-last-name"
+            className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+          >
             Legal Last Name *
           </label>
           <input
+            id="account-legal-last-name"
             type="text"
             value={legalLastName}
             onChange={(e) => setLegalLastName(e.target.value)}
@@ -69,10 +77,14 @@ export function AccountInfoStep({
       </div>
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
+        <label
+          htmlFor="account-email"
+          className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+        >
           {isManager ? 'Manager Email Address *' : 'Student Email Address *'}
         </label>
         <input
+          id="account-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -93,10 +105,14 @@ export function AccountInfoStep({
 
       {isManager && setPassword && (
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
+          <label
+            htmlFor="account-password"
+            className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+          >
             Create Portal Account Password *
           </label>
           <input
+            id="account-password"
             type="password"
             value={password || ''}
             onChange={(e) => setPassword(e.target.value)}
@@ -114,12 +130,16 @@ export function AccountInfoStep({
       )}
 
       <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
+        <label
+          htmlFor="account-graduation-year"
+          className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+        >
           {isManager
             ? 'Affiliation / Academic Year *'
             : 'Anticipated High School Graduation Year *'}
         </label>
         <select
+          id="account-graduation-year"
           value={graduationYear}
           onChange={(e) => setGraduationYear(Number(e.target.value))}
           className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"

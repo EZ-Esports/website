@@ -138,6 +138,16 @@ const mocks = vi.hoisted(() => {
           return state.teamsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
         if (currentTable === schema.rosters) {
+          if (joins.length > 0 && joins[0].table === schema.teams) {
+            const matchingRosters = state.rostersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
+            return matchingRosters.map((r) => {
+              const team = state.teamsStore.find((t) => t.id === r.teamId);
+              return {
+                roster: r,
+                team,
+              };
+            });
+          }
           return state.rostersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
         if (currentTable === schema.players) {
