@@ -98,7 +98,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
       competitiveRole?: CompetitiveRole;
     }
   ) {
-    const { inviteId, decision, rejectionReason, targetRosterId, competitiveRole = 'starter' } = params;
+    const { inviteId, decision, rejectionReason: _rejectionReason, targetRosterId, competitiveRole = 'starter' } = params;
 
     const invite = await this.repo.findInviteById(inviteId);
     if (!invite) {

@@ -110,7 +110,7 @@ export function formatRole(department: string, role: string): string {
 }
 
 /** A staff member's public-facing display name, returning clean name. */
-export function displayName(name: string, preferred: string): string {
+export function displayName(name: string, _preferred: string): string {
   const cleanName = name.replace(/\s*\([^)]*\)/g, '').trim();
   return cleanName || name.trim();
 }

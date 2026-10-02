@@ -1,6 +1,5 @@
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import crypto from 'crypto';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type {
   OnboardingRepositoryPort,
