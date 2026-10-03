@@ -16,6 +16,7 @@ export const playerRoleEnum = pgEnum('player_role', ['captain', 'player', 'coach
 export const sponsorTierEnum = pgEnum('sponsor_tier', ['platinum', 'gold', 'community']);
 export const applicationStatusEnum = pgEnum('application_status', ['pending', 'reviewed', 'accepted', 'rejected']);
 export const newsStatusEnum = pgEnum('news_status', ['draft', 'published', 'archived']);
+export const careerPostingStatusEnum = pgEnum('career_posting_status', ['draft', 'published', 'closed']);
 
 // --- CORE ENTITIES ---
 
@@ -515,8 +516,29 @@ export const schoolApplications = pgTable('school_applications', {
   index('school_applications_submitted_at_idx').on(table.submittedAt),
 ]).enableRLS();
 
+export const careerPostings = pgTable('career_postings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  slug: text('slug').unique().notNull(),
+  department: text('department').notNull(),
+  location: text('location').default('Remote (NYC High School League)').notNull(),
+  commitment: text('commitment').default('5–10 hours / week').notNull(),
+  employmentType: text('employment_type').default('Volunteer / High School Internship').notNull(),
+  summary: text('summary').notNull(),
+  description: text('description').notNull(),
+  status: careerPostingStatusEnum('status').default('published').notNull(),
+  displayOrder: integer('display_order').default(0).notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: text('deleted_by'),
+  ...auditColumns,
+}, (table) => [
+  index('career_postings_status_idx').on(table.status),
+  index('career_postings_display_order_idx').on(table.displayOrder),
+]).enableRLS();
+
 export const staffApplications = pgTable('staff_applications', {
   id: uuid('id').defaultRandom().primaryKey(),
+  careerPostingId: uuid('career_posting_id').references(() => careerPostings.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   preferredFirstName: text('preferred_first_name'),
   email: text('email').notNull(),
@@ -535,6 +557,7 @@ export const staffApplications = pgTable('staff_applications', {
   ...auditColumns,
 }, (table) => [
   index('staff_applications_submitted_at_idx').on(table.submittedAt),
+  index('staff_applications_career_posting_id_idx').on(table.careerPostingId),
 ]).enableRLS();
 
 export const applicationStatusLogs = pgTable(

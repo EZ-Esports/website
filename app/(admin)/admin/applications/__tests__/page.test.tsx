@@ -61,6 +61,7 @@ describe("ApplicationsAdminPage", () => {
     vi.mocked(getStaffApplications).mockResolvedValueOnce([
       {
         id: "staff-app-1",
+        careerPostingId: null,
         name: "Staff Applicant",
         preferredFirstName: "Staffer",
         email: "staff@example.com",

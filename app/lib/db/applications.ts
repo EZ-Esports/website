@@ -59,12 +59,16 @@ export function buildSchoolApplicationsQuery(statusFilter?: ApplicationStatus | 
 
 export const getSchoolApplications = buildSchoolApplicationsQuery;
 
-export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | 'all') {
+export function buildStaffApplicationsQuery(
+  statusFilter?: ApplicationStatus | 'all',
+  careerPostingId?: string
+) {
   const latestLogs = getLatestStatusLogSubquery('staff');
 
   const query = db
     .select({
       id: schema.staffApplications.id,
+      careerPostingId: schema.staffApplications.careerPostingId,
       name: schema.staffApplications.name,
       preferredFirstName: schema.staffApplications.preferredFirstName,
       email: schema.staffApplications.email,
@@ -88,6 +92,10 @@ export function buildStaffApplicationsQuery(statusFilter?: ApplicationStatus | '
     );
 
   const conditions = [isNull(schema.staffApplications.deletedAt)];
+
+  if (careerPostingId) {
+    conditions.push(eq(schema.staffApplications.careerPostingId, careerPostingId));
+  }
 
   if (statusFilter === 'pending') {
     conditions.push(or(isNull(latestLogs.status), eq(latestLogs.status, 'pending'))!);

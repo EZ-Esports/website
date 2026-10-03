@@ -59,9 +59,11 @@ export async function POST(request: NextRequest) {
   const phone = field('phone');
   const discordTag = field('discordTag');
   const role = field('role');
+  const careerPostingId = field('careerPostingId') || null;
 
   if (!name || !email || !phone || !role) return badRequest('Missing required fields');
-  if (!isStaffRole(role)) return badRequest('Invalid role');
+  const isGeneral = role === 'General Staff Application' || role === 'Open Application';
+  if (!isStaffRole(role) && !careerPostingId && !isGeneral) return badRequest('Invalid role');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return badRequest('Invalid email address');
 
   // `details` is unauthenticated JSON; the parser rebuilds it from known keys
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await db.insert(schema.staffApplications).values({
+      careerPostingId,
       name,
       preferredFirstName,
       email,

@@ -23,6 +23,7 @@ export const ROUTES = {
   archives: '/archives',
   apply: '/apply',
   staffApp: '/apply/staff',
+  careers: '/careers',
   sponsors: '/sponsors',
   privacy: '/privacy',
   rules: '/rules',
@@ -261,6 +262,7 @@ export const SOCIAL_LINKS: SocialLink[] = [
 
 export const FOOTER_LINKS = [
   { label: 'Apply', href: '/apply' },
+  { label: 'Careers', href: '/careers' },
   { label: 'News', href: '/news' },
   { label: 'Leadership', href: '/leadership' },
   { label: 'Gallery', href: '/gallery' },

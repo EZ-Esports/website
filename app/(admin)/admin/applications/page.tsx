@@ -28,11 +28,11 @@ function parseStatusFilter(raw: string | undefined): StatusFilter {
 export default async function ApplicationsAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; staffStatus?: string }>;
+  searchParams: Promise<{ status?: string; staffStatus?: string; posting?: string }>;
 }) {
   if (!(await getStaffForAdminSection("/admin/applications"))) return <PermissionDenied />;
 
-  const { status: rawStatus, staffStatus: rawStaffStatus } = await searchParams;
+  const { status: rawStatus, staffStatus: rawStaffStatus, posting: postingId } = await searchParams;
   const statusFilter = parseStatusFilter(rawStatus);
   const staffStatusFilter = parseStatusFilter(rawStaffStatus);
   const queryStatus = statusFilter === "all" ? undefined : statusFilter;
@@ -46,7 +46,7 @@ export default async function ApplicationsAdminPage({
     if (process.env.DATABASE_URL) {
       [applications, staffApplications] = await Promise.all([
         getSchoolApplications(queryStatus),
-        getStaffApplications(staffQueryStatus),
+        getStaffApplications(staffQueryStatus, postingId),
       ]);
       dbConfigured = true;
     }
@@ -58,6 +58,7 @@ export default async function ApplicationsAdminPage({
     const params = new URLSearchParams();
     if (s !== "all") params.set("status", s);
     if (staffStatusFilter !== "all") params.set("staffStatus", staffStatusFilter);
+    if (postingId) params.set("posting", postingId);
     const qs = params.toString();
     return qs ? `/admin/applications?${qs}` : "/admin/applications";
   };
@@ -66,6 +67,7 @@ export default async function ApplicationsAdminPage({
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (s !== "all") params.set("staffStatus", s);
+    if (postingId) params.set("posting", postingId);
     const qs = params.toString();
     return qs ? `/admin/applications?${qs}` : "/admin/applications";
   };
@@ -176,6 +178,18 @@ export default async function ApplicationsAdminPage({
             )}
           </div>
         </div>
+
+        {postingId && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-accent/10 border border-accent/30 flex items-center justify-between text-xs">
+            <span className="text-accent font-medium">Filtered by specific Career Opening</span>
+            <Link
+              href={staffFilterHref(staffStatusFilter).replace(/[?&]posting=[^&]+/, "")}
+              className="font-bold text-white hover:underline uppercase text-[10px] tracking-wider"
+            >
+              Clear Filter ✕
+            </Link>
+          </div>
+        )}
 
         {staffApplications.length === 0 ? (
           <p className="text-foreground-secondary text-sm">

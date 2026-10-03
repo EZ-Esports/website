@@ -10,6 +10,7 @@ export const ADMIN_SECTION_PERMISSIONS = {
   '/admin/gallery': Permissions.MANAGE_GALLERY,
   '/admin/sponsors': Permissions.MANAGE_SPONSORS,
   '/admin/schools': Permissions.MANAGE_SCHOOLS,
+  '/admin/careers': Permissions.MANAGE_APPLICATIONS,
   '/admin/applications': Permissions.MANAGE_APPLICATIONS,
   '/admin/content': Permissions.MANAGE_CONTENT,
   '/admin/team': Permissions.MANAGE_ROLES,

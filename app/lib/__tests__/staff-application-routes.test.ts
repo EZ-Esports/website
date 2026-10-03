@@ -173,6 +173,35 @@ describe('POST /api/apply/staff', () => {
     expect(await res.json()).toEqual({ error: 'Invalid role' });
   });
 
+  it('accepts careerPostingId with a custom role title', async () => {
+    mocks.insertValues.mockClear();
+    const careerId = '11111111-2222-3333-4444-555555555555';
+    const res = await POST(
+      submission({
+        fields: { role: 'Lead DevOps Engineer', careerPostingId: careerId },
+        details: buildStaffApplicationDetails({ ...form, role: 'Lead DevOps Engineer' }),
+      })
+    );
+    expect(res.status).toBe(201);
+    const row = mocks.insertValues.mock.calls[0][0];
+    expect(row.careerPostingId).toBe(careerId);
+    expect(row.role).toBe('Lead DevOps Engineer');
+  });
+
+  it('accepts General Staff Application without careerPostingId', async () => {
+    mocks.insertValues.mockClear();
+    const res = await POST(
+      submission({
+        fields: { role: 'General Staff Application' },
+        details: buildStaffApplicationDetails({ ...form, role: 'General Staff Application' }),
+      })
+    );
+    expect(res.status).toBe(201);
+    const row = mocks.insertValues.mock.calls[0][0];
+    expect(row.careerPostingId).toBeNull();
+    expect(row.role).toBe('General Staff Application');
+  });
+
   it('requires a director position for Game Regulations, and stores it in details', async () => {
     const withoutDirector = await POST(
       submission({
