@@ -164,12 +164,12 @@ function StatCard({ href, label, value, icon }: { href: string; label: string; v
       href={href}
       className={`group flex h-32 flex-col justify-between rounded-2xl bg-admin-panel p-5 ${cardHover} outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface`}
     >
-      <div className="flex items-center justify-between text-sm font-medium text-foreground-secondary">
+      <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-foreground-secondary">
         <span>{label}</span>
         <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">{icon}</span>
       </div>
       <div className="flex items-end justify-between">
-        <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
+        <p className="text-4xl font-black tabular-nums tracking-tight text-white">{value}</p>
         <HiArrowRight
           aria-hidden
           className="mb-1 h-4 w-4 -translate-x-1 text-accent opacity-0 transition-[opacity,translate] duration-200 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none"

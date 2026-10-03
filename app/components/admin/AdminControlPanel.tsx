@@ -22,7 +22,7 @@ export default function AdminControlPanel({ categories }: AdminControlPanelProps
   return (
     <section aria-labelledby="control-panel-heading" className="space-y-4">
       <div>
-        <h2 id="control-panel-heading" className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <h2 id="control-panel-heading" className="flex items-center gap-2 text-xl font-black tracking-tight text-white">
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
           Control Panel
         </h2>
@@ -51,7 +51,7 @@ function CategoryPanel({ category }: { category: AdminNavCategory }) {
           <Icon aria-hidden className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <h3 id={headingId} className="text-sm font-semibold text-foreground">
+          <h3 id={headingId} className="text-lg font-black tracking-tight text-white">
             {category.label}
           </h3>
           <p className="mt-0.5 text-xs leading-5 text-foreground-secondary">{category.description}</p>
@@ -59,7 +59,7 @@ function CategoryPanel({ category }: { category: AdminNavCategory }) {
       </div>
 
       <div>
-        <h4 className="text-xs font-medium text-foreground-secondary">Quick links</h4>
+        <h4 className="text-[11px] font-bold uppercase tracking-widest text-foreground-secondary">Quick links</h4>
         {/* Accent text links with an always-visible arrow so they read as
             links at a glance; each section's description is a hover tooltip. */}
         <ul className="mt-1.5 space-y-0.5">
@@ -68,7 +68,7 @@ function CategoryPanel({ category }: { category: AdminNavCategory }) {
               <Link
                 href={item.href}
                 title={item.description}
-                className="group inline-flex min-h-7 items-center gap-1.5 rounded text-sm font-medium text-accent hover:underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                className="group inline-flex min-h-7 items-center gap-1.5 rounded text-sm font-bold text-accent hover:underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 <HiArrowRight
                   aria-hidden

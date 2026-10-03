@@ -95,14 +95,14 @@ export function AdminPageHeader({ route, title: titleProp, description, actions,
           </Link>
         )}
         {eyebrow && !back && (
-          <p className="mb-1.5 flex items-center gap-2 text-xs font-medium text-accent">
+          <p className="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-accent">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
             {eyebrow}
           </p>
         )}
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <h1 className="text-3xl font-black tracking-tight text-white">{title}</h1>
         {/* Short accent rule under the title; it draws in from the left on page entry. */}
-        <span aria-hidden className="admin-rule mt-2.5 block h-0.5 w-10 rounded-full bg-accent/80" />
+        <span aria-hidden className="admin-rule mt-3 block h-1 w-12 rounded-full bg-accent/80" />
         {description && <p className="mt-1.5 text-sm leading-6 text-foreground-secondary">{description}</p>}
         {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
       </div>
@@ -156,7 +156,7 @@ export function AdminSection({
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <div className="min-w-0">
               {title && (
-                <Heading id={headingId} className="flex items-center gap-2 text-base font-semibold text-foreground">
+                <Heading id={headingId} className="flex items-center gap-2 text-lg font-black tracking-tight text-white">
                   <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                   <span className="min-w-0">{title}</span>
                 </Heading>
@@ -241,7 +241,7 @@ export function AdminEmptyState({ icon, title, description, action, compact = fa
         </span>
       )}
       <div className="max-w-sm space-y-1">
-        <Title className={Title === 'p' ? 'text-sm font-medium text-foreground' : 'text-lg font-semibold text-foreground'}>{title}</Title>
+        <Title className={Title === 'p' ? 'text-sm font-bold text-foreground' : 'text-xl font-black tracking-tight text-white'}>{title}</Title>
         {description && (
           <p role={alert ? 'alert' : undefined} className="text-sm leading-6 text-foreground-secondary">
             {description}

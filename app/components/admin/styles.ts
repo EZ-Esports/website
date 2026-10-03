@@ -208,7 +208,7 @@ export const chipDot = 'h-1.5 w-1.5 shrink-0 rounded-full bg-current';
 export const tableWrap = 'overflow-x-auto';
 export const table = 'w-full border-collapse text-left text-sm';
 export const theadRow = 'border-b border-line/60';
-export const th = 'px-4 py-2.5 text-xs font-medium text-foreground-secondary whitespace-nowrap first:pl-5 last:pr-5';
+export const th = 'px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-foreground-secondary whitespace-nowrap first:pl-5 last:pr-5';
 export const thRight = `${th} text-right`;
 export const td = 'px-4 py-3 align-middle first:pl-5 last:pr-5';
 export const tdRight = `${td} text-right`;
@@ -218,7 +218,7 @@ export const tdRight = `${td} text-right`;
  * in the 2/3 column next to the schedule form: ~625px at 1280). The trailing
  * `pr-3` still leaves room for the row-action hit-area overhang.
  */
-export const thCompact = 'px-2 py-2.5 text-xs font-medium text-foreground-secondary whitespace-nowrap first:pl-4 last:pr-3';
+export const thCompact = 'px-2 py-2.5 text-[11px] font-bold uppercase tracking-widest text-foreground-secondary whitespace-nowrap first:pl-4 last:pr-3';
 export const thCompactRight = `${thCompact} text-right`;
 export const tdCompact = 'px-2 py-3 align-middle first:pl-4 last:pr-3';
 export const tdCompactRight = `${tdCompact} text-right`;
