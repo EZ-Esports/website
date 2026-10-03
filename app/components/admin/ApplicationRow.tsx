@@ -175,7 +175,7 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
           </div>
         </td>
         <td className={td}>
-          <div className="flex flex-wrap gap-1 items-center" role="group" aria-label="Application status">
+          <div className="flex flex-col items-stretch gap-1" role="group" aria-label="Application status">
             {(["pending", "reviewed", "accepted", "rejected"] as const).map((s) => {
               const isCurrent = status === s;
               const canTransition = isCurrent || isValidStatusTransition(status, s);
@@ -187,7 +187,7 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
                   onClick={() => handleStatusChange(s)}
                   aria-pressed={isCurrent}
                   className={cx(
-                    "capitalize",
+                    "capitalize justify-center",
                     isCurrent
                       ? cx(chip(statusTone[s], "sm"), "cursor-default")
                       : canTransition
