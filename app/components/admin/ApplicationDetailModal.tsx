@@ -7,6 +7,7 @@ import { schoolApplicationsToCsv } from "@/app/lib/application-csv";
 import DownloadCsvButton from "@/app/components/admin/DownloadCsvButton";
 import { DetailSection, DetailField, FlatDetailList } from "@/app/components/admin/ApplicationDetailSections";
 import type { Application } from "@/app/components/admin/ApplicationRow";
+import { iconBtn } from "@/app/components/admin/styles";
 
 interface ApplicationDetailModalProps {
   app: Application;
@@ -37,14 +38,14 @@ function safeString(value: unknown, fallback = "—"): string {
 function DetailsBody({ details }: { details: SchoolApplicationDetails | null }) {
   if (!details) {
     return (
-      <p className="text-sm text-foreground-muted italic">No details were submitted with this application.</p>
+      <p className="text-sm text-foreground-secondary">No details were submitted with this application.</p>
     );
   }
 
   if (details.version === 1) {
     return (
       <>
-        <p className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2 mb-4">
+        <p className="mb-5 rounded-lg bg-warning/[0.08] px-3 py-2 text-xs leading-5 text-warning">
           This application used an earlier form version -- a sectioned view is not available for it.
         </p>
         <FlatDetailList rows={formatSchoolApplicationDetails(details)} />
@@ -74,7 +75,7 @@ function DetailsBody({ details }: { details: SchoolApplicationDetails | null }) 
     const contribute = safeJoin(details.club.contributeBeyondSchool);
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <DetailField label="Club Status" value={safeString(details.clubStatus)} />
 
         <DetailSection title="President">
@@ -140,7 +141,7 @@ function DetailsBody({ details }: { details: SchoolApplicationDetails | null }) 
     const agreed = (v: unknown) => (v === true ? "Agreed" : "Disagreed");
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <DetailField label="Club Status" value={safeString(details.clubStatus)} />
 
         <DetailSection title="President">
@@ -205,21 +206,21 @@ export default function ApplicationDetailModal({ app, isOpen, onOpenChange }: Ap
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       isDismissable
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+      className="admin-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
     >
-      <Modal className="w-full max-w-2xl outline-none">
+      <Modal className="admin-modal w-full max-w-2xl outline-none">
         <Dialog
           aria-label={`Application details for ${app.applicantName}`}
-          className="bg-surface-sunken border border-line rounded-2xl w-full max-h-[90vh] overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none flex flex-col"
+          className="relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-surface-raised text-left shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none"
         >
-          <div className="bg-gradient-to-r from-accent/15 to-transparent border-b border-line px-6 py-5 flex items-start justify-between gap-4 shrink-0">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line/60 px-6 py-5">
             <div className="min-w-0">
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight truncate">{app.applicantName}</h4>
-              <p className="text-sm text-foreground-secondary mt-0.5 truncate">
+              <h4 className="truncate text-lg font-semibold text-foreground">{app.applicantName}</h4>
+              <p className="mt-0.5 truncate text-sm text-foreground-secondary">
                 {app.schoolName} · <span className="capitalize">{app.role}</span>
               </p>
-              <p className="text-xs text-foreground-muted mt-1">
-                <a href={`mailto:${app.email}`} className="hover:text-foreground transition-colors">
+              <p className="mt-1.5 text-xs leading-5 text-foreground-secondary">
+                <a href={`mailto:${app.email}`} className="rounded underline-offset-2 hover:text-foreground hover:underline transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                   {app.email}
                 </a>
                 {" · Submitted " + formatSubmittedDate(app.submittedAt) + " · "}
@@ -229,17 +230,17 @@ export default function ApplicationDetailModal({ app, isOpen, onOpenChange }: Ap
             <button
               onClick={() => onOpenChange(false)}
               aria-label="Close details"
-              className="p-2 rounded-lg bg-surface-raised border border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40 transition-colors cursor-pointer shrink-0"
+              className={`${iconBtn} -mr-2 -mt-1`}
             >
-              <FiX className="w-5 h-5" />
+              <FiX aria-hidden className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto">
+          <div className="overflow-y-auto p-6">
             <DetailsBody details={app.details} />
           </div>
 
-          <div className="bg-surface-raised/30 border-t border-line px-6 py-3 flex items-center justify-end shrink-0">
+          <div className="flex shrink-0 items-center justify-end border-t border-line/60 px-6 py-3">
             <DownloadCsvButton content={csvContent} filename={csvFilename} label="Download CSV" />
           </div>
         </Dialog>

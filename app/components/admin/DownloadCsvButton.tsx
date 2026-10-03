@@ -1,6 +1,8 @@
 "use client";
 
+import { HiArrowDownTray } from "react-icons/hi2";
 import { downloadCsv } from "@/app/lib/csv-download";
+import { ghostBtnSm } from "@/app/components/admin/styles";
 
 interface DownloadCsvButtonProps {
   content: string;
@@ -9,8 +11,7 @@ interface DownloadCsvButtonProps {
   className?: string;
 }
 
-const defaultClassName =
-  "inline-flex items-center gap-1 text-[11px] font-semibold text-foreground-muted hover:text-foreground-secondary underline decoration-line hover:decoration-foreground-secondary underline-offset-2 transition-colors cursor-pointer";
+const defaultClassName = ghostBtnSm;
 
 /**
  * Deliberately understated CSV export trigger -- a small text control, not a
@@ -20,6 +21,7 @@ const defaultClassName =
 export default function DownloadCsvButton({ content, filename, label = "Export CSV", className }: DownloadCsvButtonProps) {
   return (
     <button type="button" onClick={() => downloadCsv(filename, content)} className={className ?? defaultClassName}>
+      <HiArrowDownTray aria-hidden className="h-3.5 w-3.5" />
       {label}
     </button>
   );

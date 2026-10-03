@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-components';
 import { revokeInvite } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
+import { cx } from '@/app/lib/cx';
 import { HiOutlineTrash, HiOutlineEllipsisVertical } from 'react-icons/hi2';
 
 interface InviteRowProps {
@@ -65,33 +66,31 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
   const highestRoleColor = highestRole ? parseHexColor(highestRole.color) : '#94a3b8';
 
   return (
-    <div
-      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-surface-sunken/20 hover:bg-surface-raised/30 border border-line/80 rounded-xl transition-all gap-4 select-none ${
-        isPending ? 'opacity-70' : ''
-      }`}
+    <li
+      aria-busy={isPending}
+      className={cx(
+        'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-5 py-3.5 transition-[background-color,opacity] duration-150 hover:bg-surface-raised/50',
+        isPending && 'opacity-60',
+      )}
     >
       {/* Left Column: Avatar & Name */}
       <div className="flex items-center gap-4 min-w-0">
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm border select-none shrink-0"
+          className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-xs select-none shrink-0"
           style={{
-            backgroundColor: `${highestRoleColor}12`,
+            backgroundColor: `${highestRoleColor}1f`,
             color: highestRoleColor,
-            borderColor: `${highestRoleColor}25`,
           }}
         >
           {getInitials(invite.email)}
         </div>
         <div className="min-w-0">
-          <span
-            className="text-sm font-extrabold truncate block leading-snug"
-            style={{ color: highestRoleColor }}
-          >
+          <span className="text-sm font-medium text-foreground truncate block leading-snug">
             {invite.email}
           </span>
-          <span className="text-[10px] text-foreground-muted font-medium">
+          <span className="text-xs text-foreground-secondary">
             {expired ? (
-              <span className="text-amber-400 font-bold uppercase tracking-wider">Expired</span>
+              <span className="font-medium text-warning">Expired</span>
             ) : (
               `Expires ${new Date(invite.expiresAt).toLocaleDateString('en-US', {
                 month: 'short',
@@ -100,7 +99,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
               })}`
             )}
           </span>
-          {error && <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="admin-fade-in mt-1 text-xs font-medium text-danger-on-tint">{error}</p>}
         </div>
       </div>
 
@@ -111,11 +110,10 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
           return (
             <span
               key={role.id}
-              className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider shrink-0"
+              className="inline-flex h-6 items-center rounded-md px-2 text-xs font-medium shrink-0"
               style={{
-                backgroundColor: `${parsedColor}12`,
+                backgroundColor: `${parsedColor}1a`,
                 color: parsedColor,
-                border: `1px solid ${parsedColor}25`,
               }}
             >
               {role.name}
@@ -124,34 +122,39 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
         })}
 
         {invite.roles.length === 0 && (
-          <span className="text-foreground-muted italic text-xs px-1">No Roles</span>
+          <span className="text-foreground-secondary text-xs px-1">No roles</span>
         )}
       </div>
 
       {/* Right Column: Actions Dropdown Menu */}
       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
         {!canRevoke ? (
-          <span className="text-xs text-foreground-muted italic px-3 select-none">—</span>
+          <span className="text-xs text-foreground-secondary px-3 select-none">—</span>
         ) : (
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
-              className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
+              className={({ isFocusVisible }) =>
+                cx(
+                  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground-secondary hover:text-foreground hover:bg-surface-raised data-[pressed]:bg-surface-raised transition-colors duration-150 cursor-pointer outline-none',
+                  isFocusVisible && 'ring-2 ring-accent/60',
+                )
+              }
               aria-label={`More actions for ${invite.email}`}
             >
-              <HiOutlineEllipsisVertical className="w-4 h-4" />
+              <HiOutlineEllipsisVertical aria-hidden className="w-4 h-4" />
             </Button>
 
-            <Popover className="w-48">
-              <Menu className="rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl outline-none">
+            <Popover className="admin-popover w-48">
+              <Menu className="rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none">
                 <MenuItem
                   id="cancel"
                   textValue="Cancel Invite"
                   isDisabled={isPending}
                   shouldCloseOnSelect={false}
                   onAction={handleRevoke}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 data-[focused]:text-red-400 data-[focused]:bg-red-950/20 transition-all cursor-pointer data-[disabled]:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-foreground-secondary hover:text-red-300 hover:bg-red-950/30 data-[focused]:text-red-300 data-[focused]:bg-red-950/30 transition-colors cursor-pointer outline-none data-[disabled]:opacity-50"
                 >
-                  <HiOutlineTrash className="w-4 h-4" />
+                  <HiOutlineTrash aria-hidden className="w-4 h-4" />
                   <span>Cancel Invite</span>
                 </MenuItem>
               </Menu>
@@ -159,6 +162,6 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
           </MenuTrigger>
         )}
       </div>
-    </div>
+    </li>
   );
 }

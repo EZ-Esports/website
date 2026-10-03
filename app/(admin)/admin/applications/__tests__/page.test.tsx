@@ -83,8 +83,8 @@ describe("ApplicationsAdminPage", () => {
       const jsx = await ApplicationsAdminPage({ searchParams: Promise.resolve({}) });
       const html = renderToStaticMarkup(jsx);
 
-      expect(html).toContain("School Applications");
-      expect(html).toContain("Staff Applications");
+      expect(html).toContain("School applications");
+      expect(html).toContain("Staff applications");
       expect(html).toContain("School Applicant");
       expect(html).toContain("Staff Applicant");
       expect(html).toContain("Export CSV");

@@ -6,6 +6,8 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import LeadershipManagerClient from '@/app/components/admin/LeadershipManagerClient';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
+import { chip } from '@/app/components/admin/styles';
 
 export default async function AdminLeadershipPage() {
   if (!(await getStaffForAdminSection('/admin/leadership'))) return <PermissionDenied />;
@@ -26,7 +28,20 @@ export default async function AdminLeadershipPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/leadership"
+        description="Manage student officers, terms, seniorities, and normalized person profiles."
+        meta={
+          !dbError && (
+            <>
+              <span className={chip('neutral')}>{peopleList.length} profiles</span>
+              <span className={chip('accent')}>{leadershipList.length} active terms</span>
+            </>
+          )
+        }
+      />
+
       {dbError && <DbErrorNotice variant="error" />}
 
       {!dbError && (
@@ -35,6 +50,6 @@ export default async function AdminLeadershipPage() {
           peopleList={peopleList}
         />
       )}
-    </div>
+    </AdminPage>
   );
 }

@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { createMatch } from '@/app/(admin)/admin/matches/actions';
+import { input, label as labelClass, primaryBtn } from '@/app/components/admin/styles';
+import { AdminNotice, PendingLabel } from '@/app/components/admin/AdminUI';
 
 interface Season {
   id: string;
@@ -81,13 +83,14 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
     });
   }, [rosters, selectedSeasonId, teamMap]);
 
-  const inputClass = "w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent/50 transition-all";
+  const inputClass = input;
+  const hint = 'admin-fade-in text-xs leading-5 text-warning';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="seasonId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
-          Active Season
+        <label htmlFor="seasonId" className={labelClass}>
+          Active season
         </label>
         <select
           id="seasonId"
@@ -100,7 +103,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
           {seasons.map((s) => {
             const game = gameMap.get(s.gameId);
             return (
-              <option key={s.id} value={s.id} className="bg-surface-raised text-white">
+              <option key={s.id} value={s.id}>
                 {game?.displayName || 'Game'} - {s.name}
               </option>
             );
@@ -108,10 +111,10 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="homeRosterId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
-            Home Roster
+          <label htmlFor="homeRosterId" className={labelClass}>
+            Home roster
           </label>
           <select
             id="homeRosterId"
@@ -121,11 +124,11 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
             onChange={(e) => setHomeRosterId(e.target.value)}
             className={inputClass}
           >
-            <option value="" className="bg-surface-raised text-foreground-muted">Select Team</option>
+            <option value="">Select Team</option>
             {filteredRosters.map((r) => {
               const team = teamMap.get(r.teamId);
               return (
-                <option key={r.id} value={r.id} className="bg-surface-raised text-white">
+                <option key={r.id} value={r.id}>
                   {team?.name} ({r.division})
                 </option>
               );
@@ -134,8 +137,8 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
         </div>
 
         <div>
-          <label htmlFor="awayRosterId" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
-            Away Roster
+          <label htmlFor="awayRosterId" className={labelClass}>
+            Away roster
           </label>
           <select
             id="awayRosterId"
@@ -145,11 +148,11 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
             onChange={(e) => setAwayRosterId(e.target.value)}
             className={inputClass}
           >
-            <option value="" className="bg-surface-raised text-foreground-muted">Select Team</option>
+            <option value="">Select Team</option>
             {filteredRosters.map((r) => {
               const team = teamMap.get(r.teamId);
               return (
-                <option key={r.id} value={r.id} className="bg-surface-raised text-white">
+                <option key={r.id} value={r.id}>
                   {team?.name} ({r.division})
                 </option>
               );
@@ -159,8 +162,8 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
       </div>
 
       <div>
-        <label htmlFor="scheduledAt" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
-          Date & Time (Eastern Time / ET)
+        <label htmlFor="scheduledAt" className={labelClass}>
+          Date &amp; time <span className="font-normal text-foreground-secondary">(Eastern Time)</span>
         </label>
         <input
           id="scheduledAt"
@@ -174,41 +177,36 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
       <button
         type="submit"
         disabled={sameRoster || isPending || seasons.length === 0}
-        className="w-full py-2.5 bg-white hover:bg-foreground text-surface-sunken text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        aria-busy={isPending}
+        className={`${primaryBtn} w-full`}
       >
-        {isPending ? 'Scheduling…' : 'Schedule Match'}
+        <PendingLabel pending={isPending} label="Schedule match" pendingLabel="Scheduling…" />
       </button>
 
       {seasons.length === 0 && (
-        <p className="text-[11px] text-amber-400/80 mt-2">
+        <p className={hint}>
           No seasons exist yet. Create a game and an active season in{' '}
-          <Link href="/admin/league" className="underline font-semibold">League Setup</Link>{' '}
+          <Link href="/admin/league" className="font-medium underline underline-offset-2">League Setup</Link>{' '}
           before scheduling matches.
         </p>
       )}
 
       {sameRoster && (
-        <p className="text-[11px] text-amber-400/80 mt-2">
+        <p className={hint}>
           Home and away rosters must be different.
         </p>
       )}
 
       {filteredRosters.length === 0 && selectedSeasonId && (
-        <p className="text-[11px] text-amber-400/80 mt-2">
+        <p className={hint}>
           No rosters found for this game. Register rosters first.
         </p>
       )}
 
       {feedback && (
-        <p
-          role="status"
-          aria-live="polite"
-          className={`text-[11px] mt-2 font-semibold ${
-            feedback.type === 'success' ? 'text-success' : 'text-red-400'
-          }`}
-        >
+        <AdminNotice tone={feedback.type === 'success' ? 'success' : 'danger'} live="status">
           {feedback.message}
-        </p>
+        </AdminNotice>
       )}
     </form>
   );

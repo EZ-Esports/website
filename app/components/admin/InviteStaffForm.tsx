@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import { inviteStaff } from '@/app/(admin)/admin/team/actions';
+import { HiCheck, HiOutlineClipboard } from 'react-icons/hi2';
 import { parseHexColor } from '@/app/lib/roles';
-import { Field } from '@/app/components/ui/form';
-import Button from '@/app/components/ui/Button';
+import { cx } from '@/app/lib/cx';
+import { input, inputSm, label as labelClass, primaryBtn, secondaryBtn } from '@/app/components/admin/styles';
+import { AdminField, AdminNotice, PendingLabel } from '@/app/components/admin/AdminUI';
 
 interface InviteStaffFormProps {
   assignableRoles: {
@@ -49,57 +51,49 @@ export default function InviteStaffForm({ assignableRoles }: InviteStaffFormProp
 
   return (
     <div className="space-y-4">
-      <form action={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <Field label="Email" htmlFor="invite-email" density="compact" className="flex-1 font-sans">
+      <form action={handleSubmit} className="space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <AdminField label="Email" htmlFor="invite-email" className="flex-1">
             <input
               id="invite-email"
               name="email"
               type="email"
               required
               placeholder="new.staff@ezesports.org"
-              className="w-full px-4 py-2.5 bg-surface border border-line rounded-lg text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+              className={input}
             />
-          </Field>
+          </AdminField>
 
-          <Button
-            type="submit"
-            disabled={isPending}
-            aria-busy={isPending}
-            className="whitespace-nowrap h-[46px]"
-          >
-            {isPending ? 'Generating…' : 'Generate invite link'}
-          </Button>
+          <button type="submit" disabled={isPending} aria-busy={isPending} className={primaryBtn}>
+            <PendingLabel pending={isPending} label="Generate invite link" pendingLabel="Generating…" />
+          </button>
         </div>
 
         {/* Roles Selection */}
-        <div className="space-y-2">
-          <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-            Initial roles (optional)
-          </label>
+        <fieldset className="space-y-2">
+          <legend className={labelClass}>Initial roles (optional)</legend>
           {assignableRoles.length === 0 ? (
-            <p className="text-xs text-foreground-muted italic">No initial roles will be assigned. The member can still accept the invite.</p>
+            <p className="text-sm text-foreground-secondary">No initial roles will be assigned. The member can still accept the invite.</p>
           ) : (
-            <div className="flex flex-wrap gap-2.5">
+            <div className="flex flex-wrap gap-2">
               {assignableRoles.map((role) => {
                 const parsedColor = parseHexColor(role.color);
                 return (
                   <label
                     key={role.id}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-surface-sunken/40 hover:bg-surface-raised border border-line/80 hover:border-line/80 rounded-lg cursor-pointer transition-all select-none"
+                    className="flex cursor-pointer select-none items-center gap-2 rounded-lg bg-surface-sunken px-2.5 py-1.5 transition-colors duration-150 hover:bg-surface-raised has-[:checked]:bg-surface-raised has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/60"
                   >
                     <input
                       type="checkbox"
                       name="roleIds"
                       value={role.id}
-                      className="rounded text-accent focus:ring-accent focus:ring-offset-0 bg-surface-sunken border-line cursor-pointer w-4 h-4"
+                      className="h-4 w-4 cursor-pointer accent-accent focus:outline-none"
                     />
                     <span
-                      className="text-xs font-extrabold px-2 py-0.5 rounded uppercase tracking-wider"
+                      className="inline-flex h-6 items-center rounded-md px-2 text-xs font-medium"
                       style={{
-                        backgroundColor: `${parsedColor}12`,
+                        backgroundColor: `${parsedColor}1a`,
                         color: parsedColor,
-                        border: `1px solid ${parsedColor}20`
                       }}
                     >
                       {role.name}
@@ -109,38 +103,35 @@ export default function InviteStaffForm({ assignableRoles }: InviteStaffFormProp
               })}
             </div>
           )}
-        </div>
+        </fieldset>
       </form>
 
-
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-lg" role="alert">
-          {error}
-        </div>
-      )}
+      {error && <AdminNotice tone="danger">{error}</AdminNotice>}
 
       {link && (
-        <div className="bg-green-500/5 border border-green-500/30 rounded-lg p-4 space-y-2">
-          <p className="text-sm text-green-300 font-sans">
-            Invite link for <span className="font-semibold">{invitedEmail}</span>. Copy and send it now. It
-            won&apos;t be shown again.
-          </p>
-          <div className="flex gap-2">
+        <AdminNotice
+          tone="success"
+          title={
+            <>
+              Invite link for <span className="font-semibold">{invitedEmail}</span>
+            </>
+          }
+        >
+          <p>Copy and send it now. It won&apos;t be shown again.</p>
+          <div className="mt-3 flex gap-2">
             <input
               readOnly
+              aria-label="Invite link"
               value={link}
               onFocus={(e) => e.currentTarget.select()}
-              className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg text-foreground text-xs font-mono"
+              className={cx(inputSm, 'font-mono')}
             />
-            <button
-              type="button"
-              onClick={copyLink}
-              className="px-4 py-2 bg-surface-raised hover:bg-line text-foreground font-bold text-xs uppercase tracking-wider rounded-lg border border-line transition-all cursor-pointer whitespace-nowrap"
-            >
+            <button type="button" onClick={copyLink} className={secondaryBtn}>
+              {copied ? <HiCheck aria-hidden className="h-4 w-4 text-success" /> : <HiOutlineClipboard aria-hidden className="h-4 w-4" />}
               {copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
-        </div>
+        </AdminNotice>
       )}
     </div>
   );

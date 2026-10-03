@@ -4,7 +4,9 @@ import { useState, useTransition, useRef, useEffect } from 'react';
 import { FiUsers } from 'react-icons/fi';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { saveBtn, cancelBtn } from '@/app/components/admin/styles';
+import { cancelBtn, chipButton, editIconBtn, chipDot, fieldError, focusRing, input, label as labelClass, saveBtn, td, tdRight, tr, trEditing } from '@/app/components/admin/styles';
+import { AdminNotice, PendingLabel, RequiredMark } from '@/app/components/admin/AdminUI';
+import { cx } from '@/app/lib/cx';
 import { updateSchool, toggleSchoolActive, deleteSchool } from '@/app/(admin)/admin/schools/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import SchoolManagersModal from '@/app/components/admin/SchoolManagersModal';
@@ -19,17 +21,16 @@ interface School {
   displayOrder: number | null;
 }
 
+const inputClass = input;
+
 interface SchoolRowProps {
   school: School;
   games?: Array<{ id: string; displayName: string; slug: string; name?: string }>;
 }
 
-const inputClass =
-  'w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all';
-
 export default function SchoolRow({ school, games }: SchoolRowProps) {
-  const [editing, setEditing] = useState(false);
   const [managersModalOpen, setManagersModalOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -69,14 +70,14 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
 
   if (editing) {
     return (
-      <tr className="bg-surface-raised/60">
-        <td colSpan={4} className="py-4 px-3">
-          <form action={handleSave} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <tr className={trEditing}>
+        <td colSpan={4} className="px-5 py-4">
+          <form action={handleSave} className="admin-fade-in grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                Name <span className="text-accent">*</span>
+              <label htmlFor={`edit-school-${school.id}-name`} className={labelClass}>
+                Name <RequiredMark />
               </label>
-              <input ref={firstFieldRef} name="name" required defaultValue={school.name} className={inputClass} />
+              <input ref={firstFieldRef} id={`edit-school-${school.id}-name`} name="name" required defaultValue={school.name} className={inputClass} />
             </div>
             <div>
               <ImageUpload
@@ -86,20 +87,20 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
                 storageKeyName="storageKey"
                 currentSrc={school.logoUrl ?? undefined}
                 currentStorageKey={school.storageKey ?? undefined}
-                label="Change Logo"
+                label="Change logo"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Website URL</label>
-              <input name="websiteUrl" defaultValue={school.websiteUrl ?? ''} placeholder="https://…" className={inputClass} />
+              <label htmlFor={`edit-school-${school.id}-websiteUrl`} className={labelClass}>Website URL</label>
+              <input id={`edit-school-${school.id}-websiteUrl`} name="websiteUrl" defaultValue={school.websiteUrl ?? ''} placeholder="https://…" className={inputClass} />
             </div>
             <input type="hidden" name="displayOrder" defaultValue={school.displayOrder ?? 0} />
             <div className="flex items-end gap-2">
-              <button type="submit" disabled={isPending} className={saveBtn}>{isPending ? 'Saving…' : 'Save'}</button>
+              <button type="submit" disabled={isPending} aria-busy={isPending} className={saveBtn}><PendingLabel pending={isPending} label="Save" pendingLabel="Saving…" /></button>
               <button type="button" onClick={closeEditing} className={cancelBtn}>Cancel</button>
             </div>
             {saveError && (
-              <p role="alert" aria-live="polite" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
+              <AdminNotice tone="danger" className="sm:col-span-3">{saveError}</AdminNotice>
             )}
           </form>
         </td>
@@ -108,60 +109,61 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
   }
 
   return (
-    <tr className="hover:bg-surface-raised/40 transition-colors">
-      <td className="py-3 pr-4">
+    <tr className={tr}>
+      <td className={td}>
         <div className="flex items-center gap-3">
           {school.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={school.logoUrl}
               alt={`${school.name} logo`}
-              className="w-8 h-8 object-contain rounded"
+              className="w-8 h-8 object-contain rounded-md bg-surface-raised"
             />
           ) : (
-            <div className="w-8 h-8 rounded bg-line flex items-center justify-center text-foreground-muted text-xs font-bold">
+            <div className="w-8 h-8 rounded-md bg-surface-raised flex items-center justify-center text-foreground-secondary text-xs font-semibold">
               {school.name.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <span className="font-semibold text-white">{school.name}</span>
+          <span className="font-medium text-foreground">{school.name}</span>
         </div>
       </td>
-      <td className="py-3 pr-4">
+      <td className={td}>
         {school.websiteUrl ? (
           <a
             href={school.websiteUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-foreground-secondary hover:text-white transition-colors truncate max-w-[180px] block"
+            className={cx("block max-w-[200px] truncate rounded text-foreground-secondary underline-offset-2 hover:text-foreground hover:underline transition-colors", focusRing)}
           >
             {school.websiteUrl}
           </a>
         ) : (
-          <span className="text-foreground-muted">—</span>
+          <span className="text-foreground-secondary">—</span>
         )}
       </td>
-      <td className="py-3 pr-4">
+      <td className={td}>
         <button
+          type="button"
           onClick={handleToggleActive}
           disabled={isPending}
-          className={`text-xs font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all disabled:opacity-50 ${
-            school.isActive ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-line text-foreground-muted hover:bg-line'
-          }`}
+          title={school.isActive ? 'Click to mark inactive' : 'Click to mark active'}
+          className={chipButton(school.isActive ? 'success' : 'neutral')}
         >
+          <span aria-hidden className={chipDot} />
           {school.isActive ? 'Active' : 'Inactive'}
         </button>
         {toggleError && (
-          <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
+          <p role="alert" aria-live="polite" className={fieldError}>{toggleError}</p>
         )}
       </td>
-      <td className="py-3 pr-2 text-right">
+      <td className={tdRight}>
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => setManagersModalOpen(true)}
             aria-label={`Manage portal managers for ${school.name}`}
             title={`Manage portal managers for ${school.name}`}
-            className="inline-flex items-center justify-center rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 relative h-8 w-8 shrink-0 bg-surface-raised hover:bg-line border-line text-foreground-secondary hover:text-accent focus-visible:ring-accent/60 after:absolute after:-inset-1.5 after:content-['']"
+            className={cx(editIconBtn, 'hover:text-accent')}
           >
             <FiUsers aria-hidden="true" className="h-4 w-4" />
           </button>

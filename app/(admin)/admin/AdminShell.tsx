@@ -1,139 +1,98 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logout } from './actions';
 import SessionWarning from '@/app/components/admin/SessionWarning';
-import {
-  HiOutlineChartBar,
-  HiOutlineTrophy,
-  HiOutlineNewspaper,
-  HiOutlineUsers,
-  HiOutlineUserGroup,
-  HiOutlinePhoto,
-  HiOutlineCurrencyDollar,
-  HiOutlineAcademicCap,
-  HiOutlineBriefcase,
-  HiOutlineClipboardDocument,
-  HiOutlinePencilSquare,
-  HiOutlineGlobeAlt,
-  HiOutlineCog6Tooth,
-  HiOutlineShieldCheck,
-  HiOutlineIdentification,
-  HiArrowRightOnRectangle,
-} from 'react-icons/hi2';
-import type { IconType } from 'react-icons';
+import AdminSidebarNav from '@/app/components/admin/AdminSidebarNav';
+import { filterAdminNav, getAdminBreadcrumb } from '@/app/lib/admin-nav';
+import { cx } from '@/app/lib/cx';
+import { HiOutlineGlobeAlt, HiArrowRightOnRectangle, HiChevronRight } from 'react-icons/hi2';
 
 interface AdminShellProps {
   children: React.ReactNode;
   allowedHrefs: string[];
 }
 
-interface SidebarItem {
-  label: string;
-  href: string;
-  icon: IconType;
-}
+/** Focus ring for controls on the sidebar's panel surface. */
+const sidebarFocus =
+  'outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-admin-panel';
+
+/** Quiet footer row (Public site, Sign out): same height and rhythm as a nav row. */
+const footerRow = cx(
+  'group flex w-full min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-foreground-secondary hover:text-foreground hover:bg-surface-raised transition-colors duration-150 cursor-pointer',
+  sidebarFocus,
+);
+
+const crumbLink = cx(
+  'rounded text-sm text-foreground-secondary hover:text-foreground transition-colors duration-150',
+  'outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+);
 
 export default function AdminShell({ children, allowedHrefs }: AdminShellProps) {
   const pathname = usePathname();
 
-  const sidebarItems: SidebarItem[] = [
-    { label: 'Overview', href: '/admin', icon: HiOutlineChartBar },
-    { label: 'League Setup', href: '/admin/league', icon: HiOutlineCog6Tooth },
-    { label: 'Matches & Standings', href: '/admin/matches', icon: HiOutlineTrophy },
-    { label: 'Standings Archive', href: '/admin/standings', icon: HiOutlineChartBar },
-    { label: 'Teams & Rosters', href: '/admin/roster', icon: HiOutlineUsers },
-    { label: 'News & Announcements', href: '/admin/news', icon: HiOutlineNewspaper },
-    { label: 'Leadership Manager', href: '/admin/leadership', icon: HiOutlineUserGroup },
-    { label: 'Gallery', href: '/admin/gallery', icon: HiOutlinePhoto },
-    { label: 'Sponsors', href: '/admin/sponsors', icon: HiOutlineCurrencyDollar },
-    { label: 'Schools', href: '/admin/schools', icon: HiOutlineAcademicCap },
-    { label: 'Careers', href: '/admin/careers', icon: HiOutlineBriefcase },
-    { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
-    { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
-    { label: 'Roles & Staff', href: '/admin/team', icon: HiOutlineShieldCheck },
-    { label: 'Student Demographics', href: '/admin/demographics', icon: HiOutlineIdentification },
-  ].filter(item => allowedHrefs.includes(item.href));
+  // Same category tree as the Overview hub, filtered to what this viewer may open.
+  const categories = filterAdminNav(allowedHrefs);
+  const breadcrumb = getAdminBreadcrumb(pathname);
 
-  // Helper to determine the current page title, including nested routes
-  const getPageTitle = () => {
-    if (pathname === '/admin/news/new') return 'New Article';
-    if (pathname.startsWith('/admin/news/')) return 'Edit Article';
-    if (pathname.startsWith('/admin/gallery')) return 'Gallery';
-    if (pathname.startsWith('/admin/sponsors')) return 'Sponsors';
-    if (pathname.startsWith('/admin/schools')) return 'Schools';
-    if (pathname.startsWith('/admin/careers')) return 'Careers';
-    if (pathname.startsWith('/admin/applications')) return 'Applications';
-    if (pathname.startsWith('/admin/content')) return 'Page Content';
-    if (pathname.startsWith('/admin/league')) return 'League Setup';
-    if (pathname.startsWith('/admin/demographics')) return 'Student Demographics';
-
-    // Pick the most specific sidebar item whose path prefixes the current route
-    const match = sidebarItems
-      .filter(item => item.href !== '/' && (pathname === item.href || pathname.startsWith(`${item.href}/`)))
-      .sort((a, b) => b.href.length - a.href.length)[0];
-
-    return match ? match.label : 'Dashboard';
-  };
+  // Staggered lists animate on first mount only. A browser restarts a CSS
+  // animation whenever a node is moved (React reorders keyed children with
+  // insertBefore), which would blink reordered gallery cards or roles back to
+  // opacity 0. Once a child's entrance finishes it is marked data-entered, and
+  // `.admin-stagger > :not([data-entered])` stops matching it. One listener on
+  // the persistent shell covers every page; new rows still animate in.
+  useEffect(() => {
+    const settle = (event: AnimationEvent) => {
+      if (event.animationName !== 'admin-rise') return;
+      const el = event.target;
+      if (el instanceof HTMLElement && el.parentElement?.classList.contains('admin-stagger')) {
+        el.setAttribute('data-entered', '');
+      }
+    };
+    document.addEventListener('animationend', settle);
+    // On a full page load the first rows can finish before hydration attaches
+    // the listener, so settle anything that is no longer animating.
+    document.querySelectorAll<HTMLElement>('.admin-stagger > :not([data-entered])').forEach((el) => {
+      const animating = el.getAnimations().some((a) => a.playState === 'running' || a.pending);
+      if (!animating) el.setAttribute('data-entered', '');
+    });
+    return () => document.removeEventListener('animationend', settle);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#111111] flex text-foreground font-sans">
-      {/* Left Sidebar */}
-      <aside className="w-64 bg-[#1a1a1a] border-r border-line flex flex-col shrink-0 z-20 sticky top-0 h-dvh self-start">
-        {/* Sidebar Header */}
-        <div className="h-16 px-6 border-b border-line flex items-center">
-          <Link href="/admin" className="font-extrabold text-xl tracking-tight flex items-center gap-2 cursor-pointer hover:opacity-90">
-            <span className="text-accent font-extrabold">EZ</span>
-            <span className="text-white font-extrabold">Staff</span>
-          </Link>
-        </div>
-
-        {/* Sidebar Items */}
-        <nav className="flex-1 min-h-0 overflow-hidden py-3 px-3 space-y-1">
-          {sidebarItems.map((item) => {
-            const isActive =
-            item.href === '/admin'
-              ? pathname === '/admin'
-              : pathname === item.href || pathname.startsWith(item.href + '/');
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-300 group cursor-pointer border-l-2 pl-3 px-4 ${
-                  isActive
-                    ? 'bg-accent/5 text-white border-accent font-bold'
-                    : 'text-foreground-secondary hover:text-white hover:bg-surface-raised/50 border-transparent'
-                }`}
-              >
-                <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'text-accent scale-110' : 'group-hover:scale-110'}`} />
-                <span className="text-sm tracking-wide">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Public Site link — separated from admin nav */}
-        <div className="px-3 pb-3 border-b border-line">
+    <div className="min-h-screen bg-surface flex text-foreground font-sans">
+      {/* Left Sidebar: pinned to the viewport (spec-001); only the nav scrolls. */}
+      <aside className="w-64 bg-admin-panel border-r border-line/60 flex flex-col shrink-0 z-20 sticky top-0 h-dvh self-start">
+        {/* Sidebar Header: same 56px height as the top bar so their bottom edges line up. */}
+        <div className="h-14 px-5 flex items-center border-b border-line/60">
           <Link
-            href="/"
-            className="flex items-center gap-3 py-2.5 border-l-2 border-transparent pl-3 px-4 text-foreground-secondary hover:text-white hover:bg-surface-raised/50 rounded-xl transition-all duration-300 text-sm tracking-wide"
+            href="/admin"
+            className={cx('rounded-md text-lg tracking-tight flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity', sidebarFocus)}
           >
-            <HiOutlineGlobeAlt className="w-5 h-5" />
-            <span>Public Site</span>
+            <span className="text-accent font-extrabold">EZ</span>
+            <span className="text-foreground font-semibold">Staff</span>
           </Link>
         </div>
 
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-line bg-surface-sunken/20">
+        {/* Sidebar navigation: Overview plus collapsible categories. Scrolls on its own
+            only when every category is open on a short viewport; the footer stays pinned. */}
+        <AdminSidebarNav pathname={pathname} categories={categories} />
+
+        {/* Pinned footer: leave-the-portal actions, separated from the nav by one hairline. */}
+        <div className="border-t border-line/60 p-3 space-y-0.5">
+          <Link href="/" className={footerRow}>
+            <HiOutlineGlobeAlt aria-hidden className="w-5 h-5 shrink-0" />
+            <span>Public site</span>
+          </Link>
           <form action={logout}>
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-surface-raised hover:bg-line hover:text-white border border-line/80 hover:border-line text-foreground-secondary font-bold text-xs uppercase tracking-wider rounded-lg transition-all duration-300 cursor-pointer"
-            >
-              <HiArrowRightOnRectangle className="w-4 h-4" />
-              <span>Sign Out</span>
+            <button type="submit" className={footerRow}>
+              <HiArrowRightOnRectangle
+                aria-hidden
+                className="w-5 h-5 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
+              />
+              <span>Sign out</span>
             </button>
           </form>
         </div>
@@ -141,20 +100,56 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
 
       {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
-        <header className="h-16 border-b border-line bg-[#111111]/40 backdrop-blur-md flex items-center px-8 justify-between z-10">
-          <div className="flex items-center gap-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-            <h2 className="text-base font-bold text-white uppercase tracking-wider">{getPageTitle()}</h2>
-          </div>
+        {/* Top bar: sticky so the breadcrumb stays visible on long pages. Sticky
+            toolbars inside pages sit just below it (`top-14`). */}
+        <header className="sticky top-0 z-30 h-14 shrink-0 border-b border-line/60 bg-surface flex items-center px-8">
+          <nav aria-label="Breadcrumb" className="min-w-0">
+            <ol className="flex min-w-0 items-center gap-2">
+              <li className="flex shrink-0 items-center">
+                <Link href="/admin" className={crumbLink}>
+                  Staff Portal
+                </Link>
+              </li>
+              {breadcrumb.category && (
+                <BreadcrumbStep>
+                  <span className="whitespace-nowrap text-sm text-foreground-secondary">{breadcrumb.category}</span>
+                </BreadcrumbStep>
+              )}
+              {breadcrumb.section && (
+                <BreadcrumbStep>
+                  <Link href={breadcrumb.section.href} className={crumbLink}>
+                    {breadcrumb.section.label}
+                  </Link>
+                </BreadcrumbStep>
+              )}
+              <BreadcrumbStep>
+                {/* Each page renders its own h1 in its page header (spec-013), so the
+                    current crumb is plain text rather than a second heading. */}
+                <span aria-current="page" className="truncate text-sm font-medium text-foreground">
+                  {breadcrumb.title}
+                </span>
+              </BreadcrumbStep>
+            </ol>
+          </nav>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-8 overflow-y-auto">
-          {children}
+        {/* Main content. Not a scroll container: the document scrolls, which is
+            what lets the top bar and page toolbars be position: sticky. */}
+        <main className="flex-1 px-8 pt-8 pb-16">
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
       <SessionWarning />
     </div>
+  );
+}
+
+/** One trail segment after the root, preceded by a "›" separator like an address bar. */
+function BreadcrumbStep({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex min-w-0 items-center gap-2">
+      <HiChevronRight aria-hidden className="w-3.5 h-3.5 shrink-0 text-foreground-muted" />
+      {children}
+    </li>
   );
 }

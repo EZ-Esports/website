@@ -42,6 +42,12 @@ html {
      URI cannot read currentColor, so the stroke is hard-coded per theme:
      --foreground-secondary here, its light-theme counterpart in .theme-light. */
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b8b8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+
+  /* Staff portal panel surface (spec-013): one opaque step above --surface,
+     between it and --surface-raised. Opaque on purpose, so sticky toolbars
+     and the sidebar can sit on it without content showing through. Only the
+     admin uses it (`bg-admin-panel`). */
+  --admin-panel: color-mix(in srgb, var(--surface-raised) 60%, var(--surface));
 }
 
 /* Re-scopes the raw vars for the apply form subtree (light, brand-pink-as-accent look). */
@@ -90,6 +96,8 @@ html {
   --color-danger: var(--danger);
   --color-danger-on-tint: var(--danger-on-tint);
 
+  --color-admin-panel: var(--admin-panel);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -131,6 +139,167 @@ body::before {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
+}
+
+/* Staff portal scroll areas (sidebar nav, long member lists): a slimmer,
+   track-less take on the site scrollbar so it sits inside its panel instead of
+   looking like a browser default.
+   Note: the standard `scrollbar-width`/`scrollbar-color` properties disable the
+   ::-webkit-scrollbar rules in Chromium, so they are only used as a fallback. */
+.admin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 9999px;
+}
+
+.admin-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .admin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Staff portal motion (spec-013). Every class here is `admin-` prefixed and
+   only used under app/(admin) and app/components/admin, so the public site
+   never picks it up. Rules of thumb:
+   - 150-300ms, ease-out on the way in, slightly faster ease-in on the way out.
+   - Only opacity and translate/scale, so nothing reflows or shifts layout.
+   - Enter animations use `backwards` fill: once finished they leave no
+     transform behind (a lingering transform would turn the wrapper into the
+     containing block for fixed-position toasts).
+   - Reduced motion: the global rule below collapses durations, but delays
+     would still hold staggered rows invisible, so every admin animation is
+     switched off outright in the reduced-motion block at the end.
+   ------------------------------------------------------------------------- */
+@keyframes admin-rise {
+  from { opacity: 0; translate: 0 6px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes admin-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes admin-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes admin-pop-in {
+  from { opacity: 0; scale: 0.97; translate: 0 6px; }
+  to   { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes admin-pop-out {
+  from { opacity: 1; scale: 1; }
+  to   { opacity: 0; scale: 0.98; }
+}
+
+@keyframes admin-toast-in {
+  from { opacity: 0; translate: 0 12px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes admin-shimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
+
+/* Main content of every admin page fades and rises in once per route. */
+.admin-page-enter {
+  animation: admin-rise 260ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* The short accent rule under each page title draws in from the left. */
+.admin-rule {
+  transform-origin: left center;
+  animation: admin-draw 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms backwards;
+}
+
+@keyframes admin-draw {
+  from { scale: 0 1; opacity: 0; }
+  to   { scale: 1 1; opacity: 1; }
+}
+
+/* Lists, tables and card grids: children cascade in on first render. The
+   delay is capped at the 8th child so a 200-row table still settles in
+   under half a second. Rows inserted later (filters, "load more") get the
+   capped delay, which reads as a gentle arrival rather than a crawl.
+   First mount only: AdminShell marks each child data-entered when its
+   entrance ends, so a reordered (moved) node never replays it. */
+.admin-stagger > :not([data-entered]) {
+  animation: admin-rise 280ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation-delay: 210ms;
+}
+.admin-stagger > :nth-child(1):not([data-entered]) { animation-delay: 0ms; }
+.admin-stagger > :nth-child(2):not([data-entered]) { animation-delay: 30ms; }
+.admin-stagger > :nth-child(3):not([data-entered]) { animation-delay: 60ms; }
+.admin-stagger > :nth-child(4):not([data-entered]) { animation-delay: 90ms; }
+.admin-stagger > :nth-child(5):not([data-entered]) { animation-delay: 120ms; }
+.admin-stagger > :nth-child(6):not([data-entered]) { animation-delay: 150ms; }
+.admin-stagger > :nth-child(7):not([data-entered]) { animation-delay: 180ms; }
+
+/* Inline feedback (notices, field errors) and freshly opened inline forms. */
+.admin-fade-in {
+  animation: admin-rise 200ms ease-out backwards;
+}
+
+/* The loading skeleton waits 150ms before fading in, so fast navigations
+   never flash it. */
+.admin-skeleton-enter {
+  animation: admin-fade-in 200ms ease-out 150ms backwards;
+}
+
+.admin-skeleton {
+  background-color: var(--surface-raised);
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--line) 55%, transparent) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: admin-shimmer 1.6s ease-in-out infinite;
+}
+
+/* RAC overlays: ModalOverlay/Modal/Popover expose data-entering and
+   data-exiting, and RAC keeps an exiting overlay mounted until its CSS
+   animation finishes. Admin modals opt in with these classes; the shared
+   overlay.tsx wrappers are untouched, so public modals keep their own look. */
+.admin-modal-overlay[data-entering] { animation: admin-fade-in 200ms ease-out; }
+.admin-modal-overlay[data-exiting]  { animation: admin-fade-out 150ms ease-in forwards; }
+.admin-modal[data-entering]         { animation: admin-pop-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.admin-modal[data-exiting]          { animation: admin-pop-out 150ms ease-in forwards; }
+.admin-popover { transform-origin: var(--trigger-anchor-point, top); }
+.admin-popover[data-entering]       { animation: admin-pop-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.admin-popover[data-exiting]        { animation: admin-pop-out 120ms ease-in forwards; }
+
+/* Floating toasts (save feedback, session warning) slide up from the corner. */
+.admin-toast {
+  animation: admin-toast-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-page-enter,
+  .admin-rule,
+  .admin-stagger > *,
+  .admin-fade-in,
+  .admin-skeleton-enter,
+  .admin-skeleton,
+  .admin-modal-overlay,
+  .admin-modal,
+  .admin-popover,
+  .admin-toast {
+    animation: none !important;
+  }
 }
 
 /* Hide number input spinner buttons (incremental arrows) */

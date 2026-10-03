@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { FiPlus, FiTrash2 } from 'react-icons/fi';
+import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { deleteIconBtn, saveBtn, cancelBtn } from '@/app/components/admin/styles';
+import { cancelBtn, chip, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
+import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
@@ -27,19 +29,17 @@ interface DBSeason {
 
 type ActionResult = { success: boolean; error?: string };
 
-const input =
-  'w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent/50 focus:border-accent/30 transition-all';
-const primaryBtn =
-  'px-4 py-2 bg-white hover:bg-foreground text-surface-sunken text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/** Label-wrapped field with the admin label style (spec-013). */
+function Field({ label, children, help }: { label: string; children: React.ReactNode; help?: React.ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">{label}</span>
+    <AdminField label={label} help={help}>
       {children}
-    </label>
+    </AdminField>
   );
 }
+
+/** Add-form strip at the top of a list panel: one hairline below it, no box of its own. */
+const addStrip = 'border-b border-line/60 px-5 pb-5';
 
 export default function LeagueSetupClient({
   games,
@@ -97,57 +97,41 @@ export default function LeagueSetupClient({
   };
 
   return (
-    <div className="space-y-8">
-      {toast && (
-        <div
-          className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-between ${
-            toast.type === 'error'
-              ? 'bg-red-950/30 border-red-900/50 text-red-300'
-              : 'bg-success/30 border-success/50 text-success'
-          }`}
-        >
-          <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-foreground-secondary hover:text-foreground" aria-label="Dismiss">
-            <FiX />
-          </button>
-        </div>
-      )}
+    <div className="space-y-6">
+      <AdminToast toast={toast} onDismiss={() => setToast(null)} />
 
       {/* ============ GAMES ============ */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between border-b border-line pb-3">
-          <h2 className="text-base font-black text-white uppercase tracking-wider">Games</h2>
-        </div>
-
+      <AdminSection
+        id="games"
+        variant="flush"
+        title={<>Games<AdminCount>{games.length}</AdminCount></>}
+        description="Each game gets its own hub, schedule and standings on the public site."
+      >
         {/* Add game form */}
-        <div className="bg-surface-sunken/60 border border-line rounded-xl p-4 space-y-3">
-          <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">Add Game</span>
-          <form
-            onSubmit={(e) => runForm(e, createGame, 'Game created.', { reset: true })}
-            className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end"
-          >
-            <Field label="Display Name">
-              <input name="displayName" required placeholder="League of Legends" className={input} />
-            </Field>
-            <Field label="Short Name">
-              <input name="shortName" required placeholder="LoL" className={input} />
-            </Field>
-            <Field label="Image URL (optional)">
-              <input name="imageUrl" placeholder="https://…" className={input} />
-            </Field>
-            <button type="submit" disabled={isPending} className={primaryBtn}>
-              <FiPlus /> Add
-            </button>
-          </form>
-        </div>
+        <form
+          onSubmit={(e) => runForm(e, createGame, 'Game created.', { reset: true })}
+          aria-label="Add game"
+          className={`${addStrip} grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1fr_auto]`}
+        >
+          <Field label="Display name">
+            <input name="displayName" required placeholder="League of Legends" className={input} />
+          </Field>
+          <Field label="Short name">
+            <input name="shortName" required placeholder="LoL" className={input} />
+          </Field>
+          <Field label="Image URL (optional)">
+            <input name="imageUrl" placeholder="https://…" className={input} />
+          </Field>
+          <button type="submit" disabled={isPending} className={primaryBtn}>
+            <FiPlus aria-hidden /> Add game
+          </button>
+        </form>
 
         {/* Games list */}
         {games.length === 0 ? (
-          <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">
-            No games yet. Add one above to get started.
-          </div>
+          <AdminEmptyState compact icon={<HiOutlinePuzzlePiece />} title="No games yet." description="Add one above to get started." />
         ) : (
-          <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised">
+          <ul className={listStack}>
             {games.map((g) => (
               <GameRow
                 key={g.id}
@@ -163,65 +147,60 @@ export default function LeagueSetupClient({
                 }
               />
             ))}
-          </div>
+          </ul>
         )}
-      </section>
+      </AdminSection>
 
       {/* ============ SEASONS ============ */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between border-b border-line pb-3">
-          <h2 className="text-base font-black text-white uppercase tracking-wider">Seasons</h2>
-        </div>
-
+      <AdminSection
+        id="seasons"
+        variant="flush"
+        title={<>Seasons<AdminCount>{seasons.length}</AdminCount></>}
+        description="Matches and team registrations attach to a season. Active seasons show on the public site."
+      >
         {games.length === 0 ? (
-          <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">
-            Create a game first before adding seasons.
-          </div>
+          <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="Create a game first before adding seasons." />
         ) : (
           <>
             {/* Add season form */}
-            <div className="bg-surface-sunken/60 border border-line rounded-xl p-4 space-y-3">
-              <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">Add Season</span>
-              <form
-                onSubmit={(e) => runForm(e, createSeason, 'Season created.', { reset: true })}
-                className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-3 items-end"
-              >
-                <Field label="Game">
-                  <select name="gameId" required defaultValue="" className={input}>
-                    <option value="" disabled>Select game…</option>
-                    {games.map((g) => (
-                      <option key={g.id} value={g.id}>{g.displayName}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Season Name">
-                  <input name="name" required placeholder="Spring 2025" className={input} />
-                </Field>
-                <Field label="Active?">
-                  <select name="isActive" defaultValue="true" className={input}>
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                  </select>
-                </Field>
-                <Field label="Standings Format">
-                  <select name="standingsFormat" defaultValue="divided" className={input}>
-                    <option value="divided">Divided</option>
-                    <option value="combined">Combined</option>
-                  </select>
-                </Field>
-                <button type="submit" disabled={isPending} className={primaryBtn}>
-                  <FiPlus /> Add
-                </button>
-              </form>
-            </div>
+            <form
+              onSubmit={(e) => runForm(e, createSeason, 'Season created.', { reset: true })}
+              aria-label="Add season"
+              className={`${addStrip} grid grid-cols-1 items-end gap-3 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto]`}
+            >
+              <Field label="Game">
+                <select name="gameId" required defaultValue="" className={input}>
+                  <option value="" disabled>Select game…</option>
+                  {games.map((g) => (
+                    <option key={g.id} value={g.id}>{g.displayName}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Season name">
+                <input name="name" required placeholder="Spring 2025" className={input} />
+              </Field>
+              <Field label="Active?">
+                <select name="isActive" defaultValue="true" className={input}>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </Field>
+              <Field label="Standings format">
+                <select name="standingsFormat" defaultValue="divided" className={input}>
+                  <option value="divided">Divided</option>
+                  <option value="combined">Combined</option>
+                </select>
+              </Field>
+              <button type="submit" disabled={isPending} className={primaryBtn}>
+                <FiPlus aria-hidden /> Add season
+              </button>
+            </form>
 
             {/* Seasons list */}
             {seasons.length === 0 ? (
-              <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">
-                No seasons yet. Add one above.
-              </div>
+              <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="No seasons yet." description="Add one above." />
             ) : (
-              <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised">
+              <ul className={listStack}>
                 {seasons.map((s) => {
                   const game = games.find((g) => g.id === s.gameId);
                   return (
@@ -241,11 +220,11 @@ export default function LeagueSetupClient({
                     />
                   );
                 })}
-              </div>
+              </ul>
             )}
           </>
         )}
-      </section>
+      </AdminSection>
     </div>
   );
 }
@@ -264,7 +243,7 @@ function GameRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="p-4 group">
+    <li className={`group px-5 py-3.5 transition-colors duration-150 ${editing ? 'bg-surface-raised/40' : 'hover:bg-surface-raised/50'}`}>
       {editing ? (
         <form
           onSubmit={async (e) => {
@@ -272,12 +251,12 @@ function GameRow({
             const ok = await onUpdate(new FormData(e.currentTarget));
             if (ok) setEditing(false);
           }}
-          className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end"
+          className="admin-fade-in grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end"
         >
-          <Field label="Display Name">
+          <Field label="Display name">
             <input name="displayName" required defaultValue={game.displayName} autoFocus className={input} />
           </Field>
-          <Field label="Short Name">
+          <Field label="Short name">
             <input name="shortName" required defaultValue={game.shortName} className={input} />
           </Field>
           <Field label="Image URL">
@@ -290,18 +269,21 @@ function GameRow({
         </form>
       ) : (
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <span className="text-sm font-bold text-white">{game.displayName}</span>
-            <span className="ml-2 text-[10px] bg-surface-raised border border-line text-foreground-secondary font-mono px-1.5 py-0.5 rounded uppercase">{game.shortName}</span>
-            <div className="text-[11px] text-foreground-muted font-mono mt-0.5">/games/{game.slug}</div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">{game.displayName}</span>
+              <span className={chip('neutral')}>{game.shortName}</span>
+            </div>
+            <div className="mt-0.5 font-mono text-xs text-foreground-secondary">/games/{game.slug}</div>
           </div>
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+          {/* Row actions stay visible (touch has no hover). */}
+          <div className="flex items-center gap-2 shrink-0">
             <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit game ${game.displayName}`} />
             <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete game ${game.displayName}`} title={`Delete game ${game.displayName}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
           </div>
         </div>
       )}
-    </div>
+    </li>
   );
 }
 
@@ -321,7 +303,7 @@ function SeasonRow({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="p-4 group">
+    <li className={`group px-5 py-3.5 transition-colors duration-150 ${editing ? 'bg-surface-raised/40' : 'hover:bg-surface-raised/50'}`}>
       {editing ? (
         <form
           onSubmit={async (e) => {
@@ -329,17 +311,16 @@ function SeasonRow({
             const ok = await onUpdate(new FormData(e.currentTarget));
             if (ok) setEditing(false);
           }}
-          className="grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-3 items-end"
+          className="admin-fade-in grid grid-cols-1 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto] gap-3 items-end"
         >
-          <Field label="Game">
+          <Field label="Game" help="Game can't be changed after creation.">
             <div className={`${input} flex items-center text-foreground-secondary`} aria-readonly="true">
               {gameName}
             </div>
-            <p className="text-[10px] text-foreground-muted mt-1">Game can&apos;t be changed after creation.</p>
             {/* Game is fixed for a season; submit it unchanged so the server action still receives it */}
             <input type="hidden" name="gameId" value={season.gameId} />
           </Field>
-          <Field label="Season Name">
+          <Field label="Season name">
             <input name="name" required defaultValue={season.name} autoFocus className={input} />
           </Field>
           <Field label="Active?">
@@ -361,22 +342,22 @@ function SeasonRow({
         </form>
       ) : (
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <span className="text-sm font-bold text-white">{season.name}</span>
-            <span className="ml-2 text-[10px] text-foreground-muted">· {gameName}</span>
-            <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${season.isActive ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-surface-raised text-foreground-muted border-line'}`}>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{season.name}</span>
+            <span className="text-sm text-foreground-secondary">{gameName}</span>
+            <span className={chip(season.isActive ? 'success' : 'neutral')}>
+              {season.isActive && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />}
               {season.isActive ? 'Active' : 'Inactive'}
             </span>
-            <span className="ml-2 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border bg-surface-raised text-foreground-secondary border-line">
-              {season.standingsFormat ?? 'divided'}
-            </span>
+            <span className={`${chip('neutral')} capitalize`}>{season.standingsFormat ?? 'divided'}</span>
           </div>
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+          {/* Row actions stay visible (touch has no hover). */}
+          <div className="flex items-center gap-2 shrink-0">
             <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit season ${season.name}`} />
             <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete season ${season.name}`} title={`Delete season ${season.name}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
           </div>
         </div>
       )}
-    </div>
+    </li>
   );
 }

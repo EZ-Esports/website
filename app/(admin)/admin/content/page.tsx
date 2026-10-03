@@ -1,4 +1,4 @@
-import Card from '@/app/components/ui/Card';
+import { HiOutlinePencilSquare } from 'react-icons/hi2';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, desc } from 'drizzle-orm';
@@ -6,6 +6,8 @@ import ContentEditor from './ContentEditor';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminEmptyState, AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
+import { chip } from '@/app/components/admin/styles';
 
 const keyPageMap: Record<string, string> = {
   'hero.title': 'Homepage → Hero',
@@ -42,45 +44,44 @@ export default async function ContentAdminPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/content"
+        description="Editable text blocks across the public pages. These blocks are managed by the system. Contact a developer to add or remove content keys."
+        meta={dbConfigured && <span className={chip('accent')}>{rows.length} block{rows.length !== 1 ? 's' : ''}</span>}
+      />
+
       {!dbConfigured && <DbErrorNotice variant="not-configured" />}
 
-      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-black text-white uppercase tracking-wider">Page Content Blocks</h2>
-            <p className="text-xs text-foreground-muted mt-1">These blocks are managed by the system. Contact a developer to add or remove content keys.</p>
-          </div>
-          {dbConfigured && (
-            <span className="text-foreground-secondary text-sm">{rows.length} block{rows.length !== 1 ? 's' : ''}</span>
-          )}
+      {rows.length === 0 ? (
+        <div className="rounded-2xl bg-admin-panel">
+          <AdminEmptyState
+            icon={<HiOutlinePencilSquare />}
+            title={
+              dbConfigured
+                ? 'No content blocks yet. Run the Phase 2 seed to populate defaults.'
+                : 'Connect the database to manage content.'
+            }
+          />
         </div>
-
-        {rows.length === 0 ? (
-          <p className="text-foreground-muted text-sm">
-            {dbConfigured
-              ? 'No content blocks yet. Run the Phase 2 seed to populate defaults.'
-              : 'Connect the database to manage content.'}
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {rows.map((row) => (
-              <div key={row.id} className="space-y-1">
-                <p className="text-xs text-foreground-muted font-mono">
-                  <span className="text-foreground-muted">Appears on:</span> {keyPageMap[row.key] ?? row.key}
-                </p>
-                <ContentEditor
-                  id={row.id}
-                  label={row.label}
-                  contentKey={row.key}
-                  initialContent={row.content}
-                  history={historyRows.filter((h) => h.contentKey === row.key)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
+      ) : (
+        <div className="admin-stagger space-y-4">
+          {rows.map((row) => (
+            <section key={row.id} aria-labelledby={`content-heading-${row.id}`} className="rounded-2xl bg-admin-panel p-5">
+              <p className="mb-3 text-xs text-foreground-secondary">
+                Appears on <span className="font-medium text-accent">{keyPageMap[row.key] ?? row.key}</span>
+              </p>
+              <ContentEditor
+                id={row.id}
+                label={row.label}
+                contentKey={row.key}
+                initialContent={row.content}
+                history={historyRows.filter((h) => h.contentKey === row.key)}
+              />
+            </section>
+          ))}
+        </div>
+      )}
+    </AdminPage>
   );
 }

@@ -3,7 +3,6 @@
 import type { ButtonHTMLAttributes, Ref } from 'react';
 import { FiEdit2, FiX } from 'react-icons/fi';
 import { cancelIconBtn, editIconBtn } from '@/app/components/admin/styles';
-import Button from '@/app/components/ui/Button';
 
 type Kind = 'edit' | 'cancel';
 
@@ -26,8 +25,10 @@ interface RowIconButtonProps
 export default function RowIconButton({ kind, label, type = 'button', ref, ...rest }: RowIconButtonProps) {
   const Icon = ICONS[kind];
   return (
-    <Button ref={ref} type={type} aria-label={label} title={label} className={STYLES[kind]} {...rest}>
+    // A native button (not ui/Button): the shared public button adds its own
+    // focus ring, 300ms transitions and press scale on top of the admin style.
+    <button ref={ref} type={type} aria-label={label} title={label} className={STYLES[kind]} {...rest}>
       <Icon aria-hidden="true" className="h-4 w-4" />
-    </Button>
+    </button>
   );
 }

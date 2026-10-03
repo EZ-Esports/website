@@ -1,31 +1,28 @@
+import { AdminSkeleton, AdminSkeletonRows } from '@/app/components/admin/AdminUI';
+
+/**
+ * Route-level skeleton in the shape every admin page shares (spec-013): page
+ * header, then a panel of rows. It fades in after a short delay so quick
+ * navigations never flash it.
+ */
 export default function AdminLoading() {
   return (
-    <div className="space-y-6 animate-pulse">
-      {/* Header skeleton */}
-      <div className="bg-surface-raised/30 border border-line rounded-2xl p-6">
-        <div className="h-7 bg-line rounded w-64 mb-2" />
-        <div className="h-3 bg-line rounded w-96" />
+    <div className="admin-skeleton-enter space-y-6" role="status" aria-live="polite">
+      <span className="sr-only">Loading…</span>
+
+      {/* Page header */}
+      <div className="space-y-3 pb-2">
+        <AdminSkeleton className="h-7 w-64" />
+        <AdminSkeleton className="h-4 w-96 max-w-full" />
       </div>
 
-      {/* Stats grid skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-surface-raised/30 border border-line rounded-2xl p-6 h-36">
-            <div className="h-3 bg-line rounded w-28 mb-4" />
-            <div className="h-10 bg-line rounded w-16 mt-auto" />
-          </div>
-        ))}
-      </div>
-
-      {/* Content skeleton */}
-      <div className="bg-surface-raised/30 border border-line rounded-2xl p-6 space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center gap-4">
-            <div className="h-4 bg-line rounded w-1/4" />
-            <div className="h-4 bg-line rounded w-1/3" />
-            <div className="h-4 bg-line rounded w-1/5 ml-auto" />
-          </div>
-        ))}
+      {/* Section panel */}
+      <div className="rounded-2xl bg-admin-panel pb-2">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <AdminSkeleton className="h-5 w-40" />
+          <AdminSkeleton className="h-8 w-56 rounded-lg" />
+        </div>
+        <AdminSkeletonRows rows={6} />
       </div>
     </div>
   );

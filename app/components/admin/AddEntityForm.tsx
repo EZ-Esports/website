@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useRef } from 'react';
+import { AdminNotice } from '@/app/components/admin/AdminUI';
 
 type Result = { success?: boolean; error?: string } | void;
 
@@ -36,7 +37,9 @@ export default function AddEntityForm({
     <form ref={formRef} action={formAction} className={className}>
       {children}
       {state?.error && (
-        <p role="alert" aria-live="polite" className="text-xs text-red-400 sm:col-span-2">{state.error}</p>
+        <AdminNotice tone="danger" className="sm:col-span-full">
+          {state.error}
+        </AdminNotice>
       )}
     </form>
   );

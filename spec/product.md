@@ -40,7 +40,7 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 
 | Area | What it edits |
 |------|----------------|
-| Dashboard | Counts / entry. |
+| Overview (`/admin`) | Welcome header, alerts, permitted stat cards, then a compact Control-Panel-style hub: one card per permitted category listing its sections as accent links, three columns wide ([spec-012](spec-012-admin-control-panel-nav.md)). |
 | League | Season/game setup. |
 | Matches, standings, roster, schools | Competition data. Standings editor exists because archives are snapshotted in `season_standings`, not only computed. Matches parse kickoffs via `parseEastern` (PR #184). |
 | News | Draft / publish / archive. |
@@ -49,7 +49,15 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 | Applications | Detail modal, status via append-only events, CSV export (`9353bf5`). |
 | Team | Staff invites and roles. Role assign/edit/revoke guarded by transactional lock-then-re-read pattern against TOCTOU races (PR #181). |
 
-**Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md). `AdminShell.tsx`: 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`); its nav list remains static (`overflow-hidden`), keeping Public Site / Sign Out permanently visible in the viewport. Page content scrolls the document. No mobile drawer exists.
+**Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md) and [spec-012](spec-012-admin-control-panel-nav.md). `AdminShell.tsx` has a 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`). It shows Overview, then three collapsible categories (RAC Disclosures), all from `app/lib/admin-nav.ts` and filtered by permission:
+
+- **People & Staffing:** Applications, Roles & Staff, Leadership.
+- **League Operations:** League Setup, Matches, Standings Archive, Teams & Rosters, Schools.
+- **Website Content:** News, Gallery, Sponsors, Page Content.
+
+The nav scrolls on its own (`overflow-y-auto`) only when it outgrows a short viewport; Public Site and Sign Out stay pinned. The top bar is sticky and shows a `Staff portal › Category › Page` breadcrumb. Page content scrolls the document. No mobile drawer exists.
+
+**Page anatomy ([spec-013](spec-013-staff-portal-ui-overhaul.md)).** Every admin page renders `AdminPage` → `AdminPageHeader` (accent category eyebrow, one `h1`, accent rule, one-line description, primary action on the right) → `AdminSection` panels, with shared empty, loading (skeleton), notice, toast, permission-denied and error states. Long lists keep their filters in sticky section toolbars (Applications, News, Matches, Standings, Leadership, Teams & Rosters). Row actions are always visible.
 
 Server actions must authorize themselves. Middleware refreshes JWT on `/admin` and `/login` only — it does not protect `'use server'` dispatch (`dd934ef`).
 

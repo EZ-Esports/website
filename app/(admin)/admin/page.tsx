@@ -8,13 +8,15 @@ import {
 } from '@/app/lib/db/queries';
 import { getStaff } from '@/app/lib/auth';
 import { hasPermission, Permissions } from '@/app/lib/roles';
-import { hasAnyManagementPermission } from '@/app/lib/staff-access';
+import { getAllowedAdminHrefs, hasAnyManagementPermission } from '@/app/lib/staff-access';
+import { filterAdminNav } from '@/app/lib/admin-nav';
+import AdminControlPanel from '@/app/components/admin/AdminControlPanel';
+import { AdminNotice, AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
+import { cardHover, secondaryBtn, secondaryBtnSm } from '@/app/components/admin/styles';
 import Link from 'next/link';
-import Card from '@/app/components/ui/Card';
-import Button from '@/app/components/ui/Button';
 import {
-  HiExclamationTriangle,
-  HiInformationCircle,
+  HiArrowRight,
+  HiArrowTopRightOnSquare,
   HiOutlineCalendarDays,
   HiOutlineNewspaper,
   HiOutlineTrophy,
@@ -32,17 +34,14 @@ export default async function AdminDashboardPage() {
 
   if (!hasAnyManagementPermission(staff.permissions, staff.isOwner)) {
     return (
-      <div className="space-y-8">
-        <WelcomeBanner />
-        <Card className="border border-line border-l-4 border-l-amber-400 bg-surface-raised/30 p-8">
-          <h2 className="text-xl font-black text-white">Awaiting role assignment</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-foreground-secondary">
-            Your staff account is active and you will remain signed in. An Owner or staff member
-            with role-management permission can assign your first role; refresh this page afterward
-            to use the newly granted sections.
-          </p>
-        </Card>
-      </div>
+      <AdminPage>
+        <OverviewHeader />
+        <AdminNotice tone="warning" live="none" title="Awaiting role assignment" className="max-w-3xl">
+          Your staff account is active and you will remain signed in. An Owner or staff member
+          with role-management permission can assign your first role; refresh this page afterward
+          to use the newly granted sections.
+        </AdminNotice>
+      </AdminPage>
     );
   }
 
@@ -77,6 +76,9 @@ export default async function AdminDashboardPage() {
     connectionError = error instanceof Error ? error.message : 'Database connection error';
   }
 
+  // Same permission filter as the sidebar, so every link here opens a page the viewer can use.
+  const controlPanel = filterAdminNav(getAllowedAdminHrefs(staff.permissions, staff.isOwner));
+
   const alerts = [
     ...(canMatches && pendingResults > 0 ? [{
       type: 'warning' as const,
@@ -97,96 +99,82 @@ export default async function AdminDashboardPage() {
   ];
 
   return (
-    <div className="space-y-8">
-      <WelcomeBanner />
+    <AdminPage className="space-y-8">
+      <OverviewHeader />
 
       {alerts.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="admin-stagger grid grid-cols-1 gap-3 md:grid-cols-2">
           {alerts.map((alert) => (
-            <div key={alert.label} className={`flex items-center justify-between rounded-xl border p-4 ${alert.type === 'warning' ? 'border-amber-500/20 bg-amber-500/5' : 'border-blue-500/20 bg-blue-500/5'}`}>
-              <div className="flex items-center gap-4">
-                {alert.type === 'warning'
-                  ? <HiExclamationTriangle className="h-5 w-5 text-amber-500" />
-                  : <HiInformationCircle className="h-5 w-5 text-blue-500" />}
-                <div>
-                  <h4 className="text-sm font-bold text-white">{alert.label} ({alert.count})</h4>
-                  <p className="mt-0.5 text-xs text-foreground-secondary">{alert.message}</p>
-                </div>
-              </div>
-              <Button href={alert.link} variant="secondary" className="h-auto shrink-0 px-3 py-1 text-[10px]">{alert.linkText}</Button>
-            </div>
+            <AdminNotice
+              key={alert.label}
+              tone={alert.type}
+              live="none"
+              title={`${alert.label} (${alert.count})`}
+              action={
+                <Link href={alert.link} className={secondaryBtnSm}>
+                  {alert.linkText}
+                </Link>
+              }
+            >
+              {alert.message}
+            </AdminNotice>
           ))}
         </div>
       )}
 
       {!dbConfigured && (
-        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-6">
-          <div className="flex items-start gap-4">
-            <HiExclamationTriangle className="mt-0.5 h-7 w-7 shrink-0 text-amber-400" />
-            <div>
-              <h3 className="text-lg font-bold text-amber-400">Database Connection Required</h3>
-              <p className="mt-1 text-sm text-foreground-secondary">Configure <code>DATABASE_URL</code> before loading management data.</p>
-              {connectionError && <p className="mt-3 rounded-lg bg-black/60 p-3 font-mono text-xs text-amber-500">{connectionError}</p>}
-            </div>
-          </div>
-        </div>
+        <AdminNotice tone="warning" live="none" title="Database connection required">
+          <p>Configure <code className="rounded bg-surface-sunken px-1 py-0.5 font-mono text-[0.8125rem] text-foreground">DATABASE_URL</code> before loading management data.</p>
+          {connectionError && <p className="mt-2 rounded-lg bg-surface-sunken p-3 font-mono text-xs text-warning">{connectionError}</p>}
+        </AdminNotice>
       )}
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {canLeague && <StatCard href="/admin/league" label="Competition Games" value={dbConfigured ? stats.games : 'N/A'} icon={<HiOutlineTrophy className="h-6 w-6" />} />}
-        {canRosters && <StatCard href="/admin/roster" label="Registered Teams" value={dbConfigured ? stats.teams : 'N/A'} icon={<HiOutlineUsers className="h-6 w-6" />} />}
-        {canMatches && <StatCard href="/admin/matches" label="Scheduled Matches" value={dbConfigured ? stats.scheduledMatches : 'N/A'} icon={<HiOutlineCalendarDays className="h-6 w-6" />} />}
-        {canNews && <StatCard href="/admin/news" label="Published Articles" value={dbConfigured ? stats.publishedNews : 'N/A'} icon={<HiOutlineNewspaper className="h-6 w-6" />} />}
-      </div>
+      <section aria-label="At a glance" className="admin-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {canLeague && <StatCard href="/admin/league" label="Competition games" value={dbConfigured ? stats.games : 'N/A'} icon={<HiOutlineTrophy className="h-5 w-5" />} />}
+        {canRosters && <StatCard href="/admin/roster" label="Registered teams" value={dbConfigured ? stats.teams : 'N/A'} icon={<HiOutlineUsers className="h-5 w-5" />} />}
+        {canMatches && <StatCard href="/admin/matches" label="Scheduled matches" value={dbConfigured ? stats.scheduledMatches : 'N/A'} icon={<HiOutlineCalendarDays className="h-5 w-5" />} />}
+        {canNews && <StatCard href="/admin/news" label="Published articles" value={dbConfigured ? stats.publishedNews : 'N/A'} icon={<HiOutlineNewspaper className="h-5 w-5" />} />}
+      </section>
 
-      {(canMatches || canNews || canRosters) && (
-        <Card className="duration-300 hover:border-line/80 hover:shadow-none">
-          <h3 className="mb-6 text-lg font-black uppercase tracking-wider text-white">Quick Actions</h3>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {canMatches && <QuickAction href="/admin/matches" title="Create Match Event" description="Schedule matches, input results, and manage varsity matchups." />}
-            {canNews && <QuickAction href="/admin/news" title="Write Announcement" description="Publish news, tournament notifications, and club updates." />}
-            {canRosters && <QuickAction href="/admin/roster" title="Roster Management" description="Assign student captains, roster lists, and player profiles." />}
-          </div>
-        </Card>
-      )}
-    </div>
+      <AdminControlPanel categories={controlPanel} />
+    </AdminPage>
   );
 }
 
-function WelcomeBanner() {
+function OverviewHeader() {
   return (
-    <Card className="flex flex-col items-start justify-between gap-6 rounded-2xl border border-l-4 border-line border-l-accent bg-surface-raised/30 p-8 shadow-none md:flex-row md:items-center">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight text-white">Welcome to <span className="text-accent">EZ</span> Staff</h1>
-        <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-foreground-secondary">Your portal access follows your effective staff roles and permissions.</p>
-      </div>
-      <Button href="/" variant="primary" className="shrink-0">View Public Website</Button>
-    </Card>
+    <AdminPageHeader
+      eyebrow="Staff Portal"
+      title={<>Welcome to <span className="text-accent">EZ</span> Staff</>}
+      description="Your portal access follows your effective staff roles and permissions."
+      actions={
+        <Link href="/" className={secondaryBtn}>
+          View public website
+          <HiArrowTopRightOnSquare aria-hidden className="h-4 w-4" />
+        </Link>
+      }
+    />
   );
 }
 
+/** A count that doubles as a shortcut into its section. Lifts slightly on hover. */
 function StatCard({ href, label, value, icon }: { href: string; label: string; value: number | string; icon: React.ReactNode }) {
   return (
-    <Link href={href}>
-      <Card className="flex h-36 cursor-pointer flex-col justify-between duration-300 hover:scale-[1.03]">
-        <div className="flex items-center justify-between text-sm font-bold uppercase tracking-wider text-foreground-secondary">
-          <span>{label}</span>
-          <span className="rounded-lg border border-accent/20 bg-accent/10 p-1.5 text-accent">{icon}</span>
-        </div>
-        <p className="text-4xl font-black text-white">{value}</p>
-      </Card>
-    </Link>
-  );
-}
-
-function QuickAction({ href, title, description }: { href: string; title: string; description: string }) {
-  return (
-    <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-line/80 bg-[#1a1a1a]/80 p-6">
-      <div>
-        <h4 className="font-extrabold text-white">{title}</h4>
-        <p className="mt-2 text-xs leading-relaxed text-foreground-secondary">{description}</p>
+    <Link
+      href={href}
+      className={`group flex h-32 flex-col justify-between rounded-2xl bg-admin-panel p-5 ${cardHover} outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface`}
+    >
+      <div className="flex items-center justify-between text-sm font-medium text-foreground-secondary">
+        <span>{label}</span>
+        <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">{icon}</span>
       </div>
-      <Link href={href} className="text-xs font-bold uppercase tracking-wider text-foreground-secondary hover:text-accent">Open manager →</Link>
-    </div>
+      <div className="flex items-end justify-between">
+        <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
+        <HiArrowRight
+          aria-hidden
+          className="mb-1 h-4 w-4 -translate-x-1 text-accent opacity-0 transition-[opacity,translate] duration-200 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none"
+        />
+      </div>
+    </Link>
   );
 }
