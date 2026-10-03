@@ -52,13 +52,21 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
       }
     };
     document.addEventListener('animationend', settle);
-    // On a full page load the first rows can finish before hydration attaches
-    // the listener, so settle anything that is no longer animating.
-    document.querySelectorAll<HTMLElement>('.admin-stagger > :not([data-entered])').forEach((el) => {
-      const animating = el.getAnimations().some((a) => a.playState === 'running' || a.pending);
-      if (!animating) el.setAttribute('data-entered', '');
-    });
-    return () => document.removeEventListener('animationend', settle);
+    // On a full page load the first rows can finish before this listener
+    // attaches, so settle anything that is no longer animating. This waits
+    // until every entrance (the longest ends ~490ms in) and hydration are done:
+    // adding data-entered while React is still hydrating the page makes it log
+    // a hydration mismatch for every row.
+    const settleTimer = window.setTimeout(() => {
+      document.querySelectorAll<HTMLElement>('.admin-stagger > :not([data-entered])').forEach((el) => {
+        const animating = el.getAnimations().some((a) => a.playState === 'running' || a.pending);
+        if (!animating) el.setAttribute('data-entered', '');
+      });
+    }, 700);
+    return () => {
+      window.clearTimeout(settleTimer);
+      document.removeEventListener('animationend', settle);
+    };
   }, []);
 
   return (
