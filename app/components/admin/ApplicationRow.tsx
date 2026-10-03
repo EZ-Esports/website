@@ -6,7 +6,7 @@ import ConfirmDeleteButton from "@/app/components/admin/ConfirmDeleteButton";
 import ApplicationDetailModal from "@/app/components/admin/ApplicationDetailModal";
 import type { SchoolApplicationDetails } from "@/app/lib/school-application-form";
 import { ApplicationStatus, isValidStatusTransition } from "@/app/lib/application-status";
-import { chip, chipButton, td, tdRight, textLinkSm, tr, type ChipTone } from "@/app/components/admin/styles";
+import { chip, chipButton, tdCompact as td, tdCompactRight as tdRight, textLinkSm, tr, type ChipTone } from "@/app/components/admin/styles";
 import { cx } from "@/app/lib/cx";
 
 type Status = ApplicationStatus;
@@ -154,15 +154,15 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
   return (
     <>
       <tr className={tr}>
-        <td className={cx(td, "font-medium text-foreground whitespace-nowrap")}>{app.applicantName}</td>
-        <td className={cx(td, "text-foreground-secondary")}>{app.schoolName}</td>
-        <td className={cx(td, "text-foreground-secondary capitalize")}>{app.role}</td>
         <td className={td}>
-          <a href={`mailto:${app.email}`} className="rounded text-foreground-secondary hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+          <div className="font-medium text-foreground">{app.applicantName}</div>
+          <div className="text-xs capitalize text-foreground-secondary">{app.role}</div>
+          <a href={`mailto:${app.email}`} className="break-all rounded text-xs text-foreground-secondary hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
             {app.email}
           </a>
         </td>
-        <td className={cx(td, "text-foreground-secondary min-w-[240px] max-w-[360px]")}>
+        <td className={cx(td, "text-foreground-secondary")}>{app.schoolName}</td>
+        <td className={cx(td, "text-foreground-secondary")}>
           <div className="flex items-start justify-between gap-2">
             <SchoolDetailsChips details={app.details} />
             <button
@@ -175,7 +175,7 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
           </div>
         </td>
         <td className={td}>
-          <div className="flex flex-nowrap gap-0.5 items-center" role="group" aria-label="Application status">
+          <div className="flex flex-wrap gap-1 items-center" role="group" aria-label="Application status">
             {(["pending", "reviewed", "accepted", "rejected"] as const).map((s) => {
               const isCurrent = status === s;
               const canTransition = isCurrent || isValidStatusTransition(status, s);

@@ -15,7 +15,7 @@ import {
   AdminPageHeader,
   AdminSection,
 } from "@/app/components/admin/AdminUI";
-import { ghostBtnSm, table, tableWrap, tbody, th, theadRow, thRight } from "@/app/components/admin/styles";
+import { ghostBtnSm, table, tableWrap, tbody, thCompact as th, theadRow, thCompactRight as thRight } from "@/app/components/admin/styles";
 import Link from "next/link";
 import { exportSchoolApplicationsCsv, exportStaffApplicationsCsv } from "./actions";
 
@@ -143,8 +143,6 @@ export default async function ApplicationsAdminPage({
                   <tr className={theadRow}>
                     <th className={th}>Applicant</th>
                     <th className={th}>School</th>
-                    <th className={th}>Role</th>
-                    <th className={th}>Email</th>
                     <th className={th}>Details</th>
                     <th className={th}>Status</th>
                     <th className={th}>Submitted</th>
@@ -212,8 +210,6 @@ export default async function ApplicationsAdminPage({
                   <tr className={theadRow}>
                     <th className={th}>Applicant</th>
                     <th className={th}>Role</th>
-                    <th className={th}>Email</th>
-                    <th className={th}>Phone</th>
                     <th className={th}>Details</th>
                     <th className={th}>Status</th>
                     <th className={th}>Submitted</th>
