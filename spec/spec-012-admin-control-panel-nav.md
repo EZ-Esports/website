@@ -18,8 +18,8 @@ The user asked for the Windows Control Panel "Category" view: a few categories, 
    | Category | Items |
    |---|---|
    | (standalone) | Overview `/admin` |
-   | People & Staffing | Applications, Roles & Staff, Leadership Manager |
-   | League Operations | League Setup, Matches & Standings, Standings Archive, Teams & Rosters, Schools |
+   | People & Staffing | Applications, Careers, Roles & Staff, Leadership Manager |
+   | League Operations | League Setup, Matches & Standings, Standings Archive, Teams & Rosters, Schools, Student Demographics |
    | Website Content | News & Announcements, Gallery, Sponsors, Page Content |
 
 2. **Pure, tested helpers in the same module.**

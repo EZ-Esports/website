@@ -278,6 +278,8 @@ body::before {
 .admin-modal-overlay[data-exiting]  { animation: admin-fade-out 150ms ease-in forwards; }
 .admin-modal[data-entering]         { animation: admin-pop-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .admin-modal[data-exiting]          { animation: admin-pop-out 150ms ease-in forwards; }
+/* Non-RAC admin dialogs (mounted only while open): enter animation only. */
+.admin-modal-pop                    { animation: admin-pop-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 .admin-popover { transform-origin: var(--trigger-anchor-point, top); }
 .admin-popover[data-entering]       { animation: admin-pop-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .admin-popover[data-exiting]        { animation: admin-pop-out 120ms ease-in forwards; }
@@ -296,6 +298,7 @@ body::before {
   .admin-skeleton,
   .admin-modal-overlay,
   .admin-modal,
+  .admin-modal-pop,
   .admin-popover,
   .admin-toast {
     animation: none !important;

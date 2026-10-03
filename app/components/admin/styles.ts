@@ -72,6 +72,8 @@ const btnBase =
 const btnSize = {
   md: 'h-9 px-4 text-sm',
   sm: 'h-8 px-3 text-xs',
+  /** 24px, only for inline confirm prompts inside a row. */
+  xs: 'h-6 px-2 text-xs',
 } as const;
 
 const btnTone = {

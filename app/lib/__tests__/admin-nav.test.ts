@@ -20,8 +20,8 @@ describe('ADMIN_NAV_CATEGORIES', () => {
 
   it('groups sections into the three Control Panel categories', () => {
     expect(ADMIN_NAV_CATEGORIES.map((c) => [c.label, c.items.map((i) => i.href)])).toEqual([
-      ['People & Staffing', ['/admin/applications', '/admin/team', '/admin/leadership']],
-      ['League Operations', ['/admin/league', '/admin/matches', '/admin/standings', '/admin/roster', '/admin/schools']],
+      ['People & Staffing', ['/admin/applications', '/admin/careers', '/admin/team', '/admin/leadership']],
+      ['League Operations', ['/admin/league', '/admin/matches', '/admin/standings', '/admin/roster', '/admin/schools', '/admin/demographics']],
       ['Website Content', ['/admin/news', '/admin/gallery', '/admin/sponsors', '/admin/content']],
     ]);
   });

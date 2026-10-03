@@ -51,8 +51,8 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 
 **Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md) and [spec-012](spec-012-admin-control-panel-nav.md). `AdminShell.tsx` has a 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`). It shows Overview, then three collapsible categories (RAC Disclosures), all from `app/lib/admin-nav.ts` and filtered by permission:
 
-- **People & Staffing:** Applications, Roles & Staff, Leadership.
-- **League Operations:** League Setup, Matches, Standings Archive, Teams & Rosters, Schools.
+- **People & Staffing:** Applications, Careers, Roles & Staff, Leadership.
+- **League Operations:** League Setup, Matches, Standings Archive, Teams & Rosters, Schools, Student Demographics.
 - **Website Content:** News, Gallery, Sponsors, Page Content.
 
 The nav scrolls on its own (`overflow-y-auto`) only when it outgrows a short viewport; Public Site and Sign Out stay pinned. The top bar is sticky and shows a `Staff portal › Category › Page` breadcrumb. Page content scrolls the document. No mobile drawer exists.

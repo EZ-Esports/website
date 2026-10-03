@@ -10,6 +10,8 @@ import {
 import { generateManagerInvite } from '@/app/(admin)/admin/schools/manager-actions';
 import { input } from '@/app/components/admin/styles';
 import type { GameItem, ManagerInviteItem } from './types';
+import { adminButton, inputSm, label as labelClass, primaryBtn, primaryBtnSm } from '../styles';
+import { RequiredMark } from '../AdminUI';
 
 interface ProvisionInviteTabProps {
   schoolId: string;
@@ -105,12 +107,12 @@ export function ProvisionInviteTab({
     <div className="space-y-6">
       {/* Generated URL Card */}
       {generatedUrl && (
-        <div className="p-4 rounded-xl border border-accent/40 bg-accent/10 space-y-3">
+        <div className="admin-fade-in rounded-xl bg-accent/10 p-4 space-y-3 ring-1 ring-accent/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-accent">
               <FiCheckCircle className="w-4 h-4" /> Manager Invite Link Ready
             </span>
-            <span className="text-[11px] text-foreground-muted">Valid for 14 days</span>
+            <span className="text-xs text-foreground-secondary">Valid for 14 days</span>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -118,12 +120,12 @@ export function ProvisionInviteTab({
               readOnly
               value={generatedUrl}
               aria-label="Generated manager invite URL"
-              className="flex-1 px-3 py-2 bg-surface text-foreground rounded-lg border border-border text-xs font-mono select-all focus:outline-none"
+              className={inputSm + ' flex-1 font-mono select-all'}
             />
             <button
               type="button"
               onClick={() => copyToClipboard(generatedUrl)}
-              className="px-3.5 py-2 bg-accent text-on-accent rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors flex items-center gap-1.5 shrink-0"
+              className={primaryBtnSm}
               aria-label="Copy invite link to clipboard"
             >
               {copiedUrl ? (
@@ -137,17 +139,17 @@ export function ProvisionInviteTab({
               )}
             </button>
           </div>
-          <p className="text-[11px] text-foreground-muted">
+          <p className="text-xs text-foreground-secondary">
             Send this link to the school manager. They will complete verification, set their password, and gain instant access to the School Manager Portal.
           </p>
         </div>
       )}
 
       {/* Provisioning Form */}
-      <div className="p-4 rounded-xl border border-line bg-surface-raised/40 space-y-4">
+      <div className="rounded-xl bg-surface-sunken/60 p-4 space-y-4">
         <div className="flex items-center gap-2">
           <FiLink className="w-4 h-4 text-accent" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+          <h3 className="text-sm font-semibold text-foreground">
             Provision Manager Invite Link
           </h3>
         </div>
@@ -157,9 +159,9 @@ export function ProvisionInviteTab({
             <div>
               <label
                 htmlFor="invite-first-name"
-                className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1"
+                className={labelClass}
               >
-                First Name <span className="text-accent">*</span>
+                First Name <RequiredMark />
               </label>
               <input
                 id="invite-first-name"
@@ -174,9 +176,9 @@ export function ProvisionInviteTab({
             <div>
               <label
                 htmlFor="invite-last-name"
-                className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1"
+                className={labelClass}
               >
-                Last Name <span className="text-accent">*</span>
+                Last Name <RequiredMark />
               </label>
               <input
                 id="invite-last-name"
@@ -194,7 +196,7 @@ export function ProvisionInviteTab({
             <div className="sm:col-span-2">
               <label
                 htmlFor="invite-email"
-                className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1"
+                className={labelClass}
               >
                 Expected Email (Optional)
               </label>
@@ -210,7 +212,7 @@ export function ProvisionInviteTab({
             <div>
               <label
                 htmlFor="invite-year"
-                className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1"
+                className={labelClass}
               >
                 Academic Year
               </label>
@@ -228,7 +230,7 @@ export function ProvisionInviteTab({
 
           {/* Scoped Games Selection */}
           <div>
-            <span className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+            <span className={labelClass}>
               Game Permissions
             </span>
             <div className="flex items-center gap-4 text-xs mb-2">
@@ -238,7 +240,7 @@ export function ProvisionInviteTab({
                   name="inviteGameScope"
                   checked={allGames}
                   onChange={() => setAllGames(true)}
-                  className="text-accent focus:ring-accent"
+                  className="h-4 w-4 accent-accent"
                 />
                 <span>All Games (Full School Access)</span>
               </label>
@@ -248,14 +250,14 @@ export function ProvisionInviteTab({
                   name="inviteGameScope"
                   checked={!allGames}
                   onChange={() => setAllGames(false)}
-                  className="text-accent focus:ring-accent"
+                  className="h-4 w-4 accent-accent"
                 />
                 <span>Specific Games Only</span>
               </label>
             </div>
 
             {!allGames && games.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-lg border border-line bg-surface-sunken">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-lg bg-surface-sunken p-3">
                 {games.map((g) => (
                   <label
                     key={g.id}
@@ -265,7 +267,7 @@ export function ProvisionInviteTab({
                       type="checkbox"
                       checked={selectedGames.includes(g.slug)}
                       onChange={() => handleToggleGame(g.slug)}
-                      className="rounded border-line text-accent focus:ring-accent"
+                      className="h-4 w-4 accent-accent"
                     />
                     <span>{g.displayName || g.name || g.slug}</span>
                   </label>
@@ -281,7 +283,7 @@ export function ProvisionInviteTab({
                 type="checkbox"
                 checked={isPrimaryContact}
                 onChange={(e) => setIsPrimaryContact(e.target.checked)}
-                className="rounded border-line text-accent focus:ring-accent"
+                className="h-4 w-4 accent-accent"
               />
               <span>Designate as primary school contact for this academic year</span>
             </label>
@@ -291,7 +293,7 @@ export function ProvisionInviteTab({
             <button
               type="submit"
               disabled={isSubmitting || !firstName.trim() || !lastName.trim()}
-              className="px-4 py-2 bg-accent text-on-accent text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-accent/90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className={primaryBtn}
             >
               <FiLink className="w-3.5 h-3.5" />
               {isSubmitting ? 'Generating...' : 'Generate Manager Invite Link'}
@@ -302,16 +304,16 @@ export function ProvisionInviteTab({
 
       {/* Recent & Pending Manager Invites List */}
       <div>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground-secondary mb-3">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
           Manager Invites ({invites.length})
         </h3>
 
         {invites.length === 0 ? (
-          <div className="p-4 rounded-xl border border-line/60 bg-surface-raised/20 text-center text-xs text-foreground-muted">
+          <div className="rounded-xl bg-surface-sunken/60 p-4 text-center text-sm text-foreground-secondary">
             No manager invites generated yet for this school.
           </div>
         ) : (
-          <div className="divide-y divide-line/40 rounded-xl border border-line/60 bg-surface-raised/20 overflow-hidden">
+          <div className="admin-stagger divide-y divide-line/50 overflow-hidden rounded-xl bg-surface-sunken/60">
             {invites.map((inv) => {
               const isExpired = inv.expiresAt ? new Date(inv.expiresAt).getTime() < now : false;
               const statusColor =
@@ -334,12 +336,12 @@ export function ProvisionInviteTab({
                         {inv.intendedFirstName} {inv.intendedLastName}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusColor}`}
+                        className={`inline-flex h-5 items-center rounded-md px-2 text-xs font-medium capitalize ${statusColor}`}
                       >
                         {isExpired && inv.status === 'pending' ? 'Expired' : inv.status}
                       </span>
                     </div>
-                    <p className="text-[11px] text-foreground-muted">
+                    <p className="text-xs text-foreground-secondary">
                       Created {new Date(inv.createdAt).toLocaleDateString()} &bull; Expires{' '}
                       {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : 'Never'}
                     </p>
@@ -359,7 +361,7 @@ export function ProvisionInviteTab({
                           }
                         }}
                         disabled={isRevokingId === inv.id}
-                        className="px-2.5 py-1 text-xs border border-rose-900/40 text-rose-400 rounded-lg hover:bg-rose-950/30 transition-colors disabled:opacity-40"
+                        className={adminButton('ghost', 'sm') + ' text-red-300 hover:text-red-200 hover:bg-red-950/40'}
                       >
                         {isRevokingId === inv.id ? 'Revoking...' : 'Revoke'}
                       </button>

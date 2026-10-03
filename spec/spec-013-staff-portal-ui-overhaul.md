@@ -75,6 +75,17 @@ Pink marks emphasis and state, roughly one or two touches per region, dark surfa
 
 Match Fixtures sits in the 2/3 column beside the schedule form, so it must fit about 625px at 1280 (the 24 Sep fit work). It uses the compact cells, 32px (`w-8`) score inputs, team names truncated at `w-16` (`2xl:w-28`), a short Eastern date ("Wed, Sep 23, 2026") over the time, and a text-only "Saving…". Measured in the real two-column layout (table `scrollWidth` vs its column): 1280: 627 / 627, 1366: 684 / 684, 1440: 733 / 733, so no horizontal scroll; min-content width is 606px. Save and Delete stay inside the column.
 
+### 7. Rebase onto main (careers, demographics, school managers)
+
+The branch was rebased onto `350cd57`, which added the careers admin, the student demographics vault, the school-manager modal, and the career-posting filter on Applications. Main's behaviour was kept as is; the presentation layer was reapplied on top:
+
+- **Navigation ([spec-012](spec-012-admin-control-panel-nav.md)):** `/admin/careers` (Careers) joins People & Staffing after Applications, and `/admin/demographics` (Student Demographics) joins League Operations after Schools. The sidebar, breadcrumb and Overview hub pick them up from `admin-nav.ts`.
+- **Careers:** `CareersManagerClient` renders the page header (its "New opening" action opens the client modal), a flush section with a status segmented filter and `AdminSearchField`, table tokens, and empty state. `CareerPostingRow` uses status chips, a secondary-button applicant count link and the delete icon with its existing inline confirm. `CareerPostingModal` stays a non-RAC dialog (no behaviour change) with the admin modal look, `admin-modal-pop` entry, associated labels and `AdminNotice` errors.
+- **Demographics:** `DemographicsExplorer` uses the page anatomy (restricted/FERPA chips in header meta, Export CSV as header action), KPI tiles, a sticky filter toolbar, table tokens, and the survey modal with `admin-modal` motion.
+- **Schools:** main removed the Display order column and field (now a hidden input) and added a "Manage portal managers" row action, styled as an `editIconBtn`. `SchoolManagersModal` uses `AdminTabs` and `AdminNotice`; its three tabs use the label, button, chip, search and contrast tokens.
+- **Applications:** main's `?posting=` career filter shows as an info `AdminNotice` with a "Clear filter" action above the staff table.
+- **Roles:** main's superadmin-only "View Student Demographics" permission keeps its lock logic and shows a `danger` chip.
+
 ## Invariants & Boundaries
 
 - **Presentation only.** No server action, query, permission check, validation rule, route, form field `name`, or database code changed. `id`/`htmlFor`/ARIA attributes were added for label association and roles. Visible text changed to sentence case in places (tests updated for "School applications" / "Staff applications").
