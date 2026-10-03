@@ -83,11 +83,45 @@ describe("ApplicationsAdminPage", () => {
       const jsx = await ApplicationsAdminPage({ searchParams: Promise.resolve({}) });
       const html = renderToStaticMarkup(jsx);
 
+      // Tabs: both are listed, but only the selected (school, by default) panel mounts.
       expect(html).toContain("School applications");
       expect(html).toContain("Staff applications");
       expect(html).toContain("School Applicant");
-      expect(html).toContain("Staff Applicant");
+      expect(html).not.toContain("Staff Applicant");
       expect(html).toContain("Export CSV");
+      expect(html).toContain("tab=school");
+
+      // A staff deep link (?posting= / ?staffStatus=) opens the staff tab instead.
+      vi.mocked(getStaffForAdminSection).mockResolvedValueOnce({
+        id: "staff-1",
+        email: "admin@ezesports.org",
+        permissions: BigInt(0xffffffff),
+        isOwner: true,
+        highestRolePosition: 1,
+      });
+      vi.mocked(getSchoolApplications).mockResolvedValueOnce([]);
+      vi.mocked(getStaffApplications).mockResolvedValueOnce([
+        {
+          id: "staff-app-1",
+          careerPostingId: "posting-1",
+          name: "Staff Applicant",
+          preferredFirstName: "Staffer",
+          email: "staff@example.com",
+          phone: "555-1234",
+          discordTag: "staff#1234",
+          role: "Productions Crew",
+          details: null,
+          hasResume: false,
+          submittedAt: new Date("2026-09-02T12:00:00Z"),
+          status: "pending",
+        },
+      ]);
+      const staffHtml = renderToStaticMarkup(
+        await ApplicationsAdminPage({ searchParams: Promise.resolve({ staffStatus: "pending" }) }),
+      );
+      expect(staffHtml).toContain("Staff Applicant");
+      expect(staffHtml).not.toContain("School Applicant");
+      expect(staffHtml).toContain("tab=staff");
     } finally {
       process.env.DATABASE_URL = prevDb;
     }
