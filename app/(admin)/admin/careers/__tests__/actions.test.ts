@@ -152,6 +152,40 @@ describe('Admin Careers Actions', () => {
         title: 'Senior Engineer',
       }));
     });
+
+    it('sends an unchanged slug and untouched fields through verbatim, without a duplicate-slug lookup', async () => {
+      vi.mocked(updateCareerPosting).mockResolvedValueOnce({
+        id: 'posting-1',
+        title: 'Senior Engineer II',
+        slug: 'senior-engineer',
+        department: 'Engineering',
+        location: 'Remote',
+        commitment: '5h',
+        employmentType: 'Volunteer',
+        summary: 'Sum',
+        description: 'Desc',
+        status: 'closed',
+        displayOrder: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await updateCareerPostingAction('posting-1', {
+        title: 'Senior Engineer II',
+        slug: 'senior-engineer',
+        status: 'closed',
+        displayOrder: 0,
+      });
+
+      expect(res.success).toBe(true);
+      expect(getCareerPostingBySlug).not.toHaveBeenCalled();
+      expect(updateCareerPosting).toHaveBeenCalledWith('posting-1', {
+        title: 'Senior Engineer II',
+        slug: 'senior-engineer',
+        status: 'closed',
+        displayOrder: 0,
+      });
+    });
   });
 
   describe('deleteCareerPostingAction', () => {

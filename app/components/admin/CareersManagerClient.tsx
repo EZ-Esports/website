@@ -15,7 +15,9 @@ interface CareersManagerClientProps {
 
 export default function CareersManagerClient({ initialPostings }: CareersManagerClientProps) {
   const router = useRouter();
-  const [postings] = useState<AdminCareerPostingWithStats[]>(initialPostings);
+  // Read straight from props so router.refresh() after a save updates the list (and the
+  // values the next Edit pre-fills) instead of freezing the first server render.
+  const postings = initialPostings;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPosting, setEditingPosting] = useState<AdminCareerPostingWithStats | null>(null);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ghostBtn, iconBtn, input, label as labelClass, primaryBtn } from './styles';
 import { AdminNotice, PendingLabel, RequiredMark } from './AdminUI';
 import { createCareerPostingAction, updateCareerPostingAction } from '@/app/(admin)/admin/careers/actions';
@@ -25,29 +25,68 @@ const DEPARTMENTS = [
   'Legal & Governance',
 ];
 
-export default function CareerPostingModal({
-  posting,
-  isOpen,
-  onClose,
-  onSuccess,
-}: CareerPostingModalProps) {
-  const isEditing = !!posting;
+export interface CareerPostingFormValues {
+  title: string;
+  slug: string;
+  department: string;
+  location: string;
+  commitment: string;
+  employmentType: string;
+  summary: string;
+  description: string;
+  status: CareerPostingStatus;
+  displayOrder: number;
+}
 
-  const [title, setTitle] = useState(posting?.title || '');
-  const [slug, setSlug] = useState(posting?.slug || '');
-  const [department, setDepartment] = useState(posting?.department || DEPARTMENTS[0]);
-  const [location, setLocation] = useState(posting?.location || 'Remote (NYC High School League)');
-  const [commitment, setCommitment] = useState(posting?.commitment || '5–10 hours / week');
-  const [employmentType, setEmploymentType] = useState(posting?.employmentType || 'Volunteer / High School Internship');
-  const [summary, setSummary] = useState(posting?.summary || '');
-  const [description, setDescription] = useState(posting?.description || '');
-  const [status, setStatus] = useState<CareerPostingStatus>(posting?.status || 'published');
-  const [displayOrder, setDisplayOrder] = useState<number>(posting?.displayOrder ?? 0);
+/** Initial form state: the posting's current values when editing, defaults for a new opening. */
+export function postingToFormValues(posting?: AdminCareerPostingWithStats | null): CareerPostingFormValues {
+  return {
+    title: posting?.title || '',
+    slug: posting?.slug || '',
+    department: posting?.department || DEPARTMENTS[0],
+    location: posting?.location || 'Remote (NYC High School League)',
+    commitment: posting?.commitment || '5–10 hours / week',
+    employmentType: posting?.employmentType || 'Volunteer / High School Internship',
+    summary: posting?.summary || '',
+    description: posting?.description || '',
+    status: posting?.status || 'published',
+    displayOrder: posting?.displayOrder ?? 0,
+  };
+}
+
+// The form seeds its state from `posting` once, on mount. It is only mounted while the
+// dialog is open (and keyed per posting), so every open starts from the right values and
+// clean loading/error state instead of inheriting the previous session's.
+export default function CareerPostingModal({ isOpen, posting, ...rest }: CareerPostingModalProps) {
+  if (!isOpen) return null;
+  return <CareerPostingForm key={posting?.id ?? 'new'} posting={posting} {...rest} />;
+}
+
+function CareerPostingForm({ posting, onClose, onSuccess }: Omit<CareerPostingModalProps, 'isOpen'>) {
+  const isEditing = !!posting;
+  const initial = postingToFormValues(posting);
+
+  const [title, setTitle] = useState(initial.title);
+  const [slug, setSlug] = useState(initial.slug);
+  const [department, setDepartment] = useState(initial.department);
+  const [location, setLocation] = useState(initial.location);
+  const [commitment, setCommitment] = useState(initial.commitment);
+  const [employmentType, setEmploymentType] = useState(initial.employmentType);
+  const [summary, setSummary] = useState(initial.summary);
+  const [description, setDescription] = useState(initial.description);
+  const [status, setStatus] = useState<CareerPostingStatus>(initial.status);
+  const [displayOrder, setDisplayOrder] = useState<number>(initial.displayOrder);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextTitle = e.target.value;
