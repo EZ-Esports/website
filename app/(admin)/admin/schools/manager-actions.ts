@@ -80,7 +80,12 @@ export async function removeSchoolManager(
 }
 
 export async function getSchoolManagers(schoolId: string) {
-  return staffManagerService.getSchoolManagers(schoolId);
+  try {
+    return await staffManagerService.getSchoolManagers(schoolId);
+  } catch (error) {
+    console.error('getSchoolManagers error:', error);
+    return [];
+  }
 }
 
 export interface GenerateManagerInviteParams {
@@ -113,7 +118,12 @@ export async function generateManagerInvite(
 }
 
 export async function getSchoolManagerInvites(schoolId: string) {
-  return staffManagerService.getSchoolManagerInvites(schoolId);
+  try {
+    return await staffManagerService.getSchoolManagerInvites(schoolId);
+  } catch (error) {
+    console.error('getSchoolManagerInvites error:', error);
+    return [];
+  }
 }
 
 export async function revokeManagerInvite(inviteId: string) {
@@ -136,7 +146,12 @@ export interface RegisteredManagerAccount {
 }
 
 export async function getRegisteredManagers(searchQuery?: string): Promise<RegisteredManagerAccount[]> {
-  return staffManagerService.getRegisteredManagers(searchQuery);
+  try {
+    return await staffManagerService.getRegisteredManagers(searchQuery);
+  } catch (error) {
+    console.error('getRegisteredManagers error:', error);
+    return [];
+  }
 }
 
 export interface AssignExistingManagerParams {

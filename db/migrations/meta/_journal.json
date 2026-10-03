@@ -292,15 +292,29 @@
     {
       "idx": 41,
       "version": "7",
-      "when": 1790802255037,
+      "when": 1790836642761,
       "tag": "0041_bright_scrambler",
       "breakpoints": true
     },
     {
       "idx": 42,
       "version": "7",
-      "when": 1790802648651,
+      "when": 1790836642762,
       "tag": "0042_parallel_albert_cleary",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1790836642763,
+      "tag": "0043_manager_onboarding_and_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1790836642764,
+      "tag": "0044_staff_members_member_id",
       "breakpoints": true
     }
   ]
