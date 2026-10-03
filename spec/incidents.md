@@ -148,7 +148,17 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
-## 15. Smaller scars
+## 15. Careers "Edit" opened with empty or stale fields (branch `fix/careers-edit-prefill`)
+
+**Symptom.** In `/admin/careers`, clicking Edit showed blank fields (or values from a previously opened posting, plus a lingering error banner), so a minor change meant retyping the whole opening.
+
+**Root cause.** `CareersManagerClient` always rendered `CareerPostingModal` and toggled `isOpen`; the modal seeded its `useState` fields from `posting` only on first mount (when `posting` was `null`) and then returned `null` while closed. The instance and its state outlived every open/close, so later `posting` props were ignored. Compounding it, the manager held `useState(initialPostings)`, which froze the list at the first server render, so `router.refresh()` after a save never updated the values a later Edit would pre-fill.
+
+**Fix.** The modal is now a thin wrapper that renders an inner `CareerPostingForm` only while open, keyed by `posting?.id ?? 'new'`; initial values come from the exported `postingToFormValues()`. The manager reads `initialPostings` from props directly. Escape now closes the dialog. The list query already returns the full row, and `updateCareerPostingAction` already passes an unchanged slug through without a duplicate lookup (the DB unique constraint does not conflict with the row's own value), so neither needed changes. Known gap: editing a slug to one that is taken (including by a soft-deleted row) surfaces as the generic `sanitizeDbError` message, not a friendly "slug exists" error.
+
+---
+
+## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
 - **`6df7d59`:** one production `message` row unparseable; recovered via v1 parser after a live check, not declared lost. `details` is a versioned union because a single fixed shape strands redesigns.

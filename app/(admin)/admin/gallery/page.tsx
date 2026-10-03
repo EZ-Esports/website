@@ -1,4 +1,4 @@
-import Card from '@/app/components/ui/Card';
+import { HiOutlinePhoto } from 'react-icons/hi2';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, isNull } from 'drizzle-orm';
@@ -10,6 +10,8 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminCount, AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, RequiredMark } from '@/app/components/admin/AdminUI';
+import { input, label as labelClass } from '@/app/components/admin/styles';
 
 async function getAllGalleryImages() {
   return db
@@ -37,67 +39,71 @@ export default async function GalleryAdminPage() {
   const set1 = images;
 
   return (
-    <div className="space-y-8">
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/gallery"
+        description="Photos for the homepage gallery. Reorder with the arrows on each card, then save the new order."
+      />
+
+      {!dbConfigured && <DbErrorNotice />}
+
       {/* Add Image Form */}
-      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
-        <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add Gallery Image</h2>
+      <AdminSection id="add-image" title="Add a gallery image">
         <AddEntityForm action={addGalleryImage} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <ImageUpload section="gallery" name="src" storageKeyName="storageKey" label="Image" required />
           </div>
           <div className="sm:col-span-2">
             {/* Caption is required — it also serves as the image alt text (WCAG) */}
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-              Caption / Alt Text <span className="text-accent">*</span>
+            <label htmlFor="add-image-caption" className={labelClass}>
+              Caption / alt text <RequiredMark />
             </label>
             <input
+              id="add-image-caption"
               name="caption"
               type="text"
               required
               placeholder="Spring 2022 Championship (used as image alt text)"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">School Name</label>
+            <label htmlFor="add-image-schoolName" className={labelClass}>School name</label>
             <input
+              id="add-image-schoolName"
               name="schoolName"
               type="text"
               placeholder="Stuyvesant High School"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Event Name</label>
+            <label htmlFor="add-image-eventName" className={labelClass}>Event name</label>
             <input
+              id="add-image-eventName"
               name="eventName"
               type="text"
               placeholder="Spring 2022 Finals"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
 
-          <div className="sm:col-span-2">
-            <SubmitButton
-              label="Add Image"
-              pendingLabel="Adding…"
-              className="px-6 py-2.5 bg-accent text-on-accent rounded-lg font-bold text-sm hover:bg-accent/80 transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            />
+          <div className="sm:col-span-2 flex justify-end border-t border-line/60 pt-4">
+            <SubmitButton label="Add image" pendingLabel="Adding…" />
           </div>
         </AddEntityForm>
-      </Card>
-
-      {!dbConfigured && <DbErrorNotice />}
+      </AdminSection>
 
       {/* Gallery Images */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-black text-white uppercase tracking-wider">Gallery Images</h2>
+      <AdminSection variant="bare" title={<>Gallery images<AdminCount>{set1.length}</AdminCount></>}>
         {set1.length === 0 ? (
-          <p className="text-foreground-muted text-sm">No images in the gallery yet.</p>
+          <div className="rounded-2xl bg-admin-panel">
+            <AdminEmptyState compact icon={<HiOutlinePhoto />} title="No images in the gallery yet." description="Add the first one above." />
+          </div>
         ) : (
           <GalleryManagerClient initialImages={set1} />
         )}
-      </div>
-    </div>
+      </AdminSection>
+    </AdminPage>
   );
 }

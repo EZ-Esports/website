@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import Card from '@/app/components/ui/Card';
+import { AdminCount, AdminEmptyState, AdminPage, AdminPageHeader, AdminSearchField, AdminSection } from '@/app/components/admin/AdminUI';
+import { chip, iconBtn, secondaryBtn, secondaryBtnSm, selectClass, table, tableWrap, tbody, td, tdRight, th, theadRow, thRight, tr } from '@/app/components/admin/styles';
+import { cx } from '@/app/lib/cx';
 import { Overlay, Modal, Dialog, Heading } from '@/app/components/ui/overlay';
 import {
   HiOutlineUserGroup,
   HiOutlineShieldCheck,
   HiOutlineAcademicCap,
   HiOutlineDocumentArrowDown,
-  HiOutlineMagnifyingGlass,
   HiOutlineInformationCircle,
   HiOutlineXMark,
   HiOutlineCheckCircle,
@@ -164,126 +165,70 @@ export default function DemographicsExplorer({ records, schools }: DemographicsE
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-surface-raised/40 border border-line border-l-4 border-l-accent rounded-2xl">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded bg-red-950/60 text-red-400 border border-red-800/50">
-              Superadmin Restricted
-            </span>
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
-              FERPA / Title I Vault
-            </span>
-          </div>
-          <h1 className="text-xl font-black text-white uppercase tracking-wider mt-2">
-            Student Demographics & Equity Vault
-          </h1>
-          <p className="text-xs text-foreground-secondary max-w-2xl mt-1 leading-relaxed">
-            Strictly isolated minor demographic PII. Accessible only to actors with{' '}
-            <code className="text-accent text-[11px]">VIEW_STUDENT_DEMOGRAPHICS</code> or Owner privileges. School managers
-            and general staff cannot see or query these records.
-          </p>
-        </div>
+  const kpis = [
+    { label: 'Total submissions', value: stats.total, pct: null, help: 'Verified student profiles', icon: <HiOutlineUserGroup />, tone: 'bg-accent/15 text-accent' },
+    { label: 'Title I (free/reduced lunch)', value: stats.titleICount, pct: stats.titleIPct, help: 'Eligible for Title I grant reporting', icon: <HiOutlineShieldCheck />, tone: 'bg-success/15 text-success' },
+    { label: 'First-gen college', value: stats.firstGenCount, pct: stats.firstGenPct, help: 'First in family to attend college', icon: <HiOutlineAcademicCap />, tone: 'bg-violet-400/15 text-violet-300' },
+    { label: 'DOE petition consent', value: stats.doeConsentCount, pct: stats.doeConsentPct, help: 'Consented for official recognition', icon: <HiOutlineCheckCircle />, tone: 'bg-sky-400/15 text-sky-300' },
+  ];
 
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          disabled={filteredRecords.length === 0}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-raised hover:bg-line border border-line text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-        >
-          <HiOutlineDocumentArrowDown className="w-4 h-4 text-accent" />
-          <span>Export CSV ({filteredRecords.length})</span>
-        </button>
-      </div>
+  return (
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/demographics"
+        description={
+          <>
+            Strictly isolated minor demographic PII. Accessible only to actors with{' '}
+            <code className="rounded bg-surface-sunken px-1 py-0.5 font-mono text-[0.8125rem] text-accent">VIEW_STUDENT_DEMOGRAPHICS</code> or Owner
+            privileges. School managers and general staff cannot see or query these records.
+          </>
+        }
+        meta={
+          <>
+            <span className={chip('danger')}>Superadmin restricted</span>
+            <span className={chip('success')}>FERPA / Title I vault</span>
+          </>
+        }
+        actions={
+          <button type="button" onClick={handleExportCsv} disabled={filteredRecords.length === 0} className={secondaryBtn}>
+            <HiOutlineDocumentArrowDown aria-hidden className="h-4 w-4 text-accent" />
+            Export CSV <span className="tabular-nums text-foreground-secondary">({filteredRecords.length})</span>
+          </button>
+        }
+      />
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-surface-raised/30 border border-line p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-              Total Submissions
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center">
-              <HiOutlineUserGroup className="w-4 h-4" />
+      <section aria-label="Summary" className="admin-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((k) => (
+          <div key={k.label} className="rounded-2xl bg-admin-panel p-5">
+            <div className="flex items-center justify-between gap-2 text-sm font-medium text-foreground-secondary">
+              <span>{k.label}</span>
+              <span aria-hidden className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg [&>svg]:h-4 [&>svg]:w-4', k.tone)}>{k.icon}</span>
             </div>
-          </div>
-          <div className="text-2xl font-black text-white mt-3">{stats.total}</div>
-          <p className="text-[11px] text-foreground-muted mt-1">Verified student profiles</p>
-        </Card>
-
-        <Card className="bg-surface-raised/30 border border-line p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-              Title I (Free/Reduced Lunch)
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-              <HiOutlineShieldCheck className="w-4 h-4" />
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{k.value}</span>
+              {k.pct !== null && <span className="text-sm font-medium tabular-nums text-foreground-secondary">({k.pct}%)</span>}
             </div>
+            <p className="mt-1 text-xs text-foreground-secondary">{k.help}</p>
           </div>
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-2xl font-black text-white">{stats.titleICount}</span>
-            <span className="text-xs font-bold text-emerald-400">({stats.titleIPct}%)</span>
-          </div>
-          <p className="text-[11px] text-foreground-muted mt-1">Eligible for Title I grant reporting</p>
-        </Card>
+        ))}
+      </section>
 
-        <Card className="bg-surface-raised/30 border border-line p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-              First-Gen College
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center">
-              <HiOutlineAcademicCap className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-2xl font-black text-white">{stats.firstGenCount}</span>
-            <span className="text-xs font-bold text-purple-400">({stats.firstGenPct}%)</span>
-          </div>
-          <p className="text-[11px] text-foreground-muted mt-1">First in family to attend college</p>
-        </Card>
-
-        <Card className="bg-surface-raised/30 border border-line p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">
-              DOE Petition Consent
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center">
-              <HiOutlineCheckCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-2xl font-black text-white">{stats.doeConsentCount}</span>
-            <span className="text-xs font-bold text-blue-400">({stats.doeConsentPct}%)</span>
-          </div>
-          <p className="text-[11px] text-foreground-muted mt-1">Consented for official recognition</p>
-        </Card>
-      </div>
-
-      {/* Controls & Filter Bar */}
-      <Card className="bg-surface-raised/20 border border-line p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          {/* Search Input */}
-          <div className="relative md:col-span-1">
-            <HiOutlineMagnifyingGlass className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
-            <input
-              type="text"
+      <AdminSection
+        variant="flush"
+        stickyToolbar
+        title={<>Student records<AdminCount>{filteredRecords.length}</AdminCount></>}
+        toolbar={
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+            <AdminSearchField
+              size="sm"
+              aria-label="Search student, email, school"
+              placeholder="Search student, email, school…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search student, email, school…"
-              className="w-full pl-9 pr-3 py-2 bg-surface-sunken border border-line rounded-xl text-xs text-white placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              onClear={() => setSearch('')}
             />
-          </div>
-
-          {/* School Select */}
-          <div>
-            <select
-              value={selectedSchool}
-              onChange={(e) => setSelectedSchool(e.target.value)}
-              className="w-full px-3 py-2 bg-surface-sunken border border-line rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
-            >
+            <select aria-label="School" value={selectedSchool} onChange={(e) => setSelectedSchool(e.target.value)} className={cx(selectClass, 'w-full')}>
               <option value="all">All Schools</option>
               {schools.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -291,167 +236,116 @@ export default function DemographicsExplorer({ records, schools }: DemographicsE
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Title I Status */}
-          <div>
-            <select
-              value={selectedTitleI}
-              onChange={(e) => setSelectedTitleI(e.target.value as any)}
-              className="w-full px-3 py-2 bg-surface-sunken border border-line rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
-            >
+            <select aria-label="Title I status" value={selectedTitleI} onChange={(e) => setSelectedTitleI(e.target.value as any)} className={cx(selectClass, 'w-full')}>
               <option value="all">Title I: All Students</option>
               <option value="yes">Title I: Eligible (Free/Reduced Lunch)</option>
               <option value="no">Title I: Standard / Ineligible</option>
             </select>
-          </div>
-
-          {/* First Gen Status */}
-          <div>
-            <select
-              value={selectedFirstGen}
-              onChange={(e) => setSelectedFirstGen(e.target.value as any)}
-              className="w-full px-3 py-2 bg-surface-sunken border border-line rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
-            >
+            <select aria-label="First-gen college status" value={selectedFirstGen} onChange={(e) => setSelectedFirstGen(e.target.value as any)} className={cx(selectClass, 'w-full')}>
               <option value="all">First-Gen: All Students</option>
               <option value="yes">First-Gen College: Yes</option>
               <option value="no">First-Gen College: No</option>
             </select>
           </div>
-        </div>
-      </Card>
-
-      {/* Main Records Table */}
-      <Card className="bg-surface-raised/30 border border-line overflow-hidden">
+        }
+      >
         {filteredRecords.length === 0 ? (
-          <div className="py-16 text-center">
-            <HiOutlineUserGroup className="w-12 h-12 text-foreground-muted mx-auto mb-3 opacity-40" />
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">No Demographic Records Found</h3>
-            <p className="text-xs text-foreground-muted mt-1 max-w-sm mx-auto">
-              {records.length === 0
+          <AdminEmptyState
+            icon={<HiOutlineUserGroup />}
+            title="No demographic records found"
+            description={
+              records.length === 0
                 ? 'No students have submitted the onboarding demographic survey yet.'
-                : 'No records match the current filter criteria.'}
-            </p>
-          </div>
+                : 'No records match the current filter criteria.'
+            }
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
-                <tr className="border-b border-line bg-surface-sunken/40">
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider">Student Name</th>
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider">School / Class</th>
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider">Birthdate / Gender</th>
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider">Race & Ethnicity</th>
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider">Equity Status</th>
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider">Language / Origin</th>
-                  <th className="py-3 px-4 font-bold text-foreground-secondary uppercase tracking-wider text-right">Details</th>
+                <tr className={theadRow}>
+                  <th className={th}>Student name</th>
+                  <th className={th}>School / class</th>
+                  <th className={th}>Birthdate / gender</th>
+                  <th className={th}>Race &amp; ethnicity</th>
+                  <th className={th}>Equity status</th>
+                  <th className={th}>Language / origin</th>
+                  <th className={thRight}>Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line/60">
+              <tbody className={tbody}>
                 {filteredRecords.map((r) => {
                   const birthDateObj = r.birthDate ? new Date(r.birthDate) : null;
                   const birthFormatted = birthDateObj ? birthDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
                   const allRaces = [...(r.race ?? []), ...(r.ethnicity ?? [])];
 
                   return (
-                    <tr key={r.id} className="hover:bg-surface-raised/40 transition-colors">
+                    <tr key={r.id} className={tr}>
                       {/* Name & Preferred Name */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-white text-sm">
+                      <td className={td}>
+                        <div className="font-medium text-foreground">
                           {r.legalFirstName} {r.legalLastName}
                         </div>
                         {(r.memberFirstName || r.memberLastName) && (
-                          <div className="text-[11px] text-foreground-muted mt-0.5">
+                          <div className="mt-0.5 text-xs text-foreground-secondary">
                             Pref: {r.memberFirstName} {r.memberLastName}
                           </div>
                         )}
-                        {r.memberEmail && (
-                          <div className="text-[11px] text-foreground-secondary truncate max-w-[180px]">
-                            {r.memberEmail}
-                          </div>
-                        )}
+                        {r.memberEmail && <div className="max-w-[180px] truncate text-xs text-foreground-secondary">{r.memberEmail}</div>}
                       </td>
 
                       {/* School & Grad Year */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-medium text-foreground">
-                          {r.schoolName || <span className="text-foreground-muted italic">Unassigned</span>}
-                        </div>
-                        <div className="text-[11px] text-foreground-muted">
-                          {r.graduationYear ? `Class of ${r.graduationYear}` : 'No class year'}
-                        </div>
+                      <td className={td}>
+                        <div className="text-foreground">{r.schoolName || <span className="text-foreground-secondary">Unassigned</span>}</div>
+                        <div className="text-xs text-foreground-secondary">{r.graduationYear ? `Class of ${r.graduationYear}` : 'No class year'}</div>
                       </td>
 
                       {/* DOB / Gender */}
-                      <td className="py-3.5 px-4">
+                      <td className={td}>
                         <div className="text-foreground">{birthFormatted}</div>
-                        <div className="text-[11px] text-foreground-muted capitalize">
-                          {r.gender || 'Not specified'}
-                        </div>
+                        <div className="text-xs capitalize text-foreground-secondary">{r.gender || 'Not specified'}</div>
                       </td>
 
                       {/* Race & Ethnicity */}
-                      <td className="py-3.5 px-4 max-w-[200px]">
+                      <td className={cx(td, 'max-w-[200px]')}>
                         {allRaces.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {allRaces.map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-surface-sunken border border-line text-foreground-secondary truncate"
-                              >
+                              <span key={idx} className={cx(chip('neutral', 'sm'), 'truncate')}>
                                 {tag}
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-foreground-muted text-[11px]">—</span>
+                          <span className="text-xs text-foreground-secondary">—</span>
                         )}
                       </td>
 
                       {/* Equity Badges */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-col gap-1 items-start">
+                      <td className={td}>
+                        <div className="flex flex-col items-start gap-1">
                           {r.isFreeOrReducedLunch === true ? (
-                            <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
-                              Title I Eligible
-                            </span>
+                            <span className={chip('success', 'sm')}>Title I eligible</span>
                           ) : (
-                            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-surface-sunken text-foreground-muted border border-line">
-                              Standard
-                            </span>
+                            <span className={chip('neutral', 'sm')}>Standard</span>
                           )}
-
-                          {r.isFirstGenCollege === true && (
-                            <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded bg-purple-950/60 text-purple-400 border border-purple-800/50">
-                              First-Gen College
-                            </span>
-                          )}
-
-                          {r.doePetitionConsent && (
-                            <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded bg-blue-950/60 text-blue-400 border border-blue-800/50">
-                              DOE Consent
-                            </span>
-                          )}
+                          {r.isFirstGenCollege === true && <span className={chip('violet', 'sm')}>First-gen college</span>}
+                          {r.doePetitionConsent && <span className={chip('info', 'sm')}>DOE consent</span>}
                         </div>
                       </td>
 
                       {/* Language & Country */}
-                      <td className="py-3.5 px-4">
-                        <div className="text-foreground capitalize">{r.primaryLanguageAtHome || 'English'}</div>
-                        <div className="text-[11px] text-foreground-muted">
-                          Born: {r.countryOfBirth || 'USA'}
-                        </div>
+                      <td className={td}>
+                        <div className="capitalize text-foreground">{r.primaryLanguageAtHome || 'English'}</div>
+                        <div className="text-xs text-foreground-secondary">Born: {r.countryOfBirth || 'USA'}</div>
                       </td>
 
                       {/* Survey View Button */}
-                      <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setActiveSurveyRecord(r)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-raised hover:bg-line border border-line text-foreground hover:text-white rounded-lg transition-all font-bold text-[11px] uppercase tracking-wider cursor-pointer"
-                        >
-                          <HiOutlineInformationCircle className="w-3.5 h-3.5 text-accent" />
-                          <span>Survey</span>
+                      <td className={tdRight}>
+                        <button type="button" onClick={() => setActiveSurveyRecord(r)} className={secondaryBtnSm}>
+                          <HiOutlineInformationCircle aria-hidden className="h-3.5 w-3.5 text-accent" />
+                          Survey
+                          <span className="sr-only"> for {r.legalFirstName} {r.legalLastName}</span>
                         </button>
                       </td>
                     </tr>
@@ -461,134 +355,78 @@ export default function DemographicsExplorer({ records, schools }: DemographicsE
             </table>
           </div>
         )}
-      </Card>
+      </AdminSection>
 
       {/* Survey Details Modal */}
       {activeSurveyRecord && (
-        <Overlay isOpen={Boolean(activeSurveyRecord)} onOpenChange={() => setActiveSurveyRecord(null)}>
-          <Modal className="w-full max-w-xl bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden my-8">
-            <Dialog className="flex flex-col max-h-[85vh] outline-none">
+        <Overlay
+          isOpen={Boolean(activeSurveyRecord)}
+          onOpenChange={() => setActiveSurveyRecord(null)}
+          className="admin-modal-overlay fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4"
+        >
+          <Modal className="admin-modal my-8 w-full max-w-xl overflow-hidden rounded-2xl bg-surface-raised text-left shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none">
+            <Dialog className="flex max-h-[85vh] flex-col outline-none">
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-line bg-surface-raised/40">
+              <div className="flex items-start justify-between gap-4 border-b border-line/60 px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                    <HiOutlineInformationCircle className="w-5 h-5" />
-                  </div>
+                  <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+                    <HiOutlineInformationCircle className="h-5 w-5" />
+                  </span>
                   <div>
-                    <Heading className="text-base font-bold text-white">
+                    <Heading className="text-lg font-semibold text-foreground">
                       {activeSurveyRecord.legalFirstName} {activeSurveyRecord.legalLastName}
                     </Heading>
-                    <p className="text-xs text-foreground-secondary">
-                      Full Survey & Demographics Responses
-                    </p>
+                    <p className="text-sm text-foreground-secondary">Full survey and demographics responses</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveSurveyRecord(null)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-foreground-muted hover:text-white hover:bg-surface-raised transition-all cursor-pointer"
-                  aria-label="Close survey dialog"
-                >
-                  <HiOutlineXMark className="w-5 h-5" />
+                <button type="button" onClick={() => setActiveSurveyRecord(null)} className={cx(iconBtn, '-mr-2 -mt-1')} aria-label="Close survey dialog">
+                  <HiOutlineXMark aria-hidden className="h-5 w-5" />
                 </button>
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 space-y-6 overflow-y-auto flex-1 text-xs">
-                {/* Gaming Metrics */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-line pb-1.5 flex items-center gap-2">
-                    <span className="w-1 h-3.5 bg-accent rounded" />
-                    <span>Gaming Environment & Connectivity</span>
-                  </h4>
+              <div className="flex-1 space-y-6 overflow-y-auto p-6 text-sm">
+                <SurveyGroup title="Gaming environment & connectivity">
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3 bg-surface-sunken/40 rounded-xl border border-line">
-                      <span className="text-[10px] text-foreground-muted font-bold uppercase">Reported Ping</span>
-                      <div className="text-sm font-bold text-white mt-1">
-                        {activeSurveyRecord.surveyDetails?.ping || 'Not reported'}
-                      </div>
-                    </div>
-                    <div className="p-3 bg-surface-sunken/40 rounded-xl border border-line">
-                      <span className="text-[10px] text-foreground-muted font-bold uppercase">Hours / Week</span>
-                      <div className="text-sm font-bold text-white mt-1">
-                        {activeSurveyRecord.surveyDetails?.hoursPerWeek || 'Not reported'}
-                      </div>
-                    </div>
-                    <div className="p-3 bg-surface-sunken/40 rounded-xl border border-line">
-                      <span className="text-[10px] text-foreground-muted font-bold uppercase">Internet Quality</span>
-                      <div className="text-sm font-bold text-white mt-1">
-                        {activeSurveyRecord.surveyDetails?.internetReliability || 'Not reported'}
-                      </div>
-                    </div>
+                    <SurveyFact label="Reported ping" value={activeSurveyRecord.surveyDetails?.ping || 'Not reported'} />
+                    <SurveyFact label="Hours / week" value={activeSurveyRecord.surveyDetails?.hoursPerWeek || 'Not reported'} />
+                    <SurveyFact label="Internet quality" value={activeSurveyRecord.surveyDetails?.internetReliability || 'Not reported'} />
                   </div>
-                </div>
+                </SurveyGroup>
 
-                {/* Career Interests */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-line pb-1.5 flex items-center gap-2">
-                    <span className="w-1 h-3.5 bg-accent rounded" />
-                    <span>Career & Academic Interests</span>
-                  </h4>
-                  {activeSurveyRecord.surveyDetails?.careerInterests &&
-                  activeSurveyRecord.surveyDetails.careerInterests.length > 0 ? (
+                <SurveyGroup title="Career & academic interests">
+                  {activeSurveyRecord.surveyDetails?.careerInterests && activeSurveyRecord.surveyDetails.careerInterests.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {activeSurveyRecord.surveyDetails.careerInterests.map((interest, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 text-xs font-medium rounded-lg bg-surface-raised border border-line text-white"
-                        >
+                        <span key={idx} className={chip('neutral')}>
                           {interest}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-foreground-muted italic">No career interests specified.</p>
+                    <p className="text-foreground-secondary">No career interests specified.</p>
                   )}
-                </div>
+                </SurveyGroup>
 
-                {/* Family & Background */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-line pb-1.5 flex items-center gap-2">
-                    <span className="w-1 h-3.5 bg-accent rounded" />
-                    <span>Family & Demographic Background</span>
-                  </h4>
+                <SurveyGroup title="Family & demographic background">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-surface-sunken/40 rounded-xl border border-line">
-                      <span className="text-[10px] text-foreground-muted font-bold uppercase">Parent Birthplace</span>
-                      <div className="text-xs font-medium text-white mt-1">
-                        {activeSurveyRecord.parentsCountryOfBirth || 'Not specified'}
-                      </div>
-                    </div>
-                    <div className="p-3 bg-surface-sunken/40 rounded-xl border border-line">
-                      <span className="text-[10px] text-foreground-muted font-bold uppercase">Home Language</span>
-                      <div className="text-xs font-medium text-white mt-1">
-                        {activeSurveyRecord.primaryLanguageAtHome || 'English'}
-                      </div>
-                    </div>
+                    <SurveyFact label="Parent birthplace" value={activeSurveyRecord.parentsCountryOfBirth || 'Not specified'} />
+                    <SurveyFact label="Home language" value={activeSurveyRecord.primaryLanguageAtHome || 'English'} />
                   </div>
-                </div>
+                </SurveyGroup>
 
-                {/* Student Feedback */}
                 {activeSurveyRecord.surveyDetails?.feedback && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-line pb-1.5 flex items-center gap-2">
-                      <span className="w-1 h-3.5 bg-accent rounded" />
-                      <span>Student Feedback & Goals</span>
-                    </h4>
-                    <div className="p-3 bg-surface-sunken/40 rounded-xl border border-line text-foreground leading-relaxed italic">
+                  <SurveyGroup title="Student feedback & goals">
+                    <p className="rounded-xl bg-surface-sunken/70 p-3 leading-relaxed text-foreground">
                       &quot;{activeSurveyRecord.surveyDetails.feedback}&quot;
-                    </div>
-                  </div>
+                    </p>
+                  </SurveyGroup>
                 )}
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-4 border-t border-line flex justify-end bg-surface-raised/20">
-                <button
-                  type="button"
-                  onClick={() => setActiveSurveyRecord(null)}
-                  className="px-5 py-2 bg-surface-raised hover:bg-line text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer border border-line"
-                >
+              <div className="flex justify-end border-t border-line/60 px-6 py-4">
+                <button type="button" onClick={() => setActiveSurveyRecord(null)} className={secondaryBtn}>
                   Close
                 </button>
               </div>
@@ -596,6 +434,24 @@ export default function DemographicsExplorer({ records, schools }: DemographicsE
           </Modal>
         </Overlay>
       )}
+    </AdminPage>
+  );
+}
+
+function SurveyGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3 border-t border-line/60 pt-5 first:border-t-0 first:pt-0">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function SurveyFact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl bg-surface-sunken/70 p-3">
+      <span className="text-xs font-medium text-foreground-secondary">{label}</span>
+      <div className="mt-1 text-sm font-medium text-foreground">{value}</div>
     </div>
   );
 }

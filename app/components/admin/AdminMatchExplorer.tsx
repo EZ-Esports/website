@@ -2,14 +2,46 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
+import { HiArrowsUpDown, HiOutlineCalendarDays } from 'react-icons/hi2';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
-import { saveBtn } from '@/app/components/admin/styles';
+import {
+  saveBtn,
+  secondaryBtnSm,
+  selectClass,
+  table,
+  tableWrap,
+  tbody,
+  tdCompact,
+  tdCompactRight,
+  thCompact,
+  thCompactRight,
+  theadRow,
+  tr,
+} from '@/app/components/admin/styles';
+import {
+  AdminEmptyState,
+  AdminSearchField,
+  AdminSection,
+  AdminSkeletonRows,
+  AdminSpinner,
+  AdminToast,
+  PendingLabel,
+} from '@/app/components/admin/AdminUI';
+import { cx } from '@/app/lib/cx';
 import { fetchMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
-import { selectClass } from '@/app/components/admin/styles';
 
 const PAGE_SIZE = 25;
+
+/** "Wed, Sep 23, 2026" in Eastern time: the fixtures column has no room for the long month name. */
+const shortDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
 
 interface Season {
   id: string;
@@ -124,209 +156,221 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
     if (id && seasonId && seasonMap.get(seasonId)?.gameId !== id) setSeasonId('');
   };
 
+  const scoreInput =
+    'h-8 w-8 rounded-md border border-line/70 bg-surface-sunken text-center text-sm font-semibold tabular-nums text-foreground transition-[border-color,box-shadow] duration-150 hover:border-line focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/15';
+
+  // The Match Fixtures status select is the one crowded control that tightens the
+  // shared chevron inset (see the select rule in globals.css).
+  const statusSelect = selectClass.replace(
+    '[--select-chevron-inset:0.75rem] [--select-chevron-space:2.25rem]',
+    'pl-2.5 [--select-chevron-inset:0.625rem] [--select-chevron-space:2rem]',
+  );
+
   return (
     <>
-    {toast && (
-      <div
-        role="status"
-        aria-live="polite"
-        className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-semibold shadow-lg border ${
-          toast.type === 'success'
-            ? 'bg-success/10 border-success/30 text-success'
-            : 'bg-red-500/10 border-red-500/30 text-red-300'
-        }`}
-      >
-        {toast.message}
-      </div>
-    )}
-    <div className="bg-[#1c1c1c]/60 border border-line rounded-2xl overflow-hidden shadow-xl shadow-black/20">
-      <div className="px-6 py-5 border-b border-line space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider">Match Fixtures</h2>
-          <input
-            type="text"
-            placeholder="Search schools..."
+      <AdminToast toast={toast} onDismiss={() => setToast(null)} />
+      <AdminSection
+        variant="flush"
+        stickyToolbar
+        title="Match fixtures"
+        actions={
+          <AdminSearchField
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label="Search schools"
+            placeholder="Search schools…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-1.5 bg-surface-sunken border border-line rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent/50 w-full sm:w-48"
+            onClear={() => setSearch('')}
           />
-        </div>
+        }
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            <select aria-label="Game" value={gameId} onChange={(e) => handleGameChange(e.target.value)} className={selectClass}>
+              <option value="">All games</option>
+              {games.map((g) => (
+                <option key={g.id} value={g.id}>{g.shortName}</option>
+              ))}
+            </select>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={gameId} onChange={(e) => handleGameChange(e.target.value)} className={selectClass}>
-            <option value="">All Games</option>
-            {games.map((g) => (
-              <option key={g.id} value={g.id}>{g.shortName}</option>
-            ))}
-          </select>
+            <select aria-label="Season" value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={selectClass}>
+              <option value="">All seasons</option>
+              {seasonOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {gameId ? '' : `${gameMap.get(s.gameId)?.shortName} `}{s.name}{s.isActive ? ' (current)' : ''}
+                </option>
+              ))}
+            </select>
 
-          <select value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={selectClass}>
-            <option value="">All Seasons</option>
-            {seasonOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {gameId ? '' : `${gameMap.get(s.gameId)?.shortName} `}{s.name}{s.isActive ? ' (current)' : ''}
-              </option>
-            ))}
-          </select>
+            <select aria-label="Division" value={division} onChange={(e) => setDivision(e.target.value)} className={selectClass}>
+              <option value="">All divisions</option>
+              <option value="Varsity">Varsity</option>
+              <option value="JV">JV</option>
+              <option value="All">All (individual)</option>
+            </select>
 
-          <select value={division} onChange={(e) => setDivision(e.target.value)} className={selectClass}>
-            <option value="">All Divisions</option>
-            <option value="Varsity">Varsity</option>
-            <option value="JV">JV</option>
-            <option value="All">All (individual)</option>
-          </select>
+            <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
+              <option value="">All statuses</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="live">Live</option>
+              <option value="completed">Completed</option>
+              <option value="forfeit">Forfeit</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
 
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
-            <option value="">All Status</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="live">Live</option>
-            <option value="completed">Completed</option>
-            <option value="forfeit">Forfeit</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+            <button
+              type="button"
+              onClick={() => setSort(sort === 'desc' ? 'asc' : 'desc')}
+              className={secondaryBtnSm}
+              title="Toggle date sort"
+            >
+              <HiArrowsUpDown aria-hidden className="h-3.5 w-3.5" />
+              {sort === 'desc' ? 'Newest first' : 'Oldest first'}
+            </button>
 
-          <button
-            onClick={() => setSort(sort === 'desc' ? 'asc' : 'desc')}
-            className={`${selectClass} font-bold`}
-            title="Toggle date sort"
-          >
-            {sort === 'desc' ? 'Newest ↓' : 'Oldest ↑'}
-          </button>
-        </div>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="text-center p-12 text-foreground-muted text-sm">
-          {isLoading ? 'Loading…' : 'No matches found for these filters.'}
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-[#0b101d] border-b border-surface-raised text-xs font-bold text-foreground-secondary uppercase tracking-widest">
-              <tr>
-                <th className="px-2 py-3">Season / Date</th>
-                <th className="px-2 py-3 text-center">Matchup & Scores</th>
-                <th className="px-2 py-3">Status</th>
-                <th className="px-2 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line text-sm">
-              {items.map((match) => {
-                const season = seasonMap.get(match.seasonId);
-                const game = season ? gameMap.get(season.gameId) : null;
-                const deleteActionWithId = deleteMatch.bind(null, match.id);
-                const isSaving = savingId === match.id;
-
-                return (
-                  <tr key={match.id} className="hover:bg-line/10 transition-colors">
-                    <td className="px-2 py-3">
-                      <div className="font-bold text-foreground text-xs uppercase tracking-wider">
-                        {game?.shortName} • {season?.name}
-                      </div>
-                      <div className="text-[11px] text-foreground-muted font-semibold mt-0.5">
-                        {formatNY(new Date(match.scheduledAt), 'date-short')} · {formatNY(new Date(match.scheduledAt), 'time')}
-                      </div>
-                    </td>
-
-                    <td className="px-2 py-3">
-                      <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-1.5">
-                        <div className="text-right w-16 2xl:w-28 truncate">
-                          <span className="block font-semibold text-white text-sm truncate" title={match.homeTeam}>{match.homeTeam}</span>
-                          <span className="text-[10px] text-foreground-muted font-semibold uppercase tracking-wider">{match.division}</span>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <input
-                            name="homeScore"
-                            aria-label={`${match.homeTeam} score`}
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            defaultValue={match.homeScore ?? ''}
-                            className="w-8 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
-                            placeholder="-"
-                          />
-                          <span className="text-foreground-muted text-[10px] font-bold uppercase select-none">vs</span>
-                          <input
-                            name="awayScore"
-                            aria-label={`${match.awayTeam} score`}
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            defaultValue={match.awayScore ?? ''}
-                            className="w-8 h-8 bg-surface-sunken border border-line rounded text-center text-white focus:outline-none focus:ring-1 focus:ring-accent/50 text-xs font-bold"
-                            placeholder="-"
-                          />
-                        </div>
-
-                        <div className="text-left w-16 2xl:w-28 truncate">
-                          <span className="block font-semibold text-white text-sm truncate" title={match.awayTeam}>{match.awayTeam}</span>
-                          <span className="text-[10px] text-foreground-muted font-semibold uppercase tracking-wider">{match.division}</span>
-                        </div>
-                      </form>
-                    </td>
-
-                    <td className="px-2 py-3">
-                      <select
-                        name="status"
-                        aria-label={`Status for ${match.homeTeam} vs ${match.awayTeam}`}
-                        form={`form-${match.id}`}
-                        defaultValue={match.status}
-                        className="pl-2 py-1 [--select-chevron-inset:0.625rem] [--select-chevron-space:2rem] bg-surface-sunken border border-line rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer font-medium"
-                      >
-                        <option value="scheduled" className="bg-surface-raised text-white">Scheduled</option>
-                        <option value="live" className="bg-surface-raised text-white">Live</option>
-                        <option value="completed" className="bg-surface-raised text-white">Completed</option>
-                        <option value="forfeit" className="bg-surface-raised text-white">Forfeit</option>
-                        <option value="cancelled" className="bg-surface-raised text-white">Cancelled</option>
-                      </select>
-                    </td>
-
-                    <td className="px-2 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="submit"
-                          form={`form-${match.id}`}
-                          disabled={isSaving}
-                          aria-label={`Save match ${match.homeTeam} vs ${match.awayTeam}`}
-                          className={saveBtn}
-                        >
-                          {isSaving ? 'Saving…' : 'Save'}
-                        </button>
-                        <ConfirmDeleteButton
-                          action={async () => {
-                            await deleteActionWithId();
-                            setItems((prev) => prev.filter((m) => m.id !== match.id));
-                          }}
-                          message={`Permanently delete this match (${match.homeTeam} vs ${match.awayTeam})? This cannot be undone.`}
-                          label={`Delete match ${match.homeTeam} vs ${match.awayTeam}`}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="px-6 py-4 border-t border-line text-center">
-        {cursor ? (
-          <button
-            onClick={loadMore}
-            disabled={isLoading}
-            className="px-4 py-2 bg-surface-raised hover:bg-line font-bold text-xs uppercase tracking-wider rounded text-foreground-secondary border border-line hover:border-line transition-all cursor-pointer disabled:opacity-50"
-          >
-            {isLoading ? 'Loading…' : `Load ${PAGE_SIZE} more`}
-          </button>
+            {isLoading && (
+              <span role="status" className="ml-auto inline-flex items-center gap-1.5 text-xs text-foreground-secondary">
+                <AdminSpinner /> Loading…
+              </span>
+            )}
+          </div>
+        }
+      >
+        {items.length === 0 ? (
+          isLoading ? (
+            <AdminSkeletonRows rows={5} />
+          ) : (
+            <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="No matches found for these filters." />
+          )
         ) : (
-          <span className="text-[11px] text-foreground-muted font-bold uppercase tracking-wider">
-            {items.length > 0 ? 'All matching fixtures loaded' : ''}
-          </span>
+          // Dimmed (not hidden) while a filter change loads, so the layout never jumps.
+          <div className={cx(tableWrap, 'transition-opacity duration-200', isLoading && 'opacity-60')} aria-busy={isLoading}>
+            <table className={table}>
+              <thead>
+                <tr className={theadRow}>
+                  <th className={thCompact}>Season / date</th>
+                  <th className={cx(thCompact, 'text-center')}>Matchup &amp; scores</th>
+                  <th className={thCompact}>Status</th>
+                  <th className={thCompactRight}>Actions</th>
+                </tr>
+              </thead>
+              <tbody className={tbody}>
+                {items.map((match) => {
+                  const season = seasonMap.get(match.seasonId);
+                  const game = season ? gameMap.get(season.gameId) : null;
+                  const deleteActionWithId = deleteMatch.bind(null, match.id);
+                  const isSaving = savingId === match.id;
+
+                  return (
+                    <tr key={match.id} className={tr}>
+                      {/* Date and time wrap onto their own lines so this column stays narrow. */}
+                      <td className={tdCompact}>
+                        <div className="text-sm font-medium text-foreground">
+                          {game?.shortName} · {season?.name}
+                        </div>
+                        <div className="mt-0.5 text-xs leading-4 text-foreground-secondary">
+                          <span className="block whitespace-nowrap">{shortDate.format(new Date(match.scheduledAt))}</span>
+                          <span className="block">{formatNY(new Date(match.scheduledAt), 'time')}</span>
+                        </div>
+                      </td>
+
+                      <td className={tdCompact}>
+                        <form id={`form-${match.id}`} onSubmit={handleSave(match.id)} className="flex items-center justify-center gap-1.5">
+                          <div className="w-16 truncate text-right 2xl:w-28">
+                            <span className="block truncate text-sm font-medium text-foreground" title={match.homeTeam}>{match.homeTeam}</span>
+                            <span className="text-xs text-foreground-secondary">{match.division}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <input
+                              name="homeScore"
+                              aria-label={`${match.homeTeam} score`}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              defaultValue={match.homeScore ?? ''}
+                              className={scoreInput}
+                              placeholder="-"
+                            />
+                            <span className="select-none text-xs text-foreground-secondary">vs</span>
+                            <input
+                              name="awayScore"
+                              aria-label={`${match.awayTeam} score`}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              defaultValue={match.awayScore ?? ''}
+                              className={scoreInput}
+                              placeholder="-"
+                            />
+                          </div>
+
+                          <div className="w-16 truncate text-left 2xl:w-28">
+                            <span className="block truncate text-sm font-medium text-foreground" title={match.awayTeam}>{match.awayTeam}</span>
+                            <span className="text-xs text-foreground-secondary">{match.division}</span>
+                          </div>
+                        </form>
+                      </td>
+
+                      <td className={tdCompact}>
+                        <select
+                          name="status"
+                          aria-label={`Status for ${match.homeTeam} vs ${match.awayTeam}`}
+                          form={`form-${match.id}`}
+                          defaultValue={match.status}
+                          className={statusSelect}
+                        >
+                          <option value="scheduled">Scheduled</option>
+                          <option value="live">Live</option>
+                          <option value="completed">Completed</option>
+                          <option value="forfeit">Forfeit</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </td>
+
+                      <td className={tdCompactRight}>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="submit"
+                            form={`form-${match.id}`}
+                            disabled={isSaving}
+                            aria-busy={isSaving}
+                            aria-label={`Save match ${match.homeTeam} vs ${match.awayTeam}`}
+                            className={saveBtn}
+                          >
+                            {/* Text only (no spinner): this column has no width to spare. */}
+                            {isSaving ? 'Saving…' : 'Save'}
+                          </button>
+                          <ConfirmDeleteButton
+                            action={async () => {
+                              await deleteActionWithId();
+                              setItems((prev) => prev.filter((m) => m.id !== match.id));
+                            }}
+                            message={`Permanently delete this match (${match.homeTeam} vs ${match.awayTeam})? This cannot be undone.`}
+                            label={`Delete match ${match.homeTeam} vs ${match.awayTeam}`}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-    </div>
+
+        <div className="flex items-center justify-center border-t border-line/60 px-5 py-4">
+          {cursor ? (
+            <button type="button" onClick={loadMore} disabled={isLoading} aria-busy={isLoading} className={secondaryBtnSm}>
+              <PendingLabel pending={isLoading} label={`Load ${PAGE_SIZE} more`} pendingLabel="Loading…" />
+            </button>
+          ) : (
+            <span className="text-xs text-foreground-secondary">
+              {items.length > 0 ? 'All matching fixtures loaded' : ''}
+            </span>
+          )}
+        </div>
+      </AdminSection>
     </>
   );
 }

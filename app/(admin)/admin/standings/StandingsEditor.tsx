@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { FiPlus, FiX } from 'react-icons/fi';
+import { HiOutlineChartBar } from 'react-icons/hi2';
 import {
   listSeasonStandings,
   createStanding,
@@ -11,7 +12,28 @@ import {
 } from './actions';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { input, primaryBtn, selectClass, saveBtn, cancelBtn } from '@/app/components/admin/styles';
+import {
+  cancelBtn,
+  input,
+  label as labelClass,
+  primaryBtn,
+  saveBtn,
+  secondaryBtnSm,
+  selectClass,
+  table,
+  tableWrap,
+  tbody,
+  td,
+  tdRight,
+  th,
+  theadRow,
+  thRight,
+  tr,
+  trEditing,
+} from '@/app/components/admin/styles';
+import { AdminEmptyState, AdminNotice, AdminSection, AdminSkeletonRows, AdminToast } from '@/app/components/admin/AdminUI';
+import { AdminSegmented } from '@/app/components/admin/AdminTabs';
+import { cx } from '@/app/lib/cx';
 import { useActionData } from '@/app/lib/hooks/useActionData';
 import { DIVISIONS } from '@/app/lib/db/match-page';
 import type { DBGame, DBSchool, DBSeason } from '@/app/types';
@@ -32,24 +54,24 @@ function StandingFields({ row, division }: { row?: StandingRow; division: string
   return (
     <>
       <input type="hidden" name="division" value={division} />
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Rank</span>
+      <label className="block">
+        <span className={labelClass}>Rank</span>
         <input name="rank" type="number" min="1" defaultValue={row?.rank ?? ''} className={numInput} />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Wins</span>
+      <label className="block">
+        <span className={labelClass}>Wins</span>
         <input name="wins" type="number" min="0" defaultValue={row?.wins ?? ''} className={numInput} />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Losses</span>
+      <label className="block">
+        <span className={labelClass}>Losses</span>
         <input name="losses" type="number" min="0" defaultValue={row?.losses ?? ''} className={numInput} />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Games</span>
+      <label className="block">
+        <span className={labelClass}>Games</span>
         <input name="gamesPlayed" type="number" min="0" defaultValue={row?.gamesPlayed ?? ''} className={numInput} />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Win %</span>
+      <label className="block">
+        <span className={labelClass}>Win %</span>
         <input
           name="winPct"
           type="number"
@@ -61,20 +83,20 @@ function StandingFields({ row, division }: { row?: StandingRow; division: string
           className={numInput}
         />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Points</span>
+      <label className="block">
+        <span className={labelClass}>Points</span>
         <input name="points" type="number" min="0" step="0.5" defaultValue={row?.points ?? ''} className={numInput} />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Player (individual)</span>
+      <label className="block">
+        <span className={labelClass}>Player (individual)</span>
         <input name="playerName" defaultValue={row?.playerName ?? ''} placeholder="Leave blank for team rows" className={`${input} w-44`} />
       </label>
-      <label className="block space-y-1">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Player IGN</span>
+      <label className="block">
+        <span className={labelClass}>Player IGN</span>
         <input name="playerIgn" defaultValue={row?.playerIgn ?? ''} className={`${input} w-36`} />
       </label>
-      <label className="block space-y-1 grow min-w-[180px]">
-        <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Notes</span>
+      <label className="block grow min-w-[180px]">
+        <span className={labelClass}>Notes</span>
         <input name="notes" defaultValue={row?.notes ?? ''} placeholder="e.g. Total Points: 120" className={input} />
       </label>
     </>
@@ -133,153 +155,156 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
     });
   };
 
+  const currentFormat = gameSeasons.find((s) => s.id === seasonId)?.standingsFormat ?? 'divided';
+
   return (
     <div className="space-y-4">
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-between ${
-            toast.type === 'error'
-              ? 'bg-red-950/30 border-red-900/50 text-red-300'
-              : 'bg-success/30 border-success/50 text-success'
-          }`}
-        >
-          <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-foreground-secondary hover:text-foreground" aria-label="Dismiss">
-            <FiX />
-          </button>
-        </div>
-      )}
+      <AdminToast toast={toast} onDismiss={() => setToast(null)} />
 
-      {/* Scope selectors */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select value={gameId} onChange={(e) => handleGameChange(e.target.value)} className={selectClass}>
-          {games.map((g) => (
-            <option key={g.id} value={g.id}>{g.displayName}</option>
-          ))}
-        </select>
-
-        <select value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={selectClass}>
-          {gameSeasons.length === 0 && <option value="">No seasons</option>}
-          {gameSeasons.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}{s.isActive ? ' (current)' : ''}</option>
-          ))}
-        </select>
-
-        {seasonId && (
-          <select
-            value={gameSeasons.find((s) => s.id === seasonId)?.standingsFormat ?? 'divided'}
-            onChange={async (e) => {
-              const newFormat = e.target.value as 'divided' | 'combined';
-              const res = await updateSeasonStandingsFormat(seasonId, newFormat);
-              if (res?.success) {
-                const s = gameSeasons.find((s) => s.id === seasonId);
-                if (s) s.standingsFormat = newFormat;
-                setToast({ message: `Format set to ${newFormat}.`, type: 'success' });
-                refresh();
-              } else {
-                setToast({ message: res?.error || 'Failed to update format.', type: 'error' });
-              }
-            }}
-            disabled={isPending}
-            className={selectClass}
-            title="Standings format (divided or combined)"
+      <AdminSection
+        variant="flush"
+        stickyToolbar
+        title={`${division} standings`}
+        actions={
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            disabled={!seasonId || fetchError}
+            aria-expanded={adding}
+            className={secondaryBtnSm}
           >
-            <option value="divided">Divided (Varsity/JV)</option>
-            <option value="combined">Combined table</option>
-          </select>
-        )}
-
-        <div className="flex gap-1">
-          {DIVISIONS.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDivision(d)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                division === d
-                  ? 'bg-accent text-on-accent'
-                  : 'bg-surface-raised border border-line/80 text-foreground-secondary hover:text-white'
-              }`}
-            >
-              {d}{usedDivisions.has(d) ? '' : ' (empty)'}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setAdding((v) => !v)}
-          disabled={!seasonId || fetchError}
-          className={`${selectClass} font-bold flex items-center gap-1.5 disabled:opacity-40`}
-        >
-          {adding ? <><FiX className="w-3.5 h-3.5" /> Cancel</> : <><FiPlus className="w-3.5 h-3.5" /> Add row</>}
-        </button>
-      </div>
-
-      {/* Add-row form */}
-      {adding && seasonId && !fetchError && (
-        <form
-          onSubmit={(e) => runForm(e, createStanding, 'Standing added.', () => setAdding(false))}
-          className="bg-surface-sunken/60 border border-line rounded-xl p-4 flex flex-wrap items-end gap-3"
-        >
-          <input type="hidden" name="seasonId" value={seasonId} />
-          <label className="block space-y-1">
-            <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">School *</span>
-            <select name="schoolId" required defaultValue="" className={`${input} w-56`}>
-              <option value="" disabled>Select school…</option>
-              {schools.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+            {adding ? <><FiX aria-hidden className="w-3.5 h-3.5" /> Cancel</> : <><FiPlus aria-hidden className="w-3.5 h-3.5" /> Add row</>}
+          </button>
+        }
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            <select aria-label="Game" value={gameId} onChange={(e) => handleGameChange(e.target.value)} className={selectClass}>
+              {games.map((g) => (
+                <option key={g.id} value={g.id}>{g.displayName}</option>
               ))}
             </select>
-          </label>
-          <StandingFields division={division} />
-          <button type="submit" disabled={isPending} className={primaryBtn}>Add</button>
-        </form>
-      )}
 
-      {/* Standings table */}
-      <div className="bg-[#1c1c1c]/60 border border-line rounded-2xl overflow-hidden shadow-xl shadow-black/20">
-        {fetchError && (
-          <div
-            role="alert"
-            aria-live="polite"
-            className="p-3.5 bg-red-950/40 border-b border-red-900/60 text-red-300 text-xs font-semibold"
+            <select aria-label="Season" value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={selectClass}>
+              {gameSeasons.length === 0 && <option value="">No seasons</option>}
+              {gameSeasons.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}{s.isActive ? ' (current)' : ''}</option>
+              ))}
+            </select>
+
+            {seasonId && (
+              <select
+                aria-label="Standings format"
+                value={currentFormat}
+                onChange={async (e) => {
+                  const newFormat = e.target.value as 'divided' | 'combined';
+                  const res = await updateSeasonStandingsFormat(seasonId, newFormat);
+                  if (res?.success) {
+                    const s = gameSeasons.find((s) => s.id === seasonId);
+                    if (s) s.standingsFormat = newFormat;
+                    setToast({ message: `Format set to ${newFormat}.`, type: 'success' });
+                    refresh();
+                  } else {
+                    setToast({ message: res?.error || 'Failed to update format.', type: 'error' });
+                  }
+                }}
+                disabled={isPending}
+                className={selectClass}
+                title="Standings format (divided or combined)"
+              >
+                <option value="divided">Divided (Varsity/JV)</option>
+                <option value="combined">Combined table</option>
+              </select>
+            )}
+
+            <AdminSegmented
+              aria-label="Division"
+              value={division}
+              onChange={setDivision}
+              options={DIVISIONS.map((d) => ({
+                value: d,
+                label: (
+                  <>
+                    {d}
+                    {/* The visual gap comes from the flex gap; the sr-only space keeps the
+                        accessible name "JV (empty)" rather than "JV(empty)". */}
+                    {!usedDivisions.has(d) && (
+                      <span className="text-foreground-secondary">
+                        <span className="sr-only"> </span>(empty)
+                      </span>
+                    )}
+                  </>
+                ),
+              }))}
+            />
+          </div>
+        }
+      >
+        {/* Add-row form */}
+        {adding && seasonId && !fetchError && (
+          <form
+            onSubmit={(e) => runForm(e, createStanding, 'Standing added.', () => setAdding(false))}
+            aria-label="Add standing row"
+            className="admin-fade-in flex flex-wrap items-end gap-3 border-b border-line/60 bg-surface-raised/30 px-5 py-4"
           >
-            Failed to load standings. Displaying last known data. Please refresh to try again.
+            <input type="hidden" name="seasonId" value={seasonId} />
+            <label className="block">
+              <span className={labelClass}>School <span aria-hidden className="text-accent">*</span></span>
+              <select name="schoolId" required defaultValue="" className={`${input} w-56`}>
+                <option value="" disabled>Select school…</option>
+                {schools.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </label>
+            <StandingFields division={division} />
+            <button type="submit" disabled={isPending} className={primaryBtn}>Add row</button>
+          </form>
+        )}
+
+        {fetchError && (
+          <div className="px-5 pb-4">
+            <AdminNotice tone="danger">
+              Failed to load standings. Displaying last known data. Please refresh to try again.
+            </AdminNotice>
           </div>
         )}
+
+        {/* Standings table */}
         {rows === null ? (
-          <div className="text-center p-12 text-foreground-muted text-sm">Loading standings…</div>
+          <AdminSkeletonRows rows={5} />
         ) : divisionRows.length === 0 ? (
-          <div className="text-center p-12 text-foreground-muted text-sm">
-            No {division} snapshot rows for this season. Use “Add row” to record final standings.
-          </div>
+          <AdminEmptyState
+            compact
+            icon={<HiOutlineChartBar />}
+            title={`No ${division} snapshot rows for this season.`}
+            description="Use “Add row” to record final standings."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-[#0b101d] border-b border-surface-raised text-xs font-bold text-foreground-secondary uppercase tracking-widest">
-                <tr>
-                  <th className="px-4 py-3">Rank</th>
-                  <th className="px-4 py-3">School / Player</th>
-                  <th className="px-4 py-3">W-L</th>
-                  <th className="px-4 py-3">Games</th>
-                  <th className="px-4 py-3">Win %</th>
-                  <th className="px-4 py-3">Points</th>
-                  <th className="px-4 py-3">Notes</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+          <div className={tableWrap}>
+            <table className={table}>
+              <thead>
+                <tr className={theadRow}>
+                  <th className={th}>Rank</th>
+                  <th className={th}>School / player</th>
+                  <th className={th}>W-L</th>
+                  <th className={th}>Games</th>
+                  <th className={th}>Win %</th>
+                  <th className={th}>Points</th>
+                  <th className={th}>Notes</th>
+                  <th className={thRight}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody className={tbody}>
                 {divisionRows.map((row) => {
                   if (editingId === row.id && !fetchError) {
                     return (
-                      <tr key={row.id} className="bg-surface-raised/40">
-                        <td colSpan={8} className="px-4 py-3">
+                      <tr key={row.id} className={trEditing}>
+                        <td colSpan={8} className="px-5 py-4">
                           <form
                             onSubmit={(e) => runForm(e, (fd) => updateStanding(row.id, fd), 'Standing updated.', () => setEditingId(null))}
-                            className="flex flex-wrap items-end gap-3"
+                            className="admin-fade-in flex flex-wrap items-end gap-3"
                           >
-                            <div className="text-xs font-bold text-foreground-secondary pb-2 w-full">{row.schoolName}</div>
+                            <div className="w-full pb-1 text-sm font-medium text-foreground">{row.schoolName}</div>
                             <StandingFields row={row} division={division} />
                             <div className="flex gap-2 pb-0.5">
                               <button type="submit" disabled={isPending} className={saveBtn}>Save</button>
@@ -291,29 +316,29 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
                     );
                   }
                   return (
-                    <tr key={row.id} className="hover:bg-line/10 transition-colors">
-                      <td className="px-4 py-3 font-bold text-foreground-secondary">{row.rank ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-bold text-white">{row.playerName ?? row.schoolName}</div>
+                    <tr key={row.id} className={tr}>
+                      <td className={cx(td, 'font-semibold tabular-nums text-foreground-secondary')}>{row.rank ?? '—'}</td>
+                      <td className={td}>
+                        <div className="font-medium text-foreground">{row.playerName ?? row.schoolName}</div>
                         {row.playerName && (
-                          <div className="text-[11px] text-foreground-muted">
+                          <div className="text-xs text-foreground-secondary">
                             {row.schoolName}
                             {row.playerIgn ? ` · ${row.playerIgn}` : ''}
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-foreground-secondary font-medium">
+                      <td className={cx(td, 'tabular-nums text-foreground-secondary')}>
                         {row.wins !== null || row.losses !== null ? `${row.wins ?? 0}-${row.losses ?? 0}` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-foreground-secondary">{row.gamesPlayed ?? '—'}</td>
-                      <td className="px-4 py-3 text-foreground-secondary font-bold">
+                      <td className={cx(td, 'tabular-nums text-foreground-secondary')}>{row.gamesPlayed ?? '—'}</td>
+                      <td className={cx(td, 'font-medium tabular-nums text-foreground')}>
                         {row.winPct !== null ? `${(row.winPct * 100).toFixed(1)}%` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-foreground-secondary">{row.points ?? '—'}</td>
-                      <td className="px-4 py-3 text-foreground-muted text-xs max-w-[220px] truncate" title={row.notes ?? ''}>
+                      <td className={cx(td, 'tabular-nums text-foreground-secondary')}>{row.points ?? '—'}</td>
+                      <td className={cx(td, 'max-w-[220px] truncate text-xs text-foreground-secondary')} title={row.notes ?? ''}>
                         {row.notes ?? ''}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className={tdRight}>
                         <div className="flex items-center justify-end gap-2">
                           <RowIconButton kind="edit" disabled={fetchError} onClick={() => setEditingId(row.id)} label={`Edit ${row.playerName ?? row.schoolName} standing`} />
                           <ConfirmDeleteButton
@@ -334,9 +359,9 @@ export default function StandingsEditor({ games, seasons, schools }: StandingsEd
             </table>
           </div>
         )}
-      </div>
+      </AdminSection>
 
-      <p className="text-[11px] text-foreground-muted leading-relaxed">
+      <p className="max-w-3xl text-xs leading-5 text-foreground-secondary">
         These snapshots power the public standings pages for seasons whose match scores were never recorded.
         Seasons without snapshot rows fall back to standings computed live from match results.
         For individual competitions (e.g. Teamfight Tactics), set the player name and keep W-L blank.

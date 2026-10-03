@@ -10,7 +10,7 @@ import { staffApplicationsToCsv } from "@/app/lib/application-csv";
 import DownloadCsvButton from "@/app/components/admin/DownloadCsvButton";
 import { DetailSection, DetailField, FlatDetailList } from "@/app/components/admin/ApplicationDetailSections";
 import type { StaffApplication } from "@/app/components/admin/StaffApplicationRow";
-import { secondaryBtn } from "@/app/components/admin/styles";
+import { iconBtn, secondaryBtn } from "@/app/components/admin/styles";
 
 interface StaffApplicationDetailModalProps {
   app: StaffApplication;
@@ -24,7 +24,7 @@ function formatSubmittedDate(date: Date): string {
 
 function StaffDetailsBody({ details, app }: { details: StaffApplicationDetails | null; app: StaffApplication }) {
   if (!details) {
-    return <p className="text-sm text-foreground-muted italic">No details were submitted with this application.</p>;
+    return <p className="text-sm text-foreground-secondary">No details were submitted with this application.</p>;
   }
 
   const linkedin = details.linkedin ? (
@@ -44,7 +44,7 @@ function StaffDetailsBody({ details, app }: { details: StaffApplicationDetails |
 
   if (details.version === 1) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <DetailSection title="Applicant Profile">
           <DetailField label="Preferred Name" value={details.preferredFirstName || app.preferredFirstName || "—"} />
           <DetailField label="Discord Tag" value={details.discordTag || app.discordTag || "—"} />
@@ -69,7 +69,7 @@ function StaffDetailsBody({ details, app }: { details: StaffApplicationDetails |
 
   if (details.version === 2) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <DetailSection title="Applicant Profile">
           <DetailField label="Preferred Name" value={details.preferredFirstName || app.preferredFirstName || "—"} />
           <DetailField label="Discord Tag" value={details.discordTag || app.discordTag || "—"} />
@@ -109,22 +109,22 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       isDismissable
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+      className="admin-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
     >
-      <Modal className="w-full max-w-xl outline-none">
+      <Modal className="admin-modal w-full max-w-xl outline-none">
         <Dialog
           aria-label={`Application details for ${app.name}`}
-          className="bg-surface-sunken border border-line rounded-2xl w-full max-h-[90vh] overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 outline-none flex flex-col"
+          className="relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-surface-raised text-left shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none"
         >
-          <div className="bg-gradient-to-r from-accent/15 to-transparent border-b border-line px-6 py-5 flex items-start justify-between gap-4 shrink-0">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line/60 px-6 py-5">
             <div className="min-w-0">
-              <h4 className="text-lg font-black text-foreground uppercase tracking-tight truncate">
+              <h4 className="truncate text-lg font-semibold text-foreground">
                 {app.name}
                 {preferredName ? ` (goes by ${preferredName})` : ""}
               </h4>
-              <p className="text-sm text-foreground-secondary mt-0.5 truncate capitalize">{app.role}</p>
-              <p className="text-xs text-foreground-muted mt-1">
-                <a href={`mailto:${app.email}`} className="hover:text-foreground transition-colors">
+              <p className="mt-0.5 truncate text-sm text-foreground-secondary capitalize">{app.role}</p>
+              <p className="mt-1.5 text-xs leading-5 text-foreground-secondary">
+                <a href={`mailto:${app.email}`} className="rounded underline-offset-2 hover:text-foreground hover:underline transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                   {app.email}
                 </a>
                 {" · " + app.phone}
@@ -136,13 +136,13 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
             <button
               onClick={() => onOpenChange(false)}
               aria-label="Close details"
-              className="p-2 rounded-lg bg-surface-raised border border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40 transition-colors cursor-pointer shrink-0"
+              className={`${iconBtn} -mr-2 -mt-1`}
             >
-              <FiX className="w-5 h-5" />
+              <FiX aria-hidden className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto space-y-4">
+          <div className="space-y-5 overflow-y-auto p-6">
             {app.hasResume && (
               // A plain link to the gated route, which redirects to a signed URL
               // valid for about a minute: nothing long-lived reaches the page.
@@ -150,7 +150,7 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
                 href={`/admin/applications/staff/${app.id}/resume`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${secondaryBtn} w-fit min-h-[44px]`}
+                className={`${secondaryBtn} w-fit`}
               >
                 <FiFileText className="w-4 h-4" aria-hidden="true" />
                 View resume (PDF)
@@ -160,7 +160,7 @@ export default function StaffApplicationDetailModal({ app, isOpen, onOpenChange 
             <StaffDetailsBody details={app.details} app={app} />
           </div>
 
-          <div className="bg-surface-raised/30 border-t border-line px-6 py-3 flex items-center justify-end shrink-0">
+          <div className="flex shrink-0 items-center justify-end border-t border-line/60 px-6 py-3">
             <DownloadCsvButton content={csvContent} filename={csvFilename} label="Download CSV" />
           </div>
         </Dialog>

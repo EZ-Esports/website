@@ -3,6 +3,7 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { getLeagueAdminData } from '@/app/lib/db/queries';
+import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
 export default async function LeagueSetupPage() {
   if (!(await getStaffForAdminSection('/admin/league'))) return <PermissionDenied />;
@@ -24,17 +25,15 @@ export default async function LeagueSetupPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-surface-raised/30 border border-line border-l-4 border-l-accent rounded-2xl p-6">
-        <h1 className="text-2xl font-black text-white uppercase tracking-wider">League Setup</h1>
-        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
-          Create games and seasons before scheduling matches or registering teams. Every match and team registration depends on at least one game and one active season.
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/league"
+        description="Create games and seasons before scheduling matches or registering teams. Every match and team registration depends on at least one game and one active season."
+      />
 
       {dbError && <DbErrorNotice variant="not-configured" />}
 
       {!dbError && <LeagueSetupClient games={games} seasons={seasons} />}
-    </div>
+    </AdminPage>
   );
 }

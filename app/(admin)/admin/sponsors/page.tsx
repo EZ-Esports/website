@@ -1,4 +1,4 @@
-import Card from '@/app/components/ui/Card';
+import { HiOutlineCurrencyDollar } from 'react-icons/hi2';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { isNull } from 'drizzle-orm';
@@ -10,6 +10,8 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminCount, AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, RequiredMark } from '@/app/components/admin/AdminUI';
+import { input, label as labelClass, table, tableWrap, tbody, th, theadRow, thRight } from '@/app/components/admin/styles';
 
 async function getAllSponsors() {
   return db.select().from(schema.sponsors).where(isNull(schema.sponsors.deletedAt)).orderBy(schema.sponsors.tier, schema.sponsors.displayOrder);
@@ -32,32 +34,40 @@ export default async function SponsorsAdminPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/sponsors"
+        description="Partners shown on the sponsors page and footer, grouped by tier and sorted by display order."
+      />
+
+      {!dbConfigured && <DbErrorNotice />}
+
       {/* Add Sponsor Form */}
-      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
-        <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add Sponsor</h2>
+      <AdminSection id="add-sponsor" title="Add a sponsor">
         <AddEntityForm action={addSponsor} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-              Name <span className="text-accent">*</span>
+            <label htmlFor="add-sponsor-name" className={labelClass}>
+              Name <RequiredMark />
             </label>
             <input
+              id="add-sponsor-name"
               name="name"
               type="text"
               required
               placeholder="Nike"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
           <div>
             <ImageUpload section="sponsors" name="logoUrl" storageKeyName="storageKey" label="Logo" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Tier</label>
+            <label htmlFor="add-sponsor-tier" className={labelClass}>Tier</label>
             <select
+              id="add-sponsor-tier"
               name="tier"
               defaultValue="community"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             >
               <option value="platinum">Platinum</option>
               <option value="gold">Gold</option>
@@ -65,56 +75,49 @@ export default async function SponsorsAdminPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Website URL</label>
+            <label htmlFor="add-sponsor-websiteUrl" className={labelClass}>Website URL</label>
             <input
+              id="add-sponsor-websiteUrl"
               name="websiteUrl"
               type="text"
               placeholder="https://sponsor.com"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
+            <label htmlFor="add-sponsor-displayOrder" className={labelClass}>Display order</label>
             <input
+              id="add-sponsor-displayOrder"
               name="displayOrder"
               type="number"
               defaultValue="0"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
-          <div className="sm:col-span-2">
-            <SubmitButton
-              label="Add Sponsor"
-              pendingLabel="Adding…"
-              className="px-6 py-2.5 bg-accent text-on-accent rounded-lg font-bold text-sm hover:bg-accent/80 transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            />
+          <div className="sm:col-span-2 flex justify-end border-t border-line/60 pt-4">
+            <SubmitButton label="Add sponsor" pendingLabel="Adding…" />
           </div>
         </AddEntityForm>
-      </Card>
-
-      {!dbConfigured && <DbErrorNotice />}
+      </AdminSection>
 
       {/* Sponsors Table */}
-      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
-        <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">
-          All Sponsors ({sponsors.length})
-        </h2>
+      <AdminSection variant="flush" title={<>All sponsors<AdminCount>{sponsors.length}</AdminCount></>}>
         {sponsors.length === 0 ? (
-          <p className="text-foreground-muted text-sm">No sponsors yet. Add one above.</p>
+          <AdminEmptyState compact icon={<HiOutlineCurrencyDollar />} title="No sponsors yet." description="Add one above." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
-                <tr className="border-b border-line">
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Name</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Tier</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Website</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Order</th>
-                  <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
+                <tr className={theadRow}>
+                  <th className={th}>Name</th>
+                  <th className={th}>Tier</th>
+                  <th className={th}>Website</th>
+                  <th className={th}>Status</th>
+                  <th className={th}>Order</th>
+                  <th className={thRight}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line/60">
+              <tbody className={tbody}>
                 {sponsors.map((sponsor) => (
                   <SponsorRow key={sponsor.id} sponsor={sponsor} />
                 ))}
@@ -122,7 +125,7 @@ export default async function SponsorsAdminPage() {
             </table>
           </div>
         )}
-      </Card>
-    </div>
+      </AdminSection>
+    </AdminPage>
   );
 }

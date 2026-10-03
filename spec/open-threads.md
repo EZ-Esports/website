@@ -93,7 +93,24 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 
 ## Admin hover-gated row actions
 
-- Roster Explorer (team tiles, roster player rows, member rows) and League Setup (game and season rows) still hide their edit/trash icon buttons behind `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, so they are invisible on touch until focus. The Standings Archive was fixed to be always visible (Sep 2026); these were out of scope. See [architecture.md](architecture.md) (Frontend, destructive row actions).
+- Resolved in [spec-013](spec-013-staff-portal-ui-overhaul.md) (2 Oct 2026): Roster Explorer and League Setup row actions are always visible.
+
+## HIGH PRIORITY: Team role editor saves destroy role data (found during spec-013, not fixed)
+
+Production data loss; fix in its own PR, not as part of a restyle. `TeamManagerClient`'s role editor renders the Display fields (`name`, `color`) and the Permissions checkboxes conditionally, one tab at a time, inside one form, and `handleEditRoleSubmit` / `handleCreateRoleSubmit` rebuild the payload from whatever is in the DOM:
+
+- **Saving from the Display tab** submits no `perm_*` fields, so the bitmask is `0` and `updateRole` clears every permission on the role.
+- **Saving from the Permissions tab** submits no `name` or `color`. `FormData.append(key, null)` sends the string `"null"` for both, so a non-system role is renamed "null" and its colour becomes "null".
+- **System roles (@everyone, Owner) can never be saved.** Their name input is `disabled`, and disabled inputs are not submitted, so `name` arrives as `"null"` and trips the system-role rename guard ("You cannot rename a system-defined role").
+- **Permissions the actor lacks are silently stripped.** Those checkboxes are `disabled` for an actor without the bit, so they are omitted from the form; saving a role that holds such a permission drops it (when the escalation guard does not reject first).
+
+Fix direction: keep both panels mounted and hide the inactive one (or give each tab its own form), submit read-only values through hidden inputs instead of `disabled` controls, and merge permission bits the actor cannot grant from the role's current value rather than from the DOM. Add tests for each case.
+
+## Staff portal follow-ups from spec-013 (need behaviour changes)
+
+- `ConfirmDeleteButton` asks twice: its alert dialog, then a native `window.confirm`. Drop the second prompt.
+- Inline-create pages (Schools, Sponsors, Gallery) could move "Add …" into a header button that opens a dialog, which needs close-on-success wiring in `AddEntityForm`.
+- League Setup, Team and Roster Explorer still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
 
 ## Dependency drift
 

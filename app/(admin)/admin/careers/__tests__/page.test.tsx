@@ -66,10 +66,10 @@ describe('CareersAdminPage', () => {
     const jsx = await CareersAdminPage();
     const html = renderToStaticMarkup(jsx);
 
-    expect(html).toContain('Career Openings');
+    expect(html).toContain('Career openings');
     expect(html).toContain('Lead Software Engineer');
     expect(html).toContain('Software Engineering');
-    expect(html).toContain('New Opening');
+    expect(html).toContain('New opening');
     expect(html).toContain('/admin/applications?posting=post-1');
   });
 });

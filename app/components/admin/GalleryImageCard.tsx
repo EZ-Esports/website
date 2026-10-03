@@ -7,6 +7,9 @@ import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { updateGalleryImage, toggleGalleryImageActive, deleteGalleryImage } from '@/app/(admin)/admin/gallery/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
+import { AdminNotice, PendingLabel, RequiredMark } from '@/app/components/admin/AdminUI';
+import { cardHover, chip, chipButton, chipDot, fieldError, focusRing, input, label as labelClass, primaryBtnSm } from '@/app/components/admin/styles';
+import { cx } from '@/app/lib/cx';
 
 interface GalleryImage {
   id: string;
@@ -26,8 +29,14 @@ interface GalleryImageCardProps {
   onOrderChange: (currentIndex: number, newIndex: number) => void;
 }
 
-const inputClass =
-  'w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all';
+const inputClass = input;
+
+/** Reorder arrow: aria-disabled at the ends (not `disabled`) so keyboard focus is never dropped. */
+const moveBtn = cx(
+  'inline-flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 cursor-pointer',
+  'hover:text-foreground hover:bg-line/70 aria-disabled:opacity-30 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent',
+  focusRing,
+);
 
 export default function GalleryImageCard({ img, index, totalCount, onOrderChange }: GalleryImageCardProps) {
   const [editOpen, setEditOpen] = useState(false);
@@ -66,49 +75,46 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-line rounded-xl overflow-hidden group hover:border-line transition-all duration-300 flex flex-col h-full">
-      <div className="relative w-full aspect-square bg-surface-raised">
+    // No hover lift while the edit form is open: the card is a workspace then, not a target.
+    <div className={cx('group flex h-full flex-col overflow-hidden rounded-xl bg-admin-panel', editOpen ? 'ring-1 ring-accent/30' : cardHover)}>
+      <div className="relative w-full aspect-square overflow-hidden bg-surface-raised">
         <Image
           src={img.src}
           alt={img.caption ?? ''}
           width={200}
           height={200}
           sizes="(max-width: 640px) 100vw, 200px"
-          className="w-full h-full object-cover"
+          className="h-full w-full object-cover transition-[scale] duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
         />
       </div>
       <div className="p-3 flex flex-col flex-grow gap-3">
         <div className="space-y-1.5">
           <div className="flex items-start justify-between gap-1">
-            <p id={`caption-${img.id}`} className="text-white text-xs font-semibold leading-tight line-clamp-2 flex-grow">
-              {img.caption || <span className="text-foreground-muted italic">No caption</span>}
+            <p id={`caption-${img.id}`} className="flex-grow text-sm font-medium leading-snug text-foreground line-clamp-2">
+              {img.caption || <span className="text-foreground-secondary">No caption</span>}
             </p>
-            <span className="text-[10px] font-black text-accent bg-accent/10 px-1.5 py-0.5 rounded shrink-0 self-start">
+            <span className={cx(chip('accent', 'sm'), 'shrink-0 self-start tabular-nums')}>
               #{index + 1}
             </span>
           </div>
-          {img.schoolName && <p className="text-foreground-secondary text-xs truncate">{img.schoolName}</p>}
-          {img.eventName && <p className="text-foreground-muted text-xs truncate">{img.eventName}</p>}
+          {img.schoolName && <p className="truncate text-xs text-foreground-secondary">{img.schoolName}</p>}
+          {img.eventName && <p className="truncate text-xs text-foreground-secondary">{img.eventName}</p>}
         </div>
 
         {totalCount > 1 && (
-          <div className="flex items-center justify-between gap-2 bg-surface-raised/40 p-2 rounded-lg border border-line/30">
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-surface-sunken/70 p-1">
             <button
               type="button"
               onClick={() => index > 0 && onOrderChange(index, index - 1)}
               aria-disabled={index === 0}
               aria-label="Move earlier in the gallery order"
               aria-describedby={`caption-${img.id}`}
-              className={`p-1.5 rounded-md border border-line transition-all cursor-pointer ${
-                index === 0
-                  ? 'opacity-30 cursor-not-allowed text-foreground-secondary'
-                  : 'text-foreground-secondary hover:text-white hover:bg-line/60'
-              }`}
+              className={moveBtn}
             >
-              <HiChevronLeft className="w-4 h-4" />
+              <HiChevronLeft aria-hidden className="w-4 h-4" />
             </button>
-            <span className="text-[9px] font-bold text-foreground-secondary uppercase tracking-wider">
-              Position <span className="text-accent">{index + 1} / {totalCount}</span>
+            <span className="text-xs text-foreground-secondary tabular-nums">
+              Position <span className="font-medium text-foreground">{index + 1}</span> of {totalCount}
             </span>
             <button
               type="button"
@@ -116,13 +122,9 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
               aria-disabled={index === totalCount - 1}
               aria-label="Move later in the gallery order"
               aria-describedby={`caption-${img.id}`}
-              className={`p-1.5 rounded-md border border-line transition-all cursor-pointer ${
-                index === totalCount - 1
-                  ? 'opacity-30 cursor-not-allowed text-foreground-secondary'
-                  : 'text-foreground-secondary hover:text-white hover:bg-line/60'
-              }`}
+              className={moveBtn}
             >
-              <HiChevronRight className="w-4 h-4" />
+              <HiChevronRight aria-hidden className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -133,12 +135,10 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
               type="button"
               onClick={handleToggleActive}
               disabled={togglePending}
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer border transition-all disabled:opacity-50 ${
-                img.isActive
-                  ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20'
-                  : 'bg-line text-foreground-muted border-line hover:bg-line'
-              }`}
+              title={img.isActive ? 'Click to hide from the public gallery' : 'Click to show in the public gallery'}
+              className={chipButton(img.isActive ? 'success' : 'neutral')}
             >
+              <span aria-hidden className={chipDot} />
               {img.isActive ? 'Active' : 'Inactive'}
             </button>
             <div className="flex items-center gap-2">
@@ -158,7 +158,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
           </div>
 
           {toggleError && (
-            <p role="alert" aria-live="polite" className="text-[10px] text-red-400">{toggleError}</p>
+            <p role="alert" aria-live="polite" className={fieldError}>{toggleError}</p>
           )}
 
           {editOpen && (
@@ -175,7 +175,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
                 setEditOpen(false);
                 setTimeout(() => editBtnRef.current?.focus(), 0);
               }}
-              className="mt-3 space-y-2 border-t border-line pt-3"
+              className="admin-fade-in mt-3 space-y-3 border-t border-line/60 pt-3"
             >
               <div>
                 <ImageUpload
@@ -185,30 +185,28 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
                   storageKeyName="storageKey"
                   currentSrc={img.src}
                   currentStorageKey={img.storageKey ?? undefined}
-                  label="Change Image"
+                  label="Change image"
                 />
               </div>
               <div>
                 {/* Caption is required — also serves as image alt text (WCAG) */}
-                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                  Caption / Alt Text <span className="text-accent">*</span>
+                <label htmlFor={`caption-input-${img.id}`} className={labelClass}>
+                  Caption / alt text <RequiredMark />
                 </label>
-                <input ref={firstFieldRef} name="caption" type="text" required defaultValue={img.caption ?? ''} className={inputClass} />
+                <input ref={firstFieldRef} id={`caption-input-${img.id}`} name="caption" type="text" required defaultValue={img.caption ?? ''} className={inputClass} />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">School</label>
-                <input name="schoolName" type="text" defaultValue={img.schoolName ?? ''} className={inputClass} />
+                <label htmlFor={`school-input-${img.id}`} className={labelClass}>School</label>
+                <input id={`school-input-${img.id}`} name="schoolName" type="text" defaultValue={img.schoolName ?? ''} className={inputClass} />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-foreground-secondary uppercase tracking-wider mb-1">Event</label>
-                <input name="eventName" type="text" defaultValue={img.eventName ?? ''} className={inputClass} />
+                <label htmlFor={`event-input-${img.id}`} className={labelClass}>Event</label>
+                <input id={`event-input-${img.id}`} name="eventName" type="text" defaultValue={img.eventName ?? ''} className={inputClass} />
               </div>
-              <button type="submit" disabled={pending} className="w-full px-3 py-1.5 bg-accent hover:bg-accent/80 font-bold text-xs uppercase tracking-wider rounded-lg text-on-accent transition-all cursor-pointer disabled:opacity-50">
-                {pending ? 'Saving…' : 'Save Changes'}
+              <button type="submit" disabled={pending} aria-busy={pending} className={cx(primaryBtnSm, 'w-full')}>
+                <PendingLabel pending={pending} label="Save changes" pendingLabel="Saving…" />
               </button>
-              {editError && (
-                <p role="alert" aria-live="polite" className="text-[10px] text-red-400">{editError}</p>
-              )}
+              {editError && <AdminNotice tone="danger">{editError}</AdminNotice>}
             </form>
           )}
         </div>

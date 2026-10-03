@@ -3,6 +3,7 @@ import { getAllCareerPostingsAdmin } from '@/app/lib/db/queries';
 import CareersManagerClient from '@/app/components/admin/CareersManagerClient';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
+import { AdminPage } from '@/app/components/admin/AdminUI';
 import type { AdminCareerPostingWithStats } from '@/app/types/careers';
 
 export const metadata = {
@@ -27,9 +28,9 @@ export default async function CareersAdminPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminPage>
       {!dbConfigured && <DbErrorNotice />}
       <CareersManagerClient initialPostings={postings} />
-    </div>
+    </AdminPage>
   );
 }

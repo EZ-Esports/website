@@ -1,12 +1,33 @@
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
-import Card from '@/app/components/ui/Card';
 import LeadershipRow, { LeaderRowItem } from '@/app/components/admin/LeadershipRow';
+import {
+  AdminCount,
+  AdminEmptyState,
+  AdminField,
+  AdminNotice,
+  AdminSearchField,
+  AdminSection,
+  RequiredMark,
+} from '@/app/components/admin/AdminUI';
+import { AdminSegmented } from '@/app/components/admin/AdminTabs';
+import {
+  focusRing,
+  input,
+  label as labelClass,
+  secondaryBtnSm,
+  table,
+  tbody,
+  th,
+  theadRow,
+  thRight,
+} from '@/app/components/admin/styles';
+import { cx } from '@/app/lib/cx';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import SubmitButton from '@/app/components/admin/SubmitButton';
 import { createLeader } from '@/app/(admin)/admin/leadership/actions';
-import { HiMagnifyingGlass, HiXMark, HiUserPlus, HiCheck, HiSparkles } from 'react-icons/hi2';
+import { HiUserPlus, HiCheck, HiSparkles } from 'react-icons/hi2';
 
 export interface PersonItem {
   id: string;
@@ -27,9 +48,6 @@ interface LeadershipManagerClientProps {
   initialLeadership: LeaderRowItem[];
   peopleList: PersonItem[];
 }
-
-const inputClass =
-  'w-full px-3 py-2.5 bg-surface-sunken border border-line/80 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all';
 
 export default function LeadershipManagerClient({
   initialLeadership,
@@ -123,195 +141,116 @@ export default function LeadershipManagerClient({
     setTimeout(() => setFormSuccess(false), 4000);
   }
 
+  const initialsOf = (fullName: string) =>
+    fullName
+      .split(' ')
+      .filter(Boolean)
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+
   return (
-    <div className="space-y-6 w-full max-w-full">
-      {/* Header */}
-      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-wider">Leadership Manager</h1>
-            <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
-              Manage student officers, terms, seniorities, and normalized person profiles.
-            </p>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="px-3 py-1 bg-surface-sunken border border-line rounded-lg text-xs font-bold text-foreground">
-              {peopleList.length} Profiles
-            </span>
-            <span className="px-3 py-1 bg-surface-sunken border border-accent/30 text-accent rounded-lg text-xs font-bold">
-              {initialLeadership.length} Active Terms
-            </span>
-          </div>
-        </div>
-      </Card>
+    <div className="grid w-full min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-12">
+      {/* Left Column: Dual Officer Creation Workflow */}
+      <AdminSection
+        className="w-full min-w-0 lg:col-span-5"
+        title="Add officer"
+        description="Register or assign an appointment."
+        actions={
+          <AdminSegmented
+            aria-label="Officer source"
+            value={creationMode}
+            onChange={(mode) => {
+              setCreationMode(mode);
+              setFormError(null);
+            }}
+            options={[
+              { value: 'existing', label: 'Assign existing', icon: <HiCheck aria-hidden className="h-3.5 w-3.5" /> },
+              { value: 'new', label: 'New person', icon: <HiUserPlus aria-hidden className="h-3.5 w-3.5" /> },
+            ]}
+          />
+        }
+      >
+        <div className="space-y-4">
+          {formError && <AdminNotice tone="danger">{formError}</AdminNotice>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full min-w-0">
-        {/* Left Column: Dual Officer Creation Workflow */}
-        <Card className="lg:col-span-5 space-y-5 w-full min-w-0">
-          <div className="flex items-center justify-between border-b border-line/60 pb-3.5">
-            <div>
-              <h2 className="text-base font-black text-white uppercase tracking-wider">Add Officer</h2>
-              <p className="text-foreground-secondary text-[11px] mt-0.5">Register or assign an appointment.</p>
-            </div>
-            <div className="flex rounded-lg bg-surface-sunken p-1 border border-line/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setCreationMode('existing');
-                  setFormError(null);
-                }}
-                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                  creationMode === 'existing'
-                    ? 'bg-accent text-on-accent shadow-sm'
-                    : 'text-foreground-secondary hover:text-white'
-                }`}
-              >
-                <HiCheck className="w-3.5 h-3.5" />
-                Assign Existing
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCreationMode('new');
-                  setFormError(null);
-                }}
-                className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                  creationMode === 'new'
-                    ? 'bg-accent text-on-accent shadow-sm'
-                    : 'text-foreground-secondary hover:text-white'
-                }`}
-              >
-                <HiUserPlus className="w-3.5 h-3.5" />
-                New Person
-              </button>
-            </div>
-          </div>
+          {formSuccess && <AdminNotice tone="success">Officer term added successfully!</AdminNotice>}
 
-          {formError && (
-            <div role="alert" className="p-3 bg-red-950/30 border border-red-900/50 rounded-lg text-red-400 text-xs">
-              {formError}
-            </div>
-          )}
-
-          {formSuccess && (
-            <div role="status" className="p-3 bg-green-950/30 border border-green-900/50 rounded-lg text-green-400 text-xs">
-              Officer term added successfully!
-            </div>
-          )}
-
-          <form ref={formRef} action={handleAddLeader} className="space-y-3.5">
+          <form ref={formRef} action={handleAddLeader} className="space-y-4">
             {/* Option A: Assign Existing Person */}
             {creationMode === 'existing' && (
-              <div className="space-y-3">
+              <div key="existing" className="admin-fade-in space-y-3">
                 <input type="hidden" name="personId" value={selectedPerson?.id || ''} />
 
                 {!selectedPerson ? (
                   <div className="relative">
-                    <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1.5">
-                      Select Person Profile <span className="text-accent">*</span>
+                    <label htmlFor="person-search" className={labelClass}>
+                      Select person profile <RequiredMark />
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search by name, handle, or school..."
-                        value={personSearch}
-                        onChange={(e) => {
-                          setPersonSearch(e.target.value);
-                          setShowPersonDropdown(true);
-                        }}
-                        onFocus={() => setShowPersonDropdown(true)}
-                        className={inputClass}
-                      />
-                      <HiMagnifyingGlass className="absolute right-3 top-3 w-4 h-4 text-foreground-muted pointer-events-none" />
-                    </div>
+                    <AdminSearchField
+                      id="person-search"
+                      aria-label="Select person profile"
+                      placeholder="Search by name, handle, or school…"
+                      value={personSearch}
+                      onChange={(e) => {
+                        setPersonSearch(e.target.value);
+                        setShowPersonDropdown(true);
+                      }}
+                      onFocus={() => setShowPersonDropdown(true)}
+                    />
 
                     {showPersonDropdown && (
-                      <div className="absolute z-20 mt-1 w-full bg-surface-raised border border-line rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-line/60">
+                      <div className="admin-fade-in absolute z-20 mt-1.5 max-h-64 w-full divide-y divide-line/50 overflow-y-auto rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70">
                         {filteredPeople.length === 0 ? (
-                          <div className="p-3 text-xs text-foreground-muted text-center">
-                            No profiles found matching &quot;{personSearch}&quot;. Switch to &quot;New Person&quot; above to create one.
+                          <div className="p-3 text-center text-sm text-foreground-secondary">
+                            No profiles found matching &quot;{personSearch}&quot;. Switch to &quot;New person&quot; above to create one.
                           </div>
                         ) : (
-                          filteredPeople.map((p) => {
-                            const pInitials = p.fullName
-                              .split(' ')
-                              .filter(Boolean)
-                              .map((n) => n[0])
-                              .slice(0, 2)
-                              .join('')
-                              .toUpperCase();
-
-                            return (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedPerson(p);
-                                  setShowPersonDropdown(false);
-                                  setPersonSearch('');
-                                }}
-                                className="w-full text-left p-2.5 hover:bg-line/20 flex items-center gap-2.5 transition-colors cursor-pointer"
-                              >
-                                <div className="w-7 h-7 rounded-full bg-surface-sunken border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
-                                  {p.avatarUrl ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={p.avatarUrl} alt={p.fullName} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <span className="text-[10px] font-black text-foreground-secondary">{pInitials}</span>
-                                  )}
+                          filteredPeople.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPerson(p);
+                                setShowPersonDropdown(false);
+                                setPersonSearch('');
+                              }}
+                              className={cx('flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2.5 text-left transition-colors duration-150 hover:bg-line/60', focusRing)}
+                            >
+                              <Avatar src={p.avatarUrl} name={p.fullName} initials={initialsOf(p.fullName)} size="sm" />
+                              <div className="min-w-0 flex-grow">
+                                <div className="flex items-center gap-1 truncate text-sm font-medium text-foreground">
+                                  <span>{p.fullName}</span>
+                                  {p.handle && <span className="font-normal text-foreground-secondary">({p.handle})</span>}
                                 </div>
-                                <div className="flex-grow min-w-0">
-                                  <div className="text-xs font-bold text-white truncate flex items-center gap-1">
-                                    <span>{p.fullName}</span>
-                                    {p.handle && <span className="text-foreground-muted font-normal">({p.handle})</span>}
-                                  </div>
-                                  <div className="text-[10px] text-foreground-secondary truncate">
-                                    {p.university || p.highSchool || 'No school specified'}
-                                  </div>
+                                <div className="truncate text-xs text-foreground-secondary">
+                                  {p.university || p.highSchool || 'No school specified'}
                                 </div>
-                              </button>
-                            );
-                          })
+                              </div>
+                            </button>
+                          ))
                         )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="p-3 bg-surface-sunken/80 border border-accent/30 rounded-xl flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-surface-raised border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
-                        {selectedPerson.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={selectedPerson.avatarUrl} alt={selectedPerson.fullName} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-[11px] font-black text-foreground-secondary">
-                            {selectedPerson.fullName
-                              .split(' ')
-                              .filter(Boolean)
-                              .map((n: string) => n[0])
-                              .slice(0, 2)
-                              .join('')
-                              .toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+                  <div className="admin-fade-in flex items-center justify-between gap-3 rounded-xl bg-surface-sunken p-3 ring-1 ring-accent/30">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Avatar src={selectedPerson.avatarUrl} name={selectedPerson.fullName} initials={initialsOf(selectedPerson.fullName)} />
                       <div className="min-w-0">
-                        <div className="text-xs font-black text-white truncate flex items-center gap-1">
+                        <div className="flex items-center gap-1 truncate text-sm font-medium text-foreground">
                           <span>{selectedPerson.fullName}</span>
                           {selectedPerson.handle && (
-                            <span className="text-foreground-muted font-normal">({selectedPerson.handle})</span>
+                            <span className="font-normal text-foreground-secondary">({selectedPerson.handle})</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-foreground-secondary truncate">
+                        <div className="truncate text-xs text-foreground-secondary">
                           {selectedPerson.university || selectedPerson.highSchool || 'Profile loaded'}
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPerson(null)}
-                      className="text-[11px] text-foreground-secondary hover:text-white px-2 py-1 bg-surface-raised border border-line rounded-md transition-all cursor-pointer shrink-0"
-                    >
+                    <button type="button" onClick={() => setSelectedPerson(null)} className={secondaryBtnSm}>
                       Change
                     </button>
                   </div>
@@ -321,106 +260,45 @@ export default function LeadershipManagerClient({
 
             {/* Option B: Create New Person */}
             {creationMode === 'new' && (
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="name" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Officer Full Name <span className="text-accent">*</span>
-                  </label>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    required
-                    placeholder="e.g. Alice Williams"
-                    className={inputClass}
-                  />
+              <div key="new" className="admin-fade-in space-y-4">
+                <AdminField label="Officer full name" htmlFor="name" required>
+                  <input id="name" name="name" type="text" required placeholder="e.g. Alice Williams" className={input} />
+                </AdminField>
+
+                <AdminField label="Handle / IGN" htmlFor="handle">
+                  <input id="handle" name="handle" type="text" placeholder="e.g. eddyson." className={input} />
+                </AdminField>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <AdminField label="High school" htmlFor="highSchool">
+                    <input id="highSchool" name="highSchool" type="text" placeholder="e.g. Stuyvesant HS" className={input} />
+                  </AdminField>
+                  <AdminField label="University" htmlFor="university">
+                    <input id="university" name="university" type="text" placeholder="e.g. Columbia" className={input} />
+                  </AdminField>
                 </div>
 
-                <div>
-                  <label htmlFor="handle" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Handle / IGN
-                  </label>
-                  <input
-                    id="handle"
-                    name="handle"
-                    type="text"
-                    placeholder="e.g. eddyson."
-                    className={inputClass}
-                  />
-                </div>
+                <ImageUpload
+                  section="leadership"
+                  entityIdName="personId"
+                  name="avatarUrl"
+                  storageKeyName="storageKey"
+                  label="Headshot photo"
+                />
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label htmlFor="highSchool" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                      High School
-                    </label>
-                    <input
-                      id="highSchool"
-                      name="highSchool"
-                      type="text"
-                      placeholder="e.g. Stuyvesant HS"
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="university" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                      University
-                    </label>
-                    <input
-                      id="university"
-                      name="university"
-                      type="text"
-                      placeholder="e.g. Columbia"
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <ImageUpload
-                    section="leadership"
-                    entityIdName="personId"
-                    name="avatarUrl"
-                    storageKeyName="storageKey"
-                    label="Headshot Avatar Photo"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="bio" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Bio / Fun Fact
-                  </label>
-                  <textarea
-                    id="bio"
-                    name="bio"
-                    rows={2}
-                    placeholder="Short bio..."
-                    className={inputClass}
-                  />
-                </div>
+                <AdminField label="Bio / fun fact" htmlFor="bio">
+                  <textarea id="bio" name="bio" rows={2} placeholder="Short bio…" className={input} />
+                </AdminField>
               </div>
             )}
 
             {/* Common Term Fields */}
-            <div className="pt-2 border-t border-line/60 space-y-3">
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label htmlFor="role" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Role Title <span className="text-accent">*</span>
-                  </label>
-                  <input
-                    id="role"
-                    name="role"
-                    type="text"
-                    required
-                    placeholder="e.g. President, CTO"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="year" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Academic Year <span className="text-accent">*</span>
-                  </label>
+            <div className="space-y-4 border-t border-line/60 pt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <AdminField label="Role title" htmlFor="role" required>
+                  <input id="role" name="role" type="text" required placeholder="e.g. President, CTO" className={input} />
+                </AdminField>
+                <AdminField label="Academic year" htmlFor="year" required>
                   <input
                     id="year"
                     name="year"
@@ -430,139 +308,120 @@ export default function LeadershipManagerClient({
                     title="Four-digit year, e.g. 2026"
                     placeholder="e.g. 2026"
                     defaultValue={selectedYear || new Date().getFullYear().toString()}
-                    className={inputClass}
+                    className={input}
                   />
-                </div>
+                </AdminField>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label htmlFor="department" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Department (Optional)
-                  </label>
-                  <input
-                    id="department"
-                    name="department"
-                    type="text"
-                    placeholder="e.g. Executive, Marketing"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="displayOrder" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                    Seniority Order
-                  </label>
-                  <select
-                    id="displayOrder"
-                    name="displayOrder"
-                    defaultValue="3"
-                    className={inputClass}
-                  >
+              <div className="grid grid-cols-2 gap-3">
+                <AdminField label="Department (optional)" htmlFor="department">
+                  <input id="department" name="department" type="text" placeholder="e.g. Executive, Marketing" className={input} />
+                </AdminField>
+                <AdminField label="Seniority order" htmlFor="displayOrder">
+                  <select id="displayOrder" name="displayOrder" defaultValue="3" className={input}>
                     <option value="1">1 - Executive (President, CTO, Founders)</option>
                     <option value="2">2 - Director / Lead (Dept & Game Leads)</option>
                     <option value="3">3 - Associate / Staff (Associates, Coordinators)</option>
                     <option value="4">4 - Advisor / Special Thanks</option>
                     <option value="0">0 - Other / Unspecified</option>
                   </select>
-                </div>
+                </AdminField>
               </div>
             </div>
 
             <SubmitButton
-              label={creationMode === 'existing' ? 'Assign Officer Term' : 'Create Person & Term'}
-              pendingLabel="Saving Officer…"
-              className="w-full py-2.5 bg-white hover:bg-foreground text-surface-sunken text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-3 shadow-lg shadow-black/20"
+              label={creationMode === 'existing' ? 'Assign officer term' : 'Create person & term'}
+              pendingLabel="Saving officer…"
+              className="w-full"
             />
           </form>
-        </Card>
+        </div>
+      </AdminSection>
 
-        {/* Right Column: Tightly Bounded Interactive Filter & Officers Table */}
-        <div className="lg:col-span-7 space-y-4 min-w-0 w-full">
-          {/* Controls Bar */}
-          <div className="p-3.5 bg-surface-raised/40 border border-line/80 rounded-2xl space-y-3 shadow-xl shadow-black/20">
-            {/* Search and stats */}
-            <div className="flex flex-col sm:flex-row gap-2.5 items-center justify-between">
-              <div className="relative w-full sm:max-w-xs">
-                <input
-                  type="text"
-                  placeholder="Search in this year..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-7 py-1.5 bg-surface-sunken border border-line/80 rounded-xl text-xs text-white placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/30 transition-all"
-                />
-                <HiMagnifyingGlass className="absolute left-2.5 top-2 w-3.5 h-3.5 text-foreground-muted pointer-events-none" />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-2 text-foreground-muted hover:text-white cursor-pointer"
-                  >
-                    <HiXMark className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+      {/* Right Column: Year filter, search and the officers table */}
+      <AdminSection
+        variant="flush"
+        stickyToolbar
+        className="w-full min-w-0 lg:col-span-7"
+        title={
+          <>
+            Officers in {selectedYear}
+            <AdminCount>{filteredLeaders.length}</AdminCount>
+          </>
+        }
+        toolbar={
+          <div className="space-y-3">
+            <AdminSearchField
+              className="w-full sm:max-w-xs"
+              aria-label="Search officers in this year"
+              placeholder="Search in this year…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClear={() => setSearchQuery('')}
+            />
 
-              <div className="text-[11px] text-foreground-secondary font-medium self-end sm:self-center">
-                Year <strong className="text-accent">{selectedYear}</strong>: <strong className="text-white font-bold">{filteredLeaders.length}</strong> officer(s)
-              </div>
-            </div>
-
-            {/* Year Selector Pills - Sorted EARLIEST first */}
-            <div className="flex flex-wrap items-center gap-1 pt-2 border-t border-line/40">
-              {availableYears.map((year) => (
-                <button
-                  key={year}
-                  type="button"
-                  onClick={() => setSelectedYear(year)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold tracking-wider transition-all cursor-pointer ${
-                    selectedYear === year
-                      ? 'bg-accent text-on-accent shadow-sm shadow-accent/20'
-                      : 'bg-surface-sunken text-foreground-secondary hover:text-white hover:bg-surface-raised border border-line/60'
-                  }`}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Officers Table - Tightly bounded without horizontal overflow */}
-          <div className="bg-surface-raised/30 border border-line/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30 w-full min-w-0">
-            {filteredLeaders.length === 0 ? (
-              <div className="p-12 text-center text-foreground-muted text-xs bg-surface-sunken/20 rounded-2xl space-y-1.5">
-                <HiSparkles className="w-7 h-7 text-foreground-muted mx-auto mb-1.5 opacity-50" />
-                <p className="font-bold text-foreground text-sm">No officers found for {selectedYear}</p>
-                <p className="text-[11px] text-foreground-secondary">
-                  {searchQuery
-                    ? 'Try adjusting your search query.'
-                    : `Add officers for ${selectedYear} using the panel on the left.`}
-                </p>
-              </div>
-            ) : (
-              <div className="w-full overflow-hidden">
-                <table className="w-full table-fixed text-left border-collapse">
-                  <thead className="bg-[#0b101d] border-b border-accent/20">
-                    <tr className="text-foreground-secondary text-[10px] font-bold uppercase tracking-widest">
-                      <th className="w-[38%] px-3.5 py-3">Officer Profile</th>
-                      <th className="w-[26%] px-3.5 py-3">Role & Dept</th>
-                      <th className="w-[18%] px-3.5 py-3">Seniority</th>
-                      <th className="w-[18%] px-3.5 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line text-xs">
-                    {filteredLeaders.map((leader) => (
-                      <LeadershipRow
-                        key={leader.termId || leader.id}
-                        leader={leader}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {availableYears.length > 0 && (
+              <AdminSegmented
+                aria-label="Academic year"
+                className="flex-wrap"
+                value={selectedYear}
+                onChange={setSelectedYear}
+                options={availableYears.map((year) => ({ value: year, label: year }))}
+              />
             )}
           </div>
-        </div>
-      </div>
+        }
+      >
+        {filteredLeaders.length === 0 ? (
+          <AdminEmptyState
+            compact
+            icon={<HiSparkles />}
+            title={`No officers found for ${selectedYear}`}
+            description={
+              searchQuery
+                ? 'Try adjusting your search query.'
+                : `Add officers for ${selectedYear} using the panel on the left.`
+            }
+          />
+        ) : (
+          <div className="w-full overflow-hidden">
+            <table className={cx(table, 'table-fixed')}>
+              <thead>
+                <tr className={theadRow}>
+                  <th className={cx(th, 'w-[38%]')}>Officer profile</th>
+                  <th className={cx(th, 'w-[26%]')}>Role &amp; dept</th>
+                  <th className={cx(th, 'w-[18%]')}>Seniority</th>
+                  <th className={cx(thRight, 'w-[18%]')}>Actions</th>
+                </tr>
+              </thead>
+              <tbody className={tbody}>
+                {filteredLeaders.map((leader) => (
+                  <LeadershipRow key={leader.termId || leader.id} leader={leader} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </AdminSection>
+    </div>
+  );
+}
+
+/** Round headshot with an initials fallback. */
+function Avatar({ src, name, initials, size = 'md' }: { src: string | null; name: string; initials: string; size?: 'sm' | 'md' }) {
+  return (
+    <div
+      className={cx(
+        'flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-raised',
+        size === 'sm' ? 'h-7 w-7' : 'h-9 w-9',
+      )}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-[11px] font-semibold text-foreground-secondary">{initials}</span>
+      )}
     </div>
   );
 }

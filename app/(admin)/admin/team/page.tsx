@@ -5,6 +5,7 @@ import * as schema from '@/app/lib/db/schema';
 import TeamManagerClient from '@/app/components/admin/TeamManagerClient';
 import { desc } from 'drizzle-orm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
 export default async function TeamAdminPage() {
   const current = await getStaffForAdminSection('/admin/team');
@@ -77,11 +78,17 @@ export default async function TeamAdminPage() {
   }));
 
   return (
-    <TeamManagerClient
-      current={serializedCurrent}
-      staffMembers={serializedStaffMembers}
-      invites={serializedInvites}
-      roles={serializedRoles}
-    />
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/team"
+        description="Invite staff, assign their roles, and decide what each role is allowed to manage."
+      />
+      <TeamManagerClient
+        current={serializedCurrent}
+        staffMembers={serializedStaffMembers}
+        invites={serializedInvites}
+        roles={serializedRoles}
+      />
+    </AdminPage>
   );
 }

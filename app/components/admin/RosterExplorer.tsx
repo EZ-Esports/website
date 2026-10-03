@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   FiArrowLeft, FiAward, FiChevronRight, FiExternalLink, FiHome, FiPlus,
-  FiSearch, FiSettings, FiTrash2, FiUsers, FiX,
+  FiSettings, FiTrash2, FiUsers, FiX,
 } from 'react-icons/fi';
 import {
   createMember, updateMember, deleteMember,
@@ -32,8 +32,13 @@ type RosterPlayerRow = Awaited<ReturnType<typeof listRosterPlayers>>[number];
 
 const ROLES = ['player', 'captain', 'coach', 'sub'] as const;
 
-import { input, primaryBtn, secondaryBtn, iconBtn, saveBtn, cancelBtn, deleteIconBtn, deleteIconBtnCompact } from '@/app/components/admin/styles';
+import {
+  input, primaryBtn, secondaryBtnSm, ghostBtnSm, iconBtn, saveBtn, cancelBtn, deleteIconBtn, deleteIconBtnCompact,
+  focusRing, selectClass, cardHover, table, tableWrap, tbody, td, tdRight, th, theadRow, thRight, tr, trEditing, chip, listStack,
+} from '@/app/components/admin/styles';
 import RowIconButton from '@/app/components/admin/RowIconButton';
+import { AdminEmptyState, AdminField, AdminNotice, AdminSearchField, AdminSkeletonRows, AdminToast } from '@/app/components/admin/AdminUI';
+import { cx } from '@/app/lib/cx';
 
 export default function RosterExplorer({
   games, teams, rosters, schools, seasons, playerCounts,
@@ -141,35 +146,25 @@ export default function RosterExplorer({
 
   // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-5 text-foreground">
-      {toast && (
-        <div
-          className={`p-3 rounded-lg border text-xs font-semibold flex items-center justify-between ${
-            toast.type === 'error'
-              ? 'bg-red-950/30 border-red-900/50 text-red-300'
-              : 'bg-success/30 border-success/50 text-success'
-          }`}
-        >
-          <span>{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-foreground-secondary hover:text-foreground" aria-label="Dismiss"><FiX /></button>
-        </div>
-      )}
+    <div className="space-y-6 text-foreground">
+      <AdminToast toast={toast} onDismiss={() => setToast(null)} />
 
-      {/* Breadcrumb + season scope */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <nav className="flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary flex-wrap">
+      {/* Breadcrumb + season scope. Sticky under the top bar so the drill-down
+          path and the season filter stay in reach on long rosters. */}
+      <div className="sticky top-14 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 bg-surface px-2 py-3">
+        <nav aria-label="Roster drill-down" className="flex flex-wrap items-center gap-1.5 text-sm text-foreground-secondary">
           <Crumb onClick={goToSchools} active={!school}><FiHome className="w-3.5 h-3.5" /> Schools</Crumb>
-          {school && (<><FiChevronRight className="w-3 h-3 text-line" /><Crumb onClick={() => goToSchool(school.id)} active={!team}>{school.name}</Crumb></>)}
-          {team && (<><FiChevronRight className="w-3 h-3 text-line" /><Crumb onClick={() => goToTeam(team.id)} active={!roster}>{teamLabel(team).short} · {teamLabel(team).season}</Crumb></>)}
-          {roster && (<><FiChevronRight className="w-3 h-3 text-line" /><Crumb active>{roster.name}</Crumb></>)}
+          {school && (<><FiChevronRight aria-hidden className="w-3.5 h-3.5 text-foreground-muted" /><Crumb onClick={() => goToSchool(school.id)} active={!team}>{school.name}</Crumb></>)}
+          {team && (<><FiChevronRight aria-hidden className="w-3.5 h-3.5 text-foreground-muted" /><Crumb onClick={() => goToTeam(team.id)} active={!roster}>{teamLabel(team).short} · {teamLabel(team).season}</Crumb></>)}
+          {roster && (<><FiChevronRight aria-hidden className="w-3.5 h-3.5 text-foreground-muted" /><Crumb active>{roster.name}</Crumb></>)}
         </nav>
 
-        <label className="flex items-center gap-2 text-xs font-semibold text-foreground-muted">
+        <label className="flex items-center gap-2 text-sm text-foreground-secondary">
           Season
           <select
             value={seasonScope ?? ''}
             onChange={(e) => setParams({ season: e.target.value || null })}
-            className="px-2.5 py-1.5 bg-surface-sunken border border-line rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+            className={selectClass}
           >
             <option value="">All seasons</option>
             {seasons.map(s => (
@@ -199,27 +194,27 @@ export default function RosterExplorer({
             onBack={goToSchools}
             actions={
               <>
-                <button className={secondaryBtn} onClick={() => toggle('team-create')}><FiPlus /> Register Team</button>
-                <button className={secondaryBtn} onClick={() => toggle('school-edit')}><FiSettings /> School Settings</button>
+                <button type="button" className={ghostBtnSm} aria-expanded={openForm === 'school-edit'} onClick={() => toggle('school-edit')}><FiSettings aria-hidden /> School settings</button>
+                <button type="button" className={primaryBtn} aria-expanded={openForm === 'team-create'} onClick={() => toggle('team-create')}><FiPlus aria-hidden /> Register team</button>
               </>
             }
           />
 
           {openForm === 'school-edit' && (
-            <Panel title="School Settings" onClose={() => setOpenForm(null)}>
-              <p className="text-xs text-foreground-secondary leading-relaxed">
+            <Panel title="School settings" onClose={() => setOpenForm(null)}>
+              <p className="text-sm text-foreground-secondary leading-6">
                 School details (name, logo, website, display order, active status) are managed in the{' '}
-                <Link href="/admin/schools" className="text-accent hover:underline font-semibold inline-flex items-center gap-1">
-                  Schools page <FiExternalLink className="w-3 h-3" />
+                <Link href="/admin/schools" className={cx('text-accent hover:underline underline-offset-4 font-medium inline-flex items-center gap-1 rounded', focusRing)}>
+                  Schools page <FiExternalLink aria-hidden className="w-3 h-3" />
                 </Link>
                 . Navigate there to edit or delete this school.
               </p>
               <div className="flex justify-end pt-2">
                 <Link
                   href="/admin/schools"
-                  className={secondaryBtn}
+                  className={secondaryBtnSm}
                 >
-                  <FiExternalLink className="w-3.5 h-3.5" /> Go to Schools
+                  <FiExternalLink aria-hidden className="w-3.5 h-3.5" /> Go to Schools
                 </Link>
               </div>
             </Panel>
@@ -237,15 +232,15 @@ export default function RosterExplorer({
           )}
 
           {/* Teams grid (scoped to the selected season) */}
-          <Section title="Game Teams" icon={<FiAward />}>
+          <Section title="Game teams" icon={<FiAward />}>
             {scopedTeams.filter(t => t.schoolId === school.id).length === 0 ? (
-              <Empty>
+              <Empty icon={<FiAward />}>
                 {seasonScope
                   ? 'No teams registered for the selected season. Switch the season scope or register one.'
-                  : 'No teams registered yet. Click “Register Team” to add one.'}
+                  : 'No teams registered yet. Click “Register team” to add one.'}
               </Empty>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="admin-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {scopedTeams.filter(t => t.schoolId === school.id).map(t => {
                   const l = teamLabel(t);
                   const teamRosters = rosters.filter(r => r.teamId === t.id);
@@ -258,9 +253,9 @@ export default function RosterExplorer({
                       )}
                       deleteLabel="Unregister team"
                     >
-                      <div className="text-sm font-bold text-white">{l.title}</div>
-                      <div className="text-[11px] text-foreground-muted font-mono mt-0.5">{l.season}</div>
-                      <div className="text-[11px] text-foreground-secondary mt-3 flex gap-3">
+                      <div className="text-sm font-medium text-foreground">{l.title}</div>
+                      <div className="text-xs text-foreground-secondary mt-0.5">{l.season}</div>
+                      <div className="text-xs text-foreground-secondary mt-3 flex gap-3 tabular-nums">
                         <span>{teamRosters.length} roster{teamRosters.length === 1 ? '' : 's'}</span>
                         <span>{playerCount} player{playerCount === 1 ? '' : 's'}</span>
                       </div>
@@ -290,11 +285,11 @@ export default function RosterExplorer({
             title={teamLabel(team).title}
             subtitle={`${teamLabel(team).season} · ${school.name}`}
             onBack={() => goToSchool(school.id)}
-            actions={<button className={secondaryBtn} onClick={() => toggle('roster-create')}><FiPlus /> Add Roster</button>}
+            actions={<button type="button" className={primaryBtn} aria-expanded={openForm === 'roster-create'} onClick={() => toggle('roster-create')}><FiPlus aria-hidden /> Add roster</button>}
           />
 
           {openForm === 'roster-create' && (
-            <Panel title="Create Roster" onClose={() => setOpenForm(null)}>
+            <Panel title="Create roster" onClose={() => setOpenForm(null)}>
               <form
                 onSubmit={(e) => runForm(e, createRoster, 'Roster created.', { onSuccess: () => setOpenForm(null) })}
                 className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end"
@@ -316,9 +311,9 @@ export default function RosterExplorer({
 
           <Section title="Rosters" icon={<FiUsers />}>
             {rosters.filter(r => r.teamId === team.id).length === 0 ? (
-              <Empty>No rosters yet. Click “Add Roster” to create the first squad.</Empty>
+              <Empty icon={<FiUsers />}>No rosters yet. Click “Add roster” to create the first squad.</Empty>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="admin-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {rosters.filter(r => r.teamId === team.id).map(r => {
                   const playerCount = playerCounts[r.id] ?? 0;
                   const record = (r.wins ?? 0) + (r.losses ?? 0) > 0 ? `${r.wins ?? 0}-${r.losses ?? 0}` : null;
@@ -331,10 +326,10 @@ export default function RosterExplorer({
                       deleteLabel="Delete roster"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">{r.name}</span>
-                        <span className="text-[9px] bg-surface-raised border border-line text-foreground-secondary font-mono px-1.5 py-0.5 rounded font-bold uppercase">Div {r.division}</span>
+                        <span className="text-sm font-medium text-foreground">{r.name}</span>
+                        <span className={chip('neutral')}>Div {r.division}</span>
                       </div>
-                      <div className="text-[11px] text-foreground-secondary mt-3 flex gap-3">
+                      <div className="text-xs text-foreground-secondary mt-3 flex gap-3 tabular-nums">
                         <span>{playerCount} player{playerCount === 1 ? '' : 's'}</span>
                         {record && <span>Record {record}</span>}
                       </div>
@@ -381,35 +376,39 @@ function SchoolsView({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-black text-white uppercase tracking-wider">Schools</h1>
-          <p className="text-xs text-foreground-secondary mt-1">Select a school to manage its teams, rosters, and members.</p>
+          <h2 className="text-base font-semibold text-foreground">Schools</h2>
+          <p className="text-sm text-foreground-secondary mt-0.5">Select a school to manage its teams, rosters, and members.</p>
         </div>
-        <Link href="/admin/schools" className={secondaryBtn}>
-          <FiExternalLink className="w-3.5 h-3.5" /> Manage Schools
+        <Link href="/admin/schools" className={secondaryBtnSm}>
+          <FiExternalLink aria-hidden className="w-3.5 h-3.5" /> Manage schools
         </Link>
       </div>
 
-      <div className="relative max-w-sm">
-        <FiSearch className="absolute left-3 top-2.5 text-foreground-muted w-4 h-4" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search schools…" className={`${input} pl-9`} />
-      </div>
+      <AdminSearchField
+        className="max-w-sm"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onClear={() => setQuery('')}
+        aria-label="Search schools"
+        placeholder="Search schools…"
+      />
 
       {filtered.length === 0 ? (
-        <Empty>{schools.length === 0 ? 'No schools registered. Click “New School” to begin.' : 'No schools match your search.'}</Empty>
+        <Empty icon={<FiHome />}>{schools.length === 0 ? 'No schools registered. Click “Manage schools” to add one.' : 'No schools match your search.'}</Empty>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="admin-stagger grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map(s => {
             const teamCount = teams.filter(t => t.schoolId === s.id).length;
             return (
-              <button key={s.id} onClick={() => onOpen(s.id)}
-                className="text-left bg-surface-sunken/40 border border-surface-raised hover:border-line rounded-xl p-4 transition-all group cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-white truncate">{s.name}</span>
-                  <FiChevronRight className="w-4 h-4 text-foreground-muted group-hover:text-foreground-secondary group-hover:translate-x-0.5 transition-all" />
+              <button key={s.id} type="button" onClick={() => onOpen(s.id)}
+                className={cx(tileSurface, 'text-left group cursor-pointer', focusRing)}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground truncate">{s.name}</span>
+                  <FiChevronRight aria-hidden className="w-4 h-4 shrink-0 text-foreground-muted group-hover:text-accent group-hover:translate-x-0.5 transition-[translate,color] duration-200 motion-reduce:transition-none" />
                 </div>
-                <div className="text-[11px] text-foreground-muted mt-2">{teamCount} team{teamCount === 1 ? '' : 's'}</div>
+                <div className="text-xs text-foreground-secondary mt-2 tabular-nums">{teamCount} team{teamCount === 1 ? '' : 's'}</div>
               </button>
             );
           })}
@@ -460,14 +459,14 @@ function RosterView({
         onBack={onBack}
         actions={
           <>
-            <button className={secondaryBtn} onClick={() => toggle('player-add')} disabled={loading || viewFetchError || eligible.length === 0}><FiPlus /> Add Player</button>
+            <button type="button" className={primaryBtn} aria-expanded={openForm === 'player-add'} onClick={() => toggle('player-add')} disabled={loading || viewFetchError || eligible.length === 0}><FiPlus aria-hidden /> Add player</button>
             <RowIconButton kind="edit" disabled={viewFetchError} onClick={() => toggle('roster-edit')} aria-expanded={openForm === 'roster-edit'} label={`Edit roster ${roster.name}`} />
           </>
         }
       />
 
       {openForm === 'roster-edit' && !viewFetchError && (
-        <Panel title="Edit Roster" onClose={() => setOpenForm(null)}>
+        <Panel title="Edit roster" onClose={() => setOpenForm(null)}>
           <form
             onSubmit={(e) => runForm(e, (fd) => updateRoster(roster.id, fd), 'Roster updated.', { onSuccess: () => setOpenForm(null) })}
             className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end"
@@ -487,23 +486,22 @@ function RosterView({
       )}
 
       {openForm === 'player-add' && !viewFetchError && (
-        <Panel title="Add Player" onClose={() => setOpenForm(null)}>
+        <Panel title="Add player" onClose={() => setOpenForm(null)}>
           {eligible.length === 0 ? (
-            <p className="text-xs text-foreground-muted italic">Every school member is already on this roster. Add more members from the school page first.</p>
+            <p className="text-sm text-foreground-secondary">Every school member is already on this roster. Add more members from the school page first.</p>
           ) : (
             <form
               onSubmit={(e) => runForm(e, createRosterMember, 'Player added.', { reset: true, onSuccess: () => { setOpenForm(null); refresh(); } })}
               className="space-y-3"
             >
-              <div className="relative max-w-sm">
-                <FiSearch className="absolute left-3 top-2.5 text-foreground-muted w-4 h-4" />
-                <input
-                  value={memberQuery}
-                  onChange={(e) => setMemberQuery(e.target.value)}
-                  placeholder="Search eligible members…"
-                  className={`${input} pl-9`}
-                />
-              </div>
+              <AdminSearchField
+                className="max-w-sm"
+                aria-label="Search eligible members"
+                value={memberQuery}
+                onChange={(e) => setMemberQuery(e.target.value)}
+                onClear={() => setMemberQuery('')}
+                placeholder="Search eligible members…"
+              />
               <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_auto] gap-3 items-end">
                 <input type="hidden" name="rosterId" value={roster.id} />
                 <Field label="Member">
@@ -529,37 +527,39 @@ function RosterView({
 
       <Section title={loading ? 'Players' : `Players (${(players ?? []).length})`} icon={<FiUsers />}>
         {viewFetchError && (
-          <div role="alert" aria-live="polite" className="p-3 bg-red-950/30 border border-red-900/50 rounded-xl text-red-300 text-xs font-semibold mb-3">
+          <AdminNotice tone="danger" className="mb-3">
             Failed to load players. Displaying last known data. Please refresh to try again.
-          </div>
+          </AdminNotice>
         )}
         {loading ? (
-          <Empty>Loading players…</Empty>
+          <div className="rounded-2xl bg-admin-panel py-1" role="status" aria-label="Loading players">
+            <AdminSkeletonRows rows={4} />
+          </div>
         ) : (players ?? []).length === 0 ? (
-          <Empty>No players on this roster yet.</Empty>
+          <Empty icon={<FiUsers />}>No players on this roster yet.</Empty>
         ) : (
-          <div className="overflow-x-auto border border-surface-raised rounded-xl">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-surface-sunken/60 text-[10px] text-foreground-muted uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-2.5 font-semibold">Player</th>
-                  <th className="px-4 py-2.5 font-semibold">In-game name</th>
-                  <th className="px-4 py-2.5 font-semibold">Role</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">Actions</th>
+          <div className={cx(tableWrap, 'rounded-2xl bg-admin-panel')}>
+            <table className={table}>
+              <thead>
+                <tr className={theadRow}>
+                  <th className={th}>Player</th>
+                  <th className={th}>In-game name</th>
+                  <th className={th}>Role</th>
+                  <th className={thRight}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-raised">
+              <tbody className={tbody}>
                 {(players ?? []).map(p => {
                   const editing = editingId === p.id;
                   if (editing && !viewFetchError) {
                     return (
-                      <tr key={p.id} className="bg-surface-raised/40">
-                        <td colSpan={4} className="px-4 py-3">
+                      <tr key={p.id} className={trEditing}>
+                        <td colSpan={4} className="px-5 py-4">
                           <form
                             onSubmit={(e) => runForm(e, (fd) => updateRosterMember(p.id, fd), 'Player updated.', { onSuccess: () => { setEditingId(null); refresh(); } })}
-                            className="flex flex-wrap items-end gap-3"
+                            className="admin-fade-in flex flex-wrap items-end gap-3"
                           >
-                            <div className="text-xs font-bold text-foreground-secondary pb-2">{p.firstName} {p.lastName}</div>
+                            <div className="text-sm font-medium text-foreground pb-2.5">{p.firstName} {p.lastName}</div>
                             <Field label="In-game name">
                               <input name="ign" defaultValue={p.ign ?? ''} placeholder="IGN" className={`${input} w-40`} />
                             </Field>
@@ -578,17 +578,18 @@ function RosterView({
                     );
                   }
                   return (
-                    <tr key={p.id} className="hover:bg-surface-raised/20 group">
-                      <td className="px-4 py-2.5 font-semibold text-foreground">
+                    <tr key={p.id} className={cx(tr, 'group')}>
+                      <td className={cx(td, 'font-medium text-foreground')}>
                         <span className="flex items-center gap-1.5">
                           {p.firstName} {p.lastName}
-                          {p.role === 'captain' && <span className="text-amber-400" title="Captain">★</span>}
+                          {p.role === 'captain' && <span className="text-warning" title="Captain">★</span>}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-foreground-secondary font-mono italic">{p.ign || '—'}</td>
-                      <td className="px-4 py-2.5 text-foreground-secondary capitalize">{p.role}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                      <td className={cx(td, 'text-foreground-secondary font-mono text-xs')}>{p.ign || '—'}</td>
+                      <td className={td}><span className={cx(chip(p.role === 'captain' ? 'warning' : p.role === 'coach' ? 'info' : 'neutral'), 'capitalize')}>{p.role}</span></td>
+                      <td className={tdRight}>
+                        {/* Row actions stay visible (touch has no hover). */}
+                        <div className="flex items-center justify-end gap-2">
                           <RowIconButton kind="edit" disabled={viewFetchError} onClick={() => setEditingId(p.id)} label={`Edit player ${p.firstName} ${p.lastName}`} />
                           <button
                             onClick={() => confirmDelete(`Permanently remove ${p.firstName} ${p.lastName} from ${roster.name}? This cannot be undone.`, () => deleteRosterMember(p.id), 'Player removed.', refresh)}
@@ -644,46 +645,56 @@ function MemberManager({
       icon={<FiUsers />}
       action={
         <button
-          className="text-[11px] font-bold text-foreground-secondary hover:text-white uppercase disabled:opacity-40"
+          type="button"
+          className={secondaryBtnSm}
           disabled={membersFetchError}
+          aria-expanded={adding}
           onClick={() => setOpenForm(adding ? null : 'member-add')}
         >
-          {adding ? 'Cancel' : '+ Add member'}
+          {adding ? <><FiX aria-hidden /> Cancel</> : <><FiPlus aria-hidden /> Add member</>}
         </button>
       }
     >
       {membersFetchError && (
-        <div role="alert" aria-live="polite" className="p-3 bg-red-950/30 border border-red-900/50 rounded-xl text-red-300 text-xs font-semibold mb-3">
+        <AdminNotice tone="danger" className="mb-3">
           Failed to load members. Displaying last known data. Please refresh to try again.
-        </div>
+        </AdminNotice>
       )}
       {adding && !membersFetchError && (
         <form
           onSubmit={(e) => runForm(e, createMember, 'Member added.', { reset: true, onSuccess: () => { setOpenForm(null); refresh(); } })}
-          className="bg-surface-sunken/60 border border-line rounded-xl p-3 space-y-2 mb-3"
+          className="admin-fade-in rounded-2xl bg-admin-panel p-5 space-y-3 mb-3"
         >
           <MemberFields schoolId={schoolId} />
-          <button type="submit" disabled={isPending} className={`${primaryBtn} w-full`}>Add member</button>
+          <div className="flex justify-end">
+            <button type="submit" disabled={isPending} className={primaryBtn}>Add member</button>
+          </div>
         </form>
       )}
 
-      <div className="relative mb-3 max-w-sm">
-        <FiSearch className="absolute left-3 top-2.5 text-foreground-muted w-4 h-4" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter members…" className={`${input} pl-9`} />
-      </div>
+      <AdminSearchField
+        className="mb-3 max-w-sm"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onClear={() => setQuery('')}
+        aria-label="Filter members"
+        placeholder="Filter members…"
+      />
 
       {loading ? (
-        <Empty>Loading members…</Empty>
+        <div className="rounded-2xl bg-admin-panel py-1" role="status" aria-label="Loading members">
+          <AdminSkeletonRows rows={4} />
+        </div>
       ) : filtered.length === 0 ? (
-        <Empty>{(members ?? []).length === 0 ? 'No members yet. Add students to build the roster pool.' : 'No members match your filter.'}</Empty>
+        <Empty icon={<FiUsers />}>{(members ?? []).length === 0 ? 'No members yet. Add students to build the roster pool.' : 'No members match your filter.'}</Empty>
       ) : (
-        <div className="border border-surface-raised rounded-xl divide-y divide-surface-raised max-h-[420px] overflow-y-auto">
+        <ul className={cx(listStack, 'admin-scroll max-h-[420px] overflow-y-auto rounded-2xl bg-admin-panel')}>
           {filtered.map(m => (
-            <div key={m.id} className="p-3 text-sm group">
+            <li key={m.id} className={cx('px-5 py-3 text-sm group transition-colors duration-150', editingId === m.id ? 'bg-surface-raised/40' : 'hover:bg-surface-raised/50')}>
               {editingId === m.id && !membersFetchError ? (
                 <form
                   onSubmit={(e) => runForm(e, (fd) => updateMember(m.id, fd), 'Member updated.', { onSuccess: () => { setEditingId(null); refresh(); } })}
-                  className="space-y-2"
+                  className="admin-fade-in space-y-3"
                 >
                   <MemberFields schoolId={schoolId} m={m} />
                   <div className="flex justify-end gap-2">
@@ -694,14 +705,15 @@ function MemberManager({
               ) : (
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-semibold text-foreground truncate">{m.firstName} {m.lastName}</div>
-                    <div className="text-[11px] text-foreground-muted font-mono truncate">
+                    <div className="font-medium text-foreground truncate">{m.firstName} {m.lastName}</div>
+                    <div className="text-xs text-foreground-secondary truncate">
                       {m.graduationYear ? `'${m.graduationYear.toString().slice(-2)}` : ''}
                       {m.discord ? ` · @${m.discord}` : ''}
                       {m.email ? ` · ${m.email}` : ''}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
+                  {/* Row actions stay visible (touch has no hover). */}
+                  <div className="flex items-center gap-2 shrink-0">
                     <RowIconButton kind="edit" disabled={membersFetchError} onClick={() => setEditingId(m.id)} label={`Edit member ${m.firstName} ${m.lastName}`} />
                     <button
                       onClick={() => confirmDelete(`Permanently delete ${m.firstName} ${m.lastName}? They will be removed from any rosters. This cannot be undone.`, () => deleteMember(m.id), 'Member deleted.', refresh)}
@@ -711,9 +723,9 @@ function MemberManager({
                   </div>
                 </div>
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </Section>
   );
@@ -724,18 +736,19 @@ function MemberManager({
  * SMALL PRESENTATIONAL HELPERS
  * ========================================================================== */
 function Crumb({ children, onClick, active }: { children: React.ReactNode; onClick?: () => void; active?: boolean }) {
-  if (active || !onClick) return <span className="text-foreground font-bold flex items-center gap-1.5">{children}</span>;
-  return <button onClick={onClick} className="hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer">{children}</button>;
+  if (active || !onClick) return <span aria-current="location" className="text-foreground font-medium flex items-center gap-1.5">{children}</span>;
+  return <button type="button" onClick={onClick} className={cx('rounded hover:text-foreground transition-colors flex items-center gap-1.5 cursor-pointer', focusRing)}>{children}</button>;
 }
 
+/** Drill-down level header (school, team, roster). The page's h1 is "Teams & rosters", so levels are h2. */
 function Header({ title, subtitle, onBack, actions }: { title: string; subtitle?: string; onBack: () => void; actions?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 flex-wrap border-b border-surface-raised pb-4">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className={iconBtn} aria-label="Back"><FiArrowLeft className="w-4 h-4" /></button>
-        <div>
-          <h1 className="text-lg font-black text-white uppercase tracking-wider">{title}</h1>
-          {subtitle && <p className="text-[11px] text-foreground-muted mt-0.5">{subtitle}</p>}
+    <div className="admin-fade-in flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-center gap-3 min-w-0">
+        <button type="button" onClick={onBack} className={cx(iconBtn, 'bg-admin-panel')} aria-label="Back"><FiArrowLeft aria-hidden className="w-4 h-4" /></button>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-foreground truncate">{title}</h2>
+          {subtitle && <p className="text-sm text-foreground-secondary mt-0.5">{subtitle}</p>}
         </div>
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -745,13 +758,13 @@ function Header({ title, subtitle, onBack, actions }: { title: string; subtitle?
 
 function Section({ title, icon, action, children }: { title: string; icon?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">{icon}{title}</h3>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 [&>svg]:text-foreground-secondary">{icon}{title}</h3>
         {action}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -776,7 +789,7 @@ function TeamCreateForm({
   const gameSeasons = seasons.filter(s => s.gameId === gameId);
 
   return (
-    <Panel title="Register Game Team" onClose={onClose}>
+    <Panel title="Register game team" onClose={onClose}>
       <form
         onSubmit={(e) => runForm(e, createTeam, 'Team registered.', { onSuccess: onClose })}
         className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end"
@@ -813,15 +826,15 @@ function TeamCreateForm({
         <button type="submit" disabled={isPending || gameSeasons.length === 0} className={primaryBtn}>Register</button>
       </form>
       {games.length === 0 ? (
-        <p className="text-[11px] text-amber-400/80 mt-2">
+        <p className="admin-fade-in text-xs leading-5 text-warning mt-2">
           No games configured yet. Create a game in{' '}
-          <Link href="/admin/league" className="underline font-semibold">League Setup</Link>{' '}
+          <Link href="/admin/league" className="font-medium underline underline-offset-2">League Setup</Link>{' '}
           first, then add a season for it.
         </p>
       ) : gameSeasons.length === 0 && (
-        <p className="text-[11px] text-amber-400/80 mt-2">
+        <p className="admin-fade-in text-xs leading-5 text-warning mt-2">
           This game has no seasons yet. Create one in{' '}
-          <Link href="/admin/league" className="underline font-semibold">League Setup</Link>{' '}
+          <Link href="/admin/league" className="font-medium underline underline-offset-2">League Setup</Link>{' '}
           before registering a team.
         </p>
       )}
@@ -829,15 +842,16 @@ function TeamCreateForm({
   );
 }
 
+/** Inline create/edit panel that opens under a level header. Fades in; the X closes it. */
 function Panel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="bg-surface-sunken/60 border border-line rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between border-b border-surface-raised pb-2">
-        <span className="text-xs font-bold text-foreground-secondary uppercase tracking-wider">{title}</span>
-        <button onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close"><FiX /></button>
+    <section aria-label={title} className="admin-fade-in rounded-2xl bg-admin-panel p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <button type="button" onClick={onClose} className={cx(iconBtn, '-mr-2 -my-1')} aria-label="Close"><FiX aria-hidden className="h-4 w-4" /></button>
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -845,15 +859,15 @@ function MemberFields({ schoolId, m }: { schoolId: string; m?: DBMember }) {
   return (
     <>
       <input type="hidden" name="schoolId" value={schoolId} />
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="First name *">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="First name" required>
           <input name="firstName" required defaultValue={m?.firstName ?? ''} placeholder="First name" className={input} />
         </Field>
-        <Field label="Last name *">
+        <Field label="Last name" required>
           <input name="lastName" required defaultValue={m?.lastName ?? ''} placeholder="Last name" className={input} />
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-3">
         <div className="col-span-2">
           <Field label="Email">
             <input name="email" type="email" defaultValue={m?.email ?? ''} placeholder="student@school.edu" className={input} />
@@ -870,28 +884,37 @@ function MemberFields({ schoolId, m }: { schoolId: string; m?: DBMember }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1">
-      <span className="block text-[10px] font-bold text-foreground-muted uppercase tracking-wider">{label}</span>
+    <AdminField label={label} required={required}>
       {children}
-    </label>
+    </AdminField>
   );
 }
 
+/** Shared tile surface: one step up from the page, lifts slightly on hover. */
+const tileSurface = `block w-full rounded-xl bg-admin-panel p-4 ${cardHover}`;
+
 function Tile({ children, onClick, onDelete, deleteLabel }: { children: React.ReactNode; onClick: () => void; onDelete: () => void; deleteLabel: string }) {
   return (
-    <div className="relative bg-surface-sunken/40 border border-surface-raised hover:border-line rounded-xl p-4 transition-all group">
-      <button onClick={onClick} className="text-left w-full cursor-pointer">{children}</button>
+    // The hover surface is the wrapper, so pointing at the corner trash keeps the tile lifted.
+    <div className={cx('relative group rounded-xl bg-admin-panel', cardHover)}>
+      <button type="button" onClick={onClick} className={cx('block w-full rounded-xl p-4 pr-12 text-left cursor-pointer', focusRing)}>{children}</button>
+      {/* Corner trash: visible but quiet (touch has no hover), full strength on hover or focus. */}
       <button
+        type="button"
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className={`${deleteIconBtnCompact} absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100`}
+        className={`${deleteIconBtnCompact} absolute top-3 right-3 p-1 opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity`}
         aria-label={deleteLabel} title={deleteLabel}
-      ><FiTrash2 className="w-3.5 h-3.5" /></button>
+      ><FiTrash2 aria-hidden className="w-3.5 h-3.5" /></button>
     </div>
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-center py-10 text-foreground-muted text-xs border border-dashed border-surface-raised rounded-xl">{children}</div>;
+function Empty({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-admin-panel">
+      <AdminEmptyState compact icon={icon} title={children} />
+    </div>
+  );
 }

@@ -1,4 +1,4 @@
-import Card from '@/app/components/ui/Card';
+import { HiOutlineAcademicCap } from 'react-icons/hi2';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, isNull } from 'drizzle-orm';
@@ -11,6 +11,8 @@ import AddEntityForm from '@/app/components/admin/AddEntityForm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { getCachedGames } from '@/app/lib/db/queries';
+import { AdminCount, AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, RequiredMark } from '@/app/components/admin/AdminUI';
+import { input, label as labelClass, table, tableWrap, tbody, th, theadRow, thRight } from '@/app/components/admin/styles';
 
 async function getAllSchools() {
   return db
@@ -40,67 +42,66 @@ export default async function SchoolsAdminPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/schools"
+        description="Member schools shown across the public site. Inactive schools stay in the archive but drop off current listings."
+      />
+
+      {!dbConfigured && <DbErrorNotice />}
+
       {/* Add School Form */}
-      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
-        <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">Add School</h2>
+      <AdminSection id="add-school" title="Add a school">
         <AddEntityForm action={addSchool} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-              Name <span className="text-accent">*</span>
+            <label htmlFor="add-school-name" className={labelClass}>
+              Name <RequiredMark />
             </label>
             <input
+              id="add-school-name"
               name="name"
               type="text"
               required
               placeholder="Northeastern University"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
           <div>
             <ImageUpload section="schools" name="logoUrl" storageKeyName="storageKey" label="Logo" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Website URL</label>
+            <label htmlFor="add-school-websiteUrl" className={labelClass}>Website URL</label>
             <input
+              id="add-school-websiteUrl"
               name="websiteUrl"
               type="text"
               placeholder="https://northeastern.edu"
-              className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all"
+              className={input}
             />
           </div>
           <input type="hidden" name="displayOrder" value="0" />
-          <div className="sm:col-span-2">
-            <SubmitButton
-              label="Add School"
-              pendingLabel="Adding…"
-              className="px-6 py-2.5 bg-accent text-on-accent rounded-lg font-bold text-sm hover:bg-accent/80 transition-all duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            />
+          <div className="sm:col-span-2 flex justify-end border-t border-line/60 pt-4">
+            <SubmitButton label="Add school" pendingLabel="Adding…" />
           </div>
         </AddEntityForm>
-      </Card>
-
-      {!dbConfigured && <DbErrorNotice />}
+      </AdminSection>
 
       {/* Schools Table */}
-      <Card className="bg-surface-raised/30 border border-line border-l-4 border-l-accent">
-        <h2 className="text-lg font-black text-white uppercase tracking-wider mb-5">
-          All Schools ({schools.length})
-        </h2>
+      <AdminSection variant="flush" title={<>All schools<AdminCount>{schools.length}</AdminCount></>}>
         {schools.length === 0 ? (
-          <p className="text-foreground-muted text-sm">No schools yet. Add one above.</p>
+          <AdminEmptyState compact icon={<HiOutlineAcademicCap />} title="No schools yet." description="Add one above." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={tableWrap}>
+            <table className={table}>
               <thead>
-                <tr className="border-b border-line">
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Name</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Website</th>
-                  <th className="text-left text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-4">Status</th>
-                  <th className="text-right text-xs font-bold text-foreground-secondary uppercase tracking-wider pb-3 pr-2">Actions</th>
+                <tr className={theadRow}>
+                  <th className={th}>Name</th>
+                  <th className={th}>Website</th>
+                  <th className={th}>Status</th>
+                  <th className={thRight}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line/60">
+              <tbody className={tbody}>
                 {schools.map((school) => (
                   <SchoolRow key={school.id} school={school} games={games} />
                 ))}
@@ -108,7 +109,7 @@ export default async function SchoolsAdminPage() {
             </table>
           </div>
         )}
-      </Card>
-    </div>
+      </AdminSection>
+    </AdminPage>
   );
 }
