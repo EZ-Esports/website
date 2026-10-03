@@ -118,11 +118,15 @@ export async function portalLogin(
       : [null];
 
     if (!managerByMember) {
-      await supabase.auth.signOut();
-      return {
-        error:
-          'This account does not have access to the School Manager Portal. If you are a league staff member, please use the Staff CMS login.',
-      };
+      const { getSchoolManagerContext } = await import('@/app/lib/onboarding/manager-auth');
+      const staffContext = await getSchoolManagerContext(undefined, { allowStaffAdmin: true });
+      if (!staffContext?.isStaffAdmin) {
+        await supabase.auth.signOut();
+        return {
+          error:
+            'This account does not have access to the School Manager Portal. If you are a league staff member, please use the Staff CMS login.',
+        };
+      }
     }
   }
 

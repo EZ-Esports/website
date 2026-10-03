@@ -9,6 +9,8 @@ import {
   enrollPlayerToRoster,
   removePlayerFromRoster,
   updateRosterPlayerRole,
+  createSchoolRoster,
+  deleteSchoolRoster,
   type SchoolInviteItem,
   type PendingSubmission,
   type SchoolRosterDetails,
@@ -23,6 +25,7 @@ import { RostersSection } from './components/RostersSection';
 import { InvitesHistoryTable } from './components/InvitesHistoryTable';
 import { EmergencySwapModal } from './components/EmergencySwapModal';
 import { EnrollPlayerModal } from './components/EnrollPlayerModal';
+import { CreateRosterModal } from './components/CreateRosterModal';
 
 export type { GameItem };
 
@@ -89,6 +92,11 @@ export default function SchoolPortalClient({
   const [enrollSearchQuery, setEnrollSearchQuery] = useState<string>('');
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [isEnrolling, startEnrolling] = useTransition();
+
+  // --- Create Roster Modal State ---
+  const [isCreateRosterOpen, setIsCreateRosterOpen] = useState(false);
+  const [createRosterError, setCreateRosterError] = useState<string | null>(null);
+  const [isCreatingRoster, startCreatingRoster] = useTransition();
 
   // --- Filtered Data ---
   const filteredInvites =
@@ -324,6 +332,47 @@ export default function SchoolPortalClient({
     }
   };
 
+  const handleConfirmCreateRoster = ({
+    gameId,
+    name,
+    division,
+  }: {
+    gameId: string;
+    name: string;
+    division: string;
+  }) => {
+    setCreateRosterError(null);
+    startCreatingRoster(async () => {
+      try {
+        const result = await createSchoolRoster({
+          schoolId: activeSchool.schoolId,
+          gameId,
+          name,
+          division,
+        });
+
+        if (result.success) {
+          setRosters((prev) => [...prev, result.roster]);
+          setIsCreateRosterOpen(false);
+          setApprovalFeedback(`Roster "${result.roster.name}" created successfully!`);
+          setTimeout(() => setApprovalFeedback(null), 4000);
+        }
+      } catch (err: any) {
+        setCreateRosterError(err.message || 'Failed to create roster');
+      }
+    });
+  };
+
+  const handleDeleteRoster = async (rosterId: string) => {
+    if (!confirm('Are you sure you want to delete this empty roster?')) return;
+    try {
+      await deleteSchoolRoster(rosterId);
+      setRosters((prev) => prev.filter((r) => r.id !== rosterId));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete roster');
+    }
+  };
+
   const handleUpdateRole = async (
     rosterId: string,
     playerId: string,
@@ -509,11 +558,16 @@ export default function SchoolPortalClient({
         schoolName={activeSchool.schoolName}
         eligibilityResults={eligibilityResults}
         evaluatingRosterId={evaluatingRosterId}
+        onOpenCreateRosterModal={() => {
+          setIsCreateRosterOpen(true);
+          setCreateRosterError(null);
+        }}
         onOpenEnrollModal={handleOpenEnrollModal}
         onOpenSwapModal={handleOpenSwapModal}
         onCheckRosterGate={handleCheckRosterGate}
         onUpdateRole={handleUpdateRole}
         onRemovePlayer={handleRemovePlayer}
+        onDeleteRoster={handleDeleteRoster}
       />
 
       {/* Invites Sent Table */}
@@ -551,6 +605,21 @@ export default function SchoolPortalClient({
         isEnrolling={isEnrolling}
         onConfirmEnroll={handleConfirmEnroll}
         onClose={() => setActiveEnrollRoster(null)}
+      />
+
+      {/* Create Team Roster Modal */}
+      <CreateRosterModal
+        isOpen={isCreateRosterOpen}
+        schoolName={activeSchool.schoolName}
+        games={games}
+        defaultGameId={selectedGame}
+        isCreating={isCreatingRoster}
+        createError={createRosterError}
+        onConfirmCreate={handleConfirmCreateRoster}
+        onClose={() => {
+          setIsCreateRosterOpen(false);
+          setCreateRosterError(null);
+        }}
       />
     </div>
   );

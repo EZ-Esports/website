@@ -84,6 +84,7 @@ export function canManageRole(
 /**
  * Prevents privilege escalation:
  * - Owners can grant any permissions.
+ * - Non-owners cannot grant VIEW_STUDENT_DEMOGRAPHICS (strictly Superadmin-only).
  * - Non-owners can only grant permissions they currently possess (targetPermissions must be a subset of actorPermissions).
  */
 export function canGrantPermissions(
@@ -92,6 +93,10 @@ export function canGrantPermissions(
   targetPermissions: bigint
 ): boolean {
   if (actorIsOwner) return true;
+  // VIEW_STUDENT_DEMOGRAPHICS is strictly restricted to Superadmins (Owners)
+  if ((targetPermissions & Permissions.VIEW_STUDENT_DEMOGRAPHICS) !== BigInt(0)) {
+    return false;
+  }
   // targetPermissions & ~actorPermissions evaluates to all bits set in target but not in actor
   return (targetPermissions & ~actorPermissions) === BigInt(0);
 }

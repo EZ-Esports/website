@@ -50,10 +50,14 @@ export function ProvisionInviteTab({
     );
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), 2500);
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2500);
+    } catch {
+      // Gracefully handle clipboard write rejection
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

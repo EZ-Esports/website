@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => {
     schoolManagersStore: [] as any[],
     playerInvitesStore: [] as any[],
     teamsStore: [] as any[],
+    seasonsStore: [] as any[],
     rostersStore: [] as any[],
     playersStore: [] as any[],
     membersStore: [] as any[],
@@ -99,6 +100,7 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.playerInvites) return state.playerInvitesStore;
     if (tbl === schema.teams) return state.teamsStore;
+    if (tbl === schema.seasons) return state.seasonsStore;
     if (tbl === schema.rosters) return state.rostersStore;
     if (tbl === schema.players) return state.playersStore;
     if (tbl === schema.members) return state.membersStore;
@@ -366,6 +368,8 @@ import {
   removePlayerFromRoster,
   updateRosterPlayerRole,
   getSchoolPlayerPool,
+  createSchoolRoster,
+  deleteSchoolRoster,
 } from '@/app/lib/onboarding/portal-actions';
 
 describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
@@ -1179,6 +1183,145 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         expect((p as any).ethnicity).toBeUndefined();
         expect((p as any).freeReducedLunch).toBeUndefined();
       }
+    });
+
+    it('creates a new competition roster when team and active season already exist', async () => {
+      // Seed active season
+      mocks.state.seasonsStore.push({
+        id: 'season-val-2026',
+        gameId: valGameId,
+        name: 'Valorant Season 2026',
+        isActive: true,
+      });
+
+      const res = await createSchoolRoster({
+        schoolId,
+        gameId: valGameId,
+        name: 'Junior Varsity',
+        division: 'B',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.roster.name).toBe('Junior Varsity');
+      expect(res.roster.division).toBe('B');
+      expect(res.roster.gameId).toBe(valGameId);
+      expect(res.roster.players).toEqual([]);
+
+      const created = mocks.state.rostersStore.find((r) => r.id === res.roster.id);
+      expect(created).toBeDefined();
+      expect(created.name).toBe('Junior Varsity');
+      expect(created.division).toBe('B');
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'teams');
+    });
+
+    it('creates team and roster atomically when team does not exist for the school', async () => {
+      mocks.state.seasonsStore.push({
+        id: 'season-lol-2026',
+        gameId: lolGameId,
+        name: 'LoL Season 2026',
+        isActive: true,
+      });
+
+      // Clear teams for lol
+      mocks.state.teamsStore = mocks.state.teamsStore.filter((t) => t.gameId !== lolGameId);
+
+      const res = await createSchoolRoster({
+        schoolId,
+        gameId: lolGameId,
+        name: 'LoL Varsity',
+        division: 'A',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.roster.name).toBe('LoL Varsity');
+
+      const teamCreated = mocks.state.teamsStore.find((t) => t.schoolId === schoolId && t.gameId === lolGameId);
+      expect(teamCreated).toBeDefined();
+    });
+
+    it('auto-provisions active season when no season exists in database (zero-friction invariant)', async () => {
+      // Empty seasons and clear team for this game
+      mocks.state.seasonsStore = [];
+      mocks.state.teamsStore = mocks.state.teamsStore.filter(
+        (t) => !(t.schoolId === schoolId && t.gameId === valGameId)
+      );
+
+      const res = await createSchoolRoster({
+        schoolId,
+        gameId: valGameId,
+        name: 'Alpha Team',
+        division: 'A',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.roster.name).toBe('Alpha Team');
+
+      // Assert season was auto-provisioned
+      expect(mocks.state.seasonsStore.length).toBeGreaterThanOrEqual(1);
+      const provisionedSeason = mocks.state.seasonsStore.find((s) => s.gameId === valGameId);
+      expect(provisionedSeason).toBeDefined();
+      expect(provisionedSeason.isActive).toBe(true);
+    });
+
+    it('rejects roster creation if user does not manage the target school (Anti-IDOR / Tenancy check)', async () => {
+      await expect(
+        createSchoolRoster({
+          schoolId: otherSchoolId,
+          gameId: valGameId,
+          name: 'Bronx Science Varsity',
+        })
+      ).rejects.toThrow(/Forbidden/);
+    });
+
+    it('rejects roster creation with empty or whitespace-only name', async () => {
+      await expect(
+        createSchoolRoster({
+          schoolId,
+          gameId: valGameId,
+          name: '   ',
+        })
+      ).rejects.toThrow(/Roster name is required/);
+    });
+
+    it('deletes an empty roster via deleteSchoolRoster', async () => {
+      // Ensure team exists
+      if (!mocks.state.teamsStore.some((t) => t.id === 'team-stuy-val-uuid')) {
+        mocks.state.teamsStore.push({
+          id: 'team-stuy-val-uuid',
+          schoolId,
+          gameId: valGameId,
+        });
+      }
+
+      // Create empty roster
+      const emptyRosterId = 'empty-roster-to-delete';
+      mocks.state.rostersStore.push({
+        id: emptyRosterId,
+        teamId: 'team-stuy-val-uuid',
+        name: 'Temp Roster',
+        division: 'Open',
+      });
+
+      const res = await deleteSchoolRoster(emptyRosterId);
+      expect(res.success).toBe(true);
+      expect(res.rosterId).toBe(emptyRosterId);
+
+      const found = mocks.state.rostersStore.find((r) => r.id === emptyRosterId);
+      expect(found).toBeUndefined();
+    });
+
+    it('refuses to delete a roster that has enrolled players', async () => {
+      if (!mocks.state.teamsStore.some((t) => t.id === 'team-stuy-val-uuid')) {
+        mocks.state.teamsStore.push({
+          id: 'team-stuy-val-uuid',
+          schoolId,
+          gameId: valGameId,
+        });
+      }
+
+      await expect(deleteSchoolRoster(rosterId)).rejects.toThrow(
+        /Cannot delete a roster with enrolled players/
+      );
     });
   });
 });
