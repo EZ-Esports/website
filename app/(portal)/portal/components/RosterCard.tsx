@@ -27,6 +27,7 @@ interface RosterCardProps {
     role: 'player' | 'sub' | 'captain'
   ) => void;
   onRemovePlayer: (rosterId: string, playerId: string) => void;
+  onDeleteRoster?: (rosterId: string) => void;
 }
 
 export function RosterCard({
@@ -38,6 +39,7 @@ export function RosterCard({
   onCheckRosterGate,
   onUpdateRole,
   onRemovePlayer,
+  onDeleteRoster,
 }: RosterCardProps) {
   return (
     <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 shadow-lg space-y-4">
@@ -76,6 +78,15 @@ export function RosterCard({
           >
             {isEvaluating ? 'Evaluating...' : 'Run Roster Gate'}
           </Button>
+          {roster.players.length === 0 && onDeleteRoster && (
+            <Button
+              onPress={() => onDeleteRoster(roster.id)}
+              aria-label="Delete empty roster"
+              className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-900/50"
+            >
+              <HiOutlineTrash className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
 

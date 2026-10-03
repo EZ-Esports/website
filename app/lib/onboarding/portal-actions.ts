@@ -896,6 +896,180 @@ export async function getSchoolRosters(
   });
 }
 
+export interface CreateSchoolRosterParams {
+  schoolId: string;
+  gameId: string;
+  name: string;
+  division?: string;
+}
+
+export interface CreateSchoolRosterResult {
+  success: boolean;
+  roster: SchoolRosterDetails;
+  message?: string;
+}
+
+/**
+ * Creates a new competition roster for a school and game directly from the School Manager Portal.
+ * Resolves or auto-provisions an active season and team record to eliminate onboarding deadlocks.
+ */
+export async function createSchoolRoster(
+  params: CreateSchoolRosterParams
+): Promise<CreateSchoolRosterResult> {
+  const { schoolId, gameId } = params;
+  const name = (params.name || '').trim();
+  const division = (params.division || 'A').trim();
+
+  if (!schoolId || !gameId) {
+    throw new Error('School ID and Game ID are required');
+  }
+
+  if (!name) {
+    throw new Error('Roster name is required (e.g. "Varsity")');
+  }
+
+  if (name.length > 50) {
+    throw new Error('Roster name must be 50 characters or less');
+  }
+
+  // 1. Manager authorization and tenancy check
+  await assertManagerForSchool(schoolId, gameId);
+
+  // 2. Fetch game details
+  const [game] = await db
+    .select({
+      id: schema.games.id,
+      displayName: schema.games.displayName,
+      slug: schema.games.slug,
+    })
+    .from(schema.games)
+    .where(eq(schema.games.id, gameId))
+    .limit(1);
+
+  if (!game) {
+    throw new Error(`Game ${gameId} not found`);
+  }
+
+  // 3. Resolve or auto-provision active season for this game
+  let [season] = await db
+    .select()
+    .from(schema.seasons)
+    .where(
+      and(
+        eq(schema.seasons.gameId, gameId),
+        eq(schema.seasons.isActive, true)
+      )
+    )
+    .limit(1);
+
+  if (!season) {
+    const [latestSeason] = await db
+      .select()
+      .from(schema.seasons)
+      .where(eq(schema.seasons.gameId, gameId))
+      .orderBy(desc(schema.seasons.createdAt))
+      .limit(1);
+
+    if (latestSeason) {
+      season = latestSeason;
+    } else {
+      const currentYear = new Date().getFullYear();
+      const [newSeason] = await db
+        .insert(schema.seasons)
+        .values({
+          gameId,
+          name: `${game.displayName} Season ${currentYear}`,
+          isActive: true,
+        })
+        .returning();
+      season = newSeason;
+    }
+  }
+
+  // 4. Find or create the Team for (schoolId, gameId, season.id)
+  let [team] = await db
+    .select()
+    .from(schema.teams)
+    .where(
+      and(
+        eq(schema.teams.schoolId, schoolId),
+        eq(schema.teams.gameId, gameId),
+        eq(schema.teams.seasonId, season.id)
+      )
+    )
+    .limit(1);
+
+  if (!team) {
+    const [newTeam] = await db
+      .insert(schema.teams)
+      .values({
+        schoolId,
+        gameId,
+        seasonId: season.id,
+      })
+      .returning();
+    team = newTeam;
+  }
+
+  // 5. Create Roster
+  const [roster] = await db
+    .insert(schema.rosters)
+    .values({
+      teamId: team.id,
+      name,
+      division,
+    })
+    .returning();
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.TEAMS);
+
+  const rosterDetails: SchoolRosterDetails = {
+    id: roster.id,
+    teamId: team.id,
+    name: roster.name,
+    division: roster.division,
+    gameId: game.id,
+    gameName: game.displayName,
+    gameSlug: game.slug,
+    players: [],
+  };
+
+  return {
+    success: true,
+    roster: rosterDetails,
+    message: `Roster "${roster.name}" created for ${game.displayName}.`,
+  };
+}
+
+/**
+ * Deletes an empty competition roster.
+ */
+export async function deleteSchoolRoster(
+  rosterId: string
+): Promise<{ success: boolean; rosterId: string }> {
+  if (!rosterId) {
+    throw new Error('rosterId is required');
+  }
+
+  await assertManagerForRoster(rosterId);
+
+  const playerRows = await db
+    .select({ id: schema.players.id })
+    .from(schema.players)
+    .where(eq(schema.players.rosterId, rosterId))
+    .limit(1);
+
+  if (playerRows.length > 0) {
+    throw new Error('Cannot delete a roster with enrolled players. Remove all players first.');
+  }
+
+  await db.delete(schema.rosters).where(eq(schema.rosters.id, rosterId));
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.TEAMS);
+
+  return { success: true, rosterId };
+}
+
 export interface SchoolPoolPlayer {
   memberId: string;
   firstName: string;

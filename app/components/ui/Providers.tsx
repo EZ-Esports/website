@@ -25,11 +25,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       const reason = event?.reason;
       const stack = reason?.stack || '';
       const message = reason?.message || String(reason || '');
+      const name = reason?.name || '';
 
       if (
         stack.includes('webkit-masked-url') ||
         (message.includes('The object can not be found here') &&
-          (reason?.name === 'NotFoundError' || reason?.code === 8))
+          (name === 'NotFoundError' || reason?.code === 8)) ||
+        name === 'NotAllowedError' ||
+        name === 'AbortError' ||
+        (typeof DOMException !== 'undefined' && reason instanceof DOMException)
       ) {
         event.preventDefault();
         event.stopImmediatePropagation();

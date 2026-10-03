@@ -17,7 +17,7 @@ interface PortalPageProps {
 export default async function PortalPage({ searchParams }: PortalPageProps) {
   const { schoolId: paramSchoolId, gameId: paramGameId } = await searchParams;
 
-  const context = await getSchoolManagerContext(paramSchoolId, { allowStaffAdmin: false });
+  const context = await getSchoolManagerContext(paramSchoolId, { allowStaffAdmin: true });
   if (!context) {
     redirect('/portal/login');
   }

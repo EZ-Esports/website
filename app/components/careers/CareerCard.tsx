@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Badge from '@/app/components/ui/Badge';
-import { HiOutlineClock, HiOutlineMapPin, HiOutlineBriefcase, HiArrowRight } from 'react-icons/hi2';
+import { HiOutlineClock, HiOutlineMapPin, HiArrowRight } from 'react-icons/hi2';
 import type { CareerPostingSummary } from '@/app/types/careers';
 
 interface CareerCardProps {

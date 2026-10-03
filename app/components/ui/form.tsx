@@ -40,6 +40,7 @@ interface FieldProps {
   htmlFor?: string;
   required?: boolean;
   error?: string;
+  defaultValue?: string;
   children: ReactNode;
   className?: string;
   labelClassName?: string;
@@ -55,6 +56,7 @@ export function Field({
   htmlFor,
   required,
   error,
+  defaultValue,
   children,
   className = '',
   labelClassName,
@@ -66,7 +68,7 @@ export function Field({
     : 'block text-sm font-semibold text-foreground-secondary mb-1.5';
 
   return (
-    <TextField isInvalid={!!error} className={cx(isCompact && 'space-y-1', className)}>
+    <TextField isInvalid={!!error} defaultValue={defaultValue} className={cx(isCompact && 'space-y-1', className)}>
       <Label htmlFor={htmlFor} className={cx(defaultLabelClass, labelClassName)}>
         {label}
         {required && <span className="text-accent ml-1" aria-hidden="true">*</span>}

@@ -51,14 +51,13 @@ export default function PortalLoginForm({ defaultEmail = '' }: { defaultEmail?: 
         </div>
       )}
 
-      <Field label="Manager Email Address" htmlFor="email">
+      <Field label="Manager Email Address" htmlFor="email" defaultValue={defaultEmail}>
         <Input
           id="email"
           name="email"
           type="email"
           required
           autoComplete="email"
-          defaultValue={defaultEmail}
           placeholder="manager@school.edu"
         />
       </Field>

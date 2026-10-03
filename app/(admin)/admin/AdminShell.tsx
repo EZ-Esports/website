@@ -19,6 +19,7 @@ import {
   HiOutlineGlobeAlt,
   HiOutlineCog6Tooth,
   HiOutlineShieldCheck,
+  HiOutlineIdentification,
   HiArrowRightOnRectangle,
 } from 'react-icons/hi2';
 import type { IconType } from 'react-icons';
@@ -52,6 +53,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
     { label: 'Applications', href: '/admin/applications', icon: HiOutlineClipboardDocument },
     { label: 'Page Content', href: '/admin/content', icon: HiOutlinePencilSquare },
     { label: 'Roles & Staff', href: '/admin/team', icon: HiOutlineShieldCheck },
+    { label: 'Student Demographics', href: '/admin/demographics', icon: HiOutlineIdentification },
   ].filter(item => allowedHrefs.includes(item.href));
 
   // Helper to determine the current page title, including nested routes
@@ -65,6 +67,7 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
     if (pathname.startsWith('/admin/applications')) return 'Applications';
     if (pathname.startsWith('/admin/content')) return 'Page Content';
     if (pathname.startsWith('/admin/league')) return 'League Setup';
+    if (pathname.startsWith('/admin/demographics')) return 'Student Demographics';
 
     // Pick the most specific sidebar item whose path prefixes the current route
     const match = sidebarItems

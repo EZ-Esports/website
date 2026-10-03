@@ -116,6 +116,17 @@ const PERMISSION_GROUPS = [
       { bit: Permissions.MANAGE_CONTENT, name: 'Manage CMS Content', desc: 'Modify editable text blocks across public pages.' },
     ],
   },
+  {
+    title: 'Student Data & Privacy Vault',
+    permissions: [
+      {
+        bit: Permissions.VIEW_STUDENT_DEMOGRAPHICS,
+        name: 'View Student Demographics',
+        desc: 'Access sensitive student demographic, Title I equity, and survey records. Restricted strictly to Superadmins.',
+        superadminOnly: true,
+      },
+    ],
+  },
 ];
 
 const PERMISSION_LABELS = PERMISSION_GROUPS.flatMap((g) => g.permissions);
@@ -715,14 +726,16 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               {group.permissions.map((label) => {
                                 const hasPerm = activeRole ? (BigInt(activeRole.permissions) & label.bit) !== BigInt(0) : false;
+                                const isSuperadminLocked = Boolean((label as any).superadminOnly && !currentIsOwner);
                                 const isActorMissing = !currentIsOwner && (currentPermissions & label.bit) === BigInt(0);
+                                const isDisabled = isActorMissing || isSuperadminLocked;
 
                                 return (
                                   <label
                                     key={label.bit.toString()}
                                     className={`flex items-start gap-3 p-3 bg-surface-sunken/30 border rounded-lg transition-all select-none ${
-                                      isActorMissing
-                                        ? 'opacity-45 border-line cursor-not-allowed'
+                                      isDisabled
+                                        ? 'opacity-40 border-line/60 cursor-not-allowed bg-surface-sunken/10'
                                         : 'border-line hover:border-line/60 cursor-pointer hover:bg-surface-raised/10'
                                     }`}
                                   >
@@ -731,17 +744,24 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                                       type="checkbox"
                                       value="true"
                                       defaultChecked={hasPerm}
-                                      disabled={isActorMissing}
+                                      disabled={isDisabled}
                                       className="rounded text-accent focus:ring-accent focus:ring-offset-0 bg-surface-sunken border-line cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
                                     />
                                     <div className="flex flex-col">
-                                      <span
-                                        className={`text-xs font-extrabold uppercase tracking-wide ${
-                                          isActorMissing ? 'text-foreground-muted' : 'text-foreground'
-                                        }`}
-                                      >
-                                        {label.name}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`text-xs font-extrabold uppercase tracking-wide ${
+                                            isDisabled ? 'text-foreground-muted' : 'text-foreground'
+                                          }`}
+                                        >
+                                          {label.name}
+                                        </span>
+                                        {(label as any).superadminOnly && (
+                                          <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded bg-red-950/60 text-red-400 border border-red-800/50">
+                                            Superadmin Only
+                                          </span>
+                                        )}
+                                      </div>
                                       <span className="text-[10px] text-foreground-muted font-medium leading-relaxed mt-0.5">{label.desc}</span>
                                     </div>
                                   </label>
