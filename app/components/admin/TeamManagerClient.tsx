@@ -18,6 +18,7 @@ import {
 import { AdminCount, AdminEmptyState, AdminNotice, AdminSearchField, AdminSection, PendingLabel } from '@/app/components/admin/AdminUI';
 import { AdminTab, AdminTabList, AdminTabPanel, AdminTabs } from '@/app/components/admin/AdminTabs';
 import { cx } from '@/app/lib/cx';
+import { buildRoleRequest, seedRoleDraft, type RoleDraft } from '@/app/components/admin/role-form';
 import InviteStaffForm from '@/app/components/admin/InviteStaffForm';
 import { canActOnMember, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
 import StaffRow from '@/app/components/admin/StaffRow';
@@ -158,7 +159,11 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null);
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [roleTab, setRoleTab] = useState<'display' | 'permissions'>('display');
-  const [selectedColor, setSelectedColor] = useState('#94a3b8');
+  // The role editor's fields live in state, not in the DOM: its Display and Permissions
+  // panels mount one at a time, so a submit must never depend on which one is showing.
+  const [roleDraft, setRoleDraft] = useState<RoleDraft>(() => seedRoleDraft(null));
+  const selectedColor = roleDraft.color;
+  const setSelectedColor = (color: string) => setRoleDraft((d) => ({ ...d, color }));
 
   const activeRole = roles.find((r) => r.id === activeRoleId) || null;
 
@@ -183,21 +188,26 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
 
 
 
-  // Handle Create Role
-  function handleCreateRoleSubmit(formData: FormData) {
-    setError(null);
-    // Calculate permissions bitmask from selected checkboxes
-    let permissionsBitmask = 0n;
-    PERMISSION_LABELS.forEach((label) => {
-      if (formData.get(`perm_${label.bit.toString()}`)) {
-        permissionsBitmask |= label.bit;
-      }
-    });
+  // Permission bits the actor may change; disabled checkboxes (missing from the actor or superadmin-only) stay out.
+  const editableBits = PERMISSION_LABELS.reduce((mask, label) => {
+    const locked = (label as { superadminOnly?: boolean }).superadminOnly && !currentIsOwner;
+    const missing = !currentIsOwner && (currentPermissions & label.bit) === BigInt(0);
+    return locked || missing ? mask : mask | label.bit;
+  }, 0n);
 
+  function toRequestBody() {
+    const { name, color, permissions } = buildRoleRequest(roleDraft, activeRole, editableBits);
     const bodyData = new FormData();
-    bodyData.append('name', formData.get('name') as string);
-    bodyData.append('color', formData.get('color') as string);
-    bodyData.append('permissions', permissionsBitmask.toString());
+    bodyData.append('name', name);
+    bodyData.append('color', color);
+    bodyData.append('permissions', permissions);
+    return bodyData;
+  }
+
+  // Handle Create Role
+  function handleCreateRoleSubmit() {
+    setError(null);
+    const bodyData = toRequestBody();
 
     startTransition(async () => {
       const result = await createRole(bodyData);
@@ -211,21 +221,10 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
   }
 
   // Handle Edit Role
-  function handleEditRoleSubmit(formData: FormData) {
+  function handleEditRoleSubmit() {
     if (!activeRole) return;
     setError(null);
-
-    let permissionsBitmask = 0n;
-    PERMISSION_LABELS.forEach((label) => {
-      if (formData.get(`perm_${label.bit.toString()}`)) {
-        permissionsBitmask |= label.bit;
-      }
-    });
-
-    const bodyData = new FormData();
-    bodyData.append('name', formData.get('name') as string);
-    bodyData.append('color', formData.get('color') as string);
-    bodyData.append('permissions', permissionsBitmask.toString());
+    const bodyData = toRequestBody();
 
     startTransition(async () => {
       const result = await updateRole(activeRole.id, bodyData);
@@ -455,7 +454,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                       setIsCreatingRole(true);
                       setActiveRoleId(null);
                       setRoleTab('display');
-                      setSelectedColor('#94a3b8');
+                      setRoleDraft(seedRoleDraft(null));
                     }}
                     className={ghostBtnSm}
                     title="Create Role"
@@ -475,7 +474,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                     setActiveRoleId(role.id);
                     setIsCreatingRole(false);
                     setRoleTab('display');
-                    setSelectedColor(parsedColor);
+                    setRoleDraft(seedRoleDraft(role));
                   };
 
                   return (
@@ -558,7 +557,11 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
             ) : (
               <form
                 key={activeRoleId ?? 'new-role'}
-                action={isCreatingRole ? handleCreateRoleSubmit : handleEditRoleSubmit}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (isCreatingRole) handleCreateRoleSubmit();
+                  else handleEditRoleSubmit();
+                }}
                 className="admin-fade-in flex flex-1 flex-col justify-between"
               >
                 <div className="space-y-6">
@@ -602,7 +605,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                     </div>
 
                     {/* Display / Permissions switch. Plain toggle buttons on purpose: each
-                        panel's fields only exist while it is shown, exactly as before. */}
+                        panel's fields only mount while it is shown; the values live in roleDraft. */}
                     {(!activeRole || !activeRole.isOwner) && (
                       <div className={cx(segmentedGroup, 'mt-4')}>
                         <button
@@ -639,7 +642,8 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                             type="text"
                             required
                             disabled={!isCreatingRole && activeRole?.isSystem}
-                            defaultValue={isCreatingRole ? '' : activeRole?.name}
+                            value={roleDraft.name}
+                            onChange={(e) => setRoleDraft((d) => ({ ...d, name: e.target.value }))}
                             placeholder="e.g. Moderator"
                             className={input}
                           />
@@ -706,7 +710,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                           <legend className="mb-2 text-sm font-semibold text-foreground">{group.title}</legend>
                           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                             {group.permissions.map((label) => {
-                              const hasPerm = activeRole ? (BigInt(activeRole.permissions) & label.bit) !== BigInt(0) : false;
+                              const hasPerm = (roleDraft.permissions & label.bit) !== BigInt(0);
                               const isSuperadminLocked = Boolean((label as any).superadminOnly && !currentIsOwner);
                               const isActorMissing = !currentIsOwner && (currentPermissions & label.bit) === BigInt(0);
                               const isDisabled = isActorMissing || isSuperadminLocked;
@@ -722,8 +726,13 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                                   <input
                                     name={`perm_${label.bit.toString()}`}
                                     type="checkbox"
-                                    value="true"
-                                    defaultChecked={hasPerm}
+                                    checked={hasPerm}
+                                    onChange={(e) =>
+                                      setRoleDraft((d) => ({
+                                        ...d,
+                                        permissions: e.target.checked ? d.permissions | label.bit : d.permissions & ~label.bit,
+                                      }))
+                                    }
                                     disabled={isDisabled}
                                     className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
                                   />

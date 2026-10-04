@@ -211,6 +211,15 @@ export function findActiveAdminNav(
   return best;
 }
 
+/**
+ * Routes of the pages nested below a section (the article editors under News).
+ * Keep in step with `NESTED_PAGE_TITLES`.
+ */
+export type AdminNestedRoute = `/admin/news/${string}`;
+
+/** Every route an `AdminPageHeader` may be given: a gated section or a nested page below one. */
+export type AdminPageRoute = AdminSectionHref | AdminNestedRoute;
+
 /** Pages below a section that get their own title instead of the section's. */
 const NESTED_PAGE_TITLES: ReadonlyArray<{ matches: (pathname: string) => boolean; title: string }> = [
   { matches: (pathname) => pathname === '/admin/news/new', title: 'New Article' },

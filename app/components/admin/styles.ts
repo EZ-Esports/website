@@ -25,6 +25,8 @@
  *   `admin-*` classes in globals.css.
  */
 
+import { cx } from '@/app/lib/cx';
+
 /** One focus treatment for every custom control. Offset matches the page surface. */
 export const focusRing =
   'outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
@@ -42,9 +44,14 @@ export const input = `${inputBase} px-3 py-2 text-sm`;
 /** The same field one size down (32px), for search boxes in filter toolbars and read-only values. */
 export const inputSm = `${inputBase} h-8 px-3 py-1 text-xs`;
 
+const selectBase =
+  'h-8 py-1 bg-surface-sunken border border-line/70 rounded-lg text-xs text-foreground cursor-pointer transition-[border-color,box-shadow] duration-150 ease-out hover:border-line focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/15 disabled:opacity-50 disabled:cursor-not-allowed';
+
 /** Native `<select>` in a filter toolbar: same look as `input`, one size smaller. */
-export const selectClass =
-  'h-8 pl-3 py-1 bg-surface-sunken border border-line/70 rounded-lg text-xs text-foreground cursor-pointer transition-[border-color,box-shadow] duration-150 ease-out hover:border-line focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/15 disabled:opacity-50 disabled:cursor-not-allowed [--select-chevron-inset:0.75rem] [--select-chevron-space:2.25rem]';
+export const selectClass = cx(selectBase, 'pl-3 [--select-chevron-inset:0.75rem] [--select-chevron-space:2.25rem]');
+
+/** `selectClass` for a crowded control: tighter left padding and chevron inset (see the select rule in globals.css). */
+export const selectClassCompact = cx(selectBase, 'pl-2.5 [--select-chevron-inset:0.625rem] [--select-chevron-space:2rem]');
 
 /** Field label text without spacing, for labels laid out by a parent's `space-y-*`. */
 export const labelText = 'block text-[13px] font-medium text-foreground-secondary';

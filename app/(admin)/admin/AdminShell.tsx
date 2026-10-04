@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logout } from './actions';
@@ -40,37 +40,23 @@ export default function AdminShell({ children, allowedHrefs }: AdminShellProps) 
   // Staggered lists animate on first mount only. A browser restarts a CSS
   // animation whenever a node is moved (React reorders keyed children with
   // insertBefore), which would blink reordered gallery cards or roles back to
-  // opacity 0. Once a child's entrance finishes it is marked data-entered, and
-  // `.admin-stagger > :not([data-entered])` stops matching it. One listener on
-  // the persistent shell covers every page; new rows still animate in.
+  // opacity 0. Once the entrance has had time to finish (the longest ends ~490ms
+  // in) the shell is "settled" and globals.css stops applying the stagger.
+  // It is tracked per pathname: the shell persists across navigations, so each
+  // new page gets its own entrance, and it starts unsettled on the server and
+  // on first client render, so hydration matches.
+  const [settledPath, setSettledPath] = useState<string | null>(null);
+  const settled = settledPath === pathname;
   useEffect(() => {
-    const settle = (event: AnimationEvent) => {
-      if (event.animationName !== 'admin-rise') return;
-      const el = event.target;
-      if (el instanceof HTMLElement && el.parentElement?.classList.contains('admin-stagger')) {
-        el.setAttribute('data-entered', '');
-      }
-    };
-    document.addEventListener('animationend', settle);
-    // On a full page load the first rows can finish before this listener
-    // attaches, so settle anything that is no longer animating. This waits
-    // until every entrance (the longest ends ~490ms in) and hydration are done:
-    // adding data-entered while React is still hydrating the page makes it log
-    // a hydration mismatch for every row.
-    const settleTimer = window.setTimeout(() => {
-      document.querySelectorAll<HTMLElement>('.admin-stagger > :not([data-entered])').forEach((el) => {
-        const animating = el.getAnimations().some((a) => a.playState === 'running' || a.pending);
-        if (!animating) el.setAttribute('data-entered', '');
-      });
-    }, 700);
-    return () => {
-      window.clearTimeout(settleTimer);
-      document.removeEventListener('animationend', settle);
-    };
-  }, []);
+    const timer = window.setTimeout(() => setSettledPath(pathname), 700);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-surface flex text-foreground font-sans">
+    <div
+      data-settled={settled || undefined}
+      className="admin-shell min-h-screen bg-surface flex text-foreground font-sans"
+    >
       {/* Left Sidebar: pinned to the viewport (spec-001); only the nav scrolls. */}
       <aside className="w-64 bg-admin-panel border-r border-line/60 flex flex-col shrink-0 z-20 sticky top-0 h-dvh self-start">
         {/* Sidebar Header: same 56px height as the top bar so their bottom edges line up. */}

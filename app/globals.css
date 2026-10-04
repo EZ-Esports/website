@@ -236,21 +236,22 @@ body::before {
 
 /* Lists, tables and card grids: children cascade in on first render. The
    delay is capped at the 8th child so a 200-row table still settles in
-   under half a second. Rows inserted later (filters, "load more") get the
-   capped delay, which reads as a gentle arrival rather than a crawl.
-   First mount only: AdminShell marks each child data-entered when its
-   entrance ends, so a reordered (moved) node never replays it. */
-.admin-stagger > :not([data-entered]) {
+   under half a second. Rows inserted before the page settles get the capped
+   delay; later ones (filters, "load more") simply appear.
+   Per page load only: AdminShell sets data-settled on .admin-shell once the
+   entrance has finished (and clears it on navigation), so a reordered (moved)
+   node never replays it. */
+.admin-shell:not([data-settled]) .admin-stagger > * {
   animation: admin-rise 280ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   animation-delay: 210ms;
 }
-.admin-stagger > :nth-child(1):not([data-entered]) { animation-delay: 0ms; }
-.admin-stagger > :nth-child(2):not([data-entered]) { animation-delay: 30ms; }
-.admin-stagger > :nth-child(3):not([data-entered]) { animation-delay: 60ms; }
-.admin-stagger > :nth-child(4):not([data-entered]) { animation-delay: 90ms; }
-.admin-stagger > :nth-child(5):not([data-entered]) { animation-delay: 120ms; }
-.admin-stagger > :nth-child(6):not([data-entered]) { animation-delay: 150ms; }
-.admin-stagger > :nth-child(7):not([data-entered]) { animation-delay: 180ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(1) { animation-delay: 0ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(2) { animation-delay: 30ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(3) { animation-delay: 60ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(4) { animation-delay: 90ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(5) { animation-delay: 120ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(6) { animation-delay: 150ms; }
+.admin-shell:not([data-settled]) .admin-stagger > :nth-child(7) { animation-delay: 180ms; }
 
 /* Inline feedback (notices, field errors) and freshly opened inline forms. */
 .admin-fade-in {

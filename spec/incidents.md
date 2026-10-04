@@ -158,6 +158,16 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 17. Role editor saves dropped the hidden tab's fields (pre-existing on main, fixed in PR #218 review)
+
+**Symptom.** Saving a role from the Display tab cleared every permission; saving from the Permissions tab renamed the role "null" and set its colour to "null"; the Owner and @everyone roles could not be saved at all.
+
+**Root cause.** The Display and Permissions panels mount one at a time as uncontrolled inputs, and `handleEditRoleSubmit` / `handleCreateRoleSubmit` read `FormData`, which only contains mounted, enabled inputs. A missing field became `0` (bitmask) or `null`, and `FormData.append(key, null)` sends the string "null". Disabled inputs (locked system-role name) are never submitted either. This existed on main before the staff portal overhaul; the overhaul kept the conditional panels.
+
+**Fix.** `name`, `color` and the permission bitmask live in `roleDraft` state, seeded when a role is selected or "New role" is clicked. Inputs are controlled, and `buildRoleRequest` builds the body from state, so a tab switch cannot drop data. The Owner role sends its stored permissions, a system role sends its stored name, and bits the actor cannot change are masked out as before (open-threads still records that behaviour). Covered by `app/components/admin/__tests__/role-form.test.ts`.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

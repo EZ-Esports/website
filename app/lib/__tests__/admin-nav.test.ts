@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ADMIN_NAV_CATEGORIES,
+  type AdminPageRoute,
   filterAdminNav,
   findActiveAdminNav,
   getAdminBreadcrumb,
@@ -125,5 +126,15 @@ describe('withActiveExpanded', () => {
   it('returns the same Set when no category is active', () => {
     const expanded = new Set(['content']);
     expect(withActiveExpanded(expanded, null)).toBe(expanded);
+  });
+});
+
+describe('AdminPageRoute', () => {
+  it('accepts sections and nested news pages; the type rejects unknown routes at compile time', () => {
+    const routes: AdminPageRoute[] = ['/admin/news', '/admin/news/new', '/admin/news/abc-123'];
+    // @ts-expect-error not a gated section or a nested page
+    const wrongRoute: AdminPageRoute = '/admin/nope';
+    expect(routes).toHaveLength(3);
+    expect(wrongRoute).toBe('/admin/nope');
   });
 });

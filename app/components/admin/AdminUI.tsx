@@ -10,7 +10,7 @@ import {
   HiXMark,
 } from 'react-icons/hi2';
 import { cx } from '@/app/lib/cx';
-import { getAdminBreadcrumb } from '@/app/lib/admin-nav';
+import { getAdminBreadcrumb, type AdminPageRoute } from '@/app/lib/admin-nav';
 import {
   focusRing,
   helpText,
@@ -51,7 +51,7 @@ interface AdminPageHeaderProps {
    * label the title (via `getAdminBreadcrumb`), so the header always matches
    * the sidebar and breadcrumb wording. `title` / `eyebrow` override.
    */
-  route?: string;
+  route?: AdminPageRoute;
   title?: ReactNode;
   /** One line: what this page is for. */
   description?: ReactNode;

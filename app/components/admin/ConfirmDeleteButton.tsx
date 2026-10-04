@@ -43,11 +43,6 @@ export default function ConfirmDeleteButton({
     setError(null);
 
     try {
-      if (!window.confirm(message)) {
-        setIsPending(false);
-        return;
-      }
-
       const res = await action();
       if (res && typeof res === 'object' && 'success' in res && (res as ActionResult).success === false) {
         const errorMsg = (res as { error?: string }).error || 'Failed to delete.';

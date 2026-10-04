@@ -9,6 +9,14 @@ vi.mock('@/app/(admin)/admin/careers/actions', () => ({
   updateCareerPostingAction: vi.fn(),
 }));
 
+// Render the RAC overlay primitives inline for static markup.
+vi.mock('@/app/components/ui/overlay', () => ({
+  Overlay: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) => (isOpen ? <div>{children}</div> : null),
+  Modal: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Dialog: ({ children }: { children: React.ReactNode }) => <div role="dialog">{children}</div>,
+  Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+}));
+
 const posting: AdminCareerPostingWithStats = {
   id: 'posting-1',
   title: 'Lead Caster',
@@ -90,16 +98,24 @@ describe('CareerPostingModal', () => {
     expect(html).toContain('New career opening');
     expect(html).toContain('value="Remote (NYC High School League)"');
     expect(html).toMatch(/<option value="published" selected=""/);
-    expect(html).not.toContain('Lead Caster');
+    expect(html).toMatch(/id="career-title"[^>]*value=""/);
   });
 
   it('keys the mounted form per posting so state cannot carry over', () => {
     const props = { isOpen: true, onClose: noop, onSuccess: noop };
-    const a = CareerPostingModal({ ...props, posting }) as React.ReactElement;
-    const b = CareerPostingModal({ ...props, posting: { ...posting, id: 'posting-2' } }) as React.ReactElement;
-    const fresh = CareerPostingModal({ ...props, posting: null }) as React.ReactElement;
-    expect(a.key).toBe('posting-1');
-    expect(b.key).toBe('posting-2');
-    expect(fresh.key).toBe('new');
+    // Overlay > Modal > Dialog > form
+    const formKey = (p: AdminCareerPostingWithStats | null) => {
+      let node = CareerPostingModal({ ...props, posting: p }) as React.ReactElement<{ children: React.ReactElement }>;
+      for (let i = 0; i < 3; i++) node = node.props.children as React.ReactElement<{ children: React.ReactElement }>;
+      return node.key;
+    };
+    expect(formKey(posting)).toBe('posting-1');
+    expect(formKey({ ...posting, id: 'posting-2' })).toBe('posting-2');
+    expect(formKey(null)).toBe('new');
+  });
+
+  it('renders the title through the Heading slot', () => {
+    const html = render(posting);
+    expect(html).toContain('<h2>Edit career opening</h2>');
   });
 });

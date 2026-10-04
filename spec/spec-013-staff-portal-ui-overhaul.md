@@ -48,7 +48,7 @@ All `admin-` prefixed in `globals.css`, opacity/translate/scale only (no layout 
 |---|---|---|
 | Page content on route entry | `.admin-page-enter` on `AdminPage` (fade + 6px rise) | 260ms |
 | Title accent rule | `.admin-rule` draws in (`scale-x`) | 420ms, 120ms delay |
-| Rows, cards, list items | `.admin-stagger > :not([data-entered])` cascade, first mount only | 280ms, 30ms steps capped at 210ms |
+| Rows, cards, list items | `.admin-shell:not([data-settled]) .admin-stagger > *` cascade, per page load only | 280ms, 30ms steps capped at 210ms |
 | Notices, inline forms, panels, field errors | `.admin-fade-in` | 200ms |
 | Loading skeleton | `.admin-skeleton-enter` (150ms delay) + `.admin-skeleton` shimmer | 200ms / 1.6s loop |
 | Modals (detail, confirm delete) | `.admin-modal-overlay` / `.admin-modal` on RAC `data-entering` / `data-exiting`; RAC holds the exit until it finishes | 200–240ms in, 150ms out |
@@ -60,7 +60,7 @@ All `admin-` prefixed in `globals.css`, opacity/translate/scale only (no layout 
 | Buttons, chips, row icons | press scale 0.97 / 0.95 / 0.94 | 150ms |
 | Stat cards, tiles, gallery cards | hover lift 2px + accent ring; gallery image zoom 1.03 | 200ms / 500ms |
 
-**Stagger is first-mount only.** Browsers restart a CSS animation when a node is moved, and React moves keyed children with `insertBefore` on reorder, so with `backwards` fill a reordered gallery card or role row blinked to opacity 0 and replayed. `AdminShell` (persistent across admin routes) listens for `animationend` of `admin-rise` and marks the child `data-entered`; on mount it also settles children that finished before hydration. Moved nodes keep the attribute and never replay; newly inserted rows still animate. Verified: reordering gallery cards keeps every card at opacity 1.
+**Stagger plays once per page load.** Browsers restart a CSS animation when a node is moved, and React moves keyed children with `insertBefore` on reorder, so with `backwards` fill a reordered gallery card or role row blinked to opacity 0 and replayed. `AdminShell` (persistent across admin routes) holds `settledPath` in React state; 700ms after a pathname's first render (the longest entrance ends ~490ms in) it equals the pathname and the shell root gets `data-settled`, after which the stagger CSS no longer matches and moved nodes never replay. A navigation changes `pathname`, so the attribute clears and the new page plays its own entrance. Rows inserted after the page has settled (filters, "load more") just appear. Server and first client render are both unsettled, so there is no hydration mismatch. (Earlier revisions marked each child `data-entered` through a global `animationend` listener and a DOM sweep; that was replaced after PR #218 review.)
 
 Reduced motion: the existing global rule collapses durations, and an explicit block sets `animation: none !important` on every `admin-*` animation class, because stagger and skeleton delays would otherwise still hold content invisible. Transitions add `motion-reduce:transition-none` / `motion-reduce:*:scale-100|translate-y-0` where they move things. No animation library was added; the existing Framer Motion use in the gallery reorder is unchanged.
 
@@ -80,7 +80,7 @@ Match Fixtures sits in the 2/3 column beside the schedule form, so it must fit a
 The branch was rebased onto `350cd57`, which added the careers admin, the student demographics vault, the school-manager modal, and the career-posting filter on Applications. Main's behaviour was kept as is; the presentation layer was reapplied on top:
 
 - **Navigation ([spec-012](spec-012-admin-control-panel-nav.md)):** `/admin/careers` (Careers) joins People & Staffing after Applications, and `/admin/demographics` (Student Demographics) joins League Operations after Schools. The sidebar, breadcrumb and Overview hub pick them up from `admin-nav.ts`.
-- **Careers:** `CareersManagerClient` renders the page header (its "New opening" action opens the client modal), a flush section with a status segmented filter and `AdminSearchField`, table tokens, and empty state. `CareerPostingRow` uses status chips, a secondary-button applicant count link and the delete icon with its existing inline confirm. `CareerPostingModal` stays a non-RAC dialog (no behaviour change) with the admin modal look, `admin-modal-pop` entry, associated labels and `AdminNotice` errors.
+- **Careers:** `CareersManagerClient` renders the page header (its "New opening" action opens the client modal), a flush section with a status segmented filter and `AdminSearchField`, table tokens, and empty state. `CareerPostingRow` uses status chips, a secondary-button applicant count link and the delete icon with its existing inline confirm. `CareerPostingModal` is a RAC `Overlay`/`Modal`/`Dialog` (admin modal look and enter/exit motion, focus containment, Escape and outside-press dismissal from RAC; the form is still mounted only while open, keyed per posting), with associated labels and `AdminNotice` errors.
 - **Demographics:** `DemographicsExplorer` uses the page anatomy (restricted/FERPA chips in header meta, Export CSV as header action), KPI tiles, a sticky filter toolbar, table tokens, and the survey modal with `admin-modal` motion.
 - **Schools:** main removed the Display order column and field (now a hidden input) and added a "Manage portal managers" row action, styled as an `editIconBtn`. `SchoolManagersModal` uses `AdminTabs` and `AdminNotice`; its three tabs use the label, button, chip, search and contrast tokens.
 - **Applications:** main's `?posting=` career filter shows as an info `AdminNotice` with a "Clear filter" action above the staff table.
@@ -91,7 +91,7 @@ The branch was rebased onto `350cd57`, which added the careers admin, the studen
 - **Presentation only.** No server action, query, permission check, validation rule, route, form field `name`, or database code changed. `id`/`htmlFor`/ARIA attributes were added for label association and roles. Visible text changed to sentence case in places (tests updated for "School applications" / "Staff applications").
 - **Public site untouched.** No file under `app/components/ui`, `app/components/layout` or `app/(marketing)` changed. Admin components stopped using the public `Card`, `Button`, `form.tsx` `Field` and the overlay `animate-fade-in`; admin motion is opt-in by class, and `overlay.tsx` itself is unchanged. The only global CSS additions are the `--admin-panel` variable, its `@theme` colour, and `admin-` classes.
 - **Kept from spec-012:** categories, Disclosure animation, guide rail, breadcrumb trail, Overview hub (stat cards above it), pinned footer, sidebar scroll.
-- **Kept deliberately:** Team role editor's Display/Permissions toggle still conditionally renders each panel's fields (see open-threads: saving from one tab drops the other tab's fields). `ConfirmDeleteButton` still calls `window.confirm` after its dialog. Gallery reorder still uses Framer Motion layout.
+- **Kept deliberately:** Gallery reorder still uses Framer Motion layout.
 - **Compact-density exception** (extends spec-012): filter pills and segmented controls are 28–32px, row actions 32px with a ~42px hit area; the portal is desktop-only.
 - **Main is not a scroll container.** `<main>` lost `overflow-y-auto` so the top bar (`sticky top-0`, 56px) and page toolbars (`sticky top-14`) work; the document scrolls (as spec-012 already described).
 
@@ -107,5 +107,15 @@ The branch was rebased onto `350cd57`, which added the careers admin, the studen
 
 Both application tables are sized to fit the content column with no horizontal scroll: six columns using the compact cell styles (Applicant with role/email stacked under the name, School or Role, Details, Status, Submitted, Actions), Details chips wrap instead of forcing width, the four status buttons are stacked vertically at equal width (a narrow column, and clearer than a wrapping row), and the old `min-w-[240px]` Details column is gone. Measured with worst-case data (long names, emails, three games, LinkedIn plus motivation): `scrollWidth` equals `clientWidth` at 1280, 1366 and 1440 viewports (content columns 960, 1046 and 1120px).
 
-The first-mount cascade's catch-up pass (marking rows that finished animating before the shell's listener attached) runs 700ms after mount, not immediately. Marking rows while React is still hydrating the page logs a "tree hydrated but some attributes didn't match" warning for every row (`data-entered` appears only on the client).
+The stagger's settle step runs 700ms after a page's first render, in React state (`data-settled` on the shell root), never by touching DOM nodes while React is hydrating.
 
+## PR #218 review follow-ups
+
+Simon's review of PR #218, addressed on `feat/admin-pr218-simon-review-fixes`:
+
+1. **`ConfirmDeleteButton`** no longer calls `window.confirm` after its alert dialog (it asked twice).
+2. **`CareerPostingModal`** uses the shared RAC `Overlay`/`Modal`/`Dialog`/`Heading` instead of a hand-built `role="dialog"` with a window Escape listener, so Tab stays inside the dialog and scroll is locked. The pre-fill guarantee from incidents section 15 is unchanged: the form is keyed per posting inside the dialog.
+3. **`AdminShell` stagger** uses React state (`settledPath`, see "Stagger plays once per page load") instead of a global `animationend` listener, a `setTimeout` and `setAttribute`. CSS keys off `.admin-shell[data-settled]`.
+4. **Team role editor** keeps `name`, `color` and the permission bitmask in `roleDraft` state (`app/components/admin/role-form.ts`: `seedRoleDraft`, `buildRoleRequest`) with controlled inputs, so saving from either tab sends every field. Owner permissions are sent as stored, a system role keeps its name, and permission bits the actor cannot change are still left out (the server rejects them). See incidents section 17.
+5. **`AdminPageHeader.route`** is typed `AdminPageRoute` (`AdminSectionHref | AdminNestedRoute`, in `admin-nav.ts`; `AdminNestedRoute` is `/admin/news/${string}`), so a wrong route is a compile error. `getAdminBreadcrumb` stays `string` because the shell passes the live pathname.
+6. **Match Fixtures status select** uses `selectClassCompact` from `styles.ts`; `selectClass` and `selectClassCompact` are composed with `cx` from a shared `selectBase`, replacing a string `.replace()`.

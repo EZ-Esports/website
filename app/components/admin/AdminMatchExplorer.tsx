@@ -8,6 +8,7 @@ import {
   saveBtn,
   secondaryBtnSm,
   selectClass,
+  selectClassCompact,
   table,
   tableWrap,
   tbody,
@@ -158,13 +159,6 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
 
   const scoreInput =
     'h-8 w-8 rounded-md border border-line/70 bg-surface-sunken text-center text-sm font-semibold tabular-nums text-foreground transition-[border-color,box-shadow] duration-150 hover:border-line focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/15';
-
-  // The Match Fixtures status select is the one crowded control that tightens the
-  // shared chevron inset (see the select rule in globals.css).
-  const statusSelect = selectClass.replace(
-    '[--select-chevron-inset:0.75rem] [--select-chevron-space:2.25rem]',
-    'pl-2.5 [--select-chevron-inset:0.625rem] [--select-chevron-space:2rem]',
-  );
 
   return (
     <>
@@ -318,7 +312,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
                           aria-label={`Status for ${match.homeTeam} vs ${match.awayTeam}`}
                           form={`form-${match.id}`}
                           defaultValue={match.status}
-                          className={statusSelect}
+                          className={selectClassCompact}
                         >
                           <option value="scheduled">Scheduled</option>
                           <option value="live">Live</option>
