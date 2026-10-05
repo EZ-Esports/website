@@ -1,9 +1,24 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Card from '@/app/components/ui/Card';
 import { FiTrash2 } from 'react-icons/fi';
-import { deleteIconBtn } from '@/app/components/admin/styles';
+import {
+  chip,
+  deleteIconBtn,
+  focusRing,
+  ghostBtnSm,
+  ghostBtn,
+  input,
+  label as labelClass,
+  listStack,
+  primaryBtn,
+  segmentedGroup,
+  segmentedItem,
+} from '@/app/components/admin/styles';
+import { AdminCount, AdminEmptyState, AdminNotice, AdminSearchField, AdminSection, PendingLabel } from '@/app/components/admin/AdminUI';
+import { AdminTab, AdminTabList, AdminTabPanel, AdminTabs } from '@/app/components/admin/AdminTabs';
+import { cx } from '@/app/lib/cx';
+import { buildRoleRequest, seedRoleDraft, type RoleDraft } from '@/app/components/admin/role-form';
 import InviteStaffForm from '@/app/components/admin/InviteStaffForm';
 import { canActOnMember, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
 import StaffRow from '@/app/components/admin/StaffRow';
@@ -20,7 +35,6 @@ import {
   HiOutlinePlus,
   HiOutlineShieldCheck,
   HiOutlineUsers,
-  HiOutlineXMark,
 } from 'react-icons/hi2';
 
 interface Role {
@@ -145,7 +159,11 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null);
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [roleTab, setRoleTab] = useState<'display' | 'permissions'>('display');
-  const [selectedColor, setSelectedColor] = useState('#94a3b8');
+  // The role editor's fields live in state, not in the DOM: its Display and Permissions
+  // panels mount one at a time, so a submit must never depend on which one is showing.
+  const [roleDraft, setRoleDraft] = useState<RoleDraft>(() => seedRoleDraft(null));
+  const selectedColor = roleDraft.color;
+  const setSelectedColor = (color: string) => setRoleDraft((d) => ({ ...d, color }));
 
   const activeRole = roles.find((r) => r.id === activeRoleId) || null;
 
@@ -170,21 +188,26 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
 
 
 
-  // Handle Create Role
-  function handleCreateRoleSubmit(formData: FormData) {
-    setError(null);
-    // Calculate permissions bitmask from selected checkboxes
-    let permissionsBitmask = 0n;
-    PERMISSION_LABELS.forEach((label) => {
-      if (formData.get(`perm_${label.bit.toString()}`)) {
-        permissionsBitmask |= label.bit;
-      }
-    });
+  // Permission bits the actor may change; disabled checkboxes (missing from the actor or superadmin-only) stay out.
+  const editableBits = PERMISSION_LABELS.reduce((mask, label) => {
+    const locked = (label as { superadminOnly?: boolean }).superadminOnly && !currentIsOwner;
+    const missing = !currentIsOwner && (currentPermissions & label.bit) === BigInt(0);
+    return locked || missing ? mask : mask | label.bit;
+  }, 0n);
 
+  function toRequestBody() {
+    const { name, color, permissions } = buildRoleRequest(roleDraft, activeRole, editableBits);
     const bodyData = new FormData();
-    bodyData.append('name', formData.get('name') as string);
-    bodyData.append('color', formData.get('color') as string);
-    bodyData.append('permissions', permissionsBitmask.toString());
+    bodyData.append('name', name);
+    bodyData.append('color', color);
+    bodyData.append('permissions', permissions);
+    return bodyData;
+  }
+
+  // Handle Create Role
+  function handleCreateRoleSubmit() {
+    setError(null);
+    const bodyData = toRequestBody();
 
     startTransition(async () => {
       const result = await createRole(bodyData);
@@ -198,21 +221,10 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
   }
 
   // Handle Edit Role
-  function handleEditRoleSubmit(formData: FormData) {
+  function handleEditRoleSubmit() {
     if (!activeRole) return;
     setError(null);
-
-    let permissionsBitmask = 0n;
-    PERMISSION_LABELS.forEach((label) => {
-      if (formData.get(`perm_${label.bit.toString()}`)) {
-        permissionsBitmask |= label.bit;
-      }
-    });
-
-    const bodyData = new FormData();
-    bodyData.append('name', formData.get('name') as string);
-    bodyData.append('color', formData.get('color') as string);
-    bodyData.append('permissions', permissionsBitmask.toString());
+    const bodyData = toRequestBody();
 
     startTransition(async () => {
       const result = await updateRole(activeRole.id, bodyData);
@@ -273,101 +285,84 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
     });
   }
 
+  const filteredStaff = staffMembers.filter((member) => {
+    const matchesSearch = member.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRole = filterRoleId ? member.roles.some((r) => r.id === filterRoleId) : true;
+    return matchesSearch && matchesRole;
+  });
+
+  const reorderBtn = cx(
+    'inline-flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary hover:text-foreground hover:bg-line/70 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-colors',
+    focusRing,
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Tabs Menu */}
-      <div className="flex border-b border-line pb-px">
-        <button
-          onClick={() => { setActiveTab('staff'); setError(null); }}
-          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm tracking-wide border-b-2 cursor-pointer transition-all duration-300 ${
-            activeTab === 'staff'
-              ? 'border-accent text-white font-extrabold'
-              : 'border-transparent text-foreground-secondary hover:text-foreground'
-          }`}
-        >
-          <HiOutlineUsers className="w-4 h-4" />
-          <span>Staff Members</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('roles'); setError(null); }}
-          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm tracking-wide border-b-2 cursor-pointer transition-all duration-300 ${
-            activeTab === 'roles'
-              ? 'border-accent text-white font-extrabold'
-              : 'border-transparent text-foreground-secondary hover:text-foreground'
-          }`}
-        >
-          <HiOutlineShieldCheck className="w-4 h-4" />
-          <span>Roles Manager</span>
-        </button>
-      </div>
+    <AdminTabs
+      selectedKey={activeTab}
+      onSelectionChange={(key) => {
+        setActiveTab(key as 'staff' | 'roles');
+        setError(null);
+      }}
+    >
+      <AdminTabList aria-label="Roles and staff sections">
+        <AdminTab id="staff">
+          <HiOutlineUsers aria-hidden className="w-4 h-4" />
+          Staff members
+        </AdminTab>
+        <AdminTab id="roles">
+          <HiOutlineShieldCheck aria-hidden className="w-4 h-4" />
+          Roles manager
+        </AdminTab>
+      </AdminTabList>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-lg flex justify-between items-center" role="alert" aria-live="polite">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 cursor-pointer">
-            <HiOutlineXMark className="w-5 h-5" />
-          </button>
-        </div>
+        <AdminNotice tone="danger" onDismiss={() => setError(null)}>
+          {error}
+        </AdminNotice>
       )}
 
-      {activeTab === 'staff' && (
-        <div className="space-y-6">
-          {/* Sub-tabs menu */}
-          <div className="flex gap-4 border-b border-line/60 pb-px mb-2">
-            <button
-              onClick={() => { setStaffSubTab('members'); setError(null); }}
-              className={`text-xs font-bold uppercase tracking-wider pb-2 border-b-2 transition-all cursor-pointer ${
-                staffSubTab === 'members'
-                  ? 'border-accent text-white font-extrabold'
-                  : 'border-transparent text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              Active Members ({staffMembers.length})
-            </button>
-            <button
-              onClick={() => { setStaffSubTab('invites'); setError(null); }}
-              className={`text-xs font-bold uppercase tracking-wider pb-2 border-b-2 transition-all cursor-pointer ${
-                staffSubTab === 'invites'
-                  ? 'border-accent text-white font-extrabold'
-                  : 'border-transparent text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              Invites & Onboarding ({invites.length})
-            </button>
-          </div>
+      <AdminTabPanel id="staff">
+        <AdminTabs
+          selectedKey={staffSubTab}
+          onSelectionChange={(key) => {
+            setStaffSubTab(key as 'members' | 'invites');
+            setError(null);
+          }}
+        >
+          <AdminTabList aria-label="Staff views" variant="pill">
+            <AdminTab id="members" variant="pill">
+              Active members <span className="tabular-nums text-foreground-secondary">{staffMembers.length}</span>
+            </AdminTab>
+            <AdminTab id="invites" variant="pill">
+              Invites &amp; onboarding <span className="tabular-nums text-foreground-secondary">{invites.length}</span>
+            </AdminTab>
+          </AdminTabList>
 
           {/* Sub-tab 1: Members Directory */}
-          {staffSubTab === 'members' && (
-            <div className="space-y-6">
-              {/* Search & Filter Header */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                {/* Search input */}
-                <div className="w-full sm:w-72 relative">
-                  <input
-                    type="text"
-                    placeholder="Search by email..."
+          <AdminTabPanel id="members">
+            <AdminSection
+              variant="flush"
+              title={<>Members<AdminCount>{filteredStaff.length}</AdminCount></>}
+              toolbar={
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  {/* Search input */}
+                  <AdminSearchField
+                    className="w-full sm:w-72"
+                    aria-label="Search staff by email"
+                    placeholder="Search by email…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-3 pr-8 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all placeholder-foreground-muted"
+                    onClear={() => setSearchQuery('')}
                   />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-foreground-secondary"
-                    >
-                      <HiOutlineXMark className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
 
-                {/* Role filter dropdown */}
-                <div className="w-full sm:w-56">
+                  {/* Role filter dropdown */}
                   <select
+                    aria-label="Filter by role"
                     value={filterRoleId}
                     onChange={(e) => setFilterRoleId(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface-sunken border border-line rounded-lg text-sm text-foreground-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all cursor-pointer"
+                    className={cx(input, 'sm:w-56 cursor-pointer')}
                   >
-                    <option value="">All Roles</option>
+                    <option value="">All roles</option>
                     {roles.map((role) => (
                       <option key={role.id} value={role.id}>
                         {role.name}
@@ -375,28 +370,18 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                     ))}
                   </select>
                 </div>
-              </div>
-
-              {/* Members List */}
-              <div className="space-y-3">
-                {(() => {
-                  const filteredStaff = staffMembers.filter((member) => {
-                    const matchesSearch = member.email.toLowerCase().includes(searchQuery.toLowerCase());
-                    const matchesRole = filterRoleId ? member.roles.some((r) => r.id === filterRoleId) : true;
-                    return matchesSearch && matchesRole;
-                  });
-
-                  if (filteredStaff.length === 0) {
-                    return (
-                      <div className="text-center py-10 border border-dashed border-line rounded-xl bg-surface-sunken/10">
-                        <HiOutlineUsers className="w-8 h-8 text-foreground-muted mx-auto mb-2.5 opacity-60" />
-                        <p className="text-foreground-secondary text-sm font-semibold uppercase tracking-wider mb-1">No staff members found</p>
-                        <p className="text-foreground-muted text-xs font-medium">Try clearing your filters or search terms.</p>
-                      </div>
-                    );
-                  }
-
-                  return filteredStaff.map((member) => {
+              }
+            >
+              {filteredStaff.length === 0 ? (
+                <AdminEmptyState
+                  compact
+                  icon={<HiOutlineUsers />}
+                  title="No staff members found"
+                  description="Try clearing your filters or search terms."
+                />
+              ) : (
+                <ul className={listStack}>
+                  {filteredStaff.map((member) => {
                     const targetHighestPos = member.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
                     const targetIsOwner = member.roles.some((r) => r.isOwner);
                     const canManage = canActOnMember(current.highestRolePosition, currentIsOwner, targetHighestPos, targetIsOwner);
@@ -410,37 +395,32 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                         assignableRoles={assignableRoles}
                       />
                     );
-                  });
-                })()}
-              </div>
-            </div>
-          )}
+                  })}
+                </ul>
+              )}
+            </AdminSection>
+          </AdminTabPanel>
 
           {/* Sub-tab 2: Invites & Onboarding */}
-          {staffSubTab === 'invites' && (
-            <div className="space-y-6">
-              {/* Action Card for new invite */}
-              <Card className="bg-surface-raised/10 border border-line border-l-4 border-l-accent p-6">
-                <h2 className="text-base font-black text-white uppercase tracking-wider mb-1">Invite Staff Member</h2>
-                <p className="text-xs text-foreground-secondary mb-5">
-                  Generates a single-use onboarding link. Roles are optional; every accepted invite receives implicit @everyone membership.
-                </p>
-                <InviteStaffForm assignableRoles={assignableRoles} />
-              </Card>
+          <AdminTabPanel id="invites" className="space-y-6">
+            <AdminSection
+              title="Invite a staff member"
+              description="Generates a single-use onboarding link. Roles are optional; every accepted invite receives implicit @everyone membership."
+            >
+              <InviteStaffForm assignableRoles={assignableRoles} />
+            </AdminSection>
 
-              {/* Pending Invites List */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-black text-foreground-secondary uppercase tracking-wider px-1">
-                  Pending Onboardings ({invites.length})
-                </h3>
-                {invites.length === 0 ? (
-                  <div className="text-center py-10 border border-dashed border-line rounded-xl bg-surface-sunken/10">
-                    <HiOutlineShieldCheck className="w-8 h-8 text-foreground-muted mx-auto mb-2.5 opacity-60" />
-                    <p className="text-foreground-secondary text-sm font-semibold uppercase tracking-wider mb-1">No pending onboardings</p>
-                    <p className="text-foreground-muted text-xs font-medium">All sent invitations have been successfully claimed or expired.</p>
-                  </div>
-                ) : (
-                  invites.map((inv) => {
+            <AdminSection variant="flush" title={<>Pending onboardings<AdminCount>{invites.length}</AdminCount></>}>
+              {invites.length === 0 ? (
+                <AdminEmptyState
+                  compact
+                  icon={<HiOutlineShieldCheck />}
+                  title="No pending onboardings"
+                  description="All sent invitations have been successfully claimed or expired."
+                />
+              ) : (
+                <ul className={listStack}>
+                  {invites.map((inv) => {
                     const targetHighestPos = inv.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
                     const canManage = canActorManageRole(targetHighestPos);
 
@@ -452,148 +432,160 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                         canRevoke={canManage}
                       />
                     );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                  })}
+                </ul>
+              )}
+            </AdminSection>
+          </AdminTabPanel>
+        </AdminTabs>
+      </AdminTabPanel>
 
-      {activeTab === 'roles' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-surface-sunken/20 border border-line rounded-xl min-h-[600px] overflow-hidden">
+      <AdminTabPanel id="roles">
+        <div className="grid min-h-[600px] grid-cols-1 overflow-hidden rounded-2xl bg-admin-panel md:grid-cols-[17rem_1fr]">
           {/* Left Pane: Role Directory Sidebar */}
-          <div className="col-span-1 border-r border-line p-4 space-y-4 bg-surface-raised/10 flex flex-col justify-between">
+          <div className="flex flex-col justify-between gap-4 border-b border-line/60 p-3 md:border-b-0 md:border-r">
             <div>
-              <div className="flex justify-between items-center mb-4 px-2">
-                <span className="text-xs font-black text-foreground-secondary uppercase tracking-wider">Roles</span>
+              <div className="flex items-center justify-between px-2 pt-1 pb-3">
+                <h2 className="text-sm font-semibold text-foreground">Roles</h2>
                 {(currentIsOwner || hasPermission(currentPermissions, currentIsOwner, Permissions.MANAGE_ROLES)) && (
                   <button
+                    type="button"
                     onClick={() => {
                       setIsCreatingRole(true);
                       setActiveRoleId(null);
                       setRoleTab('display');
-                      setSelectedColor('#94a3b8');
+                      setRoleDraft(seedRoleDraft(null));
                     }}
-                    className="p-1 hover:bg-line border border-transparent hover:border-line rounded-lg text-foreground-secondary hover:text-white transition-all cursor-pointer"
+                    className={ghostBtnSm}
                     title="Create Role"
                   >
-                    <HiOutlinePlus className="w-4 h-4" />
+                    <HiOutlinePlus aria-hidden className="w-4 h-4" />
+                    New role
                   </button>
                 )}
               </div>
 
-              <div className="space-y-1 overflow-y-auto max-h-[500px] pr-1">
+              <ul className="admin-stagger max-h-[500px] space-y-0.5 overflow-y-auto">
                 {roles.map((role, idx) => {
                   const isActive = activeRoleId === role.id && !isCreatingRole;
                   const parsedColor = parseHexColor(role.color);
                   const isReorderable = !role.isOwner && role.name !== '@everyone' && canActorManageRole(role.position);
+                  const selectRole = () => {
+                    setActiveRoleId(role.id);
+                    setIsCreatingRole(false);
+                    setRoleTab('display');
+                    setRoleDraft(seedRoleDraft(role));
+                  };
 
                   return (
-                    <div
+                    <li
                       key={role.id}
-                      onClick={() => {
-                        setActiveRoleId(role.id);
-                        setIsCreatingRole(false);
-                        setRoleTab('display');
-                        setSelectedColor(parsedColor);
-                      }}
-                      className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all select-none ${
-                        isActive
-                          ? 'bg-line/80 text-white shadow border border-line/50'
-                          : 'text-foreground-secondary hover:text-foreground hover:bg-surface-raised/30 border border-transparent'
-                      }`}
+                      className={cx(
+                        'group flex items-center justify-between gap-1 rounded-lg pr-1 transition-colors duration-150',
+                        isActive ? 'bg-surface-raised text-foreground' : 'text-foreground-secondary hover:bg-surface-raised/60 hover:text-foreground',
+                      )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      {/* The row's main hit area is a real button, so roles are reachable by keyboard. */}
+                      <button
+                        type="button"
+                        onClick={selectRole}
+                        aria-pressed={isActive}
+                        className={cx('flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left cursor-pointer', focusRing)}
+                      >
                         {/* Colored Circle representing role color, matching Discord */}
                         <span
-                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-black/40"
+                          aria-hidden
+                          className="h-3 w-3 shrink-0 rounded-full ring-2 ring-black/30"
                           style={{ backgroundColor: parsedColor }}
                         />
-                        <span className={`text-xs font-extrabold uppercase tracking-wide truncate ${isActive ? 'text-white' : ''}`}>
-                          {role.name}
-                        </span>
-                      </div>
+                        <span className={cx('truncate text-sm', isActive && 'font-medium')}>{role.name}</span>
+                      </button>
 
-                      {/* Reordering Controls (subtle hover buttons like Discord) */}
+                      {/* Reordering controls: always visible (touch has no hover), quieter until the row is hovered or focused. */}
                       {isReorderable ? (
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center opacity-60 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                           <button
+                            type="button"
                             disabled={idx === 0 || isPending || !roles[idx - 1] || roles[idx - 1].isOwner || !canActorManageRole(roles[idx - 1].position)}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMoveRole(idx, 'up');
                             }}
-                            className="p-0.5 hover:bg-line rounded text-foreground-secondary hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className={reorderBtn}
                             title="Move Up"
+                            aria-label={`Move ${role.name} up`}
                           >
-                            <HiOutlineChevronUp className="w-3.5 h-3.5" />
+                            <HiOutlineChevronUp aria-hidden className="h-3.5 w-3.5" />
                           </button>
                           <button
+                            type="button"
                             disabled={idx === roles.length - 1 || isPending || !roles[idx + 1] || roles[idx + 1].name === '@everyone' || !canActorManageRole(roles[idx + 1].position)}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMoveRole(idx, 'down');
                             }}
-                            className="p-0.5 hover:bg-line rounded text-foreground-secondary hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className={reorderBtn}
                             title="Move Down"
+                            aria-label={`Move ${role.name} down`}
                           >
-                            <HiOutlineChevronDown className="w-3.5 h-3.5" />
+                            <HiOutlineChevronDown aria-hidden className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-foreground-muted italic shrink-0 select-none">Locked</span>
+                        <span className="shrink-0 select-none px-2 text-xs text-foreground-secondary">Locked</span>
                       )}
-                    </div>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </div>
 
-            <div className="pt-2 border-t border-line/60 text-[10px] text-foreground-muted leading-relaxed font-medium">
+            <p className="border-t border-line/60 px-2 pt-3 text-xs leading-5 text-foreground-secondary">
               Roles are listed in rank hierarchy order. Higher roles override and manage roles beneath them.
-            </div>
+            </p>
           </div>
 
           {/* Right Pane: Configuration Workspace */}
-          <div className="col-span-3 p-6 bg-surface-raised/5 min-h-[500px] flex flex-col">
+          <div className="flex min-h-[500px] flex-col p-6">
             {!activeRoleId && !isCreatingRole ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-line/80 rounded-xl my-auto bg-surface-sunken/10">
-                <HiOutlineShieldCheck className="w-12 h-12 text-foreground-muted mb-4 opacity-50" />
-                <h3 className="text-sm font-black text-foreground-secondary uppercase tracking-widest mb-1.5">No Role Selected</h3>
-                <p className="text-foreground-muted text-xs max-w-sm leading-relaxed">
-                  Select a role from the list on the left to customize its name, hex badge color, hierarchy position, and granular staff permissions.
-                </p>
-              </div>
+              <AdminEmptyState
+                className="my-auto"
+                icon={<HiOutlineShieldCheck />}
+                title="No role selected"
+                description="Select a role from the list on the left to customize its name, hex badge color, hierarchy position, and granular staff permissions."
+              />
             ) : (
               <form
                 key={activeRoleId ?? 'new-role'}
-                action={isCreatingRole ? handleCreateRoleSubmit : handleEditRoleSubmit}
-                className="flex-1 flex flex-col justify-between"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (isCreatingRole) handleCreateRoleSubmit();
+                  else handleEditRoleSubmit();
+                }}
+                className="admin-fade-in flex flex-1 flex-col justify-between"
               >
                 <div className="space-y-6">
                   {/* Title and Action Header */}
-                  <div className="border-b border-line pb-4">
-                    <div className="flex justify-between items-start gap-4 mb-3">
+                  <div className="border-b border-line/60 pb-4">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-black text-white uppercase tracking-wider">
-                            {isCreatingRole ? 'Create New Role' : 'Configure Role'}
-                          </h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-lg font-semibold text-foreground">
+                            {isCreatingRole ? 'Create new role' : 'Configure role'}
+                          </h2>
                           {!isCreatingRole && activeRole && (
                             <span
-                              className="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider"
+                              className="inline-flex h-6 items-center rounded-md px-2 text-xs font-medium"
                               style={{
-                                backgroundColor: `${parseHexColor(activeRole.color)}12`,
+                                backgroundColor: `${parseHexColor(activeRole.color)}1f`,
                                 color: parseHexColor(activeRole.color),
-                                border: `1px solid ${parseHexColor(activeRole.color)}25`,
                               }}
                             >
                               {activeRole.name}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-foreground-secondary">
+                        <p className="mt-1 text-sm text-foreground-secondary">
                           {isCreatingRole
                             ? 'Configure role styling and assign initial staff permissions.'
                             : `Update styling and permission policies for this role.`}
@@ -612,28 +604,23 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                       )}
                     </div>
 
-                    {/* Tabs Bar */}
+                    {/* Display / Permissions switch. Plain toggle buttons on purpose: each
+                        panel's fields only mount while it is shown; the values live in roleDraft. */}
                     {(!activeRole || !activeRole.isOwner) && (
-                      <div className="flex gap-4 mt-4">
+                      <div className={cx(segmentedGroup, 'mt-4')}>
                         <button
                           type="button"
+                          aria-pressed={roleTab === 'display'}
                           onClick={() => setRoleTab('display')}
-                          className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
-                            roleTab === 'display'
-                              ? 'border-accent text-white font-extrabold'
-                              : 'border-transparent text-foreground-secondary hover:text-foreground'
-                          }`}
+                          className={cx(segmentedItem(roleTab === 'display'), 'cursor-pointer')}
                         >
                           Display
                         </button>
                         <button
                           type="button"
+                          aria-pressed={roleTab === 'permissions'}
                           onClick={() => setRoleTab('permissions')}
-                          className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
-                            roleTab === 'permissions'
-                              ? 'border-accent text-white font-extrabold'
-                              : 'border-transparent text-foreground-secondary hover:text-foreground'
-                          }`}
+                          className={cx(segmentedItem(roleTab === 'permissions'), 'cursor-pointer')}
                         >
                           Permissions
                         </button>
@@ -643,11 +630,11 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
 
                   {/* Tab Content: Display Settings */}
                   {(isCreatingRole || roleTab === 'display' || activeRole?.isOwner) && (
-                    <div className="space-y-6 animate-in fade-in duration-200">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="admin-fade-in space-y-6">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                          <label htmlFor="role-name" className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                            Role Name
+                          <label htmlFor="role-name" className={labelClass}>
+                            Role name
                           </label>
                           <input
                             id="role-name"
@@ -655,34 +642,35 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                             type="text"
                             required
                             disabled={!isCreatingRole && activeRole?.isSystem}
-                            defaultValue={isCreatingRole ? '' : activeRole?.name}
+                            value={roleDraft.name}
+                            onChange={(e) => setRoleDraft((d) => ({ ...d, name: e.target.value }))}
                             placeholder="e.g. Moderator"
-                            className="w-full px-4 py-2.5 bg-surface border border-line rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed font-sans text-sm"
+                            className={input}
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                            Badge Color
-                          </label>
+                          <span className={labelClass}>Badge color</span>
                           <div className="flex gap-2">
-                            <div className="flex items-center gap-1.5 shrink-0 bg-surface border border-line rounded-lg px-2 py-1">
+                            <div className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line/70 bg-surface-sunken px-1.5 py-1">
                               <input
                                 type="color"
                                 name="color"
+                                aria-label="Badge color picker"
                                 value={selectedColor}
                                 onChange={(e) => setSelectedColor(e.target.value)}
-                                className="w-8 h-8 bg-transparent cursor-pointer border-0 p-0"
+                                className="h-7 w-7 cursor-pointer border-0 bg-transparent p-0"
                               />
                               <input
                                 type="text"
+                                aria-label="Badge color hex value"
                                 value={selectedColor}
                                 onChange={(e) => setSelectedColor(e.target.value)}
                                 placeholder="#94a3b8"
-                                className="w-20 px-1 py-1 text-[11px] font-mono bg-surface-sunken/40 border border-line rounded text-foreground focus:outline-none focus:ring-1 focus:ring-accent transition-all uppercase text-center"
+                                className="w-20 rounded-md bg-transparent px-1 py-1 text-center font-mono text-xs uppercase text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
                               />
                             </div>
-                            <div className="flex-1 flex flex-wrap gap-1.5 items-center bg-surface-sunken/20 px-2.5 py-1.5 border border-line rounded-lg">
+                            <div className="flex flex-1 flex-wrap items-center gap-1.5 rounded-lg bg-surface-sunken px-2.5 py-1.5">
                               {PRESET_COLORS.map((c) => {
                                 const isActive = selectedColor.toLowerCase() === c.toLowerCase();
                                 return (
@@ -690,11 +678,12 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                                     key={c}
                                     type="button"
                                     onClick={() => setSelectedColor(c)}
-                                    className={`w-4 h-4 rounded-full transition-all cursor-pointer hover:scale-125 ${
-                                      isActive
-                                        ? 'ring-2 ring-white ring-offset-2 ring-offset-[#18181b] scale-110'
-                                        : 'border border-black/30 hover:border-white/50'
-                                    }`}
+                                    aria-label={`Use color ${c}`}
+                                    aria-pressed={isActive}
+                                    className={cx(
+                                      'h-4 w-4 cursor-pointer rounded-full outline-none transition-[scale,box-shadow] duration-150 hover:scale-125 motion-reduce:hover:scale-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-sunken',
+                                      isActive ? 'scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-surface-sunken' : 'ring-1 ring-black/30',
+                                    )}
                                     style={{ backgroundColor: c }}
                                     title={c}
                                   />
@@ -706,100 +695,87 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                       </div>
 
                       {activeRole?.isOwner && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-xs px-4 py-3 rounded-lg font-sans">
+                        <AdminNotice tone="danger" live="none">
                           This is the system Owner role. It automatically grants all permissions and bypasses all constraints. Its permissions cannot be modified.
-                        </div>
+                        </AdminNotice>
                       )}
                     </div>
                   )}
 
                   {/* Tab Content: Permissions Checkboxes */}
                   {!activeRole?.isOwner && (isCreatingRole || roleTab === 'permissions') && (
-                    <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 animate-in fade-in duration-200">
-                      <div className="space-y-6">
-                        {PERMISSION_GROUPS.map((group) => (
-                          <div key={group.title} className="space-y-3 p-4 bg-surface-sunken/20 border border-surface-raised rounded-xl">
-                            <h4 className="text-xs font-black text-white uppercase tracking-wider border-b border-line pb-1.5 flex items-center gap-2 select-none">
-                              <span className="w-1 h-3.5 bg-accent rounded" />
-                              <span>{group.title}</span>
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {group.permissions.map((label) => {
-                                const hasPerm = activeRole ? (BigInt(activeRole.permissions) & label.bit) !== BigInt(0) : false;
-                                const isSuperadminLocked = Boolean((label as any).superadminOnly && !currentIsOwner);
-                                const isActorMissing = !currentIsOwner && (currentPermissions & label.bit) === BigInt(0);
-                                const isDisabled = isActorMissing || isSuperadminLocked;
+                    <div className="admin-fade-in max-h-[420px] space-y-6 overflow-y-auto pr-1">
+                      {PERMISSION_GROUPS.map((group) => (
+                        <fieldset key={group.title}>
+                          <legend className="mb-2 text-sm font-semibold text-foreground">{group.title}</legend>
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                            {group.permissions.map((label) => {
+                              const hasPerm = (roleDraft.permissions & label.bit) !== BigInt(0);
+                              const isSuperadminLocked = Boolean((label as any).superadminOnly && !currentIsOwner);
+                              const isActorMissing = !currentIsOwner && (currentPermissions & label.bit) === BigInt(0);
+                              const isDisabled = isActorMissing || isSuperadminLocked;
 
-                                return (
-                                  <label
-                                    key={label.bit.toString()}
-                                    className={`flex items-start gap-3 p-3 bg-surface-sunken/30 border rounded-lg transition-all select-none ${
-                                      isDisabled
-                                        ? 'opacity-40 border-line/60 cursor-not-allowed bg-surface-sunken/10'
-                                        : 'border-line hover:border-line/60 cursor-pointer hover:bg-surface-raised/10'
-                                    }`}
-                                  >
-                                    <input
-                                      name={`perm_${label.bit.toString()}`}
-                                      type="checkbox"
-                                      value="true"
-                                      defaultChecked={hasPerm}
-                                      disabled={isDisabled}
-                                      className="rounded text-accent focus:ring-accent focus:ring-offset-0 bg-surface-sunken border-line cursor-pointer disabled:cursor-not-allowed w-4 h-4 mt-0.5 shrink-0"
-                                    />
-                                    <div className="flex flex-col">
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className={`text-xs font-extrabold uppercase tracking-wide ${
-                                            isDisabled ? 'text-foreground-muted' : 'text-foreground'
-                                          }`}
-                                        >
-                                          {label.name}
-                                        </span>
-                                        {(label as any).superadminOnly && (
-                                          <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded bg-red-950/60 text-red-400 border border-red-800/50">
-                                            Superadmin Only
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-[10px] text-foreground-muted font-medium leading-relaxed mt-0.5">{label.desc}</span>
-                                    </div>
-                                  </label>
-                                );
-                              })}
-                            </div>
+                              return (
+                                <label
+                                  key={label.bit.toString()}
+                                  className={cx(
+                                    'flex select-none items-start gap-3 rounded-lg bg-surface-sunken/60 p-3 transition-colors duration-150',
+                                    isDisabled ? 'cursor-not-allowed opacity-45' : 'cursor-pointer hover:bg-surface-raised',
+                                  )}
+                                >
+                                  <input
+                                    name={`perm_${label.bit.toString()}`}
+                                    type="checkbox"
+                                    checked={hasPerm}
+                                    onChange={(e) =>
+                                      setRoleDraft((d) => ({
+                                        ...d,
+                                        permissions: e.target.checked ? d.permissions | label.bit : d.permissions & ~label.bit,
+                                      }))
+                                    }
+                                    disabled={isDisabled}
+                                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
+                                  />
+                                  <span className="flex flex-col">
+                                    <span className="flex flex-wrap items-center gap-2">
+                                      <span className={cx('text-sm font-medium', isDisabled ? 'text-foreground-secondary' : 'text-foreground')}>
+                                        {label.name}
+                                      </span>
+                                      {(label as any).superadminOnly && <span className={chip('danger', 'sm')}>Superadmin only</span>}
+                                    </span>
+                                    <span className="mt-0.5 text-xs leading-5 text-foreground-secondary">{label.desc}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
                           </div>
-                        ))}
-                      </div>
+                        </fieldset>
+                      ))}
                     </div>
                   )}
                 </div>
 
                 {/* Footer Save & Cancel Buttons */}
-                <div className="mt-6 border-t border-line pt-4 flex justify-end gap-3 bg-surface-sunken/5">
+                <div className="mt-6 flex justify-end gap-2 border-t border-line/60 pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveRoleId(null);
                       setIsCreatingRole(false);
                     }}
-                    className="px-4 py-2 border border-line hover:border-line text-foreground-secondary hover:text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                    className={ghostBtn}
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className="px-5 py-2 bg-accent hover:bg-accent/80 text-on-accent font-extrabold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                  >
-                    {isPending ? 'Saving…' : 'Save Changes'}
+                  <button type="submit" disabled={isPending} aria-busy={isPending} className={primaryBtn}>
+                    <PendingLabel pending={isPending} label="Save changes" pendingLabel="Saving…" />
                   </button>
                 </div>
               </form>
             )}
           </div>
         </div>
-      )}
-    </div>
+      </AdminTabPanel>
+    </AdminTabs>
   );
 }

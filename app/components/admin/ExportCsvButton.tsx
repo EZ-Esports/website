@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { HiArrowDownTray } from "react-icons/hi2";
 import { downloadCsv } from "@/app/lib/csv-download";
+import { ghostBtnSm } from "@/app/components/admin/styles";
+import { AdminSpinner } from "@/app/components/admin/AdminUI";
 
 interface ExportCsvButtonProps {
   /** Server action that returns CSV text on-demand (called only when clicked). */
@@ -13,8 +16,8 @@ interface ExportCsvButtonProps {
   className?: string;
 }
 
-const defaultClassName =
-  "inline-flex items-center gap-1 text-[11px] font-semibold text-foreground-muted hover:text-foreground-secondary underline decoration-line hover:decoration-foreground-secondary underline-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+/** Understated on purpose: a quiet ghost button, never the page's primary action. */
+const defaultClassName = ghostBtnSm;
 
 /**
  * Triggers a server action on click to fetch CSV data on-demand,
@@ -44,16 +47,18 @@ export default function ExportCsvButton({
   };
 
   return (
-    <span className="inline-flex flex-col items-start gap-0.5">
+    <span className="inline-flex flex-col items-end gap-1">
       <button
         type="button"
         onClick={handleClick}
         disabled={isPending}
+        aria-busy={isPending}
         className={className ?? defaultClassName}
       >
+        {isPending ? <AdminSpinner /> : <HiArrowDownTray aria-hidden className="h-3.5 w-3.5" />}
         {isPending ? "Exporting…" : label}
       </button>
-      {error && <span className="text-[10px] text-danger font-semibold">{error}</span>}
+      {error && <span role="alert" className="admin-fade-in text-xs font-medium text-danger-on-tint">{error}</span>}
     </span>
   );
 }

@@ -10,6 +10,9 @@ import {
   type UploadSection,
 } from '@/app/lib/storage-constants';
 import { compressImage } from '@/app/lib/image-compression';
+import { chip, chipDot, fieldError, focusRing, labelText, secondaryBtnSm } from '@/app/components/admin/styles';
+import { RequiredMark } from '@/app/components/admin/AdminUI';
+import { cx } from '@/app/lib/cx';
 
 interface ImageUploadProps {
   name: string;
@@ -184,9 +187,9 @@ export default function ImageUpload({
   return (
     <div ref={rootRef} className="space-y-1.5 w-full">
       {label && (
-        <span className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider">
+        <span className={labelText}>
           {label}
-          {required && <span className="text-accent ml-1">*</span>}
+          {required && <RequiredMark />}
         </span>
       )}
 
@@ -219,45 +222,47 @@ export default function ImageUpload({
           onDrop={handleDrop}
           onClick={() => !uploading && fileInputRef.current?.click()}
           onKeyDown={handleKeyDown}
-          className={`relative w-full rounded-xl border-2 border-dashed p-4 text-center transition-all cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent/40 ${
+          className={cx(
+            'relative w-full rounded-xl border border-dashed p-4 text-center cursor-pointer select-none transition-[background-color,border-color,scale] duration-200 ease-out',
+            focusRing,
             isDragOver
-              ? 'border-accent bg-accent/15 scale-[1.01] shadow-lg shadow-accent/10'
-              : 'border-line/80 bg-surface-sunken/60 hover:bg-surface-raised/60 hover:border-line'
-          } ${uploading ? 'pointer-events-none opacity-80' : ''}`}
+              ? 'border-accent bg-accent/10 scale-[1.01] motion-reduce:scale-100'
+              : 'border-line bg-surface-sunken hover:bg-surface-raised/60 hover:border-foreground-muted',
+            uploading && 'pointer-events-none opacity-80',
+          )}
         >
           {uploading ? (
             <div className="flex flex-col items-center justify-center gap-2 py-3">
-              <HiArrowPath className="w-7 h-7 text-accent animate-spin" />
-              <span className="text-xs font-bold text-foreground animate-pulse">
+              <HiArrowPath aria-hidden className="w-6 h-6 text-accent animate-spin" />
+              <span className="text-sm font-medium text-foreground">
                 Uploading image…
               </span>
-              <span className="text-[11px] text-foreground-muted">
+              <span className="text-xs text-foreground-secondary">
                 Optimizing and storing asset
               </span>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 py-2">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                  isDragOver
-                    ? 'bg-accent text-on-accent'
-                    : 'bg-surface-raised border border-line text-foreground-secondary'
-                }`}
+                className={cx(
+                  'w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-200',
+                  isDragOver ? 'bg-accent text-on-accent' : 'bg-surface-raised text-foreground-secondary',
+                )}
               >
                 {isDragOver ? (
-                  <HiArrowUpTray className="w-5 h-5 animate-bounce" />
+                  <HiArrowUpTray aria-hidden className="w-5 h-5 -translate-y-0.5 transition-transform" />
                 ) : (
-                  <HiPhoto className="w-5 h-5" />
+                  <HiPhoto aria-hidden className="w-5 h-5" />
                 )}
               </div>
               <div className="space-y-0.5">
-                <p className="text-xs font-bold text-white">
-                  <span className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
+                <p className="text-sm text-foreground">
+                  <span className="font-medium text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
                     Click to browse
                   </span>{' '}
                   or drag & drop
                 </p>
-                <p className="text-[11px] text-foreground-secondary">
+                <p className="text-xs text-foreground-secondary">
                   JPEG, PNG, GIF, or WebP (max 5 MB)
                 </p>
               </div>
@@ -266,10 +271,10 @@ export default function ImageUpload({
         </div>
       ) : (
         /* Image Preview with Unclipped Responsive Stack */
-        <div className="relative rounded-xl border border-line/80 bg-surface-sunken/80 p-3 space-y-2.5 w-full">
+        <div className="admin-fade-in relative w-full space-y-2.5 rounded-xl bg-surface-sunken p-3">
           <div className="flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-11 h-11 rounded-lg bg-surface-raised border border-line flex-shrink-0 flex items-center justify-center overflow-hidden">
+              <div className="w-11 h-11 rounded-lg bg-surface-raised flex-shrink-0 flex items-center justify-center overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={previewUrl}
@@ -278,22 +283,22 @@ export default function ImageUpload({
                 />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-white truncate max-w-[120px] sm:max-w-[180px]">
+                <div className="text-sm font-medium text-foreground truncate max-w-[120px] sm:max-w-[180px]">
                   {storageKey ? storageKey.split('/').pop() : 'Image loaded'}
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-green-400 font-semibold uppercase mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
-                  <span>Ready</span>
-                </div>
+                <span className={cx(chip('success', 'sm'), 'mt-1')}>
+                  <span aria-hidden className={chipDot} />
+                  Ready
+                </span>
               </div>
             </div>
             <button
               type="button"
               onClick={handleRemove}
               aria-label="Remove image"
-              className="p-1.5 rounded-lg bg-surface-raised hover:bg-red-950/30 text-foreground-secondary hover:text-red-400 border border-line hover:border-red-900/40 transition-all cursor-pointer shrink-0"
+              className={cx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-secondary hover:text-red-300 hover:bg-red-950/40 transition-colors duration-150 cursor-pointer', focusRing)}
             >
-              <HiXMark className="w-4 h-4" />
+              <HiXMark aria-hidden className="w-4 h-4" />
             </button>
           </div>
 
@@ -301,17 +306,17 @@ export default function ImageUpload({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             aria-label="Replace image"
-            className="w-full py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-surface-raised hover:bg-line text-foreground border border-line hover:border-line transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            className={cx(secondaryBtnSm, 'w-full')}
           >
-            <HiArrowUpTray className="w-3.5 h-3.5 text-foreground-muted" />
-            Replace Image
+            <HiArrowUpTray aria-hidden className="w-3.5 h-3.5" />
+            Replace image
           </button>
         </div>
       )}
 
       {/* Error Message */}
       {error && (
-        <div role="alert" aria-live="polite" className="text-xs text-red-400 font-medium pt-0.5">
+        <div role="alert" aria-live="polite" className={fieldError}>
           {error}
         </div>
       )}

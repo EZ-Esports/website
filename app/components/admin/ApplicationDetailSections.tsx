@@ -12,10 +12,10 @@ interface DetailSectionProps {
  */
 export function DetailSection({ title, children }: DetailSectionProps) {
   return (
-    <div className="rounded-xl border border-line bg-surface-raised/40 p-4">
-      <h4 className="text-[11px] font-bold uppercase tracking-wider text-accent mb-3">{title}</h4>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">{children}</dl>
-    </div>
+    <section className="border-t border-line/60 pt-5 first:border-t-0 first:pt-0">
+      <h4 className="mb-3 text-sm font-semibold text-foreground">{title}</h4>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">{children}</dl>
+    </section>
   );
 }
 
@@ -28,8 +28,8 @@ export function DetailField({ label, value }: DetailFieldProps) {
   const displayValue = value === null || value === undefined || value === "" ? "—" : value;
   return (
     <div>
-      <dt className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">{label}</dt>
-      <dd className="text-sm text-foreground-secondary break-words">{displayValue}</dd>
+      <dt className="text-xs font-medium text-foreground-secondary">{label}</dt>
+      <dd className="mt-0.5 text-sm text-foreground break-words">{displayValue}</dd>
     </div>
   );
 }
@@ -45,7 +45,7 @@ interface FlatDetailListProps {
  */
 export function FlatDetailList({ rows }: FlatDetailListProps) {
   return (
-    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
       {rows.map(({ label, value }) => (
         <DetailField key={label} label={label} value={value} />
       ))}

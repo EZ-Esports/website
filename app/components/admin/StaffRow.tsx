@@ -5,7 +5,9 @@ import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-compone
 import type { Selection } from 'react-aria-components';
 import { revokeStaff, updateUserRoles } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
+import { cx } from '@/app/lib/cx';
 import {
+  HiCheck,
   HiOutlinePlus,
   HiOutlineTrash,
   HiOutlineEllipsisVertical,
@@ -94,34 +96,32 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
   const selectedRoleIds = new Set(member.roles.map((r) => r.id));
 
   return (
-    <div
-      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-surface-sunken/20 hover:bg-surface-raised/30 border border-line/80 rounded-xl transition-all gap-4 select-none ${
-        isPending ? 'opacity-70' : ''
-      }`}
+    <li
+      aria-busy={isPending}
+      className={cx(
+        'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-5 py-3.5 transition-[background-color,opacity] duration-150 hover:bg-surface-raised/50',
+        isPending && 'opacity-60',
+      )}
     >
       {/* Left Column: Avatar & Name */}
       <div className="flex items-center gap-4 min-w-0">
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm border select-none shrink-0"
+          className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-xs select-none shrink-0"
           style={{
-            backgroundColor: `${highestRoleColor}12`,
+            backgroundColor: `${highestRoleColor}1f`,
             color: highestRoleColor,
-            borderColor: `${highestRoleColor}25`,
           }}
         >
           {getInitials(member.email)}
         </div>
         <div className="min-w-0">
-          <span
-            className="text-sm font-extrabold truncate block leading-snug"
-            style={{ color: highestRoleColor }}
-          >
+          <span className="text-sm font-medium text-foreground truncate block leading-snug">
             {member.email}
           </span>
-          <span className="text-[10px] text-foreground-muted font-medium">
+          <span className="text-xs text-foreground-secondary">
             Joined {new Date(member.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
-          {error && <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="admin-fade-in mt-1 text-xs font-medium text-danger-on-tint">{error}</p>}
         </div>
       </div>
 
@@ -132,11 +132,10 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
           return (
             <span
               key={role.id}
-              className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider shrink-0"
+              className="inline-flex h-6 items-center rounded-md px-2 text-xs font-medium shrink-0"
               style={{
-                backgroundColor: `${parsedColor}12`,
+                backgroundColor: `${parsedColor}1a`,
                 color: parsedColor,
-                border: `1px solid ${parsedColor}25`,
               }}
             >
               {role.name}
@@ -145,7 +144,7 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
         })}
 
         {member.roles.length === 0 && (
-          <span className="text-foreground-muted italic text-xs px-1">No Roles</span>
+          <span className="text-foreground-secondary text-xs px-1">No roles</span>
         )}
 
         {/* Inline Role Assignment Popover, matching Discord */}
@@ -153,15 +152,20 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
           <MenuTrigger>
             <Button
               isDisabled={isPending}
-              className="p-1 hover:bg-line rounded text-foreground-secondary hover:text-white transition-all cursor-pointer border border-transparent hover:border-line ml-1"
+              className={({ isFocusVisible }) =>
+                cx(
+                  'ml-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted data-[pressed]:bg-surface-raised transition-colors duration-150 cursor-pointer outline-none data-[disabled]:opacity-50',
+                  isFocusVisible && 'ring-2 ring-accent/60',
+                )
+              }
               aria-label="Add / Remove Roles"
             >
-              <HiOutlinePlus className="w-3.5 h-3.5" />
+              <HiOutlinePlus aria-hidden className="w-3.5 h-3.5" />
             </Button>
 
-            <Popover className="w-56">
-              <div className="rounded-xl bg-surface-sunken border border-line p-2 shadow-2xl space-y-1">
-                <div className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest px-2 py-1 border-b border-surface-raised mb-1 select-none">
+            <Popover className="admin-popover w-56">
+              <div className="rounded-xl bg-surface-raised p-1.5 shadow-2xl shadow-black/60 ring-1 ring-line/70 space-y-1">
+                <div className="px-2 pt-1 pb-1.5 text-xs font-medium text-foreground-secondary border-b border-line/60 mb-1 select-none">
                   Assign Roles
                 </div>
                 <Menu
@@ -171,7 +175,7 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
                   selectedKeys={selectedRoleIds}
                   onSelectionChange={handleRolesChange}
                   renderEmptyState={() => (
-                    <div className="text-center py-2 text-[10px] text-foreground-muted italic">No roles assignable</div>
+                    <div className="text-center py-2 text-xs text-foreground-secondary">No roles assignable</div>
                   )}
                 >
                   {assignableRoles.map((role) => {
@@ -182,13 +186,13 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
                         key={role.id}
                         id={role.id}
                         textValue={role.name}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-white hover:bg-surface-raised data-[focused]:text-white data-[focused]:bg-surface-raised transition-all cursor-pointer data-[disabled]:opacity-50 select-none"
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-sm text-foreground-secondary hover:text-foreground hover:bg-line/60 data-[focused]:text-foreground data-[focused]:bg-line/60 data-[selected]:text-foreground transition-colors cursor-pointer outline-none data-[disabled]:opacity-50 select-none"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/30" style={{ backgroundColor: parsedColor }} />
+                          <span aria-hidden className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/30" style={{ backgroundColor: parsedColor }} />
                           <span>{role.name}</span>
                         </div>
-                        {hasRole && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
+                        {hasRole && <HiCheck aria-hidden className="w-4 h-4 text-accent" />}
                       </MenuItem>
                     );
                   })}
@@ -202,29 +206,34 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
       {/* Right Column: Actions Dropdown Menu */}
       <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
         {isSelf ? (
-          <span className="text-xs text-foreground-muted italic px-3 select-none">You</span>
+          <span className="text-xs text-foreground-secondary px-3 select-none">You</span>
         ) : !canRevoke ? (
-          <span className="text-xs text-foreground-muted italic px-3 select-none">—</span>
+          <span className="text-xs text-foreground-secondary px-3 select-none">—</span>
         ) : (
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
-              className="p-2 bg-surface-raised/50 hover:bg-line text-foreground-secondary hover:text-white rounded-lg border border-line hover:border-line transition-all cursor-pointer"
+              className={({ isFocusVisible }) =>
+                cx(
+                  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground-secondary hover:text-foreground hover:bg-surface-raised data-[pressed]:bg-surface-raised transition-colors duration-150 cursor-pointer outline-none',
+                  isFocusVisible && 'ring-2 ring-accent/60',
+                )
+              }
               aria-label={`More actions for ${member.email}`}
             >
-              <HiOutlineEllipsisVertical className="w-4 h-4" />
+              <HiOutlineEllipsisVertical aria-hidden className="w-4 h-4" />
             </Button>
 
-            <Popover className="w-48">
-              <Menu className="rounded-xl bg-surface-sunken border border-line p-1.5 shadow-2xl outline-none">
+            <Popover className="admin-popover w-48">
+              <Menu className="rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none">
                 <MenuItem
                   id="remove"
                   textValue="Remove Access"
                   isDisabled={isPending}
                   shouldCloseOnSelect={false}
                   onAction={handleRevoke}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold text-foreground-secondary hover:text-red-400 hover:bg-red-950/20 data-[focused]:text-red-400 data-[focused]:bg-red-950/20 transition-all cursor-pointer data-[disabled]:opacity-50"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-foreground-secondary hover:text-red-300 hover:bg-red-950/30 data-[focused]:text-red-300 data-[focused]:bg-red-950/30 transition-colors cursor-pointer outline-none data-[disabled]:opacity-50"
                 >
-                  <HiOutlineTrash className="w-4 h-4" />
+                  <HiOutlineTrash aria-hidden className="w-4 h-4" />
                   <span>Remove Access</span>
                 </MenuItem>
               </Menu>
@@ -232,6 +241,6 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
           </MenuTrigger>
         )}
       </div>
-    </div>
+    </li>
   );
 }

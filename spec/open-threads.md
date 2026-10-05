@@ -93,7 +93,16 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 
 ## Admin hover-gated row actions
 
-- Roster Explorer (team tiles, roster player rows, member rows) and League Setup (game and season rows) still hide their edit/trash icon buttons behind `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`, so they are invisible on touch until focus. The Standings Archive was fixed to be always visible (Sep 2026); these were out of scope. See [architecture.md](architecture.md) (Frontend, destructive row actions).
+- Resolved in [spec-013](spec-013-staff-portal-ui-overhaul.md) (2 Oct 2026): Roster Explorer and League Setup row actions are always visible.
+
+## Team role editor saves destroy role data (resolved)
+
+Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-overhaul.md), incidents section 17): the editor's fields are held in state, so tab switches no longer drop data and the Owner and system roles save. Still true: permission bits the actor lacks are disabled and are left out of the saved bitmask, so saving a role that holds one removes it (unless the escalation guard rejects first). Preserving them would need a server-side merge, because `updateRole` rejects any submitted bit the actor lacks.
+
+## Staff portal follow-ups from spec-013 (need behaviour changes)
+
+- Inline-create pages (Schools, Sponsors, Gallery) could move "Add …" into a header button that opens a dialog, which needs close-on-success wiring in `AddEntityForm`.
+- League Setup, Team and Roster Explorer still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
 
 ## Dependency drift
 

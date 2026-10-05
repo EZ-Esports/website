@@ -2,6 +2,8 @@
 
 import { FiStar, FiTrash2 } from 'react-icons/fi';
 import type { ManagerItem } from './types';
+import { chip, deleteIconBtn } from '../styles';
+
 
 interface ActiveManagersTabProps {
   managers: ManagerItem[];
@@ -21,21 +23,21 @@ export function ActiveManagersTab({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground-secondary">
+        <h3 className="text-sm font-semibold text-foreground">
           Active Portal Managers ({managers.length})
         </h3>
       </div>
 
       {loading ? (
-        <div className="py-6 text-center text-xs text-foreground-muted">
+        <div className="py-6 text-center text-sm text-foreground-secondary" role="status">
           Loading managers...
         </div>
       ) : managers.length === 0 ? (
-        <div className="p-4 rounded-xl border border-line/60 bg-surface-raised/20 text-center text-xs text-foreground-muted">
+        <div className="rounded-xl bg-surface-sunken/60 p-4 text-center text-sm text-foreground-secondary">
           No portal managers currently assigned to this school.
         </div>
       ) : (
-        <div className="divide-y divide-line/40 rounded-xl border border-line/60 bg-surface-raised/20 overflow-hidden">
+        <div className="admin-stagger divide-y divide-line/50 overflow-hidden rounded-xl bg-surface-sunken/60">
           {managers.map((m) => {
             const displayName = [m.firstName, m.lastName].filter(Boolean).join(' ').trim();
             const displayEmail = m.email || `User: ${m.userId.slice(0, 8)}...`;
@@ -51,7 +53,7 @@ export function ActiveManagersTab({
                         <span className="font-semibold text-foreground">
                           {displayName}
                         </span>
-                        <span className="text-[11px] text-foreground-muted">
+                        <span className="text-xs text-foreground-secondary">
                           &bull; {displayEmail}
                         </span>
                       </>
@@ -61,16 +63,16 @@ export function ActiveManagersTab({
                       </span>
                     )}
                     {m.isPrimaryContact && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      <span className={chip('warning', 'sm')}>
                         <FiStar className="w-2.5 h-2.5 fill-current" /> Primary
                       </span>
                     )}
-                    <span className="px-2 py-0.5 rounded text-[10px] bg-surface-sunken text-foreground-muted border border-line">
+                    <span className={chip('neutral', 'sm')}>
                       {m.academicYear}
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-foreground-muted flex items-center gap-1.5 flex-wrap">
+                  <div className="text-xs text-foreground-secondary flex items-center gap-1.5 flex-wrap">
                     <span>Games:</span>
                     {!m.managedGames || m.managedGames.length === 0 ? (
                       <span className="text-foreground-secondary font-medium">
@@ -80,7 +82,7 @@ export function ActiveManagersTab({
                       m.managedGames.map((g) => (
                         <span
                           key={g}
-                          className="px-1.5 py-0.5 rounded bg-surface border border-line text-[10px] font-medium uppercase tracking-wider"
+                          className={chip('neutral', 'sm')}
                         >
                           {g}
                         </span>
@@ -98,7 +100,7 @@ export function ActiveManagersTab({
                     }
                   }}
                   disabled={isRemovingId === m.id}
-                  className="p-1.5 rounded-lg border border-red-900/30 text-red-400 hover:bg-red-950/30 hover:border-red-900/60 transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                  className={deleteIconBtn}
                   title="Remove manager access"
                   aria-label={`Remove manager ${displayName || displayEmail}`}
                 >

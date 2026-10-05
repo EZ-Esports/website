@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { editIconBtn, iconBtn } from './styles';
+import { adminButton, chip, chipDot, deleteIconBtn, editIconBtn, focusRing, secondaryBtnSm, td, tdRight, tr } from './styles';
 import { deleteCareerPostingAction } from '@/app/(admin)/admin/careers/actions';
 import type { AdminCareerPostingWithStats } from '@/app/types/careers';
 import {
@@ -43,81 +43,63 @@ export default function CareerPostingRow({
     }
   };
 
+  const statusTone = { published: 'success', draft: 'warning', closed: 'danger' } as const;
+  const statusLabel = { published: 'Published', draft: 'Draft', closed: 'Closed' } as const;
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'published':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            Published
-          </span>
-        );
-      case 'draft':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            Draft
-          </span>
-        );
-      case 'closed':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30">
-            Closed
-          </span>
-        );
-      default:
-        return null;
-    }
+    if (!(status in statusTone)) return null;
+    const key = status as keyof typeof statusTone;
+    return (
+      <span className={chip(statusTone[key])}>
+        <span aria-hidden className={chipDot} />
+        {statusLabel[key]}
+      </span>
+    );
   };
 
   return (
-    <tr className="hover:bg-surface-raised/40 transition-colors">
+    <tr className={tr}>
       {/* Title & Slug */}
-      <td className="py-3.5 pr-4">
+      <td className={td}>
         <div className="flex items-center gap-2">
-          <span className="font-bold text-white text-sm">{posting.title}</span>
+          <span className="font-medium text-foreground">{posting.title}</span>
           {posting.status === 'published' && (
             <Link
               href={`/careers/${posting.slug}`}
               target="_blank"
               title="Preview public posting"
-              className="text-foreground-muted hover:text-accent transition-colors"
+              aria-label={`Preview public posting for ${posting.title} (opens in a new tab)`}
+              className={`rounded text-foreground-secondary hover:text-accent transition-colors ${focusRing}`}
             >
-              <HiOutlineArrowTopRightOnSquare className="w-3.5 h-3.5" />
+              <HiOutlineArrowTopRightOnSquare aria-hidden className="w-3.5 h-3.5" />
             </Link>
           )}
         </div>
-        <p className="text-xs text-foreground-muted font-mono mt-0.5">/{posting.slug}</p>
+        <p className="mt-0.5 font-mono text-xs text-foreground-secondary">/{posting.slug}</p>
       </td>
 
       {/* Department */}
-      <td className="py-3.5 pr-4">
-        <span className="text-xs text-foreground-secondary font-medium">
-          {posting.department}
-        </span>
-      </td>
+      <td className={`${td} text-foreground-secondary`}>{posting.department}</td>
 
       {/* Status */}
-      <td className="py-3.5 pr-4">
-        {getStatusBadge(posting.status)}
-      </td>
+      <td className={td}>{getStatusBadge(posting.status)}</td>
 
       {/* Commitment */}
-      <td className="py-3.5 pr-4 text-xs text-foreground-muted">
-        {posting.commitment}
-      </td>
+      <td className={`${td} text-foreground-secondary`}>{posting.commitment}</td>
 
       {/* Applicants Count */}
-      <td className="py-3.5 pr-4">
+      <td className={td}>
         <Link
           href={`/admin/applications?posting=${posting.id}`}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-raised hover:bg-surface border border-line text-xs font-bold text-foreground hover:text-white transition-all"
+          aria-label={`${posting.applicantCount} applicants for ${posting.title}`}
+          className={`${secondaryBtnSm} tabular-nums`}
         >
-          <HiOutlineUsers className="w-3.5 h-3.5 text-accent" />
+          <HiOutlineUsers aria-hidden className="w-3.5 h-3.5 text-accent" />
           <span>{posting.applicantCount}</span>
         </Link>
       </td>
 
       {/* Actions */}
-      <td className="py-3.5 pr-2 text-right">
+      <td className={tdRight}>
         <div className="inline-flex items-center gap-2 justify-end">
           <button
             type="button"
@@ -126,25 +108,16 @@ export default function CareerPostingRow({
             title="Edit Opening"
             aria-label="Edit Opening"
           >
-            <HiOutlinePencilSquare className="w-4 h-4" />
+            <HiOutlinePencilSquare aria-hidden className="w-4 h-4" />
           </button>
 
           {showConfirmDelete ? (
-            <div className="inline-flex items-center gap-1.5 bg-red-950/80 border border-red-500/40 rounded-lg px-2 py-1">
-              <span className="text-[10px] text-red-200 font-bold uppercase">Delete?</span>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="text-[10px] bg-red-600 hover:bg-red-500 text-white font-bold px-1.5 py-0.5 rounded cursor-pointer"
-              >
+            <div role="group" aria-label="Confirm delete" className="admin-fade-in inline-flex h-8 items-center gap-1 rounded-lg bg-danger/10 pl-2.5 pr-1">
+              <span className="text-xs font-medium text-danger-on-tint">Delete?</span>
+              <button type="button" onClick={handleDelete} disabled={isDeleting} aria-busy={isDeleting} className={adminButton('danger', 'xs')}>
                 Yes
               </button>
-              <button
-                type="button"
-                onClick={() => setShowConfirmDelete(false)}
-                className="text-[10px] text-foreground-muted hover:text-white px-1 cursor-pointer"
-              >
+              <button type="button" onClick={() => setShowConfirmDelete(false)} className={adminButton('ghost', 'xs')}>
                 No
               </button>
             </div>
@@ -152,11 +125,11 @@ export default function CareerPostingRow({
             <button
               type="button"
               onClick={() => setShowConfirmDelete(true)}
-              className={`${iconBtn} text-red-400 hover:text-red-300 hover:bg-red-500/10`}
+              className={deleteIconBtn}
               title="Delete Opening"
               aria-label="Delete Opening"
             >
-              <HiOutlineTrash className="w-4 h-4" />
+              <HiOutlineTrash aria-hidden className="w-4 h-4" />
             </button>
           )}
         </div>

@@ -51,6 +51,12 @@ Reach for these existing wrappers rather than building new ones:
 - **Forms and validation**: the wrappers in `app/components/ui/form.tsx` —
   `Field` wires up `aria-invalid`/`aria-describedby` automatically from RAC's
   `TextField` and `FieldError` context when an `error` prop is present.
+- **Staff portal (`/admin`) forms and pages**: don't use `ui/form.tsx` `Field`,
+  `ui/Card` or `ui/Button` there. Use the admin primitives in
+  `app/components/admin/AdminUI.tsx` (`AdminPage`, `AdminSection`,
+  `AdminField`, `AdminSearchField`, `AdminNotice`, …) and the class tokens in
+  `app/components/admin/styles.ts` (`input`, `label`, `adminButton`, …); see
+  spec-013.
 
 Two exceptions where a non-RAC primitive is the right call:
 

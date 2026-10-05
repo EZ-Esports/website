@@ -1,11 +1,11 @@
 import { getCachedTeams, getCachedRosters, getCachedSeasons, getStaffSeasons, getCachedGames, getMatchesPage } from '@/app/lib/db/queries';
-import Card from '@/app/components/ui/Card';
 import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
 
 export default async function AdminMatchesPage() {
   if (!(await getStaffForAdminSection('/admin/matches'))) return <PermissionDenied />;
@@ -38,43 +38,40 @@ export default async function AdminMatchesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
-        <h1 className="text-2xl font-black text-white uppercase tracking-wider">Matches & Standings</h1>
-        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">Schedule matches and input scores to recalculate team standings and seasonal records.</p>
-      </Card>
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/matches"
+        description="Schedule matches and input scores to recalculate team standings and seasonal records."
+      />
 
       {dbError && <DbErrorNotice variant="error" />}
 
       {!dbError && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Scheduling Column */}
-          <Card className="lg:col-span-1 h-fit space-y-5">
-            <div>
-              <h2 className="text-base font-bold text-white uppercase tracking-wider">Schedule Match</h2>
-              <p className="text-foreground-secondary text-xs mt-0.5">Register a new scheduled event.</p>
-            </div>
-
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          {/* Scheduling column: stays in view while scrolling a long fixture list. */}
+          <AdminSection
+            className="lg:sticky lg:top-20 lg:col-span-1 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
+            title="Schedule a match"
+            description="Register a new scheduled event."
+          >
             <MatchScheduleForm
               seasons={activeSeasons}
               rosters={rosters as any}
               teams={teams}
               games={games}
             />
-          </Card>
+          </AdminSection>
 
-          {/* Matches List Column */}
-          <div className="lg:col-span-2">
+          {/* Matches list column */}
+          <div className="min-w-0 lg:col-span-2">
             <AdminMatchExplorer
               seasons={allSeasons}
               games={games}
               initialPage={initialPage}
             />
           </div>
-
         </div>
       )}
-    </div>
+    </AdminPage>
   );
 }

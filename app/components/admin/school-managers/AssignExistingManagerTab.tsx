@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiUserPlus, FiSearch, FiX } from 'react-icons/fi';
+import { FiUserPlus } from 'react-icons/fi';
 import {
   assignExistingManager,
   type RegisteredManagerAccount,
 } from '@/app/(admin)/admin/schools/manager-actions';
 import { input } from '@/app/components/admin/styles';
 import type { GameItem } from './types';
+import { chip, label as labelClass, labelText, primaryBtn, secondaryBtnSm, textLinkSm } from '../styles';
+import { AdminSearchField } from '../AdminUI';
 
 interface AssignExistingManagerTabProps {
   school: {
@@ -98,64 +100,50 @@ export function AssignExistingManagerTab({
 
   return (
     <div className="space-y-4">
-      <div className="p-4 rounded-xl border border-line bg-surface-raised/40 space-y-4">
+      <div className="rounded-xl bg-surface-sunken/60 p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FiUserPlus className="w-4 h-4 text-accent" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+            <h3 className="text-sm font-semibold text-foreground">
               Assign Existing Registered Manager
             </h3>
           </div>
-          <span className="text-[11px] text-foreground-muted">
+          <span className="text-xs text-foreground-secondary">
             {registeredManagers.length} registered {registeredManagers.length === 1 ? 'account' : 'accounts'}
           </span>
         </div>
 
         {/* Search bar */}
-        <div className="relative">
-          <FiSearch className="absolute left-3.5 top-3 w-4 h-4 text-foreground-muted pointer-events-none" />
-          <input
-            id="manager-search-input"
-            type="text"
-            value={managerSearchQuery}
-            onChange={(e) => setManagerSearchQuery(e.target.value)}
-            placeholder="Search registered accounts by name, email, or school..."
-            aria-label="Search registered manager accounts"
-            className={`${input} pl-10 pr-8 text-xs`}
-          />
-          {managerSearchQuery && (
-            <button
-              type="button"
-              onClick={() => setManagerSearchQuery('')}
-              className="absolute right-3 top-3 text-foreground-muted hover:text-foreground text-xs"
-              aria-label="Clear search input"
-            >
-              <FiX className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        <AdminSearchField
+          id="manager-search-input"
+          value={managerSearchQuery}
+          onChange={(e) => setManagerSearchQuery(e.target.value)}
+          onClear={() => setManagerSearchQuery('')}
+          placeholder="Search registered accounts by name, email, or school..."
+          aria-label="Search registered manager accounts"
+        />
 
         {/* Selected Manager Highlight */}
         {selectedManager ? (
-          <div className="p-3.5 rounded-xl border border-accent/40 bg-accent/10 flex items-center justify-between gap-3">
+          <div className="admin-fade-in flex items-center justify-between gap-3 rounded-xl bg-accent/10 p-3.5 ring-1 ring-accent/30">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-full bg-accent text-on-accent font-bold text-xs flex items-center justify-center shrink-0">
                 {(selectedManager.firstName?.[0] || selectedManager.fullName?.[0] || 'M').toUpperCase()}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-foreground text-xs truncate">
+                  <span className="font-medium text-foreground text-sm truncate">
                     {selectedManager.fullName}
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/20 text-accent font-medium">
+                  <span className={chip('accent', 'sm')}>
                     Selected
                   </span>
                 </div>
-                <p className="text-[11px] text-foreground-muted truncate">
+                <p className="text-xs text-foreground-secondary truncate">
                   {selectedManager.email}
                 </p>
                 {selectedManager.schools.length > 0 && (
-                  <p className="text-[10px] text-foreground-muted/80 truncate">
+                  <p className="text-xs text-foreground-secondary truncate">
                     Current Schools: {selectedManager.schools.join(', ')}
                   </p>
                 )}
@@ -164,7 +152,7 @@ export function AssignExistingManagerTab({
             <button
               type="button"
               onClick={() => setSelectedManager(null)}
-              className="px-2.5 py-1 text-xs text-foreground-muted hover:text-foreground border border-line rounded-lg hover:bg-surface transition-colors shrink-0 cursor-pointer"
+              className={secondaryBtnSm}
             >
               Change
             </button>
@@ -172,23 +160,23 @@ export function AssignExistingManagerTab({
         ) : (
           /* Search results list */
           <div className="space-y-2">
-            <span className="block text-[11px] font-bold text-foreground-secondary uppercase tracking-wider">
+            <span className={labelText}>
               Select a Manager Account:
             </span>
 
             {filteredManagers.length === 0 ? (
-              <div className="p-4 rounded-xl border border-line/60 bg-surface-raised/20 text-center text-xs text-foreground-muted space-y-1">
+              <div className="rounded-xl bg-surface-sunken/60 p-4 text-center text-sm text-foreground-secondary space-y-1">
                 <p>
                   {managerSearchQuery
                     ? `No registered managers found matching "${managerSearchQuery}".`
                     : 'No registered manager accounts available.'}
                 </p>
-                <p className="text-[11px] text-foreground-muted/70">
+                <p className="text-xs text-foreground-secondary/70">
                   To invite a new manager, use the{' '}
                   <button
                     type="button"
                     onClick={onSwitchToInvites}
-                    className="text-accent underline font-semibold cursor-pointer"
+                    className={textLinkSm}
                   >
                     Provision Invite Link
                   </button>{' '}
@@ -196,26 +184,26 @@ export function AssignExistingManagerTab({
                 </p>
               </div>
             ) : (
-              <div className="max-h-56 overflow-y-auto divide-y divide-line/40 rounded-xl border border-line/60 bg-surface-raised/20">
+              <div className="admin-scroll max-h-56 overflow-y-auto divide-y divide-line/50 rounded-xl bg-surface-sunken/60">
                 {filteredManagers.map((m) => (
                   <div
                     key={m.email}
                     onClick={() => setSelectedManager(m)}
-                    className="p-3 flex items-center justify-between gap-3 hover:bg-surface-raised/60 transition-colors cursor-pointer"
+                    className="p-3 flex items-center justify-between gap-3 hover:bg-surface-raised/60 transition-colors cursor-pointer outline-none focus-visible:bg-surface-raised/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-surface-sunken border border-line text-foreground-secondary font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-surface-raised text-foreground-secondary font-bold text-xs flex items-center justify-center shrink-0">
                         {(m.firstName?.[0] || m.fullName?.[0] || 'M').toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground text-xs truncate">
+                        <p className="font-medium text-foreground text-sm truncate">
                           {m.fullName}
                         </p>
-                        <p className="text-[11px] text-foreground-muted truncate">
+                        <p className="text-xs text-foreground-secondary truncate">
                           {m.email}
                         </p>
                         {m.schools.length > 0 && (
-                          <p className="text-[10px] text-foreground-muted/70 truncate">
+                          <p className="text-xs text-foreground-secondary truncate">
                             {m.schools.join(', ')}
                           </p>
                         )}
@@ -227,7 +215,7 @@ export function AssignExistingManagerTab({
                         e.stopPropagation();
                         setSelectedManager(m);
                       }}
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-surface border border-line text-foreground hover:border-accent hover:text-accent transition-colors shrink-0 cursor-pointer"
+                      className={secondaryBtnSm}
                     >
                       Select
                     </button>
@@ -244,7 +232,7 @@ export function AssignExistingManagerTab({
             <div>
               <label
                 htmlFor="assign-year"
-                className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1"
+                className={labelClass}
               >
                 Academic Year
               </label>
@@ -261,7 +249,7 @@ export function AssignExistingManagerTab({
 
             {/* Scoped Games Selection */}
             <div>
-              <span className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-2">
+              <span className={labelClass}>
                 Game Permissions
               </span>
               <div className="flex items-center gap-4 text-xs mb-2">
@@ -271,7 +259,7 @@ export function AssignExistingManagerTab({
                     name="assignGameScope"
                     checked={assignAllGames}
                     onChange={() => setAssignAllGames(true)}
-                    className="text-accent focus:ring-accent"
+                    className="h-4 w-4 accent-accent"
                   />
                   <span>All Games (Full School Access)</span>
                 </label>
@@ -281,14 +269,14 @@ export function AssignExistingManagerTab({
                     name="assignGameScope"
                     checked={!assignAllGames}
                     onChange={() => setAssignAllGames(false)}
-                    className="text-accent focus:ring-accent"
+                    className="h-4 w-4 accent-accent"
                   />
                   <span>Specific Games Only</span>
                 </label>
               </div>
 
               {!assignAllGames && games.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-lg border border-line bg-surface-sunken">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-lg bg-surface-sunken p-3">
                   {games.map((g) => (
                     <label
                       key={g.id}
@@ -298,7 +286,7 @@ export function AssignExistingManagerTab({
                         type="checkbox"
                         checked={assignSelectedGames.includes(g.slug)}
                         onChange={() => handleToggleAssignGame(g.slug)}
-                        className="rounded border-line text-accent focus:ring-accent"
+                        className="h-4 w-4 accent-accent"
                       />
                       <span>{g.displayName || g.name || g.slug}</span>
                     </label>
@@ -314,7 +302,7 @@ export function AssignExistingManagerTab({
                   type="checkbox"
                   checked={assignIsPrimary}
                   onChange={(e) => setAssignIsPrimary(e.target.checked)}
-                  className="rounded border-line text-accent focus:ring-accent"
+                  className="h-4 w-4 accent-accent"
                 />
                 <span>Designate as primary school contact for this academic year</span>
               </label>
@@ -324,7 +312,7 @@ export function AssignExistingManagerTab({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-accent text-on-accent text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-accent/90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className={primaryBtn}
               >
                 <FiUserPlus className="w-3.5 h-3.5" />
                 {isSubmitting

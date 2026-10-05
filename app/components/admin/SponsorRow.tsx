@@ -3,14 +3,16 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { saveBtn, cancelBtn } from '@/app/components/admin/styles';
+import { cancelBtn, chip, chipButton, chipDot, fieldError, focusRing, input, label as labelClass, saveBtn, td, tdRight, tr, trEditing, type ChipTone } from '@/app/components/admin/styles';
+import { AdminNotice, PendingLabel, RequiredMark } from '@/app/components/admin/AdminUI';
+import { cx } from '@/app/lib/cx';
 import { updateSponsor, toggleSponsorActive, deleteSponsor } from '@/app/(admin)/admin/sponsors/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 
-const tierBadgeClass: Record<string, string> = {
-  platinum: 'bg-foreground-secondary/10 text-foreground-secondary',
-  gold: 'bg-yellow-500/10 text-yellow-400',
-  community: 'bg-blue-500/10 text-blue-400',
+const tierTone: Record<string, ChipTone> = {
+  platinum: 'neutral',
+  gold: 'warning',
+  community: 'info',
 };
 
 const tierLabel: Record<string, string> = {
@@ -30,8 +32,7 @@ interface Sponsor {
   displayOrder: number | null;
 }
 
-const inputClass =
-  'w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all';
+const inputClass = input;
 
 export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
   const [editing, setEditing] = useState(false);
@@ -72,14 +73,14 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
 
   if (editing) {
     return (
-      <tr className="bg-surface-raised/60">
-        <td colSpan={6} className="py-4 px-3">
-          <form action={handleSave} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <tr className={trEditing}>
+        <td colSpan={6} className="px-5 py-4">
+          <form action={handleSave} className="admin-fade-in grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">
-                Name <span className="text-accent">*</span>
+              <label htmlFor={`edit-sponsor-${sponsor.id}-name`} className={labelClass}>
+                Name <RequiredMark />
               </label>
-              <input ref={firstFieldRef} name="name" required defaultValue={sponsor.name} className={inputClass} />
+              <input ref={firstFieldRef} id={`edit-sponsor-${sponsor.id}-name`} name="name" required defaultValue={sponsor.name} className={inputClass} />
             </div>
             <div>
               <ImageUpload
@@ -89,31 +90,31 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
                 storageKeyName="storageKey"
                 currentSrc={sponsor.logoUrl ?? undefined}
                 currentStorageKey={sponsor.storageKey ?? undefined}
-                label="Change Logo"
+                label="Change logo"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Tier</label>
-              <select name="tier" defaultValue={sponsor.tier} className={inputClass}>
+              <label htmlFor={`edit-sponsor-${sponsor.id}-tier`} className={labelClass}>Tier</label>
+              <select id={`edit-sponsor-${sponsor.id}-tier`} name="tier" defaultValue={sponsor.tier} className={inputClass}>
                 <option value="platinum">Platinum</option>
                 <option value="gold">Gold</option>
                 <option value="community">Community</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Website URL</label>
-              <input name="websiteUrl" defaultValue={sponsor.websiteUrl ?? ''} placeholder="https://…" className={inputClass} />
+              <label htmlFor={`edit-sponsor-${sponsor.id}-websiteUrl`} className={labelClass}>Website URL</label>
+              <input id={`edit-sponsor-${sponsor.id}-websiteUrl`} name="websiteUrl" defaultValue={sponsor.websiteUrl ?? ''} placeholder="https://…" className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-foreground-secondary uppercase tracking-wider mb-1">Display Order</label>
-              <input name="displayOrder" type="number" defaultValue={sponsor.displayOrder ?? 0} className={inputClass} />
+              <label htmlFor={`edit-sponsor-${sponsor.id}-displayOrder`} className={labelClass}>Display order</label>
+              <input id={`edit-sponsor-${sponsor.id}-displayOrder`} name="displayOrder" type="number" defaultValue={sponsor.displayOrder ?? 0} className={inputClass} />
             </div>
             <div className="flex items-end gap-2">
-              <button type="submit" disabled={isPending} className={saveBtn}>{isPending ? 'Saving…' : 'Save'}</button>
+              <button type="submit" disabled={isPending} aria-busy={isPending} className={saveBtn}><PendingLabel pending={isPending} label="Save" pendingLabel="Saving…" /></button>
               <button type="button" onClick={closeEditing} className={cancelBtn}>Cancel</button>
             </div>
             {saveError && (
-              <p role="alert" aria-live="polite" className="sm:col-span-3 text-xs text-red-400">{saveError}</p>
+              <AdminNotice tone="danger" className="sm:col-span-3">{saveError}</AdminNotice>
             )}
           </form>
         </td>
@@ -122,43 +123,44 @@ export default function SponsorRow({ sponsor }: { sponsor: Sponsor }) {
   }
 
   return (
-    <tr className="hover:bg-surface-raised/40 transition-colors">
-      <td className="py-3 pr-4 font-semibold text-white">{sponsor.name}</td>
-      <td className="py-3 pr-4">
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${tierBadgeClass[sponsor.tier] ?? 'bg-line text-foreground-secondary'}`}>
+    <tr className={tr}>
+      <td className={cx(td, "font-medium text-foreground")}>{sponsor.name}</td>
+      <td className={td}>
+        <span className={chip(tierTone[sponsor.tier] ?? 'neutral')}>
           {tierLabel[sponsor.tier] ?? sponsor.tier}
         </span>
       </td>
-      <td className="py-3 pr-4">
+      <td className={td}>
         {sponsor.websiteUrl ? (
           <a
             href={sponsor.websiteUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-foreground-secondary hover:text-white transition-colors truncate max-w-[180px] block"
+            className={cx("block max-w-[200px] truncate rounded text-foreground-secondary underline-offset-2 hover:text-foreground hover:underline transition-colors", focusRing)}
           >
             {sponsor.websiteUrl}
           </a>
         ) : (
-          <span className="text-foreground-muted">—</span>
+          <span className="text-foreground-secondary">—</span>
         )}
       </td>
-      <td className="py-3 pr-4">
+      <td className={td}>
         <button
+          type="button"
           onClick={handleToggleActive}
           disabled={isPending}
-          className={`text-xs font-bold px-2.5 py-1 rounded-full cursor-pointer transition-all disabled:opacity-50 ${
-            sponsor.isActive ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-line text-foreground-muted hover:bg-line'
-          }`}
+          title={sponsor.isActive ? 'Click to mark inactive' : 'Click to mark active'}
+          className={chipButton(sponsor.isActive ? 'success' : 'neutral')}
         >
+          <span aria-hidden className={chipDot} />
           {sponsor.isActive ? 'Active' : 'Inactive'}
         </button>
         {toggleError && (
-          <p role="alert" aria-live="polite" className="text-[10px] text-red-400 mt-1">{toggleError}</p>
+          <p role="alert" aria-live="polite" className={fieldError}>{toggleError}</p>
         )}
       </td>
-      <td className="py-3 pr-4 text-foreground-secondary">{sponsor.displayOrder}</td>
-      <td className="py-3 pr-2 text-right">
+      <td className={cx(td, "tabular-nums text-foreground-secondary")}>{sponsor.displayOrder}</td>
+      <td className={tdRight}>
         <div className="flex items-center justify-end gap-2">
           <RowIconButton
             ref={editBtnRef}

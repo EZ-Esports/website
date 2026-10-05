@@ -132,4 +132,71 @@ centered heading plus four form cards with a static sidebar.
 three scannable lines instead of a detour; and there are no surface seams because there
 is only one surface. It now reads as an application portal, not a brochure.
 
+### Case study 2: /admin — from a flat 13-link sidebar to Control Panel categories (2026-10)
+
+**What it was:** the staff sidebar listed 13 pages in one flat column with no
+grouping or order (League Setup, then Matches, then News, then Leadership, then
+Gallery and so on). The Overview had three hard-coded "Quick Actions" cards for
+matches, news and roster.
+
+**Why it was bad, from first principles:**
+
+- *Violated rule 2 (genre):* admin consoles and settings apps (Windows Control
+  Panel, macOS System Settings, every SaaS admin) group pages by job. A flat
+  list makes staff read every label to find one page.
+- *Violated rule 4 (screen budget):* 13 rows at about 44px, plus the header and
+  footer, overflowed a 1366×768 laptop. Because the nav was `overflow-hidden`,
+  the last links were clipped and could not be reached.
+- *Violated rule 1 (user's job):* the Overview's quick actions only ever offered
+  three of twelve sections, regardless of what else the viewer could manage.
+
+**What we did ([spec-012](../../../spec/spec-012-admin-control-panel-nav.md)):**
+
+- Three categories (People & Staffing, League Operations, Website Content) as
+  RAC Disclosures. Several can be open. The active category opens itself and
+  keeps an accent marker when collapsed. The nav scrolls instead of clipping on
+  short viewports, and the footer stays pinned.
+- A `Staff Portal › Category › Page` breadcrumb in the top bar, like the Control
+  Panel address bar.
+- The Overview became a hub: per permitted category, an icon, title, one-line
+  description and its sections as plain accent links, three columns wide. A
+  first version stacked two-column cards of section tiles plus "common tasks"
+  and pushed whole categories below the fold. Most of those tasks just repeated
+  a section link under a verb they didn't perform (rule 6), so they were cut;
+  task shortcuts only belong on the hub once they are real deep links.
+- One shared definition (`app/lib/admin-nav.ts`) drives the sidebar, the hub and
+  the breadcrumb, so they cannot disagree.
+
+**Why it's better:** staff find a page by its category, out of three choices
+instead of thirteen. The sidebar always tells you where you are. The hub answers
+"what can I do here?" for each role, and nothing is unreachable at laptop
+heights. We copied the Control Panel's information architecture, not its light
+theme.
+
+### Case study 3: /admin pages — one anatomy, calm surfaces, an accent budget (2026-10)
+
+**What it was:** each staff page invented its own header (a bordered card with a
+left accent bar, or nothing), its own uppercase micro-labels and inputs, and
+nested boxes (card → bordered table → bordered rows). Feedback appeared in
+three different places and styles.
+
+**What we did ([spec-013](../../../spec/spec-013-staff-portal-ui-overhaul.md)):**
+one page anatomy (eyebrow, `h1`, one-line description, primary action right,
+then sections), three surface steps instead of borders, sentence-case labels,
+one empty/loading/notice/toast vocabulary, and short purposeful motion.
+
+**Reusable lessons:**
+
+- *Rule 2 and 3 at site scale:* when every page shares the same skeleton, staff
+  stop re-learning the layout; the primitives (`AdminPage`, `AdminSection`)
+  make the consistent version the easy one to write.
+- *Calm is not the same as flat.* The first pass removed every accent and the
+  user called it "a bit too simple". Give the brand colour a budget instead of
+  removing it: one or two touches per region, spent on state and emphasis
+  (active tab, focus, primary action, section marker, hover edge), never on
+  large fills or body text.
+- *Animate the arrival, not the wait:* page-entry and row stagger must use
+  `backwards` fill and be switched off (not just shortened) for reduced motion,
+  or delays keep content invisible.
+
 <!-- Add new case studies above this line as we ship more redesigns. -->

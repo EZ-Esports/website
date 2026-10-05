@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { saveBtn } from '@/app/components/admin/styles';
+import { Button as AriaButton, Disclosure, DisclosurePanel } from 'react-aria-components';
+import { HiCheck, HiChevronDown, HiOutlineClock } from 'react-icons/hi2';
+import { input, listStack, saveBtn, secondaryBtnSm } from '@/app/components/admin/styles';
+import { AdminSpinner, PendingLabel } from '@/app/components/admin/AdminUI';
+import { cx } from '@/app/lib/cx';
 import { updatePageContent, restorePageContent } from './actions';
 
 interface HistoryEntry {
@@ -91,85 +95,117 @@ export default function ContentEditor({ id, label, contentKey, initialContent, h
   const hasMore = sortedHistory.length > 10;
 
   return (
-    <div className="bg-[#1a1a1a]/80 border border-line/80 rounded-2xl p-5 space-y-3 hover:border-line transition-all duration-300">
+    // History opens as a RAC Disclosure so it slides open and closed (same
+    // height animation as the sidebar categories) instead of popping in.
+    <Disclosure isExpanded={showHistory} onExpandedChange={setShowHistory} className="space-y-3">
       <div>
-        <h3 className="font-bold text-white text-sm">{label}</h3>
-        <p className="text-foreground-muted text-xs mt-0.5 font-mono">{contentKey}</p>
+        {/* h2: each block is a top-level section directly under the page h1. */}
+        <h2 id={`content-heading-${id}`} className="flex items-center gap-2 text-base font-semibold text-foreground">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {label}
+        </h2>
+        <p className="mt-0.5 font-mono text-xs text-foreground-secondary">{contentKey}</p>
       </div>
       <form action={handleSubmit}>
+        <label htmlFor={`content-${id}`} className="sr-only">
+          {label}
+        </label>
         <textarea
+          id={`content-${id}`}
           name="content"
           value={currentContent}
           onChange={(e) => setCurrentContent(e.target.value)}
           rows={4}
-          className="w-full px-3 py-2 rounded-lg bg-[#111111] border border-line text-white placeholder-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all resize-y font-sans leading-relaxed"
+          className={cx(input, 'resize-y leading-relaxed')}
         />
-        <div className="flex items-center gap-3 mt-3">
-          <button type="submit" disabled={saving} className={saveBtn}>{saving ? 'Saving…' : 'Save'}</button>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={saving} aria-busy={saving} className={saveBtn}>
+            {saving ? (
+              <>
+                <AdminSpinner className="mr-1.5" />
+                Saving…
+              </>
+            ) : (
+              'Save'
+            )}
+          </button>
           {saved && (
-            <span className="text-green-400 text-xs font-semibold">Saved!</span>
+            <span role="status" className="admin-fade-in inline-flex items-center gap-1 text-xs font-medium text-success">
+              <HiCheck aria-hidden className="h-4 w-4" /> Saved!
+            </span>
           )}
           {saveError && (
-            <span role="alert" aria-live="polite" className="text-red-400 text-xs font-semibold">{saveError}</span>
+            <span role="alert" aria-live="polite" className="admin-fade-in text-xs font-medium text-danger-on-tint">{saveError}</span>
           )}
           {restoreError && (
-            <span role="alert" aria-live="polite" className="text-red-400 text-xs font-semibold">{restoreError}</span>
+            <span role="alert" aria-live="polite" className="admin-fade-in text-xs font-medium text-danger-on-tint">{restoreError}</span>
           )}
           {restored && (
-            <span className="text-green-400 text-xs font-semibold">Restored!</span>
+            <span role="status" className="admin-fade-in inline-flex items-center gap-1 text-xs font-medium text-success">
+              <HiCheck aria-hidden className="h-4 w-4" /> Restored!
+            </span>
           )}
           {history.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowHistory((v) => !v)}
-              className="ml-auto text-xs text-foreground-muted hover:text-foreground-secondary transition-colors underline-offset-2 hover:underline"
+            <AriaButton
+              slot="trigger"
+              className={({ isFocusVisible }) =>
+                cx(
+                  'ml-auto inline-flex items-center gap-1 rounded text-xs text-foreground-secondary hover:text-foreground transition-colors cursor-pointer outline-none',
+                  isFocusVisible && 'ring-2 ring-accent/60',
+                )
+              }
             >
+              <HiOutlineClock aria-hidden className="h-3.5 w-3.5" />
               {showHistory ? 'Hide' : 'History'} ({history.length})
-            </button>
+              <HiChevronDown
+                aria-hidden
+                className={cx('h-3.5 w-3.5 transition-[rotate] duration-300 ease-out motion-reduce:transition-none', showHistory && 'rotate-180')}
+              />
+            </AriaButton>
           )}
         </div>
       </form>
 
-      {showHistory && displayedHistory.length > 0 && (
-        <div className="space-y-2 pt-1">
-          {hasMore && (
-            <p className="text-xs text-foreground-muted text-right">Showing 10 most recent</p>
-          )}
-          {displayedHistory.map((entry) => {
-            const preview =
-              entry.previousContent.length > 120
-                ? entry.previousContent.slice(0, 120) + '…'
-                : entry.previousContent;
+      <DisclosurePanel className="h-(--disclosure-panel-height) overflow-clip transition-[height] duration-300 ease-out motion-reduce:transition-none">
+        {displayedHistory.length > 0 && (
+          <div className="space-y-2 pt-1">
+            {hasMore && <p className="text-right text-xs text-foreground-secondary">Showing 10 most recent</p>}
+            <ul className={cx(listStack, 'rounded-xl bg-surface-sunken/70')}>
+              {displayedHistory.map((entry) => {
+                const preview =
+                  entry.previousContent.length > 120
+                    ? entry.previousContent.slice(0, 120) + '…'
+                    : entry.previousContent;
 
-            return (
-              <div
-                key={entry.id}
-                className="bg-[#111111] border border-line/60 rounded-lg p-3 text-xs space-y-2"
-              >
-                <p className="text-foreground-secondary font-mono leading-relaxed line-clamp-2">{preview}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-foreground-muted">{formatDate(entry.savedAt)}</span>
-                  <div className="flex items-center gap-2">
-                    {restoreError && restoringId === null && (
-                      <span role="alert" aria-live="polite" className="text-red-400 text-xs font-semibold">
-                        {restoreError}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRestore(entry)}
-                      disabled={restoringId !== null}
-                      className="px-2.5 py-1 bg-surface-raised border border-line hover:border-accent/40 hover:text-accent text-foreground-secondary rounded text-xs font-bold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {restoringId === entry.id ? 'Restoring…' : 'Restore'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                return (
+                  <li key={entry.id} className="flex items-start justify-between gap-4 px-4 py-3 text-xs">
+                    <div className="min-w-0 space-y-1">
+                      <p className="leading-relaxed text-foreground-secondary line-clamp-2">{preview}</p>
+                      <span className="text-foreground-secondary">{formatDate(entry.savedAt)}</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {restoreError && restoringId === null && (
+                        <span role="alert" aria-live="polite" className="text-xs font-medium text-danger-on-tint">
+                          {restoreError}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRestore(entry)}
+                        disabled={restoringId !== null}
+                        aria-busy={restoringId === entry.id}
+                        className={secondaryBtnSm}
+                      >
+                        <PendingLabel pending={restoringId === entry.id} label="Restore" pendingLabel="Restoring…" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </DisclosurePanel>
+    </Disclosure>
   );
 }

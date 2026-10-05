@@ -1,10 +1,10 @@
 import { getCachedGames, getStaffSeasons, getCachedSchools } from '@/app/lib/db/queries';
-import Card from '@/app/components/ui/Card';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import StandingsEditor from './StandingsEditor';
 import type { DBGame, DBSchool, DBSeason } from '@/app/types';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
 export default async function AdminStandingsPage() {
   if (!(await getStaffForAdminSection('/admin/standings'))) return <PermissionDenied />;
@@ -28,20 +28,22 @@ export default async function AdminStandingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="border-l-4 border-l-accent hover:shadow-none duration-300">
-        <h1 className="text-2xl font-black text-white uppercase tracking-wider">Standings Archive</h1>
-        <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">
-          Record or correct final standings for seasons whose per-match scores were never captured.
-          Active seasons with live results usually don&apos;t need snapshot rows.
-        </p>
-      </Card>
+    <AdminPage>
+      <AdminPageHeader
+        route="/admin/standings"
+        description={
+          <>
+            Record or correct final standings for seasons whose per-match scores were never captured.
+            Active seasons with live results usually don&apos;t need snapshot rows.
+          </>
+        }
+      />
 
       {dbError ? (
         <DbErrorNotice variant="error" />
       ) : (
         <StandingsEditor games={games} seasons={seasons} schools={schools} />
       )}
-    </div>
+    </AdminPage>
   );
 }

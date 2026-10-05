@@ -148,7 +148,27 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
-## 15. Smaller scars
+## 15. Careers "Edit" opened with empty or stale fields (branch `fix/careers-edit-prefill`)
+
+**Symptom.** In `/admin/careers`, clicking Edit showed blank fields (or values from a previously opened posting, plus a lingering error banner), so a minor change meant retyping the whole opening.
+
+**Root cause.** `CareersManagerClient` always rendered `CareerPostingModal` and toggled `isOpen`; the modal seeded its `useState` fields from `posting` only on first mount (when `posting` was `null`) and then returned `null` while closed. The instance and its state outlived every open/close, so later `posting` props were ignored. Compounding it, the manager held `useState(initialPostings)`, which froze the list at the first server render, so `router.refresh()` after a save never updated the values a later Edit would pre-fill.
+
+**Fix.** The modal is now a thin wrapper that renders an inner `CareerPostingForm` only while open, keyed by `posting?.id ?? 'new'`; initial values come from the exported `postingToFormValues()`. The manager reads `initialPostings` from props directly. Escape now closes the dialog. The list query already returns the full row, and `updateCareerPostingAction` already passes an unchanged slug through without a duplicate lookup (the DB unique constraint does not conflict with the row's own value), so neither needed changes. Known gap: editing a slug to one that is taken (including by a soft-deleted row) surfaces as the generic `sanitizeDbError` message, not a friendly "slug exists" error.
+
+---
+
+## 17. Role editor saves dropped the hidden tab's fields (pre-existing on main, fixed in PR #218 review)
+
+**Symptom.** Saving a role from the Display tab cleared every permission; saving from the Permissions tab renamed the role "null" and set its colour to "null"; the Owner and @everyone roles could not be saved at all.
+
+**Root cause.** The Display and Permissions panels mount one at a time as uncontrolled inputs, and `handleEditRoleSubmit` / `handleCreateRoleSubmit` read `FormData`, which only contains mounted, enabled inputs. A missing field became `0` (bitmask) or `null`, and `FormData.append(key, null)` sends the string "null". Disabled inputs (locked system-role name) are never submitted either. This existed on main before the staff portal overhaul; the overhaul kept the conditional panels.
+
+**Fix.** `name`, `color` and the permission bitmask live in `roleDraft` state, seeded when a role is selected or "New role" is clicked. Inputs are controlled, and `buildRoleRequest` builds the body from state, so a tab switch cannot drop data. The Owner role sends its stored permissions, a system role sends its stored name, and bits the actor cannot change are masked out as before (open-threads still records that behaviour). Covered by `app/components/admin/__tests__/role-form.test.ts`.
+
+---
+
+## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
 - **`6df7d59`:** one production `message` row unparseable; recovered via v1 parser after a live check, not declared lost. `details` is a versioned union because a single fixed shape strands redesigns.

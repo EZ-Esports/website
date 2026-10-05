@@ -1,30 +1,23 @@
-import Link from 'next/link';
 import { createNewsPost } from '../actions';
-import Card from '@/app/components/ui/Card';
 import NewsPostForm from '@/app/components/admin/NewsPostForm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
 
 export default async function AdminNewNewsPostPage() {
   if (!(await getStaffForAdminSection('/admin/news'))) return <PermissionDenied />;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center">
-        <Link href="/admin/news" className="text-xs font-bold text-foreground-secondary hover:text-accent uppercase tracking-widest transition-colors">
-          ← Back to News list
-        </Link>
-      </div>
+    <AdminPage className="mx-auto max-w-3xl">
+      <AdminPageHeader
+        back={{ href: '/admin/news', label: 'News & Announcements' }}
+        route="/admin/news/new"
+        description="Publish news updates to the public league portal."
+      />
 
-      <Card className="p-8 space-y-6 hover:shadow-none hover:border-line/80 duration-300">
-        <div>
-          <h1 className="text-2xl font-black text-white uppercase tracking-wider">Write Announcement</h1>
-          <p className="text-foreground-secondary text-xs mt-1.5 leading-relaxed">Publish news updates to the public league portal.</p>
-        </div>
-
+      <AdminSection>
         <NewsPostForm action={createNewsPost} status="new" />
-      </Card>
-    </div>
+      </AdminSection>
+    </AdminPage>
   );
 }

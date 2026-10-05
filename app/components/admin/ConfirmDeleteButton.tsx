@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { FiTrash2 } from 'react-icons/fi';
-import { deleteIconBtn } from '@/app/components/admin/styles';
+import { HiOutlineTrash } from 'react-icons/hi2';
+import { dangerBtn, deleteIconBtn, ghostBtn } from '@/app/components/admin/styles';
+import { AdminNotice, PendingLabel } from '@/app/components/admin/AdminUI';
 import { Overlay, Modal, Dialog, Heading } from '@/app/components/ui/overlay';
 import type { ActionResult } from '@/app/lib/result';
 
@@ -41,11 +43,6 @@ export default function ConfirmDeleteButton({
     setError(null);
 
     try {
-      if (!window.confirm(message)) {
-        setIsPending(false);
-        return;
-      }
-
       const res = await action();
       if (res && typeof res === 'object' && 'success' in res && (res as ActionResult).success === false) {
         const errorMsg = (res as { error?: string }).error || 'Failed to delete.';
@@ -83,51 +80,56 @@ export default function ConfirmDeleteButton({
         <span
           role="alert"
           aria-live="polite"
-          className="text-[10px] text-red-400 font-semibold"
+          className="admin-fade-in text-xs font-medium text-danger-on-tint"
         >
           {error}
         </span>
       )}
 
+      {/* Admin modal motion (admin-modal-overlay / admin-modal in globals.css):
+          RAC keeps the overlay mounted until the exit animation finishes. */}
       <Overlay
         isOpen={isOpen}
         onOpenChange={(open) => {
           if (!isPending) setIsOpen(open);
         }}
         isDismissable={!isPending}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+        className="admin-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       >
-        <Modal className="w-full max-w-md outline-none">
+        <Modal className="admin-modal w-full max-w-md outline-none">
           <Dialog
             role="alertdialog"
             aria-label={label}
-            className="bg-surface-sunken border border-line rounded-2xl w-full p-6 shadow-2xl outline-none"
+            className="w-full rounded-2xl bg-surface-raised p-6 text-left shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none"
           >
             {({ close }) => (
               <>
-                <Heading className="text-lg font-bold text-foreground mb-2">
-                  Confirm Deletion
-                </Heading>
-                <p className="text-sm text-foreground-secondary mb-6 leading-relaxed">
-                  {message}
-                </p>
+                <div className="flex items-start gap-4">
+                  <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger/15 text-danger-on-tint">
+                    <HiOutlineTrash className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 space-y-1.5">
+                    <Heading className="text-base font-semibold text-foreground">
+                      Confirm deletion
+                    </Heading>
+                    <p className="text-sm leading-6 text-foreground-secondary whitespace-normal">
+                      {message}
+                    </p>
+                  </div>
+                </div>
 
                 {error && (
-                  <div
-                    role="alert"
-                    aria-live="polite"
-                    className="p-3 mb-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium"
-                  >
+                  <AdminNotice tone="danger" className="mt-4">
                     {error}
-                  </div>
+                  </AdminNotice>
                 )}
 
-                <div className="flex items-center justify-end gap-3">
+                <div className="mt-6 flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={close}
                     disabled={isPending}
-                    className="px-4 py-2 rounded-lg border border-line bg-surface-raised hover:bg-surface-raised/80 text-foreground text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={ghostBtn}
                   >
                     Cancel
                   </button>
@@ -135,9 +137,10 @@ export default function ConfirmDeleteButton({
                     type="button"
                     onClick={() => handleDelete(close)}
                     disabled={isPending}
-                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-busy={isPending}
+                    className={dangerBtn}
                   >
-                    {isPending ? 'Deleting…' : 'Delete'}
+                    <PendingLabel pending={isPending} label="Delete" pendingLabel="Deleting…" />
                   </button>
                 </div>
               </>
