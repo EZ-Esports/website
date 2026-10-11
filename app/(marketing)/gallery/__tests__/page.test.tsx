@@ -77,8 +77,9 @@ describe('Community Gallery Page & Showcase Integration (/gallery)', () => {
       // Check for mocked items rendered in the grid
       expect(html).toContain('Test Photo 1: Valorant Tournament');
       expect(html).toContain('Test Photo 2: LAN Finals Arena');
-      expect(html).toContain(encodeURIComponent('/images/gallery/test-1.png'));
-      expect(html).toContain(encodeURIComponent('/images/gallery/test-2.png'));
+      expect(html).toContain('/images/gallery/test-1.png');
+      expect(html).toContain('/images/gallery/test-2.png');
+      expect(html).not.toContain('/_next/image');
     });
 
     it('renders interactive photo buttons with accessible labels', async () => {

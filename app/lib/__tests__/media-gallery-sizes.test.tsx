@@ -15,16 +15,26 @@ describe('Media and Gallery responsive sizes & optimization (Issue #192)', () =>
 
   describe('GalleryGrid.tsx', () => {
     it('sets responsive sizes on photo cards to mitigate mobile bandwidth egress', () => {
-      const html = renderToStaticMarkup(<GalleryGrid items={mockImages} />);
-      expect(html).toContain('sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"');
-    });
-
-    it('ensures GalleryGrid does not bypass Next.js image optimization with unoptimized', () => {
+      // Unoptimized <Image> omits `sizes` from the rendered HTML, so assert the source prop.
       const fileContent = readFileSync(
         resolve(process.cwd(), 'app/(marketing)/gallery/GalleryGrid.tsx'),
         'utf8',
       );
-      expect(fileContent).not.toContain('unoptimized');
+      expect(fileContent).toContain('sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"');
+    });
+
+    it('renders Supabase-hosted images unoptimized (raw src, no /_next/image transformation)', () => {
+      const html = renderToStaticMarkup(<GalleryGrid items={mockImages} />);
+      expect(html).toContain('src="/images/gallery/test-1.png"');
+      expect(html).not.toContain('/_next/image');
+    });
+
+    it('marks both the grid thumbnail and the lightbox image unoptimized', () => {
+      const fileContent = readFileSync(
+        resolve(process.cwd(), 'app/(marketing)/gallery/GalleryGrid.tsx'),
+        'utf8',
+      );
+      expect(fileContent.match(/^\s*unoptimized\s*$/gm)).toHaveLength(2);
     });
 
     it('configures lightbox image with responsive sizes capped at 1024px', () => {
@@ -38,16 +48,25 @@ describe('Media and Gallery responsive sizes & optimization (Issue #192)', () =>
 
   describe('MediaGrid.tsx', () => {
     it('sets responsive sizes on marquee items matching basis breakpoints', () => {
-      const html = renderToStaticMarkup(<MediaGrid items={mockImages} />);
-      expect(html).toContain('sizes="(max-width: 640px) 70vw, (max-width: 768px) 45vw, (max-width: 1024px) 32vw, (max-width: 1280px) 26vw, 300px"');
-    });
-
-    it('ensures MediaGrid does not bypass Next.js image optimization with unoptimized', () => {
       const fileContent = readFileSync(
         resolve(process.cwd(), 'app/components/sections/MediaGrid.tsx'),
         'utf8',
       );
-      expect(fileContent).not.toContain('unoptimized');
+      expect(fileContent).toContain('sizes="(max-width: 640px) 70vw, (max-width: 768px) 45vw, (max-width: 1024px) 32vw, (max-width: 1280px) 26vw, 300px"');
+    });
+
+    it('renders Supabase-hosted images unoptimized (raw src, no /_next/image transformation)', () => {
+      const html = renderToStaticMarkup(<MediaGrid items={mockImages} />);
+      expect(html).toContain('src="/images/gallery/test-1.png"');
+      expect(html).not.toContain('/_next/image');
+    });
+
+    it('marks both the marquee image and the lightbox image unoptimized', () => {
+      const fileContent = readFileSync(
+        resolve(process.cwd(), 'app/components/sections/MediaGrid.tsx'),
+        'utf8',
+      );
+      expect(fileContent.match(/^\s*unoptimized\s*$/gm)).toHaveLength(2);
     });
 
     it('configures lightbox image with responsive sizes capped at 1024px', () => {
@@ -61,20 +80,29 @@ describe('Media and Gallery responsive sizes & optimization (Issue #192)', () =>
 
   describe('SponsorMarquee.tsx', () => {
     it('sets explicit sizes="130px" on sponsor logo images', () => {
+      const fileContent = readFileSync(
+        resolve(process.cwd(), 'app/(marketing)/sponsors/SponsorMarquee.tsx'),
+        'utf8',
+      );
+      expect(fileContent).toContain('sizes="130px"');
+    });
+
+    it('renders sponsor logos unoptimized (raw src, no /_next/image transformation)', () => {
       const html = renderToStaticMarkup(
         <SponsorMarquee sponsors={[{ id: 'sp-1', name: 'Test Sponsor', logoUrl: '/images/sponsors/test.png' }]} />,
       );
-      expect(html).toContain('sizes="130px"');
+      expect(html).toContain('src="/images/sponsors/test.png"');
+      expect(html).not.toContain('/_next/image');
     });
   });
 
   describe('GalleryImageCard.tsx (Admin thumbnail)', () => {
-    it('removes unoptimized and specifies responsive thumbnail sizes', () => {
+    it('keeps unoptimized and specifies responsive thumbnail sizes', () => {
       const fileContent = readFileSync(
         resolve(process.cwd(), 'app/components/admin/GalleryImageCard.tsx'),
         'utf8',
       );
-      expect(fileContent).not.toContain('unoptimized');
+      expect(fileContent).toMatch(/^\s*unoptimized\s*$/m);
       expect(fileContent).toContain('sizes="(max-width: 640px) 100vw, 200px"');
     });
   });

@@ -84,6 +84,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
           width={200}
           height={200}
           sizes="(max-width: 640px) 100vw, 200px"
+          unoptimized
           className="h-full w-full object-cover transition-[scale] duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
         />
       </div>

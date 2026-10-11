@@ -53,6 +53,7 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
                 alt={item.alt}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"
+                unoptimized
                 className="object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
@@ -152,6 +153,7 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
                         height={800}
                         priority
                         sizes="(max-width: 1024px) 100vw, 1024px"
+                        unoptimized
                         className="object-contain max-h-[75vh] w-auto h-auto rounded-lg shadow-2xl select-none"
                       />
                     </div>
