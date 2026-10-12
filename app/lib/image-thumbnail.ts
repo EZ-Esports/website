@@ -44,15 +44,34 @@ function rethrowPixelLimit(err: unknown): never {
 }
 
 /**
+ * Cheap magic-byte sniff for the four allowed formats. Run before sharp so that
+ * SVG and every other format never reaches the decoders (sharp parses SVG with
+ * librsvg even for a metadata-only call).
+ */
+export function sniffAllowedFormat(bytes: Uint8Array): (typeof ALLOWED_DECODED_FORMATS)[number] | null {
+  const startsWith = (sig: readonly number[], offset = 0) => sig.every((b, i) => bytes[offset + i] === b);
+  if (startsWith([0xff, 0xd8, 0xff])) return 'jpeg';
+  if (startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'png';
+  if (startsWith([0x47, 0x49, 0x46, 0x38]) && (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61) return 'gif';
+  if (startsWith([0x52, 0x49, 0x46, 0x46]) && startsWith([0x57, 0x45, 0x42, 0x50], 8)) return 'webp';
+  return null;
+}
+
+/**
  * Header-only inspection (no full decode). Rejects formats outside the allowlist
  * and images over the pixel limit before any bytes are written to storage.
  */
 export async function inspectImage(input: Buffer | ArrayBuffer) {
   const source = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  if (!sniffAllowedFormat(source)) {
+    throw new ImageInputError('unsupported-format', 'Only JPEG, PNG, WebP or GIF images can be uploaded.');
+  }
   let meta;
   try {
-    // `animated: true` makes sharp report every frame in `pages`.
-    meta = await sharp(source, { ...SHARP_OPTIONS, animated: true }).metadata();
+    // Deliberately not `animated: true`: that reports the summed height of every
+    // frame, so a legitimate animated GIF (say 480x480x250) would trip the pixel
+    // cap. Without it width/height describe one frame and `pages` still gives the count.
+    meta = await sharp(source, SHARP_OPTIONS).metadata();
   } catch (err) {
     rethrowPixelLimit(err);
   }

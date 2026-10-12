@@ -8,6 +8,7 @@ import {
   inspectImage,
   generateThumbnail,
   planThumbnail,
+  sniffAllowedFormat,
 } from '@/app/lib/image-thumbnail';
 
 // Noise defeats compression, so the "10x smaller" claim is tested against a
@@ -181,4 +182,46 @@ describe('input hardening', () => {
     const { meta } = await inspectImage(bytes);
     expect(meta.format).toBe(format);
   });
+});
+
+describe('format sniffing before sharp', () => {
+  it('recognises the four allowed formats by magic bytes', async () => {
+    for (const format of ['jpeg', 'png', 'webp', 'gif'] as const) {
+      const bytes = await sharp(await photoLike(16, 16, 'png'))[format]().toBuffer();
+      expect(sniffAllowedFormat(bytes)).toBe(format);
+    }
+  });
+
+  it.each([
+    ['SVG', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')],
+    ['XML-prefixed SVG', Buffer.from('<?xml version="1.0"?><svg/>')],
+    ['plain text', Buffer.from('hello')],
+    ['RIFF that is not WebP', Buffer.from('RIFF\u0000\u0000\u0000\u0000WAVEfmt ')],
+    ['empty', Buffer.alloc(0)],
+  ])('rejects %s without invoking sharp', async (_label, bytes) => {
+    expect(sniffAllowedFormat(bytes)).toBeNull();
+    await expect(inspectImage(bytes)).rejects.toMatchObject({ name: 'ImageInputError', code: 'unsupported-format' });
+  });
+});
+
+describe('animated inputs and the pixel cap', () => {
+  it('accepts an animated GIF whose frames sum past the cap but whose single frame is small', async () => {
+    const w = 480;
+    const h = 480;
+    const frames = 250; // 57.6M pixels in total, 230k per frame
+    expect(w * h * frames).toBeGreaterThan(MAX_INPUT_PIXELS);
+    const raw = Buffer.alloc(w * h * frames * 3);
+    // Differing pixels per frame stop the encoder merging frames into fewer pages.
+    for (let f = 0; f < frames; f++) for (let i = 0; i < w * h; i += 97) raw[(f * w * h + i) * 3] = (f * 5 + i) % 256;
+    const gif = await sharp(raw, { raw: { width: w, height: h * frames, channels: 3, pageHeight: h } })
+      .gif({ delay: Array(frames).fill(40), loop: 0 })
+      .toBuffer();
+
+    const { meta } = await inspectImage(gif);
+    expect(meta.pages).toBe(frames);
+    expect(meta.width).toBe(w);
+    expect(meta.height).toBe(h);
+    // Animated sources are skipped (kept as the full file), not rejected.
+    expect(await generateThumbnail(gif)).toEqual({ skipped: true, reason: 'animated' });
+  }, 30_000);
 });

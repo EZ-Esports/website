@@ -97,6 +97,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
       () =>
         db
           .select({
+            src: schema.galleryImages.src,
             storageKey: schema.galleryImages.storageKey,
             thumbnailUrl: schema.galleryImages.thumbnailUrl,
             thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
@@ -107,7 +108,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
       async () =>
         (
           await db
-            .select({ storageKey: schema.galleryImages.storageKey })
+            .select({ src: schema.galleryImages.src, storageKey: schema.galleryImages.storageKey })
             .from(schema.galleryImages)
             .where(eq(schema.galleryImages.id, id))
             .limit(1)

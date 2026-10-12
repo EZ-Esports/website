@@ -180,6 +180,18 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 19. Gallery thumbnail backfill crashed on launch (`server-only`) — Oct 2026 (PR #220 follow-up)
+
+**Symptom.** `npm run db:backfill:gallery-thumbnails` died immediately with the `server-only` import error before reaching any of its own checks.
+
+**Root cause.** The script imports `app/lib/db/schema.ts`, which has `import 'server-only'` (added by #203). Under plain `tsx` the package's default export throws; only the `react-server` condition resolves it to the empty module. The unit tests import `db/gallery-thumbnails.ts` (pure planning code) and vitest aliases `server-only` to `empty.js`, so nothing ever executed the real entry point under real module resolution.
+
+**Fix.** The npm script now passes `--conditions=react-server`. `db/__tests__/backfill-entry.test.ts` spawns the entry point under tsx with an empty environment and requires it to fail at its own guard, never on the import. The same crash very likely affects the other tsx scripts that import `app/lib/db` or its schema (`db:seed:gold`/`db:ingest:gold`, `db:seed:leadership`/`db:ingest:leadership`, `db:backfill:leadership`, `db:seed-owner`, `db:storage:clean`); they were left unchanged in this PR.
+
+**Do not repeat.** A script's tests must include one that launches the real entry point, not just its pure helpers.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

@@ -11,11 +11,17 @@
  *  - needs the exact DB host in SEED_ALLOW_REMOTE (db/seed-target.ts) AND the exact
  *    Storage host in GALLERY_THUMBNAIL_BACKFILL_ALLOW;
  *  - `--bucket=admin-uploads` must be typed out;
- *  - only ever uploads `<name>_thumb.webp` beside the original and sets the two
- *    thumbnail columns; originals are never deleted, overwritten or re-keyed;
+ *  - only ever uploads `<name>_thumb.webp` into the row's own `gallery/<id>/` folder
+ *    and sets the two thumbnail columns; originals (bucket objects or files in
+ *    public/) are never deleted, overwritten, moved or re-keyed;
  *  - idempotent and resumable: rows that already have a thumbnail are skipped, an
  *    already-uploaded thumbnail object is reused, and the row update only matches
  *    rows still lacking a thumbnail.
+ *
+ * Three kinds of row are handled (see planBackfill): `gallery-folder` (original in
+ * the row's own folder), `legacy-root-key` (original is a root-level bucket
+ * object) and `local-static` (no storage key; the PNG is read from
+ * public/images/gallery/ in this repo). Everything else is skipped and reported.
  *
  * Run (PowerShell):
  *   $env:SEED_ALLOW_REMOTE = "<db host>"; $env:GALLERY_THUMBNAIL_BACKFILL_ALLOW = "<project>.supabase.co"
@@ -25,17 +31,26 @@
  * The Data Cache is not touched by this script. Afterwards save any gallery row in
  * /admin/gallery (unchanged) so its action calls updateTag('gallery-images').
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { and, eq, isNull } from 'drizzle-orm';
 import * as schema from '../app/lib/db/schema';
-import { BUCKET, STORAGE_CACHE_CONTROL } from '../app/lib/storage-constants';
+import { BUCKET, STORAGE_CACHE_CONTROL, buildPublicObjectUrl } from '../app/lib/storage-constants';
 import { generateThumbnail } from '../app/lib/image-thumbnail';
 import { assertSeedTargetAllowed } from './seed-target';
-import { assertBackfillTargetAllowed, classifyRowUpdate, parseBackfillArgs, planBackfill } from './gallery-thumbnails';
+import {
+  assertBackfillTargetAllowed,
+  classifyRowUpdate,
+  describeTodo,
+  parseBackfillArgs,
+  planBackfill,
+  resolveStaticGalleryFile,
+  summarizePlan,
+  type BackfillTodo,
+} from './gallery-thumbnails';
 
 async function main() {
   const args = parseBackfillArgs(process.argv.slice(2), BUCKET);
@@ -52,6 +67,7 @@ async function main() {
     const rows = await db
       .select({
         id: schema.galleryImages.id,
+        src: schema.galleryImages.src,
         storageKey: schema.galleryImages.storageKey,
         thumbnailUrl: schema.galleryImages.thumbnailUrl,
         thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
@@ -65,20 +81,27 @@ async function main() {
     for (const s of plan.skipped) console.log(`  skip ${s.id} (${s.reason})`);
 
     if (!args.apply && !args.previewDir) {
-      for (const t of todo) console.log(`  would create ${t.thumbnailKey}`);
+      for (const t of todo) console.log(`  ${describeTodo(t)}`);
+      for (const line of summarizePlan(plan, rows.length)) console.log(`[gallery-thumbs] ${line}`);
       console.log('[gallery-thumbs] Dry run: nothing written. Re-run with --apply to write.');
       return;
     }
     if (args.previewDir) mkdirSync(args.previewDir, { recursive: true });
+
+    // Bucket originals are downloaded by key; static ones come from this checkout's public/ folder.
+    async function loadOriginal(t: BackfillTodo): Promise<Buffer> {
+      if (t.kind === 'local-static') return readFileSync(resolveStaticGalleryFile(process.cwd(), t.src));
+      const { data: blob, error: dlError } = await supabase.storage.from(args.bucket).download(t.storageKey);
+      if (dlError || !blob) throw new Error(`download failed: ${dlError?.message ?? 'no data'}`);
+      return Buffer.from(await blob.arrayBuffer());
+    }
 
     let done = 0;
     let failed = 0;
     let conflicts = 0;
     for (const t of todo) {
       try {
-        const { data: blob, error: dlError } = await supabase.storage.from(args.bucket).download(t.storageKey);
-        if (dlError || !blob) throw new Error(`download failed: ${dlError?.message ?? 'no data'}`);
-        const original = Buffer.from(await blob.arrayBuffer());
+        const original = await loadOriginal(t);
         const thumb = await generateThumbnail(original);
         if (thumb.skipped) {
           console.log(`  skip ${t.id} (${thumb.reason})`);
@@ -100,13 +123,21 @@ async function main() {
         if (upError && !alreadyThere) throw new Error(`upload failed: ${upError.message}`);
 
         const { data: pub } = supabase.storage.from(args.bucket).getPublicUrl(t.thumbnailKey);
+        // The app only keeps a legacy thumbnail whose URL it can rebuild exactly; refuse
+        // to store one it would later reject (and wipe on the next caption edit).
+        if (pub.publicUrl !== buildPublicObjectUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, args.bucket, t.thumbnailKey)) {
+          throw new Error('public URL for the thumbnail does not match the expected form');
+        }
         const updated = await db
           .update(schema.galleryImages)
           .set({ thumbnailUrl: pub.publicUrl, thumbnailStorageKey: t.thumbnailKey })
           .where(
             and(
               eq(schema.galleryImages.id, t.id),
-              eq(schema.galleryImages.storageKey, t.storageKey),
+              t.storageKey === null
+                ? isNull(schema.galleryImages.storageKey)
+                : eq(schema.galleryImages.storageKey, t.storageKey),
+              eq(schema.galleryImages.src, t.src),
               isNull(schema.galleryImages.thumbnailStorageKey),
             ),
           )

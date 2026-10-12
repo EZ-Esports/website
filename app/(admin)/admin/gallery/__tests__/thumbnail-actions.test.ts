@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { mockDb, mockTx, remove, list, updateTag } = vi.hoisted(() => {
   const mockTx = { execute: vi.fn(), select: vi.fn(), insert: vi.fn() };
@@ -141,6 +141,76 @@ describe('gallery actions with thumbnails', () => {
 
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ thumbnailStorageKey: OLD_THUMB }));
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  describe('legacy rows (root-level original, thumbnail in gallery/<id>/)', () => {
+    const ROOT_NAME = '2c07ef71-aaaa.jpg';
+    const ROOT_SRC = `${BASE}/${ROOT_NAME}`;
+    const LEGACY_THUMB = `gallery/${ID}/2c07ef71-aaaa_thumb.webp`;
+    const legacyRow = {
+      src: ROOT_SRC,
+      storageKey: ROOT_NAME,
+      thumbnailUrl: `${BASE}/${LEGACY_THUMB}`,
+      thumbnailStorageKey: LEGACY_THUMB,
+    };
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co');
+      mockDb.select.mockReturnValue({ from: () => ({ where: () => ({ limit: () => Promise.resolve([legacyRow]) }) }) });
+      list.mockResolvedValue({ data: [{ name: '2c07ef71-aaaa_thumb.webp' }], error: null });
+    });
+
+    it('a caption-only edit keeps the legacy thumbnail and does not delete it from storage', async () => {
+      const set = vi.fn().mockReturnValue({ where: () => Promise.resolve() });
+      mockDb.update.mockReturnValue({ set });
+
+      const res = await updateGalleryImage(ID, form({ src: ROOT_SRC, caption: 'new', storageKey: ROOT_NAME }));
+
+      expect(res).toEqual({ success: true });
+      expect(set).toHaveBeenCalledWith(
+        expect.objectContaining({ thumbnailUrl: `${BASE}/${LEGACY_THUMB}`, thumbnailStorageKey: LEGACY_THUMB }),
+      );
+      expect(remove).not.toHaveBeenCalled();
+    });
+
+    it('replacing the photo drops the legacy thumbnail and removes it from the row folder', async () => {
+      const set = vi.fn().mockReturnValue({ where: () => Promise.resolve() });
+      mockDb.update.mockReturnValue({ set });
+      list.mockResolvedValue({ data: [{ name: '2c07ef71-aaaa_thumb.webp' }, { name: '1700000009999.jpg' }], error: null });
+
+      await updateGalleryImage(ID, form({ src: `${BASE}/${NEW_FULL}`, caption: 'new', storageKey: NEW_FULL }));
+
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ storageKey: NEW_FULL, thumbnailUrl: null, thumbnailStorageKey: null }));
+      expect(remove).toHaveBeenCalledWith([LEGACY_THUMB]);
+    });
+
+    it('a forged thumbnail posted with an edit is ignored', async () => {
+      mockDb.select.mockReturnValue({
+        from: () => ({ where: () => ({ limit: () => Promise.resolve([{ ...legacyRow, thumbnailUrl: null, thumbnailStorageKey: null }]) }) }),
+      });
+      const set = vi.fn().mockReturnValue({ where: () => Promise.resolve() });
+      mockDb.update.mockReturnValue({ set });
+      const forged = `gallery/${ID}/evil_thumb.webp`;
+
+      await updateGalleryImage(
+        ID,
+        form({ src: ROOT_SRC, caption: 'x', storageKey: ROOT_NAME, thumbnailStorageKey: forged, thumbnailUrl: `${BASE}/${forged}` }),
+      );
+
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ thumbnailUrl: null, thumbnailStorageKey: null }));
+    });
+
+    it('deleting removes only the row folder (including the legacy thumbnail); the root-level original is never listed or removed', async () => {
+      mockDb.update.mockReturnValue({ set: () => ({ where: () => Promise.resolve() }) });
+
+      await deleteGalleryImage(ID);
+
+      expect(list).toHaveBeenCalledWith(`gallery/${ID}`);
+      expect(remove).toHaveBeenCalledWith([LEGACY_THUMB]);
+      expect(remove.mock.calls.flat(2)).not.toContain(ROOT_NAME);
+    });
   });
 
   describe('before migration 0046 is applied', () => {

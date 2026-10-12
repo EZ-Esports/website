@@ -110,5 +110,6 @@ Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-o
 
 ## Gallery thumbnail rollout (spec-014)
 
-- Migration `0046_gallery_image_thumbnails` and `npm run db:backfill:gallery-thumbnails` are written but **not applied**. Until the backfill runs, existing gallery rows have no thumbnail and the grid/marquee load full-size files (unoptimized). Apply the migration before merging the thumbnails PR (the code tolerates a missing migration for reads and admin saves, but `storage-clean` and the backfill do not); after the migration and again after the backfill, save any gallery row in `/admin/gallery` to refresh the Data Cache.
+- Migration `0046_gallery_image_thumbnails` is **applied** in production; `npm run db:backfill:gallery-thumbnails` has only been dry-run (it then saw 3 own-folder rows; the extended backfill also covers 29 legacy root-key and 3 local-static live rows). Run it dry first, then `--apply`, then save any gallery row in `/admin/gallery` to refresh the Data Cache. Until then existing rows show full-size files (unoptimized).
 - Sponsor logos and leadership avatars stay unoptimized without thumbnails; revisit only if they grow.
+- The other tsx db scripts that import `app/lib/db` (seed-gold, seed-leadership, backfill-leadership, seed-owner, storage-clean) likely hit the same `server-only` launch crash (incidents section 19); decide whether to add `--conditions=react-server` to them.
