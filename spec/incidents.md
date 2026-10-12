@@ -168,6 +168,20 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 18. Owner role ranked below Dev/Ops; a Dev could grant Owner (found 12 Oct 2026)
+
+**Symptom.** On the staff page a `Dev` could assign only the `Owner` role, and could not assign `Ops`. Production `roles` rows: Ops 10001, Dev 10000, Owner 9999 (seeded as the absolute top), @everyone 0. Higher position means higher rank.
+
+**Root cause.** `createRole` computed the new role's position as `max(position) + 1` over ALL roles when the actor was an Owner, so every role an Owner created landed above the Owner role. With Owner outranked, the position-only `canManageRole` let a non-owner Dev pass for the Owner role, and `canGrantPermissions` passed because ADMINISTRATOR is in Dev's mask: a privilege-escalation path. Ops sat above Dev, so Dev could not assign it.
+
+**Data fix (manual, NOT part of the diff).** The user corrected production themselves via SQL (Ops=1, Dev=2) after read-only verification. No migration or script in this repo does it.
+
+**Code fix.** the commit that introduces `nextRolePosition` (branch `feat/dev-role-assign-and-careers-hero-nav`). (1) `nextRolePosition` (`app/lib/roles.ts`) places new roles strictly below the lowest owner role and returns `null` (surfaced as an `ActionError`) when there is no room, including when positions are already inverted, so the table cannot silently re-invert; the shift step only runs when needed and can never push a role to or past an owner role. (2) `canManageRole` now takes a required `targetRoleIsOwner`; a non-owner can never manage or grant an owner role regardless of position, at every call site in `team/actions.ts`. (3) The invite/role pickers use `filterAssignableRoles`, built from the same predicates as the server. (4) `reorderRoles` refuses a reorder whose 1..n positions would reach the lowest owner position. `deleteRole` only shifts non-owner roles down, so it cannot raise a role. `canGrantPermissions` and `canActOnMember` are unchanged and there is no ADMINISTRATOR shortcut.
+
+**Caveat.** Until stored positions are repaired, an Owner cannot create roles (loud `ActionError`), by design.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
