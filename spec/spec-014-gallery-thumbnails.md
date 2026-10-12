@@ -1,9 +1,9 @@
 # spec-014: Gallery Thumbnails and Unoptimized Image Delivery
 
 - **Status:** In Review
-- **PR:** #220 (unoptimized restore, branch `fix/restore-unoptimized-images`) and a follow-up PR (thumbnails, branch `feat/gallery-thumbnails`)
+- **PR:** #220 (branch `fix/restore-unoptimized-images` on the remote; `fix/image-quota-unoptimized-thumbnails` locally) — the `unoptimized` restore and the thumbnail work ship together
 - **Date:** 2026-10-12
-- **Scope:** gallery photo storage, upload route, gallery admin actions, public marquee/grid/lightbox rendering, one additive migration (`0046`, applied in production) and an operator backfill script (dry run only so far).
+- **Scope:** gallery photo storage, upload route, gallery admin actions, public marquee/grid/lightbox rendering, one additive migration (`0046`, applied in production) and an operator backfill script (run with `--apply` on 2026-10-12: 35 rows).
 
 ## Context & Motivation
 
@@ -54,7 +54,7 @@ WebP, quality 80, longest edge 640px (fit inside, never upscaled, EXIF orientati
 
 `/api/upload` inspects the bytes before writing anything (`inspectImage`, `app/lib/image-thumbnail.ts`), for every section: the decoded format must be jpeg/png/webp/gif (the declared MIME is client-controlled, so an SVG or TIFF labelled `image/png` is rejected), and sharp runs with `limitInputPixels` of 50 million so a small PNG declaring billions of pixels cannot exhaust function memory. Both cases return a clean 400. Bytes are first sniffed (`sniffAllowedFormat`: JPEG/PNG/GIF/WebP magic numbers) so SVG and anything else never reaches sharp (which would parse SVG with librsvg). `metadata()` is called without `animated: true`, because that sums every frame's height and a legitimate 480x480x250-frame GIF would hit the pixel cap; width/height are one frame, `pages` still counts frames. `sharp` is pinned `^0.35.5` (librsvg advisory GHSA-wq5f-xc86-pv6w fixed in 0.35.5).
 
-### 7b. Migration not applied yet
+### 7b. If the migration has not run
 
 The code degrades instead of erroring if `0046` has not run. `withThumbnailColumnFallback` (`app/lib/db/thumbnail-columns.ts`) runs the thumbnail-aware query and, only on Postgres `42703` naming a `thumbnail_*` column, retries without those columns: `getCachedHomepageGallery` (public marquee and `/gallery` show full-size images), the admin gallery list, and the add/update actions (saved without thumbnails). Any other error is rethrown. This is a safety net, not a plan: apply `0046` first. Caveat: `getCachedHomepageGallery` caches whatever it returned, so after applying the migration (and the backfill) save a gallery row to refresh `gallery-images`. `db/storage-clean.ts` and the backfill script still need the columns; they are operator tools run after the migration.
 
