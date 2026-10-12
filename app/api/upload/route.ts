@@ -14,7 +14,7 @@ import {
   uploadToStorage,
   removeFromStorage,
 } from '@/app/lib/storage';
-import { generateThumbnail, type ThumbnailResult } from '@/app/lib/image-thumbnail';
+import { generateThumbnail, inspectImage, ImageInputError, type ThumbnailResult } from '@/app/lib/image-thumbnail';
 
 // Authorized staff uploading images: 30 uploads per minute is a generous cap
 // that prevents accidental runaway scripts from exhausting Supabase Storage.
@@ -87,18 +87,23 @@ export async function POST(req: NextRequest) {
   const storageKey = buildStorageKey(section, entityId, ext);
   const arrayBuffer = await file.arrayBuffer();
 
-  // Gallery photos get a small thumbnail so grids and the marquee never download
-  // the full-size file. It is generated before anything is written, so an
-  // undecodable file is rejected without touching storage. Decoding here also
-  // verifies the bytes really are an image, not just labelled as one.
+  // The declared MIME type is client-controlled, so the bytes are inspected before
+  // anything is written: the decoded format must be on the allowlist and the pixel
+  // count bounded. Gallery photos additionally get a small thumbnail so grids and
+  // the marquee never download the full-size file.
   let thumbnail: ThumbnailResult | null = null;
-  if (section === 'gallery') {
-    try {
+  try {
+    if (section === 'gallery') {
       thumbnail = await generateThumbnail(arrayBuffer);
-    } catch (err) {
-      console.error('Thumbnail generation failed:', err);
-      return NextResponse.json({ error: 'Could not read that image. Try a different file.' }, { status: 400 });
+    } else {
+      await inspectImage(arrayBuffer);
     }
+  } catch (err) {
+    if (err instanceof ImageInputError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    console.error('Image validation failed:', err);
+    return NextResponse.json({ error: 'Could not read that image. Try a different file.' }, { status: 400 });
   }
 
   // Use secret key for storage via uploadToStorage helper with Cache-Control: 31536000

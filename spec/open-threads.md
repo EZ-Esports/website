@@ -110,5 +110,5 @@ Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-o
 
 ## Gallery thumbnail rollout (spec-014)
 
-- Migration `0046_gallery_image_thumbnails` and `npm run db:backfill:gallery-thumbnails` are written but **not applied**. Until the backfill runs, existing gallery rows have no thumbnail and the grid/marquee load full-size files (unoptimized). Apply the migration before deploying the code; after the backfill, save any gallery row in `/admin/gallery` to refresh the Data Cache.
+- Migration `0046_gallery_image_thumbnails` and `npm run db:backfill:gallery-thumbnails` are written but **not applied**. Until the backfill runs, existing gallery rows have no thumbnail and the grid/marquee load full-size files (unoptimized). Apply the migration before merging the thumbnails PR (the code tolerates a missing migration for reads and admin saves, but `storage-clean` and the backfill do not); after the migration and again after the backfill, save any gallery row in `/admin/gallery` to refresh the Data Cache.
 - Sponsor logos and leadership avatars stay unoptimized without thumbnails; revisit only if they grow.

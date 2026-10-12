@@ -10,6 +10,7 @@ import { sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 import { ActionError } from '@/app/lib/errors';
 import { resolveGalleryThumbnail } from '@/app/lib/gallery-thumbnails';
+import { withThumbnailColumnFallback } from '@/app/lib/db/thumbnail-columns';
 
 export async function addGalleryImage(formData: FormData) {
   await requirePermission(Permissions.MANAGE_GALLERY);
@@ -24,6 +25,7 @@ export async function addGalleryImage(formData: FormData) {
   const storageKey = entityId && isKeyScopedToEntity(rawStorageKey, 'gallery', entityId) ? rawStorageKey : null;
 
   const thumb = resolveGalleryThumbnail({
+    src,
     entityId,
     storageKey,
     rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
@@ -38,7 +40,7 @@ export async function addGalleryImage(formData: FormData) {
     // The advisory lock serializes concurrent adds so two simultaneous submissions can't both
     // read the same max() and insert duplicate displayOrder values (it's tied to the transaction,
     // so it's safe under Supabase's transaction pooler, unlike a session-level advisory lock).
-    await db.transaction(async (tx) => {
+    const insertRow = (includeThumbnail: boolean) => db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('gallery_images_display_order'))`);
 
       const [maxOrderResult] = await tx
@@ -55,7 +57,7 @@ export async function addGalleryImage(formData: FormData) {
         eventName,
         displayOrder,
         storageKey,
-        ...thumb,
+        ...(includeThumbnail ? thumb : {}),
       };
       if (entityId) {
         insertValues.id = entityId;
@@ -63,6 +65,8 @@ export async function addGalleryImage(formData: FormData) {
 
       await tx.insert(schema.galleryImages).values(insertValues);
     });
+    // A failed statement aborts the transaction, so the legacy path re-runs it whole.
+    await withThumbnailColumnFallback(() => insertRow(true), () => insertRow(false));
 
     if (entityId) {
       await cleanupEntityStorage('gallery', entityId, [storageKey, thumb.thumbnailStorageKey]);
@@ -89,21 +93,33 @@ export async function updateGalleryImage(id: string, formData: FormData) {
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
 
   try {
-    const [old] = await db
-      .select({
-        storageKey: schema.galleryImages.storageKey,
-        thumbnailUrl: schema.galleryImages.thumbnailUrl,
-        thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
-      })
-      .from(schema.galleryImages)
-      .where(eq(schema.galleryImages.id, id))
-      .limit(1);
+    const [old] = await withThumbnailColumnFallback(
+      () =>
+        db
+          .select({
+            storageKey: schema.galleryImages.storageKey,
+            thumbnailUrl: schema.galleryImages.thumbnailUrl,
+            thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
+          })
+          .from(schema.galleryImages)
+          .where(eq(schema.galleryImages.id, id))
+          .limit(1),
+      async () =>
+        (
+          await db
+            .select({ storageKey: schema.galleryImages.storageKey })
+            .from(schema.galleryImages)
+            .where(eq(schema.galleryImages.id, id))
+            .limit(1)
+        ).map((row) => ({ ...row, thumbnailUrl: null as string | null, thumbnailStorageKey: null as string | null })),
+    );
 
     // Only accept storage keys strictly scoped to this entity folder
     const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'gallery', id) ? rawStorageKey : null;
     const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (old?.storageKey && isKeyScopedToEntity(old.storageKey, 'gallery', id) ? old.storageKey : null));
 
     const thumb = resolveGalleryThumbnail({
+      src,
       entityId: id,
       storageKey,
       rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
@@ -115,10 +131,11 @@ export async function updateGalleryImage(id: string, formData: FormData) {
     // and thumbnail keys; a replaced photo's old pair is removed together.
     await cleanupEntityStorage('gallery', id, [storageKey, thumb.thumbnailStorageKey]);
 
-    await db
-      .update(schema.galleryImages)
-      .set({ src, caption, schoolName, eventName, storageKey, ...thumb })
-      .where(eq(schema.galleryImages.id, id));
+    const row = { src, caption, schoolName, eventName, storageKey };
+    await withThumbnailColumnFallback(
+      () => db.update(schema.galleryImages).set({ ...row, ...thumb }).where(eq(schema.galleryImages.id, id)),
+      () => db.update(schema.galleryImages).set(row).where(eq(schema.galleryImages.id, id)),
+    );
   } catch (error) {
     console.error('Failed to update gallery image', error);
     return { success: false, error: sanitizeDbError(error) };

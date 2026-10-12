@@ -143,6 +143,69 @@ describe('gallery actions with thumbnails', () => {
     expect(remove).not.toHaveBeenCalled();
   });
 
+  describe('before migration 0046 is applied', () => {
+    const missing = () =>
+      Object.assign(new Error('Failed query'), {
+        cause: Object.assign(new Error('column "thumbnail_url" of relation "gallery_images" does not exist'), { code: '42703' }),
+      });
+
+    it('addGalleryImage retries the insert without thumbnail columns and still succeeds', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockTx.select.mockReturnValue({ from: () => ({ where: () => Promise.resolve([{ maxOrder: 1 }]) }) });
+      const values = vi.fn().mockRejectedValueOnce(missing()).mockResolvedValue(undefined);
+      mockTx.insert.mockReturnValue({ values });
+
+      const res = await addGalleryImage(
+        form({
+          src: `${BASE}/${NEW_FULL}`,
+          caption: 'cap',
+          entityId: ID,
+          storageKey: NEW_FULL,
+          thumbnailUrl: `${BASE}/${NEW_THUMB}`,
+          thumbnailStorageKey: NEW_THUMB,
+        }),
+      );
+
+      expect(res).toEqual({ success: true });
+      expect(values).toHaveBeenCalledTimes(2);
+      expect(values.mock.calls[1][0]).not.toHaveProperty('thumbnailUrl');
+      expect(values.mock.calls[1][0]).not.toHaveProperty('thumbnailStorageKey');
+      expect(values.mock.calls[1][0]).toMatchObject({ storageKey: NEW_FULL });
+    });
+
+    it('updateGalleryImage reads and writes without thumbnail columns', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockDb.select
+        .mockReturnValueOnce({ from: () => ({ where: () => ({ limit: () => Promise.reject(missing()) }) }) })
+        .mockReturnValueOnce({ from: () => ({ where: () => ({ limit: () => Promise.resolve([{ storageKey: OLD_FULL }]) }) }) });
+      const set = vi
+        .fn()
+        .mockReturnValueOnce({ where: () => Promise.reject(missing()) })
+        .mockReturnValue({ where: () => Promise.resolve() });
+      mockDb.update.mockReturnValue({ set });
+      list.mockResolvedValue({ data: [{ name: OLD_FULL.split('/').pop() }], error: null });
+
+      const res = await updateGalleryImage(ID, form({ src: `${BASE}/${OLD_FULL}`, caption: 'new', storageKey: OLD_FULL }));
+
+      expect(res).toEqual({ success: true });
+      expect(set).toHaveBeenCalledTimes(2);
+      expect(set.mock.calls[1][0]).not.toHaveProperty('thumbnailUrl');
+      expect(set.mock.calls[1][0]).toMatchObject({ caption: 'new', storageKey: OLD_FULL });
+    });
+
+    it('does not swallow unrelated database errors', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockTx.select.mockReturnValue({ from: () => ({ where: () => Promise.resolve([{ maxOrder: 1 }]) }) });
+      const values = vi.fn().mockRejectedValue(new Error('connection terminated'));
+      mockTx.insert.mockReturnValue({ values });
+
+      const res = await addGalleryImage(form({ src: `${BASE}/${NEW_FULL}`, caption: 'cap', entityId: ID, storageKey: NEW_FULL }));
+
+      expect(res.success).toBe(false);
+      expect(values).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('deleteGalleryImage removes both the full-size image and its thumbnail', async () => {
     mockDb.update.mockReturnValue({ set: () => ({ where: () => Promise.resolve() }) });
     list.mockResolvedValue({ data: [OLD_FULL, OLD_THUMB].map((k) => ({ name: k.split('/').pop() })), error: null });

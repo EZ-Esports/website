@@ -2,14 +2,14 @@ import Image from 'next/image';
 import type { Image as ImageType } from '@/app/types';
 
 /**
- * Gallery photos are served in two tiers so Vercel image transformations
- * (a metered monthly quota) are only spent when a visitor opens a photo:
+ * Every gallery image is `unoptimized`: it loads straight from Supabase and never
+ * goes through `/_next/image`, whose transformations are a metered monthly quota.
  *
- *  - Thumbnails (marquee, grid cards, admin cards) load straight from Supabase
- *    with `unoptimized`. The object is already a small, 1-year-cacheable WebP, so
- *    `/_next/image` would only add a billable transformation.
- *  - The lightbox renders the full-size file WITHOUT `unoptimized`, so Next resizes
- *    it through `/_next/image` for the visitor's viewport.
+ *  - Thumbnails (marquee, grid cards, admin cards) are small, 1-year-cacheable WebPs
+ *    generated at upload time, so grids never download the full-size file.
+ *  - The full-size file is fetched only by the lightbox, and only once a visitor
+ *    opens a photo. The lightbox is mounted only while open and renders a single
+ *    image, so there is no adjacent-image preloading and nothing is `priority`.
  */
 
 type PhotoSource = Pick<ImageType, 'src' | 'thumbnailSrc'>;
@@ -51,7 +51,7 @@ interface GalleryLightboxImageProps {
   className?: string;
 }
 
-/** Large preview. Deliberately omits `unoptimized`: this is the only gallery image allowed to hit /_next/image. */
+/** Large preview of the full-size file, served raw from Supabase like every other gallery image. */
 export function GalleryLightboxImage({ item, className }: GalleryLightboxImageProps) {
   return (
     <Image
@@ -59,8 +59,7 @@ export function GalleryLightboxImage({ item, className }: GalleryLightboxImagePr
       alt={item.alt}
       width={1200}
       height={800}
-      priority
-      sizes="(max-width: 1024px) 100vw, 1024px"
+      unoptimized
       className={className}
     />
   );

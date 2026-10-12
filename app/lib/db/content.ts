@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { withThumbnailColumnFallback } from './thumbnail-columns';
 import { and, asc, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 export const NEWS_PAGE_SIZE = 20;
@@ -143,24 +144,33 @@ export async function restorePageContentFromHistory(id: string, historyId: strin
 
 export const getCachedHomepageGallery = unstable_cache(
   async () => {
-    const rows = await db
-      .select({
-        id: schema.galleryImages.id,
-        src: schema.galleryImages.src,
-        thumbnailUrl: schema.galleryImages.thumbnailUrl,
-        caption: schema.galleryImages.caption,
-      })
-      .from(schema.galleryImages)
-      .where(
-        and(
-          eq(schema.galleryImages.isActive, true),
-          isNull(schema.galleryImages.deletedAt)
-        )
-      )
-      .orderBy(
-        asc(schema.galleryImages.displayOrder),
-        asc(schema.galleryImages.createdAt)
-      );
+    const active = and(eq(schema.galleryImages.isActive, true), isNull(schema.galleryImages.deletedAt));
+    const order = [asc(schema.galleryImages.displayOrder), asc(schema.galleryImages.createdAt)] as const;
+    const rows = await withThumbnailColumnFallback(
+      () =>
+        db
+          .select({
+            id: schema.galleryImages.id,
+            src: schema.galleryImages.src,
+            thumbnailUrl: schema.galleryImages.thumbnailUrl,
+            caption: schema.galleryImages.caption,
+          })
+          .from(schema.galleryImages)
+          .where(active)
+          .orderBy(...order),
+      async () =>
+        (
+          await db
+            .select({
+              id: schema.galleryImages.id,
+              src: schema.galleryImages.src,
+              caption: schema.galleryImages.caption,
+            })
+            .from(schema.galleryImages)
+            .where(active)
+            .orderBy(...order)
+        ).map((row) => ({ ...row, thumbnailUrl: null as string | null })),
+    );
 
     // Defensive de-dupe: bad data entry has occasionally produced two active rows
     // for the same set pointing at the same underlying image file (by basename).

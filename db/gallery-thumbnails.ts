@@ -113,3 +113,12 @@ export function parseBackfillArgs(argv: readonly string[], expectedBucket: strin
 
   return { apply: argv.includes('--apply'), bucket, limit, previewDir: value('preview-dir') };
 }
+
+/**
+ * The backfill's UPDATE only matches a row that still has the storage key it was
+ * planned with and no thumbnail. Matching nothing is not success: the row changed
+ * underneath the run, so it must be reported rather than counted as written.
+ */
+export function classifyRowUpdate(updatedRows: number): 'written' | 'conflict' {
+  return updatedRows > 0 ? 'written' : 'conflict';
+}

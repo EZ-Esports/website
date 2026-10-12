@@ -112,6 +112,34 @@ describe('POST /api/upload (gallery thumbnails)', () => {
     expect(uploadToStorage).not.toHaveBeenCalled();
   });
 
+  it('rejects an SVG labelled as image/png before writing anything, in every section', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script></svg>');
+    for (const section of ['gallery', 'sponsors']) {
+      const res = await POST(request(svg, 'image/png', { section }));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/JPEG, PNG, WebP or GIF/);
+    }
+    expect(uploadToStorage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a TIFF labelled as image/jpeg before writing anything', async () => {
+    const tiff = await sharp(await jpeg(64, 64)).tiff().toBuffer();
+    const res = await POST(request(tiff, 'image/jpeg'));
+    expect(res.status).toBe(400);
+    expect(uploadToStorage).not.toHaveBeenCalled();
+  });
+
+  it('returns a clean 400 for an image over the pixel limit, without touching storage', async () => {
+    const big = await sharp({ create: { width: 7200, height: 7200, channels: 3, background: '#000' } })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    expect(big.length).toBeLessThan(5 * 1024 * 1024);
+    const res = await POST(request(big, 'image/png'));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/too many pixels/i);
+    expect(uploadToStorage).not.toHaveBeenCalled();
+  });
+
   it('does not generate thumbnails for non-gallery sections', async () => {
     const res = await POST(request(await jpeg(), 'image/jpeg', { section: 'sponsors' }));
     expect(res.status).toBe(201);

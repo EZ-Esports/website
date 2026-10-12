@@ -33,16 +33,6 @@ const nextConfig: NextConfig = {
     }));
   },
   images: {
-    // Only the gallery lightbox calls /_next/image (thumbnails are `unoptimized`
-    // and load straight from Supabase), but every optimized image is billed per
-    // distinct (url, width, quality) on Vercel. Few widths and one quality bound
-    // that to three transformations per image instead of one per device bucket.
-    deviceSizes: [640, 1200, 1920],
-    qualities: [75],
-    formats: ['image/webp'],
-    // 31 days. Uploaded photos already carry a 1-year Cache-Control, which wins
-    // when larger; this covers local public/ assets that have none.
-    minimumCacheTTL: 2678400,
     remotePatterns: [
       {
         protocol: 'https',

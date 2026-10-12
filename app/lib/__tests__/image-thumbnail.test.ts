@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
+import { deflateSync } from 'node:zlib';
 import {
+  ImageInputError,
+  MAX_INPUT_PIXELS,
   THUMBNAIL_MAX_EDGE,
+  inspectImage,
   generateThumbnail,
   planThumbnail,
 } from '@/app/lib/image-thumbnail';
@@ -109,5 +113,72 @@ describe('generateThumbnail (real sharp)', () => {
 
   it('rejects bytes that are not an image', async () => {
     await expect(generateThumbnail(Buffer.from('definitely not an image'))).rejects.toThrow();
+  });
+});
+
+function crc32(buf: Buffer) {
+  let c = ~0;
+  for (const byte of buf) {
+    c ^= byte;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+  }
+  return ~c >>> 0;
+}
+
+function chunk(type: string, data: Buffer) {
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const out = Buffer.alloc(body.length + 8);
+  out.writeUInt32BE(data.length, 0);
+  body.copy(out, 4);
+  out.writeUInt32BE(crc32(body), body.length + 4);
+  return out;
+}
+
+/** A tiny PNG whose header declares width x height 8-bit grayscale pixels. */
+function declaredPng(width: number, height: number) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 0; // grayscale
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(Buffer.alloc(64))),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+describe('input hardening', () => {
+  it('rejects a tiny PNG that declares more pixels than the limit', async () => {
+    const bomb = declaredPng(30_000, 30_000);
+    expect(bomb.length).toBeLessThan(1000);
+    expect(30_000 * 30_000).toBeGreaterThan(MAX_INPUT_PIXELS);
+    await expect(generateThumbnail(bomb)).rejects.toMatchObject({ name: 'ImageInputError', code: 'too-large' });
+    await expect(inspectImage(bomb)).rejects.toBeInstanceOf(ImageInputError);
+  });
+
+  it('rejects a real image over the pixel limit that sharp can actually decode', async () => {
+    const big = await sharp({ create: { width: 7200, height: 7200, channels: 3, background: '#000' } })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    await expect(generateThumbnail(big)).rejects.toMatchObject({ code: 'too-large' });
+  });
+
+  it('rejects SVG even if it was uploaded under an image MIME type', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>');
+    await expect(inspectImage(svg)).rejects.toMatchObject({ code: 'unsupported-format' });
+    await expect(generateThumbnail(svg)).rejects.toMatchObject({ code: 'unsupported-format' });
+  });
+
+  it('rejects TIFF, which is outside the allowlist', async () => {
+    const tiff = await sharp(await photoLike(32, 32, 'png')).tiff().toBuffer();
+    await expect(inspectImage(tiff)).rejects.toMatchObject({ code: 'unsupported-format' });
+  });
+
+  it.each(['jpeg', 'png', 'webp', 'gif'] as const)('accepts %s', async (format) => {
+    const bytes = await sharp(await photoLike(32, 32, 'png'))[format]().toBuffer();
+    const { meta } = await inspectImage(bytes);
+    expect(meta.format).toBe(format);
   });
 });

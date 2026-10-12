@@ -35,7 +35,7 @@ import * as schema from '../app/lib/db/schema';
 import { BUCKET, STORAGE_CACHE_CONTROL } from '../app/lib/storage-constants';
 import { generateThumbnail } from '../app/lib/image-thumbnail';
 import { assertSeedTargetAllowed } from './seed-target';
-import { assertBackfillTargetAllowed, parseBackfillArgs, planBackfill } from './gallery-thumbnails';
+import { assertBackfillTargetAllowed, classifyRowUpdate, parseBackfillArgs, planBackfill } from './gallery-thumbnails';
 
 async function main() {
   const args = parseBackfillArgs(process.argv.slice(2), BUCKET);
@@ -73,6 +73,7 @@ async function main() {
 
     let done = 0;
     let failed = 0;
+    let conflicts = 0;
     for (const t of todo) {
       try {
         const { data: blob, error: dlError } = await supabase.storage.from(args.bucket).download(t.storageKey);
@@ -99,7 +100,7 @@ async function main() {
         if (upError && !alreadyThere) throw new Error(`upload failed: ${upError.message}`);
 
         const { data: pub } = supabase.storage.from(args.bucket).getPublicUrl(t.thumbnailKey);
-        await db
+        const updated = await db
           .update(schema.galleryImages)
           .set({ thumbnailUrl: pub.publicUrl, thumbnailStorageKey: t.thumbnailKey })
           .where(
@@ -108,7 +109,15 @@ async function main() {
               eq(schema.galleryImages.storageKey, t.storageKey),
               isNull(schema.galleryImages.thumbnailStorageKey),
             ),
-          );
+          )
+          .returning({ id: schema.galleryImages.id });
+        // Zero rows means the row changed since it was read (photo replaced, thumbnail
+        // set by an admin save, or row removed); the uploaded object is left unreferenced.
+        if (classifyRowUpdate(updated.length) === 'conflict') {
+          conflicts += 1;
+          console.warn(`  CONFLICT ${t.id}: row changed during backfill, not updated (re-run to re-evaluate)`);
+          continue;
+        }
         done += 1;
       } catch (err) {
         failed += 1;
@@ -116,7 +125,7 @@ async function main() {
       }
     }
 
-    console.log(`[gallery-thumbs] Finished: ${done} written, ${failed} failed. Re-run to retry failures.`);
+    console.log(`[gallery-thumbs] Finished: ${done} written, ${conflicts} skipped (row changed), ${failed} failed. Re-run to retry failures.`);
     if (args.apply && done > 0) {
       console.log('[gallery-thumbs] Now save any gallery row in /admin/gallery (unchanged) to refresh the Data Cache.');
     }

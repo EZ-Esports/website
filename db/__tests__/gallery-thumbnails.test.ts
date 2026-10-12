@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BACKFILL_ALLOW_ENV,
   assertBackfillTargetAllowed,
+  classifyRowUpdate,
   parseBackfillArgs,
   planBackfill,
   storageHost,
@@ -105,5 +106,15 @@ describe('parseBackfillArgs', () => {
     expect(args.previewDir).toBe('db/thumbnail-previews');
     expect(() => parseBackfillArgs(['--bucket=admin-uploads', '--limit=0'], 'admin-uploads')).toThrow('--limit');
     expect(() => parseBackfillArgs(['--bucket=admin-uploads', '--limit=abc'], 'admin-uploads')).toThrow('--limit');
+  });
+});
+
+describe('classifyRowUpdate', () => {
+  it('counts a matched row as written', () => {
+    expect(classifyRowUpdate(1)).toBe('written');
+  });
+
+  it('reports a 0-row update as a conflict instead of done', () => {
+    expect(classifyRowUpdate(0)).toBe('conflict');
   });
 });

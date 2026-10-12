@@ -9,6 +9,62 @@ export const THUMBNAIL_MAX_EDGE = 640;
 export const THUMBNAIL_QUALITY = 80;
 export const THUMBNAIL_MIME = 'image/webp';
 
+/**
+ * Decoded-pixel ceiling (about 7000x7000). The upload cap limits compressed bytes
+ * only, and a few KB of PNG can declare billions of pixels, so sharp is told to
+ * refuse to decode anything larger instead of allocating for it.
+ */
+export const MAX_INPUT_PIXELS = 50_000_000;
+
+/**
+ * Formats the decoder may report. Mirrors ALLOWED_MIME_TYPES: the declared MIME
+ * is client-controlled, so the decoded format is what actually gets trusted
+ * (an SVG or TIFF labelled image/png is rejected here).
+ */
+export const ALLOWED_DECODED_FORMATS = ['jpeg', 'png', 'webp', 'gif'] as const;
+
+/** Raised for input the uploader should be told about; anything else is an opaque decode failure. */
+export class ImageInputError extends Error {
+  constructor(
+    readonly code: 'unsupported-format' | 'too-large',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ImageInputError';
+  }
+}
+
+const SHARP_OPTIONS = { limitInputPixels: MAX_INPUT_PIXELS } as const;
+
+function rethrowPixelLimit(err: unknown): never {
+  if (err instanceof Error && /pixel limit/i.test(err.message)) {
+    throw new ImageInputError('too-large', 'That image has too many pixels. Resize it and try again.');
+  }
+  throw err;
+}
+
+/**
+ * Header-only inspection (no full decode). Rejects formats outside the allowlist
+ * and images over the pixel limit before any bytes are written to storage.
+ */
+export async function inspectImage(input: Buffer | ArrayBuffer) {
+  const source = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  let meta;
+  try {
+    // `animated: true` makes sharp report every frame in `pages`.
+    meta = await sharp(source, { ...SHARP_OPTIONS, animated: true }).metadata();
+  } catch (err) {
+    rethrowPixelLimit(err);
+  }
+  if (!meta.format || !(ALLOWED_DECODED_FORMATS as readonly string[]).includes(meta.format)) {
+    throw new ImageInputError('unsupported-format', 'Only JPEG, PNG, WebP or GIF images can be uploaded.');
+  }
+  if ((meta.width ?? 0) * (meta.height ?? 0) > MAX_INPUT_PIXELS) {
+    throw new ImageInputError('too-large', 'That image has too many pixels. Resize it and try again.');
+  }
+  return { source, meta };
+}
+
 export type ThumbnailPlan =
   | { skip: true; reason: 'animated' | 'unreadable' }
   | { skip: false; width: number; height: number };
@@ -46,9 +102,7 @@ export type ThumbnailResult =
  * which doubles as a content check on the client-declared MIME type.
  */
 export async function generateThumbnail(input: Buffer | ArrayBuffer): Promise<ThumbnailResult> {
-  const source = Buffer.isBuffer(input) ? input : Buffer.from(input);
-  // `animated: true` makes sharp report every frame in `pages`.
-  const meta = await sharp(source, { animated: true }).metadata();
+  const { source, meta } = await inspectImage(input);
   const plan = planThumbnail({
     width: meta.width,
     // For animated images sharp reports the full multi-frame height; pageHeight is one frame.
@@ -63,11 +117,17 @@ export async function generateThumbnail(input: Buffer | ArrayBuffer): Promise<Th
 
   // rotate() applies EXIF orientation so phone photos are not stored sideways once
   // the metadata is stripped; the bounding box is square so it holds for either axis.
-  const { data, info } = await sharp(source)
-    .rotate()
-    .resize({ width: THUMBNAIL_MAX_EDGE, height: THUMBNAIL_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: THUMBNAIL_QUALITY })
-    .toBuffer({ resolveWithObject: true });
+  let encoded;
+  try {
+    encoded = await sharp(source, SHARP_OPTIONS)
+      .rotate()
+      .resize({ width: THUMBNAIL_MAX_EDGE, height: THUMBNAIL_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: THUMBNAIL_QUALITY })
+      .toBuffer({ resolveWithObject: true });
+  } catch (err) {
+    rethrowPixelLimit(err);
+  }
+  const { data, info } = encoded;
 
   return { skipped: false, buffer: data, width: info.width, height: info.height, mime: THUMBNAIL_MIME };
 }

@@ -10,7 +10,6 @@ import {
   GalleryThumbnail,
   getThumbnailSrc,
 } from '@/app/components/ui/GalleryImage';
-import nextConfig from '@/next.config';
 import type { Image as ImageType } from '@/app/types';
 
 const SUPABASE = 'https://fziqdmlymqtobxrngneh.supabase.co/storage/v1/object/public/admin-uploads';
@@ -19,7 +18,7 @@ const THUMB = `${SUPABASE}/gallery/a/1700000000000_thumb.webp`;
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
-describe('Gallery image tiers: thumbnails unoptimized, lightbox optimized', () => {
+describe('Gallery image tiers: thumbnails in grids, full image only in the lightbox, nothing via /_next/image', () => {
   const withThumb: ImageType[] = [
     { id: '1', src: FULL, thumbnailSrc: THUMB, alt: 'Has thumbnail' },
     { id: '2', src: `${SUPABASE}/gallery/b/1700000000001.jpg`, thumbnailSrc: null, alt: 'No thumbnail yet' },
@@ -54,16 +53,19 @@ describe('Gallery image tiers: thumbnails unoptimized, lightbox optimized', () =
   });
 
   describe('GalleryLightboxImage', () => {
-    it('serves the FULL image through /_next/image, never the thumbnail', () => {
+    it('renders the FULL image straight from Supabase: no /_next/image, never the thumbnail', () => {
       const html = renderToStaticMarkup(<GalleryLightboxImage item={{ src: FULL, alt: 'Big' }} />);
-      expect(html).toContain('/_next/image?url=');
-      expect(html).toContain(encodeURIComponent(FULL));
-      expect(html).not.toContain(encodeURIComponent(THUMB));
+      expect(html).toContain(`src="${FULL}"`);
+      expect(html).not.toContain('/_next/image');
+      expect(html).not.toContain(THUMB);
     });
 
-    it('declares a bounded sizes hint for the large view', () => {
+    it('keeps explicit dimensions (no layout shift) and is not preloaded', () => {
       const html = renderToStaticMarkup(<GalleryLightboxImage item={{ src: FULL, alt: 'Big' }} />);
-      expect(html).toContain('sizes="(max-width: 1024px) 100vw, 1024px"');
+      expect(html).toContain('width="1200"');
+      expect(html).toContain('height="800"');
+      expect(html).not.toContain('fetchPriority');
+      expect(html).not.toContain('fetchpriority');
     });
   });
 
@@ -116,11 +118,33 @@ describe('Gallery image tiers: thumbnails unoptimized, lightbox optimized', () =
   });
 
   describe('GalleryImage.tsx', () => {
-    it('keeps unoptimized on the thumbnail only: the lightbox <Image> must stay optimizable', () => {
+    it('marks both tiers unoptimized and never sets priority', () => {
       const source = read('app/components/ui/GalleryImage.tsx');
-      const lightbox = source.slice(source.indexOf('export function GalleryLightboxImage'));
-      expect(source.match(/^\s*unoptimized\s*$/gm)).toHaveLength(1);
-      expect(lightbox).not.toMatch(/^\s*unoptimized\s*$/m);
+      expect(source.match(/<Image\b/g)).toHaveLength(2);
+      expect(source.match(/^\s*unoptimized\s*$/gm)).toHaveLength(2);
+      expect(source).not.toMatch(/^\s*priority\s*$/m);
+    });
+  });
+
+  describe('no gallery <Image> can reach /_next/image', () => {
+    const GALLERY_FILES = [
+      'app/components/ui/GalleryImage.tsx',
+      'app/components/admin/GalleryImageCard.tsx',
+      'app/components/sections/MediaGrid.tsx',
+      'app/(marketing)/gallery/GalleryGrid.tsx',
+    ];
+
+    it.each(GALLERY_FILES)('%s: every <Image> element declares unoptimized', (file) => {
+      const elements = read(file).match(/<Image\b[^>]*?\/>/gs) ?? [];
+      for (const element of elements) expect(element).toMatch(/\bunoptimized\b/);
+    });
+
+    it('the lightboxes mount an image only while a photo is selected', () => {
+      for (const file of ['app/components/sections/MediaGrid.tsx', 'app/(marketing)/gallery/GalleryGrid.tsx']) {
+        const source = read(file);
+        expect(source.match(/<GalleryLightboxImage/g)).toHaveLength(1);
+        expect(source).toMatch(/selectedImageIndex !== null && \(/);
+      }
     });
   });
 
@@ -144,16 +168,6 @@ describe('Gallery image tiers: thumbnails unoptimized, lightbox optimized', () =
       expect(source).toContain('getThumbnailSrc(');
       expect(source).toMatch(/^\s*unoptimized\s*$/m);
       expect(source).toContain('sizes="(max-width: 640px) 100vw, 200px"');
-    });
-  });
-
-  describe('next.config.ts images', () => {
-    it('limits transformation variants for the lightbox and caches them long', () => {
-      const images = nextConfig.images!;
-      expect(images.deviceSizes).toHaveLength(3);
-      expect(images.qualities).toEqual([75]);
-      expect(images.formats).toEqual(['image/webp']);
-      expect(images.minimumCacheTTL).toBeGreaterThanOrEqual(31 * 24 * 60 * 60);
     });
   });
 });

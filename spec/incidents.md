@@ -168,6 +168,18 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 18. Vercel image-transformation quota exhausted — Oct 2026 (PR #202 cause, PR #220 fix)
+
+**Symptom.** Images across the site (gallery, schools, games) stopped loading and showed alt text instead.
+
+**Root cause.** PR #202 removed `unoptimized` so every Supabase image went through `/_next/image`. Each photo produced roughly 10-12 transformations (one per device width bucket and quality), which reached 5,040 against the 5,000 monthly Hobby limit. New transformations then returned HTTP 402; already-cached variants kept working, so it looked intermittent.
+
+**Fix.** PR #220 restores `unoptimized` on Supabase images. A follow-up gives gallery photos a server-generated WebP thumbnail (spec-014) so grids stay light without transformations; the lightbox loads the full file `unoptimized` too, so no gallery image uses `/_next/image`. The quota resets monthly; nothing else in the repo had to change.
+
+**Do not repeat.** Do not route user-uploaded images through `/_next/image` without costing it (images x widths x qualities). Prefer pre-sized derivatives generated at upload.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

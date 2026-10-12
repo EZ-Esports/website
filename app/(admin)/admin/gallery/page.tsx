@@ -1,7 +1,8 @@
 import { HiOutlinePhoto } from 'react-icons/hi2';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { asc, isNull } from 'drizzle-orm';
+import { asc, getTableColumns, isNull } from 'drizzle-orm';
+import { withThumbnailColumnFallback } from '@/app/lib/db/thumbnail-columns';
 import { addGalleryImage } from './actions';
 import GalleryManagerClient from '@/app/components/admin/GalleryManagerClient';
 import ImageUpload from '@/app/components/admin/ImageUpload';
@@ -14,11 +15,24 @@ import { AdminCount, AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, 
 import { input, label as labelClass } from '@/app/components/admin/styles';
 
 async function getAllGalleryImages() {
-  return db
-    .select()
-    .from(schema.galleryImages)
-    .where(isNull(schema.galleryImages.deletedAt))
-    .orderBy(asc(schema.galleryImages.displayOrder), asc(schema.galleryImages.createdAt));
+  // Every column except the two added by migration 0046, for use before it is applied.
+  const { thumbnailUrl: _thumbUrl, thumbnailStorageKey: _thumbKey, ...legacyColumns } = getTableColumns(schema.galleryImages);
+  return withThumbnailColumnFallback(
+    () =>
+      db
+        .select()
+        .from(schema.galleryImages)
+        .where(isNull(schema.galleryImages.deletedAt))
+        .orderBy(asc(schema.galleryImages.displayOrder), asc(schema.galleryImages.createdAt)),
+    async () =>
+      (
+        await db
+          .select(legacyColumns)
+          .from(schema.galleryImages)
+          .where(isNull(schema.galleryImages.deletedAt))
+          .orderBy(asc(schema.galleryImages.displayOrder), asc(schema.galleryImages.createdAt))
+      ).map((row) => ({ ...row, thumbnailUrl: null, thumbnailStorageKey: null })),
+  );
 }
 
 export default async function GalleryAdminPage() {
