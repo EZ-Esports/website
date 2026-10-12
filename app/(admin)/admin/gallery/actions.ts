@@ -9,6 +9,7 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 import { ActionError } from '@/app/lib/errors';
+import { resolveGalleryThumbnail } from '@/app/lib/gallery-thumbnails';
 
 export async function addGalleryImage(formData: FormData) {
   await requirePermission(Permissions.MANAGE_GALLERY);
@@ -21,6 +22,13 @@ export async function addGalleryImage(formData: FormData) {
 
   const rawStorageKey = (formData.get('storageKey') as string) || null;
   const storageKey = entityId && isKeyScopedToEntity(rawStorageKey, 'gallery', entityId) ? rawStorageKey : null;
+
+  const thumb = resolveGalleryThumbnail({
+    entityId,
+    storageKey,
+    rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
+    rawThumbnailUrl: (formData.get('thumbnailUrl') as string) || null,
+  });
 
   if (!src) return { success: false, error: 'Please upload an image first.' };
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
@@ -47,6 +55,7 @@ export async function addGalleryImage(formData: FormData) {
         eventName,
         displayOrder,
         storageKey,
+        ...thumb,
       };
       if (entityId) {
         insertValues.id = entityId;
@@ -56,7 +65,7 @@ export async function addGalleryImage(formData: FormData) {
     });
 
     if (entityId) {
-      await cleanupEntityStorage('gallery', entityId, storageKey);
+      await cleanupEntityStorage('gallery', entityId, [storageKey, thumb.thumbnailStorageKey]);
     }
   } catch (error) {
     console.error('Failed to add gallery image', error);
@@ -81,7 +90,11 @@ export async function updateGalleryImage(id: string, formData: FormData) {
 
   try {
     const [old] = await db
-      .select({ storageKey: schema.galleryImages.storageKey })
+      .select({
+        storageKey: schema.galleryImages.storageKey,
+        thumbnailUrl: schema.galleryImages.thumbnailUrl,
+        thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
+      })
       .from(schema.galleryImages)
       .where(eq(schema.galleryImages.id, id))
       .limit(1);
@@ -90,12 +103,21 @@ export async function updateGalleryImage(id: string, formData: FormData) {
     const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'gallery', id) ? rawStorageKey : null;
     const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (old?.storageKey && isKeyScopedToEntity(old.storageKey, 'gallery', id) ? old.storageKey : null));
 
-    // Scope cleanup strictly to this entity folder, preserving the active key
-    await cleanupEntityStorage('gallery', id, storageKey);
+    const thumb = resolveGalleryThumbnail({
+      entityId: id,
+      storageKey,
+      rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
+      rawThumbnailUrl: (formData.get('thumbnailUrl') as string) || null,
+      existing: old,
+    });
+
+    // Scope cleanup strictly to this entity folder, preserving the active full-size
+    // and thumbnail keys; a replaced photo's old pair is removed together.
+    await cleanupEntityStorage('gallery', id, [storageKey, thumb.thumbnailStorageKey]);
 
     await db
       .update(schema.galleryImages)
-      .set({ src, caption, schoolName, eventName, storageKey })
+      .set({ src, caption, schoolName, eventName, storageKey, ...thumb })
       .where(eq(schema.galleryImages.id, id));
   } catch (error) {
     console.error('Failed to update gallery image', error);

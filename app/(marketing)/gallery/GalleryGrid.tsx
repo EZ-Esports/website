@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Image as ImageType } from '@/app/types';
 import Badge from '@/app/components/ui/Badge';
+import { GalleryThumbnail, GalleryLightboxImage } from '@/app/components/ui/GalleryImage';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 import { usePrefersReducedMotion } from '@/app/lib/hooks/usePrefersReducedMotion';
 
@@ -48,12 +48,9 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
             className="group rounded-2xl overflow-hidden bg-surface-raised/40 border border-line/80 hover:border-accent/50 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <div className="relative aspect-[16/10] w-full overflow-hidden block">
-              <Image
-                src={item.src}
-                alt={item.alt}
-                fill
+              <GalleryThumbnail
+                item={item}
                 sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"
-                unoptimized
                 className="object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
@@ -146,14 +143,8 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
                     className="flex flex-col items-center max-w-full"
                   >
                     <div className="relative max-h-[75vh] w-auto flex items-center justify-center">
-                      <Image
-                        src={items[selectedImageIndex].src}
-                        alt={items[selectedImageIndex].alt}
-                        width={1200}
-                        height={800}
-                        priority
-                        sizes="(max-width: 1024px) 100vw, 1024px"
-                        unoptimized
+                      <GalleryLightboxImage
+                        item={items[selectedImageIndex]}
                         className="object-contain max-h-[75vh] w-auto h-auto rounded-lg shadow-2xl select-none"
                       />
                     </div>

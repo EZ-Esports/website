@@ -323,6 +323,13 @@
       "when": 1790882000000,
       "tag": "0045_career_postings",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791800000000,
+      "tag": "0046_gallery_image_thumbnails",
+      "breakpoints": true
     }
   ]
 }

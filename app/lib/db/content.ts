@@ -147,6 +147,7 @@ export const getCachedHomepageGallery = unstable_cache(
       .select({
         id: schema.galleryImages.id,
         src: schema.galleryImages.src,
+        thumbnailUrl: schema.galleryImages.thumbnailUrl,
         caption: schema.galleryImages.caption,
       })
       .from(schema.galleryImages)
@@ -181,6 +182,7 @@ export const getCachedHomepageGallery = unstable_cache(
       set1: dedupedRows.map((row) => ({
         id: row.id,
         src: row.src,
+        thumbnailSrc: row.thumbnailUrl,
         alt: row.caption || 'EZ Esports gallery photo',
       })),
     };

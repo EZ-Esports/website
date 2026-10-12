@@ -75,6 +75,40 @@ export function buildStorageKey(
   return `${section}/${safeId}/${timestamp}.${cleanExt}`;
 }
 
+/** Suffix that marks a thumbnail object stored beside its full-size original. */
+export const THUMBNAIL_KEY_SUFFIX = '_thumb';
+export const THUMBNAIL_EXT = 'webp';
+
+/**
+ * Deterministic thumbnail key for a full-size storage key: the thumbnail lives in
+ * the same entity folder as the original (`gallery/<id>/<ts>.webp` ->
+ * `gallery/<id>/<ts>_thumb.webp`). Keeping it in that folder means the existing
+ * folder-scoped cleanup removes both objects together, and the key can always be
+ * recomputed from the original so a client never needs to be trusted for it.
+ */
+export function deriveThumbnailKey(storageKey: string): string {
+  const slash = storageKey.lastIndexOf('/');
+  const dot = storageKey.lastIndexOf('.');
+  const base = dot > slash ? storageKey.slice(0, dot) : storageKey;
+  return `${base}${THUMBNAIL_KEY_SUFFIX}.${THUMBNAIL_EXT}`;
+}
+
+/**
+ * True when `thumbnailKey` is exactly the thumbnail key derived from `storageKey`
+ * and both are scoped to the given entity folder.
+ */
+export function isThumbnailKeyFor(
+  thumbnailKey: string | null | undefined,
+  storageKey: string | null | undefined,
+  section: UploadSection,
+  entityId: string | null | undefined,
+): thumbnailKey is string {
+  if (!thumbnailKey || !storageKey) return false;
+  if (!isKeyScopedToEntity(storageKey, section, entityId)) return false;
+  if (!isKeyScopedToEntity(thumbnailKey, section, entityId)) return false;
+  return thumbnailKey === deriveThumbnailKey(storageKey);
+}
+
 /**
  * Checks whether a given storageKey is strictly scoped to the expected section and entity.
  */

@@ -51,7 +51,15 @@ export default async function GalleryAdminPage() {
       <AdminSection id="add-image" title="Add a gallery image">
         <AddEntityForm action={addGalleryImage} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <ImageUpload section="gallery" name="src" storageKeyName="storageKey" label="Image" required />
+            <ImageUpload
+              section="gallery"
+              name="src"
+              storageKeyName="storageKey"
+              thumbnailUrlName="thumbnailUrl"
+              thumbnailStorageKeyName="thumbnailStorageKey"
+              label="Image"
+              required
+            />
           </div>
           <div className="sm:col-span-2">
             {/* Caption is required — it also serves as the image alt text (WCAG) */}

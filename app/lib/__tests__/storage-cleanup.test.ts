@@ -60,6 +60,30 @@ describe('cleanupEntityStorage', () => {
     ]);
   });
 
+  it('preserves every key in a keep list (full-size image plus its thumbnail)', async () => {
+    mockList.mockResolvedValueOnce({
+      data: [
+        { name: '1700000000000.jpg' },
+        { name: '1700000000000_thumb.webp' },
+        { name: '1700000009999.jpg' },
+        { name: '1700000009999_thumb.webp' },
+      ],
+      error: null,
+    });
+    mockRemove.mockResolvedValueOnce({ data: [], error: null });
+
+    const result = await cleanupEntityStorage('gallery', 'entity-123', [
+      'gallery/entity-123/1700000009999.jpg',
+      'gallery/entity-123/1700000009999_thumb.webp',
+      null,
+    ]);
+
+    expect(result.deleted).toEqual([
+      'gallery/entity-123/1700000000000.jpg',
+      'gallery/entity-123/1700000000000_thumb.webp',
+    ]);
+  });
+
   it('removes all files when keepStorageKey is not provided (row deletion)', async () => {
     mockList.mockResolvedValueOnce({
       data: [

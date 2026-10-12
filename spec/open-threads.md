@@ -107,3 +107,8 @@ Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-o
 ## Dependency drift
 
 - `eslint-config-next` is pinned at `16.1.0` in `package.json` while `next` is `^16.3.8`. Lint passes, but the two should be aligned in a separate dependency pass (left untouched in the Dependabot #71 security bump to keep the diff minimal).
+
+## Gallery thumbnail rollout (spec-014)
+
+- Migration `0046_gallery_image_thumbnails` and `npm run db:backfill:gallery-thumbnails` are written but **not applied**. Until the backfill runs, existing gallery rows have no thumbnail and the grid/marquee load full-size files (unoptimized). Apply the migration before deploying the code; after the backfill, save any gallery row in `/admin/gallery` to refresh the Data Cache.
+- Sponsor logos and leadership avatars stay unoptimized without thumbnails; revisit only if they grow.

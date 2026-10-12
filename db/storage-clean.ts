@@ -59,12 +59,19 @@ export async function cleanAbandonedStorage(options: { dryRun?: boolean } = {}):
 
   try {
     const galleryRows = await db
-      .select({ id: schema.galleryImages.id, storageKey: schema.galleryImages.storageKey })
+      .select({
+        id: schema.galleryImages.id,
+        storageKey: schema.galleryImages.storageKey,
+        thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
+      })
       .from(schema.galleryImages)
       .where(isNull(schema.galleryImages.deletedAt));
     for (const r of galleryRows) {
       if (r.id) activeEntitiesBySection.gallery.add(r.id);
       if (r.storageKey) activeKeys.add(r.storageKey);
+      // A thumbnail is referenced by its own column; without this it would look
+      // abandoned and be purged 24h after upload.
+      if (r.thumbnailStorageKey) activeKeys.add(r.thumbnailStorageKey);
     }
 
     const schoolRows = await db

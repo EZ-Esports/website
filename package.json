@@ -20,6 +20,7 @@
     "db:ingest:gold": "npx tsx --env-file-if-exists=.env db/seed-gold.ts",
     "db:ingest:leadership": "npx tsx --env-file-if-exists=.env db/seed-leadership.ts",
     "db:backfill:leadership": "npx tsx --env-file-if-exists=.env db/backfill-leadership.ts",
+    "db:backfill:gallery-thumbnails": "npx tsx --env-file-if-exists=.env db/backfill-gallery-thumbnails.ts",
     "db:backup:clean": "npx tsx db/backup-clean.ts",
     "db:storage:clean": "npx tsx --env-file-if-exists=.env db/storage-clean.ts",
     "prepare": "node scripts/prepare-hooks.mjs || true"
@@ -40,7 +41,8 @@
     "react-aria-components": "^1.19.0",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

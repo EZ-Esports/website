@@ -10,11 +10,14 @@ import ImageUpload from '@/app/components/admin/ImageUpload';
 import { AdminNotice, PendingLabel, RequiredMark } from '@/app/components/admin/AdminUI';
 import { cardHover, chip, chipButton, chipDot, fieldError, focusRing, input, label as labelClass, primaryBtnSm } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
+import { getThumbnailSrc } from '@/app/components/ui/GalleryImage';
 
 interface GalleryImage {
   id: string;
   src: string;
   storageKey: string | null;
+  thumbnailUrl?: string | null;
+  thumbnailStorageKey?: string | null;
   caption: string | null;
   schoolName: string | null;
   eventName: string | null;
@@ -79,7 +82,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
     <div className={cx('group flex h-full flex-col overflow-hidden rounded-xl bg-admin-panel', editOpen ? 'ring-1 ring-accent/30' : cardHover)}>
       <div className="relative w-full aspect-square overflow-hidden bg-surface-raised">
         <Image
-          src={img.src}
+          src={getThumbnailSrc({ src: img.src, thumbnailSrc: img.thumbnailUrl })}
           alt={img.caption ?? ''}
           width={200}
           height={200}
@@ -186,6 +189,10 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
                   storageKeyName="storageKey"
                   currentSrc={img.src}
                   currentStorageKey={img.storageKey ?? undefined}
+                  thumbnailUrlName="thumbnailUrl"
+                  thumbnailStorageKeyName="thumbnailStorageKey"
+                  currentThumbnailUrl={img.thumbnailUrl ?? undefined}
+                  currentThumbnailStorageKey={img.thumbnailStorageKey ?? undefined}
                   label="Change image"
                 />
               </div>

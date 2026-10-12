@@ -1,0 +1,155 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockDb, mockTx, remove, list, updateTag } = vi.hoisted(() => {
+  const mockTx = { execute: vi.fn(), select: vi.fn(), insert: vi.fn() };
+  const mockDb = {
+    transaction: vi.fn(async (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
+    select: vi.fn(),
+    update: vi.fn(),
+  };
+  return { mockDb, mockTx, remove: vi.fn(), list: vi.fn(), updateTag: vi.fn() };
+});
+
+vi.mock('@/app/lib/db', () => ({ db: mockDb }));
+vi.mock('@/app/lib/auth', () => ({ requirePermission: vi.fn().mockResolvedValue({ id: 'staff' }) }));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), updateTag }));
+vi.mock('drizzle-orm', async (orig) => ({
+  ...(await orig<typeof import('drizzle-orm')>()),
+  eq: (_c: unknown, v: unknown) => v,
+}));
+vi.mock('@/app/lib/supabase/service', () => ({
+  createServiceClient: () => ({ storage: { from: () => ({ list, remove }) } }),
+}));
+
+import { addGalleryImage, updateGalleryImage, deleteGalleryImage } from '../actions';
+
+const ID = '3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f';
+const OLD_FULL = `gallery/${ID}/1700000000000.jpg`;
+const OLD_THUMB = `gallery/${ID}/1700000000000_thumb.webp`;
+const NEW_FULL = `gallery/${ID}/1700000009999.jpg`;
+const NEW_THUMB = `gallery/${ID}/1700000009999_thumb.webp`;
+const BASE = 'https://x.supabase.co/storage/v1/object/public/admin-uploads';
+
+const names = (keys: string[]) => keys.map((k) => k.split('/').pop());
+
+function form(fields: Record<string, string>) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+  return fd;
+}
+
+describe('gallery actions with thumbnails', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    remove.mockResolvedValue({ error: null });
+    list.mockResolvedValue({
+      data: [OLD_FULL, OLD_THUMB, NEW_FULL, NEW_THUMB].map((k) => ({ name: k.split('/').pop() })),
+      error: null,
+    });
+  });
+
+  it('addGalleryImage persists the validated thumbnail columns and keeps both objects', async () => {
+    mockTx.select.mockReturnValue({
+      from: () => ({ where: () => Promise.resolve([{ maxOrder: 3 }]) }),
+    });
+    const values = vi.fn().mockResolvedValue(undefined);
+    mockTx.insert.mockReturnValue({ values });
+
+    const res = await addGalleryImage(
+      form({
+        src: `${BASE}/${NEW_FULL}`,
+        caption: 'cap',
+        entityId: ID,
+        storageKey: NEW_FULL,
+        thumbnailUrl: `${BASE}/${NEW_THUMB}`,
+        thumbnailStorageKey: NEW_THUMB,
+      }),
+    );
+
+    expect(res).toEqual({ success: true });
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ storageKey: NEW_FULL, thumbnailUrl: `${BASE}/${NEW_THUMB}`, thumbnailStorageKey: NEW_THUMB }),
+    );
+    // Only the stale pair is removed; the kept full-size file and its thumbnail survive.
+    expect(names(remove.mock.calls[0][0])).toEqual(['1700000000000.jpg', '1700000000000_thumb.webp']);
+    expect(updateTag).toHaveBeenCalledWith('gallery-images');
+  });
+
+  it('addGalleryImage ignores a thumbnail key that is not derived from the storage key', async () => {
+    mockTx.select.mockReturnValue({ from: () => ({ where: () => Promise.resolve([{ maxOrder: 0 }]) }) });
+    const values = vi.fn().mockResolvedValue(undefined);
+    mockTx.insert.mockReturnValue({ values });
+
+    await addGalleryImage(
+      form({
+        src: `${BASE}/${NEW_FULL}`,
+        caption: 'cap',
+        entityId: ID,
+        storageKey: NEW_FULL,
+        thumbnailUrl: `${BASE}/gallery/other/1_thumb.webp`,
+        thumbnailStorageKey: 'gallery/other/1_thumb.webp',
+      }),
+    );
+
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ thumbnailUrl: null, thumbnailStorageKey: null }));
+  });
+
+  it('updateGalleryImage replacing the photo stores the new pair and removes the old pair', async () => {
+    mockDb.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([{ storageKey: OLD_FULL, thumbnailUrl: `${BASE}/${OLD_THUMB}`, thumbnailStorageKey: OLD_THUMB }]),
+        }),
+      }),
+    });
+    const set = vi.fn().mockReturnValue({ where: () => Promise.resolve() });
+    mockDb.update.mockReturnValue({ set });
+
+    const res = await updateGalleryImage(
+      ID,
+      form({
+        src: `${BASE}/${NEW_FULL}`,
+        caption: 'cap',
+        storageKey: NEW_FULL,
+        thumbnailUrl: `${BASE}/${NEW_THUMB}`,
+        thumbnailStorageKey: NEW_THUMB,
+      }),
+    );
+
+    expect(res).toEqual({ success: true });
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ storageKey: NEW_FULL, thumbnailStorageKey: NEW_THUMB, thumbnailUrl: `${BASE}/${NEW_THUMB}` }),
+    );
+    expect(names(remove.mock.calls[0][0])).toEqual(['1700000000000.jpg', '1700000000000_thumb.webp']);
+  });
+
+  it('updateGalleryImage on a caption-only edit keeps the existing thumbnail even if the form posted none', async () => {
+    mockDb.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([{ storageKey: OLD_FULL, thumbnailUrl: `${BASE}/${OLD_THUMB}`, thumbnailStorageKey: OLD_THUMB }]),
+        }),
+      }),
+    });
+    const set = vi.fn().mockReturnValue({ where: () => Promise.resolve() });
+    mockDb.update.mockReturnValue({ set });
+    list.mockResolvedValue({ data: [OLD_FULL, OLD_THUMB].map((k) => ({ name: k.split('/').pop() })), error: null });
+
+    await updateGalleryImage(ID, form({ src: `${BASE}/${OLD_FULL}`, caption: 'new caption', storageKey: OLD_FULL }));
+
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ thumbnailStorageKey: OLD_THUMB }));
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('deleteGalleryImage removes both the full-size image and its thumbnail', async () => {
+    mockDb.update.mockReturnValue({ set: () => ({ where: () => Promise.resolve() }) });
+    list.mockResolvedValue({ data: [OLD_FULL, OLD_THUMB].map((k) => ({ name: k.split('/').pop() })), error: null });
+
+    await deleteGalleryImage(ID);
+
+    expect(remove).toHaveBeenCalledWith([OLD_FULL, OLD_THUMB]);
+    expect(updateTag).toHaveBeenCalledWith('gallery-images');
+  });
+});
