@@ -2,15 +2,19 @@
 
 import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { eq, sql, isNull } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 import { ActionError } from '@/app/lib/errors';
 import { resolveGalleryThumbnail } from '@/app/lib/gallery-thumbnails';
-import { withThumbnailColumnFallback } from '@/app/lib/db/thumbnail-columns';
+import {
+  getGalleryImageStoredFields,
+  insertGalleryImage,
+  reorderGalleryImages,
+  setGalleryImageActive,
+  softDeleteGalleryImage,
+  updateGalleryImageRow,
+} from '@/app/lib/db/gallery';
 
 export async function addGalleryImage(formData: FormData) {
   await requirePermission(Permissions.MANAGE_GALLERY);
@@ -29,44 +33,13 @@ export async function addGalleryImage(formData: FormData) {
     entityId,
     storageKey,
     rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
-    rawThumbnailUrl: (formData.get('thumbnailUrl') as string) || null,
   });
 
   if (!src) return { success: false, error: 'Please upload an image first.' };
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
 
   try {
-    // New images always go to the end of the list — display order is derived, never user-entered.
-    // The advisory lock serializes concurrent adds so two simultaneous submissions can't both
-    // read the same max() and insert duplicate displayOrder values (it's tied to the transaction,
-    // so it's safe under Supabase's transaction pooler, unlike a session-level advisory lock).
-    const insertRow = (includeThumbnail: boolean) => db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('gallery_images_display_order'))`);
-
-      const [maxOrderResult] = await tx
-        .select({ maxOrder: sql<number>`max(${schema.galleryImages.displayOrder})` })
-        .from(schema.galleryImages)
-        .where(isNull(schema.galleryImages.deletedAt));
-
-      const displayOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
-
-      const insertValues: typeof schema.galleryImages.$inferInsert = {
-        src,
-        caption,
-        schoolName,
-        eventName,
-        displayOrder,
-        storageKey,
-        ...(includeThumbnail ? thumb : {}),
-      };
-      if (entityId) {
-        insertValues.id = entityId;
-      }
-
-      await tx.insert(schema.galleryImages).values(insertValues);
-    });
-    // A failed statement aborts the transaction, so the legacy path re-runs it whole.
-    await withThumbnailColumnFallback(() => insertRow(true), () => insertRow(false));
+    await insertGalleryImage({ id: entityId, src, caption, schoolName, eventName, storageKey, thumb });
 
     if (entityId) {
       await cleanupEntityStorage('gallery', entityId, [storageKey, thumb.thumbnailStorageKey]);
@@ -93,27 +66,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
 
   try {
-    const [old] = await withThumbnailColumnFallback(
-      () =>
-        db
-          .select({
-            src: schema.galleryImages.src,
-            storageKey: schema.galleryImages.storageKey,
-            thumbnailUrl: schema.galleryImages.thumbnailUrl,
-            thumbnailStorageKey: schema.galleryImages.thumbnailStorageKey,
-          })
-          .from(schema.galleryImages)
-          .where(eq(schema.galleryImages.id, id))
-          .limit(1),
-      async () =>
-        (
-          await db
-            .select({ src: schema.galleryImages.src, storageKey: schema.galleryImages.storageKey })
-            .from(schema.galleryImages)
-            .where(eq(schema.galleryImages.id, id))
-            .limit(1)
-        ).map((row) => ({ ...row, thumbnailUrl: null as string | null, thumbnailStorageKey: null as string | null })),
-    );
+    const old = await getGalleryImageStoredFields(id);
 
     // Only accept storage keys strictly scoped to this entity folder
     const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'gallery', id) ? rawStorageKey : null;
@@ -124,19 +77,14 @@ export async function updateGalleryImage(id: string, formData: FormData) {
       entityId: id,
       storageKey,
       rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
-      rawThumbnailUrl: (formData.get('thumbnailUrl') as string) || null,
-      existing: old,
+        existing: old,
     });
 
     // Scope cleanup strictly to this entity folder, preserving the active full-size
     // and thumbnail keys; a replaced photo's old pair is removed together.
     await cleanupEntityStorage('gallery', id, [storageKey, thumb.thumbnailStorageKey]);
 
-    const row = { src, caption, schoolName, eventName, storageKey };
-    await withThumbnailColumnFallback(
-      () => db.update(schema.galleryImages).set({ ...row, ...thumb }).where(eq(schema.galleryImages.id, id)),
-      () => db.update(schema.galleryImages).set(row).where(eq(schema.galleryImages.id, id)),
-    );
+    await updateGalleryImageRow(id, { src, caption, schoolName, eventName, storageKey }, thumb);
   } catch (error) {
     console.error('Failed to update gallery image', error);
     return { success: false, error: sanitizeDbError(error) };
@@ -161,34 +109,7 @@ export async function updateGalleryImagesOrder(orderedIds: string[]) {
   }
 
   try {
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('gallery_images_display_order'))`);
-
-      const currentImages = await tx
-        .select({ id: schema.galleryImages.id })
-        .from(schema.galleryImages)
-        .where(isNull(schema.galleryImages.deletedAt));
-
-      const currentIdSet = new Set(currentImages.map((img) => img.id));
-
-      if (
-        orderedIds.length !== currentImages.length ||
-        new Set(orderedIds).size !== orderedIds.length ||
-        !orderedIds.every((id) => currentIdSet.has(id))
-      ) {
-        throw new ActionError(
-          'INVALID_ORDER_PAYLOAD',
-          'Image list is out of date or invalid. Please refresh and try again.'
-        );
-      }
-
-      for (let i = 0; i < orderedIds.length; i++) {
-        await tx
-          .update(schema.galleryImages)
-          .set({ displayOrder: i + 1 })
-          .where(eq(schema.galleryImages.id, orderedIds[i]));
-      }
-    });
+    await reorderGalleryImages(orderedIds);
   } catch (error) {
     if (error instanceof ActionError) {
       return { success: false, error: error.message };
@@ -206,10 +127,7 @@ export async function updateGalleryImagesOrder(orderedIds: string[]) {
 export async function toggleGalleryImageActive(id: string, isActive: boolean) {
   await requirePermission(Permissions.MANAGE_GALLERY);
   try {
-    await db
-      .update(schema.galleryImages)
-      .set({ isActive })
-      .where(eq(schema.galleryImages.id, id));
+    await setGalleryImageActive(id, isActive);
   } catch (error) {
     console.error('Failed to toggle gallery image active state', error);
     return { success: false, error: 'Could not update status. Please try again.' };
@@ -224,7 +142,7 @@ export async function toggleGalleryImageActive(id: string, isActive: boolean) {
 export async function deleteGalleryImage(id: string) {
   const user = await requirePermission(Permissions.MANAGE_GALLERY);
 
-  await db.update(schema.galleryImages).set({ deletedAt: new Date(), deletedBy: user.id }).where(eq(schema.galleryImages.id, id));
+  await softDeleteGalleryImage(id, user.id);
 
   // Scope cleanup strictly to that entity's folder in Supabase Storage
   await cleanupEntityStorage('gallery', id);

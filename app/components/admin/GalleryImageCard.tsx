@@ -189,9 +189,7 @@ export default function GalleryImageCard({ img, index, totalCount, onOrderChange
                   storageKeyName="storageKey"
                   currentSrc={img.src}
                   currentStorageKey={img.storageKey ?? undefined}
-                  thumbnailUrlName="thumbnailUrl"
                   thumbnailStorageKeyName="thumbnailStorageKey"
-                  currentThumbnailUrl={img.thumbnailUrl ?? undefined}
                   currentThumbnailStorageKey={img.thumbnailStorageKey ?? undefined}
                   label="Change image"
                 />

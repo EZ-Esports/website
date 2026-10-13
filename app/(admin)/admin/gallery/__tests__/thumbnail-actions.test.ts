@@ -61,7 +61,6 @@ describe('gallery actions with thumbnails', () => {
         caption: 'cap',
         entityId: ID,
         storageKey: NEW_FULL,
-        thumbnailUrl: `${BASE}/${NEW_THUMB}`,
         thumbnailStorageKey: NEW_THUMB,
       }),
     );
@@ -86,7 +85,6 @@ describe('gallery actions with thumbnails', () => {
         caption: 'cap',
         entityId: ID,
         storageKey: NEW_FULL,
-        thumbnailUrl: `${BASE}/gallery/other/1_thumb.webp`,
         thumbnailStorageKey: 'gallery/other/1_thumb.webp',
       }),
     );
@@ -112,7 +110,6 @@ describe('gallery actions with thumbnails', () => {
         src: `${BASE}/${NEW_FULL}`,
         caption: 'cap',
         storageKey: NEW_FULL,
-        thumbnailUrl: `${BASE}/${NEW_THUMB}`,
         thumbnailStorageKey: NEW_THUMB,
       }),
     );
@@ -196,7 +193,7 @@ describe('gallery actions with thumbnails', () => {
 
       await updateGalleryImage(
         ID,
-        form({ src: ROOT_SRC, caption: 'x', storageKey: ROOT_NAME, thumbnailStorageKey: forged, thumbnailUrl: `${BASE}/${forged}` }),
+        form({ src: ROOT_SRC, caption: 'x', storageKey: ROOT_NAME, thumbnailStorageKey: forged }),
       );
 
       expect(set).toHaveBeenCalledWith(expect.objectContaining({ thumbnailUrl: null, thumbnailStorageKey: null }));
@@ -231,7 +228,6 @@ describe('gallery actions with thumbnails', () => {
           caption: 'cap',
           entityId: ID,
           storageKey: NEW_FULL,
-          thumbnailUrl: `${BASE}/${NEW_THUMB}`,
           thumbnailStorageKey: NEW_THUMB,
         }),
       );

@@ -69,7 +69,6 @@ export default async function GalleryAdminPage() {
               section="gallery"
               name="src"
               storageKeyName="storageKey"
-              thumbnailUrlName="thumbnailUrl"
               thumbnailStorageKeyName="thumbnailStorageKey"
               label="Image"
               required

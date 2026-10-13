@@ -97,7 +97,7 @@ describe('resolveGalleryThumbnail: legacy (root-level or static original)', () =
   const url = `${PUB}/${key}`;
   const rootSrc = `${PUB}/2c07ef71-aaaa.jpg`;
   const existing = (over = {}) => ({ src: rootSrc, storageKey: null, thumbnailUrl: url, thumbnailStorageKey: key, ...over });
-  const base = { entityId: ID, storageKey: null, rawThumbnailKey: null, rawThumbnailUrl: null, supabaseUrl: PROJECT };
+  const base = { entityId: ID, storageKey: null, rawThumbnailKey: null, supabaseUrl: PROJECT };
 
   it('preserves the thumbnail on a caption-only edit of a root-level row', () => {
     expect(resolveGalleryThumbnail({ ...base, src: rootSrc, existing: existing() })).toEqual({
@@ -141,7 +141,6 @@ describe('resolveGalleryThumbnail: legacy (root-level or static original)', () =
         ...base,
         src: rootSrc,
         rawThumbnailKey: forged,
-        rawThumbnailUrl: `${PUB}/${forged}`,
         existing: existing({ thumbnailUrl: null, thumbnailStorageKey: null }),
       }),
     ).toEqual(NONE);
@@ -175,7 +174,6 @@ describe('resolveGalleryThumbnail: legacy (root-level or static original)', () =
         src: `${PUB}/${full}`,
         storageKey: full,
         rawThumbnailKey: thumb,
-        rawThumbnailUrl: `${PUB}/${thumb}`,
       }),
     ).toEqual({ thumbnailUrl: `${PUB}/${thumb}`, thumbnailStorageKey: thumb });
   });

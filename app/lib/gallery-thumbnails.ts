@@ -10,10 +10,11 @@ const NONE: GalleryThumbnailFields = { thumbnailUrl: null, thumbnailStorageKey: 
 /**
  * Decides which thumbnail columns a gallery write may persist.
  *
- * Form fields come from hidden inputs, so they are only accepted when the key is
- * exactly the one derived from the row's own (already validated) storage key and
- * the URL is the row's own `src` with that key swapped in (same origin and bucket
- * path), so a thumbnail can never point at another host or bucket. Anything else collapses to "no thumbnail", and readers
+ * The posted thumbnail key (a hidden input, the only thumbnail field the client
+ * sends) is accepted only when it is exactly the key derived from the row's own
+ * (already validated) storage key. The public URL is then derived server-side as the
+ * row's own `src` with that key swapped in (same origin and bucket path), so a
+ * thumbnail can never point at another host or bucket. Anything else collapses to "no thumbnail", and readers
  * fall back to the full image — a bad value can degrade performance, never point a
  * row at another entity's object.
  *
@@ -64,7 +65,6 @@ export function resolveGalleryThumbnail(opts: {
   entityId: string | null | undefined;
   storageKey: string | null;
   rawThumbnailKey: string | null | undefined;
-  rawThumbnailUrl: string | null | undefined;
   existing?: {
     src?: string | null;
     storageKey: string | null;
@@ -74,7 +74,7 @@ export function resolveGalleryThumbnail(opts: {
   /** Project URL used to validate legacy thumbnails; defaults to NEXT_PUBLIC_SUPABASE_URL. */
   supabaseUrl?: string;
 }): GalleryThumbnailFields {
-  const { src, entityId, storageKey, rawThumbnailKey, rawThumbnailUrl, existing } = opts;
+  const { src, entityId, storageKey, rawThumbnailKey, existing } = opts;
   if (!storageKey) {
     // A legacy row (root-level or static original) has no own-folder storage key, yet
     // may carry a backfilled thumbnail. It is kept only while the image itself is
@@ -96,13 +96,10 @@ export function resolveGalleryThumbnail(opts: {
     return NONE;
   }
 
-  if (
-    isThumbnailKeyFor(rawThumbnailKey, storageKey, 'gallery', entityId) &&
-    rawThumbnailUrl &&
-    src &&
-    rawThumbnailUrl === deriveThumbnailUrl(src, storageKey, rawThumbnailKey!)
-  ) {
-    return { thumbnailUrl: rawThumbnailUrl, thumbnailStorageKey: rawThumbnailKey };
+  // The URL is never taken from the form: it is derived here from the row's own src.
+  if (src && isThumbnailKeyFor(rawThumbnailKey, storageKey, 'gallery', entityId)) {
+    const thumbnailUrl = deriveThumbnailUrl(src, storageKey, rawThumbnailKey);
+    if (thumbnailUrl) return { thumbnailUrl, thumbnailStorageKey: rawThumbnailKey };
   }
 
   if (

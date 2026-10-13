@@ -46,7 +46,7 @@ describe('isThumbnailKeyFor', () => {
 
 describe('resolveGalleryThumbnail', () => {
   const src = `${URL_BASE}/${FULL}`;
-  const posted = { rawThumbnailKey: THUMB, rawThumbnailUrl: `${URL_BASE}/${THUMB}` };
+  const posted = { rawThumbnailKey: THUMB };
 
   it('accepts a posted thumbnail that matches the validated storage key', () => {
     expect(resolveGalleryThumbnail({ src, entityId: ID, storageKey: FULL, ...posted })).toEqual({
@@ -59,30 +59,21 @@ describe('resolveGalleryThumbnail', () => {
     const none = { thumbnailUrl: null, thumbnailStorageKey: null };
     const foreign = `gallery/${OTHER}/1700000000000_thumb.webp`;
     expect(
-      resolveGalleryThumbnail({ src, entityId: ID, storageKey: FULL, rawThumbnailKey: foreign, rawThumbnailUrl: `${URL_BASE}/${foreign}` }),
+      resolveGalleryThumbnail({ src, entityId: ID, storageKey: FULL, rawThumbnailKey: foreign }),
     ).toEqual(none);
   });
 
-  it('drops a thumbnail whose URL does not end in its key', () => {
-    expect(
-      resolveGalleryThumbnail({
-        src,
-        entityId: ID,
-        storageKey: FULL,
-        rawThumbnailKey: THUMB,
-        rawThumbnailUrl: 'https://evil.example/other.webp',
-      }),
-    ).toEqual({ thumbnailUrl: null, thumbnailStorageKey: null });
+  it('derives the URL from src and ignores any origin the client could have posted', () => {
+    const foreignSrc = `https://evil.example/storage/v1/object/public/other-bucket/${FULL}`;
+    expect(resolveGalleryThumbnail({ src: foreignSrc, entityId: ID, storageKey: FULL, ...posted })).toEqual({
+      thumbnailUrl: `https://evil.example/storage/v1/object/public/other-bucket/${THUMB}`,
+      thumbnailStorageKey: THUMB,
+    });
   });
 
-  it.each([
-    ['a foreign host that still ends in the key', `https://evil.example/${THUMB}`],
-    ['another bucket on the same host', `https://x.supabase.co/storage/v1/object/public/other-bucket/${THUMB}`],
-    ['a different scheme', `http://x.supabase.co/storage/v1/object/public/admin-uploads/${THUMB}`],
-    ['a query-string suffix', `${URL_BASE}/${THUMB}?x=1`],
-  ])('drops a thumbnail URL on %s', (_label, rawThumbnailUrl) => {
+  it('drops a thumbnail when src is not the object at the storage key', () => {
     expect(
-      resolveGalleryThumbnail({ src, entityId: ID, storageKey: FULL, rawThumbnailKey: THUMB, rawThumbnailUrl }),
+      resolveGalleryThumbnail({ src: `${URL_BASE}/gallery/${ID}/other.jpg`, entityId: ID, storageKey: FULL, ...posted }),
     ).toEqual({ thumbnailUrl: null, thumbnailStorageKey: null });
   });
 
@@ -103,7 +94,7 @@ describe('resolveGalleryThumbnail', () => {
   it('keeps the existing thumbnail when the form posts none and the full image is unchanged', () => {
     const existing = { storageKey: FULL, thumbnailUrl: `${URL_BASE}/${THUMB}`, thumbnailStorageKey: THUMB };
     expect(
-      resolveGalleryThumbnail({ entityId: ID, storageKey: FULL, rawThumbnailKey: null, rawThumbnailUrl: null, existing }),
+      resolveGalleryThumbnail({ entityId: ID, storageKey: FULL, rawThumbnailKey: null, existing }),
     ).toEqual({ thumbnailUrl: `${URL_BASE}/${THUMB}`, thumbnailStorageKey: THUMB });
   });
 
@@ -114,7 +105,6 @@ describe('resolveGalleryThumbnail', () => {
         entityId: ID,
         storageKey: `gallery/${ID}/1700000009999.gif`,
         rawThumbnailKey: null,
-        rawThumbnailUrl: null,
         existing,
       }),
     ).toEqual({ thumbnailUrl: null, thumbnailStorageKey: null });
