@@ -6,25 +6,30 @@ import { extractTablesFromSql } from '../../../../db/migrate-tables';
 
 const migrationsDir = resolve(__dirname, '../../../../db/migrations');
 const metaDir = resolve(migrationsDir, 'meta');
-const migrationPath = resolve(migrationsDir, '0046_career_postings_rls.sql');
+const migrationPath = resolve(migrationsDir, '0047_career_postings_rls.sql');
 const journalPath = resolve(metaDir, '_journal.json');
 
-describe('Career postings RLS migration (0046)', () => {
-  it('migration file exists and is sequentially ordered right after 0045 in _journal.json', () => {
+describe('Career postings RLS migration (0047)', () => {
+  it('migration file exists and is registered in _journal.json after 0045 with a matching idx', () => {
     expect(existsSync(migrationPath)).toBe(true);
     const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
-      entries: { idx: number; tag: string }[];
+      entries: { idx: number; tag: string; when: number }[];
     };
     const tags = journal.entries.map((e) => e.tag);
     const idx0045 = tags.indexOf('0045_career_postings');
-    const idx0046 = tags.indexOf('0046_career_postings_rls');
+    const idx0047 = tags.indexOf('0047_career_postings_rls');
 
     expect(idx0045).toBeGreaterThanOrEqual(0);
-    expect(idx0046).toBe(idx0045 + 1);
+    expect(idx0047).toBeGreaterThan(idx0045);
 
-    const entry0046 = journal.entries[idx0046];
-    expect(entry0046.idx).toBe(46);
-    expect(entry0046.tag).toBe('0046_career_postings_rls');
+    const entry0047 = journal.entries[idx0047];
+    expect(entry0047.idx).toBe(idx0047);
+    expect(entry0047.idx).toBe(47);
+    // drizzle applies migrations by `when`, so it must exceed every earlier entry
+    for (const earlier of journal.entries.slice(0, idx0047)) {
+      expect(entry0047.when).toBeGreaterThan(earlier.when);
+    }
+    expect(entry0047.tag).toBe('0047_career_postings_rls');
   });
 
   it('explicitly enables Row Level Security on career_postings', () => {
