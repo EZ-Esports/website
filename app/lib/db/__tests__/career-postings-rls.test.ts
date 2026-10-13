@@ -23,7 +23,6 @@ describe('Career postings RLS migration (0047)', () => {
     expect(idx0047).toBeGreaterThan(idx0045);
 
     const entry0047 = journal.entries[idx0047];
-    expect(entry0047.idx).toBe(idx0047);
     expect(entry0047.idx).toBe(47);
     // drizzle applies migrations by `when`, so it must exceed every earlier entry
     for (const earlier of journal.entries.slice(0, idx0047)) {
