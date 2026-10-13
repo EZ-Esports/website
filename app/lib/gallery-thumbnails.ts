@@ -7,21 +7,6 @@ export interface GalleryThumbnailFields {
 
 const NONE: GalleryThumbnailFields = { thumbnailUrl: null, thumbnailStorageKey: null };
 
-/**
- * Decides which thumbnail columns a gallery write may persist.
- *
- * The posted thumbnail key (a hidden input, the only thumbnail field the client
- * sends) is accepted only when it is exactly the key derived from the row's own
- * (already validated) storage key. The public URL is then derived server-side as the
- * row's own `src` with that key swapped in (same origin and bucket path), so a
- * thumbnail can never point at another host or bucket. Anything else collapses to "no thumbnail", and readers
- * fall back to the full image — a bad value can degrade performance, never point a
- * row at another entity's object.
- *
- * When the full-size image is unchanged, an existing thumbnail is kept even if the
- * form posted none: the edit form can be stale relative to a backfill that ran
- * while it was open, and a caption edit must not discard the thumbnail.
- */
 /** The public URL of `thumbnailKey`, derived by swapping it into `src`; null if `src` isn't the object at `storageKey`. */
 export function deriveThumbnailUrl(src: string, storageKey: string, thumbnailKey: string): string | null {
   let url: URL;
@@ -60,6 +45,21 @@ function legacyThumbnailUrls(src: string, thumbnailKey: string, supabaseUrl: str
   return urls;
 }
 
+/**
+ * Decides which thumbnail columns a gallery write may persist.
+ *
+ * The posted thumbnail key (a hidden input, the only thumbnail field the client
+ * sends) is accepted only when it is exactly the key derived from the row's own
+ * (already validated) storage key. The public URL is then derived server-side as the
+ * row's own `src` with that key swapped in (same origin and bucket path), so a
+ * thumbnail can never point at another host or bucket. Anything else collapses to "no thumbnail", and readers
+ * fall back to the full image — a bad value can degrade performance, never point a
+ * row at another entity's object.
+ *
+ * When the full-size image is unchanged, an existing thumbnail is kept even if the
+ * form posted none: the edit form can be stale relative to a backfill that ran
+ * while it was open, and a caption edit must not discard the thumbnail.
+ */
 export function resolveGalleryThumbnail(opts: {
   src?: string | null;
   entityId: string | null | undefined;

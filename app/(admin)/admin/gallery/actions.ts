@@ -77,7 +77,7 @@ export async function updateGalleryImage(id: string, formData: FormData) {
       entityId: id,
       storageKey,
       rawThumbnailKey: (formData.get('thumbnailStorageKey') as string) || null,
-        existing: old,
+      existing: old,
     });
 
     // Scope cleanup strictly to this entity folder, preserving the active full-size
