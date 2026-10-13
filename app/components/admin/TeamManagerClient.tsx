@@ -20,7 +20,7 @@ import { AdminTab, AdminTabList, AdminTabPanel, AdminTabs } from '@/app/componen
 import { cx } from '@/app/lib/cx';
 import { buildRoleRequest, seedRoleDraft, type RoleDraft } from '@/app/components/admin/role-form';
 import InviteStaffForm from '@/app/components/admin/InviteStaffForm';
-import { canActOnMember, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
+import { canActOnMember, canManageRole, filterAssignableRoles, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
 import StaffRow from '@/app/components/admin/StaffRow';
 import InviteRow from '@/app/components/admin/InviteRow';
 import {
@@ -71,6 +71,7 @@ interface PendingInvite {
     name: string;
     color: string;
     position: number;
+    isOwner: boolean;
   }[];
 }
 
@@ -171,22 +172,18 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
   const currentPermissions = BigInt(current.permissions);
   const currentIsOwner = current.isOwner;
 
-  // Filter assignable roles: strictly lower than actor's highest role, and actor must possess their permissions
-  const assignableRoles = roles.filter((role) => {
-    if (role.name === '@everyone') return false;
-    if (currentIsOwner) return true;
-    const isLower = current.highestRolePosition > role.position;
-    const hasSubset = (BigInt(role.permissions) & ~currentPermissions) === BigInt(0);
-    return isLower && hasSubset;
+  // Assignable roles use the same predicates as the server actions so the pickers never
+  // offer a role (notably an owner role) the server would refuse.
+  const assignableRoles = filterAssignableRoles(roles, {
+    permissions: currentPermissions,
+    isOwner: currentIsOwner,
+    highestRolePosition: current.highestRolePosition,
   });
 
-  // Check if current user can manage a target role
-  function canActorManageRole(rolePosition: number) {
-    if (currentIsOwner) return true;
-    return current.highestRolePosition > rolePosition;
+  // Check if current user can manage a role (or invite) at this rank.
+  function canActorManageRole(rolePosition: number, roleIsOwner: boolean) {
+    return canManageRole(current.highestRolePosition, currentIsOwner, rolePosition, roleIsOwner);
   }
-
-
 
   // Permission bits the actor may change; disabled checkboxes (missing from the actor or superadmin-only) stay out.
   const editableBits = PERMISSION_LABELS.reduce((mask, label) => {
@@ -421,8 +418,8 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
               ) : (
                 <ul className={listStack}>
                   {invites.map((inv) => {
-                    const targetHighestPos = inv.roles.reduce((max, r) => (r.position > max ? r.position : max), 0);
-                    const canManage = canActorManageRole(targetHighestPos);
+                    // Revoking is allowed only if every role on the invite is manageable.
+                    const canManage = inv.roles.every((r) => canActorManageRole(r.position, r.isOwner));
 
                     return (
                       <InviteRow
@@ -469,7 +466,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                 {roles.map((role, idx) => {
                   const isActive = activeRoleId === role.id && !isCreatingRole;
                   const parsedColor = parseHexColor(role.color);
-                  const isReorderable = !role.isOwner && role.name !== '@everyone' && canActorManageRole(role.position);
+                  const isReorderable = !role.isOwner && role.name !== '@everyone' && canActorManageRole(role.position, role.isOwner);
                   const selectRole = () => {
                     setActiveRoleId(role.id);
                     setIsCreatingRole(false);
@@ -506,7 +503,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                         <div className="flex items-center opacity-60 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                           <button
                             type="button"
-                            disabled={idx === 0 || isPending || !roles[idx - 1] || roles[idx - 1].isOwner || !canActorManageRole(roles[idx - 1].position)}
+                            disabled={idx === 0 || isPending || !roles[idx - 1] || roles[idx - 1].isOwner || !canActorManageRole(roles[idx - 1].position, roles[idx - 1].isOwner)}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMoveRole(idx, 'up');
@@ -519,7 +516,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                           </button>
                           <button
                             type="button"
-                            disabled={idx === roles.length - 1 || isPending || !roles[idx + 1] || roles[idx + 1].name === '@everyone' || !canActorManageRole(roles[idx + 1].position)}
+                            disabled={idx === roles.length - 1 || isPending || !roles[idx + 1] || roles[idx + 1].name === '@everyone' || !canActorManageRole(roles[idx + 1].position, roles[idx + 1].isOwner)}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMoveRole(idx, 'down');
