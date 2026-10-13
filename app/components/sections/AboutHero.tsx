@@ -39,7 +39,7 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
   };
 
   return (
-    <section className="relative w-full min-h-[min(92vh,860px)] overflow-hidden [clip-path:polygon(0_0,100%_0,100%_94%,0_100%)]">
+    <section className="theme-dark relative w-full min-h-[min(92vh,860px)] overflow-hidden [clip-path:polygon(0_0,100%_0,100%_94%,0_100%)]">
       {/* Background image */}
       <div className="absolute inset-0 z-0 select-none pointer-events-none">
         <Image

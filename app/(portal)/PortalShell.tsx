@@ -17,6 +17,10 @@ interface PortalShellProps {
   context: SchoolManagerContext;
 }
 
+/**
+ * School-manager shell. `theme-dark` pins the dark tokens: this UI hardcodes
+ * light-on-dark text, and it must not follow the public light theme.
+ */
 export default function PortalShell({ children, context }: PortalShellProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,7 +34,7 @@ export default function PortalShell({ children, context }: PortalShellProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--surface-sunken)] text-[var(--foreground)] flex flex-col font-sans">
+    <div className="theme-dark min-h-screen bg-[var(--surface-sunken)] text-[var(--foreground)] flex flex-col font-sans">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-[var(--surface-raised)]/90 backdrop-blur-md border-b border-[var(--line)] px-4 sm:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">

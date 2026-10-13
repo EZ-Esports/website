@@ -79,7 +79,7 @@ export default function GalleryGrid({ items }: GalleryGridProps) {
         isOpen={selectedImageIndex !== null}
         onOpenChange={(open) => !open && closeLightbox()}
         isDismissable
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out"
+        className="theme-dark fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out"
       >
         <Modal className="outline-none max-w-5xl w-full flex items-center justify-center cursor-default">
           <Dialog

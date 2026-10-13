@@ -34,9 +34,13 @@ surfaces — it fails contrast on light backgrounds. On light surfaces, use
 `#f4cccc` as text color on a light section is the single most common contrast
 bug in this codebase (see `uiux` skill, case study 1).
 
-Theme switching is scoped via the `.theme-light` class on a subtree (forms,
-light-mode sections), not a page-level toggle — apply it to the container
-that needs the light variant, and every token underneath follows.
+Theme switching is the public header control (Light, Dark, System). It sets
+`.theme-light` on `<html>` ([spec-014](../../../../spec/spec-014-light-dark-theme.md)).
+The same class on a subtree still scopes the light tokens to that container
+(the apply forms stay light when the rest of the site is dark). `.theme-dark`
+pins the dark tokens on a surface that must not follow the page — the header,
+photo heroes, and photo lightboxes. Use the token classes so those surfaces
+flip or stay put with the class, rather than a literal hex.
 
 ## Hero overlay gradients
 
