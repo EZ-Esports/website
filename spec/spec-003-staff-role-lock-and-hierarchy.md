@@ -43,11 +43,13 @@ Previously, authorization and role hierarchy checks (such as verifying whether a
 
 - No role assignment, role update, invite revocation, or staff revocation may proceed without holding `pg_advisory_xact_lock(STAFF_REVOCATION_LOCK_KEY)`.
 - Authorization checks must use live data queried inside the locked transaction; pre-transaction session claims are untrusted for hierarchy checks.
-- Non-owner staff members can never modify, assign, or revoke roles with a `position` less than or equal to their own highest position (lower position number = higher hierarchy).
+- Non-owner staff members can never modify, assign, or revoke roles with a `position` greater than or equal to their own highest position (higher position number = higher rank).
+- Owner roles are always the top of the hierarchy and non-owners can never grant, edit, delete, reorder or revoke an owner role regardless of stored positions: `canManageRole(actorPos, actorIsOwner, targetPos, targetRoleIsOwner)` requires the target's owner flag explicitly. UI pickers use `filterAssignableRoles` so they cannot drift from the server.
+- New roles are created strictly below every owner role (`nextRolePosition`); with no room the action fails rather than placing a role at or above an owner role. See incidents section 18.
 
 ## Verification
 
-- Vitest unit tests: `npx vitest run app/(admin)/admin/team/__tests__/actions.test.ts` (12 concurrency tests)
+- Vitest unit tests: `npx vitest run app/(admin)/admin/team/__tests__/actions.test.ts` (concurrency tests plus the Owner-role hierarchy tests)
 - Full test suite: `npm test`
 - Type checking: `npx tsc --noEmit`
 - Linter: `npm run lint`

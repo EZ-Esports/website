@@ -316,6 +316,9 @@ vi.mock('@/app/lib/db', () => ({ db: mocks.mockDb }));
 import {
   updateUserRoles,
   updateRole,
+  deleteRole,
+  inviteStaff,
+  createRole,
   revokeInvite,
   revokeStaff,
 } from '../actions';
@@ -676,5 +679,139 @@ describe('Team actions lock-then-re-read concurrency authorization (Issue #156)'
       expect(result.error).toMatch(/role hierarchy changed/i);
       expect(mocks.state.executedLocks).toContain(STAFF_REVOCATION_LOCK_KEY);
     });
+  });
+});
+
+describe('Owner role hierarchy (non-owners can never grant or manage Owner roles)', () => {
+  const role = (over: Partial<typeof schema.roles.$inferSelect> & { id: string; name: string; position: number }) => ({
+    color: '#94a3b8',
+    permissions: BigInt(0),
+    isOwner: false,
+    isSystem: false,
+    ...over,
+  });
+
+  const everyone = role({ id: 'r-everyone', name: '@everyone', position: 0, isSystem: true });
+  const viewer = role({ id: 'r-viewer', name: 'Viewer', position: 1 });
+  const owner = role({ id: 'r-owner', name: 'Owner', position: 9999, isOwner: true, isSystem: true, permissions: Permissions.ADMINISTRATOR });
+  // Reproduces the production inversion: Dev ranked ABOVE Owner with every permission bit.
+  const dev = role({ id: 'r-dev', name: 'Dev', position: 10000, permissions: BigInt(4095) });
+  const removableOwnerRole = role({ id: 'r-owner2', name: 'Co-Owner', position: 9998, isOwner: true, permissions: Permissions.ADMINISTRATOR });
+
+  const devActor = {
+    id: 'user-dev',
+    email: 'dev@example.com',
+    permissions: BigInt(4095),
+    isOwner: false,
+    highestRolePosition: 10000,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.state.onLockHook = null;
+    mocks.state.executedLocks.length = 0;
+    mocks.state.rolesStore = [everyone, viewer, owner, dev, removableOwnerRole].map((r) => ({ ...r }));
+    mocks.state.staffMembersStore = [
+      { userId: 'user-dev', email: 'dev@example.com' },
+      { userId: 'user-owner', email: 'owner@example.com' },
+      { userId: 'user-target', email: 'target@example.com' },
+    ];
+    mocks.state.userRolesStore = [
+      { userId: 'user-dev', roleId: dev.id },
+      { userId: 'user-owner', roleId: owner.id },
+      { userId: 'user-target', roleId: viewer.id },
+    ];
+    mocks.state.staffInvitesStore = [];
+    mocks.state.staffInviteRolesStore = [];
+    mocks.mockRequirePermission.mockResolvedValue(devActor);
+  });
+
+  it('refuses to let a Dev ranked above Owner assign the Owner role', async () => {
+    const result = await updateUserRoles('user-target', [owner.id]);
+
+    expect(result.success).toBe(false);
+    expect(mocks.state.userRolesStore.some((ur) => ur.userId === 'user-target' && ur.roleId === owner.id)).toBe(false);
+  });
+
+  it('refuses to let a Dev ranked above Owner invite someone with the Owner role', async () => {
+    const form = new FormData();
+    form.set('email', 'new@example.com');
+    form.append('roleIds', owner.id);
+
+    const result = await inviteStaff(form);
+
+    expect(result.success).toBe(false);
+    expect(mocks.state.staffInviteRolesStore).toHaveLength(0);
+  });
+
+  it('refuses to let a Dev edit the Owner role or an owner-flagged role', async () => {
+    const form = new FormData();
+    form.set('name', 'Co-Owner');
+    form.set('color', '#94a3b8');
+    form.set('permissions', Permissions.ADMINISTRATOR.toString());
+
+    const result = await updateRole(removableOwnerRole.id, form);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/role hierarchy/i);
+  });
+
+  it('refuses to let a Dev delete an owner-flagged role', async () => {
+    const result = await deleteRole(removableOwnerRole.id);
+
+    expect(result.success).toBe(false);
+    expect(mocks.state.rolesStore.some((r) => r.id === removableOwnerRole.id)).toBe(true);
+  });
+
+  it('still lets the same Dev assign a lower non-owner role', async () => {
+    mocks.state.userRolesStore = mocks.state.userRolesStore.filter((ur) => ur.userId !== 'user-target');
+
+    const result = await updateUserRoles('user-target', [viewer.id]);
+
+    expect(result.success).toBe(true);
+    expect(mocks.state.userRolesStore).toContainEqual({ userId: 'user-target', roleId: viewer.id });
+  });
+
+  it('createRole by an Owner never places the new role at or above the Owner role', async () => {
+    mocks.state.rolesStore = [everyone, viewer, owner].map((r) => ({ ...r }));
+    mocks.mockRequirePermission.mockResolvedValue({
+      id: 'user-owner',
+      email: 'owner@example.com',
+      permissions: Permissions.ADMINISTRATOR,
+      isOwner: true,
+      highestRolePosition: 9999,
+    });
+    const form = new FormData();
+    form.set('name', 'Ops');
+    form.set('color', '#94a3b8');
+    form.set('permissions', '0');
+
+    const result = await createRole(form);
+
+    expect(result.success).toBe(true);
+    const created = mocks.state.rolesStore.find((r) => r.name === 'Ops')!;
+    expect(created.position).toBe(2);
+    expect(created.position).toBeLessThan(owner.position);
+    expect(mocks.state.rolesStore.find((r) => r.id === owner.id)!.position).toBe(9999);
+  });
+
+  it('createRole refuses (and inserts nothing) when roles are already inverted above the Owner role', async () => {
+    mocks.mockRequirePermission.mockResolvedValue({
+      id: 'user-owner',
+      email: 'owner@example.com',
+      permissions: Permissions.ADMINISTRATOR,
+      isOwner: true,
+      highestRolePosition: 9999,
+    });
+    const form = new FormData();
+    form.set('name', 'Ops');
+    form.set('color', '#94a3b8');
+    form.set('permissions', '0');
+
+    const result = await createRole(form);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/no room/i);
+    expect(mocks.state.rolesStore.find((r) => r.name === 'Ops')).toBeUndefined();
   });
 });

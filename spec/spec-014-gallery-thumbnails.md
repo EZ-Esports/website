@@ -81,7 +81,7 @@ npm run db:backfill:gallery-thumbnails -- --bucket=admin-uploads
 npm run db:backfill:gallery-thumbnails -- --bucket=admin-uploads --apply
 ```
 
-The npm script runs `tsx --conditions=react-server` because `app/lib/db/schema.ts` imports `server-only`, which throws under plain tsx (incidents section 19). `db/__tests__/backfill-entry.test.ts` runs the real entry point in a subprocess with an empty environment and asserts it reaches its own "refusing" guard.
+The npm script runs `tsx --conditions=react-server` because `app/lib/db/schema.ts` imports `server-only`, which throws under plain tsx (incidents section 20). `db/__tests__/backfill-entry.test.ts` runs the real entry point in a subprocess with an empty environment and asserts it reaches its own "refusing" guard.
 
 ## Invariants & Boundaries
 
