@@ -258,10 +258,17 @@ export async function assertManagerForRoster(rosterId: string): Promise<{
  * client can never ask about someone else's account.
  */
 export async function hasCompletedPortalTour(userId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ userId: schema.managerPortalTours.userId })
-    .from(schema.managerPortalTours)
-    .where(eq(schema.managerPortalTours.userId, userId))
-    .limit(1);
-  return Boolean(row);
+  try {
+    const [row] = await db
+      .select({ userId: schema.managerPortalTours.userId })
+      .from(schema.managerPortalTours)
+      .where(eq(schema.managerPortalTours.userId, userId))
+      .limit(1);
+    return Boolean(row);
+  } catch (error) {
+    // Fail safe: the tour is an extra, so a failed lookup (for example before the
+    // table's migration is applied) hides it rather than taking the portal down.
+    console.error('hasCompletedPortalTour failed; hiding the tour', error);
+    return true;
+  }
 }

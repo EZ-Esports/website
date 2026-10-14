@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { HiOutlineShieldCheck } from "react-icons/hi2";
+import { HiOutlineShieldCheck } from 'react-icons/hi2';
 
 interface PortalHeaderProps {
   schoolName: string;
@@ -17,16 +17,13 @@ export function PortalHeader({ schoolName, actions }: PortalHeaderProps) {
             School Operations
           </span>
           <span className="text-zinc-600">&bull;</span>
-          <span className="text-xs text-zinc-400 font-medium">
-            {schoolName}
-          </span>
+          <span className="text-xs text-zinc-400 font-medium">{schoolName}</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
           Manager Control Deck
         </h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Issue personalized player invitations, review submitted applications,
-          and verify tournament roster gates.
+          Issue personalized player invitations, review submitted applications, and verify tournament roster gates.
         </p>
       </div>
 
@@ -39,9 +36,7 @@ export function PortalHeader({ schoolName, actions }: PortalHeaderProps) {
             <p className="text-[11px] font-bold text-zinc-200 uppercase tracking-wider">
               Zero-PII Vault Active
             </p>
-            <p className="text-[11px] text-zinc-400">
-              NY § 2-D & FERPA Compliant
-            </p>
+            <p className="text-[11px] text-zinc-400">NY § 2-D & FERPA Compliant</p>
           </div>
         </div>
       </div>

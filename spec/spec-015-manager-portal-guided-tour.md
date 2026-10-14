@@ -30,10 +30,11 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 
 ### Dismissal storage (database flag)
 
-- A per-**account** flag on the school manager record (not per school, because managers can manage several schools and switching schools must not replay the tour). Exact table and column are decided at implementation against `app/lib/db/schema.ts` and `app/lib/onboarding/manager-auth.ts`.
+- A per-**account** flag stored in its own table, `manager_portal_tours` (one row per Supabase auth user id; a row means the tour has ended). It is deliberately not a column on `school_managers`: that table has one row per school per academic year, so a column would replay the tour when a manager switches schools or is assigned a new school or year.
 - Set by a server action when the tour **ends** (finished or skipped), not when it starts. A manager who closes the tab at step 2 sees it again next time.
-- **Existing managers are not backfilled.** The new column defaults to "not seen", so every current manager sees the tour once on their next visit. This was a deliberate decision.
+- **Existing managers are not backfilled.** The table starts empty, so a missing row means "not seen", so every current manager sees the tour once on their next visit. This was a deliberate decision.
 - Replays from the Tutorial button never touch the flag.
+- **Fail safe:** `hasCompletedPortalTour` catches lookup errors, logs them and returns "completed" (tour hidden, portal still renders), so a missing table or a database blip can never take `/portal` down. A failed `completePortalTour` write is swallowed on the client. The client also remembers, per account, that the first run ended, so a remount before the server flag propagates cannot restart it.
 - The migration is applied to production, since `.env` points at production. Per `CLAUDE.md` it needs explicit confirmation from the user before it runs, even though `assertSeedTargetAllowed()` would permit it.
 
 ### Anchors
@@ -83,6 +84,7 @@ Automated (all DB-free; no migration was applied and no script touched `.env`):
 - `tour/__tests__/anchors.test.tsx`: renders `SchoolPortalClient` as a brand-new school (no invites, submissions or rosters) and fails if any anchor in `TOUR_ANCHORS` is missing or if a step's anchor does not appear exactly once.
 - `tour/__tests__/steps.test.ts`: unique ids, anchors declared, full-tour order, section slices end at their boundary, missing-target steps omitted, unknown section is empty.
 - `app/lib/onboarding/__tests__/tour-actions.test.ts`: unauthenticated rejected without writing, writes the session user id, idempotent `ON CONFLICT DO NOTHING`.
+- `app/lib/onboarding/__tests__/tour-status.test.ts`: the status lookup returns false/true by row and returns true (tour hidden) when the lookup throws.
 - `app/lib/db/__tests__/manager-portal-tours-migration.test.ts`: table shape, RLS, no backfill insert, journal order.
 - `npx tsc --noEmit` clean; `npm run lint` 0 errors (1 pre-existing `<img>` warning); `npm test` 1294 pass, 1 fail (the known Windows path-separator `db/__tests__/backup.test.ts`).
 
