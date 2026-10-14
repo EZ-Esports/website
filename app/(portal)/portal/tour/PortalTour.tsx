@@ -230,7 +230,6 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
     if (!isOpen || !targetRef.current) return;
     scrollTargetIntoView(targetRef.current, panelRef.current);
     setRect(targetRef.current.getBoundingClientRect());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, session?.index, confirmingSkip]);
 
   // Place the card from the live target rect. Runs on every rect change (scroll and
