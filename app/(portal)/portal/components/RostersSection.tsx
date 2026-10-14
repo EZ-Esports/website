@@ -40,9 +40,9 @@ export function RostersSection({
   onDeleteRoster,
 }: RostersSectionProps) {
   return (
-    <div data-tour="rosters" className="space-y-5 pt-4 border-t border-zinc-800">
+    <div data-tour="rosters" className="min-w-0 space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-bold text-white tracking-tight">Team Rosters & Eligibility Gates</h2>
           <p className="text-xs sm:text-sm text-zinc-400">
             Live 5-point verification for tournament registration (Roster size, Captain, Riot ID, Discord link, and In-Guild status).
@@ -51,7 +51,7 @@ export function RostersSection({
         <Button
           data-tour="create-roster"
           onPress={onOpenCreateRosterModal}
-          className="self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+          className="self-start sm:self-auto min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
         >
           <HiOutlinePlus className="w-4 h-4" />
           <span>Create Roster</span>

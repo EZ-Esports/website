@@ -531,7 +531,7 @@ export default function SchoolPortalClient({
 
       {/* Action Grid: Invite Generator & Approvals Queue */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-5 space-y-6">
+        <div className="min-w-0 lg:col-span-5 space-y-6">
           <GenerateInviteCard
             games={games}
             schoolId={activeSchool.schoolId}
@@ -542,7 +542,7 @@ export default function SchoolPortalClient({
           />
         </div>
 
-        <div className="lg:col-span-7 space-y-4">
+        <div className="min-w-0 lg:col-span-7 space-y-4">
           <PendingApprovalsCard
             submissions={filteredSubmissions}
             rosters={rosters}

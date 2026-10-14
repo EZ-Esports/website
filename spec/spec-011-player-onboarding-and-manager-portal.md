@@ -168,6 +168,8 @@ The student opens the link. The wizard renders 4 streamlined steps:
 4. If an uninvited troll obtained the link, Manager clicks **"Reject"** with an optional note, invalidating the submission.
 
 ### Flow 5: Tournament Registration & Real-Time Roster Gate
+_Portal button wording: the roster card's trigger for this check is **"Check Eligibility"** (formerly "Run Roster Gate")._
+
 When registering for an upcoming tournament season (e.g. *Fall 2026 Valorant Championship*):
 1. Manager selects 5 Starters + at least 1 Substitute from their approved pool.
 2. **The 5-Point Validation Gate**:
