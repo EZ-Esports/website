@@ -89,7 +89,7 @@ export function PendingApprovalsCard({
                   </div>
 
                   <div className="text-xs text-zinc-400 font-medium">
-                    Grade: <span className="text-white font-semibold">{sub.grade}</span>
+                    Graduating: <span className="text-white font-semibold">{sub.grade}</span>
                   </div>
                 </div>
 

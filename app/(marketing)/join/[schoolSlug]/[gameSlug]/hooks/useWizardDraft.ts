@@ -23,7 +23,7 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
   const [email, setEmail] = useState(initialDraft.email || '');
   const [password, setPassword] = useState(initialDraft.password || '');
   const [graduationYear, setGraduationYear] = useState<number>(
-    initialDraft.graduationYear ? Number(initialDraft.graduationYear) : 2026
+    initialDraft.graduationYear ? Number(initialDraft.graduationYear) : 0
   );
 
   // Step 2: Discord Connection
@@ -67,12 +67,12 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
   );
 
   // Tech & Gaming Survey
-  const [ping, setPing] = useState(initialDraft.surveyDetails?.ping || '20-40ms');
+  const [ping, setPing] = useState(initialDraft.surveyDetails?.ping || '');
   const [hoursPerWeek, setHoursPerWeek] = useState(
-    initialDraft.surveyDetails?.hoursPerWeek || '6-10 hrs'
+    initialDraft.surveyDetails?.hoursPerWeek || ''
   );
   const [internetReliability, setInternetReliability] = useState(
-    initialDraft.surveyDetails?.internetReliability || 'Cable / Broadband (Stable)'
+    initialDraft.surveyDetails?.internetReliability || ''
   );
   const [careerInterests, setCareerInterests] = useState<string[]>(
     Array.isArray(initialDraft.surveyDetails?.careerInterests)

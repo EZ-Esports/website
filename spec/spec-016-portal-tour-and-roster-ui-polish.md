@@ -24,3 +24,9 @@
 ## First-run welcome modal
 
 The automatic first-run tour no longer starts abruptly. `tour/WelcomeModal.tsx` (RAC `ModalOverlay`) greets the manager by school name with a staggered entrance (`welcome-*` keyframes in `globals.css`, switched off outright under `prefers-reduced-motion`). **Start the tour** closes it and begins the full tour after the 200ms exit; **Maybe later** (also Escape / backdrop) records the first run as ended via `completePortalTour`, so it does not reappear on every load; the Tutorial menu still replays the tour. Replays from the menu never show the welcome. Not yet checked in a browser at the time of writing.
+
+## Join form and pending-approval polish
+
+- Pending approvals now show `Graduating: Class of <year>` (the year the student entered) instead of the broken `2026th Grade` (`portal-actions.ts`, `PendingApprovalsCard.tsx`).
+- The join wizard no longer pre-selects answers: graduation/academic year, ping, gaming hours and internet reliability start on **Choose an option** (gender and the two yes/no selects reworded to match). Graduation year stays required via the existing validation; the survey fields stay optional and submit as empty.
+- Required fields use `join/.../components/RequiredMark.tsx`: a larger danger-coloured asterisk plus screen-reader "(required)".

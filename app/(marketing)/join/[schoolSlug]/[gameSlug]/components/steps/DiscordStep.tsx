@@ -2,6 +2,7 @@
 
 import { FiCheck, FiExternalLink } from 'react-icons/fi';
 import { SiDiscord } from 'react-icons/si';
+import { RequiredMark } from '../RequiredMark';
 
 interface DiscordStepProps {
   discordUsername: string;
@@ -52,7 +53,7 @@ export function DiscordStep({
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
-            Your Discord Handle / Username *
+            Your Discord Handle / Username<RequiredMark />
           </label>
           <input
             type="text"

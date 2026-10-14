@@ -1,6 +1,7 @@
 'use client';
 
 import { FiCheck, FiExternalLink } from 'react-icons/fi';
+import { RequiredMark } from '../RequiredMark';
 
 interface GameIdentityStepProps {
   riotId: string;
@@ -38,7 +39,7 @@ export function GameIdentityStep({
 
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
-          Riot ID (GameName#TagLine) *
+          Riot ID (GameName#TagLine)<RequiredMark />
         </label>
         <input
           type="text"

@@ -1,5 +1,7 @@
 'use client';
 
+import { RequiredMark } from '../RequiredMark';
+
 interface AccountInfoStepProps {
   legalFirstName: string;
   setLegalFirstName: (val: string) => void;
@@ -44,7 +46,7 @@ export function AccountInfoStep({
             htmlFor="account-legal-first-name"
             className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
           >
-            Legal First Name *
+            Legal First Name<RequiredMark />
           </label>
           <input
             id="account-legal-first-name"
@@ -62,7 +64,7 @@ export function AccountInfoStep({
             htmlFor="account-legal-last-name"
             className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
           >
-            Legal Last Name *
+            Legal Last Name<RequiredMark />
           </label>
           <input
             id="account-legal-last-name"
@@ -81,7 +83,7 @@ export function AccountInfoStep({
           htmlFor="account-email"
           className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
         >
-          {isManager ? 'Manager Email Address *' : 'Student Email Address *'}
+          {isManager ? <>Manager Email Address<RequiredMark /></> : <>Student Email Address<RequiredMark /></>}
         </label>
         <input
           id="account-email"
@@ -109,7 +111,7 @@ export function AccountInfoStep({
             htmlFor="account-password"
             className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
           >
-            Create Portal Account Password *
+            Create Portal Account Password<RequiredMark />
           </label>
           <input
             id="account-password"
@@ -135,15 +137,18 @@ export function AccountInfoStep({
           className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
         >
           {isManager
-            ? 'Affiliation / Academic Year *'
-            : 'Anticipated High School Graduation Year *'}
+            ? <>Affiliation / Academic Year<RequiredMark /></>
+            : <>Anticipated High School Graduation Year<RequiredMark /></>}
         </label>
         <select
           id="account-graduation-year"
-          value={graduationYear}
+          value={graduationYear || ''}
           onChange={(e) => setGraduationYear(Number(e.target.value))}
           className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         >
+          <option value="" disabled>
+            Choose an option
+          </option>
           {isManager ? (
             <>
               <option value={2026}>2025-2026 (Current Academic Year)</option>
