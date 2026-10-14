@@ -514,7 +514,13 @@ export default function SchoolPortalClient({
       {/* Top Banner & Title */}
       <PortalHeader
         schoolName={activeSchool.schoolName}
-        actions={<PortalTour tourCompleted={tourCompleted} accountId={_context.userId} />}
+        actions={
+          <PortalTour
+            tourCompleted={tourCompleted}
+            accountId={_context.userId}
+            schoolName={activeSchool.schoolName}
+          />
+        }
       />
 
       {/* Game Filter Tabs */}

@@ -20,3 +20,7 @@
 - `tour/__tests__/placement.test.ts`: below/above/docked at 1920x1080 including a target taller than the screen; bottom sheet and scroll reserve at 375x812.
 - Rendered a temporary mock of the portal (removed afterwards) in the dev server with the Tutorial replay: at 1920x1080 every step's card sat fully inside the viewport with no inner scroll; at the narrowest width the browser pane allows (529px wide, mobile branch) every card was docked, buttons inside the viewport, no page horizontal overflow. Roster card header measured at card widths 260-900px: no overlapping or overflowing children.
 - Not verified: a true 375px-wide viewport (the preview pane clamps emulation to 529px wide), and the real authenticated `/portal` page.
+
+## First-run welcome modal
+
+The automatic first-run tour no longer starts abruptly. `tour/WelcomeModal.tsx` (RAC `ModalOverlay`) greets the manager by school name with a staggered entrance (`welcome-*` keyframes in `globals.css`, switched off outright under `prefers-reduced-motion`). **Start the tour** closes it and begins the full tour after the 200ms exit; **Maybe later** (also Escape / backdrop) records the first run as ended via `completePortalTour`, so it does not reappear on every load; the Tutorial menu still replays the tour. Replays from the menu never show the welcome. Not yet checked in a browser at the time of writing.

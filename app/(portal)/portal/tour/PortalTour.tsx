@@ -26,12 +26,15 @@ import {
   type TourSelection,
 } from './steps';
 import { computePanelPlacement, computeScrollDelta } from './placement';
+import WelcomeModal from './WelcomeModal';
 
 interface PortalTourProps {
   /** True once this account has ended the tour; false triggers the first-run auto-start. */
   tourCompleted: boolean;
   /** Auth user id; scopes the remount guard so a different login in the same tab still gets its tour. */
   accountId: string;
+  /** Shown in the first-run welcome greeting. */
+  schoolName?: string;
 }
 
 interface TourSession {
@@ -85,8 +88,12 @@ function scrollTargetIntoView(target: HTMLElement, panel: HTMLElement | null) {
   if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, behavior: 'auto' });
 }
 
-export default function PortalTour({ tourCompleted, accountId }: PortalTourProps) {
+// Matches the welcome modal's exit animation so the tour starts as it finishes fading.
+const WELCOME_EXIT_MS = 200;
+
+export default function PortalTour({ tourCompleted, accountId, schoolName }: PortalTourProps) {
   const [session, setSession] = useState<TourSession | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [confirmingSkip, setConfirmingSkip] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [targetReady, setTargetReady] = useState(false);
@@ -115,28 +122,41 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
     setSession({ steps, index: 0, isFirstRun });
   }, []);
 
+  const markFirstRunEnded = useCallback(() => {
+    firstRunEndedFor = accountId;
+    setCompleted(true);
+    // Written only when the first run ends so an abandoned one comes back. A failed
+    // write just means the welcome may show once more, never a broken portal.
+    completePortalTour().catch(() => {});
+  }, [accountId]);
+
   const end = useCallback(() => {
-    if (session?.isFirstRun) {
-      firstRunEndedFor = accountId;
-      setCompleted(true);
-      // Written only when the tour ends so an abandoned first run comes back. A
-      // failed write just means the tour may show once more, never a broken portal.
-      completePortalTour().catch(() => {});
-    }
+    if (session?.isFirstRun) markFirstRunEnded();
     setSession(null);
     setConfirmingSkip(false);
     setTargetReady(false);
     targetRef.current = null;
     // Deferred past the popover's own focus-restore on unmount, which would otherwise win.
     setTimeout(() => tutorialButtonRef.current?.focus(), 50);
-  }, [session, accountId]);
+  }, [session, markFirstRunEnded]);
 
-  // First visit: start the full tour once the page and its anchors have mounted.
+  // First visit: greet the manager; the tour only starts once they choose to.
   useEffect(() => {
     if (completed || firstRunEndedFor === accountId || autoStarted.current) return;
     autoStarted.current = true;
-    start('full', true);
-  }, [completed, accountId, start]);
+    setWelcomeOpen(true);
+  }, [completed, accountId]);
+
+  const startFromWelcome = () => {
+    setWelcomeOpen(false);
+    setTimeout(() => start('full', true), WELCOME_EXIT_MS);
+  };
+
+  const dismissWelcome = () => {
+    setWelcomeOpen(false);
+    markFirstRunEnded();
+    setTimeout(() => tutorialButtonRef.current?.focus(), WELCOME_EXIT_MS + 50);
+  };
 
   // Resolve the current target. A step whose anchor has vanished is skipped, so a
   // missing element can never strand the manager on a dead step.
@@ -298,6 +318,13 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
           </Menu>
         </Popover>
       </MenuTrigger>
+
+      <WelcomeModal
+        isOpen={welcomeOpen}
+        schoolName={schoolName}
+        onStart={startFromWelcome}
+        onDismiss={dismissWelcome}
+      />
 
       {isOpen && rect && (
         <div
