@@ -5,6 +5,8 @@
 export interface Image {
   id?: string;
   src: string;
+  /** Small grid/marquee rendition; absent for photos without one (callers fall back to `src`). */
+  thumbnailSrc?: string | null;
   alt: string;
   width?: number;
   height?: number;

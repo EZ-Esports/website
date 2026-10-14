@@ -68,17 +68,75 @@ export function canActOnMember(
 }
 
 /**
- * Discord-style hierarchy check for managing roles:
+ * Discord-style hierarchy check for managing (or granting) a role:
  * - Owners can manage any role.
+ * - An owner role (`targetRoleIsOwner`) can be managed ONLY by an owner, whatever the
+ *   positions say. Rank is a convenience for ordering; it must never be the only thing
+ *   standing between a non-owner and the Owner role, because stored positions can drift.
  * - Non-owners can only manage roles with a position strictly lower than their highest role.
+ *
+ * `targetRoleIsOwner` is deliberately required so no call site can forget it.
  */
 export function canManageRole(
   actorHighestPosition: number,
   actorIsOwner: boolean,
-  targetRolePosition: number
+  targetRolePosition: number,
+  targetRoleIsOwner: boolean
 ): boolean {
   if (actorIsOwner) return true;
+  if (targetRoleIsOwner) return false;
   return actorHighestPosition > targetRolePosition;
+}
+
+export interface RolePositionInput {
+  position: number;
+  isOwner: boolean;
+}
+
+export interface RolePlacement {
+  /** Position the new role is inserted at. */
+  position: number;
+  /** True when existing non-owner roles at/above `position` must be shifted up by one first. */
+  shiftNonOwnerRoles: boolean;
+}
+
+/**
+ * Chooses where a newly created role goes. Owner roles are always the top of the
+ * hierarchy, so a new role must land strictly below the lowest owner role, and the
+ * shift that makes room must never push a non-owner role to or past an owner role.
+ *
+ * - Owner actor: directly above the highest non-owner role (no shift needed).
+ * - Non-owner actor: directly above the highest role below the actor's own rank; roles
+ *   at or above that slot (including the actor's) shift up by one.
+ *
+ * Returns `null` when there is no room below the owner roles, which also happens if stored
+ * positions are already inverted (a non-owner role at/above an owner role). Failing loudly
+ * is intentional: silently placing a role there is how the hierarchy got inverted.
+ */
+export function nextRolePosition(args: {
+  roles: RolePositionInput[];
+  actorIsOwner: boolean;
+  actorHighestPosition: number;
+}): RolePlacement | null {
+  const { roles, actorIsOwner, actorHighestPosition } = args;
+  const nonOwnerPositions = roles.filter((r) => !r.isOwner).map((r) => r.position);
+  const ownerPositions = roles.filter((r) => r.isOwner).map((r) => r.position);
+  const lowestOwner = ownerPositions.length > 0 ? Math.min(...ownerPositions) : Infinity;
+  const highestNonOwner = nonOwnerPositions.length > 0 ? Math.max(...nonOwnerPositions) : null;
+
+  let position: number;
+  if (actorIsOwner) {
+    position = highestNonOwner === null ? 1 : highestNonOwner + 1;
+  } else {
+    const below = nonOwnerPositions.filter((p) => p < actorHighestPosition);
+    position = below.length > 0 ? Math.max(...below) + 1 : 1;
+  }
+
+  const shiftNonOwnerRoles = highestNonOwner !== null && highestNonOwner >= position;
+  const topAfterInsert = shiftNonOwnerRoles ? highestNonOwner + 1 : position;
+  if (position >= lowestOwner || topAfterInsert >= lowestOwner) return null;
+
+  return { position, shiftNonOwnerRoles };
 }
 
 /**
@@ -99,6 +157,25 @@ export function canGrantPermissions(
   }
   // targetPermissions & ~actorPermissions evaluates to all bits set in target but not in actor
   return (targetPermissions & ~actorPermissions) === BigInt(0);
+}
+
+/**
+ * Roles an actor may hand out (invite pickers, member role editors). Built from the same
+ * predicates the server actions enforce so the UI cannot offer a role the server refuses —
+ * in particular an owner role is never offered to a non-owner.
+ */
+export function filterAssignableRoles<
+  R extends { name: string; position: number; isOwner: boolean; permissions: string | bigint },
+>(
+  roles: R[],
+  actor: { permissions: bigint; isOwner: boolean; highestRolePosition: number },
+): R[] {
+  return roles.filter(
+    (role) =>
+      role.name !== '@everyone' &&
+      canManageRole(actor.highestRolePosition, actor.isOwner, role.position, role.isOwner) &&
+      canGrantPermissions(actor.permissions, actor.isOwner, BigInt(role.permissions)),
+  );
 }
 
 /**

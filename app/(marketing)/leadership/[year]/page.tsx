@@ -164,6 +164,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
                         alt={leader.name}
                         fill
                         sizes="(max-width: 768px) 112px, 112px"
+                        unoptimized
                         className="object-cover"
                       />
                     </div>

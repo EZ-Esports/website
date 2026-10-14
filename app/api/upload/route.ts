@@ -7,11 +7,14 @@ import {
   MIME_TO_EXT,
   MAX_FILE_SIZE_BYTES,
   STORAGE_CACHE_CONTROL,
+  deriveThumbnailKey,
   isValidSection,
   sanitizeEntityId,
   buildStorageKey,
   uploadToStorage,
+  removeFromStorage,
 } from '@/app/lib/storage';
+import { generateThumbnail, inspectImage, ImageInputError, type ThumbnailResult } from '@/app/lib/image-thumbnail';
 
 // Authorized staff uploading images: 30 uploads per minute is a generous cap
 // that prevents accidental runaway scripts from exhausting Supabase Storage.
@@ -84,6 +87,25 @@ export async function POST(req: NextRequest) {
   const storageKey = buildStorageKey(section, entityId, ext);
   const arrayBuffer = await file.arrayBuffer();
 
+  // The declared MIME type is client-controlled, so the bytes are inspected before
+  // anything is written: the decoded format must be on the allowlist and the pixel
+  // count bounded. Gallery photos additionally get a small thumbnail so grids and
+  // the marquee never download the full-size file.
+  let thumbnail: ThumbnailResult | null = null;
+  try {
+    if (section === 'gallery') {
+      thumbnail = await generateThumbnail(arrayBuffer);
+    } else {
+      await inspectImage(arrayBuffer);
+    }
+  } catch (err) {
+    if (err instanceof ImageInputError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    console.error('Image validation failed:', err);
+    return NextResponse.json({ error: 'Could not read that image. Try a different file.' }, { status: 400 });
+  }
+
   // Use secret key for storage via uploadToStorage helper with Cache-Control: 31536000
   const { error: uploadError, publicUrl } = await uploadToStorage(storageKey, arrayBuffer, {
     contentType: file.type,
@@ -96,5 +118,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
   }
 
-  return NextResponse.json({ url: publicUrl, storageKey }, { status: 201 });
+  let thumbnailUrl: string | null = null;
+  let thumbnailStorageKey: string | null = null;
+
+  if (thumbnail && !thumbnail.skipped) {
+    const thumbKey = deriveThumbnailKey(storageKey);
+    const { error: thumbError, publicUrl: thumbPublicUrl } = await uploadToStorage(thumbKey, thumbnail.buffer, {
+      contentType: thumbnail.mime,
+      upsert: false,
+      cacheControl: STORAGE_CACHE_CONTROL,
+    });
+
+    if (thumbError) {
+      // Keep the pair atomic: a full-size photo without its thumbnail would silently
+      // send every grid view back to the heavy file, so undo the first object.
+      console.error('Thumbnail upload failed:', thumbError);
+      const rollback = await removeFromStorage([storageKey]);
+      if (rollback.error) console.error('Rollback of full-size upload failed:', rollback.error);
+      return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
+    }
+
+    thumbnailUrl = thumbPublicUrl;
+    thumbnailStorageKey = thumbKey;
+  }
+
+  return NextResponse.json({ url: publicUrl, storageKey, thumbnailUrl, thumbnailStorageKey }, { status: 201 });
 }

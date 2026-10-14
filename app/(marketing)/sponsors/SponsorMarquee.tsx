@@ -116,6 +116,7 @@ export default function SponsorMarquee({ sponsors }: { sponsors: MarqueeSponsor[
                   width={130}
                   height={40}
                   sizes="130px"
+                  unoptimized
                   className="h-8 w-auto object-contain opacity-90"
                 />
               ) : (

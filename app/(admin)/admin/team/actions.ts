@@ -7,6 +7,7 @@ import {
   Permissions,
   canActOnMember,
   canManageRole,
+  nextRolePosition,
   canGrantPermissions,
   calculateEffectiveStaffAccess,
   hasPermission,
@@ -126,7 +127,7 @@ export async function inviteStaff(formData: FormData): Promise<{
 
   // Verify that all requested roles are lower in hierarchy and within the inviter's permissions subset
   for (const role of selectedRoles) {
-    if (!canManageRole(staff.highestRolePosition, staff.isOwner, role.position)) {
+    if (!canManageRole(staff.highestRolePosition, staff.isOwner, role.position, role.isOwner)) {
       return {
         success: false,
         error: `You cannot grant the role "${role.name}" because it is equal to or higher than your own highest role.`,
@@ -184,7 +185,7 @@ export async function inviteStaff(formData: FormData): Promise<{
           throw new ActionError('INVALID_ROLE', 'One or more selected roles do not exist.');
         }
         for (const role of lockedSelectedRoles) {
-          if (!canManageRole(freshStaff.highestRolePosition, freshStaff.isOwner, role.position)) {
+          if (!canManageRole(freshStaff.highestRolePosition, freshStaff.isOwner, role.position, role.isOwner)) {
             throw new ActionError(
               'HIERARCHY_VIOLATION',
               `You cannot grant the role "${role.name}" because it is equal to or higher than your own highest role.`,
@@ -210,13 +211,13 @@ export async function inviteStaff(formData: FormData): Promise<{
 
         // Verify the actor has permission to revoke the superseded invite roles
         const associatedRoles = await tx
-          .select({ name: schema.roles.name, position: schema.roles.position })
+          .select({ name: schema.roles.name, position: schema.roles.position, isOwner: schema.roles.isOwner })
           .from(schema.staffInviteRoles)
           .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id))
           .where(inArray(schema.staffInviteRoles.inviteId, supersededInviteIds));
 
         for (const role of associatedRoles) {
-          if (!canManageRole(freshStaff.highestRolePosition, freshStaff.isOwner, role.position)) {
+          if (!canManageRole(freshStaff.highestRolePosition, freshStaff.isOwner, role.position, role.isOwner)) {
             throw new ActionError(
               'SUPERSEDE_FORBIDDEN',
               `Only staff with a higher role rank can replace this pending invite containing the "${role.name}" role.`
@@ -261,13 +262,13 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
 
   // Fetch roles attached to the invite first to run hierarchy check
   const inviteRoles = await db
-    .select({ name: schema.roles.name, position: schema.roles.position })
+    .select({ name: schema.roles.name, position: schema.roles.position, isOwner: schema.roles.isOwner })
     .from(schema.staffInviteRoles)
     .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id))
     .where(eq(schema.staffInviteRoles.inviteId, inviteId));
 
   for (const role of inviteRoles) {
-    if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
+    if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position, role.isOwner)) {
       return {
         success: false,
         error: `You cannot revoke this invite because it contains the "${role.name}" role which is equal to or higher than your own highest role.`,
@@ -292,13 +293,13 @@ export async function revokeInvite(inviteId: string): Promise<{ success: boolean
       }
 
       const lockedInviteRoles = await tx
-        .select({ name: schema.roles.name, position: schema.roles.position })
+        .select({ name: schema.roles.name, position: schema.roles.position, isOwner: schema.roles.isOwner })
         .from(schema.staffInviteRoles)
         .innerJoin(schema.roles, eq(schema.staffInviteRoles.roleId, schema.roles.id))
         .where(eq(schema.staffInviteRoles.inviteId, inviteId));
 
       for (const role of lockedInviteRoles) {
-        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position, role.isOwner)) {
           throw new ActionError(
             'STAFF_HIERARCHY_CHANGED',
             `You cannot revoke this invite because it contains the "${role.name}" role which is equal to or higher than your own highest role.`
@@ -530,37 +531,43 @@ export async function createRole(formData: FormData): Promise<{ success: boolean
         throw new ActionError('PRIVILEGE_ESCALATION', 'You cannot grant permissions that you do not possess.');
       }
 
-      // Determine initial position (1 + maximum position below actor's highest role, or position 1)
-      let initialPosition = 1;
-      const [maxPosRow] = await tx
-        .select({ maxPos: sql<number>`max(${schema.roles.position})::int` })
-        .from(schema.roles)
-        .where(
-          freshActor.isOwner
-            ? undefined
-            : sql`${schema.roles.position} < ${freshActor.highestRolePosition}`
-        );
+      // Owner roles must stay the top of the hierarchy, so placement is computed from every
+      // role's position and owner flag rather than a bare max(position).
+      const existingRoles = await tx
+        .select({ position: schema.roles.position, isOwner: schema.roles.isOwner })
+        .from(schema.roles);
 
-      if (maxPosRow && maxPosRow.maxPos !== null) {
-        initialPosition = maxPosRow.maxPos + 1;
+      const placement = nextRolePosition({
+        roles: existingRoles,
+        actorIsOwner: freshActor.isOwner,
+        actorHighestPosition: freshActor.highestRolePosition,
+      });
+      if (!placement) {
+        throw new ActionError(
+          'NO_ROLE_SLOT',
+          'There is no room to create a role below the Owner role. Role positions need repair before more roles can be added.',
+        );
       }
 
-      // Shifting roles at and above initialPosition to make space, keeping Owners at the top
-      await tx
-        .update(schema.roles)
-        .set({ position: sql`${schema.roles.position} + 1` })
-        .where(
-          and(
-            sql`${schema.roles.position} >= ${initialPosition}`,
-            eq(schema.roles.isOwner, false)
-          )
-        );
+      // Shift roles at and above the slot up to make space; owner roles never move, and
+      // nextRolePosition guarantees the shifted roles still end up below them.
+      if (placement.shiftNonOwnerRoles) {
+        await tx
+          .update(schema.roles)
+          .set({ position: sql`${schema.roles.position} + 1` })
+          .where(
+            and(
+              sql`${schema.roles.position} >= ${placement.position}`,
+              eq(schema.roles.isOwner, false)
+            )
+          );
+      }
 
       await tx.insert(schema.roles).values({
         name,
         color,
         permissions: permissionsVal,
-        position: initialPosition,
+        position: placement.position,
         isOwner: false,
         isSystem: false,
       });
@@ -601,7 +608,7 @@ export async function updateRole(roleId: string, formData: FormData): Promise<{ 
   }
 
   // Check hierarchy: actor highest position must be strictly higher than target role's position
-  if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
+  if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position, role.isOwner)) {
     return { success: false, error: 'You do not have permission to manage this role due to role hierarchy.' };
   }
 
@@ -636,7 +643,7 @@ export async function updateRole(roleId: string, formData: FormData): Promise<{ 
         throw new ActionError('ROLE_NOT_FOUND', 'Role not found.');
       }
 
-      if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+      if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position, role.isOwner)) {
         throw new ActionError(
           'STAFF_HIERARCHY_CHANGED',
           'You do not have permission to manage this role due to role hierarchy.'
@@ -695,7 +702,7 @@ export async function deleteRole(roleId: string): Promise<{ success: boolean; er
   }
 
   // Check hierarchy: actor highest position must be strictly higher than target role's position
-  if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position)) {
+  if (!canManageRole(admin.highestRolePosition, admin.isOwner, role.position, role.isOwner)) {
     return { success: false, error: 'You do not have permission to delete this role due to role hierarchy.' };
   }
 
@@ -719,7 +726,7 @@ export async function deleteRole(roleId: string): Promise<{ success: boolean; er
         throw new ActionError('SYSTEM_ROLE', 'System-defined roles cannot be deleted.');
       }
 
-      if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+      if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position, role.isOwner)) {
         throw new ActionError(
           'STAFF_HIERARCHY_CHANGED',
           'You do not have permission to delete this role due to role hierarchy.'
@@ -778,20 +785,26 @@ export async function reorderRoles(orderedRoleIds: string[]): Promise<{ success:
         if (role.isOwner || role.name === '@everyone') {
           throw new ActionError('IMMUTABLE_ROLE', 'Cannot reorder Owner or @everyone roles.');
         }
-        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position, role.isOwner)) {
           throw new ActionError('STAFF_HIERARCHY_CHANGED', `You do not have permission to reorder the role "${role.name}".`);
         }
       }
 
       // Reorder roles by assigning positions: starting from 1 (above @everyone) up to the length
-      // Owner is unaffected because it stays at the top.
+      // Owner is unaffected because it stays at the top; the guard below keeps it that way.
+      const lowestOwnerPosition = allRoles
+        .filter((r) => r.isOwner)
+        .reduce((lowest, r) => Math.min(lowest, r.position), Infinity);
+      if (orderedRoleIds.length >= lowestOwnerPosition) {
+        throw new ActionError('NO_ROLE_SLOT', 'Reordering would move a role to or above the Owner role.');
+      }
       for (let i = 0; i < orderedRoleIds.length; i++) {
         const roleId = orderedRoleIds[i];
         const newPosition = i + 1; // position 0 is @everyone
 
         const role = rolesMap.get(roleId)!;
         // Verify that the new position doesn't exceed/equal the actor's own highest role position
-        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, newPosition)) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, newPosition, false)) {
           throw new ActionError(
             'STAFF_HIERARCHY_CHANGED',
             `You do not have permission to move "${role.name}" to position ${newPosition} (equals or exceeds your own highest role rank).`
@@ -862,7 +875,7 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
 
   // Validate added roles: must be strictly lower than actor's highest role, and actor must possess their permissions
   for (const role of addedRoles) {
-    if (!canManageRole(actorInfo.highestRolePosition, actorInfo.isOwner, role.position)) {
+    if (!canManageRole(actorInfo.highestRolePosition, actorInfo.isOwner, role.position, role.isOwner)) {
       return { success: false, error: `You cannot add the role "${role.name}" because its rank equals or exceeds yours.` };
     }
     if (!canGrantPermissions(actorInfo.permissions, actorInfo.isOwner, BigInt(role.permissions))) {
@@ -872,7 +885,7 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
 
   // Validate removed roles: must be strictly lower than actor's highest role
   for (const role of removedRoles) {
-    if (!canManageRole(actorInfo.highestRolePosition, actorInfo.isOwner, role.position)) {
+    if (!canManageRole(actorInfo.highestRolePosition, actorInfo.isOwner, role.position, role.isOwner)) {
       return { success: false, error: `You cannot remove the role "${role.name}" because its rank equals or exceeds yours.` };
     }
   }
@@ -927,7 +940,7 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
       const lockedRemovedRoles = freshTargetInfo.roles.filter((r) => !lockedTargetRoleIds.includes(r.id));
 
       for (const role of lockedAddedRoles) {
-        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position, role.isOwner)) {
           throw new ActionError(
             'STAFF_HIERARCHY_CHANGED',
             `You cannot add the role "${role.name}" because its rank equals or exceeds yours.`
@@ -942,7 +955,7 @@ export async function updateUserRoles(targetUserId: string, roleIds: string[]): 
       }
 
       for (const role of lockedRemovedRoles) {
-        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position)) {
+        if (!canManageRole(freshActor.highestRolePosition, freshActor.isOwner, role.position, role.isOwner)) {
           throw new ActionError(
             'STAFF_HIERARCHY_CHANGED',
             `You cannot remove the role "${role.name}" because its rank equals or exceeds yours.`

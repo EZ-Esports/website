@@ -12,7 +12,7 @@ import type { Image as ImageType } from '@/app/types';
 vi.mock('@/app/lib/db/queries', () => ({
   getCachedHomepageGallery: vi.fn().mockResolvedValue({
     set1: [
-      { id: 'img-1', src: '/images/gallery/test-1.png', alt: 'Test Photo 1: Valorant Tournament' },
+      { id: 'img-1', src: '/images/gallery/test-1.png', thumbnailSrc: '/images/gallery/test-1_thumb.webp', alt: 'Test Photo 1: Valorant Tournament' },
       { id: 'img-2', src: '/images/gallery/test-2.png', alt: 'Test Photo 2: LAN Finals Arena' },
     ],
   }),
@@ -77,8 +77,12 @@ describe('Community Gallery Page & Showcase Integration (/gallery)', () => {
       // Check for mocked items rendered in the grid
       expect(html).toContain('Test Photo 1: Valorant Tournament');
       expect(html).toContain('Test Photo 2: LAN Finals Arena');
-      expect(html).toContain(encodeURIComponent('/images/gallery/test-1.png'));
-      expect(html).toContain(encodeURIComponent('/images/gallery/test-2.png'));
+      // The grid loads the thumbnail when there is one, else the full file, both unoptimized.
+      expect(html).toContain('src="/images/gallery/test-1_thumb.webp"');
+      expect(html).not.toContain('src="/images/gallery/test-1.png"');
+      expect(html).toContain('src="/images/gallery/test-2.png"');
+      // No transformation until a visitor opens the lightbox (which is not rendered closed).
+      expect(html).not.toContain('/_next/image');
     });
 
     it('renders interactive photo buttons with accessible labels', async () => {
