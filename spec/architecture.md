@@ -72,6 +72,10 @@ All league competition occurs in NYC and canonicalizes to Eastern Time (`America
 
 ---
 
+## Manager portal guided tour
+
+One tour definition (`app/(portal)/portal/tour/steps.ts`) targets stable `data-tour` attributes, never selectors or text; `resolveTourSteps` slices it for the full tour or one section and drops steps with no target. Dismissal is the table `manager_portal_tours` (one row per auth user id, written by `completePortalTour()` only when the first-run tour ends, read server-side by `hasCompletedPortalTour()`), deliberately not a column on `school_managers`, which is per school and academic year. The popover is a modal RAC `Popover` because react-aria closes non-modal popovers on scroll. A test renders the portal for a school with no data and fails if a referenced anchor is missing. See [spec-015](spec-015-manager-portal-guided-tour.md).
+
 ## Frontend
 
 - **Tokens.** July rewrite PRs #11–#13: two-layer semantic tokens (`:root` + `@theme inline` in `globals.css`), primitives under `components/ui/`, admin denser via `admin/styles.ts`. Bridge aliases kept old pages compiling until PR #13 deleted them.
