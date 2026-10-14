@@ -157,7 +157,6 @@ export function AccountInfoStep({
             </>
           ) : (
             <>
-              <option value={2025}>Class of 2025 (12th Grade / Senior)</option>
               <option value={2026}>Class of 2026 (11th Grade / Junior)</option>
               <option value={2027}>Class of 2027 (10th Grade / Sophomore)</option>
               <option value={2028}>Class of 2028 (9th Grade / Freshman)</option>
