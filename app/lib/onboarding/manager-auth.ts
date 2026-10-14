@@ -259,15 +259,18 @@ export async function assertManagerForRoster(rosterId: string): Promise<{
  */
 export async function hasCompletedPortalTour(userId: string): Promise<boolean> {
   try {
-    const [row] = await db
-      .select({ userId: schema.managerPortalTours.userId })
-      .from(schema.managerPortalTours)
-      .where(eq(schema.managerPortalTours.userId, userId))
-      .limit(1);
-    return Boolean(row);
+    const rows = await db
+      .select({ tourCompletedAt: schema.schoolManagers.tourCompletedAt })
+      .from(schema.schoolManagers)
+      .where(eq(schema.schoolManagers.userId, userId));
+    // A staff admin viewing the portal has no manager row to record dismissal on, so
+    // the tour is skipped for them rather than replaying on every visit.
+    if (rows.length === 0) return true;
+    // Any row counts, so a new school or academic year for the same person never replays it.
+    return rows.some((r) => r.tourCompletedAt !== null);
   } catch (error) {
     // Fail safe: the tour is an extra, so a failed lookup (for example before the
-    // table's migration is applied) hides it rather than taking the portal down.
+    // column's migration is applied) hides it rather than taking the portal down.
     console.error('hasCompletedPortalTour failed; hiding the tour', error);
     return true;
   }

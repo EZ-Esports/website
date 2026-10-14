@@ -735,6 +735,9 @@ export const schoolManagers = pgTable('school_managers', {
   academicYear: text('academic_year').notNull(), // e.g. "2025-2026"
   isPrimaryContact: boolean('is_primary_contact').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  // Set when this person ends the portal tour (finished or skipped). Null = not seen;
+  // existing rows are intentionally not backfilled so current managers see it once.
+  tourCompletedAt: timestamp('tour_completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (t) => [
@@ -742,14 +745,6 @@ export const schoolManagers = pgTable('school_managers', {
   index('school_managers_user_id_idx').on(t.userId),
   index('school_managers_member_id_idx').on(t.memberId),
 ]).enableRLS();
-
-// 1b. Portal tour dismissal. Keyed by the auth account (not the school) so a manager
-// who switches between several schools, or is assigned a new one next year, is
-// never shown the tour twice. A row exists only once the tour has ended.
-export const managerPortalTours = pgTable('manager_portal_tours', {
-  userId: uuid('user_id').primaryKey(), // Supabase auth.users.id
-  completedAt: timestamp('completed_at').defaultNow().notNull(),
-}).enableRLS();
 
 // 2. Single-Use Player & Manager Invite Tokens
 export const playerInvites = pgTable('player_invites', {

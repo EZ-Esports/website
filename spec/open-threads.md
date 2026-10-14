@@ -116,5 +116,5 @@ Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-o
 
 ## Manager portal tour (spec-015)
 
-- Migration `0048_manager_portal_tours` is written but **not applied** to production; applying it needs explicit user confirmation (`CLAUDE.md`). Until then the tour is hidden (the status lookup fails safe) and the first-run completion write fails silently.
+- Migration `0048_school_manager_tour_completed` (adds nullable `school_managers.tour_completed_at`) is written but **not applied** to production; applying it needs explicit user confirmation (`CLAUDE.md`). Until then the tour is hidden (the status lookup fails safe) and the first-run completion write fails silently. Apply it before or with the deploy: whole-row `school_managers` queries (e.g. `findManagerById`, add/remove manager) select the new column and error until it exists.
 - `drizzle-kit generate` aborts because `db/migrations/meta/0041_snapshot.json` and `0042_snapshot.json` point at the same parent snapshot; migrations 0043-0048 were hand-written. Repair the snapshot chain so future migrations can be generated.

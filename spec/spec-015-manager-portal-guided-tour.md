@@ -30,11 +30,12 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 
 ### Dismissal storage (database flag)
 
-- A per-**account** flag stored in its own table, `manager_portal_tours` (one row per Supabase auth user id; a row means the tour has ended). It is deliberately not a column on `school_managers`: that table has one row per school per academic year, so a column would replay the tour when a manager switches schools or is assigned a new school or year.
+- A nullable column `school_managers.tour_completed_at` (timestamp, no default). Each person has their own manager rows, so one manager finishing the tour never hides it from another manager at the same school. The read is **any row of the session user set**, so switching schools, or a new school or academic-year row for the same person, never replays it. (A separate per-user table was considered and rejected by the user in favour of the existing table.)
 - Set by a server action when the tour **ends** (finished or skipped), not when it starts. A manager who closes the tab at step 2 sees it again next time.
-- **Existing managers are not backfilled.** The table starts empty, so a missing row means "not seen", so every current manager sees the tour once on their next visit. This was a deliberate decision.
+- **Existing managers are not backfilled.** The column is NULL for every current row, so every current manager sees the tour once on their next visit. This was a deliberate decision.
 - Replays from the Tutorial button never touch the flag.
 - **Fail safe:** `hasCompletedPortalTour` catches lookup errors, logs them and returns "completed" (tour hidden, portal still renders), so a missing table or a database blip can never take `/portal` down. A failed `completePortalTour` write is swallowed on the client. The client also remembers, per account, that the first run ended, so a remount before the server flag propagates cannot restart it.
+- **Staff admins without a manager row** (viewing `/portal` through the admin override): the read returns "completed" (no tour) and the write is a no-op, so nothing throws and the tour does not replay on every visit. Staff admins who also hold a manager row follow the normal path.
 - The migration is applied to production, since `.env` points at production. Per `CLAUDE.md` it needs explicit confirmation from the user before it runs, even though `assertSeedTargetAllowed()` would permit it.
 
 ### Anchors
@@ -71,8 +72,8 @@ A brand-new school has no pending submissions and likely no rosters, so row-leve
 
 ## Implementation notes
 
-- **Flag storage.** New table `manager_portal_tours` (`user_id uuid PRIMARY KEY`, `completed_at timestamp NOT NULL DEFAULT now()`, RLS enabled, no policies, like `school_managers`), keyed by the Supabase auth user id. A table rather than a column on `school_managers` because that table has one row per school per academic year: a column would replay the tour for a manager assigned a new school or year. Row exists = tour ended. Migration `db/migrations/0048_manager_portal_tours.sql`, hand-written and journaled because `drizzle-kit generate` currently aborts on a pre-existing snapshot collision (`0041_snapshot.json` and `0042_snapshot.json` share a parent); migrations 0043-0047 were also hand-written. It creates the table empty: no backfill.
-- **Read/write.** `hasCompletedPortalTour(userId)` in `manager-auth.ts` (server only, called from `page.tsx`); `completePortalTour()` in `tour-actions.ts` (server action, derives the user from the session, `ON CONFLICT DO NOTHING`). Only the automatic first-run tour calls it; replays do not.
+- **Flag storage.** Nullable `school_managers.tour_completed_at timestamp` (no default, no backfill; RLS unchanged). Migration `db/migrations/0048_school_manager_tour_completed.sql`, hand-written and journaled because `drizzle-kit generate` currently aborts on a pre-existing snapshot collision (`0041_snapshot.json` and `0042_snapshot.json` share a parent); migrations 0043-0047 were also hand-written.
+- **Read/write.** `hasCompletedPortalTour(userId)` in `manager-auth.ts` (server only, called from `page.tsx`): true if any of the user's `school_managers` rows has the column set, true when the user has no rows, true on error. `completePortalTour()` in `tour-actions.ts` (server action, user from the session only) sets `tour_completed_at = now()` on all of that user's rows where it is still null. Only the automatic first-run tour calls it; replays do not.
 - **Definition.** `app/(portal)/portal/tour/steps.ts`: `TOUR_SECTIONS` (Pick a game, Invite players, Approvals, Rosters; 6 steps), `TOUR_ANCHORS`, and `resolveTourSteps(selection, hasTarget)`, which serves the full tour and each section slice and drops steps whose target is missing.
 - **Anchors.** `game-tabs`, `invite-card`, `invite-history`, `approvals`, `rosters`, `create-roster`, all on always-rendered elements.
 - **UI.** `tour/PortalTour.tsx` renders the Tutorial `MenuTrigger` (placed in `PortalHeader` via an `actions` slot) and a modal RAC `Popover` anchored with `triggerRef` to the target, plus a pointer-events-none spotlight ring. Modal rather than non-modal because react-aria closes non-modal popovers on any scroll. Esc toggles the skip confirmation (Esc again = Keep going); Skip opens the same confirmation; arrows step; focus returns to the Tutorial button on end. Scrolling to a target is instant (no travel animation, which also satisfies reduced motion); the spotlight transition is `motion-safe` only.
@@ -83,9 +84,9 @@ Automated (all DB-free; no migration was applied and no script touched `.env`):
 
 - `tour/__tests__/anchors.test.tsx`: renders `SchoolPortalClient` as a brand-new school (no invites, submissions or rosters) and fails if any anchor in `TOUR_ANCHORS` is missing or if a step's anchor does not appear exactly once.
 - `tour/__tests__/steps.test.ts`: unique ids, anchors declared, full-tour order, section slices end at their boundary, missing-target steps omitted, unknown section is empty.
-- `app/lib/onboarding/__tests__/tour-actions.test.ts`: unauthenticated rejected without writing, writes the session user id, idempotent `ON CONFLICT DO NOTHING`.
-- `app/lib/onboarding/__tests__/tour-status.test.ts`: the status lookup returns false/true by row and returns true (tour hidden) when the lookup throws.
-- `app/lib/db/__tests__/manager-portal-tours-migration.test.ts`: table shape, RLS, no backfill insert, journal order.
+- `app/lib/onboarding/__tests__/tour-actions.test.ts`: unauthenticated rejected without writing; updates `school_managers.tour_completed_at`; the WHERE clause is the session user id and `tour_completed_at IS NULL` only.
+- `app/lib/onboarding/__tests__/tour-status.test.ts`: any stamped row is completed, none is not, no rows (staff admin) is completed, a throwing lookup hides the tour.
+- `app/lib/db/__tests__/school-manager-tour-migration.test.ts`: single nullable column, no default or backfill, journal order.
 - `npx tsc --noEmit` clean; `npm run lint` 0 errors (1 pre-existing `<img>` warning); `npm test` 1294 pass, 1 fail (the known Windows path-separator `db/__tests__/backup.test.ts`).
 
 Still to do manually (needs a non-production database; not run, see Open Items):
@@ -95,7 +96,7 @@ Still to do manually (needs a non-production database; not run, see Open Items):
 
 ## Open Items
 
-- Apply migration `0048` to production (needs explicit user confirmation per `CLAUDE.md`), then run the manual checks above. Until applied, `/portal` will error on the flag lookup.
+- Apply migration `0048` (adds `school_managers.tour_completed_at`) to production (needs explicit user confirmation per `CLAUDE.md`), then run the manual checks above. Until applied, the status lookup fails safe and the tour is simply hidden. **Deploy order matters:** because the column is now part of the `school_managers` Drizzle model, any query that selects or returns whole rows (for example the repository's `findManagerById`, `addSchoolManager` and `removeSchoolManager`) fails with a missing-column error until the migration is applied, so apply `0048` before or with the deploy; only the tour lookup itself fails safe.
 - Repair `drizzle-kit generate` (snapshot collision at 0041/0042) so future migrations can be generated rather than hand-written.
 
 - Final section names and step copy are first-draft and live in `tour/steps.ts`; wording can change without touching logic.
