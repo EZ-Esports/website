@@ -115,7 +115,8 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
     setConfirmingSkip(false);
     setTargetReady(false);
     targetRef.current = null;
-    requestAnimationFrame(() => tutorialButtonRef.current?.focus());
+    // Deferred past the popover's own focus-restore on unmount, which would otherwise win.
+    setTimeout(() => tutorialButtonRef.current?.focus(), 50);
   }, [session, accountId]);
 
   // First visit: start the full tour once the page and its anchors have mounted.
@@ -178,8 +179,18 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
     setSession({ ...session, index: next });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // Document-level so arrows and Esc keep working if the manager clicks into the page.
+  // Latest handler is read through a ref to avoid re-subscribing on every step.
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandler.current = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setConfirmingSkip((c) => !c);
+      return;
+    }
     if (confirmingSkip) return;
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       goTo(1);
@@ -188,6 +199,13 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
       goTo(-1);
     }
   };
+  const tourActive = session !== null;
+  useEffect(() => {
+    if (!tourActive) return;
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [tourActive]);
 
   const isLast = session ? session.index === session.steps.length - 1 : false;
   const isOpen = Boolean(session && step && targetReady);
@@ -253,11 +271,11 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
           key={`${step.id}:${confirmingSkip ? 'confirm' : 'step'}`}
           triggerRef={targetRef}
           isOpen={isOpen}
-          onOpenChange={(open) => {
-            // Esc (or any dismissal) toggles the confirmation; it never ends the tour silently.
-            if (!open) setConfirmingSkip((c) => !c);
-          }}
-          shouldCloseOnInteractOutside={() => false}
+          // Non-modal: a modal popover locks page scroll, which stops the tour from scrolling
+          // targets into view. The popover is absolutely positioned, so it scrolls with its target.
+          // Esc is handled by the document listener above, never by popover dismissal.
+          isNonModal
+          onOpenChange={() => {}}
           placement="bottom"
           offset={SPOTLIGHT_PADDING + 10}
           containerPadding={12}
@@ -267,8 +285,7 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
             aria-label={confirmingSkip ? 'Skip the tour?' : step.title}
             className="p-5 outline-none"
           >
-            {/* Arrow-key stepping is handled on this wrapper because RAC Dialog takes no key handlers. */}
-            <div onKeyDown={handleKeyDown}>
+            <div>
               {confirmingSkip ? (
                 <div className="space-y-4">
                   <Heading slot="title" className="text-base font-bold">
