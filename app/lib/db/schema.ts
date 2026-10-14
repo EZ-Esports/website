@@ -743,6 +743,14 @@ export const schoolManagers = pgTable('school_managers', {
   index('school_managers_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
+// 1b. Portal tour dismissal. Keyed by the auth account (not the school) so a manager
+// who switches between several schools, or is assigned a new one next year, is
+// never shown the tour twice. A row exists only once the tour has ended.
+export const managerPortalTours = pgTable('manager_portal_tours', {
+  userId: uuid('user_id').primaryKey(), // Supabase auth.users.id
+  completedAt: timestamp('completed_at').defaultNow().notNull(),
+}).enableRLS();
+
 // 2. Single-Use Player & Manager Invite Tokens
 export const playerInvites = pgTable('player_invites', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -38,7 +38,7 @@ export function PendingApprovalsCard({
   onReject,
 }: PendingApprovalsCardProps) {
   return (
-    <div className="space-y-4">
+    <div data-tour="approvals" className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-bold text-white">Pending Approvals Queue</h2>

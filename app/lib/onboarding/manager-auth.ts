@@ -251,3 +251,17 @@ export async function assertManagerForRoster(rosterId: string): Promise<{
     team: row.team,
   };
 }
+
+/**
+ * Whether this auth account has already finished or skipped the portal tour.
+ * Read server-side from the session user id; deliberately not a server action so a
+ * client can never ask about someone else's account.
+ */
+export async function hasCompletedPortalTour(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ userId: schema.managerPortalTours.userId })
+    .from(schema.managerPortalTours)
+    .where(eq(schema.managerPortalTours.userId, userId))
+    .limit(1);
+  return Boolean(row);
+}
