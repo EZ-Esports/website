@@ -93,16 +93,16 @@ export function RosterCard({
       </div>
 
       {/* Players Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[34rem] text-left text-xs">
+      <div>
+        <table className="w-full text-left text-xs">
           <thead>
             <tr className="text-zinc-500 border-b border-zinc-800/80">
-              <th className="pb-2 pr-3 font-semibold whitespace-nowrap">Player</th>
-              <th className="pb-2 pr-3 font-semibold whitespace-nowrap">Role</th>
-              <th className="pb-2 pr-3 font-semibold whitespace-nowrap">In-Game Name</th>
-              <th className="pb-2 pr-3 font-semibold whitespace-nowrap">Discord</th>
-              <th className="pb-2 pr-3 font-semibold whitespace-nowrap">Server</th>
-              <th className="pb-2 font-semibold text-right whitespace-nowrap">Actions</th>
+              <th className="pb-2 pr-3 font-semibold">Player</th>
+              <th className="pb-2 pr-3 font-semibold">Role</th>
+              <th className="pb-2 pr-3 font-semibold">In-Game Name</th>
+              <th className="pb-2 pr-3 font-semibold">Discord</th>
+              <th className="pb-2 pr-3 font-semibold">Server</th>
+              <th className="pb-2 font-semibold text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/40">
@@ -141,7 +141,7 @@ export function RosterCard({
                   </td>
                   <td className="py-2.5 pr-3 font-mono text-zinc-300 break-all">{p.ign}</td>
                   <td className="py-2.5 pr-3 font-mono text-zinc-400 break-all">{p.discordUsername}</td>
-                  <td className="py-2.5 pr-3 whitespace-nowrap">
+                  <td className="py-2.5 pr-3">
                     {p.inGuild ? (
                       <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
                         <HiOutlineCheckCircle className="w-3.5 h-3.5" />
