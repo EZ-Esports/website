@@ -2,7 +2,7 @@
 
 - **Spec ID:** spec-015
 - **Title:** School Manager Portal Guided Tour
-- **Status:** In Review (design agreed with Isaac, 2026-10-14; implemented on `feat/issue-225-manager-portal-tour`, migration `0048` not yet applied)
+- **Status:** In Review (design agreed with Isaac, 2026-10-14; implemented on `feat/issue-225-manager-portal-tour`, PR #227 merged 2026-10-14; migration `0048` applied to production 2026-10-14)
 - **PR / Commit:** TBD
 - **Date:** 2026-10-14
 - **Scope:** `/portal` only (school managers). Issue: EZ-Esports/website#225. The staff portal (`/admin`) is out of scope.
@@ -96,7 +96,7 @@ Still to do manually (needs a non-production database; not run, see Open Items):
 
 ## Open Items
 
-- Apply migration `0048` (adds `school_managers.tour_completed_at`) to production (needs explicit user confirmation per `CLAUDE.md`), then run the manual checks above. Until applied, the status lookup fails safe and the tour is simply hidden. **Deploy order matters.** Before `0048` is applied, the onboarding submission-approval path (`app/lib/onboarding/wizard/submission-pipeline.ts`, a bare select plus insert on `schoolManagers`) and the admin add/remove manager flows (`drizzle-onboarding-repository.ts`: `findManagerById`, `createOrUpdateSchoolManager`, `removeSchoolManager`) all throw `column tour_completed_at does not exist`; only `hasCompletedPortalTour` fails safe. Apply `0048` **before or with** the deploy.
+- Done 2026-10-14: migration `0048` (adds `school_managers.tour_completed_at`) applied to production with the user's confirmation, after merging #227 (merge first, migrate right after; the brief window is the one described below). Still to do: the manual checks above. Until applied, the status lookup fails safe and the tour is simply hidden. **Deploy order matters.** Before `0048` is applied, the onboarding submission-approval path (`app/lib/onboarding/wizard/submission-pipeline.ts`, a bare select plus insert on `schoolManagers`) and the admin add/remove manager flows (`drizzle-onboarding-repository.ts`: `findManagerById`, `createOrUpdateSchoolManager`, `removeSchoolManager`) all throw `column tour_completed_at does not exist`; only `hasCompletedPortalTour` fails safe. Apply `0048` **before or with** the deploy.
 - Repair `drizzle-kit generate` (snapshot collision at 0041/0042) so future migrations can be generated rather than hand-written.
 
 - Final section names and step copy are first-draft and live in `tour/steps.ts`; wording can change without touching logic.
