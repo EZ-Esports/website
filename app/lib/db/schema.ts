@@ -477,6 +477,10 @@ export const galleryImages = pgTable('gallery_images', {
   displayOrder: integer('display_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   storageKey: text('storage_key'),
+  // Small WebP beside the full-size file; null until uploaded (or backfilled), in
+  // which case readers fall back to `src`. See app/lib/gallery-image-sources.ts.
+  thumbnailUrl: text('thumbnail_url'),
+  thumbnailStorageKey: text('thumbnail_storage_key'),
   deletedAt: timestamp('deleted_at'),
   deletedBy: text('deleted_by'),
   ...auditColumns,

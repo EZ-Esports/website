@@ -107,3 +107,9 @@ Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-o
 ## Dependency drift
 
 - `eslint-config-next` is pinned at `16.1.0` in `package.json` while `next` is `^16.3.8`. Lint passes, but the two should be aligned in a separate dependency pass (left untouched in the Dependabot #71 security bump to keep the diff minimal).
+
+## Gallery thumbnail rollout (spec-014)
+
+- Migration `0046_gallery_image_thumbnails` is **applied** in production; `npm run db:backfill:gallery-thumbnails` has only been dry-run (it then saw 3 own-folder rows; the extended backfill also covers 29 legacy root-key and 3 local-static live rows). Run it dry first, then `--apply`, then save any gallery row in `/admin/gallery` to refresh the Data Cache. Until then existing rows show full-size files (unoptimized).
+- Sponsor logos and leadership avatars stay unoptimized without thumbnails; revisit only if they grow.
+- The other tsx db scripts that import `app/lib/db` (seed-gold, seed-leadership, backfill-leadership, seed-owner, storage-clean) likely hit the same `server-only` launch crash (incidents section 20); decide whether to add `--conditions=react-server` to them.

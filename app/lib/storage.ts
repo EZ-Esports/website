@@ -36,17 +36,39 @@ export async function uploadToStorage(
 }
 
 /**
+ * Removes specific objects by key. Only for keys this server just created itself
+ * (e.g. rolling back a half-finished upload) — never pass client-supplied keys.
+ */
+export async function removeFromStorage(keys: string[]): Promise<{ error: string | null }> {
+  if (keys.length === 0) return { error: null };
+  try {
+    const supabase = createServiceClient();
+    const { error } = await supabase.storage.from(BUCKET).remove(keys);
+    return { error: error ? error.message : null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
  * Scopes cleanup strictly to an entity's storage folder `${section}/${entityId}/`.
  * Ignores client-supplied delete keys and only removes objects inside this entity folder,
- * optionally preserving a specific active key (e.g., during replacement).
+ * optionally preserving the active key(s) (e.g., a full-size image and its thumbnail
+ * during replacement).
  */
 export async function cleanupEntityStorage(
   section: UploadSection,
   entityId: string | null | undefined,
-  keepStorageKey?: string | null,
+  keepStorageKey?: string | null | readonly (string | null | undefined)[],
 ): Promise<{ deleted: string[]; error?: string }> {
   const safeId = sanitizeEntityId(entityId);
   if (!safeId) return { deleted: [] };
+
+  const keep = new Set(
+    (Array.isArray(keepStorageKey) ? keepStorageKey : [keepStorageKey]).filter(
+      (key): key is string => typeof key === 'string' && key !== '',
+    ),
+  );
 
   const folder = `${section}/${safeId}`;
   try {
@@ -65,7 +87,7 @@ export async function cleanupEntityStorage(
       .filter((file) => {
         if (!file.name) return false;
         const fullKey = `${folder}/${file.name}`;
-        return !keepStorageKey || fullKey !== keepStorageKey;
+        return !keep.has(fullKey);
       })
       .map((file) => `${folder}/${file.name}`);
 

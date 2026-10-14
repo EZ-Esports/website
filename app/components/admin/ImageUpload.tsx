@@ -17,6 +17,9 @@ import { cx } from '@/app/lib/cx';
 interface ImageUploadProps {
   name: string;
   storageKeyName: string;
+  /** Gallery only: hidden-input name/initial value for the server-generated thumbnail key; the server derives the URL. */
+  thumbnailStorageKeyName?: string;
+  currentThumbnailStorageKey?: string;
   section: UploadSection;
   entityId?: string;
   entityIdName?: string;
@@ -31,6 +34,8 @@ const ALLOWED_TYPES = ALLOWED_MIME_TYPES as readonly string[];
 export default function ImageUpload({
   name,
   storageKeyName,
+  thumbnailStorageKeyName,
+  currentThumbnailStorageKey,
   section,
   entityId,
   entityIdName,
@@ -41,6 +46,7 @@ export default function ImageUpload({
 }: ImageUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string>(currentSrc ?? '');
   const [storageKey, setStorageKey] = useState<string>(currentStorageKey ?? '');
+  const [thumbnailKey, setThumbnailKey] = useState<string>(currentThumbnailStorageKey ?? '');
   const [draftId, setDraftId] = useState<string>(() => crypto.randomUUID());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +65,7 @@ export default function ImageUpload({
     const onReset = () => {
       setPreviewUrl(currentSrc ?? '');
       setStorageKey(currentStorageKey ?? '');
+      setThumbnailKey(currentThumbnailStorageKey ?? '');
       setError(null);
       setIsDragOver(false);
       dragCounterRef.current = 0;
@@ -67,7 +74,7 @@ export default function ImageUpload({
     };
     form.addEventListener('reset', onReset);
     return () => form.removeEventListener('reset', onReset);
-  }, [currentSrc, currentStorageKey]);
+  }, [currentSrc, currentStorageKey, currentThumbnailStorageKey]);
 
   const processFile = useCallback(async (file: File) => {
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -114,6 +121,8 @@ export default function ImageUpload({
 
       setPreviewUrl(json.url);
       setStorageKey(json.storageKey);
+      // Animated GIFs come back without a thumbnail; clear any previous photo's.
+      setThumbnailKey(json.thumbnailStorageKey ?? '');
     } catch {
       setError('Upload failed. Please check your connection and try again.');
     } finally {
@@ -171,6 +180,7 @@ export default function ImageUpload({
   const handleRemove = () => {
     setPreviewUrl('');
     setStorageKey('');
+    setThumbnailKey('');
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -196,6 +206,7 @@ export default function ImageUpload({
       {/* Hidden form submission inputs */}
       <input type="hidden" name={name} value={previewUrl} required={required} />
       <input type="hidden" name={storageKeyName} value={storageKey} />
+      {thumbnailStorageKeyName && <input type="hidden" name={thumbnailStorageKeyName} value={thumbnailKey} />}
       <input type="hidden" name={entityIdName ?? 'entityId'} value={effectiveEntityId} />
 
       {/* Hidden real file input */}

@@ -182,6 +182,30 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 19. Vercel image-transformation quota exhausted — Oct 2026 (PR #202 cause, PR #220 fix)
+
+**Symptom.** Images across the site (gallery, schools, games) stopped loading and showed alt text instead.
+
+**Root cause.** PR #202 removed `unoptimized` so every Supabase image went through `/_next/image`. Each photo produced roughly 10-12 transformations (one per device width bucket and quality), which reached 5,040 against the 5,000 monthly Hobby limit. New transformations then returned HTTP 402; already-cached variants kept working, so it looked intermittent.
+
+**Fix.** PR #220 restores `unoptimized` on Supabase images. A follow-up gives gallery photos a server-generated WebP thumbnail (spec-014) so grids stay light without transformations; the lightbox loads the full file `unoptimized` too, so no gallery image uses `/_next/image`. The quota resets monthly; nothing else in the repo had to change.
+
+**Do not repeat.** Do not route user-uploaded images through `/_next/image` without costing it (images x widths x qualities). Prefer pre-sized derivatives generated at upload.
+
+---
+
+## 20. Gallery thumbnail backfill crashed on launch (`server-only`) — Oct 2026 (PR #220 follow-up)
+
+**Symptom.** `npm run db:backfill:gallery-thumbnails` died immediately with the `server-only` import error before reaching any of its own checks.
+
+**Root cause.** The script imports `app/lib/db/schema.ts`, which has `import 'server-only'` (added by #203). Under plain `tsx` the package's default export throws; only the `react-server` condition resolves it to the empty module. The unit tests import `db/gallery-thumbnails.ts` (pure planning code) and vitest aliases `server-only` to `empty.js`, so nothing ever executed the real entry point under real module resolution.
+
+**Fix.** The npm script now passes `--conditions=react-server`. `db/__tests__/backfill-entry.test.ts` spawns the entry point under tsx with an empty environment and requires it to fail at its own guard, never on the import. The same crash very likely affects the other tsx scripts that import `app/lib/db` or its schema (`db:seed:gold`/`db:ingest:gold`, `db:seed:leadership`/`db:ingest:leadership`, `db:backfill:leadership`, `db:seed-owner`, `db:storage:clean`); they were left unchanged in this PR.
+
+**Do not repeat.** A script's tests must include one that launches the real entry point, not just its pure helpers.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

@@ -74,3 +74,6 @@ _scratch/
 # python bytecode from the sharepoint pipeline
 __pycache__/
 *.py[cod]
+
+# Local thumbnail previews from db/backfill-gallery-thumbnails.ts --preview-dir
+/db/thumbnail-previews/
