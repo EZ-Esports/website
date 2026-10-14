@@ -1,9 +1,9 @@
-# spec-014 — Public light and dark theme
+# spec-016 — Public light and dark theme
 
-- **Spec ID:** spec-014
+- **Spec ID:** spec-016
 - **Title:** Public light and dark theme
 - **Status:** In Progress
-- **PR / Commit:** branch `feat/light-dark-mode`
+- **PR / Commit:** PR #226
 - **Date:** 2026-10-12
 - **Scope:** Public site appearance. Staff portal and school manager portal stay dark.
 

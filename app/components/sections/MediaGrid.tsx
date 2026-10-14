@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import useEmblaCarousel from 'embla-carousel-react';
 import AutoScroll from 'embla-carousel-auto-scroll';
 import type { Image as ImageType, GridColumns } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import Badge from '@/app/components/ui/Badge';
+import { GalleryThumbnail, GalleryLightboxImage } from '@/app/components/ui/GalleryImage';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 import CutCTA from '@/app/components/ui/CutCTA';
 import { ROUTES } from '@/app/lib/constants';
@@ -85,10 +85,8 @@ function MarqueeRow({
                   aria-label={`View photo: ${item.alt}`}
                   className="w-full h-full relative block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  <Image
-                    src={item.src}
-                    alt={item.alt}
-                    fill
+                  <GalleryThumbnail
+                    item={item}
                     loading="lazy"
                     sizes="(max-width: 640px) 70vw, (max-width: 768px) 45vw, (max-width: 1024px) 32vw, (max-width: 1280px) 26vw, 300px"
                     className="object-cover transition-transform duration-500 group-hover/card:scale-105 pointer-events-none"
@@ -260,13 +258,8 @@ export default function MediaGrid({
 
                 {/* Active Image */}
                 <div className="relative max-w-5xl max-h-[80vh] w-full h-full flex flex-col items-center justify-center cursor-default">
-                  <Image
-                    src={items[selectedImageIndex].src}
-                    alt={items[selectedImageIndex].alt}
-                    width={1200}
-                    height={800}
-                    priority
-                    sizes="(max-width: 1024px) 100vw, 1024px"
+                  <GalleryLightboxImage
+                    item={items[selectedImageIndex]}
                     className="object-contain max-h-[80vh] w-auto h-auto rounded-lg shadow-2xl select-none"
                   />
                   <div id="lightbox-caption" className="mt-3 text-center text-foreground-secondary text-sm">

@@ -14,7 +14,7 @@ export function InvitesHistoryTable({
   onCopyLink,
 }: InvitesHistoryTableProps) {
   return (
-    <div className="space-y-4 pt-4 border-t border-zinc-800">
+    <div data-tour="invite-history" className="space-y-4 pt-4 border-t border-zinc-800">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-white">Issued Player Invitations</h2>
         <span className="text-xs text-zinc-500">{invites.length} Total Invites</span>

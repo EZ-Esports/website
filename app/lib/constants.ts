@@ -37,6 +37,7 @@ export const HERO_ROUTES = [
   ROUTES.about,
   ROUTES.gallery,
   ROUTES.news,
+  ROUTES.careers,
   ROUTES.sponsors,
   ROUTES.privacy,
   ROUTES.rules,

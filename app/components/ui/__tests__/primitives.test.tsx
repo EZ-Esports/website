@@ -48,6 +48,10 @@ describe('UI Primitives and Architectural Refactors (Issue #158)', () => {
       expect(hasHeroRoute('/about')).toBe(true);
       expect(hasHeroRoute('/gallery')).toBe(true);
       expect(hasHeroRoute('/news/post-123')).toBe(true);
+      expect(hasHeroRoute('/careers')).toBe(true);
+      // Careers subpages have no hero image, so they keep the solid header and top padding.
+      expect(hasHeroRoute('/careers/lead-software-engineer')).toBe(false);
+      expect(hasHeroRoute('/careers/apply/general')).toBe(false);
       expect(hasHeroRoute('/valorant')).toBe(false);
       expect(hasHeroRoute('/league-of-legends/schedule')).toBe(false);
     });
@@ -57,6 +61,7 @@ describe('UI Primitives and Architectural Refactors (Issue #158)', () => {
       expect(HERO_ROUTES).toContain('/about');
       expect(HERO_ROUTES).toContain('/gallery');
       expect(HERO_ROUTES).toContain('/news');
+      expect(HERO_ROUTES).toContain('/careers');
       expect(HERO_ROUTES).toContain('/sponsors');
       expect(HERO_ROUTES).toContain('/privacy');
       expect(HERO_ROUTES).toContain('/rules');

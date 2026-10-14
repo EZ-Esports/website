@@ -26,6 +26,7 @@ import { InvitesHistoryTable } from './components/InvitesHistoryTable';
 import { EmergencySwapModal } from './components/EmergencySwapModal';
 import { EnrollPlayerModal } from './components/EnrollPlayerModal';
 import { CreateRosterModal } from './components/CreateRosterModal';
+import PortalTour from './tour/PortalTour';
 
 export type { GameItem };
 
@@ -38,6 +39,8 @@ interface SchoolPortalClientProps {
   initialRosters: SchoolRosterDetails[];
   initialPlayerPool?: SchoolPoolPlayer[];
   selectedGameId?: string;
+  /** Whether this account has already finished or skipped the guided tour. */
+  tourCompleted: boolean;
 }
 
 export default function SchoolPortalClient({
@@ -49,6 +52,7 @@ export default function SchoolPortalClient({
   initialRosters,
   initialPlayerPool = [],
   selectedGameId: initialGameId,
+  tourCompleted,
 }: SchoolPortalClientProps) {
   // --- Game Selection Tab ---
   const [selectedGame, setSelectedGame] = useState<string>(initialGameId || 'all');
@@ -508,7 +512,10 @@ export default function SchoolPortalClient({
   return (
     <div className="space-y-8">
       {/* Top Banner & Title */}
-      <PortalHeader schoolName={activeSchool.schoolName} />
+      <PortalHeader
+        schoolName={activeSchool.schoolName}
+        actions={<PortalTour tourCompleted={tourCompleted} accountId={_context.userId} />}
+      />
 
       {/* Game Filter Tabs */}
       <GameTabs

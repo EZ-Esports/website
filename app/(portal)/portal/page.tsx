@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSchoolManagerContext } from '@/app/lib/onboarding/manager-auth';
+import { getSchoolManagerContext, hasCompletedPortalTour } from '@/app/lib/onboarding/manager-auth';
 import {
   getSchoolInvites,
   getPendingSubmissions,
@@ -44,11 +44,12 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
   const allGames = await getCachedGames();
 
   // Load initial invites, submissions, rosters, and eligible player pool for the active school
-  const [initialInvites, initialSubmissions, initialRosters, initialPlayerPool] = await Promise.all([
+  const [initialInvites, initialSubmissions, initialRosters, initialPlayerPool, tourCompleted] = await Promise.all([
     getSchoolInvites(activeSchool.schoolId, paramGameId),
     getPendingSubmissions(activeSchool.schoolId, paramGameId),
     getSchoolRosters(activeSchool.schoolId, paramGameId),
     getSchoolPlayerPool(activeSchool.schoolId, paramGameId),
+    hasCompletedPortalTour(context.userId),
   ]);
 
   return (
@@ -62,6 +63,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialRosters={initialRosters}
         initialPlayerPool={initialPlayerPool}
         selectedGameId={paramGameId}
+        tourCompleted={tourCompleted}
       />
     </PortalShell>
   );

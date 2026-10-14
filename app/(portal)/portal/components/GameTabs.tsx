@@ -15,7 +15,10 @@ interface GameTabsProps {
 
 export function GameTabs({ games, selectedGame, onSelectGame }: GameTabsProps) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-zinc-800/80">
+    <div
+      data-tour="game-tabs"
+      className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-zinc-800/80"
+    >
       <button
         onClick={() => onSelectGame('all')}
         className={`px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
