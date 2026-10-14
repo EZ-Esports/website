@@ -251,3 +251,27 @@ export async function assertManagerForRoster(rosterId: string): Promise<{
     team: row.team,
   };
 }
+
+/**
+ * Whether this auth account has already finished or skipped the portal tour.
+ * Read server-side from the session user id; deliberately not a server action so a
+ * client can never ask about someone else's account.
+ */
+export async function hasCompletedPortalTour(userId: string): Promise<boolean> {
+  try {
+    const rows = await db
+      .select({ tourCompletedAt: schema.schoolManagers.tourCompletedAt })
+      .from(schema.schoolManagers)
+      .where(eq(schema.schoolManagers.userId, userId));
+    // A staff admin viewing the portal has no manager row to record dismissal on, so
+    // the tour is skipped for them rather than replaying on every visit.
+    if (rows.length === 0) return true;
+    // Any row counts, so a new school or academic year for the same person never replays it.
+    return rows.some((r) => r.tourCompletedAt !== null);
+  } catch (error) {
+    // Fail safe: the tour is an extra, so a failed lookup (for example before the
+    // column's migration is applied) hides it rather than taking the portal down.
+    console.error('hasCompletedPortalTour failed; hiding the tour', error);
+    return true;
+  }
+}

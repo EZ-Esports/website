@@ -93,6 +93,7 @@ Dedicated portal for vetted school managers and staff administrators ([spec-011]
 - Zero-PII Approve / Reject queue (hides minor demographic PII, protecting `student_demographics` behind `Permissions.VIEW_STUDENT_DEMOGRAPHICS`).
 - Live 5-Point Eligibility Validation Gate (roster caps, single captain, 100% Riot verified, 100% Discord connected and present in guild).
 - Match-day emergency substitute swapper with atomic role exchange.
+- Guided tour ([spec-015](spec-015-manager-portal-guided-tour.md)): auto-starts on a manager's first visit (full tour: pick a game, invite players, approvals, rosters), and a Tutorial button in the page header replays the full tour or one section. Skip/Esc asks for confirmation. Finishing or skipping the first-run tour is stored per account, so switching schools never replays it.
 
 ---
 

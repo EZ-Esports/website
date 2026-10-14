@@ -337,6 +337,13 @@
       "when": 1790882000002,
       "tag": "0047_career_postings_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1790882000003,
+      "tag": "0048_school_manager_tour_completed",
+      "breakpoints": true
     }
   ]
 }

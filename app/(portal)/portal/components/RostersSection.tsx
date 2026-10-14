@@ -40,7 +40,7 @@ export function RostersSection({
   onDeleteRoster,
 }: RostersSectionProps) {
   return (
-    <div className="space-y-5 pt-4 border-t border-zinc-800">
+    <div data-tour="rosters" className="space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Team Rosters & Eligibility Gates</h2>
@@ -49,6 +49,7 @@ export function RostersSection({
           </p>
         </div>
         <Button
+          data-tour="create-roster"
           onPress={onOpenCreateRosterModal}
           className="self-start sm:self-auto px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
         >

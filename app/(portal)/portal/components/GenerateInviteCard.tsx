@@ -118,7 +118,10 @@ export function GenerateInviteCard({
   };
 
   return (
-    <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 shadow-xl space-y-5">
+    <div
+      data-tour="invite-card"
+      className="p-5 sm:p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 shadow-xl space-y-5"
+    >
       <div className="flex items-center gap-2.5">
         <div className="p-2 rounded-lg bg-[#f4cccc]/10 text-[#f4cccc]">
           <HiOutlineUserPlus className="w-5 h-5" />

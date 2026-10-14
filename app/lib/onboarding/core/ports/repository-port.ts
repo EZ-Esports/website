@@ -50,6 +50,7 @@ export interface SchoolManagerRecord {
   academicYear: string;
   isPrimaryContact: boolean;
   isActive: boolean;
+  tourCompletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
