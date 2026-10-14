@@ -330,6 +330,13 @@
       "when": 1790882000001,
       "tag": "0046_gallery_image_thumbnails",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790882000002,
+      "tag": "0047_career_postings_rls",
+      "breakpoints": true
     }
   ]
 }
