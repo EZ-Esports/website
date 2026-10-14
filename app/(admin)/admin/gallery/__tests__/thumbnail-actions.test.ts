@@ -39,8 +39,11 @@ function form(fields: Record<string, string>) {
 }
 
 describe('gallery actions with thumbnails', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://x.supabase.co');
     remove.mockResolvedValue({ error: null });
     list.mockResolvedValue({
       data: [OLD_FULL, OLD_THUMB, NEW_FULL, NEW_THUMB].map((k) => ({ name: k.split('/').pop() })),
@@ -138,6 +141,38 @@ describe('gallery actions with thumbnails', () => {
 
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ thumbnailStorageKey: OLD_THUMB }));
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  describe('src validation', () => {
+    it('addGalleryImage rejects a foreign-host src without touching the database', async () => {
+      const res = await addGalleryImage(form({ src: 'https://evil.example/a.jpg', caption: 'c' }));
+      expect(res.success).toBe(false);
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('addGalleryImage rejects a src that does not match the posted storage key', async () => {
+      const res = await addGalleryImage(
+        form({ src: `${BASE}/gallery/${ID}/other.jpg`, caption: 'c', entityId: ID, storageKey: NEW_FULL }),
+      );
+      expect(res.success).toBe(false);
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('updateGalleryImage rejects a foreign src for a changed image', async () => {
+      mockDb.select.mockReturnValue({ from: () => ({ where: () => ({ limit: () => Promise.resolve([{ src: '/images/gallery/a.png', storageKey: null }]) }) }) });
+      const res = await updateGalleryImage(ID, form({ src: 'https://evil.example/a.jpg', caption: 'c' }));
+      expect(res.success).toBe(false);
+      expect(mockDb.update).not.toHaveBeenCalled();
+    });
+
+    it('updateGalleryImage accepts an unchanged legacy static src', async () => {
+      mockDb.select.mockReturnValue({ from: () => ({ where: () => ({ limit: () => Promise.resolve([{ src: '/images/gallery/a.png', storageKey: null, thumbnailUrl: null, thumbnailStorageKey: null }]) }) }) });
+      const set = vi.fn().mockReturnValue({ where: () => Promise.resolve() });
+      mockDb.update.mockReturnValue({ set });
+      const res = await updateGalleryImage(ID, form({ src: '/images/gallery/a.png', caption: 'new' }));
+      expect(res).toEqual({ success: true });
+      expect(set).toHaveBeenCalledWith(expect.objectContaining({ src: '/images/gallery/a.png' }));
+    });
   });
 
   describe('legacy rows (root-level original, thumbnail in gallery/<id>/)', () => {

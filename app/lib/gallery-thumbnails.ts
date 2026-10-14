@@ -113,3 +113,41 @@ export function resolveGalleryThumbnail(opts: {
 
   return NONE;
 }
+
+/**
+ * Server-side check that a posted gallery `src` points at our own Supabase
+ * bucket (`<project>/storage/v1/object/public/<bucket>/...`), https only, no
+ * credentials/query/hash. The project origin comes from config, never the form.
+ * When the row has an own-folder `storageKey`, `src` must be exactly that
+ * object's public URL. An unchanged `src` (equal to the row's stored one) is
+ * always accepted so legacy rows (static `/images/gallery/*` paths, old hosts)
+ * stay editable. Returns a user-facing error, or null when acceptable.
+ */
+export function validateGalleryImageSrc(opts: {
+  src: string;
+  storageKey: string | null;
+  existingSrc?: string | null;
+  supabaseUrl?: string;
+}): string | null {
+  const { src, storageKey, existingSrc } = opts;
+  if (existingSrc && src === existingSrc) return null;
+  const invalid = 'The image must be uploaded through the uploader. Please upload it again.';
+  const configured = opts.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const prefix = buildPublicObjectUrl(configured, BUCKET, '');
+  if (!prefix) return invalid;
+  let url: URL;
+  let allowed: URL;
+  try {
+    url = new URL(src);
+    allowed = new URL(prefix);
+  } catch {
+    return invalid;
+  }
+  const loopback = allowed.hostname === 'localhost' || allowed.hostname === '127.0.0.1';
+  if (url.protocol !== 'https:' && !(loopback && url.protocol === 'http:')) return invalid;
+  if (url.origin !== allowed.origin) return invalid;
+  if (url.username || url.password || url.search || url.hash) return invalid;
+  if (!url.pathname.startsWith(allowed.pathname) || url.pathname.length === allowed.pathname.length) return invalid;
+  if (storageKey && src !== buildPublicObjectUrl(configured, BUCKET, storageKey)) return invalid;
+  return null;
+}

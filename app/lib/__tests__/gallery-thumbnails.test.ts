@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveThumbnailKey, isThumbnailKeyFor } from '@/app/lib/storage-constants';
-import { deriveThumbnailUrl, resolveGalleryThumbnail } from '@/app/lib/gallery-thumbnails';
+import { deriveThumbnailUrl, resolveGalleryThumbnail, validateGalleryImageSrc } from '@/app/lib/gallery-thumbnails';
 
 const ID = '3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f';
 const OTHER = '9a8b7c6d-1a2b-4c3d-8e9f-0a1b2c3d4e5f';
@@ -119,5 +119,45 @@ describe('deriveThumbnailUrl', () => {
   it('returns null when src is not the object at the storage key, or not a URL', () => {
     expect(deriveThumbnailUrl(`${URL_BASE}/gallery/${ID}/other.jpg`, FULL, THUMB)).toBeNull();
     expect(deriveThumbnailUrl('not a url', FULL, THUMB)).toBeNull();
+  });
+});
+
+describe('validateGalleryImageSrc', () => {
+  const P = 'https://x.supabase.co';
+  const B = `${P}/storage/v1/object/public/admin-uploads`;
+  const KEY = 'gallery/abc/1700000000000.jpg';
+  const v = (o: { src: string; storageKey?: string | null; existingSrc?: string | null }) =>
+    validateGalleryImageSrc({ storageKey: null, supabaseUrl: P, ...o });
+
+  it('accepts our bucket URL, with or without a matching storage key', () => {
+    expect(v({ src: `${B}/${KEY}`, storageKey: KEY })).toBeNull();
+    expect(v({ src: `${B}/root.jpg` })).toBeNull();
+  });
+
+  it.each([
+    ['foreign host', 'https://evil.example/storage/v1/object/public/admin-uploads/a.jpg'],
+    ['http', `${P.replace('https', 'http')}/storage/v1/object/public/admin-uploads/a.jpg`],
+    ['other bucket', `${P}/storage/v1/object/public/other/a.jpg`],
+    ['credentials', 'https://u:p@x.supabase.co/storage/v1/object/public/admin-uploads/a.jpg'],
+    ['query', `${B}/a.jpg?x=1`],
+    ['bucket root only', `${B}/`],
+    ['relative path', '/images/gallery/a.png'],
+    ['javascript url', 'javascript:alert(1)'],
+    ['garbage', 'not a url'],
+  ])('rejects %s', (_n, src) => {
+    expect(v({ src })).not.toBeNull();
+  });
+
+  it('rejects a src that is not the storage key object', () => {
+    expect(v({ src: `${B}/gallery/abc/other.jpg`, storageKey: KEY })).not.toBeNull();
+  });
+
+  it('fails closed when the project URL is not configured', () => {
+    expect(validateGalleryImageSrc({ src: `${B}/a.jpg`, storageKey: null, supabaseUrl: '' })).not.toBeNull();
+  });
+
+  it('accepts an unchanged legacy src', () => {
+    expect(v({ src: '/images/gallery/a.png', existingSrc: '/images/gallery/a.png' })).toBeNull();
+    expect(v({ src: '/images/gallery/b.png', existingSrc: '/images/gallery/a.png' })).not.toBeNull();
   });
 });

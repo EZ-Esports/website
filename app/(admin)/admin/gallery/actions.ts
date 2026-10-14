@@ -6,7 +6,7 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { cleanupEntityStorage, isKeyScopedToEntity, sanitizeEntityId } from '@/app/lib/storage';
 import { ActionError } from '@/app/lib/errors';
-import { resolveGalleryThumbnail } from '@/app/lib/gallery-thumbnails';
+import { resolveGalleryThumbnail, validateGalleryImageSrc } from '@/app/lib/gallery-thumbnails';
 import {
   getGalleryImageStoredFields,
   insertGalleryImage,
@@ -37,6 +37,8 @@ export async function addGalleryImage(formData: FormData) {
 
   if (!src) return { success: false, error: 'Please upload an image first.' };
   if (!caption) return { success: false, error: 'A caption (used as alt text) is required.' };
+  const srcError = validateGalleryImageSrc({ src, storageKey });
+  if (srcError) return { success: false, error: srcError };
 
   try {
     await insertGalleryImage({ id: entityId, src, caption, schoolName, eventName, storageKey, thumb });
@@ -71,6 +73,9 @@ export async function updateGalleryImage(id: string, formData: FormData) {
     // Only accept storage keys strictly scoped to this entity folder
     const validNewStorageKey = isKeyScopedToEntity(rawStorageKey, 'gallery', id) ? rawStorageKey : null;
     const storageKey = validNewStorageKey ?? (rawStorageKey === '' ? null : (old?.storageKey && isKeyScopedToEntity(old.storageKey, 'gallery', id) ? old.storageKey : null));
+
+    const srcError = validateGalleryImageSrc({ src, storageKey, existingSrc: old?.src });
+    if (srcError) return { success: false, error: srcError };
 
     const thumb = resolveGalleryThumbnail({
       src,
