@@ -96,7 +96,7 @@ Still to do manually (needs a non-production database; not run, see Open Items):
 
 ## Open Items
 
-- Apply migration `0048` (adds `school_managers.tour_completed_at`) to production (needs explicit user confirmation per `CLAUDE.md`), then run the manual checks above. Until applied, the status lookup fails safe and the tour is simply hidden. **Deploy order matters:** because the column is now part of the `school_managers` Drizzle model, any query that selects or returns whole rows (for example the repository's `findManagerById`, `addSchoolManager` and `removeSchoolManager`) fails with a missing-column error until the migration is applied, so apply `0048` before or with the deploy; only the tour lookup itself fails safe.
+- Apply migration `0048` (adds `school_managers.tour_completed_at`) to production (needs explicit user confirmation per `CLAUDE.md`), then run the manual checks above. Until applied, the status lookup fails safe and the tour is simply hidden. **Deploy order matters.** Before `0048` is applied, the onboarding submission-approval path (`app/lib/onboarding/wizard/submission-pipeline.ts`, a bare select plus insert on `schoolManagers`) and the admin add/remove manager flows (`drizzle-onboarding-repository.ts`: `findManagerById`, `createOrUpdateSchoolManager`, `removeSchoolManager`) all throw `column tour_completed_at does not exist`; only `hasCompletedPortalTour` fails safe. Apply `0048` **before or with** the deploy.
 - Repair `drizzle-kit generate` (snapshot collision at 0041/0042) so future migrations can be generated rather than hand-written.
 
 - Final section names and step copy are first-draft and live in `tour/steps.ts`; wording can change without touching logic.
