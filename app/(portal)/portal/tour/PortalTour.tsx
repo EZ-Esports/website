@@ -215,6 +215,7 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
       <MenuTrigger>
         <Button
           ref={tutorialButtonRef}
+          data-tour="tutorial-button"
           className="min-h-[44px] inline-flex items-center gap-2 px-3.5 text-sm font-semibold text-foreground bg-surface border border-line rounded-xl outline-none cursor-pointer hover:bg-surface-raised data-[focus-visible]:ring-2 data-[focus-visible]:ring-accent"
         >
           <HiOutlineAcademicCap

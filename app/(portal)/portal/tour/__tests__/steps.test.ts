@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TOUR_ANCHORS, TOUR_SECTIONS, resolveTourSteps } from '../steps';
+import { CLOSING_STEP, TOUR_ANCHORS, TOUR_SECTIONS, resolveTourSteps } from '../steps';
 
 const everything = () => true;
 
@@ -16,15 +16,33 @@ describe('tour definition', () => {
       expect(section.steps.length).toBeGreaterThan(0);
       for (const step of section.steps) expect(TOUR_ANCHORS).toContain(step.anchor);
     }
+    expect(TOUR_ANCHORS).toContain(CLOSING_STEP.anchor);
   });
 });
 
 describe('resolveTourSteps', () => {
   it('returns every step in definition order for the full tour', () => {
     const steps = resolveTourSteps('full', everything);
-    expect(steps.map((s) => s.id)).toEqual(
-      TOUR_SECTIONS.flatMap((section) => section.steps.map((s) => s.id)),
-    );
+    expect(steps.map((s) => s.id)).toEqual([
+      ...TOUR_SECTIONS.flatMap((section) => section.steps.map((s) => s.id)),
+      CLOSING_STEP.id,
+    ]);
+  });
+
+  it('ends the full tour on the Tutorial-button step and never adds it to a section replay', () => {
+    const full = resolveTourSteps('full', everything);
+    expect(full[full.length - 1].anchor).toBe('tutorial-button');
+    for (const section of TOUR_SECTIONS) {
+      const steps = resolveTourSteps(section.id, everything);
+      expect(steps.some((s) => s.id === CLOSING_STEP.id)).toBe(false);
+    }
+    expect(TOUR_SECTIONS.flatMap((s) => s.steps).some((s) => s.id === CLOSING_STEP.id)).toBe(false);
+  });
+
+  it('omits the closing step when the Tutorial button is not rendered', () => {
+    const steps = resolveTourSteps('full', (anchor) => anchor !== 'tutorial-button');
+    expect(steps.some((s) => s.id === CLOSING_STEP.id)).toBe(false);
+    expect(steps.length).toBeGreaterThan(0);
   });
 
   it('slices exactly one section for a section replay, ending at its boundary', () => {

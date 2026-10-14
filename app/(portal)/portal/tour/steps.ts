@@ -15,6 +15,7 @@ export const TOUR_ANCHORS = [
   'approvals',
   'rosters',
   'create-roster',
+  'tutorial-button',
 ] as const;
 
 export type TourAnchor = (typeof TOUR_ANCHORS)[number];
@@ -95,6 +96,18 @@ export const TOUR_SECTIONS: TourSection[] = [
   },
 ];
 
+/**
+ * Closing step of the full tour only. It is deliberately not part of TOUR_SECTIONS, so
+ * the Tutorial menu never lists it and a section replay ends on that section's last
+ * real step.
+ */
+export const CLOSING_STEP: TourStep = {
+  id: 'replay',
+  anchor: 'tutorial-button',
+  title: 'Replay this anytime',
+  body: 'Use the Tutorial button to run the full tour again, or pick a single feature to revisit just that part.',
+};
+
 export type TourSelection = 'full' | string;
 
 export interface ResolvedTourStep extends TourStep {
@@ -103,7 +116,8 @@ export interface ResolvedTourStep extends TourStep {
 }
 
 /**
- * Returns the ordered steps for the full tour or one section. Steps whose anchor is
+ * Returns the ordered steps for the full tour (sections, then the closing replay step)
+ * or one section. Steps whose anchor is
  * not present are dropped rather than shown as dead controls; an unknown section id
  * yields an empty tour.
  */
@@ -112,13 +126,18 @@ export function resolveTourSteps(
   hasTarget: (anchor: TourAnchor) => boolean,
   sections: TourSection[] = TOUR_SECTIONS,
 ): ResolvedTourStep[] {
-  return sections
+  const resolved = sections
     .filter((section) => selection === 'full' || section.id === selection)
     .flatMap((section) =>
       section.steps
         .filter((step) => hasTarget(step.anchor))
         .map((step) => ({ ...step, sectionId: section.id, sectionLabel: section.label })),
     );
+
+  if (selection === 'full' && hasTarget(CLOSING_STEP.anchor)) {
+    resolved.push({ ...CLOSING_STEP, sectionId: 'replay', sectionLabel: 'Replay' });
+  }
+  return resolved;
 }
 
 export function tourAnchorSelector(anchor: TourAnchor): string {

@@ -15,7 +15,7 @@ vi.mock('@/app/lib/onboarding/portal-actions', () => ({
 vi.mock('@/app/lib/onboarding/tour-actions', () => ({ completePortalTour: vi.fn() }));
 
 import SchoolPortalClient from '../../SchoolPortalClient';
-import { TOUR_ANCHORS, TOUR_SECTIONS } from '../steps';
+import { CLOSING_STEP, TOUR_ANCHORS, TOUR_SECTIONS } from '../steps';
 
 /**
  * Renders the portal as a brand-new school sees it (no submissions, rosters or
@@ -51,7 +51,7 @@ describe('tour anchors', () => {
   }
 
   it('renders every anchor a tour step refers to exactly once', () => {
-    for (const step of TOUR_SECTIONS.flatMap((s) => s.steps)) {
+    for (const step of [...TOUR_SECTIONS.flatMap((s) => s.steps), CLOSING_STEP]) {
       const matches = html.split(`data-tour="${step.anchor}"`).length - 1;
       expect(matches, `anchor ${step.anchor} for step ${step.id}`).toBe(1);
     }
