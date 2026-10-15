@@ -42,7 +42,7 @@ export default function Hero({
   };
 
   return (
-    <section className={`theme-dark relative overflow-hidden w-full ${isLarge ? 'h-screen' : 'h-[35vh]'} flex items-center`}>
+    <section className={`relative overflow-hidden w-full ${isLarge ? 'h-screen' : 'h-[35vh]'} flex items-center`}>
       {/* Background Image */}
       <div className="absolute inset-0 select-none pointer-events-none z-0">
         <Image

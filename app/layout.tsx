@@ -4,8 +4,7 @@ import "./globals.css";
 import { CANONICAL_APP_URL, METADATA, SITE_CONFIG } from "@/app/lib/constants";
 import Providers from "@/app/components/ui/Providers";
 import { Analytics } from "@vercel/analytics/next";
-import { cookies, headers } from "next/headers";
-import { THEME_BOOT_SCRIPT, THEME_COOKIE, parseThemePreference, themeClassFor } from "@/app/lib/theme";
+import { headers } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -69,27 +68,14 @@ export default async function RootLayout({
 }>) {
   // Awaiting headers opts the layout tree into dynamic rendering so Next.js
   // can inject per-request CSP nonces into script tags during SSR.
-  const headerList = await headers();
-  const nonce = headerList.get("x-nonce") ?? undefined;
-  const themePreference = parseThemePreference((await cookies()).get(THEME_COOKIE)?.value);
-  // `system` cannot be resolved here. The boot script corrects it before
-  // paint; suppressHydrationWarning covers that class change.
-  const themeClass = themeClassFor(themePreference === "light" ? "light" : "dark");
+  await headers();
 
   return (
-    <html
-      lang="en"
-      className={["notranslate", themeClass].filter(Boolean).join(" ")}
-      translate="no"
-      suppressHydrationWarning
-    >
-      <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-      </head>
+    <html lang="en" className="notranslate" translate="no">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers initialTheme={themePreference}>{children}</Providers>
+        <Providers>{children}</Providers>
         {/* Renders nothing; injects the Vercel Analytics script. A sibling of
             Providers rather than a child because it reads route state straight
             from next/navigation and needs none of RAC's RouterProvider. */}

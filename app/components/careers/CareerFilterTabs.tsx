@@ -47,7 +47,7 @@ export default function CareerFilterTabs({ postings }: CareerFilterTabsProps) {
                 className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all duration-200 whitespace-nowrap cursor-pointer border ${
                   isSelected
                     ? 'bg-accent/15 text-accent border-accent/40 shadow-sm'
-                    : 'bg-surface-raised/40 text-foreground-secondary border-line hover:text-foreground hover:border-line hover:bg-surface-raised'
+                    : 'bg-surface-raised/40 text-foreground-secondary border-line hover:text-white hover:border-line hover:bg-surface-raised'
                 }`}
               >
                 {dept}

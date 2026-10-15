@@ -9,7 +9,6 @@ import CutCTA from '@/app/components/ui/CutCTA';
 import { Overlay, Modal, Dialog } from '@/app/components/ui/overlay';
 import Navigation from './Navigation';
 import GameSubHeader from './GameSubHeader';
-import ThemeToggle from '@/app/components/theme/ThemeToggle';
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -48,12 +47,10 @@ export default function Header() {
     >
       Skip to main content
     </a>
-    {/* theme-dark: the wordmark is white, and this bar sits on photographs,
-        so it keeps the dark tokens when the page itself is light. */}
     <header
-      className={`theme-dark z-50 w-full border-b transition-colors duration-300 fixed top-0 py-3 ${
+      className={`z-50 w-full border-b transition-colors duration-300 fixed top-0 py-3 ${
         showDarkBg
-          ? 'bg-surface/95 border-line backdrop-blur-md'
+          ? 'bg-[#111111]/95 border-white/10 backdrop-blur-md'
           : 'bg-transparent border-transparent'
       }`}
     >
@@ -73,22 +70,18 @@ export default function Header() {
             </AriaLink>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-4 lg:gap-6">
-              <Navigation />
-            </div>
-            <ThemeToggle />
-            <div className="hidden md:block shrink-0">
-              <CutCTA href={ROUTES.apply} variant="primary" size="sm">
-                Submit Interest
-              </CutCTA>
-            </div>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-4 lg:gap-6">
+            <Navigation />
+            <CutCTA href={ROUTES.apply} variant="primary" size="sm" className="shrink-0">
+              Submit Interest
+            </CutCTA>
+          </div>
 
           {/* Mobile Menu Button */}
           <Button
             onPress={() => setIsOpen(!isOpen)}
-            className="md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-all duration-300 min-h-[44px] min-w-[44px] flex items-center justify-center text-foreground/90 hover:text-accent border-line bg-surface-raised/40 hover:bg-surface-raised backdrop-blur-sm"
+            className="md:hidden focus:outline-none p-1.5 cursor-pointer rounded border transition-all duration-300 min-h-[44px] min-w-[44px] flex items-center justify-center text-white/90 hover:text-accent border-white/15 bg-white/5 hover:bg-white/10 backdrop-blur-sm"
             aria-expanded={isOpen}
             aria-controls="mobile-nav"
             aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
@@ -103,7 +96,6 @@ export default function Header() {
               </svg>
             )}
           </Button>
-          </div>
         </div>
 
         {/* Mobile Navigation Drawer: Routed through overlay primitives for focus trapping, scroll locking, Escape-to-close, and outside-click dismissal. */}
@@ -111,13 +103,13 @@ export default function Header() {
           isOpen={isOpen}
           onOpenChange={setIsOpen}
           isDismissable
-          className="theme-dark fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden flex flex-col justify-start"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden flex flex-col justify-start"
         >
           <Modal className="w-full outline-none">
             <Dialog aria-label="Mobile navigation" className="outline-none w-full">
               <div
                 id="mobile-nav"
-                className="py-4 border-b border-line/40 rounded-b-2xl px-6 bg-surface/98 backdrop-blur-xl shadow-2xl"
+                className="py-4 border-b border-line/40 rounded-b-2xl px-6 bg-[#111111]/98 backdrop-blur-xl shadow-2xl"
               >
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-line/30">
                   <span className="text-xs font-black uppercase tracking-widest text-foreground-secondary">
@@ -127,7 +119,7 @@ export default function Header() {
                     type="button"
                     onClick={handleCloseMenu}
                     aria-label="Close navigation menu"
-                    className="p-1.5 rounded border border-line bg-surface-raised/40 hover:bg-surface-raised text-foreground/90 hover:text-accent cursor-pointer transition-colors"
+                    className="p-1.5 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/90 hover:text-accent cursor-pointer transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

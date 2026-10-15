@@ -6,7 +6,7 @@ import { secondaryBtn } from '@/app/components/admin/styles';
 /** Full-screen state when the signed-in account has no usable staff record (rendered without the shell). */
 export default function StaffSetupProblem({ message }: { message: string }) {
   return (
-    <main className="theme-dark min-h-screen bg-surface flex items-center justify-center px-4 py-12">
+    <main className="min-h-screen bg-surface flex items-center justify-center px-4 py-12">
       <div className="admin-page-enter w-full max-w-md rounded-2xl bg-admin-panel">
         <AdminEmptyState
           icon={<HiOutlineExclamationTriangle />}

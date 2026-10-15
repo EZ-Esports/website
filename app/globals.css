@@ -4,19 +4,7 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Dark tokens are the default (`:root`). `.theme-light` on `<html>` is the
-   public light theme. Surfaces that must stay dark when that class is set —
-   the header (the wordmark is white), photo heroes, photo lightboxes, and the
-   staff and manager portals — restate these variables on themselves. Admin
-   dialogs portal to `document.body`, so the reset also lives on
-   `.admin-modal-overlay` and `.admin-popover`, not only on `.admin-shell`. */
-:root,
-.theme-dark,
-.admin-shell,
-.admin-modal-overlay,
-.admin-popover {
-  color-scheme: dark;
-
+:root {
   /* Surfaces */
   --surface: #111111; /* Midnight graphite dark background */
   --surface-raised: #1c1c1c; /* Elevated graphite, matching v1 background */
@@ -62,11 +50,8 @@ html {
   --admin-panel: color-mix(in srgb, var(--surface-raised) 60%, var(--surface));
 }
 
-/* Light theme. Set on `<html>` by the theme control, and on the apply forms
-   so those pages stay a light document when the rest of the site is dark. */
+/* Re-scopes the raw vars for the apply form subtree (light, brand-pink-as-accent look). */
 .theme-light {
-  color-scheme: light;
-
   --surface: #ffffff;
   --surface-raised: #fdf5f5;
   --surface-sunken: #f7eded;
@@ -120,7 +105,6 @@ html {
 body {
   background: var(--surface);
   color: var(--foreground);
-  transition: background-color 200ms ease, color 200ms ease;
   font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
 }
