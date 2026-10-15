@@ -25,7 +25,7 @@ export default function CareerCard({ posting }: CareerCardProps) {
           </span>
         </div>
 
-        <h3 className="text-xl font-black text-white group-hover:text-accent transition-colors mb-2">
+        <h3 className="text-xl font-black text-foreground group-hover:text-accent transition-colors mb-2">
           {posting.title}
         </h3>
 
@@ -48,7 +48,7 @@ export default function CareerCard({ posting }: CareerCardProps) {
 
         <Link
           href={`/careers/${posting.slug}`}
-          className="w-full inline-flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-accent hover:text-black text-white font-bold text-xs uppercase tracking-wider transition-all duration-300 group/link border border-line hover:border-accent"
+          className="w-full inline-flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-raised hover:bg-accent hover:text-on-accent text-foreground font-bold text-xs uppercase tracking-wider transition-all duration-300 group/link border border-line hover:border-accent"
         >
           <span>View Role & Apply</span>
           <HiArrowRight className="w-4 h-4 transition-transform duration-300 group-hover/link:translate-x-1" />

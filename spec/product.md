@@ -30,6 +30,8 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 
 Games in `app/lib/constants.ts`: Valorant, League of Legends, Teamfight Tactics (full archive/seasons), plus **osu!**, **Minecraft**, **TETR.IO** (slug `tetris`, display name `f04641b`). The last three have hubs only — no seasons, excluded from `getGamesForShowcase`, banners are placeholder `/images/hero-background.jpg`. Empty hubs are the same bento grid with a blank “This season” tile (`d047f99` removed the founding-season recruitment layout `c759fa3` had gated). `MigrationNotice` (`452073e`) still shows on competition pages.
 
+**Appearance ([spec-017](spec-017-light-dark-theme.md)).** The public site defaults to dark. The header has a Light / Dark / System control (`ez-theme` cookie). Light swaps the semantic tokens on `<html>`. The header, photo heroes, and photo lightboxes stay dark so the white wordmark and type on photographs stay readable. `/apply` and `/apply/staff` keep their own light form surface. The staff portal and the school manager portal do not follow the public theme.
+
 **No public `/gallery`.** Photos render via homepage `MediaGrid` plus `/admin/gallery`. `feat/issue-100-view-full-gallery` exists on origin and is **not** an ancestor of HEAD.
 
 ---
