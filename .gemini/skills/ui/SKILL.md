@@ -17,13 +17,11 @@ values, see `references/style-tokens.md`.
 Theme tokens live in `app/globals.css` under `:root`, mapped into Tailwind
 via `@theme inline`. Use the token classes (`bg-surface`, `text-foreground`,
 `border-line`, etc.) rather than literal hex values, so a component
-follows the public theme. The header control sets `.theme-light` on `<html>`
-for the light appearance (see spec-017). The same class on a subtree (the
-apply forms) still scopes the light tokens to that container when the rest
-of the site is dark. `.theme-dark` pins the dark tokens on a surface that
-must not follow the page (the header, a photo hero, a lightbox). Use the
-`.glass-panel` class for glassmorphic card/panel containers instead of
-hand-rolling blur/gradient/border styles. Wrap animations and transitions in a
+automatically follows theme changes. Apply the `.theme-light` class to a
+subtree (a form section, a light-mode panel) to scope the light-theme token
+overrides to just that container. Use the `.glass-panel` class for
+glassmorphic card/panel containers instead of hand-rolling blur/gradient/
+border styles. Wrap animations and transitions in a
 `@media (prefers-reduced-motion: reduce)` rule that collapses duration to
 `0.01ms`.
 

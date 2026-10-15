@@ -16,7 +16,7 @@ export default function GeneralApplicationCard() {
               All Departments
             </span>
           </div>
-          <h3 className="text-2xl font-black text-foreground mb-2 flex items-center gap-2">
+          <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2">
             <span>Don&apos;t see your specific role?</span>
             <HiOutlineSparkles className="w-6 h-6 text-accent" />
           </h3>
@@ -28,7 +28,7 @@ export default function GeneralApplicationCard() {
         <div className="shrink-0">
           <Link
             href="/careers/apply/general"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent text-on-accent font-extrabold text-sm uppercase tracking-wider hover:bg-accent/90 transition-all duration-300 shadow-lg shadow-accent/10"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent text-black font-extrabold text-sm uppercase tracking-wider hover:bg-accent/90 transition-all duration-300 shadow-lg shadow-accent/10"
           >
             <span>Submit Open Application</span>
             <HiArrowRight className="w-4 h-4" />

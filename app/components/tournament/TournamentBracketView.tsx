@@ -147,29 +147,28 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
 
   return (
     <div className="space-y-8">
-      {/* Bracket cards follow the page tokens so round titles and scores
-          stay readable in both themes. */}
+      {/* Global styling for bracketry matches to fit dark design tokens */}
       <style jsx global>{`
         .bracketry-container .match-body {
-          background: var(--surface-raised);
-          border: 1px solid var(--line);
+          background: #14161b;
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 4px 14px color-mix(in srgb, var(--surface-sunken) 55%, transparent);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
           transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
           cursor: pointer;
         }
         .bracketry-container .match-body:hover {
-          border-color: var(--accent);
-          box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent);
+          border-color: #ec3556;
+          box-shadow: 0 6px 20px rgba(236, 53, 86, 0.3);
           transform: translateY(-2px);
         }
         .bracketry-container .side-wrapper {
           padding: 8px 12px;
-          background: var(--surface);
+          background: #181b22;
         }
         .bracketry-container .side-wrapper:first-child {
-          border-bottom: 1px solid var(--line);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
         .bracketry-container .match-status {
           display: none !important;
@@ -177,19 +176,19 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
         .bracketry-container .main-score {
           font-weight: 800;
           font-size: 13px;
-          color: var(--foreground);
+          color: #f8fafc;
         }
         .bracketry-container .side-wrapper.winner .main-score {
-          color: var(--accent);
+          color: #ec3556;
         }
         .bracketry-container .side-wrapper.winner {
-          background: color-mix(in srgb, var(--accent) 14%, var(--surface-raised));
+          background: #1e222b;
         }
         .bracketry-container .round-titles-wrapper .round-title {
           font-weight: 800;
           text-transform: uppercase;
           letter-spacing: 0.05em;
-          color: var(--foreground);
+          color: #f8fafc;
         }
       `}</style>
 
@@ -203,7 +202,7 @@ export default function TournamentBracketView({ structure }: TournamentBracketVi
               onClick={() => setActiveTabId(tab.id)}
               className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer select-none ${
                 isActive
-                  ? 'bg-accent text-on-accent shadow-md shadow-accent/20'
+                  ? 'bg-accent text-white shadow-md shadow-accent/20'
                   : 'bg-surface-raised/60 text-foreground-secondary hover:text-foreground hover:bg-surface-raised border border-line/60'
               }`}
             >

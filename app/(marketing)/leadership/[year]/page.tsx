@@ -170,7 +170,7 @@ export default async function LeadershipPage({ params }: { params: Promise<Leade
                     </div>
                   ) : (
                     <div className="w-28 h-28 rounded-full mx-auto mb-6 bg-gradient-to-b from-surface-raised to-surface-sunken border-2 border-line/80 flex items-center justify-center text-foreground shadow-xl group-hover:border-accent/50 group-hover:shadow-accent/10 transition-all duration-300">
-                      <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                      <span className="text-3xl font-extrabold tracking-tight text-white/90">
                         {initials}
                       </span>
                     </div>

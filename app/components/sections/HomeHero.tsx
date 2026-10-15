@@ -61,7 +61,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
   };
 
   return (
-    <section className="theme-dark relative w-full min-h-[max(100vh,640px)] overflow-hidden">
+    <section className="relative w-full min-h-[max(100vh,640px)] overflow-hidden">
       {/* Background image */}
       <div className="absolute inset-0 z-0 select-none pointer-events-none">
         <Image

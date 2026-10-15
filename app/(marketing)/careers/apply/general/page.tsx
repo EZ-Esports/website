@@ -31,7 +31,7 @@ export default function GeneralApplyPage() {
             <HiOutlineSparkles className="w-4 h-4 text-accent" />
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-foreground tracking-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mb-4">
             General Staff Application
           </h1>
 

@@ -78,7 +78,7 @@ export function BracketMatchModal({ match, onClose }: BracketMatchModalProps) {
                     <span
                       className={`inline-block px-3 py-1 rounded-lg text-sm font-black tabular-nums ${
                         p.isWinner
-                          ? 'bg-accent text-on-accent shadow-sm'
+                          ? 'bg-accent text-white shadow-sm'
                           : 'bg-surface-raised border border-line text-foreground-secondary'
                       }`}
                     >
@@ -175,7 +175,7 @@ export function GroupFixtureCard({
               </span>
             </div>
             <span className={`font-black tabular-nums px-2 py-0.5 rounded text-xs ${
-              p.isWinner ? 'bg-accent text-on-accent' : 'text-foreground-secondary'
+              p.isWinner ? 'bg-accent text-white' : 'text-foreground-secondary'
             }`}>
               {p.score ?? '—'}
             </span>
