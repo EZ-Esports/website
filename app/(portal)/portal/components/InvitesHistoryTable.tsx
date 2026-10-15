@@ -15,13 +15,13 @@ export function InvitesHistoryTable({
 }: InvitesHistoryTableProps) {
   return (
     <div data-tour="invite-history" className="space-y-4 pt-4 border-t border-zinc-800">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2 className="text-lg font-bold text-white">Issued Player Invitations</h2>
         <span className="text-xs text-zinc-500">{invites.length} Total Invites</span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
-        <table className="w-full text-left text-xs">
+        <table className="w-full min-w-[36rem] text-left text-xs">
           <thead>
             <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950/60">
               <th className="py-3 px-4 font-semibold">Intended Student</th>
@@ -78,7 +78,7 @@ export function InvitesHistoryTable({
                         onCopyLink(url);
                       }}
                       aria-label="Copy Base Join URL"
-                      className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                      className="p-2.5 -m-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
                     >
                       <HiOutlineClipboardDocument className="w-4 h-4" />
                     </Button>

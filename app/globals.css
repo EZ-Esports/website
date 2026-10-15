@@ -392,3 +392,57 @@ select:not([multiple]):not([size]) {
 }
 
 
+
+/* Manager portal welcome modal (portal/tour/WelcomeModal.tsx). The overlay and
+   card keep RAC's data-entering / data-exiting so the modal stays mounted until
+   the exit finishes. Reduced motion switches every one of these off outright,
+   because the global rule above would still leave staggered delays holding
+   content invisible. */
+@keyframes welcome-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes welcome-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes welcome-card-in {
+  from { opacity: 0; scale: 0.92; translate: 0 24px; }
+  to   { opacity: 1; scale: 1; translate: 0 0; }
+}
+@keyframes welcome-card-out {
+  from { opacity: 1; scale: 1; translate: 0 0; }
+  to   { opacity: 0; scale: 0.96; translate: 0 8px; }
+}
+@keyframes welcome-rise {
+  from { opacity: 0; translate: 0 10px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+@keyframes welcome-icon-in {
+  0%   { opacity: 0; scale: 0.5; rotate: -12deg; }
+  60%  { opacity: 1; scale: 1.08; rotate: 3deg; }
+  100% { opacity: 1; scale: 1; rotate: 0deg; }
+}
+@keyframes welcome-ring {
+  0%   { opacity: 0.6; scale: 1; }
+  100% { opacity: 0; scale: 1.9; }
+}
+@keyframes welcome-glow {
+  from { opacity: 0; scale: 0.7; }
+  to   { opacity: 1; scale: 1; }
+}
+
+.welcome-overlay[data-entering] { animation: welcome-fade-in 250ms ease-out; }
+.welcome-overlay[data-exiting]  { animation: welcome-fade-out 200ms ease-in forwards; }
+.welcome-card[data-entering] { animation: welcome-card-in 520ms cubic-bezier(0.16, 1, 0.3, 1); }
+.welcome-card[data-exiting]  { animation: welcome-card-out 200ms ease-in forwards; }
+.welcome-rise { animation: welcome-rise 480ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.welcome-icon { animation: welcome-icon-in 700ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms backwards; }
+.welcome-ring { animation: welcome-ring 2.2s ease-out 700ms infinite; }
+.welcome-glow { animation: welcome-glow 900ms ease-out backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-overlay,
+  .welcome-card,
+  .welcome-rise,
+  .welcome-icon,
+  .welcome-ring,
+  .welcome-glow {
+    animation: none !important;
+  }
+  .welcome-ring { display: none; }
+}

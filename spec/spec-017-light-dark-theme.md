@@ -1,6 +1,6 @@
-# spec-016 — Public light and dark theme
+# spec-017 — Public light and dark theme
 
-- **Spec ID:** spec-016
+- **Spec ID:** spec-017
 - **Title:** Public light and dark theme
 - **Status:** In Progress
 - **PR / Commit:** PR #226

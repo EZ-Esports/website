@@ -250,8 +250,8 @@ describe('backupPath', () => {
     const a = backupPath(new Date('2026-07-30T21:40:08.123Z'));
     const b = backupPath(new Date('2026-07-30T21:40:09.123Z'));
     expect(a).not.toBe(b);
-    // path.resolve uses the OS separator, so compare a normalized path.
-    expect(a.replaceAll('\\', '/').endsWith('db/backups/gold-seed-2026-07-30T21-40-08-123Z.sql')).toBe(true);
+    // resolve() uses backslashes on Windows; compare with forward slashes.
+    expect(a.replace(/\\/g, '/').endsWith('db/backups/gold-seed-2026-07-30T21-40-08-123Z.sql')).toBe(true);
   });
 });
 

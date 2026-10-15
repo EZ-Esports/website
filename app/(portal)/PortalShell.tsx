@@ -52,7 +52,7 @@ export default function PortalShell({ children, context }: PortalShellProps) {
             </span>
           </div>
 
-          {/* School Selector (if multiple managed schools or staff admin) */}
+          {/* School Selector (shown when the user has more than one school; the arrow comes from the global select rule in globals.css) */}
           <div className="flex-1 max-w-xs sm:max-w-sm">
             {context.managedSchools.length > 1 ? (
               <div className="relative">
@@ -71,9 +71,6 @@ export default function PortalShell({ children, context }: PortalShellProps) {
                     </option>
                   ))}
                 </select>
-                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-zinc-400 text-xs">
-                  ▼
-                </div>
               </div>
             ) : context.managedSchools[0] ? (
               <div className="flex items-center gap-2 text-xs sm:text-sm text-zinc-300 font-semibold px-2 py-1 bg-zinc-900/60 rounded-lg border border-zinc-800">
