@@ -36,10 +36,10 @@ export function EmergencySwapModal({
       aria-labelledby="emergency-swap-modal-title"
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4"
     >
-      <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-400/10 text-amber-400">
+      <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 p-4 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-800">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="shrink-0 p-1.5 rounded-lg bg-amber-400/10 text-amber-400">
               <HiOutlineArrowsRightLeft className="w-5 h-5" />
             </div>
             <div>
@@ -53,7 +53,7 @@ export function EmergencySwapModal({
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-1 rounded-lg"
+            className="shrink-0 text-zinc-500 hover:text-zinc-300 cursor-pointer p-2.5 -m-2 rounded-lg"
           >
             <HiOutlineXMark className="w-5 h-5" />
           </button>
@@ -117,17 +117,17 @@ export function EmergencySwapModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
           <Button
             onPress={onClose}
-            className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
           >
             Cancel
           </Button>
           <Button
             onPress={onConfirmSwap}
             isDisabled={isSwapping}
-            className="px-4 py-2 text-xs font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+            className="min-h-[44px] sm:min-h-0 px-4 py-2 text-xs font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer shadow-sm disabled:opacity-50"
           >
             {isSwapping ? 'Swapping...' : 'Confirm Emergency Swap'}
           </Button>

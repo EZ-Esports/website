@@ -263,7 +263,7 @@ export async function getPendingSubmissions(
     const discord = discordIdent?.providerUsername ?? memberInfo?.discord ?? draft.discord ?? 'Pending';
     const grade =
       draft.grade ??
-      (memberInfo?.graduationYear ? `${memberInfo.graduationYear}th Grade` : 'N/A');
+      (memberInfo?.graduationYear ? `Class of ${memberInfo.graduationYear}` : 'N/A');
 
     return {
       id: invite.id,

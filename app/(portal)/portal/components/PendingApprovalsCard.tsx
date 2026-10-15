@@ -38,8 +38,8 @@ export function PendingApprovalsCard({
   onReject,
 }: PendingApprovalsCardProps) {
   return (
-    <div data-tour="approvals" className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div data-tour="approvals" className="min-w-0 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-bold text-white">Pending Approvals Queue</h2>
           <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20">
@@ -77,8 +77,8 @@ export function PendingApprovalsCard({
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800/60">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-base">{sub.playerName}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-bold text-white text-base break-words">{sub.playerName}</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
                         {sub.gameName}
                       </span>
@@ -89,30 +89,30 @@ export function PendingApprovalsCard({
                   </div>
 
                   <div className="text-xs text-zinc-400 font-medium">
-                    Grade: <span className="text-white font-semibold">{sub.grade}</span>
+                    Graduating: <span className="text-white font-semibold">{sub.grade}</span>
                   </div>
                 </div>
 
                 {/* Verified Details Badges (Zero-PII: IGN + Discord only) */}
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 text-xs">
+                  <div className="min-w-0 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
                     <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">
                       In-Game ID (Riot)
                     </span>
-                    <span className="font-mono font-semibold text-zinc-200">{sub.ign}</span>
+                    <span className="font-mono font-semibold text-zinc-200 break-all">{sub.ign}</span>
                   </div>
-                  <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                  <div className="min-w-0 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
                     <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">
                       Discord Handle
                     </span>
-                    <span className="font-mono font-semibold text-zinc-200">{sub.discord}</span>
+                    <span className="font-mono font-semibold text-zinc-200 break-all">{sub.discord}</span>
                   </div>
                 </div>
 
                 {/* Actions: Assign Roster + Role + Approve / Reject */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       <span className="text-xs text-zinc-400 shrink-0">Roster:</span>
                       <select
                         value={
@@ -126,7 +126,7 @@ export function PendingApprovalsCard({
                             [sub.id]: e.target.value,
                           }))
                         }
-                        className="px-2.5 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
+                        className="min-w-0 max-w-full min-h-[44px] sm:min-h-0 px-2.5 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
                       >
                         {gameRosters.length > 0 && (
                           <optgroup label={`${sub.gameName} Rosters`}>
@@ -163,7 +163,7 @@ export function PendingApprovalsCard({
                               [sub.id]: e.target.value as 'player' | 'sub' | 'captain',
                             }))
                           }
-                          className="px-2 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
+                          className="min-h-[44px] sm:min-h-0 px-2 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
                         >
                           <option value="player">Starter</option>
                           <option value="sub">Substitute</option>
@@ -173,18 +173,18 @@ export function PendingApprovalsCard({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:self-auto">
                     <Button
                       onPress={() => onReject(sub.id)}
                       isDisabled={isRejecting || isApproving}
-                      className="px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                      className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                     >
                       Reject
                     </Button>
                     <Button
                       onPress={() => onApprove(sub.id)}
                       isDisabled={isApproving || isRejecting}
-                      className="px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                      className="min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
                     >
                       {isApproving ? 'Approving...' : 'Approve & Enroll'}
                     </Button>

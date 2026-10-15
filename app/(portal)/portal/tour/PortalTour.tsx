@@ -25,12 +25,16 @@ import {
   type ResolvedTourStep,
   type TourSelection,
 } from './steps';
+import { computePanelPlacement, computeScrollDelta } from './placement';
+import WelcomeModal from './WelcomeModal';
 
 interface PortalTourProps {
   /** True once this account has ended the tour; false triggers the first-run auto-start. */
   tourCompleted: boolean;
   /** Auth user id; scopes the remount guard so a different login in the same tab still gets its tour. */
   accountId: string;
+  /** Shown in the first-run welcome greeting. */
+  schoolName?: string;
 }
 
 interface TourSession {
@@ -60,36 +64,51 @@ function findTarget(step: ResolvedTourStep): HTMLElement | null {
   return document.querySelector<HTMLElement>(tourAnchorSelector(step.anchor));
 }
 
-/** Brings the target clear of the sticky portal header and the viewport bottom. */
-function scrollTargetIntoView(target: HTMLElement) {
+function headerInset(): number {
   const header = document.querySelector('header');
-  const headerHeight =
-    header?.getBoundingClientRect().height ?? FALLBACK_HEADER_HEIGHT;
-  const top = headerHeight + 16;
-  const bottom = window.innerHeight - 16;
-  const rect = target.getBoundingClientRect();
-  if (rect.top >= top && rect.bottom <= bottom) return;
-
-  // Instant on purpose: the popover positions against the settled rect, and it keeps
-  // the no-travel-animation promise for prefers-reduced-motion without a branch.
-  const fitsInView = rect.height <= bottom - top;
-  const delta = fitsInView
-    ? rect.top - (top + (bottom - top - rect.height) / 2)
-    : rect.top - top;
-  window.scrollBy({ top: delta, behavior: 'auto' });
+  return header?.getBoundingClientRect().height ?? FALLBACK_HEADER_HEIGHT;
 }
 
-export default function PortalTour({ tourCompleted, accountId }: PortalTourProps) {
+/**
+ * Scrolls so the target and the tour card are both clear of the sticky header and the
+ * viewport edges. Instant on purpose: the card positions against the settled rect, and
+ * it keeps the no-travel-animation promise for prefers-reduced-motion without a branch.
+ */
+function scrollTargetIntoView(target: HTMLElement, panel: HTMLElement | null) {
+  const rect = target.getBoundingClientRect();
+  const delta = computeScrollDelta({
+    target: rect,
+    panel: {
+      width: panel?.offsetWidth ?? 0,
+      height: panel?.offsetHeight ?? 0,
+    },
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    topInset: headerInset(),
+  });
+  if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, behavior: 'auto' });
+}
+
+// Matches the welcome modal's exit animation so the tour starts as it finishes fading.
+const WELCOME_EXIT_MS = 200;
+
+export default function PortalTour({ tourCompleted, accountId, schoolName }: PortalTourProps) {
   const [session, setSession] = useState<TourSession | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [confirmingSkip, setConfirmingSkip] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [targetReady, setTargetReady] = useState(false);
+  const [panelPos, setPanelPos] = useState<{
+    key: string;
+    top: number;
+    left: number;
+  } | null>(null);
   // Local mirror of the server flag: the prop only updates after revalidation, so a
   // remount in between must not restart a tour the manager just ended.
   const [completed, setCompleted] = useState(tourCompleted || firstRunEndedFor === accountId);
 
   const tutorialButtonRef = useRef<HTMLButtonElement>(null);
   const targetRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const autoStarted = useRef(false);
 
   const step = session ? session.steps[session.index] : null;
@@ -103,28 +122,41 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
     setSession({ steps, index: 0, isFirstRun });
   }, []);
 
+  const markFirstRunEnded = useCallback(() => {
+    firstRunEndedFor = accountId;
+    setCompleted(true);
+    // Written only when the first run ends so an abandoned one comes back. A failed
+    // write just means the welcome may show once more, never a broken portal.
+    completePortalTour().catch(() => {});
+  }, [accountId]);
+
   const end = useCallback(() => {
-    if (session?.isFirstRun) {
-      firstRunEndedFor = accountId;
-      setCompleted(true);
-      // Written only when the tour ends so an abandoned first run comes back. A
-      // failed write just means the tour may show once more, never a broken portal.
-      completePortalTour().catch(() => {});
-    }
+    if (session?.isFirstRun) markFirstRunEnded();
     setSession(null);
     setConfirmingSkip(false);
     setTargetReady(false);
     targetRef.current = null;
     // Deferred past the popover's own focus-restore on unmount, which would otherwise win.
     setTimeout(() => tutorialButtonRef.current?.focus(), 50);
-  }, [session, accountId]);
+  }, [session, markFirstRunEnded]);
 
-  // First visit: start the full tour once the page and its anchors have mounted.
+  // First visit: greet the manager; the tour only starts once they choose to.
   useEffect(() => {
     if (completed || firstRunEndedFor === accountId || autoStarted.current) return;
     autoStarted.current = true;
-    start('full', true);
-  }, [completed, accountId, start]);
+    setWelcomeOpen(true);
+  }, [completed, accountId]);
+
+  const startFromWelcome = () => {
+    setWelcomeOpen(false);
+    setTimeout(() => start('full', true), WELCOME_EXIT_MS);
+  };
+
+  const dismissWelcome = () => {
+    setWelcomeOpen(false);
+    markFirstRunEnded();
+    setTimeout(() => tutorialButtonRef.current?.focus(), WELCOME_EXIT_MS + 50);
+  };
 
   // Resolve the current target. A step whose anchor has vanished is skipped, so a
   // missing element can never strand the manager on a dead step.
@@ -140,7 +172,6 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
       }
       return;
     }
-    scrollTargetIntoView(target);
     targetRef.current = target;
     setRect(target.getBoundingClientRect());
     setTargetReady(true);
@@ -210,6 +241,40 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
   const isLast = session ? session.index === session.steps.length - 1 : false;
   const isOpen = Boolean(session && step && targetReady);
 
+  const stepKey = step ? `${step.id}:${confirmingSkip ? 'confirm' : 'step'}` : '';
+
+  // Bring the target (and room for the card) into view once the card is mounted and
+  // measurable. Re-run when the card swaps between step and skip-confirmation, since
+  // their heights differ.
+  useLayoutEffect(() => {
+    if (!isOpen || !targetRef.current) return;
+    scrollTargetIntoView(targetRef.current, panelRef.current);
+    setRect(targetRef.current.getBoundingClientRect());
+  }, [isOpen, session?.index, confirmingSkip]);
+
+  // Place the card from the live target rect. Runs on every rect change (scroll and
+  // resize included) so it follows the target without a floating-UI dependency.
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!isOpen || !rect || !panel) return;
+    const placement = computePanelPlacement({
+      target: rect,
+      panel: { width: panel.offsetWidth, height: panel.offsetHeight },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      topInset: headerInset(),
+    });
+    setPanelPos((prev) =>
+      prev &&
+      prev.key === stepKey &&
+      Math.abs(prev.top - placement.top) < 0.5 &&
+      Math.abs(prev.left - placement.left) < 0.5
+        ? prev
+        : { key: stepKey, top: placement.top, left: placement.left },
+    );
+  }, [isOpen, rect, stepKey]);
+
+  const panelPlaced = panelPos?.key === stepKey ? panelPos : null;
+
   return (
     <>
       <MenuTrigger>
@@ -254,6 +319,13 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
         </Popover>
       </MenuTrigger>
 
+      <WelcomeModal
+        isOpen={welcomeOpen}
+        schoolName={schoolName}
+        onStart={startFromWelcome}
+        onDismiss={dismissWelcome}
+      />
+
       {isOpen && rect && (
         <div
           aria-hidden="true"
@@ -267,24 +339,24 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
         />
       )}
 
-      {session && step && (
-        <Popover
-          key={`${step.id}:${confirmingSkip ? 'confirm' : 'step'}`}
-          triggerRef={targetRef}
-          isOpen={isOpen}
-          // Non-modal: a modal popover locks page scroll, which stops the tour from scrolling
-          // targets into view. The popover is absolutely positioned, so it scrolls with its target.
-          // Esc is handled by the document listener above, never by popover dismissal.
-          isNonModal
-          onOpenChange={() => {}}
-          placement="bottom"
-          offset={SPOTLIGHT_PADDING + 10}
-          containerPadding={12}
-          className="z-[60] w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto bg-surface-raised text-foreground border border-line rounded-2xl shadow-2xl outline-none"
+      {session && step && isOpen && (
+        <div
+          ref={panelRef}
+          key={stepKey}
+          // Fixed and self-positioned (see placement.ts): a popover anchored to a target
+          // taller than the viewport has nowhere to flip to and ends up off-screen. Hidden
+          // transparent until measured (opacity, not visibility, so autoFocus still lands) so it never flashes at the wrong spot. max-h plus scroll is only
+          // a safety net for tiny viewports; the copy fits without it.
+          style={{
+            top: panelPlaced?.top ?? 0,
+            left: panelPlaced?.left ?? 0,
+            opacity: panelPlaced ? 1 : 0,
+          }}
+          className="fixed z-[60] w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain bg-surface-raised text-foreground border border-line rounded-2xl shadow-2xl outline-none"
         >
           <Dialog
             aria-label={confirmingSkip ? 'Skip the tour?' : step.title}
-            className="p-5 outline-none"
+            className="p-4 sm:p-5 outline-none"
           >
             <div>
               {confirmingSkip ? (
@@ -355,7 +427,7 @@ export default function PortalTour({ tourCompleted, accountId }: PortalTourProps
               )}
             </div>
           </Dialog>
-        </Popover>
+        </div>
       )}
     </>
   );
