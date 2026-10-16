@@ -84,3 +84,20 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 
 - Migration `0048_school_manager_tour_completed` (adds nullable `school_managers.tour_completed_at`) is **applied to production** (14 Oct 2026, right after merging #227). Remaining: run the manual checks in spec-015 against real data (first visit, completion stamped on all of a person's rows, second manager at the same school still sees it, staff admin sees no tour). Staff admins with no `school_managers` row never auto-start the tour but can still replay it from the Tutorial button (confirmed by reading `PortalTour.tsx`; deliberate).
 - `drizzle-kit generate` aborts because `db/migrations/meta/0041_snapshot.json` and `0042_snapshot.json` point at the same parent snapshot; migrations 0043-0048 were hand-written. Repair the snapshot chain so future migrations can be generated.
+
+---
+
+## Open GitHub issues
+
+Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issue list` for the current state.
+
+- [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`.
+- [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views.
+- [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
+- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season.
+- [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should get a `staff_members` row when they reach `/admin` or `/login`.
+- [#240](https://github.com/EZ-Esports/website/issues/240): link school names in Season standing and the Standings tab to team pages.
+- [#241](https://github.com/EZ-Esports/website/issues/241): show high school alongside university on leadership cards.
+- [#242](https://github.com/EZ-Esports/website/issues/242): in-site match reporting instead of Discord text channel reporting.
+- [#243](https://github.com/EZ-Esports/website/issues/243): school roster locking on the manager side.
+- [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
