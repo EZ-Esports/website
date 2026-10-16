@@ -421,7 +421,7 @@ export default function ApplyForm() {
                               isComplete
                                 ? 'bg-success text-white'
                                 : isActive
-                                ? 'bg-accent text-white'
+                                ? 'bg-accent text-on-accent'
                                 : 'bg-accent/10 text-accent border border-line'
                             }`}
                           >

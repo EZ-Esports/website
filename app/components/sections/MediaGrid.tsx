@@ -210,7 +210,7 @@ export default function MediaGrid({
         isOpen={selectedImageIndex !== null}
         onOpenChange={(open) => !open && closeLightbox()}
         isDismissable
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out animate-fade-in"
+        className="theme-dark fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 cursor-zoom-out animate-fade-in"
       >
         <Modal className="w-full max-w-5xl outline-none flex items-center justify-center cursor-default">
           <Dialog
