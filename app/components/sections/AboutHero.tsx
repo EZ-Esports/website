@@ -69,14 +69,14 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
       <div className="absolute inset-x-0 bottom-0 z-10 pb-14 sm:pb-16">
         <div className="container mx-auto px-6 sm:px-10 lg:px-16 xl:px-24">
           <h1
-            className="font-black uppercase tracking-tight leading-[0.94] text-foreground max-w-[16ch] drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+            className="hero-copy font-black uppercase tracking-tight leading-[0.94] text-foreground max-w-[16ch] drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
             style={{ fontSize: 'clamp(38px, 8vw, 92px)' }}
           >
             {renderTitle(title)}
           </h1>
 
           {subtitle && (
-            <p className="mt-5 max-w-[62ch] text-base sm:text-lg leading-relaxed text-foreground-secondary font-medium">
+            <p className="hero-copy mt-5 max-w-[62ch] text-base sm:text-lg leading-relaxed text-foreground-secondary font-medium">
               {subtitle}
             </p>
           )}

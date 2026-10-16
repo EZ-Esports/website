@@ -122,7 +122,9 @@ html {
 }
 
 /* Photo heroes. Dark keeps the heavy grade and the stronger pink wash.
-   Light leaves the photograph, with a short bottom fade so type stays readable. */
+   Light uses the same shape in white: a shadow behind the type, not a second
+   dark grade. `.hero-copy` then switches that type to the dark foreground,
+   because the section itself stays `.theme-dark` (buttons, wordmark chrome). */
 .hero-photo-scrim {
   background:
     linear-gradient(0deg, rgba(13, 8, 9, 0.97) 0%, rgba(13, 8, 9, 0.6) 42%, rgba(13, 8, 9, 0.28) 70%, rgba(13, 8, 9, 0.62) 100%),
@@ -133,9 +135,20 @@ html {
   background: linear-gradient(180deg, rgba(10, 10, 10, 0.72) 0%, rgba(10, 10, 10, 0.22) 30%, rgba(10, 10, 10, 0.5) 72%, rgba(10, 10, 10, 0.95) 100%);
 }
 
-html.theme-light .hero-photo-scrim,
+html.theme-light .hero-photo-scrim {
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.62) 42%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.55) 100%);
+}
+
 html.theme-light .about-hero-scrim {
-  background: linear-gradient(180deg, rgba(13, 8, 9, 0.28) 0%, rgba(13, 8, 9, 0.12) 42%, rgba(13, 8, 9, 0.5) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.28) 30%, rgba(255, 255, 255, 0.55) 72%, rgba(255, 255, 255, 0.94) 100%);
+}
+
+html.theme-light .hero-copy {
+  --foreground: #2d0015;
+  --foreground-secondary: #4a2e3b;
+  --accent: #b5005a;
+  text-shadow: 0 2px 18px rgba(255, 255, 255, 0.95), 0 1px 2px rgba(255, 255, 255, 0.9);
+  filter: none;
 }
 
 html.theme-light .about-hero-scanline {
@@ -143,9 +156,20 @@ html.theme-light .about-hero-scanline {
 }
 
 @media (prefers-color-scheme: light) {
-  html:not(.theme-dark) .hero-photo-scrim,
+  html:not(.theme-dark) .hero-photo-scrim {
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.62) 42%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.55) 100%);
+  }
+
   html:not(.theme-dark) .about-hero-scrim {
-    background: linear-gradient(180deg, rgba(13, 8, 9, 0.28) 0%, rgba(13, 8, 9, 0.12) 42%, rgba(13, 8, 9, 0.5) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.28) 30%, rgba(255, 255, 255, 0.55) 72%, rgba(255, 255, 255, 0.94) 100%);
+  }
+
+  html:not(.theme-dark) .hero-copy {
+    --foreground: #2d0015;
+    --foreground-secondary: #4a2e3b;
+    --accent: #b5005a;
+    text-shadow: 0 2px 18px rgba(255, 255, 255, 0.95), 0 1px 2px rgba(255, 255, 255, 0.9);
+    filter: none;
   }
 
   html:not(.theme-dark) .about-hero-scanline {

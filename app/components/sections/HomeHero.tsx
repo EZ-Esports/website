@@ -83,14 +83,14 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
       <div className="absolute inset-x-0 top-[58%] -translate-y-1/2 z-10">
         <div className="container mx-auto px-6 sm:px-10 lg:px-16 xl:px-24">
           <h1
-            className="font-black text-foreground tracking-[-0.02em] leading-[1.06] max-w-[19ch]"
+            className="hero-copy font-black text-foreground tracking-[-0.02em] leading-[1.06] max-w-[19ch]"
             style={{ fontSize: 'clamp(30px, 4.6vw, 54px)' }}
           >
             {renderTitle(title)}
           </h1>
 
           {subtitle && (
-            <p className="mt-4 text-base text-foreground-secondary max-w-[75ch] leading-[1.6]">
+            <p className="hero-copy mt-4 text-base text-foreground-secondary max-w-[75ch] leading-[1.6]">
               {subtitle}
             </p>
           )}
