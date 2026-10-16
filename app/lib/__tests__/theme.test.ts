@@ -1,27 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_THEME_PREFERENCE,
-  THEME_BOOT_SCRIPT,
   THEME_COOKIE,
+  htmlThemeClass,
   parseThemePreference,
   resolveTheme,
-  themeClassFor,
   themeCookieAssignment,
 } from '@/app/lib/theme';
 
 describe('parseThemePreference', () => {
-  it('accepts the three stored choices', () => {
+  it('accepts an explicit light or dark choice', () => {
     expect(parseThemePreference('light')).toBe('light');
     expect(parseThemePreference('dark')).toBe('dark');
-    expect(parseThemePreference('system')).toBe('system');
   });
 
-  it('falls back to dark for a missing or unknown cookie', () => {
+  it('treats a missing, system, or unknown cookie as follow-the-OS', () => {
     expect(parseThemePreference(null)).toBe(DEFAULT_THEME_PREFERENCE);
-    expect(parseThemePreference(undefined)).toBe('dark');
-    expect(parseThemePreference('')).toBe('dark');
-    expect(parseThemePreference('Light')).toBe('dark');
-    expect(parseThemePreference('auto')).toBe('dark');
+    expect(parseThemePreference(undefined)).toBe('system');
+    expect(parseThemePreference('')).toBe('system');
+    expect(parseThemePreference('system')).toBe('system');
+    expect(parseThemePreference('Light')).toBe('system');
+    expect(parseThemePreference('auto')).toBe('system');
   });
 });
 
@@ -37,10 +36,11 @@ describe('resolveTheme', () => {
   });
 });
 
-describe('themeClassFor', () => {
-  it('adds the light class only for the light appearance', () => {
-    expect(themeClassFor('light')).toBe('theme-light');
-    expect(themeClassFor('dark')).toBeUndefined();
+describe('htmlThemeClass', () => {
+  it('sets a class only for an explicit choice', () => {
+    expect(htmlThemeClass('light')).toBe('theme-light');
+    expect(htmlThemeClass('dark')).toBe('theme-dark');
+    expect(htmlThemeClass('system')).toBeUndefined();
   });
 });
 
@@ -52,17 +52,6 @@ describe('themeCookieAssignment', () => {
     expect(plain).toContain('Max-Age=31536000');
     expect(plain).toContain('SameSite=Lax');
     expect(plain).not.toContain('Secure');
-    expect(themeCookieAssignment('system', true)).toContain('; Secure');
-  });
-});
-
-describe('THEME_BOOT_SCRIPT', () => {
-  it('reads the same cookie and the same three choices the server parser accepts', () => {
-    expect(THEME_BOOT_SCRIPT).toContain(THEME_COOKIE);
-    expect(THEME_BOOT_SCRIPT).toContain('"light"');
-    expect(THEME_BOOT_SCRIPT).toContain('"dark"');
-    expect(THEME_BOOT_SCRIPT).toContain('"system"');
-    expect(THEME_BOOT_SCRIPT).toContain('prefers-color-scheme: dark');
-    expect(THEME_BOOT_SCRIPT).toContain('theme-light');
+    expect(themeCookieAssignment('dark', true)).toContain('; Secure');
   });
 });

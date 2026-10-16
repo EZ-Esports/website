@@ -12,20 +12,21 @@ import {
 type ThemeContextValue = {
   preference: ThemePreference;
   resolved: ResolvedTheme;
-  setPreference: (next: ThemePreference) => void;
+  setPreference: (next: 'light' | 'dark') => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function systemPrefersDark(): boolean {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-/** Applies the resolved appearance on `<html>` so every token underneath follows. */
-export function applyResolvedTheme(resolved: ResolvedTheme) {
+/**
+ * An explicit choice sets one class on `<html>`. System clears both so the
+ * stylesheet's `prefers-color-scheme` rule owns the tokens. No script runs
+ * before paint.
+ */
+export function applyThemePreference(preference: ThemePreference, resolved: ResolvedTheme) {
   const root = document.documentElement;
-  root.classList.toggle('theme-light', resolved === 'light');
-  root.style.colorScheme = resolved;
+  root.classList.toggle('theme-light', preference === 'light');
+  root.classList.toggle('theme-dark', preference === 'dark');
+  root.style.colorScheme = preference === 'system' ? '' : resolved;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', THEME_COLORS[resolved]);
 }
@@ -38,8 +39,8 @@ export function ThemeProvider({
   children: React.ReactNode;
 }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(initialPreference);
-  // Dark until the effect reads the OS. The boot script has already painted
-  // the correct class; this state only drives the control's icon.
+  // The icon needs the OS when the visitor has not chosen yet. The first
+  // paint uses dark for that icon only; the page colors come from CSS.
   const [systemDark, setSystemDark] = useState(true);
 
   useEffect(() => {
@@ -47,17 +48,17 @@ export function ThemeProvider({
     const sync = () => {
       const dark = media.matches;
       setSystemDark(dark);
-      applyResolvedTheme(resolveTheme(preference, dark));
+      applyThemePreference(preference, resolveTheme(preference, dark));
     };
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
   }, [preference]);
 
-  const setPreference = (next: ThemePreference) => {
+  const setPreference = (next: 'light' | 'dark') => {
     setPreferenceState(next);
     document.cookie = themeCookieAssignment(next, window.location.protocol === 'https:');
-    applyResolvedTheme(resolveTheme(next, systemPrefersDark()));
+    applyThemePreference(next, next);
   };
 
   return (

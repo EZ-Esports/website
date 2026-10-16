@@ -5,7 +5,7 @@ import { CANONICAL_APP_URL, METADATA, SITE_CONFIG } from "@/app/lib/constants";
 import Providers from "@/app/components/ui/Providers";
 import { Analytics } from "@vercel/analytics/next";
 import { cookies, headers } from "next/headers";
-import { THEME_BOOT_SCRIPT, THEME_COOKIE, parseThemePreference, themeClassFor } from "@/app/lib/theme";
+import { THEME_COOKIE, htmlThemeClass, parseThemePreference } from "@/app/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,24 +68,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Awaiting headers opts the layout tree into dynamic rendering so Next.js
-  // can inject per-request CSP nonces into script tags during SSR.
-  const headerList = await headers();
-  const nonce = headerList.get("x-nonce") ?? undefined;
+  // can inject per-request CSP nonces into its own scripts during SSR.
+  await headers();
   const themePreference = parseThemePreference((await cookies()).get(THEME_COOKIE)?.value);
-  // `system` cannot be resolved here. The boot script corrects it before
-  // paint; suppressHydrationWarning covers that class change.
-  const themeClass = themeClassFor(themePreference === "light" ? "light" : "dark");
+  const themeClass = htmlThemeClass(themePreference);
 
   return (
     <html
       lang="en"
       className={["notranslate", themeClass].filter(Boolean).join(" ")}
       translate="no"
-      suppressHydrationWarning
     >
-      <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

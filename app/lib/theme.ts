@@ -7,10 +7,11 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 export type ResolvedTheme = 'light' | 'dark';
 
 /**
- * Visitors who have never chosen keep the site's designed dark appearance.
- * `system` is an explicit choice, not the default.
+ * No cookie means follow the operating system. Light and dark are explicit
+ * choices the header toggle writes. `system` is accepted so an older cookie
+ * still means "no explicit choice."
  */
-export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'dark';
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system';
 
 export const THEME_COLORS: Record<ResolvedTheme, string> = {
   light: '#ffffff',
@@ -18,7 +19,7 @@ export const THEME_COLORS: Record<ResolvedTheme, string> = {
 };
 
 export function parseThemePreference(value: string | null | undefined): ThemePreference {
-  if (value === 'light' || value === 'dark' || value === 'system') return value;
+  if (value === 'light' || value === 'dark') return value;
   return DEFAULT_THEME_PREFERENCE;
 }
 
@@ -28,20 +29,19 @@ export function resolveTheme(preference: ThemePreference, prefersDark: boolean):
   return preference;
 }
 
-/** Class that opts an element into the light token set in `globals.css`. */
-export function themeClassFor(resolved: ResolvedTheme): 'theme-light' | undefined {
-  return resolved === 'light' ? 'theme-light' : undefined;
+/**
+ * Class on `<html>`. System leaves both off so the `prefers-color-scheme`
+ * rule in `globals.css` can paint the right tokens without a script.
+ * `theme-dark` here is the explicit dark choice; the same class on a
+ * subtree still pins that subtree to the dark tokens.
+ */
+export function htmlThemeClass(preference: ThemePreference): 'theme-light' | 'theme-dark' | undefined {
+  if (preference === 'light') return 'theme-light';
+  if (preference === 'dark') return 'theme-dark';
+  return undefined;
 }
 
-export function themeCookieAssignment(preference: ThemePreference, secure: boolean): string {
+export function themeCookieAssignment(preference: 'light' | 'dark', secure: boolean): string {
   const secureFlag = secure ? '; Secure' : '';
   return `${THEME_COOKIE}=${preference}; Path=/; Max-Age=31536000; SameSite=Lax${secureFlag}`;
 }
-
-/**
- * Runs before first paint. Must stay equivalent to `parseThemePreference` +
- * `resolveTheme`: the server can render an explicit light or dark choice, but
- * only the browser knows what `system` resolves to. A mismatch here flashes
- * the wrong surface before hydration.
- */
-export const THEME_BOOT_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=([^;]*)/);var p=m?decodeURIComponent(m[1]):"${DEFAULT_THEME_PREFERENCE}";if(p!=="light"&&p!=="dark"&&p!=="system")p="${DEFAULT_THEME_PREFERENCE}";var dark=window.matchMedia("(prefers-color-scheme: dark)").matches;var resolved=p==="system"?(dark?"dark":"light"):p;var light=resolved==="light";document.documentElement.classList.toggle("theme-light",light);document.documentElement.style.colorScheme=resolved;var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute("content",light?"${THEME_COLORS.light}":"${THEME_COLORS.dark}");}catch(e){}})();`;

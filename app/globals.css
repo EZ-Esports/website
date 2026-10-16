@@ -91,6 +91,68 @@ html {
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234a2e3b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
 }
 
+/* No class on `<html>` means "follow the OS". Explicit dark sets `.theme-dark`
+   on `<html>`, which excludes this rule. Keep these values identical to
+   `.theme-light` above. */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) {
+    color-scheme: light;
+
+    --surface: #ffffff;
+    --surface-raised: #fdf5f5;
+    --surface-sunken: #f7eded;
+
+    --foreground: #2d0015;
+    --foreground-secondary: #4a2e3b;
+    --foreground-muted: #6b5560;
+
+    --line: #f4cccc;
+
+    --accent: #b5005a;
+    --accent-secondary: #4f46e5;
+    --on-accent: #ffffff;
+
+    --success: #047857;
+    --warning: #b45309;
+    --danger: #dc2626;
+    --danger-on-tint: #b91c1c;
+
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234a2e3b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  }
+}
+
+/* Photo heroes. Dark keeps the heavy grade and the stronger pink wash.
+   Light leaves the photograph, with a short bottom fade so type stays readable. */
+.hero-photo-scrim {
+  background:
+    linear-gradient(0deg, rgba(13, 8, 9, 0.97) 0%, rgba(13, 8, 9, 0.6) 42%, rgba(13, 8, 9, 0.28) 70%, rgba(13, 8, 9, 0.62) 100%),
+    radial-gradient(ellipse at 75% 15%, color-mix(in srgb, #b5005a 22%, transparent) 0%, transparent 55%);
+}
+
+.about-hero-scrim {
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.72) 0%, rgba(10, 10, 10, 0.22) 30%, rgba(10, 10, 10, 0.5) 72%, rgba(10, 10, 10, 0.95) 100%);
+}
+
+html.theme-light .hero-photo-scrim,
+html.theme-light .about-hero-scrim {
+  background: linear-gradient(180deg, rgba(13, 8, 9, 0.28) 0%, rgba(13, 8, 9, 0.12) 42%, rgba(13, 8, 9, 0.5) 100%);
+}
+
+html.theme-light .about-hero-scanline {
+  opacity: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not(.theme-dark) .hero-photo-scrim,
+  html:not(.theme-dark) .about-hero-scrim {
+    background: linear-gradient(180deg, rgba(13, 8, 9, 0.28) 0%, rgba(13, 8, 9, 0.12) 42%, rgba(13, 8, 9, 0.5) 100%);
+  }
+
+  html:not(.theme-dark) .about-hero-scanline {
+    opacity: 0;
+  }
+}
+
 @theme inline {
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);

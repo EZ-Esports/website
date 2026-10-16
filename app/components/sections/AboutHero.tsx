@@ -52,16 +52,11 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
         />
         {/* Bottom-heavy gradient for legibility, plus a top scrim so the
             transparent header's nav text stays readable over the photo. */}
+        <div className="about-hero-scrim absolute inset-0" />
+        {/* Faint scanline texture: a light broadcast-overlay cue, not a load-bearing effect.
+            Light mode drops it so the photograph is not graded. */}
         <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(180deg, rgba(10,10,10,.72) 0%, rgba(10,10,10,.22) 30%, rgba(10,10,10,.5) 72%, rgba(10,10,10,.95) 100%)',
-          }}
-        />
-        {/* Faint scanline texture: a light broadcast-overlay cue, not a load-bearing effect. */}
-        <div
-          className="absolute inset-0 opacity-40 mix-blend-overlay"
+          className="about-hero-scanline absolute inset-0 opacity-40 mix-blend-overlay"
           style={{
             backgroundImage:
               'repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 3px)',

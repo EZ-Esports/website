@@ -34,7 +34,7 @@ surfaces — it fails contrast on light backgrounds. On light surfaces, use
 `#f4cccc` as text color on a light section is the single most common contrast
 bug in this codebase (see `uiux` skill, case study 1).
 
-Theme switching is the public header control (Light, Dark, System). It sets
+Theme switching is the public header toggle (light or dark). No choice follows the OS. An explicit light choice sets
 `.theme-light` on `<html>` ([spec-017](../../../../spec/spec-017-light-dark-theme.md)).
 The same class on a subtree still scopes the light tokens to that container
 (the apply forms stay light when the rest of the site is dark). `.theme-dark`

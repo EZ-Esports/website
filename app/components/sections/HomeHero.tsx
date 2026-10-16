@@ -73,13 +73,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
           className="object-cover object-center"
         />
         {/* Bottom-heavy gradient (legibility for bottom-aligned text) + top-right accent glow */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(0deg, rgba(13,8,9,.97) 0%, rgba(13,8,9,.6) 42%, rgba(13,8,9,.28) 70%, rgba(13,8,9,.62) 100%), radial-gradient(ellipse at 75% 15%, color-mix(in srgb, var(--color-accent) 18%, transparent) 0%, transparent 55%)',
-          }}
-        />
+        <div className="hero-photo-scrim absolute inset-0" />
       </div>
 
       {/* Content — anchored slightly below and left of dead-center: `top-[58%]`
