@@ -35,7 +35,7 @@ an explicit `DATABASE_URL` — never by relying on `.env`.
 ## The Vercel Data Cache survives redeploys
 
 `unstable_cache` entries (tags: `games`, `schools`, `members`, `teams`,
-`seasons`, `matches`, `rosters`, `players`, `news`, `leadership`, `people`, `sponsors`,
+`seasons`, `matches`, `rosters`, `players`, `tournaments`, `news`, `leadership`, `people`, `sponsors`,
 `page-content`, `gallery-images`) are **infrastructure**, not
 build output. Redeploying does **not** clear them.
 

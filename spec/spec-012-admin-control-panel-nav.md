@@ -1,7 +1,7 @@
 # spec-012: Admin Control Panel Navigation
 
-- **Status:** In Review
-- **PR:** TBD (branch `feat/admin-control-panel-nav`)
+- **Status:** Shipped
+- **PR:** #218 (branch `feat/admin-control-panel-nav`)
 - **Date:** 2026-10-02
 - **Scope:** `app/lib/admin-nav.ts`, `app/components/admin/AdminSidebarNav.tsx`, `app/components/admin/AdminControlPanel.tsx`, `app/(admin)/admin/AdminShell.tsx`, `app/(admin)/admin/page.tsx`, tests in `app/lib/__tests__/admin-nav.test.ts`, `app/components/admin/__tests__/AdminSidebarNav.test.tsx`, `app/(admin)/admin/__tests__/page.test.tsx`
 

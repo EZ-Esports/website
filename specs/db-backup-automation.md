@@ -1,6 +1,6 @@
 # Specification: Scoped Local Pre-Migration/Seed Backups
 
-**Status**: Ready for Implementation
+**Status**: Shipped (local scoped backups, PR #90). The off-site work in section 0 was dropped: issues #81-#89 were closed not planned on 2026-09-13.
 **Target Path**: `specs/db-backup-automation.md`
 **Related Components**: `db/backup.ts`, `db/seed.ts`, `db/seed-gold.ts`, `db/migrations/`, `package.json` (`db:migrate`)
 

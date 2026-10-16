@@ -1,7 +1,7 @@
 # spec-011: Player Onboarding, School Manager Portal, and Hexagonal Tournament Verification (V1)
 
-- **Status:** Proposed
-- **PR:** not opened yet (worktree `feat/player-onboarding-v1`)
+- **Status:** Shipped
+- **PR:** #216 (merged 2026-10-02); follow-ups in #217 and #232
 - **Date:** 2026-09-30
 - **Scope:** 
   - Schema & Migrations: `app/lib/db/schema.ts`, `db/migrations/0037_player_onboarding_and_manager_portal.sql`
