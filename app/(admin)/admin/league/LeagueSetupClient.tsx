@@ -10,7 +10,6 @@ import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
 } from './actions';
-import { seasonNameChoices } from '@/app/lib/season-name';
 
 interface DBGame {
   id: string;
@@ -177,13 +176,16 @@ export default function LeagueSetupClient({
                   ))}
                 </select>
               </Field>
-              <Field label="Season name" help="YYYY-YY, e.g. 2026-27.">
-                <select name="name" required defaultValue="" className={input}>
-                  <option value="" disabled>Select season…</option>
-                  {seasonNameChoices().map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
+              <Field label="Season name" help="Format YYYY-YY, e.g. 2025-26.">
+                <input
+                  name="name"
+                  required
+                  placeholder="2025-26"
+                  maxLength={7}
+                  pattern="\d{4}-\d{2}"
+                  title="Format YYYY-YY, for example 2025-26"
+                  className={input}
+                />
               </Field>
               <Field label="Active?">
                 <select name="isActive" defaultValue="true" className={input}>
@@ -327,11 +329,15 @@ function SeasonRow({
             <input type="hidden" name="gameId" value={season.gameId} />
           </Field>
           <Field label="Season name">
-            <select name="name" required defaultValue={season.name} autoFocus className={input}>
-              {seasonNameChoices(season.name).map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
+            <input
+              name="name"
+              required
+              defaultValue={season.name}
+              autoFocus
+              placeholder="2025-26"
+              title="Format YYYY-YY, for example 2025-26"
+              className={input}
+            />
           </Field>
           <Field label="Active?">
             <select name="isActive" defaultValue={season.isActive ? 'true' : 'false'} className={input}>

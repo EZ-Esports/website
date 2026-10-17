@@ -30,7 +30,7 @@ function buildSeasonNames(firstStartYear: number, lastStartYear: number): string
   return names;
 }
 
-/** Every season an admin can pick when creating or editing a season or a manager affiliation. */
+/** Every season an admin can pick for a manager affiliation (Provision / Assign tabs). */
 export const SEASON_NAME_OPTIONS: readonly string[] = buildSeasonNames(2021, 2035);
 
 /** Seasons a manager can apply for in the join wizard (the current year and the three after). */
@@ -40,14 +40,3 @@ export const MANAGER_SEASON_OPTIONS = ['2026-27', '2027-28', '2028-29', '2029-30
 export const DEFAULT_MANAGER_SEASON: string = MANAGER_SEASON_OPTIONS[0];
 
 export const SEASON_NAME_ERROR = 'Season must be in the format YYYY-YY (for example 2026-27).';
-
-/**
- * Options for a season picker. A stored name that is not canonical (legacy data) stays
- * selectable at the top so opening an edit form never silently rewrites it.
- */
-export function seasonNameChoices(current?: string | null): string[] {
-  if (current && !SEASON_NAME_OPTIONS.includes(current)) {
-    return [current, ...SEASON_NAME_OPTIONS];
-  }
-  return [...SEASON_NAME_OPTIONS];
-}

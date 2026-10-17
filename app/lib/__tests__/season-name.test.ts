@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   isValidSeasonName,
   seasonNameFromStartYear,
-  seasonNameChoices,
   SEASON_NAME_OPTIONS,
   MANAGER_SEASON_OPTIONS,
   DEFAULT_MANAGER_SEASON,
@@ -38,13 +37,5 @@ describe('season name format (YYYY-YY)', () => {
     expect(SEASON_NAME_OPTIONS).toContain('2026-27');
     expect(isValidSeasonName(DEFAULT_MANAGER_SEASON)).toBe(true);
     expect(MANAGER_SEASON_OPTIONS).toContain(DEFAULT_MANAGER_SEASON);
-  });
-
-  it('keeps a legacy non-conforming name selectable without making it valid', () => {
-    const choices = seasonNameChoices('Spring 2025');
-    expect(choices[0]).toBe('Spring 2025');
-    expect(choices).toContain('2026-27');
-    expect(seasonNameChoices('2026-27')).toEqual([...SEASON_NAME_OPTIONS]);
-    expect(isValidSeasonName('Spring 2025')).toBe(false);
   });
 });
