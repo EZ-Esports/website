@@ -1,7 +1,7 @@
 # spec-007: Staff Application Resume Upload, Volunteer Acknowledgement, and Recruiting Intro
 
-- **Status:** In Progress (code on `fix/staff-apply-tidy`, not deployed; migration `0036` and the `staff-resumes` bucket are **live in production** as of 2026-09-26)
-- **PR:** not opened yet
+- **Status:** Shipped (PR #190, merged 2026-09-26; migration `0036` and the `staff-resumes` bucket are live in production). Decline-time deletion is still manual; see [open-threads.md](open-threads.md)
+- **PR:** #190
 - **Date:** 2026-09-25 (follow-up round 2026-09-26)
 - **Scope:** `app/(marketing)/apply/staff/StaffApplyForm.tsx`, `app/(marketing)/privacy/page.tsx`, `app/api/apply/staff/route.ts`, `app/lib/staff-application-form.ts`, `app/lib/staff-resume.ts` (new), `app/(admin)/admin/applications/staff/[id]/resume/route.ts` (new), `app/components/admin/StaffApplicationDetailModal.tsx`, `app/components/admin/StaffApplicationRow.tsx`, `app/lib/application-csv.ts`, `app/lib/db/queries.ts`, `app/lib/db/schema.ts`, `db/migrations/0036_staff_application_resume.sql`, tests under `app/lib/__tests__/` and `app/lib/db/__tests__/`.
 

@@ -2,8 +2,8 @@
 
 - **Spec ID:** spec-015
 - **Title:** School Manager Portal Guided Tour
-- **Status:** In Review (design agreed with Isaac, 2026-10-14; implemented on `feat/issue-225-manager-portal-tour`, PR #227 merged 2026-10-14; migration `0048` applied to production 2026-10-14)
-- **PR / Commit:** TBD
+- **Status:** Shipped (design agreed with Isaac, 2026-10-14; PR #227 merged 2026-10-14; migration `0048` applied to production 2026-10-14)
+- **PR / Commit:** #227
 - **Date:** 2026-10-14
 - **Scope:** `/portal` only (school managers). Issue: EZ-Esports/website#225. The staff portal (`/admin`) is out of scope.
 

@@ -1,6 +1,6 @@
 # Specification: Leadership Architecture & Person Profile Normalization
 
-**Status**: Ready for Implementation  
+**Status**: Shipped (PR #78, `f14c7f4`; seeding into `people` + `leadership_terms` since PR #198)  
 **Target Path**: `specs/leadership-architecture.md`  
 **Related Components**: `app/lib/db/schema.ts`, `app/lib/db/queries.ts`, `app/(admin)/admin/leadership/`, `app/(marketing)/leadership/`, `db/migrations/`
 

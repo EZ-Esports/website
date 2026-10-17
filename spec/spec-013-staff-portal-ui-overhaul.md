@@ -1,7 +1,7 @@
 # spec-013: Staff Portal UI Overhaul (calmer surfaces, page anatomy, motion, accent rules)
 
-- **Status:** In Review
-- **PR:** TBD (branch `feat/admin-control-panel-nav`, on top of [spec-012](spec-012-admin-control-panel-nav.md))
+- **Status:** Shipped
+- **PR:** #218 (branch `feat/admin-control-panel-nav`, on top of [spec-012](spec-012-admin-control-panel-nav.md))
 - **Date:** 2026-10-02
 - **Scope:** presentation only, everything under `app/(admin)` and `app/components/admin`, plus `admin-*` classes and the `--admin-panel` token in `app/globals.css`. New files: `app/components/admin/AdminUI.tsx`, `app/components/admin/AdminTabs.tsx`, `app/components/admin/NewsStatusBadge.tsx`.
 
