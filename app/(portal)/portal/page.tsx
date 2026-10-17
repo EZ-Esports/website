@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import {
   getSchoolManagerContext,
   getAuthorizedGameScopes,
+  resolveRequestedGameId,
   hasCompletedPortalTour,
 } from '@/app/lib/onboarding/manager-auth';
 import {
@@ -19,7 +20,7 @@ interface PortalPageProps {
 }
 
 export default async function PortalPage({ searchParams }: PortalPageProps) {
-  const { schoolId: paramSchoolId, gameId: paramGameId } = await searchParams;
+  const { schoolId: paramSchoolId, gameId: requestedGameId } = await searchParams;
 
   const context = await getSchoolManagerContext(paramSchoolId, { allowStaffAdmin: true });
   if (!context) {
@@ -46,6 +47,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
 
   // A manager works only on each managed game's active season; staff admins (null) see everything.
   const scopes = await getAuthorizedGameScopes(context, activeSchool.schoolId);
+  const paramGameId = resolveRequestedGameId(scopes, requestedGameId);
   if (scopes && scopes.length === 0) {
     return (
       <PortalShell context={context}>

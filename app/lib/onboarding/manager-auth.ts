@@ -331,6 +331,20 @@ export async function getAuthorizedGameScopes(
   return scopes;
 }
 
+/**
+ * Honors a requested `?gameId=` filter only when the caller may see that game. Staff admins
+ * (scopes === null) keep any value; for managers a stale or foreign id is ignored so the page
+ * renders its normal state instead of throwing Forbidden.
+ */
+export function resolveRequestedGameId(
+  scopes: AuthorizedGameScope[] | null,
+  requested: string | undefined
+): string | undefined {
+  if (!requested) return undefined;
+  if (scopes === null) return requested;
+  return scopes.some((s) => s.gameId === requested) ? requested : undefined;
+}
+
 /** Validates the game-level season grant and returns the game's active season. */
 async function assertManagerForGame(
   school: ManagedSchoolInfo,

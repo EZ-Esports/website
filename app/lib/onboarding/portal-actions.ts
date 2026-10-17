@@ -356,7 +356,11 @@ export async function reviewPlayerInvite(
     throw new Error(`Invite ${inviteId} not found`);
   }
 
-  await assertManagerForSchool(invite.schoolId, invite.gameId ?? undefined);
+  const reviewContext = await assertManagerForSchool(invite.schoolId, invite.gameId ?? undefined);
+  // Without a game there is no active season to match, so only staff admins may review it.
+  if (!invite.gameId && !reviewContext.isStaffAdmin) {
+    throw new Error('Forbidden: This invite is not tied to a game in your active season');
+  }
 
   if (rosterId) {
     const { team } = await assertManagerForRoster(rosterId);

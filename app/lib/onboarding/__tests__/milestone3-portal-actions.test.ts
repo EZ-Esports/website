@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => {
     membersStore: [] as any[],
     playerIdentitiesStore: [] as any[],
     studentDemographicsStore: [] as any[],
+    staffMembersStore: [] as any[],
   };
 
   function extractConditions(clause: any): Array<{ col: string; op: 'eq' | 'in' | 'isNull'; val?: any }> {
@@ -106,6 +107,7 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.members) return state.membersStore;
     if (tbl === schema.playerIdentities) return state.playerIdentitiesStore;
     if (tbl === schema.studentDemographics) return state.studentDemographicsStore;
+    if (tbl === schema.staffMembers) return state.staffMembersStore;
     return null;
   }
 
@@ -168,7 +170,13 @@ const mocks = vi.hoisted(() => {
 
         // 2. School Managers join Schools
         if (currentTable === schema.schoolManagers) {
-          const rows = store.filter((m) => conds.every((c) => matchesRow(m, c)));
+          const rows = store
+            .filter((m) => conds.every((c) => matchesRow(m, c)))
+            // The query inner-joins schools and requires schools.deleted_at IS NULL.
+            .filter((m) => {
+              const sch = state.schoolsStore.find((x) => x.id === m.schoolId);
+              return !!sch && (sch.deletedAt === null || sch.deletedAt === undefined);
+            });
           return rows.map((m) => {
             const school = state.schoolsStore.find((s) => s.id === m.schoolId);
             return {
@@ -361,6 +369,8 @@ vi.mock('@/app/lib/supabase/server', () => ({
 import {
   getSchoolManagerContext,
   managerMatchesActiveSeason,
+  getAuthorizedGameScopes,
+  resolveRequestedGameId,
   assertManagerForSchool,
   assertManagerForRoster,
 } from '@/app/lib/onboarding/manager-auth';
@@ -1477,6 +1487,69 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       const pool = await getSchoolPlayerPool(schoolId);
       expect(pool).toHaveLength(1);
       expect(pool[0].enrolledRosters.map((r) => r.rosterId)).toEqual([rosterActive]);
+    });
+    it('a role-less staff_members row does not grant the staff-admin bypass', async () => {
+      mocks.state.staffMembersStore = [{ userId: 'manager-user-1', email: 'coach@stuy.edu' }];
+      mocks.state.schoolManagersStore[0].academicYear = '2025-26';
+
+      const context = await getSchoolManagerContext();
+      expect(context?.isStaffAdmin).toBe(false);
+      expect(await getSchoolRosters(schoolId)).toEqual([]);
+      await expect(deleteSchoolRoster(rosterActive)).rejects.toThrow(/Forbidden/);
+    });
+
+    it('ignores inactive manager rows and soft-deleted schools', async () => {
+      mocks.state.schoolManagersStore[0].isActive = false;
+      expect(await getSchoolManagerContext()).toBeNull();
+
+      mocks.state.schoolManagersStore[0].isActive = true;
+      mocks.state.schoolsStore[0].deletedAt = new Date();
+      expect(await getSchoolManagerContext()).toBeNull();
+      await expect(getSchoolRosters(schoolId)).rejects.toThrow('Unauthorized');
+    });
+
+    it('refuses emergencySwapSub and getRosterEligibility individually on a past-season roster', async () => {
+      await expect(
+        emergencySwapSub({ rosterId: rosterPast, outPlayerId: 'a', inPlayerId: 'b' })
+      ).rejects.toThrow(/past season/);
+      await expect(getRosterEligibility({ rosterId: rosterPast })).rejects.toThrow(/past season/);
+    });
+
+    it('limits invites and pending submissions to games the manager currently manages', async () => {
+      // LoL's active season is a different year than the manager's affiliation.
+      mocks.state.seasonsStore.find((s) => s.id === 'season-lol-now').name = '2027-28';
+      const base = { schoolId, status: 'submitted', submissionDraft: {}, memberId: null, expiresAt: new Date(), createdAt: new Date(), submittedAt: new Date() };
+      mocks.state.playerInvitesStore = [
+        { ...base, id: 'inv-val', gameId: valGameId, intendedFirstName: 'V', intendedLastName: 'Al' },
+        { ...base, id: 'inv-lol', gameId: lolGameId, intendedFirstName: 'L', intendedLastName: 'Ol' },
+        { ...base, id: 'inv-null', gameId: null, intendedFirstName: 'N', intendedLastName: 'Ull' },
+      ];
+
+      expect((await getSchoolInvites(schoolId)).map((i) => i.id)).toEqual(['inv-val']);
+      expect((await getPendingSubmissions(schoolId)).map((i) => i.id)).toEqual(['inv-val']);
+    });
+
+    it('refuses a manager reviewing an invite with no game, but lets a staff admin', async () => {
+      mocks.state.playerInvitesStore = [
+        { id: 'inv-null', schoolId, gameId: null, status: 'submitted', memberId: null, intendedFirstName: 'N', intendedLastName: 'Ull', submissionDraft: {} },
+      ];
+      await expect(reviewPlayerInvite({ inviteId: 'inv-null', action: 'reject' })).rejects.toThrow(/Forbidden/);
+      expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+
+      mocks.state.rolesStore.push({ id: 'role-admin', name: 'Admin', permissions: Permissions.ADMINISTRATOR, position: 5, isOwner: false });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
+      await expect(reviewPlayerInvite({ inviteId: 'inv-null', action: 'reject' })).resolves.toMatchObject({ success: true });
+    });
+
+    it('resolveRequestedGameId ignores a game outside the manager scopes but keeps it for staff admins', async () => {
+      const scopes = await getAuthorizedGameScopes(
+        (await getSchoolManagerContext())!,
+        schoolId
+      );
+      expect(resolveRequestedGameId(scopes, valGameId)).toBe(valGameId);
+      expect(resolveRequestedGameId(scopes, 'game-stale')).toBeUndefined();
+      expect(resolveRequestedGameId(scopes, undefined)).toBeUndefined();
+      expect(resolveRequestedGameId(null, 'anything')).toBe('anything');
     });
   });
 });
