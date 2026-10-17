@@ -101,3 +101,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#242](https://github.com/EZ-Esports/website/issues/242): in-site match reporting instead of Discord text channel reporting.
 - [#243](https://github.com/EZ-Esports/website/issues/243): school roster locking on the manager side.
 - [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
+- [#247](https://github.com/EZ-Esports/website/issues/247): Riot Sign-On (OAuth) and consent for student onboarding. On hold until Riot approves the production key.
+- [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
+- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and guild membership check in the join wizard (spec-011 designed it; only the honor-system checkbox is built).
+- [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
