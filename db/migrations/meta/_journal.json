@@ -344,6 +344,13 @@
       "when": 1790882000003,
       "tag": "0048_school_manager_tour_completed",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790882000004,
+      "tag": "0049_manager_invites_table",
+      "breakpoints": true
     }
   ]
 }

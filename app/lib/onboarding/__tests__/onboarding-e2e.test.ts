@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => {
     membersStore: [] as any[],
     schoolManagersStore: [] as any[],
     playerInvitesStore: [] as any[],
+    managerInvitesStore: [] as any[],
     playerIdentitiesStore: [] as any[],
     studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
@@ -205,8 +206,25 @@ const mocks = vi.hoisted(() => {
                 schoolName: school?.name || 'School Name',
                 schoolSlug: school?.slug || 'school-slug',
                 gameId: game?.id || inv.gameId,
-                gameName: game?.displayName || (inv.role === 'manager' ? 'School Manager' : 'Game Name'),
-                gameSlug: game?.slug || (inv.role === 'manager' ? 'manager' : 'game-slug'),
+                gameName: game?.displayName || 'Game Name',
+                gameSlug: game?.slug || 'game-slug',
+              };
+            });
+          }
+          return rows;
+        }
+
+        if (currentTable === schema.managerInvites) {
+          const rows = state.managerInvitesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
+          if (joins.length > 0) {
+            return rows.map((inv) => {
+              const school = state.schoolsStore.find((s) => s.id === inv.schoolId);
+              return {
+                ...inv,
+                invite: inv,
+                schoolId: school?.id || inv.schoolId,
+                schoolName: school?.name || 'School Name',
+                schoolSlug: school?.slug || 'school-slug',
               };
             });
           }
@@ -238,6 +256,10 @@ const mocks = vi.hoisted(() => {
 
         if (tbl === schema.playerInvites) {
           state.playerInvitesStore.push(record);
+          return [record];
+        }
+        if (tbl === schema.managerInvites) {
+          state.managerInvitesStore.push(record);
           return [record];
         }
         if (tbl === schema.members) {
@@ -303,6 +325,7 @@ const mocks = vi.hoisted(() => {
         }
 
         if (tbl === schema.playerInvites) return updateStore(state.playerInvitesStore);
+        if (tbl === schema.managerInvites) return updateStore(state.managerInvitesStore);
         if (tbl === schema.schoolManagers) return updateStore(state.schoolManagersStore);
         if (tbl === schema.members) return updateStore(state.membersStore);
         return [];
@@ -465,6 +488,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
     mocks.state.membersStore = [];
     mocks.state.schoolManagersStore = [];
     mocks.state.playerInvitesStore = [];
+    mocks.state.managerInvitesStore = [];
     mocks.state.playerIdentitiesStore = [];
     mocks.state.studentDemographicsStore = [];
     mocks.state.staffMembersStore = [

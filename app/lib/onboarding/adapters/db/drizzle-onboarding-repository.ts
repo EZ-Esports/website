@@ -6,6 +6,7 @@ import type {
   SchoolRecord,
   GameRecord,
   PlayerInviteRecord,
+  ManagerInviteRecord,
   SchoolManagerRecord,
 } from '../../core/ports/repository-port';
 import type {
@@ -340,7 +341,6 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
         intendedFirstName: params.intendedFirstName,
         intendedLastName: params.intendedLastName,
         invitedByUserId: params.invitedByUserId,
-        role: 'player',
         status: 'pending',
         expiresAt: params.expiresAt,
       })
@@ -371,7 +371,6 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
   async listSchoolInvites(schoolId: string, gameId?: string): Promise<PlayerInviteRecord[]> {
     const conditions = [
       eq(schema.playerInvites.schoolId, schoolId),
-      eq(schema.playerInvites.role, 'player'),
       eq(schema.playerInvites.status, 'pending'),
     ];
     if (gameId) {
@@ -390,7 +389,6 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
   async listPendingSubmissions(schoolId: string, gameId?: string): Promise<PlayerInviteRecord[]> {
     const conditions = [
       eq(schema.playerInvites.schoolId, schoolId),
-      eq(schema.playerInvites.role, 'player'),
       eq(schema.playerInvites.status, 'submitted'),
     ];
     if (gameId) {
@@ -978,13 +976,11 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
     invitedByUserId: string;
     expiresAt: Date;
     draft?: Record<string, unknown>;
-  }): Promise<PlayerInviteRecord> {
+  }): Promise<ManagerInviteRecord> {
     const [inserted] = await db
-      .insert(schema.playerInvites)
+      .insert(schema.managerInvites)
       .values({
         schoolId: params.schoolId,
-        gameId: null,
-        role: 'manager',
         tokenHash: params.tokenHash,
         intendedFirstName: params.intendedFirstName,
         intendedLastName: params.intendedLastName,
@@ -994,32 +990,27 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
         submissionDraft: params.draft ?? null,
       })
       .returning();
-    return inserted as PlayerInviteRecord;
+    return inserted as ManagerInviteRecord;
   }
 
-  async listSchoolManagerInvites(schoolId: string): Promise<PlayerInviteRecord[]> {
+  async listSchoolManagerInvites(schoolId: string): Promise<ManagerInviteRecord[]> {
     const rows = await db
       .select()
-      .from(schema.playerInvites)
-      .where(
-        and(
-          eq(schema.playerInvites.schoolId, schoolId),
-          eq(schema.playerInvites.role, 'manager')
-        )
-      )
-      .orderBy(desc(schema.playerInvites.createdAt));
-    return rows as PlayerInviteRecord[];
+      .from(schema.managerInvites)
+      .where(eq(schema.managerInvites.schoolId, schoolId))
+      .orderBy(desc(schema.managerInvites.createdAt));
+    return rows as ManagerInviteRecord[];
   }
 
   async revokeManagerInvite(inviteId: string): Promise<void> {
     await db
-      .update(schema.playerInvites)
+      .update(schema.managerInvites)
       .set({
         status: 'rejected',
         rejectionReason: 'Revoked by staff administrator',
         reviewedAt: new Date(),
       })
-      .where(eq(schema.playerInvites.id, inviteId));
+      .where(eq(schema.managerInvites.id, inviteId));
   }
 
   async writeStaffAuditLog(params: {

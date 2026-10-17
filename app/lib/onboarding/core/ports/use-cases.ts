@@ -7,6 +7,7 @@ import type {
 } from '../domain/types';
 import type {
   PlayerInviteRecord,
+  ManagerInviteRecord,
   SchoolManagerRecord,
   RegisteredManagerAccountRecord,
 } from './repository-port';
@@ -195,7 +196,7 @@ export interface StaffManagerProvisioningUseCase {
     error?: string;
   }>;
 
-  getSchoolManagerInvites(schoolId: string): Promise<PlayerInviteRecord[]>;
+  getSchoolManagerInvites(schoolId: string): Promise<ManagerInviteRecord[]>;
 
   revokeManagerInvite(
     actor: { id: string; email: string },

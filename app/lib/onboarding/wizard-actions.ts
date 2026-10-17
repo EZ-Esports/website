@@ -167,7 +167,7 @@ export async function validateInviteToken(
 
   const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-  const [row] = await db
+  const [playerRow] = await db
     .select({
       invite: schema.playerInvites,
       schoolId: schema.schools.id,
@@ -183,6 +183,28 @@ export async function validateInviteToken(
     .where(eq(schema.playerInvites.tokenHash, tokenHash))
     .limit(1);
 
+  // Manager invites live in their own table and carry no game, so they are
+  // only consulted when the hash is not a player invite.
+  const [managerRow] = playerRow
+    ? []
+    : await db
+        .select({
+          invite: schema.managerInvites,
+          schoolId: schema.schools.id,
+          schoolName: schema.schools.name,
+          schoolSlug: schema.schools.slug,
+        })
+        .from(schema.managerInvites)
+        .innerJoin(schema.schools, eq(schema.managerInvites.schoolId, schema.schools.id))
+        .where(eq(schema.managerInvites.tokenHash, tokenHash))
+        .limit(1);
+
+  const row = playerRow
+    ? playerRow
+    : managerRow
+      ? { ...managerRow, gameId: null, gameName: null, gameSlug: null }
+      : undefined;
+
   if (!row) {
     return {
       valid: false,
@@ -191,7 +213,7 @@ export async function validateInviteToken(
     };
   }
 
-  const isManager = row.invite.role === 'manager';
+  const isManager = Boolean(managerRow);
   const resolvedGameId = row.gameId ?? null;
   const resolvedGameSlug = row.gameSlug || (isManager ? 'manager' : 'all');
   const resolvedGameName = row.gameName || (isManager ? 'School Manager' : 'All Games');
@@ -223,7 +245,7 @@ export async function validateInviteToken(
     return {
       valid: false,
       status: 'accepted',
-      role: row.invite.role as 'player' | 'manager',
+      role: isManager ? 'manager' : 'player',
       schoolName: row.schoolName,
       message: isManager
         ? 'You have successfully signed up! Your School Manager portal account is active.'
@@ -262,7 +284,7 @@ export async function validateInviteToken(
       valid: true,
       status: 'pending',
       inviteId: invite.id,
-      role: (row.invite.role as 'player' | 'manager') || 'player',
+      role: isManager ? 'manager' : 'player',
       isManager,
       intendedFirstName: invite.intendedFirstName,
       intendedLastName: invite.intendedLastName,
@@ -299,12 +321,21 @@ export async function saveOnboardingDraft(
 
   const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-  const [invite] = await db
+  const [playerInvite] = await db
     .select()
     .from(schema.playerInvites)
     .where(eq(schema.playerInvites.tokenHash, tokenHash))
     .limit(1);
 
+  const [managerInvite] = playerInvite
+    ? []
+    : await db
+        .select()
+        .from(schema.managerInvites)
+        .where(eq(schema.managerInvites.tokenHash, tokenHash))
+        .limit(1);
+
+  const invite = playerInvite ?? managerInvite;
   if (!invite) {
     throw new Error('Invalid or non-existent invite token');
   }
@@ -317,12 +348,13 @@ export async function saveOnboardingDraft(
     throw new Error('Cannot save draft: invite link has expired');
   }
 
+  const inviteTable = playerInvite ? schema.playerInvites : schema.managerInvites;
   await db
-    .update(schema.playerInvites)
+    .update(inviteTable)
     .set({
       submissionDraft: sanitizeDraftData(draftData),
     })
-    .where(eq(schema.playerInvites.id, invite.id));
+    .where(eq(inviteTable.id, invite.id));
 
   return {
     success: true,

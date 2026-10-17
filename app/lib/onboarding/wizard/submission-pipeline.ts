@@ -366,23 +366,32 @@ export async function processOnboardingSubmission(
 
   const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-  const [inviteRow] = await db
+  const [playerRow] = await db
     .select({
       invite: schema.playerInvites,
       gameSlug: schema.games.slug,
-      schoolId: schema.playerInvites.schoolId,
     })
     .from(schema.playerInvites)
     .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
     .where(eq(schema.playerInvites.tokenHash, tokenHash))
     .limit(1);
 
-  if (!inviteRow) {
+  // Manager invites live in their own table and carry no game.
+  const [managerInvite] = playerRow
+    ? []
+    : await db
+        .select()
+        .from(schema.managerInvites)
+        .where(eq(schema.managerInvites.tokenHash, tokenHash))
+        .limit(1);
+
+  const invite = playerRow?.invite ?? managerInvite;
+  if (!invite) {
     throw new Error('Invalid or non-existent invite link.');
   }
 
-  const invite = inviteRow.invite;
-  const isManager = invite.role === 'manager';
+  const isManager = !playerRow;
+  const gameSlug = playerRow?.gameSlug ?? null;
 
   if (invite.status !== 'pending') {
     throw new Error(`Cannot submit application: invite is already ${invite.status}.`);
@@ -396,7 +405,7 @@ export async function processOnboardingSubmission(
   const validated = validateSubmissionInputs(submission);
 
   // Step 2: Resolve external Riot identity
-  const effectiveGameSlug = inviteRow.gameSlug || (isManager ? 'valorant' : 'valorant');
+  const effectiveGameSlug = gameSlug || 'valorant';
   const riotAdapter = options?.riotAdapter ?? new ManualRiotIdAdapter({ isVerified: true });
   const resolvedRiot = await riotAdapter.resolveIdentity(effectiveGameSlug, submission.riotId);
 
@@ -442,14 +451,14 @@ export async function processOnboardingSubmission(
       });
 
       await tx
-        .update(schema.playerInvites)
+        .update(schema.managerInvites)
         .set({
           memberId: createdOrUpdatedMemberId,
           status: 'accepted',
           submittedAt: new Date(),
           reviewedAt: new Date(),
         })
-        .where(eq(schema.playerInvites.id, invite.id));
+        .where(eq(schema.managerInvites.id, invite.id));
     } else {
       await tx
         .update(schema.playerInvites)
