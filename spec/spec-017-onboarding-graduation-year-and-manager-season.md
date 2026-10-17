@@ -12,4 +12,6 @@ Step 1 of the `/join/[schoolSlug]/[gameSlug]` wizard ([spec-011](spec-011-player
 
 **Not changed:** the `'2025-2026'` defaults in `staff-manager-service.ts` and the admin Provision / Assign tabs (their tests assert them), and `saveOnboardingDraft`, which replaces the whole invite draft (see open-threads).
 
+**Superseded by [spec-019](spec-019-manager-portal-season-scope.md):** manager seasons are now `YYYY-YY` (`2026-27`), not `YYYY-YYYY`.
+
 **Tests:** two cases added to `milestone4-player-wizard.test.ts` (picked season overrides the invite-seeded one and graduation year is stored on the member; malformed season rejected).

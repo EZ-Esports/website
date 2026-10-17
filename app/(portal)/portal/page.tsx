@@ -1,5 +1,9 @@
 import { redirect } from 'next/navigation';
-import { getSchoolManagerContext, hasCompletedPortalTour } from '@/app/lib/onboarding/manager-auth';
+import {
+  getSchoolManagerContext,
+  getAuthorizedGameScopes,
+  hasCompletedPortalTour,
+} from '@/app/lib/onboarding/manager-auth';
 import {
   getSchoolInvites,
   getPendingSubmissions,
@@ -40,8 +44,31 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     );
   }
 
+  // A manager works only on each managed game's active season; staff admins (null) see everything.
+  const scopes = await getAuthorizedGameScopes(context, activeSchool.schoolId);
+  if (scopes && scopes.length === 0) {
+    return (
+      <PortalShell context={context}>
+        <div className="p-8 text-center border border-zinc-800 rounded-xl bg-zinc-900/50">
+          <h2 className="text-xl font-bold text-white mb-2">No Managed Season</h2>
+          <p className="text-sm text-zinc-400">
+            None of your games for {activeSchool.schoolName} has an active season that matches your
+            affiliation ({[...new Set(activeSchool.affiliations.map((a) => a.academicYear))].join(', ')}).
+            Please contact an EZ Esports administrator.
+          </p>
+        </div>
+      </PortalShell>
+    );
+  }
+
   // Load games from database cache
-  const allGames = await getCachedGames();
+  const cachedGames = await getCachedGames();
+  const allGames = scopes
+    ? cachedGames.filter((g) => scopes.some((s) => s.gameId === g.id))
+    : cachedGames;
+  const seasonLabel = scopes
+    ? [...new Set(scopes.map((s) => s.seasonName))].join(', ')
+    : undefined;
 
   // Load initial invites, submissions, rosters, and eligible player pool for the active school
   const [initialInvites, initialSubmissions, initialRosters, initialPlayerPool, tourCompleted] = await Promise.all([
@@ -63,6 +90,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialRosters={initialRosters}
         initialPlayerPool={initialPlayerPool}
         selectedGameId={paramGameId}
+        seasonLabel={seasonLabel}
         tourCompleted={tourCompleted}
       />
     </PortalShell>

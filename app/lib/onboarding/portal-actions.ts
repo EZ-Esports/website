@@ -4,7 +4,14 @@ import crypto from 'node:crypto';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
-import { assertManagerForSchool, assertManagerForRoster } from './manager-auth';
+import {
+  assertManagerForSchool,
+  assertManagerForRoster,
+  getAuthorizedGameScopes,
+  getActiveSeasonForGame,
+  NO_ACTIVE_SEASON_ERROR,
+  type AuthorizedGameScope,
+} from './manager-auth';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 
 export interface CreatePlayerInviteParams {
@@ -31,6 +38,19 @@ export async function generateInviteToken(): Promise<{ token: string; tokenHash:
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   return { token, tokenHash };
+}
+
+/**
+ * Asserts school (and optional game) authorization and resolves which games' active seasons the
+ * caller may read. `scopes` is null for a staff admin (unrestricted, all seasons).
+ */
+async function resolveManagerScope(
+  schoolId: string,
+  gameId?: string
+): Promise<{ scopes: AuthorizedGameScope[] | null }> {
+  const context = await assertManagerForSchool(schoolId, gameId);
+  const scopes = await getAuthorizedGameScopes(context, schoolId);
+  return { scopes };
 }
 
 /**
@@ -120,11 +140,17 @@ export async function getSchoolInvites(
   schoolId: string,
   gameId?: string
 ): Promise<SchoolInviteItem[]> {
-  await assertManagerForSchool(schoolId, gameId);
+  const { scopes } = await resolveManagerScope(schoolId, gameId);
+  if (scopes && scopes.length === 0) return [];
 
   const whereConditions = [eq(schema.playerInvites.schoolId, schoolId)];
   if (gameId) {
     whereConditions.push(eq(schema.playerInvites.gameId, gameId));
+  }
+  // Invites carry no season column, so a manager is limited to the games they currently manage
+  // (an active season matching their affiliation) rather than to a single season.
+  if (scopes) {
+    whereConditions.push(inArray(schema.playerInvites.gameId, scopes.map((g) => g.gameId)));
   }
 
   const invites = await db
@@ -179,7 +205,8 @@ export async function getPendingSubmissions(
   schoolId: string,
   gameId?: string
 ): Promise<PendingSubmission[]> {
-  await assertManagerForSchool(schoolId, gameId);
+  const { scopes } = await resolveManagerScope(schoolId, gameId);
+  if (scopes && scopes.length === 0) return [];
 
   const whereConditions = [
     eq(schema.playerInvites.schoolId, schoolId),
@@ -187,6 +214,9 @@ export async function getPendingSubmissions(
   ];
   if (gameId) {
     whereConditions.push(eq(schema.playerInvites.gameId, gameId));
+  }
+  if (scopes) {
+    whereConditions.push(inArray(schema.playerInvites.gameId, scopes.map((g) => g.gameId)));
   }
 
   const submittedInvites = await db
@@ -349,17 +379,21 @@ export async function reviewPlayerInvite(
 
     if (invite.memberId) {
       if (!targetRosterId && invite.gameId) {
-        // Find existing team & roster for this school and game
-        const [team] = await db
-          .select({ id: schema.teams.id })
-          .from(schema.teams)
-          .where(
-            and(
-              eq(schema.teams.schoolId, invite.schoolId),
-              eq(schema.teams.gameId, invite.gameId)
-            )
-          )
-          .limit(1);
+        // Find the school's team for the game's ACTIVE season; a past season's roster is never a target
+        const activeSeason = await getActiveSeasonForGame(invite.gameId);
+        const [team] = activeSeason
+          ? await db
+              .select({ id: schema.teams.id })
+              .from(schema.teams)
+              .where(
+                and(
+                  eq(schema.teams.schoolId, invite.schoolId),
+                  eq(schema.teams.gameId, invite.gameId),
+                  eq(schema.teams.seasonId, activeSeason.id)
+                )
+              )
+              .limit(1)
+          : [];
 
         if (team) {
           const [firstRoster] = await db
@@ -787,6 +821,8 @@ export interface SchoolRosterPlayer {
 export interface SchoolRosterDetails {
   id: string;
   teamId: string;
+  seasonId: string;
+  seasonName: string;
   name: string;
   division: string;
   gameId: string;
@@ -802,11 +838,16 @@ export async function getSchoolRosters(
   schoolId: string,
   gameId?: string
 ): Promise<SchoolRosterDetails[]> {
-  await assertManagerForSchool(schoolId, gameId);
+  const { scopes } = await resolveManagerScope(schoolId, gameId);
+  if (scopes && scopes.length === 0) return [];
 
   const whereConditions = [eq(schema.teams.schoolId, schoolId)];
   if (gameId) {
     whereConditions.push(eq(schema.teams.gameId, gameId));
+  }
+  // A manager sees only the rosters of each managed game's active season; staff admins see all.
+  if (scopes) {
+    whereConditions.push(inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId)));
   }
 
   const schoolTeams = await db
@@ -814,6 +855,7 @@ export async function getSchoolRosters(
       id: schema.teams.id,
       schoolId: schema.teams.schoolId,
       gameId: schema.teams.gameId,
+      seasonId: schema.teams.seasonId,
       gameName: schema.games.displayName,
       gameSlug: schema.games.slug,
     })
@@ -824,6 +866,13 @@ export async function getSchoolRosters(
   if (schoolTeams.length === 0) {
     return [];
   }
+
+  const seasonIds = [...new Set(schoolTeams.map((t) => t.seasonId))];
+  const seasonRows = await db
+    .select({ id: schema.seasons.id, name: schema.seasons.name })
+    .from(schema.seasons)
+    .where(inArray(schema.seasons.id, seasonIds));
+  const seasonNames = new Map(seasonRows.map((r) => [r.id, r.name]));
 
   const teamIds = schoolTeams.map((t) => t.id);
   const teamRosters = await db
@@ -886,6 +935,8 @@ export async function getSchoolRosters(
     return {
       id: roster.id,
       teamId: roster.teamId,
+      seasonId: team?.seasonId ?? '',
+      seasonName: (team && seasonNames.get(team.seasonId)) ?? '',
       name: roster.name,
       division: roster.division,
       gameId: team?.gameId ?? '',
@@ -911,7 +962,8 @@ export interface CreateSchoolRosterResult {
 
 /**
  * Creates a new competition roster for a school and game directly from the School Manager Portal.
- * Resolves or auto-provisions an active season and team record to eliminate onboarding deadlocks.
+ * Rosters are only ever created in the game's active season (never an old or auto-created one); the
+ * season's team record is found or created on demand.
  */
 export async function createSchoolRoster(
   params: CreateSchoolRosterParams
@@ -950,40 +1002,10 @@ export async function createSchoolRoster(
     throw new Error(`Game ${gameId} not found`);
   }
 
-  // 3. Resolve or auto-provision active season for this game
-  let [season] = await db
-    .select()
-    .from(schema.seasons)
-    .where(
-      and(
-        eq(schema.seasons.gameId, gameId),
-        eq(schema.seasons.isActive, true)
-      )
-    )
-    .limit(1);
-
+  // 3. The game's active season is the only one a roster can be created in
+  const season = await getActiveSeasonForGame(gameId);
   if (!season) {
-    const [latestSeason] = await db
-      .select()
-      .from(schema.seasons)
-      .where(eq(schema.seasons.gameId, gameId))
-      .orderBy(desc(schema.seasons.createdAt))
-      .limit(1);
-
-    if (latestSeason) {
-      season = latestSeason;
-    } else {
-      const currentYear = new Date().getFullYear();
-      const [newSeason] = await db
-        .insert(schema.seasons)
-        .values({
-          gameId,
-          name: `${game.displayName} Season ${currentYear}`,
-          isActive: true,
-        })
-        .returning();
-      season = newSeason;
-    }
+    throw new Error(`${NO_ACTIVE_SEASON_ERROR}.`);
   }
 
   // 4. Find or create the Team for (schoolId, gameId, season.id)
@@ -1026,6 +1048,8 @@ export async function createSchoolRoster(
   const rosterDetails: SchoolRosterDetails = {
     id: roster.id,
     teamId: team.id,
+    seasonId: season.id,
+    seasonName: season.name,
     name: roster.name,
     division: roster.division,
     gameId: game.id,
@@ -1097,7 +1121,8 @@ export async function getSchoolPlayerPool(
   schoolId: string,
   gameId?: string
 ): Promise<SchoolPoolPlayer[]> {
-  await assertManagerForSchool(schoolId, gameId);
+  const { scopes } = await resolveManagerScope(schoolId, gameId);
+  if (scopes && scopes.length === 0) return [];
 
   const schoolMembers = await db
     .select({
@@ -1136,7 +1161,14 @@ export async function getSchoolPlayerPool(
     .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
     .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
     .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
-    .where(inArray(schema.players.memberId, memberIds));
+    .where(
+      scopes
+        ? and(
+            inArray(schema.players.memberId, memberIds),
+            inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId))
+          )
+        : inArray(schema.players.memberId, memberIds)
+    );
 
   // Fetch invite drafts for fallback IGNs
   const invites = await db

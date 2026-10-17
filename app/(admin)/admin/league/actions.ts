@@ -4,6 +4,10 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
+import { isValidSeasonName, SEASON_NAME_ERROR } from '@/app/lib/season-name';
+import { db } from '@/app/lib/db';
+import * as schema from '@/app/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import {
   createGameInDb,
   updateGameInDb,
@@ -103,6 +107,9 @@ export async function createSeason(formData: FormData) {
     if (!gameId || !name) {
       return { success: false, error: 'Game and season name are required.' };
     }
+    if (!isValidSeasonName(name)) {
+      return { success: false, error: SEASON_NAME_ERROR };
+    }
 
     const season = await createSeasonInDb({ gameId, name, isActive, standingsFormat });
 
@@ -124,6 +131,18 @@ export async function updateSeason(id: string, formData: FormData) {
 
     if (!name) {
       return { success: false, error: 'Season name is required.' };
+    }
+    if (!isValidSeasonName(name)) {
+      // A legacy non-conforming name may be kept as-is (for example when only toggling
+      // Active), but it can never be changed to another non-conforming name.
+      const [existing] = await db
+        .select({ name: schema.seasons.name })
+        .from(schema.seasons)
+        .where(eq(schema.seasons.id, id))
+        .limit(1);
+      if (!existing || existing.name !== name) {
+        return { success: false, error: SEASON_NAME_ERROR };
+      }
     }
 
     const season = await updateSeasonInDb(id, { name, isActive, standingsFormat });

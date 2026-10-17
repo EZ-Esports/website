@@ -176,6 +176,7 @@ const mocks = vi.hoisted(() => {
               schoolName: school?.name ?? 'Unknown School',
               schoolSlug: school?.slug ?? 'unknown',
               managedGames: m.managedGames,
+              academicYear: m.academicYear,
               isPrimaryContact: m.isPrimaryContact,
             };
           });
@@ -198,7 +199,13 @@ const mocks = vi.hoisted(() => {
 
         // 4. Players join Members, Rosters, Teams, Games
         if (currentTable === schema.players) {
-          const matchingPlayers = store.filter((p) => conds.every((c) => matchesRow(p, c)));
+          // Joined columns (teams.season_id) are matched against the player's roster -> team.
+          const withTeamColumns = (p: any) => {
+            const roster = state.rostersStore.find((r) => r.id === p.rosterId);
+            const team = state.teamsStore.find((t) => t.id === roster?.teamId);
+            return { ...p, seasonId: team?.seasonId };
+          };
+          const matchingPlayers = store.filter((p) => conds.every((c) => matchesRow(withTeamColumns(p), c)));
           if (joins.length > 0) {
             return matchingPlayers.map((p) => {
               const member = state.membersStore.find((m) => m.id === p.memberId);
@@ -353,6 +360,7 @@ vi.mock('@/app/lib/supabase/server', () => ({
 // Import implementations under test
 import {
   getSchoolManagerContext,
+  managerMatchesActiveSeason,
   assertManagerForSchool,
   assertManagerForRoster,
 } from '@/app/lib/onboarding/manager-auth';
@@ -370,6 +378,7 @@ import {
   getSchoolPlayerPool,
   createSchoolRoster,
   deleteSchoolRoster,
+  getSchoolRosters,
 } from '@/app/lib/onboarding/portal-actions';
 
 describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
@@ -408,13 +417,17 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         schoolId,
         userId: 'manager-user-1',
         managedGames: ['valorant'], // Scoped to Valorant only
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         isPrimaryContact: true,
         isActive: true,
       },
     ];
 
     mocks.state.playerInvitesStore = [];
+    mocks.state.seasonsStore = [
+      { id: 'season-fall-26', gameId: valGameId, name: '2026-27', isActive: true },
+      { id: 'season-lol-26', gameId: lolGameId, name: '2026-27', isActive: true },
+    ];
     mocks.state.teamsStore = [
       { id: 'team-val-stuy', schoolId, gameId: valGameId, seasonId: 'season-fall-26' },
       { id: 'team-val-bxsci', schoolId: otherSchoolId, gameId: valGameId, seasonId: 'season-fall-26' },
@@ -995,6 +1008,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       mocks.state.schoolManagersStore = [
         {
           id: 'sm-1',
+          academicYear: '2026-27',
           schoolId,
           userId: 'manager-user-1',
           managedGames: null,
@@ -1008,7 +1022,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           id: teamId,
           schoolId,
           gameId: valGameId,
-          seasonId: 'season-1',
+          seasonId: 'season-fall-26',
         },
       ];
 
@@ -1186,14 +1200,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('creates a new competition roster when team and active season already exist', async () => {
-      // Seed active season
-      mocks.state.seasonsStore.push({
-        id: 'season-val-2026',
-        gameId: valGameId,
-        name: 'Valorant Season 2026',
-        isActive: true,
-      });
-
       const res = await createSchoolRoster({
         schoolId,
         gameId: valGameId,
@@ -1215,13 +1221,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('creates team and roster atomically when team does not exist for the school', async () => {
-      mocks.state.seasonsStore.push({
-        id: 'season-lol-2026',
-        gameId: lolGameId,
-        name: 'LoL Season 2026',
-        isActive: true,
-      });
-
       // Clear teams for lol
       mocks.state.teamsStore = mocks.state.teamsStore.filter((t) => t.gameId !== lolGameId);
 
@@ -1239,28 +1238,27 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(teamCreated).toBeDefined();
     });
 
-    it('auto-provisions active season when no season exists in database (zero-friction invariant)', async () => {
-      // Empty seasons and clear team for this game
+    it('refuses to create a roster when the game has no active season (no auto-provisioning)', async () => {
       mocks.state.seasonsStore = [];
       mocks.state.teamsStore = mocks.state.teamsStore.filter(
         (t) => !(t.schoolId === schoolId && t.gameId === valGameId)
       );
 
-      const res = await createSchoolRoster({
-        schoolId,
-        gameId: valGameId,
-        name: 'Alpha Team',
-        division: 'A',
-      });
+      await expect(
+        createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alpha Team', division: 'A' })
+      ).rejects.toThrow(/No active season for this game/);
 
-      expect(res.success).toBe(true);
-      expect(res.roster.name).toBe('Alpha Team');
+      expect(mocks.state.seasonsStore).toHaveLength(0);
+      expect(mocks.state.teamsStore.some((t) => t.schoolId === schoolId && t.gameId === valGameId)).toBe(false);
+    });
 
-      // Assert season was auto-provisioned
-      expect(mocks.state.seasonsStore.length).toBeGreaterThanOrEqual(1);
-      const provisionedSeason = mocks.state.seasonsStore.find((s) => s.gameId === valGameId);
-      expect(provisionedSeason).toBeDefined();
-      expect(provisionedSeason.isActive).toBe(true);
+    it('does not fall back to an old inactive season when creating a roster', async () => {
+      mocks.state.seasonsStore = [
+        { id: 'season-old', gameId: valGameId, name: '2025-26', isActive: false },
+      ];
+      await expect(
+        createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alpha Team' })
+      ).rejects.toThrow(/No active season for this game/);
     });
 
     it('rejects roster creation if user does not manage the target school (Anti-IDOR / Tenancy check)', async () => {
@@ -1290,6 +1288,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           id: 'team-stuy-val-uuid',
           schoolId,
           gameId: valGameId,
+          seasonId: 'season-fall-26',
         });
       }
 
@@ -1316,12 +1315,168 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           id: 'team-stuy-val-uuid',
           schoolId,
           gameId: valGameId,
+          seasonId: 'season-fall-26',
         });
       }
 
       await expect(deleteSchoolRoster(rosterId)).rejects.toThrow(
         /Cannot delete a roster with enrolled players/
       );
+    });
+  });
+  describe('8. Season scoping (a manager only works in the active season of their affiliation)', () => {
+    const rosterPast = 'roster-val-past';
+    const rosterActive = 'roster-val-active';
+
+    beforeEach(() => {
+      mocks.state.seasonsStore = [
+        { id: 'season-val-past', gameId: valGameId, name: '2025-26', isActive: false },
+        { id: 'season-val-now', gameId: valGameId, name: '2026-27', isActive: true },
+        { id: 'season-lol-now', gameId: lolGameId, name: '2026-27', isActive: true },
+      ];
+      mocks.state.schoolManagersStore = [
+        {
+          id: 'mgr-1',
+          schoolId,
+          userId: 'manager-user-1',
+          managedGames: null,
+          academicYear: '2026-27',
+          isPrimaryContact: true,
+          isActive: true,
+        },
+      ];
+      mocks.state.teamsStore = [
+        { id: 'team-past', schoolId, gameId: valGameId, seasonId: 'season-val-past' },
+        { id: 'team-now', schoolId, gameId: valGameId, seasonId: 'season-val-now' },
+      ];
+      mocks.state.rostersStore = [
+        { id: rosterPast, teamId: 'team-past', name: 'Old Varsity', division: 'A' },
+        { id: rosterActive, teamId: 'team-now', name: 'Varsity', division: 'A' },
+      ];
+      mocks.state.membersStore = [
+        { id: 'member-1', schoolId, firstName: 'Ana', lastName: 'Lee', discord: 'ana', graduationYear: 2027, createdAt: new Date() },
+      ];
+      mocks.state.playersStore = [
+        { id: 'pl-past', rosterId: rosterPast, memberId: 'member-1', role: 'player', isCaptain: false, ign: 'a' },
+        { id: 'pl-now', rosterId: rosterActive, memberId: 'member-1', role: 'player', isCaptain: false, ign: 'a' },
+      ];
+    });
+
+    it('managerMatchesActiveSeason: matches only an equal season name that covers the game', () => {
+      const game = { id: valGameId, slug: 'valorant' };
+      const season = { name: '2026-27' };
+      expect(managerMatchesActiveSeason([{ academicYear: '2026-27', managedGames: null }], game, season)).toBe(true);
+      expect(managerMatchesActiveSeason([{ academicYear: '2026-27', managedGames: ['valorant'] }], game, season)).toBe(true);
+      expect(managerMatchesActiveSeason([{ academicYear: '2026-27', managedGames: [valGameId] }], game, season)).toBe(true);
+      expect(managerMatchesActiveSeason([{ academicYear: '2025-26', managedGames: null }], game, season)).toBe(false);
+      expect(managerMatchesActiveSeason([{ academicYear: '2026-27', managedGames: ['league-of-legends'] }], game, season)).toBe(false);
+      expect(managerMatchesActiveSeason([{ academicYear: '2026-27', managedGames: null }], game, null)).toBe(false);
+      // Multi-row manager: any matching row is enough.
+      expect(
+        managerMatchesActiveSeason(
+          [
+            { academicYear: '2025-26', managedGames: null },
+            { academicYear: '2026-27', managedGames: ['valorant'] },
+          ],
+          game,
+          season
+        )
+      ).toBe(true);
+    });
+
+    it('getSchoolRosters returns only the active season rosters for a manager', async () => {
+      const rosters = await getSchoolRosters(schoolId);
+      expect(rosters.map((r) => r.id)).toEqual([rosterActive]);
+      expect(rosters[0].seasonName).toBe('2026-27');
+    });
+
+    it('a staff admin who also holds a manager row sees every season', async () => {
+      mocks.state.rolesStore.push({
+        id: 'role-admin',
+        name: 'Admin',
+        permissions: Permissions.ADMINISTRATOR,
+        position: 5,
+        isOwner: false,
+      });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
+
+      const context = await getSchoolManagerContext();
+      expect(context?.isStaffAdmin).toBe(true);
+
+      const rosters = await getSchoolRosters(schoolId);
+      expect(rosters.map((r) => r.id).sort()).toEqual([rosterActive, rosterPast].sort());
+      await expect(removePlayerFromRoster({ rosterId: rosterPast, playerId: 'pl-past' })).resolves.toMatchObject({
+        success: true,
+      });
+    });
+
+    it('a manager whose affiliation year differs from the active season sees nothing and is refused', async () => {
+      mocks.state.schoolManagersStore[0].academicYear = '2025-26';
+
+      expect(await getSchoolRosters(schoolId)).toEqual([]);
+      expect(await getSchoolPlayerPool(schoolId)).toEqual([]);
+      expect(await getSchoolInvites(schoolId)).toEqual([]);
+      expect(await getPendingSubmissions(schoolId)).toEqual([]);
+      await expect(getSchoolRosters(schoolId, valGameId)).rejects.toThrow(/Forbidden/);
+      await expect(createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' })).rejects.toThrow(/Forbidden/);
+      await expect(removePlayerFromRoster({ rosterId: rosterActive, playerId: 'pl-now' })).rejects.toThrow(/Forbidden/);
+    });
+
+    it('a game with no active season is empty and refuses mutations', async () => {
+      mocks.state.seasonsStore = mocks.state.seasonsStore.filter((s) => s.gameId !== valGameId);
+
+      expect(await getSchoolRosters(schoolId)).toEqual([]);
+      await expect(getSchoolRosters(schoolId, valGameId)).rejects.toThrow(/No active season for this game/);
+      await expect(deleteSchoolRoster(rosterActive)).rejects.toThrow(/No active season for this game/);
+    });
+
+    it('scopes per game: a matching Valorant season does not unlock League of Legends', async () => {
+      // LoL's active season is a different year than the manager's affiliation.
+      mocks.state.seasonsStore.find((s) => s.id === 'season-lol-now').name = '2027-28';
+      mocks.state.teamsStore.push({ id: 'team-lol', schoolId, gameId: lolGameId, seasonId: 'season-lol-now' });
+      mocks.state.rostersStore.push({ id: 'roster-lol', teamId: 'team-lol', name: 'LoL', division: 'A' });
+
+      const rosters = await getSchoolRosters(schoolId);
+      expect(rosters.map((r) => r.id)).toEqual([rosterActive]);
+      await expect(getSchoolRosters(schoolId, lolGameId)).rejects.toThrow(/Forbidden/);
+      await expect(deleteSchoolRoster('roster-lol')).rejects.toThrow(/Forbidden/);
+    });
+
+    it('a manager with rows for two seasons works in whichever matches the active season', async () => {
+      mocks.state.schoolManagersStore.push({
+        id: 'mgr-2',
+        schoolId,
+        userId: 'manager-user-1',
+        managedGames: null,
+        academicYear: '2025-26',
+        isPrimaryContact: false,
+        isActive: true,
+      });
+      const rosters = await getSchoolRosters(schoolId);
+      // The 2025-26 row does not unlock the inactive 2025-26 season; only the active one is visible.
+      expect(rosters.map((r) => r.id)).toEqual([rosterActive]);
+    });
+
+    it('refuses every roster mutation on a past-season roster', async () => {
+      const msg = /past season/;
+      await expect(deleteSchoolRoster(rosterPast)).rejects.toThrow(msg);
+      await expect(removePlayerFromRoster({ rosterId: rosterPast, playerId: 'pl-past' })).rejects.toThrow(msg);
+      await expect(updateRosterPlayerRole({ rosterId: rosterPast, playerId: 'pl-past', role: 'sub' })).rejects.toThrow(msg);
+      await expect(enrollPlayerToRoster({ rosterId: rosterPast, memberId: 'member-1' })).rejects.toThrow(msg);
+      await expect(getRosterEligibility({ rosterId: rosterPast })).rejects.toThrow(msg);
+      await expect(emergencySwapSub({ rosterId: rosterPast, outPlayerId: 'a', inPlayerId: 'b' })).rejects.toThrow(msg);
+      expect(mocks.state.playersStore.some((p) => p.id === 'pl-past')).toBe(true);
+    });
+
+    it('allows the same mutations on the active-season roster', async () => {
+      const res = await updateRosterPlayerRole({ rosterId: rosterActive, playerId: 'pl-now', role: 'sub' });
+      expect(res.success).toBe(true);
+    });
+
+    it('the player pool only lists enrollments from the active season', async () => {
+      const pool = await getSchoolPlayerPool(schoolId);
+      expect(pool).toHaveLength(1);
+      expect(pool[0].enrolledRosters.map((r) => r.rosterId)).toEqual([rosterActive]);
     });
   });
 });

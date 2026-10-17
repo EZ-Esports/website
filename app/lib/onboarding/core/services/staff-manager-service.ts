@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { StaffManagerProvisioningUseCase } from '../ports/use-cases';
 import type { DrizzleOnboardingRepository } from '../../adapters/db/drizzle-onboarding-repository';
 import { generateCryptoToken } from '../domain/invariants';
+import { DEFAULT_MANAGER_SEASON, SEASON_NAME_ERROR, isValidSeasonName } from '@/app/lib/season-name';
 
 export class StaffManagerService implements StaffManagerProvisioningUseCase {
   constructor(private readonly repo: DrizzleOnboardingRepository) {}
@@ -17,8 +18,9 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
       academicYear?: string;
     }
   ) {
-    const { schoolId, email, userId, managedGames, isPrimaryContact = false, academicYear = '2025-2026' } = params;
+    const { schoolId, email, userId, managedGames, isPrimaryContact = false, academicYear = DEFAULT_MANAGER_SEASON } = params;
 
+    if (!isValidSeasonName(academicYear)) return { success: false, error: SEASON_NAME_ERROR };
     if (!schoolId) return { success: false, error: 'School ID is required.' };
     if (!email || !email.trim()) return { success: false, error: 'Email is required.' };
 
@@ -107,8 +109,9 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
       isPrimaryContact?: boolean;
     }
   ) {
-    const { schoolId, firstName, lastName, email, academicYear = '2025-2026', managedGames = null, isPrimaryContact = false } = params;
+    const { schoolId, firstName, lastName, email, academicYear = DEFAULT_MANAGER_SEASON, managedGames = null, isPrimaryContact = false } = params;
 
+    if (!isValidSeasonName(academicYear)) return { success: false, error: SEASON_NAME_ERROR };
     if (!schoolId) return { success: false, error: 'School ID is required.' };
     if (!firstName?.trim() || !lastName?.trim()) return { success: false, error: 'First name and last name are required.' };
 
@@ -191,8 +194,9 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
       isPrimaryContact?: boolean;
     }
   ) {
-    const { schoolId, userId, memberId, email, academicYear = '2025-2026', managedGames = null, isPrimaryContact = false } = params;
+    const { schoolId, userId, memberId, email, academicYear = DEFAULT_MANAGER_SEASON, managedGames = null, isPrimaryContact = false } = params;
 
+    if (!isValidSeasonName(academicYear)) return { success: false, error: SEASON_NAME_ERROR };
     if (!schoolId) return { success: false, error: 'School ID is required.' };
     if (!userId && !memberId && !email) return { success: false, error: 'Either userId, memberId, or email is required.' };
 

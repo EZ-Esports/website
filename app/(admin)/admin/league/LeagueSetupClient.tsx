@@ -10,6 +10,7 @@ import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
 } from './actions';
+import { seasonNameChoices } from '@/app/lib/season-name';
 
 interface DBGame {
   id: string;
@@ -156,7 +157,7 @@ export default function LeagueSetupClient({
         id="seasons"
         variant="flush"
         title={<>Seasons<AdminCount>{seasons.length}</AdminCount></>}
-        description="Matches and team registrations attach to a season. Active seasons show on the public site."
+        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager can only work on the active season that matches their affiliation (YYYY-YY)."
       >
         {games.length === 0 ? (
           <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="Create a game first before adding seasons." />
@@ -176,8 +177,13 @@ export default function LeagueSetupClient({
                   ))}
                 </select>
               </Field>
-              <Field label="Season name">
-                <input name="name" required placeholder="Spring 2025" className={input} />
+              <Field label="Season name" help="YYYY-YY, e.g. 2026-27.">
+                <select name="name" required defaultValue="" className={input}>
+                  <option value="" disabled>Select season…</option>
+                  {seasonNameChoices().map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="Active?">
                 <select name="isActive" defaultValue="true" className={input}>
@@ -321,7 +327,11 @@ function SeasonRow({
             <input type="hidden" name="gameId" value={season.gameId} />
           </Field>
           <Field label="Season name">
-            <input name="name" required defaultValue={season.name} autoFocus className={input} />
+            <select name="name" required defaultValue={season.name} autoFocus className={input}>
+              {seasonNameChoices(season.name).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
           </Field>
           <Field label="Active?">
             <select name="isActive" defaultValue={season.isActive ? 'true' : 'false'} className={input}>

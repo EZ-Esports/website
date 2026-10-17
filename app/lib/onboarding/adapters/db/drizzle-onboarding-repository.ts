@@ -107,21 +107,37 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
       .limit(1);
 
     if (!row) return null;
+    const [season] = await db
+      .select({ isActive: schema.seasons.isActive })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.id, row.team.seasonId))
+      .limit(1);
     return {
       id: row.roster.id,
       schoolId: row.team.schoolId,
       gameId: row.team.gameId,
       name: row.roster.name,
+      isActiveSeason: season?.isActive ?? false,
     };
   }
 
   async findSchoolRosters(
     schoolId: string,
-    gameIds?: string[] | null
+    gameIds?: string[] | null,
+    options?: { activeSeasonOnly?: boolean }
   ): Promise<SchoolRosterWithPlayers[]> {
     const whereConditions = [eq(schema.teams.schoolId, schoolId)];
     if (gameIds && gameIds.length > 0) {
       whereConditions.push(inArray(schema.teams.gameId, gameIds));
+    }
+    if (options?.activeSeasonOnly) {
+      // Managers only ever see the game's active season; past seasons stay admin-only.
+      const activeSeasons = await db
+        .select({ id: schema.seasons.id })
+        .from(schema.seasons)
+        .where(eq(schema.seasons.isActive, true));
+      if (activeSeasons.length === 0) return [];
+      whereConditions.push(inArray(schema.teams.seasonId, activeSeasons.map((s) => s.id)));
     }
 
     const schoolTeams = await db

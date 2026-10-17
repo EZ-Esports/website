@@ -39,6 +39,8 @@ interface SchoolPortalClientProps {
   initialRosters: SchoolRosterDetails[];
   initialPlayerPool?: SchoolPoolPlayer[];
   selectedGameId?: string;
+  /** Active season name(s) the manager is working in; undefined for a staff admin. */
+  seasonLabel?: string;
   /** Whether this account has already finished or skipped the guided tour. */
   tourCompleted: boolean;
 }
@@ -52,6 +54,7 @@ export default function SchoolPortalClient({
   initialRosters,
   initialPlayerPool = [],
   selectedGameId: initialGameId,
+  seasonLabel,
   tourCompleted,
 }: SchoolPortalClientProps) {
   // --- Game Selection Tab ---
@@ -514,6 +517,7 @@ export default function SchoolPortalClient({
       {/* Top Banner & Title */}
       <PortalHeader
         schoolName={activeSchool.schoolName}
+        seasonLabel={seasonLabel}
         actions={
           <PortalTour
             tourCompleted={tourCompleted}

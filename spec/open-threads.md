@@ -94,7 +94,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`.
 - [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views.
 - [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
-- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season.
+- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Addressed in spec-019 (in review); invite scoping is still open, see below.
 - [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should get a `staff_members` row when they reach `/admin` or `/login`.
 - [#240](https://github.com/EZ-Esports/website/issues/240): link school names in Season standing and the Standings tab to team pages.
 - [#241](https://github.com/EZ-Esports/website/issues/241): show high school alongside university on leadership cards.
@@ -109,5 +109,13 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 ## Onboarding draft and season defaults (spec-017)
 
 - `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
-- The `'2025-2026'` default is still hard-coded in `staff-manager-service.ts` and the admin Provision / Assign tabs (`ProvisionInviteTab.tsx`, `AssignExistingManagerTab.tsx`), with tests asserting it. Bump or derive it from today's date in a separate change.
+- (Resolved in spec-019: the hard-coded `'2025-2026'` default is gone; manager seasons are `YYYY-YY` and default to `DEFAULT_MANAGER_SEASON`.) Bump or derive it from today's date in a separate change.
 - The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.
+
+## Manager portal season scope (spec-019)
+
+- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to the active season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
+- **#233 interplay.** Managers can be given role-less `staff_members` rows. The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way when #233 lands.
+- The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
+- Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.
+

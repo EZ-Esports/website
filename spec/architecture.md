@@ -78,6 +78,9 @@ All league competition occurs in NYC and canonicalizes to Eastern Time (`America
 
 One tour definition (`app/(portal)/portal/tour/steps.ts`) targets stable `data-tour` attributes, never selectors or text; `resolveTourSteps` slices it for the full tour or one section and drops steps with no target. Dismissal is the nullable column `school_managers.tour_completed_at`: read server-side by `hasCompletedPortalTour()` (true if any of the user's rows is set; true with no rows or on error), written by `completePortalTour()` (stamps all of the user's unset rows) only when the first-run tour ends. Each person has their own rows, so another manager at the same school is unaffected. The popover is a non-modal RAC `Popover` (a modal one locks page scroll, which blocks scrolling targets into view); Esc and arrows come from a document-level listener. A test renders the portal for a school with no data and fails if a referenced anchor is missing. See [spec-015](spec-015-manager-portal-guided-tour.md).
 
+## Manager portal season scope
+School managers are scoped by season, not just school and game (spec-019). Season names and `school_managers.academic_year` are both `YYYY-YY` (`app/lib/season-name.ts`), so a manager reaches a game only when a row's `academic_year` equals that game's active season name. The checks live in `app/lib/onboarding/manager-auth.ts` (`managerMatchesActiveSeason`, `assertManagerForSchool`, `assertManagerForRoster`, `getAuthorizedGameScopes`) and `portal-actions.ts` reads filter through the resulting scopes. A staff admin means the ADMINISTRATOR permission, checked before manager rows; a `staff_members` row alone never grants the all-season view.
+
 ## Frontend
 
 - **Tokens.** July rewrite PRs #11–#13: two-layer semantic tokens (`:root` + `@theme inline` in `globals.css`), primitives under `components/ui/`, admin denser via `admin/styles.ts`. Bridge aliases kept old pages compiling until PR #13 deleted them.
