@@ -70,6 +70,7 @@ export default function PlayerOnboardingWizard({
           email: draft.email.trim().toLowerCase(),
           password: isManager ? draft.password : undefined,
           graduationYear: draft.graduationYear,
+          academicYear: isManager ? draft.academicYear : undefined,
           riotId: draft.riotId.trim(),
           discordUsername: draft.discordUsername.trim(),
           inGuild: true,
@@ -200,6 +201,8 @@ export default function PlayerOnboardingWizard({
             setPassword={draft.setPassword}
             graduationYear={draft.graduationYear}
             setGraduationYear={draft.setGraduationYear}
+            academicYear={draft.academicYear}
+            setAcademicYear={draft.setAcademicYear}
             isManager={isManager}
           />
         )}

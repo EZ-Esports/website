@@ -105,3 +105,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
 - [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and guild membership check in the join wizard (spec-011 designed it; only the honor-system checkbox is built).
 - [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
+
+## Onboarding draft and season defaults (spec-017)
+
+- `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
+- The `'2025-2026'` default is still hard-coded in `staff-manager-service.ts` and the admin Provision / Assign tabs (`ProvisionInviteTab.tsx`, `AssignExistingManagerTab.tsx`), with tests asserting it. Bump or derive it from today's date in a separate change.
+- The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.

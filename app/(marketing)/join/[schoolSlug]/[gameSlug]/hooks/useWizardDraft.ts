@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { saveOnboardingDraft } from '@/app/lib/onboarding/wizard-actions';
 import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/riot-manual';
-import type { InviteData, WizardFormData } from '../types';
+import {
+  DEFAULT_MANAGER_SEASON,
+  GRADUATION_YEAR_OPTIONS,
+  MANAGER_SEASON_OPTIONS,
+  type InviteData,
+  type WizardFormData,
+} from '../types';
 
 export function useWizardDraft(token: string, inviteData: InviteData) {
   const initialDraft = inviteData.submissionDraft || {};
@@ -22,8 +28,17 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
   );
   const [email, setEmail] = useState(initialDraft.email || '');
   const [password, setPassword] = useState(initialDraft.password || '');
+  // Drafts saved with a year that is no longer offered (e.g. 2026) start unset instead of blank-but-valid.
   const [graduationYear, setGraduationYear] = useState<number>(
-    initialDraft.graduationYear ? Number(initialDraft.graduationYear) : 0
+    GRADUATION_YEAR_OPTIONS.some((o) => o.value === Number(initialDraft.graduationYear))
+      ? Number(initialDraft.graduationYear)
+      : 0
+  );
+  // Manager only: season applied for. The admin invite may seed it; stale/unknown seasons fall back to the default.
+  const [academicYear, setAcademicYear] = useState<string>(
+    (MANAGER_SEASON_OPTIONS as readonly string[]).includes(initialDraft.academicYear)
+      ? initialDraft.academicYear
+      : DEFAULT_MANAGER_SEASON
   );
 
   // Step 2: Discord Connection
@@ -101,6 +116,7 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       email,
       password: isManager ? password : undefined,
       graduationYear,
+      academicYear: isManager ? academicYear : undefined,
       discordUsername,
       discordJoinedConfirmed,
       discordConnected: Boolean(discordUsername && discordJoinedConfirmed),
@@ -168,8 +184,12 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       );
       return false;
     }
-    if (!graduationYear || graduationYear < 2024 || graduationYear > 2035) {
-      setErrorMessage('Please select a valid expected graduation or academic year.');
+    if (!GRADUATION_YEAR_OPTIONS.some((o) => o.value === graduationYear)) {
+      setErrorMessage('Please select your anticipated high school graduation year.');
+      return false;
+    }
+    if (isManager && !(MANAGER_SEASON_OPTIONS as readonly string[]).includes(academicYear)) {
+      setErrorMessage('Please select the season you are applying for.');
       return false;
     }
     return true;
@@ -238,6 +258,8 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     setPassword,
     graduationYear,
     setGraduationYear,
+    academicYear,
+    setAcademicYear,
     discordUsername,
     setDiscordUsername,
     discordJoinedConfirmed,
