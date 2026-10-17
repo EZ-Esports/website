@@ -257,6 +257,8 @@ export async function provisionManagerAccount(
     memberId: string;
     schoolId: string;
     password?: string;
+    /** Season the manager picked in the wizard; takes precedence over the invite's seeded season. */
+    academicYear?: string;
     submissionDraft: Record<string, any> | null;
   }
 ): Promise<string> {
@@ -301,7 +303,14 @@ export async function provisionManagerAccount(
   }
 
   const draft = submissionDraft || {};
-  const academicYear = draft.academicYear || '2025-2026';
+  const submittedSeason = params.academicYear?.trim();
+  if (submittedSeason) {
+    const m = /^(\d{4})-(\d{4})$/.exec(submittedSeason);
+    if (!m || Number(m[2]) !== Number(m[1]) + 1) {
+      throw new Error('A valid season (e.g. 2026-2027) is required.');
+    }
+  }
+  const academicYear = submittedSeason || draft.academicYear || '2026-2027';
   const managedGames = draft.managedGames ?? null;
   const isPrimaryContact = Boolean(draft.isPrimaryContact);
 
@@ -428,6 +437,7 @@ export async function processOnboardingSubmission(
         memberId: createdOrUpdatedMemberId,
         schoolId: invite.schoolId,
         password: submission.password,
+        academicYear: submission.academicYear,
         submissionDraft: invite.submissionDraft as Record<string, any> | null,
       });
 

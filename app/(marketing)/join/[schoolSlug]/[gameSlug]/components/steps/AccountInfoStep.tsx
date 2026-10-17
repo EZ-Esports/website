@@ -1,6 +1,11 @@
 'use client';
 
 import { RequiredMark } from '../RequiredMark';
+import {
+  DEFAULT_MANAGER_SEASON,
+  GRADUATION_YEAR_OPTIONS,
+  MANAGER_SEASON_OPTIONS,
+} from '../../types';
 
 interface AccountInfoStepProps {
   legalFirstName: string;
@@ -13,6 +18,8 @@ interface AccountInfoStepProps {
   setPassword?: (val: string) => void;
   graduationYear: number;
   setGraduationYear: (val: number) => void;
+  academicYear?: string;
+  setAcademicYear?: (val: string) => void;
   isManager: boolean;
 }
 
@@ -27,6 +34,8 @@ export function AccountInfoStep({
   setPassword,
   graduationYear,
   setGraduationYear,
+  academicYear,
+  setAcademicYear,
   isManager,
 }: AccountInfoStepProps) {
   return (
@@ -136,9 +145,7 @@ export function AccountInfoStep({
           htmlFor="account-graduation-year"
           className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
         >
-          {isManager
-            ? <>Affiliation / Academic Year<RequiredMark /></>
-            : <>Anticipated High School Graduation Year<RequiredMark /></>}
+          Anticipated High School Graduation Year<RequiredMark />
         </label>
         <select
           id="account-graduation-year"
@@ -149,22 +156,40 @@ export function AccountInfoStep({
           <option value="" disabled>
             Choose an option
           </option>
-          {isManager ? (
-            <>
-              <option value={2026}>2025-2026 (Current Academic Year)</option>
-              <option value={2027}>2026-2027</option>
-              <option value={2028}>2027-2028</option>
-            </>
-          ) : (
-            <>
-              <option value={2026}>Class of 2026 (11th Grade / Junior)</option>
-              <option value={2027}>Class of 2027 (10th Grade / Sophomore)</option>
-              <option value={2028}>Class of 2028 (9th Grade / Freshman)</option>
-              <option value={2029}>Class of 2029 (8th Grade)</option>
-            </>
-          )}
+          {GRADUATION_YEAR_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </select>
       </div>
+
+      {isManager && setAcademicYear && (
+        <div>
+          <label
+            htmlFor="account-academic-year"
+            className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+          >
+            Season Affiliation<RequiredMark />
+          </label>
+          <select
+            id="account-academic-year"
+            value={academicYear ?? DEFAULT_MANAGER_SEASON}
+            onChange={(e) => setAcademicYear(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            {MANAGER_SEASON_OPTIONS.map((season) => (
+              <option key={season} value={season}>
+                {season}
+                {season === DEFAULT_MANAGER_SEASON ? ' (Current Season)' : ''}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-foreground-muted mt-1">
+            The season you are applying to manage your school&apos;s teams for.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

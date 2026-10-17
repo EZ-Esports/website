@@ -71,6 +71,8 @@ export interface PlayerOnboardingSubmission {
   legalFirstName: string;
   legalLastName: string;
   graduationYear: number;
+  /** Manager only: season applied for, e.g. "2026-2027". */
+  academicYear?: string;
   password?: string;
   riotId: string;
   discordUsername: string;
