@@ -72,6 +72,22 @@ describe.skipIf(!enabled)('season roster lock against the local database', () =>
     expect(() => auth.assertSeasonRostersUnlocked({ isStaffAdmin: true }, a)).not.toThrow();
   });
 
+  it('a repeat lock keeps the original timestamp', async () => {
+    const { and, isNull } = await import('drizzle-orm');
+    const first = (await auth.getActiveSeasonForGame(gameA))?.rostersLockedAt;
+    expect(first).toBeNull();
+    const stamp = new Date('2026-01-01T00:00:00Z');
+    await dbh.update(schema.seasons).set({ rostersLockedAt: stamp }).where(eq(schema.seasons.id, seasonA));
+    // The guarded update the lock action issues must match no row once already locked.
+    const again = await dbh
+      .update(schema.seasons)
+      .set({ rostersLockedAt: new Date() })
+      .where(and(eq(schema.seasons.id, seasonA), isNull(schema.seasons.rostersLockedAt)))
+      .returning({ id: schema.seasons.id });
+    expect(again).toHaveLength(0);
+    expect((await auth.getActiveSeasonForGame(gameA))?.rostersLockedAt?.getTime()).toBe(stamp.getTime());
+  });
+
   it('unlocking clears the timestamp', async () => {
     await dbh.update(schema.seasons).set({ rostersLockedAt: null }).where(eq(schema.seasons.id, seasonA));
     const a = await auth.getActiveSeasonForGame(gameA);

@@ -2,9 +2,9 @@
 
 **Status:** In Review (branch `feat/season-roster-lock`, stacked on `fix/manager-portal-season-scope` / spec-019, PR TBD). **Date:** 18 Oct 2026. **Scope:** `seasons.rosters_locked_at` (migration `0050`), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService` / repository, League Setup, manager portal roster UI.
 
-**Migration `0050_season_rosters_locked` is NOT applied to production.** It was applied only to a local throwaway Postgres (`ezesports_test`, loopback). Production needs `db:migrate` (with the usual user confirmation) before this ships; until then the portal's season queries select a column that does not exist and fail, so merge and migrate together.
+**Migration `0050_season_rosters_locked` is NOT applied to production.** It was applied only to a local throwaway Postgres (`ezesports_test`, loopback). The code must not deploy before 0050 is applied: any `db.select().from(schema.seasons)` (for example `app/lib/db/league.ts`) now selects the new column, so the public site and the staff admin break, not just the portal. Run `db:migrate` against production (with the usual user confirmation) first, then deploy.
 
-**Collision risk:** open PR #252 (spec-018, manager invites) uses migration `0049`. This branch uses file `0050` and journal `idx` 50 / `when` 1790882000005 (after `0049`'s expected `...004`), so the journal edits are additive and should merge with a trivial conflict at the end of `entries`. Whichever PR merges second must re-check that `idx` values stay unique and `when` stays increasing (`season-rosters-locked-migration.test.ts` asserts both). Hand-written like 0047/0048 (snapshots stop at 0042).
+**Collision risk:** open PR #252 (spec-018, manager invites) uses migration `0049`. This branch uses file `0050` and journal `idx` 50 / `when` 1790882000005 (after `0049`'s expected `...004`), so the journal edits are additive and should merge with a trivial conflict at the end of `entries`. Merge PR #252 (0049) first, or bump 0050's `when`: drizzle applies by `when`, so if 0050 reaches production first, 0049 (older `when`) could be silently skipped. Whichever PR merges second must re-check that `idx` values stay unique and `when` stays increasing (`season-rosters-locked-migration.test.ts` asserts both). Hand-written like 0047/0048 (snapshots stop at 0042).
 
 ## Why
 
@@ -34,6 +34,8 @@ Staff need to freeze a game's rosters mid-season (for example once the bracket o
 
 **Invite approval decision:** approval is the intake onto a roster, so for a manager it is refused outright while the game's active season is locked (when the invite has a member and a game), rather than accepting the invite and skipping enrollment, which would leave an accepted-but-unrostered student with no obvious next step. The invite stays `submitted`, so the manager can approve after the unlock; rejecting still works. Staff admins can approve while locked. Trade-off: an approval that would have enrolled nobody (no team yet) is also refused during a lock; accepted as the simpler, safer rule.
 
+- **Best-effort at request start:** the lock is read when the guard runs, not held for the whole mutation. A request that passed the check just before staff locked can still commit. Closing that window needs a `FOR SHARE` read of the season row inside the mutation's transaction; not done.
+- **Lifecycle:** a new active season starts unlocked (null column), and the previous season's lock goes dormant with it (managers never act on an inactive season). Locking an inactive season has no manager effect until it is activated; the confirm dialog says so. Locking is idempotent: a repeat lock keeps the first timestamp.
 - **Hexagonal path (unused by the app, kept consistent):** `findRosterById` returns `isSeasonLocked`, the new optional `isActiveSeasonLocked(gameId)` repository method backs the default-roster approval check, and `PortalService` refuses non-super-admin enroll / remove / role / swap / approve while locked.
 
 ### Staff UI (Admin -> League Setup)

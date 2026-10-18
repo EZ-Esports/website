@@ -224,7 +224,7 @@ export default function LeagueSetupClient({
                       onToggleLock={() => {
                         const locking = !s.rostersLockedAt;
                         const message = locking
-                          ? `Lock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.`
+                          ? `Lock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${s.isActive ? '' : ' This season is inactive, so locking has no effect on managers until it is activated.'}`
                           : `Unlock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will be able to change rosters again.`;
                         if (!window.confirm(message)) return;
                         runAction(
