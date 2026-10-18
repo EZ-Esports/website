@@ -115,5 +115,5 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 ## Student Handbook page (spec-019)
 
 - Unverified in production: a real Supabase upload being read by pdf.js (public-bucket CORS) and the `?download=` filename behavior. On any pdf.js failure the page shows the bundled pages plus an Open PDF link.
-- 4 MB upload cap (Vercel body limit); larger handbooks need a signed direct-to-storage upload. No "remove PDF" button, only replace.
+- The stored handbook is capped at 4 MB (Vercel body limit). Picks up to 50 MB are shrunk in the browser by recompressing large raster images; a PDF still over 4 MB after two passes (for example mostly vector or CMYK/indexed images, which are skipped) is refused with its size. A signed direct-to-storage upload would lift the cap. Compression was exercised in the dev server on the real file but no upload was made. No "remove PDF" button, only replace.
 - The bundled page images and text (`public/handbook/`, `app/lib/handbook-pages.ts`) are the 2026-27 edition and go stale each season. pdf.js standard-font/CMap data is not bundled.

@@ -22,6 +22,13 @@ export const HANDBOOK_MAX_BYTES = 4 * 1024 * 1024;
 
 export const HANDBOOK_DOWNLOAD_NAME = 'EZ-Esports-Student-Handbook.pdf';
 
+/**
+ * Largest PDF staff may pick. Anything above HANDBOOK_MAX_BYTES is shrunk in the
+ * browser before upload (see handbook-compress.ts); the server still enforces
+ * HANDBOOK_MAX_BYTES on what actually arrives.
+ */
+export const HANDBOOK_MAX_INPUT_BYTES = 50 * 1024 * 1024;
+
 export const HANDBOOK_ACCEPT = 'application/pdf,.pdf';
 
 const HANDBOOK_KEY_REGEX = /^handbook\/\d{10,16}\.pdf$/;
@@ -48,6 +55,16 @@ export function checkHandbookFile(file: HandbookFileLike | null | undefined): st
   if (!looksLikePdf) return 'The handbook must be a PDF file.';
   if (file.size === 0) return 'That file is empty.';
   if (file.size > HANDBOOK_MAX_BYTES) return `The handbook PDF must be ${formatBytes(HANDBOOK_MAX_BYTES)} or smaller.`;
+  return null;
+}
+
+/** Browser pre-check on the picked file, before compression: type, non-empty, within the 50 MB input limit. */
+export function checkHandbookSelection(file: HandbookFileLike | null | undefined): string | null {
+  if (!file) return 'Choose a PDF to upload.';
+  const looksLikePdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  if (!looksLikePdf) return 'The handbook must be a PDF file.';
+  if (file.size === 0) return 'That file is empty.';
+  if (file.size > HANDBOOK_MAX_INPUT_BYTES) return `The handbook PDF must be ${formatBytes(HANDBOOK_MAX_INPUT_BYTES)} or smaller.`;
   return null;
 }
 
