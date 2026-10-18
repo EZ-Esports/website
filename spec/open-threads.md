@@ -91,7 +91,7 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 
 Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issue list` for the current state.
 
-- [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`.
+- [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`. Shipped in #252 ([spec-018](spec-018-manager-invites-table.md)); migration `0049` was applied to production on 18 Oct 2026 after a full backup. Resolved.
 - [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views.
 - [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
 - [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Addressed in spec-019 (in review); invite scoping is still open, see below.
@@ -121,6 +121,6 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Season roster lock (spec-020)
 
-- Migration `0050_season_rosters_locked` is not applied to production; apply it (after confirming with the user) before the PR's code deploys. It collides in number space with open PR #252's `0049`; re-check journal `idx` / `when` ordering on whichever merges second.
+- Migration `0050_season_rosters_locked` is not applied to production; apply it (after confirming with the user) before the PR's code deploys. It follows `0049` (already applied to production and merged via #252), journal `idx` 50.
 - The lock is per season with no actor or reason recorded, and no scheduled auto-lock.
 - Invite approval is refused whenever the game's season is locked, even if it would have enrolled nobody; revisit if staff want approvals to continue during a lock.
