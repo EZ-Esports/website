@@ -89,9 +89,22 @@ export interface OnboardingRepositoryPort {
   findGameBySlug(slug: string): Promise<GameRecord | null>;
 
   // Roster & Player queries
-  findSchoolRosters(schoolId: string, gameIds?: string[] | null): Promise<SchoolRosterWithPlayers[]>;
+  findSchoolRosters(
+    schoolId: string,
+    gameIds?: string[] | null,
+    options?: { activeSeasonOnly?: boolean }
+  ): Promise<SchoolRosterWithPlayers[]>;
   findSchoolPlayerPool(schoolId: string, gameId?: string): Promise<SchoolPlayerPoolItem[]>;
-  findRosterById(rosterId: string): Promise<{ id: string; schoolId: string; gameId: string; name: string } | null>;
+  findRosterById(
+    rosterId: string
+  ): Promise<{
+    id: string;
+    schoolId: string;
+    gameId: string;
+    name: string;
+    /** Whether the roster's team belongs to its game's active season. */
+    isActiveSeason?: boolean;
+  } | null>;
 
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;

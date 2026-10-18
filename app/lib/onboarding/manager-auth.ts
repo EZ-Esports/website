@@ -5,12 +5,22 @@ import * as schema from '@/app/lib/db/schema';
 import { Permissions, hasPermission, calculateEffectiveStaffAccess } from '@/app/lib/roles';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 
+/** One `school_managers` row's grant at a school: a season (`YYYY-YY`) and the games it covers. */
+export interface ManagerAffiliation {
+  academicYear: string;
+  /** Game slugs/ids this row covers; null or empty means every game. */
+  managedGames: string[] | null;
+}
+
 export interface ManagedSchoolInfo {
   schoolId: string;
   schoolName: string;
   schoolSlug: string;
+  /** Union of the games across the school's affiliations (null when any row covers all games). */
   managedGames: string[] | null;
   isPrimaryContact: boolean;
+  /** Every active manager row for this school. Empty for a staff admin (unrestricted). */
+  affiliations: ManagerAffiliation[];
 }
 
 export interface SchoolManagerContext {
@@ -20,11 +30,105 @@ export interface SchoolManagerContext {
   managedSchools: ManagedSchoolInfo[];
 }
 
+export interface ActiveSeasonInfo {
+  id: string;
+  name: string;
+  gameId: string;
+}
+
+/** A game a manager may work on at a school, together with its active season. */
+export interface AuthorizedGameScope {
+  gameId: string;
+  gameSlug: string;
+  seasonId: string;
+  seasonName: string;
+}
+
+export const NO_ACTIVE_SEASON_ERROR =
+  'No active season for this game; ask an EZ Esports admin to activate one';
+
+type ManagerRow = {
+  schoolId: string;
+  schoolName: string;
+  schoolSlug: string;
+  managedGames: string[] | null;
+  academicYear: string;
+  isPrimaryContact: boolean;
+};
+
+/** Collapses per-row results into one entry per school, keeping every row's season grant. */
+function mergeManagerRows(rows: ManagerRow[]): ManagedSchoolInfo[] {
+  const bySchool = new Map<string, ManagedSchoolInfo>();
+  for (const row of rows) {
+    const affiliation: ManagerAffiliation = {
+      academicYear: row.academicYear,
+      managedGames: row.managedGames,
+    };
+    const existing = bySchool.get(row.schoolId);
+    if (!existing) {
+      bySchool.set(row.schoolId, {
+        schoolId: row.schoolId,
+        schoolName: row.schoolName,
+        schoolSlug: row.schoolSlug,
+        managedGames: row.managedGames && row.managedGames.length > 0 ? [...row.managedGames] : null,
+        isPrimaryContact: row.isPrimaryContact,
+        affiliations: [affiliation],
+      });
+      continue;
+    }
+    existing.affiliations.push(affiliation);
+    existing.isPrimaryContact = existing.isPrimaryContact || row.isPrimaryContact;
+    if (!row.managedGames || row.managedGames.length === 0 || existing.managedGames === null) {
+      existing.managedGames = null;
+    } else {
+      existing.managedGames = [...new Set([...existing.managedGames, ...row.managedGames])];
+    }
+  }
+  return [...bySchool.values()];
+}
+
+/**
+ * Whether the user holds the ADMINISTRATOR permission through their staff roles (the same
+ * definition the staff CMS uses). Deliberately not "has a staff_members row": school managers
+ * can be given role-less staff rows, which must never widen their portal access.
+ */
+async function isStaffAdminUser(userId: string): Promise<boolean> {
+  const assignedRoles = await db
+    .select({
+      permissions: schema.roles.permissions,
+      position: schema.roles.position,
+      isOwner: schema.roles.isOwner,
+    })
+    .from(schema.userRoles)
+    .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+    .where(eq(schema.userRoles.userId, userId));
+
+  const [everyoneRole] = await db
+    .select({
+      permissions: schema.roles.permissions,
+      position: schema.roles.position,
+      isOwner: schema.roles.isOwner,
+    })
+    .from(schema.roles)
+    .where(eq(schema.roles.name, '@everyone'))
+    .limit(1);
+
+  const { isOwner, permissions } = calculateEffectiveStaffAccess(
+    assignedRoles,
+    everyoneRole ?? null
+  );
+  return hasPermission(permissions, isOwner, Permissions.ADMINISTRATOR);
+}
+
 /**
  * Resolves user from Supabase auth and determines their school management tenancy.
- * - Prioritizes `schoolManagers` active rows linked to the user's ID or member record.
- * - If optional `schoolId` is specified, ensures the user has authorization for that specific school (or returns null).
- * - Only evaluates staff admin fallback if explicitly enabled via `options.allowStaffAdmin` (defaults to false for portal UI isolation).
+ * - A user with the ADMINISTRATOR permission is a staff admin and sees every school and season,
+ *   even when they also hold `school_managers` rows (unless `options.allowStaffAdmin` is false).
+ * - Otherwise access comes from active `school_managers` rows linked to the user's ID or member
+ *   record. Each row grants one season (`academic_year`, `YYYY-YY`); the per-game season check
+ *   itself lives in `assertManagerForSchool` / `getAuthorizedGameScopes`.
+ * - If optional `schoolId` is specified, ensures the user has authorization for that specific
+ *   school (or returns null).
  */
 export async function getSchoolManagerContext(
   schoolId?: string,
@@ -39,15 +143,53 @@ export async function getSchoolManagerContext(
     return null;
   }
 
-  // 1. Primary check: Query schoolManagers for active management assignments
-  const managerRows = await db
-    .select({
-      schoolId: schema.schoolManagers.schoolId,
-      schoolName: schema.schools.name,
-      schoolSlug: schema.schools.slug,
-      managedGames: schema.schoolManagers.managedGames,
-      isPrimaryContact: schema.schoolManagers.isPrimaryContact,
-    })
+  // 1. Staff admins bypass manager scoping entirely.
+  if (options?.allowStaffAdmin ?? true) {
+    if (await isStaffAdminUser(userId)) {
+      const allSchools = await db
+        .select({
+          id: schema.schools.id,
+          name: schema.schools.name,
+          slug: schema.schools.slug,
+        })
+        .from(schema.schools)
+        .where(isNull(schema.schools.deletedAt))
+        .orderBy(schema.schools.name);
+
+      const managedSchools: ManagedSchoolInfo[] = allSchools.map((s) => ({
+        schoolId: s.id,
+        schoolName: s.name,
+        schoolSlug: s.slug,
+        managedGames: null,
+        isPrimaryContact: false,
+        affiliations: [],
+      }));
+
+      if (schoolId && !managedSchools.some((s) => s.schoolId === schoolId)) {
+        return null;
+      }
+
+      return {
+        userId,
+        email: email ?? '',
+        isStaffAdmin: true,
+        managedSchools,
+      };
+    }
+  }
+
+  // 2. School manager: active schoolManagers rows linked to the auth user
+  const managerSelect = {
+    schoolId: schema.schoolManagers.schoolId,
+    schoolName: schema.schools.name,
+    schoolSlug: schema.schools.slug,
+    managedGames: schema.schoolManagers.managedGames,
+    academicYear: schema.schoolManagers.academicYear,
+    isPrimaryContact: schema.schoolManagers.isPrimaryContact,
+  };
+
+  const managerRows: ManagerRow[] = await db
+    .select(managerSelect)
     .from(schema.schoolManagers)
     .innerJoin(schema.schools, eq(schema.schoolManagers.schoolId, schema.schools.id))
     .where(
@@ -68,14 +210,8 @@ export async function getSchoolManagerContext(
       .limit(1);
 
     if (member) {
-      const rowsByMember = await db
-        .select({
-          schoolId: schema.schoolManagers.schoolId,
-          schoolName: schema.schools.name,
-          schoolSlug: schema.schools.slug,
-          managedGames: schema.schoolManagers.managedGames,
-          isPrimaryContact: schema.schoolManagers.isPrimaryContact,
-        })
+      const rowsByMember: ManagerRow[] = await db
+        .select(managerSelect)
         .from(schema.schoolManagers)
         .innerJoin(schema.schools, eq(schema.schoolManagers.schoolId, schema.schools.id))
         .where(
@@ -90,7 +226,8 @@ export async function getSchoolManagerContext(
   }
 
   if (managerRows.length > 0) {
-    if (schoolId && !managerRows.some((s) => s.schoolId === schoolId)) {
+    const managedSchools = mergeManagerRows(managerRows);
+    if (schoolId && !managedSchools.some((s) => s.schoolId === schoolId)) {
       return null;
     }
 
@@ -98,76 +235,147 @@ export async function getSchoolManagerContext(
       userId,
       email: email ?? '',
       isStaffAdmin: false,
-      managedSchools: managerRows,
+      managedSchools,
     };
-  }
-
-  // 2. Staff admin fallback only if explicitly permitted (defaults to true for backend/DAL, false for portal UI)
-  if (options?.allowStaffAdmin ?? true) {
-    const assignedRoles = await db
-      .select({
-        permissions: schema.roles.permissions,
-        position: schema.roles.position,
-        isOwner: schema.roles.isOwner,
-      })
-      .from(schema.userRoles)
-      .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
-      .where(eq(schema.userRoles.userId, userId));
-
-    const [everyoneRole] = await db
-      .select({
-        permissions: schema.roles.permissions,
-        position: schema.roles.position,
-        isOwner: schema.roles.isOwner,
-      })
-      .from(schema.roles)
-      .where(eq(schema.roles.name, '@everyone'))
-      .limit(1);
-
-    const { isOwner, permissions } = calculateEffectiveStaffAccess(
-      assignedRoles,
-      everyoneRole ?? null
-    );
-
-    const isStaffAdmin = hasPermission(permissions, isOwner, Permissions.ADMINISTRATOR);
-
-    if (isStaffAdmin) {
-      const allSchools = await db
-        .select({
-          id: schema.schools.id,
-          name: schema.schools.name,
-          slug: schema.schools.slug,
-        })
-        .from(schema.schools)
-        .where(isNull(schema.schools.deletedAt))
-        .orderBy(schema.schools.name);
-
-      const managedSchools: ManagedSchoolInfo[] = allSchools.map((s) => ({
-        schoolId: s.id,
-        schoolName: s.name,
-        schoolSlug: s.slug,
-        managedGames: null,
-        isPrimaryContact: false,
-      }));
-
-      if (schoolId && !managedSchools.some((s) => s.schoolId === schoolId)) {
-        return null;
-      }
-
-      return {
-        userId,
-        email: email ?? '',
-        isStaffAdmin: true,
-        managedSchools,
-      };
-    }
   }
 
   return null;
 }
 
+async function resolveGame(idOrSlug: string): Promise<{ id: string; slug: string } | null> {
+  let [game] = await db
+    .select({ id: schema.games.id, slug: schema.games.slug })
+    .from(schema.games)
+    .where(eq(schema.games.id, idOrSlug))
+    .limit(1);
+
+  if (!game) {
+    [game] = await db
+      .select({ id: schema.games.id, slug: schema.games.slug })
+      .from(schema.games)
+      .where(eq(schema.games.slug, idOrSlug))
+      .limit(1);
+  }
+  return game ?? null;
+}
+
+/** The game's single active season, or null when none is active. */
+export async function getActiveSeasonForGame(gameId: string): Promise<ActiveSeasonInfo | null> {
+  const [season] = await db
+    .select({ id: schema.seasons.id, name: schema.seasons.name, gameId: schema.seasons.gameId })
+    .from(schema.seasons)
+    .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
+    .limit(1);
+  return season ?? null;
+}
+
+function affiliationCoversGame(
+  affiliation: ManagerAffiliation,
+  game: { id: string; slug: string }
+): boolean {
+  const games = affiliation.managedGames;
+  if (!games || games.length === 0) return true;
+  return games.includes(game.slug) || games.includes(game.id);
+}
+
 /**
- * Asserts that the authenticated user is an authorized manager for the specified school and optional game.
+ * Pure matching rule for the manager portal: a manager may work on a game only through the
+ * game's ACTIVE season, and only when one of their rows' `academic_year` equals that season's
+ * name (both `YYYY-YY`) and that row covers the game.
+ */
+export function managerMatchesActiveSeason(
+  affiliations: ManagerAffiliation[],
+  game: { id: string; slug: string },
+  activeSeason: { name: string } | null
+): boolean {
+  if (!activeSeason) return false;
+  return affiliations.some(
+    (a) => a.academicYear === activeSeason.name && affiliationCoversGame(a, game)
+  );
+}
+
+/**
+ * Games (with their active season) a manager can see and act on at a school.
+ * Returns null for a staff admin, who is unrestricted and sees every season.
+ */
+export async function getAuthorizedGameScopes(
+  context: SchoolManagerContext,
+  schoolId: string
+): Promise<AuthorizedGameScope[] | null> {
+  if (context.isStaffAdmin) return null;
+  const school = context.managedSchools.find((s) => s.schoolId === schoolId);
+  if (!school) return [];
+
+  const activeSeasons = await db
+    .select({ id: schema.seasons.id, name: schema.seasons.name, gameId: schema.seasons.gameId })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.isActive, true));
+  if (activeSeasons.length === 0) return [];
+
+  const games = await db
+    .select({ id: schema.games.id, slug: schema.games.slug })
+    .from(schema.games);
+
+  const scopes: AuthorizedGameScope[] = [];
+  for (const season of activeSeasons) {
+    const game = games.find((g) => g.id === season.gameId);
+    if (game && managerMatchesActiveSeason(school.affiliations, game, season)) {
+      scopes.push({
+        gameId: game.id,
+        gameSlug: game.slug,
+        seasonId: season.id,
+        seasonName: season.name,
+      });
+    }
+  }
+  return scopes;
+}
+
+/**
+ * Honors a requested `?gameId=` filter only when the caller may see that game. Staff admins
+ * (scopes === null) keep any value; for managers a stale or foreign id is ignored so the page
+ * renders its normal state instead of throwing Forbidden.
+ */
+export function resolveRequestedGameId(
+  scopes: AuthorizedGameScope[] | null,
+  requested: string | undefined
+): string | undefined {
+  if (!requested) return undefined;
+  if (scopes === null) return requested;
+  return scopes.some((s) => s.gameId === requested) ? requested : undefined;
+}
+
+/** Validates the game-level season grant and returns the game's active season. */
+async function assertManagerForGame(
+  school: ManagedSchoolInfo,
+  schoolId: string,
+  gameId: string
+): Promise<ActiveSeasonInfo> {
+  const game = await resolveGame(gameId);
+  if (!game) {
+    throw new Error(`Forbidden: Not authorized for game ${gameId} at school ${schoolId}`);
+  }
+
+  const season = await getActiveSeasonForGame(game.id);
+  if (!season) {
+    throw new Error(NO_ACTIVE_SEASON_ERROR);
+  }
+
+  if (!managerMatchesActiveSeason(school.affiliations, game, season)) {
+    const coversGame = school.affiliations.some((a) => affiliationCoversGame(a, game));
+    throw new Error(
+      coversGame
+        ? `Forbidden: Your manager affiliation does not include the active season (${season.name}) for this game`
+        : `Forbidden: Not authorized for game ${gameId} at school ${schoolId}`
+    );
+  }
+  return season;
+}
+
+/**
+ * Asserts that the authenticated user is an authorized manager for the specified school and,
+ * when given, game. For a game the user must hold a manager row whose season equals the game's
+ * active season. Staff admins pass unconditionally.
  * Throws an Error with 'Forbidden' if unauthorized.
  */
 export async function assertManagerForSchool(
@@ -191,31 +399,8 @@ export async function assertManagerForSchool(
     throw new Error(`Forbidden: Not authorized for school ${schoolId}`);
   }
 
-  if (gameId && school.managedGames && school.managedGames.length > 0) {
-    let matches = school.managedGames.includes(gameId);
-    if (!matches) {
-      let [game] = await db
-        .select({ id: schema.games.id, slug: schema.games.slug })
-        .from(schema.games)
-        .where(eq(schema.games.id, gameId))
-        .limit(1);
-
-      if (!game) {
-        [game] = await db
-          .select({ id: schema.games.id, slug: schema.games.slug })
-          .from(schema.games)
-          .where(eq(schema.games.slug, gameId))
-          .limit(1);
-      }
-
-      if (game) {
-        matches = school.managedGames.includes(game.slug) || school.managedGames.includes(game.id);
-      }
-    }
-
-    if (!matches) {
-      throw new Error(`Forbidden: Not authorized for game ${gameId} at school ${schoolId}`);
-    }
+  if (gameId) {
+    await assertManagerForGame(school, schoolId, gameId);
   }
 
   return context;
@@ -223,6 +408,8 @@ export async function assertManagerForSchool(
 
 /**
  * Traces a roster -> team -> schoolId and asserts school manager authorization.
+ * A manager may only touch rosters whose team belongs to the game's active season and whose
+ * affiliation matches it; a past-season roster is refused. Staff admins may touch any roster.
  * Returns the resolved context, roster, and team records.
  */
 export async function assertManagerForRoster(rosterId: string): Promise<{
@@ -245,6 +432,14 @@ export async function assertManagerForRoster(rosterId: string): Promise<{
   }
 
   const context = await assertManagerForSchool(row.team.schoolId, row.team.gameId);
+  if (!context.isStaffAdmin) {
+    const activeSeason = await getActiveSeasonForGame(row.team.gameId);
+    if (!activeSeason || row.team.seasonId !== activeSeason.id) {
+      throw new Error(
+        'Forbidden: This roster belongs to a past season and can no longer be changed from the portal'
+      );
+    }
+  }
   return {
     context,
     roster: row.roster,

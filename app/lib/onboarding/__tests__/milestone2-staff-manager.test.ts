@@ -563,7 +563,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         email: 'coach@stuy.edu',
         managedGames: ['valorant', 'lol'],
         isPrimaryContact: true,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
       });
 
       expect(result.success).toBe(true);
@@ -571,7 +571,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
       expect(result.manager?.schoolId).toBe(schoolId);
       expect(result.manager?.userId).toBe('coach-user-uuid');
       expect(result.manager?.managedGames).toEqual(['valorant', 'lol']);
-      expect(result.manager?.academicYear).toBe('2025-2026');
+      expect(result.manager?.academicYear).toBe('2026-27');
       expect(result.manager?.isPrimaryContact).toBe(true);
       expect(result.manager?.isActive).toBe(true);
 
@@ -589,6 +589,18 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
       expect(mocks.mockRevalidatePath).toHaveBeenCalledWith('/admin/schools');
     });
 
+    it('rejects an academic year that is not in the YYYY-YY season format', async () => {
+      for (const academicYear of ['2026-2027', '2026-28', 'Fall 2026', '']) {
+        const result = await provisionSchoolManager({
+          schoolId,
+          email: 'bad-year@brooklyn-tech.edu',
+          academicYear,
+        });
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/YYYY-YY/);
+      }
+    });
+
     it('automatically generates a new userId when manager email is not yet in staff directory', async () => {
       const newManagerEmail = 'new-coach@brooklyn-tech.edu';
       const result = await provisionSchoolManager({
@@ -600,7 +612,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
       expect(result.manager).toBeDefined();
       expect(result.manager?.userId).toBeDefined();
       expect(typeof result.manager?.userId).toBe('string');
-      expect(result.manager?.academicYear).toBe('2025-2026'); // Default academic year
+      expect(result.manager?.academicYear).toBe('2026-27'); // Default academic year
       expect(result.manager?.isActive).toBe(true);
     });
 
@@ -611,7 +623,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         schoolId,
         userId: 'old-coach-uuid',
         managedGames: null,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         isPrimaryContact: true,
         isActive: true,
         createdAt: new Date(),
@@ -622,7 +634,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         schoolId,
         email: 'coach@stuy.edu',
         isPrimaryContact: true,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
       });
 
       expect(result.success).toBe(true);
@@ -640,7 +652,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         schoolId,
         userId: 'coach-user-uuid',
         managedGames: ['valorant'],
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         isPrimaryContact: false,
         isActive: false,
         createdAt: new Date(),
@@ -652,7 +664,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         email: 'coach@stuy.edu',
         managedGames: ['valorant', 'rocket-league'],
         isPrimaryContact: true,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
       });
 
       expect(result.success).toBe(true);
@@ -682,7 +694,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         schoolId,
         userId: 'coach-user-uuid',
         managedGames: null,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         isPrimaryContact: false,
         isActive: true,
         createdAt: new Date(),
@@ -724,7 +736,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
           schoolId,
           userId: 'coach-user-uuid',
           managedGames: ['valorant'],
-          academicYear: '2025-2026',
+          academicYear: '2026-27',
           isPrimaryContact: true,
           isActive: true,
           createdAt: new Date('2026-09-01'),
@@ -746,7 +758,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
           schoolId: 'other-school-999',
           userId: 'coach-user-uuid',
           managedGames: null,
-          academicYear: '2025-2026',
+          academicYear: '2026-27',
           isPrimaryContact: true,
           isActive: true,
           createdAt: new Date('2026-09-01'),
@@ -799,7 +811,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
           userId: 'user-alex-uuid',
           memberId: 'member-alex',
           managedGames: null,
-          academicYear: '2025-2026',
+          academicYear: '2026-27',
           isPrimaryContact: true,
           isActive: true,
           createdAt: new Date(),
@@ -842,7 +854,7 @@ describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', 
         userId: 'existing-user-uuid',
         memberId: 'existing-member-uuid',
         email: 'alex.chen@nycstudents.net',
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         managedGames: ['valorant'],
         isPrimaryContact: true,
       });

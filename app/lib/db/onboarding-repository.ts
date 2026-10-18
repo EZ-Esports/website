@@ -89,14 +89,43 @@ export async function findRosterWithTeam(rosterId: string) {
   return row ?? null;
 }
 
+/** Whether the given season is currently marked active (false when it does not exist). */
+export async function isSeasonActive(seasonId: string): Promise<boolean> {
+  const [season] = await db
+    .select({ isActive: schema.seasons.isActive })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.id, seasonId))
+    .limit(1);
+  return season?.isActive ?? false;
+}
+
 /**
  * Loads the teams, rosters, players and identities behind a school's rosters.
- * Returns null when the school has no teams or no rosters.
+ * Returns null when the school has no teams or no rosters (or, with
+ * `activeSeasonOnly`, when no season is active).
  */
-export async function loadSchoolRosterData(schoolId: string, gameIds?: string[] | null) {
+export async function loadSchoolRosterData(
+  schoolId: string,
+  gameIds?: string[] | null,
+  options?: { activeSeasonOnly?: boolean }
+) {
   const whereConditions = [eq(schema.teams.schoolId, schoolId)];
   if (gameIds && gameIds.length > 0) {
     whereConditions.push(inArray(schema.teams.gameId, gameIds));
+  }
+  if (options?.activeSeasonOnly) {
+    // Managers only ever see the game's active season; past seasons stay admin-only.
+    const activeSeasons = await db
+      .select({ id: schema.seasons.id })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.isActive, true));
+    if (activeSeasons.length === 0) return null;
+    whereConditions.push(
+      inArray(
+        schema.teams.seasonId,
+        activeSeasons.map((s) => s.id)
+      )
+    );
   }
 
   const schoolTeams = await db

@@ -760,7 +760,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         submissionDraft: {
           email: 'smiller@stuy.edu',
-          academicYear: '2025-2026',
+          academicYear: '2026-27',
           managedGames: null,
           isPrimaryContact: true,
         },
@@ -823,7 +823,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       );
       expect(managerRow).toBeDefined();
       expect(managerRow.isActive).toBe(true);
-      expect(managerRow.academicYear).toBe('2025-2026');
+      expect(managerRow.academicYear).toBe('2026-27');
       expect(managerRow.isPrimaryContact).toBe(true);
 
       // 3. Verify invite status transitioned to accepted
@@ -845,7 +845,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
           email: 'smiller@stuy.edu',
           password: 'securePassword123!',
           graduationYear: 2028,
-          academicYear: '2026-2027',
+          academicYear: '2026-27',
           riotId: 'CoachSam#NA1',
           discordUsername: 'coach_sam',
           discordUserId: 'discord-sam-999',
@@ -857,7 +857,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       expect(result.success).toBe(true);
       const managerRow = mocks.state.schoolManagersStore.find((sm) => sm.schoolId === schoolId);
-      expect(managerRow.academicYear).toBe('2026-2027');
+      expect(managerRow.academicYear).toBe('2026-27');
       const member = mocks.state.membersStore.find((m) => m.id === result.memberId);
       expect(member.graduationYear).toBe(2028);
     });
@@ -873,6 +873,27 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
             password: 'securePassword123!',
             graduationYear: 2028,
             academicYear: '2026-2029',
+            riotId: 'CoachSam#NA1',
+            discordUsername: 'coach_sam',
+            inGuild: true,
+            birthDate: '1988-08-20',
+            codeOfConductAccepted: true,
+          },
+        })
+      ).rejects.toThrow(/valid season/i);
+    });
+
+    it('rejects the legacy YYYY-YYYY manager season format', async () => {
+      await expect(
+        submitPlayerOnboarding({
+          token: managerToken,
+          submission: {
+            legalFirstName: 'Samuel',
+            legalLastName: 'Miller',
+            email: 'smiller@stuy.edu',
+            password: 'securePassword123!',
+            graduationYear: 2028,
+            academicYear: '2026-2027',
             riotId: 'CoachSam#NA1',
             discordUsername: 'coach_sam',
             inGuild: true,

@@ -19,7 +19,7 @@ export interface WizardFormData {
   email: string;
   password?: string;
   graduationYear: number;
-  /** Manager only: season the manager is applying for, e.g. "2026-2027". */
+  /** Manager only: season the manager is applying for, e.g. "2026-27". */
   academicYear?: string;
   discordUsername: string;
   discordJoinedConfirmed: boolean;
@@ -52,9 +52,8 @@ export const GRADUATION_YEAR_OPTIONS = [
   { value: 2030, label: 'Class of 2030 (9th Grade / Freshman)' },
 ] as const;
 
-/** Seasons a School Manager can apply for. */
-export const MANAGER_SEASON_OPTIONS = ['2026-2027', '2027-2028', '2028-2029', '2029-2030'] as const;
-export const DEFAULT_MANAGER_SEASON = MANAGER_SEASON_OPTIONS[0];
+/** Seasons a School Manager can apply for (`YYYY-YY`, shared with the rest of the app). */
+export { MANAGER_SEASON_OPTIONS, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
 
 export const CAREER_INTEREST_OPTIONS = [
   'Competitive Esports Player',
