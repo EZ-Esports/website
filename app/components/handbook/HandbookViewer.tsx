@@ -322,6 +322,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const page = pages[current];
   const zoomOptions = [
     { value: 1.5, label: '100%' },
+    { value: 3, label: '200%' },
     { value: 1, label: narrow ? 'Fit width' : 'Full page' },
   ];
 
