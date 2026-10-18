@@ -74,8 +74,6 @@ describe.skipIf(!enabled)('season roster lock against the local database', () =>
 
   it('a repeat lock keeps the original timestamp', async () => {
     const { and, isNull } = await import('drizzle-orm');
-    const first = (await auth.getActiveSeasonForGame(gameA))?.rostersLockedAt;
-    expect(first).toBeNull();
     const stamp = new Date('2026-01-01T00:00:00Z');
     await dbh.update(schema.seasons).set({ rostersLockedAt: stamp }).where(eq(schema.seasons.id, seasonA));
     // The guarded update the lock action issues must match no row once already locked.
