@@ -24,7 +24,7 @@ describe('school_managers.tour_completed_at migration (0048)', () => {
     const entry = journal.entries.find((e) => e.tag === '0048_school_manager_tour_completed');
     expect(entry).toBeDefined();
     expect(entry!.idx).toBe(48);
-    for (const other of journal.entries.filter((e) => e !== entry)) {
+    for (const other of journal.entries.filter((e) => e.idx < entry!.idx)) {
       expect(entry!.when).toBeGreaterThan(other.when);
     }
   });

@@ -26,8 +26,7 @@ export interface GameRecord {
 export interface PlayerInviteRecord {
   id: string;
   schoolId: string;
-  gameId: string | null;
-  role: string;
+  gameId: string;
   tokenHash: string;
   intendedFirstName: string;
   intendedLastName: string;
@@ -38,6 +37,23 @@ export interface PlayerInviteRecord {
   submittedAt: Date | string | null;
   reviewedAt: Date | string | null;
   rejectionReason: string | null;
+  createdAt: Date | string;
+}
+
+export interface ManagerInviteRecord {
+  id: string;
+  schoolId: string;
+  tokenHash: string;
+  intendedFirstName: string;
+  intendedLastName: string;
+  invitedByUserId: string;
+  status: string;
+  submissionDraft: Record<string, unknown> | null;
+  expiresAt: Date | string | null;
+  submittedAt: Date | string | null;
+  reviewedAt: Date | string | null;
+  rejectionReason: string | null;
+  memberId: string | null;
   createdAt: Date | string;
 }
 
@@ -159,8 +175,8 @@ export interface OnboardingRepositoryPort {
     invitedByUserId: string;
     expiresAt: Date;
     draft?: Record<string, unknown>;
-  }): Promise<PlayerInviteRecord>;
-  listSchoolManagerInvites(schoolId: string): Promise<PlayerInviteRecord[]>;
+  }): Promise<ManagerInviteRecord>;
+  listSchoolManagerInvites(schoolId: string): Promise<ManagerInviteRecord[]>;
   revokeManagerInvite(inviteId: string): Promise<void>;
 
   // Audit

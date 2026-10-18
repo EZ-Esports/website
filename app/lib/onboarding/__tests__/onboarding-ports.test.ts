@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Permissions, hasPermission } from '@/app/lib/roles';
-import { schoolManagers, playerInvites, playerIdentities, studentDemographics } from '@/app/lib/db/schema';
+import { schoolManagers, playerInvites, managerInvites, playerIdentities, studentDemographics } from '@/app/lib/db/schema';
 import { ManualRiotIdAdapter, deriveTrackerUrl, RIOT_ID_REGEX } from '../adapters/riot-manual';
 
 describe('Milestone 1: Permissions & Schema', () => {
@@ -44,6 +44,18 @@ describe('Milestone 1: Permissions & Schema', () => {
     expect(playerInvites.reviewedAt).toBeDefined();
     expect(playerInvites.rejectionReason).toBeDefined();
     expect(playerInvites.createdAt).toBeDefined();
+    expect((playerInvites as Record<string, unknown>).role).toBeUndefined();
+  });
+
+  it('defines managerInvites schema columns without game or role', () => {
+    expect(managerInvites.id).toBeDefined();
+    expect(managerInvites.schoolId).toBeDefined();
+    expect(managerInvites.tokenHash).toBeDefined();
+    expect(managerInvites.status).toBeDefined();
+    expect(managerInvites.memberId).toBeDefined();
+    expect(managerInvites.submissionDraft).toBeDefined();
+    expect((managerInvites as Record<string, unknown>).gameId).toBeUndefined();
+    expect((managerInvites as Record<string, unknown>).role).toBeUndefined();
   });
 
   it('defines playerIdentities schema columns correctly', () => {
