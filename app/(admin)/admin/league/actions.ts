@@ -7,7 +7,7 @@ import { sanitizeDbError } from '@/app/lib/text-utils';
 import { isValidSeasonName, SEASON_NAME_ERROR } from '@/app/lib/season-name';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   createGameInDb,
   updateGameInDb,
@@ -165,4 +165,54 @@ export async function deleteSeason(id: string) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
   }
+}
+
+// --- SEASON ROSTER LOCK ---
+
+/**
+ * Sets or clears `seasons.rosters_locked_at`. The manager portal reads the column straight from
+ * the database on every request (no unstable_cache), so the change is effective immediately;
+ * `revalidateLeague` still refreshes the `seasons`/`teams` tags and the admin pages.
+ */
+async function setSeasonRostersLocked(seasonId: string, locked: boolean) {
+  await requirePermission(Permissions.MANAGE_LEAGUE);
+  try {
+    if (!seasonId) {
+      return { success: false, error: 'Season is required.' };
+    }
+    // Locking only stamps an unlocked season, so a repeat lock keeps the original timestamp.
+    const updated = await db
+      .update(schema.seasons)
+      .set({ rostersLockedAt: locked ? new Date() : null })
+      .where(
+        locked
+          ? and(eq(schema.seasons.id, seasonId), isNull(schema.seasons.rostersLockedAt))
+          : eq(schema.seasons.id, seasonId)
+      )
+      .returning({ id: schema.seasons.id });
+    if (updated.length === 0) {
+      const [existing] = await db
+        .select({ id: schema.seasons.id })
+        .from(schema.seasons)
+        .where(eq(schema.seasons.id, seasonId))
+        .limit(1);
+      if (!existing) {
+        return { success: false, error: 'Season not found.' };
+      }
+    }
+    revalidateLeague();
+    revalidatePath('/portal');
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+export async function lockSeasonRosters(seasonId: string) {
+  return setSeasonRostersLocked(seasonId, true);
+}
+
+export async function unlockSeasonRosters(seasonId: string) {
+  return setSeasonRostersLocked(seasonId, false);
 }

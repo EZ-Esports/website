@@ -89,14 +89,35 @@ export async function findRosterWithTeam(rosterId: string) {
   return row ?? null;
 }
 
-/** Whether the given season is currently marked active (false when it does not exist). */
-export async function isSeasonActive(seasonId: string): Promise<boolean> {
+/**
+ * Active and roster-lock state of a season. A missing season is reported as inactive and
+ * unlocked.
+ */
+export async function getSeasonRosterState(
+  seasonId: string
+): Promise<{ isActive: boolean; isLocked: boolean }> {
   const [season] = await db
-    .select({ isActive: schema.seasons.isActive })
+    .select({
+      isActive: schema.seasons.isActive,
+      rostersLockedAt: schema.seasons.rostersLockedAt,
+    })
     .from(schema.seasons)
     .where(eq(schema.seasons.id, seasonId))
     .limit(1);
-  return season?.isActive ?? false;
+  return {
+    isActive: season?.isActive ?? false,
+    isLocked: !!season?.rostersLockedAt,
+  };
+}
+
+/** Whether the game's active season has its rosters locked (false when none is active). */
+export async function isActiveSeasonRostersLocked(gameId: string): Promise<boolean> {
+  const [season] = await db
+    .select({ rostersLockedAt: schema.seasons.rostersLockedAt })
+    .from(schema.seasons)
+    .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
+    .limit(1);
+  return !!season?.rostersLockedAt;
 }
 
 /**

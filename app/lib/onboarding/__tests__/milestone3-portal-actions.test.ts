@@ -1552,4 +1552,146 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(resolveRequestedGameId(null, 'anything')).toBe('anything');
     });
   });
+
+  describe('9. Season roster lock (staff lock, managers refused, staff admins exempt)', () => {
+    const LOCKED = /locked by EZ Esports staff/;
+    const rosterId = 'roster-lock-val';
+    const emptyRosterId = 'roster-lock-empty';
+    const lolRosterId = 'roster-lock-lol';
+
+    const lockSeason = (id: string) => {
+      mocks.state.seasonsStore.find((s) => s.id === id).rostersLockedAt = new Date();
+    };
+    const unlockSeason = (id: string) => {
+      mocks.state.seasonsStore.find((s) => s.id === id).rostersLockedAt = null;
+    };
+    const makeAdmin = () => {
+      mocks.state.rolesStore.push({ id: 'role-admin', name: 'Admin', permissions: Permissions.ADMINISTRATOR, position: 5, isOwner: false });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
+    };
+
+    beforeEach(() => {
+      mocks.state.seasonsStore = [
+        { id: 'season-val-now', gameId: valGameId, name: '2026-27', isActive: true, rostersLockedAt: null },
+        { id: 'season-lol-now', gameId: lolGameId, name: '2026-27', isActive: true, rostersLockedAt: null },
+      ];
+      mocks.state.schoolManagersStore = [
+        { id: 'mgr-1', schoolId, userId: 'manager-user-1', managedGames: null, academicYear: '2026-27', isPrimaryContact: true, isActive: true },
+      ];
+      mocks.state.teamsStore = [
+        { id: 'team-val', schoolId, gameId: valGameId, seasonId: 'season-val-now' },
+        { id: 'team-lol', schoolId, gameId: lolGameId, seasonId: 'season-lol-now' },
+      ];
+      mocks.state.rostersStore = [
+        { id: rosterId, teamId: 'team-val', name: 'Varsity', division: 'A' },
+        { id: emptyRosterId, teamId: 'team-val', name: 'Empty', division: 'B' },
+        { id: lolRosterId, teamId: 'team-lol', name: 'LoL Varsity', division: 'A' },
+      ];
+      mocks.state.membersStore = [
+        { id: 'm-new', schoolId, firstName: 'New', lastName: 'Kid', discord: 'new#1', graduationYear: 2027 },
+        { id: 'm-starter', schoolId, firstName: 'St', lastName: 'Arter', discord: 'st#1', graduationYear: 2027 },
+        { id: 'm-sub', schoolId, firstName: 'Su', lastName: 'B', discord: 'su#1', graduationYear: 2027 },
+      ];
+      mocks.state.playersStore = [
+        { id: 'pl-starter', rosterId, memberId: 'm-starter', role: 'player', isCaptain: false, ign: 'St#1' },
+        { id: 'pl-sub', rosterId, memberId: 'm-sub', role: 'sub', isCaptain: false, ign: 'Su#1' },
+        { id: 'pl-lol', rosterId: lolRosterId, memberId: 'm-starter', role: 'player', isCaptain: false, ign: 'St#1' },
+      ];
+      mocks.state.playerInvitesStore = [];
+    });
+
+    const attempts: Array<[string, () => Promise<unknown>]> = [
+      ['createSchoolRoster', () => createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })],
+      ['deleteSchoolRoster', () => deleteSchoolRoster(emptyRosterId)],
+      ['enrollPlayerToRoster', () => enrollPlayerToRoster({ rosterId, memberId: 'm-new' })],
+      ['removePlayerFromRoster', () => removePlayerFromRoster({ rosterId, playerId: 'pl-sub' })],
+      ['updateRosterPlayerRole', () => updateRosterPlayerRole({ rosterId, playerId: 'pl-starter', role: 'sub' })],
+      ['emergencySwapSub', () => emergencySwapSub({ rosterId, outPlayerId: 'pl-starter', inPlayerId: 'pl-sub' })],
+    ];
+
+    it.each(attempts)('%s is refused for a manager while the season is locked, with no write', async (_name, run) => {
+      lockSeason('season-val-now');
+      const before = JSON.stringify([mocks.state.playersStore, mocks.state.rostersStore]);
+      await expect(run()).rejects.toThrow(LOCKED);
+      expect(JSON.stringify([mocks.state.playersStore, mocks.state.rostersStore])).toBe(before);
+    });
+
+    it.each(attempts)('%s works for a manager while the season is unlocked', async (_name, run) => {
+      await expect(run()).resolves.toMatchObject({ success: true });
+    });
+
+    it('unlocking restores manager access', async () => {
+      lockSeason('season-val-now');
+      await expect(deleteSchoolRoster(emptyRosterId)).rejects.toThrow(LOCKED);
+      unlockSeason('season-val-now');
+      await expect(deleteSchoolRoster(emptyRosterId)).resolves.toMatchObject({ success: true });
+    });
+
+    it('a staff admin (even holding a manager row) can still edit locked rosters', async () => {
+      makeAdmin();
+      lockSeason('season-val-now');
+      const seed = JSON.parse(JSON.stringify(mocks.state.playersStore));
+      for (const [, run] of attempts) {
+        // Each attempt is independent: earlier ones remove or re-role the players later ones use.
+        mocks.state.playersStore = JSON.parse(JSON.stringify(seed));
+        await expect(run()).resolves.toMatchObject({ success: true });
+      }
+    });
+
+    it('locking one game does not affect another game', async () => {
+      lockSeason('season-val-now');
+      await expect(
+        updateRosterPlayerRole({ rosterId: lolRosterId, playerId: 'pl-lol', role: 'sub' })
+      ).resolves.toMatchObject({ success: true });
+      await expect(createSchoolRoster({ schoolId, gameId: lolGameId, name: 'JV' })).resolves.toMatchObject({ success: true });
+      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
+    });
+
+    it('reads keep working while locked and report the lock per game scope', async () => {
+      lockSeason('season-val-now');
+      const rosters = await getSchoolRosters(schoolId);
+      expect(rosters.map((r) => r.id).sort()).toEqual([emptyRosterId, lolRosterId, rosterId].sort());
+      await expect(getRosterEligibility({ rosterId })).resolves.toBeDefined();
+      await expect(getSchoolPlayerPool(schoolId)).resolves.toBeDefined();
+      await expect(getSchoolInvites(schoolId)).resolves.toEqual([]);
+
+      const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
+      expect(scopes!.find((s) => s.gameId === valGameId)!.rostersLocked).toBe(true);
+      expect(scopes!.find((s) => s.gameId === lolGameId)!.rostersLocked).toBe(false);
+    });
+
+    it('assertManagerForRoster refuses by default and allows reads with allowLocked', async () => {
+      lockSeason('season-val-now');
+      await expect(assertManagerForRoster(rosterId)).rejects.toThrow(LOCKED);
+      await expect(assertManagerForRoster(rosterId, { allowLocked: true })).resolves.toMatchObject({ roster: { id: rosterId } });
+    });
+
+    describe('invite approval', () => {
+      beforeEach(() => {
+        mocks.state.playerInvitesStore = [
+          { id: 'inv-lock', schoolId, gameId: valGameId, memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
+        ];
+      });
+
+      it('refuses approval (explicit or default roster) while locked and leaves the invite untouched', async () => {
+        lockSeason('season-val-now');
+        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve', rosterId })).rejects.toThrow(LOCKED);
+        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve' })).rejects.toThrow(LOCKED);
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+        expect(mocks.state.playersStore.some((p) => p.memberId === 'm-new')).toBe(false);
+      });
+
+      it('still allows rejecting while locked', async () => {
+        lockSeason('season-val-now');
+        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'reject' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('approves and enrolls once unlocked, and for a staff admin while locked', async () => {
+        lockSeason('season-val-now');
+        makeAdmin();
+        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve', rosterId })).resolves.toMatchObject({ success: true });
+        expect(mocks.state.playersStore.some((p) => p.memberId === 'm-new' && p.rosterId === rosterId)).toBe(true);
+      });
+    });
+  });
 });

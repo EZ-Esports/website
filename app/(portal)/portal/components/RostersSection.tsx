@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from 'react-aria-components';
-import { HiOutlinePlus } from 'react-icons/hi2';
+import { HiOutlineLockClosed, HiOutlinePlus } from 'react-icons/hi2';
 import type {
   SchoolRosterDetails,
   RosterEligibilityResult,
@@ -11,6 +11,12 @@ import { RosterCard } from './RosterCard';
 interface RostersSectionProps {
   rosters: SchoolRosterDetails[];
   schoolName: string;
+  /** Games whose season rosters staff have locked. */
+  lockedGameIds?: string[];
+  /** Locked season name(s) for the banner. */
+  lockedSeasonLabel?: string;
+  /** Every game id shown in the portal, to tell when creation is locked everywhere. */
+  allGameIds?: string[];
   eligibilityResults: Record<string, RosterEligibilityResult>;
   evaluatingRosterId: string | null;
   onOpenCreateRosterModal: () => void;
@@ -29,6 +35,9 @@ interface RostersSectionProps {
 export function RostersSection({
   rosters,
   schoolName,
+  lockedGameIds = [],
+  lockedSeasonLabel = '',
+  allGameIds = [],
   eligibilityResults,
   evaluatingRosterId,
   onOpenCreateRosterModal,
@@ -39,6 +48,10 @@ export function RostersSection({
   onRemovePlayer,
   onDeleteRoster,
 }: RostersSectionProps) {
+  const anyLocked = lockedGameIds.length > 0;
+  // Creating is only pointless when every visible game is locked; otherwise the modal offers
+  // just the unlocked games.
+  const createLocked = anyLocked && allGameIds.every((id) => lockedGameIds.includes(id));
   return (
     <div data-tour="rosters" className="min-w-0 space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -51,19 +64,36 @@ export function RostersSection({
         <Button
           data-tour="create-roster"
           onPress={onOpenCreateRosterModal}
-          className="self-start sm:self-auto min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
+          isDisabled={createLocked}
+          className="self-start sm:self-auto min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <HiOutlinePlus className="w-4 h-4" />
           <span>Create Roster</span>
         </Button>
       </div>
 
+      {anyLocked && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200"
+        >
+          <HiOutlineLockClosed className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            <span className="font-bold">Rosters locked{lockedSeasonLabel ? ` for ${lockedSeasonLabel}` : ''}.</span>{' '}
+            EZ Esports staff have locked rosters for this season, so players cannot be enrolled,
+            removed, swapped or re-roled, and rosters cannot be created or deleted. Contact an admin
+            to request changes. You can still view rosters and check eligibility.
+          </p>
+        </div>
+      )}
+
       {rosters.length === 0 ? (
         <div className="p-8 text-center rounded-2xl bg-zinc-900/40 border border-zinc-800 text-zinc-400 text-sm space-y-3">
           <p>No active rosters configured for {schoolName}.</p>
           <Button
             onPress={onOpenCreateRosterModal}
-            className="px-4 py-2 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+            isDisabled={createLocked}
+            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
           >
             <HiOutlinePlus className="w-4 h-4" />
             <span>Create First Roster</span>
@@ -75,6 +105,7 @@ export function RostersSection({
             <RosterCard
               key={roster.id}
               roster={roster}
+              locked={lockedGameIds.includes(roster.gameId)}
               gateResult={eligibilityResults[roster.id]}
               isEvaluating={evaluatingRosterId === roster.id}
               onOpenEnrollModal={onOpenEnrollModal}

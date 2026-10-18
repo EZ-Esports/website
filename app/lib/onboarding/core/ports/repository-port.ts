@@ -104,7 +104,11 @@ export interface OnboardingRepositoryPort {
     name: string;
     /** Whether the roster's team belongs to its game's active season. */
     isActiveSeason?: boolean;
+    /** Whether staff have locked the roster's season against manager changes. */
+    isSeasonLocked?: boolean;
   } | null>;
+  /** Whether the game's active season has its rosters locked (false when none is active). */
+  isActiveSeasonLocked?(gameId: string): Promise<boolean>;
 
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;

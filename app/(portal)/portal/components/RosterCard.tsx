@@ -16,6 +16,8 @@ import type {
 
 interface RosterCardProps {
   roster: SchoolRosterDetails;
+  /** Staff have locked this roster's season: every change control is disabled. */
+  locked?: boolean;
   gateResult?: RosterEligibilityResult;
   isEvaluating: boolean;
   onOpenEnrollModal: (roster: SchoolRosterDetails) => void;
@@ -32,6 +34,7 @@ interface RosterCardProps {
 
 export function RosterCard({
   roster,
+  locked = false,
   gateResult,
   isEvaluating,
   onOpenEnrollModal,
@@ -61,14 +64,16 @@ export function RosterCard({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             onPress={() => onOpenEnrollModal(roster)}
-            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            isDisabled={locked}
+            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <HiOutlineUserPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Enroll Player</span>
           </Button>
           <Button
             onPress={() => onOpenSwapModal(roster)}
-            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            isDisabled={locked}
+            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <HiOutlineArrowsRightLeft className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Emergency Sub</span>
@@ -83,8 +88,9 @@ export function RosterCard({
           {roster.players.length === 0 && onDeleteRoster && (
             <Button
               onPress={() => onDeleteRoster(roster.id)}
+              isDisabled={locked}
               aria-label="Delete empty roster"
-              className="shrink-0 p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-900/50"
+              className="shrink-0 p-1.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-900/50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <HiOutlineTrash className="w-4 h-4" />
             </Button>
@@ -119,6 +125,7 @@ export function RosterCard({
                   <td className="py-2.5 pr-3 whitespace-nowrap">
                     <select
                       value={p.isCaptain ? 'captain' : p.role}
+                      disabled={locked}
                       onChange={(e) =>
                         onUpdateRole(
                           roster.id,
@@ -126,7 +133,7 @@ export function RosterCard({
                           e.target.value as 'player' | 'sub' | 'captain'
                         )
                       }
-                      className={`px-2 py-1 text-[10px] font-bold rounded border cursor-pointer focus:outline-none ${
+                      className={`px-2 py-1 text-[10px] font-bold rounded border cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none ${
                         p.isCaptain || p.role === 'captain'
                           ? 'bg-amber-400/10 text-amber-400 border-amber-400/20'
                           : p.role === 'sub'
@@ -157,8 +164,9 @@ export function RosterCard({
                   <td className="py-2.5 text-right">
                     <Button
                       onPress={() => onRemovePlayer(roster.id, p.id)}
+                      isDisabled={locked}
                       aria-label={`Remove ${p.playerName} from ${roster.name}`}
-                      className="p-2.5 -m-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                      className="p-2.5 -m-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <HiOutlineTrash className="w-3.5 h-3.5" />
                     </Button>

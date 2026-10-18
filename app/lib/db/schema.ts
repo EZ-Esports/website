@@ -107,6 +107,11 @@ export const seasons = pgTable('seasons', {
   // what every season but that one actually is; the exceptions are listed in
   // COMBINED_STANDINGS in sharepoint/normalize_gold.py, with their evidence.
   standingsFormat: text('standings_format').default('divided').notNull(),
+  // Null = unlocked. When set, school managers cannot change any roster of this
+  // season (create, delete, enroll, remove, role change, emergency swap, invite
+  // approval onto a roster); staff admins still can. Kept per season row so that
+  // locking one game's season never affects another game's.
+  rostersLockedAt: timestamp('rosters_locked_at'),
   ...auditColumns,
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),

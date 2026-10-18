@@ -53,14 +53,19 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
   async findRosterById(rosterId: string) {
     const row = await dal.findRosterWithTeam(rosterId);
     if (!row) return null;
-    const isActiveSeason = await dal.isSeasonActive(row.team.seasonId);
+    const season = await dal.getSeasonRosterState(row.team.seasonId);
     return {
       id: row.roster.id,
       schoolId: row.team.schoolId,
       gameId: row.team.gameId,
       name: row.roster.name,
-      isActiveSeason,
+      isActiveSeason: season.isActive,
+      isSeasonLocked: season.isLocked,
     };
+  }
+
+  async isActiveSeasonLocked(gameId: string): Promise<boolean> {
+    return dal.isActiveSeasonRostersLocked(gameId);
   }
 
   async findSchoolRosters(
