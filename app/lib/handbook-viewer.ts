@@ -6,8 +6,8 @@ import type { HandbookLink } from './handbook-viewer-types';
 
 export const LETTER_ASPECT = 612 / 792;
 
-/** Below this viewport width the viewer always shows a single page. */
-export const SPREAD_MIN_WIDTH = 760;
+/** Below this viewport width the viewer fits the page to the screen width, not its height. */
+export const NARROW_MAX_WIDTH = 767;
 
 export interface ResolvedHandbookLink {
   href: string;
@@ -46,25 +46,6 @@ export function fitSheetWidth(opts: {
   const w = Math.max(20, availableWidth);
   const h = Math.max(20, availableHeight);
   return Math.max(10, Math.min((w - (count - 1) * gap) / count, h * aspect)) * zoom;
-}
-
-/**
- * Index of the first page of the spread that contains `index`. Page 0 is the
- * cover and always stands alone; the rest pair up (1-2, 3-4, ...) in two-page mode.
- */
-export function spreadStart(index: number, pageCount: number, spread: boolean): number {
-  const clamped = Math.max(0, Math.min(pageCount - 1, index));
-  if (spread && clamped > 0) return 1 + 2 * Math.floor((clamped - 1) / 2);
-  return clamped;
-}
-
-export function spreadSize(current: number, spread: boolean): number {
-  return spread && current > 0 ? 2 : 1;
-}
-
-/** Start of the spread before `current`. */
-export function previousSpreadStart(current: number, spread: boolean): number {
-  return current - (spread && current > 1 ? 2 : 1);
 }
 
 export interface HandbookSearchHit {
@@ -114,4 +95,89 @@ export function withDownloadName(url: string, filename: string): string {
   const u = new URL(url);
   u.searchParams.set('download', filename);
   return u.toString();
+}
+
+export type HandbookTextBlock =
+  | { type: 'heading'; text: string; page: number }
+  | { type: 'paragraph'; text: string; page: number }
+  | { type: 'list'; items: string[]; page: number };
+
+const BULLETS = /[●❖•]/;
+
+/**
+ * Turns per-page extracted text into headings, paragraphs and lists for the
+ * "Read as text" view. The extraction keeps no layout, so structure comes from
+ * what is recoverable: known section headings (when given), bullet glyphs and
+ * the leading page number.
+ */
+export function structureHandbookText(pageTexts: readonly string[], headings: readonly string[] = []): HandbookTextBlock[] {
+  const blocks: HandbookTextBlock[] = [];
+  pageTexts.forEach((raw, page) => {
+    let rest = raw.replace(/\s+/g, ' ').trim().replace(/^\d{1,3}\s+/, '');
+    const emit = (segment: string) => {
+      const parts = segment.split(BULLETS).map((s) => s.trim());
+      if (parts[0]) blocks.push({ type: 'paragraph', text: parts[0], page });
+      const items = parts.slice(1).filter(Boolean);
+      if (items.length) blocks.push({ type: 'list', items, page });
+    };
+    for (;;) {
+      let best: { at: number; heading: string } | null = null;
+      for (const heading of headings) {
+        const at = rest.indexOf(heading);
+        if (at !== -1 && (!best || at < best.at)) best = { at, heading };
+      }
+      if (!best) break;
+      emit(rest.slice(0, best.at));
+      blocks.push({ type: 'heading', text: best.heading, page });
+      rest = rest.slice(best.at + best.heading.length);
+    }
+    emit(rest);
+  });
+  return blocks;
+}
+
+export type TextSegment = string | { text: string; href: string; newTab: boolean };
+
+/** Wraps the first occurrence of each safe link label in `text` so the text view keeps the pamphlet's links. */
+export function linkifyText(text: string, links: readonly HandbookLink[]): TextSegment[] {
+  let segments: TextSegment[] = [text];
+  const candidates = links
+    .map((l) => ({ label: l.label.replace(/\s+/g, ' ').trim(), resolved: resolveHandbookLink(l.uri) }))
+    .filter((l): l is { label: string; resolved: ResolvedHandbookLink } => Boolean(l.label && l.resolved))
+    .sort((a, b) => b.label.length - a.label.length);
+  const used = new Set<string>();
+  for (const { label, resolved } of candidates) {
+    if (used.has(label)) continue;
+    const next: TextSegment[] = [];
+    let done = false;
+    for (const seg of segments) {
+      const at = typeof seg === 'string' && !done ? seg.indexOf(label) : -1;
+      if (typeof seg !== 'string' || at === -1) {
+        next.push(seg);
+        continue;
+      }
+      done = true;
+      if (at > 0) next.push(seg.slice(0, at));
+      next.push({ text: label, href: resolved.href, newTab: resolved.newTab });
+      if (at + label.length < seg.length) next.push(seg.slice(at + label.length));
+    }
+    if (done) used.add(label);
+    segments = next;
+  }
+  return segments;
+}
+
+/** `#page-3` is page index 2 (clamped to the document); anything else is null. */
+export function parsePageHash(hash: string, pageCount: number): number | null {
+  const m = /^#page-(\d{1,4})$/.exec(hash);
+  if (!m || pageCount < 1) return null;
+  const n = Number(m[1]);
+  if (n < 1) return null;
+  return Math.min(n, pageCount) - 1;
+}
+
+/** Swipe test: far enough, clearly more sideways than vertical, and quick. -1 = next page, 1 = previous, 0 = not a page swipe. */
+export function swipeDirection(dx: number, dy: number, ms: number): -1 | 0 | 1 {
+  if (ms > 800 || Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return 0;
+  return dx < 0 ? -1 : 1;
 }

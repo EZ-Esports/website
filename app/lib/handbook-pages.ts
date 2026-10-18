@@ -32,6 +32,16 @@ export const BUNDLED_CHAPTERS = [
   { label: '5. Our #1 Rule', page: 6 },
 ] as const;
 
+/** Section headings as they appear in the pages' text, used to structure the "Read as text" view. */
+export const BUNDLED_TEXT_HEADINGS = [
+  '0. Key Links',
+  '1. Who and what is EZ Esports?',
+  '2. What games are organized?',
+  '3. Three Communities of EZ Esports',
+  '4. 2026–27 Key Dates and the Interschool League Timeline',
+  '5. Our #1 Rule',
+] as const;
+
 export const BUNDLED_HANDBOOK_PAGES: BundledHandbookPage[] = [
   {
     "image": "/handbook/page-1.jpg",

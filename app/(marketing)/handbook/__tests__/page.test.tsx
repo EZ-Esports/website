@@ -31,7 +31,7 @@ describe('Student Handbook page (/handbook)', () => {
     expect(html).toContain('src="/handbook/page-1.jpg"');
     expect(html).toContain('Open in Google Docs');
     expect(html).toContain('Search the handbook');
-    expect(html).toContain('Two pages');
+    expect(html).toContain('Page zoom');
     expect(html).toContain('Fit screen');
     expect(html).toContain('Go to page 7');
     expect(html).toContain('4. Key Dates and Timeline');
@@ -39,6 +39,21 @@ describe('Student Handbook page (/handbook)', () => {
     expect(html).not.toContain('Download PDF');
     expect(html).not.toContain('Open PDF');
     expect(html).not.toContain('<iframe');
+  });
+
+  it('has a skip link, a live page announcement, a Read as text toggle and edge turn zones', async () => {
+    getCachedHandbookPdfKey.mockResolvedValue(null);
+    const html = await render();
+    expect(html).toContain('href="#handbook-viewer"');
+    expect(html).toContain('Skip to the handbook');
+    expect(html).toContain('id="handbook-viewer"');
+    expect(html).toMatch(/role="status" aria-live="polite" class="sr-only">Page 1 of 7</);
+    expect(html).toMatch(/aria-pressed="false"[^>]*>Read as text</);
+    // First page: only a "next" zone.
+    expect(html.match(/tabindex="-1" aria-hidden="true"/g)).toHaveLength(1);
+    expect(html).toContain('right-0 z-[1] w-[15%]');
+    expect(html).not.toContain('left-0 z-[1] w-[15%]');
+    expect(html).not.toContain('-resize');
   });
 
   it('renders mailto link boxes in place and web link boxes in a new tab with noopener', () => {

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   fitSheetWidth,
-  previousSpreadStart,
+  linkifyText,
+  parsePageHash,
+  structureHandbookText,
+  swipeDirection,
   resolveHandbookLink,
   searchHandbookPages,
-  spreadSize,
-  spreadStart,
   viewportRectToLink,
   withDownloadName,
 } from '../handbook-viewer';
@@ -23,30 +24,12 @@ describe('resolveHandbookLink', () => {
   });
 });
 
-describe('spread paging', () => {
-  it('keeps the cover alone and pairs the rest', () => {
-    expect(spreadStart(0, 7, true)).toBe(0);
-    expect([1, 2, 3, 4, 5, 6].map((i) => spreadStart(i, 7, true))).toEqual([1, 1, 3, 3, 5, 5]);
-    expect(spreadStart(4, 7, false)).toBe(4);
-    expect(spreadStart(99, 7, false)).toBe(6);
-    expect(spreadSize(0, true)).toBe(1);
-    expect(spreadSize(3, true)).toBe(2);
-    expect(spreadSize(3, false)).toBe(1);
-  });
-
-  it('steps back by a spread', () => {
-    expect(previousSpreadStart(3, true)).toBe(1);
-    expect(previousSpreadStart(1, true)).toBe(0);
-    expect(previousSpreadStart(3, false)).toBe(2);
-  });
-});
-
 describe('fitSheetWidth', () => {
   it('is limited by height for a tall box and by width for a wide one, then zoomed', () => {
     const aspect = 612 / 792;
     expect(fitSheetWidth({ availableWidth: 2000, availableHeight: 792, count: 1, aspect, zoom: 1 })).toBeCloseTo(612);
     expect(fitSheetWidth({ availableWidth: 400, availableHeight: 2000, count: 1, aspect, zoom: 1 })).toBe(400);
-    expect(fitSheetWidth({ availableWidth: 1002, availableHeight: 2000, count: 2, aspect, zoom: 1.5 })).toBe(750);
+    expect(fitSheetWidth({ availableWidth: 400, availableHeight: 99999, count: 1, aspect, zoom: 1.5 })).toBe(600);
   });
 });
 
@@ -70,5 +53,57 @@ describe('PDF helpers', () => {
 
   it('adds a download filename without disturbing the URL', () => {
     expect(withDownloadName('https://x.supabase.co/a/b.pdf', 'h.pdf')).toBe('https://x.supabase.co/a/b.pdf?download=h.pdf');
+  });
+});
+
+describe('structureHandbookText', () => {
+  it('splits known headings, paragraphs and bullet lists, dropping the page number', () => {
+    const blocks = structureHandbookText(
+      ['3  ❖ osu! ❖ Tetr.io 1. Who we are Intro text ● First ● Second', '4 more'],
+      ['1. Who we are'],
+    );
+    expect(blocks).toEqual([
+      { type: 'list', items: ['osu!', 'Tetr.io'], page: 0 },
+      { type: 'heading', text: '1. Who we are', page: 0 },
+      { type: 'paragraph', text: 'Intro text', page: 0 },
+      { type: 'list', items: ['First', 'Second'], page: 0 },
+      { type: 'paragraph', text: 'more', page: 1 },
+    ]);
+  });
+});
+
+describe('linkifyText', () => {
+  const box = { x: 0, y: 0, w: 1, h: 1 };
+
+  it('links the first occurrence of each safe label and ignores unsafe ones', () => {
+    const out = linkifyText('Join our Discord today, Discord rocks. Bad link here', [
+      { ...box, label: 'Discord', uri: 'https://discord.com/invite/x' },
+      { ...box, label: 'Bad link', uri: 'javascript:alert(1)' },
+      { ...box, label: 'Key Links 2', page: 1 },
+    ]);
+    expect(out).toEqual([
+      'Join our ',
+      { text: 'Discord', href: 'https://discord.com/invite/x', newTab: true },
+      ' today, Discord rocks. Bad link here',
+    ]);
+  });
+});
+
+describe('parsePageHash', () => {
+  it('reads #page-N, clamps to the document, and rejects anything else', () => {
+    expect(parsePageHash('#page-3', 7)).toBe(2);
+    expect(parsePageHash('#page-99', 7)).toBe(6);
+    for (const bad of ['#page-0', '#page-x', '#other', '', '#page-3x']) expect(parsePageHash(bad, 7)).toBeNull();
+    expect(parsePageHash('#page-1', 0)).toBeNull();
+  });
+});
+
+describe('swipeDirection', () => {
+  it('turns pages only for quick, mostly horizontal swipes', () => {
+    expect(swipeDirection(-120, 10, 200)).toBe(-1);
+    expect(swipeDirection(120, 10, 200)).toBe(1);
+    expect(swipeDirection(-120, 200, 200)).toBe(0);
+    expect(swipeDirection(-30, 0, 100)).toBe(0);
+    expect(swipeDirection(-120, 0, 2000)).toBe(0);
   });
 });
