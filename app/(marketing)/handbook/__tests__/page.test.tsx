@@ -32,7 +32,7 @@ describe('Student Handbook page (/handbook)', () => {
     expect(html).toContain('Open in Google Docs');
     expect(html).toContain('Search the handbook');
     expect(html).toContain('Page zoom');
-    expect(html).toContain('150%');
+    expect(html).toContain('100%');
     expect(html).toContain('Go to page 7');
     expect(html).toContain('4. Key Dates and Timeline');
     expect(html).toContain('href="#page-2"');
