@@ -1,7 +1,16 @@
 import crypto from 'node:crypto';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import {
+  findInviteForSubmission,
+  findStaffUserIdByEmail,
+  markManagerInviteAccepted,
+  markPlayerInviteSubmitted,
+  runOnboardingTransaction,
+  upsertMemberRecord,
+  upsertPlayerIdentities,
+  upsertSchoolManager,
+  upsertStudentDemographics,
+  type OnboardingTx,
+} from '@/app/lib/db/onboarding';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import type {
@@ -66,143 +75,10 @@ export function validateSubmissionInputs(submission: PlayerOnboardingSubmission)
 }
 
 /**
- * Pipeline step: Upserts student/manager record in the members table.
- */
-export async function upsertMemberRecord(
-  tx: any,
-  params: {
-    email: string;
-    legalFirstName: string;
-    legalLastName: string;
-    discordUsername: string;
-    gradYear: number;
-    schoolId: string;
-  }
-): Promise<string> {
-  const { email, legalFirstName, legalLastName, discordUsername, gradYear, schoolId } = params;
-
-  const [existingMember] = await tx
-    .select()
-    .from(schema.members)
-    .where(eq(schema.members.email, email))
-    .limit(1);
-
-  if (existingMember) {
-    await tx
-      .update(schema.members)
-      .set({
-        firstName: legalFirstName,
-        lastName: legalLastName,
-        discord: discordUsername,
-        graduationYear: gradYear,
-        schoolId,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.members.id, existingMember.id));
-    return existingMember.id;
-  }
-
-  const [newMember] = await tx
-    .insert(schema.members)
-    .values({
-      firstName: legalFirstName,
-      lastName: legalLastName,
-      email,
-      discord: discordUsername,
-      graduationYear: gradYear,
-      schoolId,
-    })
-    .returning();
-
-  return newMember.id;
-}
-
-/**
- * Pipeline step: Upserts competitive gaming & community identities (Riot ID + Discord).
- */
-export async function upsertPlayerIdentities(
-  tx: any,
-  memberId: string,
-  params: {
-    riotIdentifier: string;
-    discordUserId: string;
-    discordUsername: string;
-    inGuild: boolean;
-  }
-): Promise<void> {
-  const { riotIdentifier, discordUserId, discordUsername, inGuild } = params;
-
-  // 1. Riot Identity
-  const [existingRiot] = await tx
-    .select()
-    .from(schema.playerIdentities)
-    .where(
-      and(
-        eq(schema.playerIdentities.provider, 'riot'),
-        eq(schema.playerIdentities.memberId, memberId)
-      )
-    )
-    .limit(1);
-
-  if (existingRiot) {
-    await tx
-      .update(schema.playerIdentities)
-      .set({
-        providerUserId: riotIdentifier,
-        providerUsername: riotIdentifier,
-        lastVerifiedAt: new Date(),
-      })
-      .where(eq(schema.playerIdentities.id, existingRiot.id));
-  } else {
-    await tx.insert(schema.playerIdentities).values({
-      memberId,
-      provider: 'riot',
-      providerUserId: riotIdentifier,
-      providerUsername: riotIdentifier,
-      inGuild: false,
-      lastVerifiedAt: new Date(),
-    });
-  }
-
-  // 2. Discord Identity
-  const [existingDiscord] = await tx
-    .select()
-    .from(schema.playerIdentities)
-    .where(
-      and(
-        eq(schema.playerIdentities.provider, 'discord'),
-        eq(schema.playerIdentities.memberId, memberId)
-      )
-    )
-    .limit(1);
-
-  if (existingDiscord) {
-    await tx
-      .update(schema.playerIdentities)
-      .set({
-        providerUserId: discordUserId,
-        providerUsername: discordUsername,
-        inGuild,
-        lastVerifiedAt: new Date(),
-      })
-      .where(eq(schema.playerIdentities.id, existingDiscord.id));
-  } else {
-    await tx.insert(schema.playerIdentities).values({
-      memberId,
-      provider: 'discord',
-      providerUserId: discordUserId,
-      providerUsername: discordUsername,
-      inGuild,
-      lastVerifiedAt: new Date(),
-    });
-  }
-}
-
-/**
  * Pipeline step: Upserts sensitive demographic survey in the FERPA / NY § 2-D encrypted vault.
  */
 export async function upsertDemographicsVault(
-  tx: any,
+  tx: OnboardingTx,
   memberId: string,
   params: {
     legalFirstName: string;
@@ -213,13 +89,7 @@ export async function upsertDemographicsVault(
 ): Promise<void> {
   const { legalFirstName, legalLastName, birthDateObj, submission } = params;
 
-  const [existingDemo] = await tx
-    .select()
-    .from(schema.studentDemographics)
-    .where(eq(schema.studentDemographics.memberId, memberId))
-    .limit(1);
-
-  const demoValues = {
+  await upsertStudentDemographics(tx, memberId, {
     legalFirstName,
     legalLastName,
     birthDate: birthDateObj,
@@ -232,26 +102,14 @@ export async function upsertDemographicsVault(
     isFirstGenCollege: submission.isFirstGenCollege ?? null,
     doePetitionConsent: Boolean(submission.doePetitionConsent),
     surveyDetails: submission.surveyDetails || null,
-  };
-
-  if (existingDemo) {
-    await tx
-      .update(schema.studentDemographics)
-      .set(demoValues)
-      .where(eq(schema.studentDemographics.id, existingDemo.id));
-  } else {
-    await tx.insert(schema.studentDemographics).values({
-      memberId,
-      ...demoValues,
-    });
-  }
+  });
 }
 
 /**
  * Pipeline step: Provisions School Manager account, linking Supabase Auth and tenancy.
  */
 export async function provisionManagerAccount(
-  tx: any,
+  tx: OnboardingTx,
   params: {
     email: string;
     memberId: string;
@@ -265,14 +123,10 @@ export async function provisionManagerAccount(
   const { email, memberId, schoolId, password, submissionDraft } = params;
 
   let resolvedUserId: string | null = null;
-  const [staff] = await tx
-    .select({ userId: schema.staffMembers.userId })
-    .from(schema.staffMembers)
-    .where(sql`lower(${schema.staffMembers.email}) = ${email}`)
-    .limit(1);
+  const staffUserId = await findStaffUserIdByEmail(tx, email);
 
-  if (staff) {
-    resolvedUserId = staff.userId;
+  if (staffUserId) {
+    resolvedUserId = staffUserId;
   } else {
     try {
       if (process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -314,40 +168,14 @@ export async function provisionManagerAccount(
   const managedGames = draft.managedGames ?? null;
   const isPrimaryContact = Boolean(draft.isPrimaryContact);
 
-  const [existingManager] = await tx
-    .select()
-    .from(schema.schoolManagers)
-    .where(
-      and(
-        eq(schema.schoolManagers.schoolId, schoolId),
-        eq(schema.schoolManagers.userId, resolvedUserId),
-        eq(schema.schoolManagers.academicYear, academicYear)
-      )
-    )
-    .limit(1);
-
-  if (existingManager) {
-    await tx
-      .update(schema.schoolManagers)
-      .set({
-        isActive: true,
-        memberId,
-        managedGames: managedGames ?? existingManager.managedGames,
-        isPrimaryContact: isPrimaryContact ?? existingManager.isPrimaryContact,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.schoolManagers.id, existingManager.id));
-  } else {
-    await tx.insert(schema.schoolManagers).values({
-      schoolId,
-      userId: resolvedUserId,
-      memberId,
-      managedGames,
-      academicYear,
-      isPrimaryContact,
-      isActive: true,
-    });
-  }
+  await upsertSchoolManager(tx, {
+    schoolId,
+    userId: resolvedUserId,
+    memberId,
+    academicYear,
+    managedGames,
+    isPrimaryContact,
+  });
 
   return resolvedUserId;
 }
@@ -366,32 +194,12 @@ export async function processOnboardingSubmission(
 
   const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-  const [playerRow] = await db
-    .select({
-      invite: schema.playerInvites,
-      gameSlug: schema.games.slug,
-    })
-    .from(schema.playerInvites)
-    .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
-    .where(eq(schema.playerInvites.tokenHash, tokenHash))
-    .limit(1);
-
-  // Manager invites live in their own table and carry no game.
-  const [managerInvite] = playerRow
-    ? []
-    : await db
-        .select()
-        .from(schema.managerInvites)
-        .where(eq(schema.managerInvites.tokenHash, tokenHash))
-        .limit(1);
-
-  const invite = playerRow?.invite ?? managerInvite;
-  if (!invite) {
+  const found = await findInviteForSubmission(tokenHash);
+  if (!found) {
     throw new Error('Invalid or non-existent invite link.');
   }
 
-  const isManager = !playerRow;
-  const gameSlug = playerRow?.gameSlug ?? null;
+  const { invite, isManager, gameSlug } = found;
 
   if (invite.status !== 'pending') {
     throw new Error(`Cannot submit application: invite is already ${invite.status}.`);
@@ -412,7 +220,7 @@ export async function processOnboardingSubmission(
   let createdOrUpdatedMemberId = '';
 
   // Step 3: Atomic database transaction
-  await db.transaction(async (tx) => {
+  await runOnboardingTransaction(async (tx) => {
     // 3a. Member
     createdOrUpdatedMemberId = await upsertMemberRecord(tx, {
       email: validated.email,
@@ -450,24 +258,9 @@ export async function processOnboardingSubmission(
         submissionDraft: invite.submissionDraft as Record<string, any> | null,
       });
 
-      await tx
-        .update(schema.managerInvites)
-        .set({
-          memberId: createdOrUpdatedMemberId,
-          status: 'accepted',
-          submittedAt: new Date(),
-          reviewedAt: new Date(),
-        })
-        .where(eq(schema.managerInvites.id, invite.id));
+      await markManagerInviteAccepted(tx, invite.id, createdOrUpdatedMemberId);
     } else {
-      await tx
-        .update(schema.playerInvites)
-        .set({
-          memberId: createdOrUpdatedMemberId,
-          status: 'submitted',
-          submittedAt: new Date(),
-        })
-        .where(eq(schema.playerInvites.id, invite.id));
+      await markPlayerInviteSubmitted(tx, invite.id, createdOrUpdatedMemberId);
     }
   });
 

@@ -13,6 +13,7 @@ School-manager invites lived in `player_invites`, told apart by `role = 'manager
 - **Token lookup.** `validateInviteToken`, `saveOnboardingDraft` and `processOnboardingSubmission` look the hash up in `player_invites` first and fall back to `manager_invites`. A manager invite is "the hash was found in `manager_invites`"; nothing reads a role column. Hashes are unique across both tables in practice (SHA-256 of random tokens).
 - **Ports.** `createManagerInvite` and `listSchoolManagerInvites` return the new `ManagerInviteRecord`; `PlayerInviteRecord` loses `role` and `gameId` is `string`. The role filters on `listSchoolInvites` and `listPendingSubmissions` are gone. Revoke targets `manager_invites`.
 - Cache tags are unchanged: manager acceptance still invalidates `players`, `members`, `schools`.
+- **DAL.** Onboarding wizard database access (invite lookups, draft save, the submission transaction and its member, identity, demographics and school-manager writes) lives in `app/lib/db/onboarding.ts`; `wizard-actions.ts` and `wizard/submission-pipeline.ts` only validate, hash tokens, provision Supabase auth and invalidate cache tags.
 
 ## Rollout
 

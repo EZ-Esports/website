@@ -1,9 +1,11 @@
 'use server';
 
 import crypto from 'node:crypto';
-import { db } from '@/app/lib/db';
-import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  findInviteByTokenHash,
+  findInviteForValidation,
+  updateInviteDraft,
+} from '@/app/lib/db/onboarding';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
 
@@ -167,43 +169,7 @@ export async function validateInviteToken(
 
   const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-  const [playerRow] = await db
-    .select({
-      invite: schema.playerInvites,
-      schoolId: schema.schools.id,
-      schoolName: schema.schools.name,
-      schoolSlug: schema.schools.slug,
-      gameId: schema.games.id,
-      gameName: schema.games.displayName,
-      gameSlug: schema.games.slug,
-    })
-    .from(schema.playerInvites)
-    .innerJoin(schema.schools, eq(schema.playerInvites.schoolId, schema.schools.id))
-    .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
-    .where(eq(schema.playerInvites.tokenHash, tokenHash))
-    .limit(1);
-
-  // Manager invites live in their own table and carry no game, so they are
-  // only consulted when the hash is not a player invite.
-  const [managerRow] = playerRow
-    ? []
-    : await db
-        .select({
-          invite: schema.managerInvites,
-          schoolId: schema.schools.id,
-          schoolName: schema.schools.name,
-          schoolSlug: schema.schools.slug,
-        })
-        .from(schema.managerInvites)
-        .innerJoin(schema.schools, eq(schema.managerInvites.schoolId, schema.schools.id))
-        .where(eq(schema.managerInvites.tokenHash, tokenHash))
-        .limit(1);
-
-  const row = playerRow
-    ? playerRow
-    : managerRow
-      ? { ...managerRow, gameId: null, gameName: null, gameSlug: null }
-      : undefined;
+  const row = await findInviteForValidation(tokenHash);
 
   if (!row) {
     return {
@@ -213,7 +179,7 @@ export async function validateInviteToken(
     };
   }
 
-  const isManager = Boolean(managerRow);
+  const isManager = row.isManager;
   const resolvedGameId = row.gameId ?? null;
   const resolvedGameSlug = row.gameSlug || (isManager ? 'manager' : 'all');
   const resolvedGameName = row.gameName || (isManager ? 'School Manager' : 'All Games');
@@ -321,24 +287,11 @@ export async function saveOnboardingDraft(
 
   const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-  const [playerInvite] = await db
-    .select()
-    .from(schema.playerInvites)
-    .where(eq(schema.playerInvites.tokenHash, tokenHash))
-    .limit(1);
-
-  const [managerInvite] = playerInvite
-    ? []
-    : await db
-        .select()
-        .from(schema.managerInvites)
-        .where(eq(schema.managerInvites.tokenHash, tokenHash))
-        .limit(1);
-
-  const invite = playerInvite ?? managerInvite;
-  if (!invite) {
+  const found = await findInviteByTokenHash(tokenHash);
+  if (!found) {
     throw new Error('Invalid or non-existent invite token');
   }
+  const { invite } = found;
 
   if (invite.status !== 'pending') {
     throw new Error(`Cannot save draft: invite status is ${invite.status}`);
@@ -348,13 +301,7 @@ export async function saveOnboardingDraft(
     throw new Error('Cannot save draft: invite link has expired');
   }
 
-  const inviteTable = playerInvite ? schema.playerInvites : schema.managerInvites;
-  await db
-    .update(inviteTable)
-    .set({
-      submissionDraft: sanitizeDraftData(draftData),
-    })
-    .where(eq(inviteTable.id, invite.id));
+  await updateInviteDraft(found.kind, invite.id, sanitizeDraftData(draftData));
 
   return {
     success: true,
