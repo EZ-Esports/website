@@ -107,6 +107,11 @@ export const seasons = pgTable('seasons', {
   // what every season but that one actually is; the exceptions are listed in
   // COMBINED_STANDINGS in sharepoint/normalize_gold.py, with their evidence.
   standingsFormat: text('standings_format').default('divided').notNull(),
+  // Null = unlocked. When set, school managers cannot change any roster of this
+  // season (create, delete, enroll, remove, role change, emergency swap, invite
+  // approval onto a roster); staff admins still can. Kept per season row so that
+  // locking one game's season never affects another game's.
+  rostersLockedAt: timestamp('rosters_locked_at'),
   ...auditColumns,
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),
@@ -732,7 +737,7 @@ export const schoolManagers = pgTable('school_managers', {
   userId: uuid('user_id').notNull(), // Supabase auth.users.id
   memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
   managedGames: text('managed_games').array(), // null = all games; ['valorant'] = scoped
-  academicYear: text('academic_year').notNull(), // e.g. "2025-2026"
+  academicYear: text('academic_year').notNull(), // e.g. "2025-26" (YYYY-YY, equals the season name)
   isPrimaryContact: boolean('is_primary_contact').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   // Set when this person ends the portal tour (finished or skipped). Null = not seen;

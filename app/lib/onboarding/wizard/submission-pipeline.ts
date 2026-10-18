@@ -13,6 +13,7 @@ import {
 } from '@/app/lib/db/onboarding';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
+import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
 import type {
   PlayerOnboardingSubmission,
   SubmitPlayerOnboardingParams,
@@ -159,12 +160,13 @@ export async function provisionManagerAccount(
   const draft = submissionDraft || {};
   const submittedSeason = params.academicYear?.trim();
   if (submittedSeason) {
-    const m = /^(\d{4})-(\d{4})$/.exec(submittedSeason);
-    if (!m || Number(m[2]) !== Number(m[1]) + 1) {
-      throw new Error('A valid season (e.g. 2026-2027) is required.');
+    if (!isValidSeasonName(submittedSeason)) {
+      throw new Error('A valid season (e.g. 2026-27) is required.');
     }
   }
-  const academicYear = submittedSeason || draft.academicYear || '2026-2027';
+  const academicYear =
+    submittedSeason ||
+    (isValidSeasonName(draft.academicYear) ? draft.academicYear : DEFAULT_MANAGER_SEASON);
   const managedGames = draft.managedGames ?? null;
   const isPrimaryContact = Boolean(draft.isPrimaryContact);
 

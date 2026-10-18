@@ -351,6 +351,13 @@
       "when": 1790882000004,
       "tag": "0049_manager_invites_table",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790882000005,
+      "tag": "0050_season_rosters_locked",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,7 @@ function renderEmptyPortal(): string {
         schoolSlug: 'test-high',
         managedGames: null,
         isPrimaryContact: false,
+        affiliations: [],
       }}
       games={[{ id: 'g1', slug: 'valorant', displayName: 'Valorant', shortName: 'VAL' }]}
       initialInvites={[]}

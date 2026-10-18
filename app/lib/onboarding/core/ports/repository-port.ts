@@ -89,9 +89,26 @@ export interface OnboardingRepositoryPort {
   findGameBySlug(slug: string): Promise<GameRecord | null>;
 
   // Roster & Player queries
-  findSchoolRosters(schoolId: string, gameIds?: string[] | null): Promise<SchoolRosterWithPlayers[]>;
+  findSchoolRosters(
+    schoolId: string,
+    gameIds?: string[] | null,
+    options?: { activeSeasonOnly?: boolean }
+  ): Promise<SchoolRosterWithPlayers[]>;
   findSchoolPlayerPool(schoolId: string, gameId?: string): Promise<SchoolPlayerPoolItem[]>;
-  findRosterById(rosterId: string): Promise<{ id: string; schoolId: string; gameId: string; name: string } | null>;
+  findRosterById(
+    rosterId: string
+  ): Promise<{
+    id: string;
+    schoolId: string;
+    gameId: string;
+    name: string;
+    /** Whether the roster's team belongs to its game's active season. */
+    isActiveSeason?: boolean;
+    /** Whether staff have locked the roster's season against manager changes. */
+    isSeasonLocked?: boolean;
+  } | null>;
+  /** Whether the game's active season has its rosters locked (false when none is active). */
+  isActiveSeasonLocked?(gameId: string): Promise<boolean>;
 
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;

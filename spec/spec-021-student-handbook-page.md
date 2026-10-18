@@ -1,4 +1,4 @@
-# Spec-019: Student Handbook page
+# Spec-021: Student Handbook page
 
 **Branch:** `worktree-student-handbook-page`. **PR:** not opened. **Status:** Code ready. No migration. Needs the existing `admin-uploads` bucket and `NEXT_PUBLIC_SUPABASE_URL` (both already live for gallery images).
 

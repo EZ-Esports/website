@@ -90,13 +90,63 @@ export async function findRosterWithTeam(rosterId: string) {
 }
 
 /**
- * Loads the teams, rosters, players and identities behind a school's rosters.
- * Returns null when the school has no teams or no rosters.
+ * Active and roster-lock state of a season. A missing season is reported as inactive and
+ * unlocked.
  */
-export async function loadSchoolRosterData(schoolId: string, gameIds?: string[] | null) {
+export async function getSeasonRosterState(
+  seasonId: string
+): Promise<{ isActive: boolean; isLocked: boolean }> {
+  const [season] = await db
+    .select({
+      isActive: schema.seasons.isActive,
+      rostersLockedAt: schema.seasons.rostersLockedAt,
+    })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.id, seasonId))
+    .limit(1);
+  return {
+    isActive: season?.isActive ?? false,
+    isLocked: !!season?.rostersLockedAt,
+  };
+}
+
+/** Whether the game's active season has its rosters locked (false when none is active). */
+export async function isActiveSeasonRostersLocked(gameId: string): Promise<boolean> {
+  const [season] = await db
+    .select({ rostersLockedAt: schema.seasons.rostersLockedAt })
+    .from(schema.seasons)
+    .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
+    .limit(1);
+  return !!season?.rostersLockedAt;
+}
+
+/**
+ * Loads the teams, rosters, players and identities behind a school's rosters.
+ * Returns null when the school has no teams or no rosters (or, with
+ * `activeSeasonOnly`, when no season is active).
+ */
+export async function loadSchoolRosterData(
+  schoolId: string,
+  gameIds?: string[] | null,
+  options?: { activeSeasonOnly?: boolean }
+) {
   const whereConditions = [eq(schema.teams.schoolId, schoolId)];
   if (gameIds && gameIds.length > 0) {
     whereConditions.push(inArray(schema.teams.gameId, gameIds));
+  }
+  if (options?.activeSeasonOnly) {
+    // Managers only ever see the game's active season; past seasons stay admin-only.
+    const activeSeasons = await db
+      .select({ id: schema.seasons.id })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.isActive, true));
+    if (activeSeasons.length === 0) return null;
+    whereConditions.push(
+      inArray(
+        schema.teams.seasonId,
+        activeSeasons.map((s) => s.id)
+      )
+    );
   }
 
   const schoolTeams = await db

@@ -4,11 +4,13 @@ import { HiOutlineShieldCheck } from 'react-icons/hi2';
 
 interface PortalHeaderProps {
   schoolName: string;
+  /** Active season(s) the manager is scoped to, e.g. "2026-27". */
+  seasonLabel?: string;
   /** Page-level controls shown beside the compliance badge (the Tutorial menu). */
   actions?: React.ReactNode;
 }
 
-export function PortalHeader({ schoolName, actions }: PortalHeaderProps) {
+export function PortalHeader({ schoolName, seasonLabel, actions }: PortalHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
       <div>
@@ -18,6 +20,12 @@ export function PortalHeader({ schoolName, actions }: PortalHeaderProps) {
           </span>
           <span className="text-zinc-600">&bull;</span>
           <span className="text-xs text-zinc-400 font-medium">{schoolName}</span>
+          {seasonLabel ? (
+            <>
+              <span className="text-zinc-600">&bull;</span>
+              <span className="text-xs text-zinc-300 font-medium">Season {seasonLabel}</span>
+            </>
+          ) : null}
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">
           Manager Control Deck
