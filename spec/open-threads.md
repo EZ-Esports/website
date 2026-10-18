@@ -91,7 +91,7 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 
 Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issue list` for the current state.
 
-- [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`. Implemented on `refactor/manager-invites-table` ([spec-018](spec-018-manager-invites-table.md)); migration `0049` is **NOT yet applied to production**. Apply it and deploy the code in the same window, after a backup, then close the issue.
+- [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`. Shipped in #252 ([spec-018](spec-018-manager-invites-table.md)); migration `0049` was applied to production on 18 Oct 2026 after a full backup. Resolved.
 - [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views.
 - [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
 - [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season.
