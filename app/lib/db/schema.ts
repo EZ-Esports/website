@@ -746,12 +746,11 @@ export const schoolManagers = pgTable('school_managers', {
   index('school_managers_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
-// 2. Single-Use Player & Manager Invite Tokens
+// 2. Single-Use Player Invite Tokens (School-manager invites live in manager_invites)
 export const playerInvites = pgTable('player_invites', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
-  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }),
-  role: text('role').default('player').notNull(), // 'player' | 'manager'
+  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }).notNull(),
   tokenHash: text('token_hash').notNull().unique(), // SHA-256
   intendedFirstName: text('intended_first_name').notNull(),
   intendedLastName: text('intended_last_name').notNull(),
@@ -766,9 +765,31 @@ export const playerInvites = pgTable('player_invites', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('player_invites_school_game_idx').on(t.schoolId, t.gameId),
-  index('player_invites_school_role_idx').on(t.schoolId, t.role),
   uniqueIndex('player_invites_token_hash_idx').on(t.tokenHash),
   index('player_invites_member_id_idx').on(t.memberId),
+]).enableRLS();
+
+// 2b. Single-Use School Manager Invite Tokens. Separate from player_invites
+// because a manager invite has no game and is never reviewed through the
+// roster approval queue.
+export const managerInvites = pgTable('manager_invites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash: text('token_hash').notNull().unique(), // SHA-256
+  intendedFirstName: text('intended_first_name').notNull(),
+  intendedLastName: text('intended_last_name').notNull(),
+  invitedByUserId: uuid('invited_by_user_id').notNull(),
+  status: text('status').default('pending').notNull(), // 'pending' | 'accepted' | 'rejected' | 'expired'
+  expiresAt: timestamp('expires_at').notNull(),
+  submittedAt: timestamp('submitted_at'),
+  reviewedAt: timestamp('reviewed_at'),
+  rejectionReason: text('rejection_reason'),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  submissionDraft: jsonb('submission_draft'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('manager_invites_school_idx').on(t.schoolId),
+  index('manager_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
 // 3. Player Game & Community Identities
@@ -812,6 +833,8 @@ export type SchoolManager = typeof schoolManagers.$inferSelect;
 export type NewSchoolManager = typeof schoolManagers.$inferInsert;
 export type PlayerInvite = typeof playerInvites.$inferSelect;
 export type NewPlayerInvite = typeof playerInvites.$inferInsert;
+export type ManagerInvite = typeof managerInvites.$inferSelect;
+export type NewManagerInvite = typeof managerInvites.$inferInsert;
 export type PlayerIdentity = typeof playerIdentities.$inferSelect;
 export type NewPlayerIdentity = typeof playerIdentities.$inferInsert;
 export type StudentDemographics = typeof studentDemographics.$inferSelect;
