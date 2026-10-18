@@ -30,7 +30,7 @@ Leadership publishes a yearly Student Handbook (key links, games, the three comm
 
 - Only keys matching `^handbook/\d{10,16}\.pdf$` are stored or rendered; the public URL is built server-side from project URL, bucket and key.
 - The bundled pages are the 2026-27 edition as designed (images are the source of truth, including the pamphlet's wording under Game Regulations). They go stale each season; refresh by replacing `public/handbook/page-N.jpg` and `handbook-pages.ts`, or just upload a PDF.
-- No "remove PDF" control (replace only). PDFs over 4 MB are not supported.
+- No "remove PDF" control (replace only). The stored file is capped at 4 MB; picks up to 50 MB are compressed first and refused if still over.
 - pdf.js standard-font and CMap data are not bundled: a PDF that relies on non-embedded standard fonts may render with substitute fonts. Exports from Google Docs embed fonts.
 - Non-goals: per-game handbooks (sent by email), versioned PDF history, server-side PDF rendering.
 
