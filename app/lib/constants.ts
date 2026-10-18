@@ -27,6 +27,7 @@ export const ROUTES = {
   sponsors: '/sponsors',
   privacy: '/privacy',
   rules: '/rules',
+  handbook: '/handbook',
   terms: '/terms',
 } as const;
 
@@ -271,6 +272,7 @@ export const FOOTER_LINKS = [
   { label: 'About', href: '/about' },
   { label: 'Archives', href: '/archives' },
   { label: 'League Rules', href: '/rules' },
+  { label: 'Student Handbook', href: '/handbook' },
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Terms of Service', href: '/terms' },
   { label: 'Manager Portal', href: '/portal' },

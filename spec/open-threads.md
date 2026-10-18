@@ -124,3 +124,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Migration `0050_season_rosters_locked` was applied to production on 18 Oct 2026 (before #256 merged). Resolved.
 - The lock is per season with no actor or reason recorded, and no scheduled auto-lock.
 - Invite approval is refused whenever the game's season is locked, even if it would have enrolled nobody; revisit if staff want approvals to continue during a lock.
+
+## Student Handbook page (spec-021)
+
+- Unverified in production: a real Supabase upload being read by pdf.js (public-bucket CORS) and the `?download=` filename behavior. On any pdf.js failure the page shows the bundled pages plus an Open PDF link.
+- The stored handbook is capped at 4 MB (Vercel body limit). Picks up to 50 MB are shrunk in the browser by recompressing large raster images; a PDF still over 4 MB after two passes (for example mostly vector or CMYK/indexed images, which are skipped) is refused with its size. A signed direct-to-storage upload would lift the cap. Compression was exercised in the dev server on the real file but no upload was made. No "remove PDF" button, only replace.
+- The bundled page images and text (`public/handbook/`, `app/lib/handbook-pages.ts`) are the 2026-27 edition and go stale each season. pdf.js standard-font/CMap data is not bundled.
