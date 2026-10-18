@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { cancelBtn, chip, chipButton, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
 import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
@@ -53,6 +54,7 @@ export default function LeagueSetupClient({
 }) {
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [lockTarget, setLockTarget] = useState<{ seasonId: string; locking: boolean; title: string; message: string } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -224,13 +226,14 @@ export default function LeagueSetupClient({
                       onToggleLock={() => {
                         const locking = !s.rostersLockedAt;
                         const message = locking
-                          ? `Lock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${s.isActive ? '' : ' This season is inactive, so locking has no effect on managers until it is activated.'}`
-                          : `Unlock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will be able to change rosters again.`;
-                        if (!window.confirm(message)) return;
-                        runAction(
-                          () => (locking ? lockSeasonRosters(s.id) : unlockSeasonRosters(s.id)),
-                          locking ? 'Rosters locked.' : 'Rosters unlocked.',
-                        );
+                          ? `School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${s.isActive ? '' : ' This season is inactive, so locking has no effect on managers until it is activated.'}`
+                          : 'School managers will be able to change rosters again.';
+                        setLockTarget({
+                          seasonId: s.id,
+                          locking,
+                          title: `${locking ? 'Lock' : 'Unlock'} rosters for ${game?.displayName ?? 'this game'} ${s.name}?`,
+                          message,
+                        });
                       }}
                       onDelete={() =>
                         confirmDelete(
@@ -247,6 +250,28 @@ export default function LeagueSetupClient({
           </>
         )}
       </AdminSection>
+
+      <ConfirmActionDialog
+        isOpen={lockTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setLockTarget(null);
+        }}
+        title={lockTarget?.title ?? ''}
+        message={lockTarget?.message ?? ''}
+        confirmLabel={lockTarget?.locking ? 'Lock rosters' : 'Unlock rosters'}
+        pendingLabel={lockTarget?.locking ? 'Locking…' : 'Unlocking…'}
+        isPending={isPending}
+        icon={lockTarget?.locking ? <FiLock className="h-5 w-5" /> : <FiUnlock className="h-5 w-5" />}
+        onConfirm={async () => {
+          if (!lockTarget) return;
+          const { seasonId, locking } = lockTarget;
+          await runAction(
+            () => (locking ? lockSeasonRosters(seasonId) : unlockSeasonRosters(seasonId)),
+            locking ? 'Rosters locked.' : 'Rosters unlocked.',
+          );
+          setLockTarget(null);
+        }}
+      />
     </div>
   );
 }
