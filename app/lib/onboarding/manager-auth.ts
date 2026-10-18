@@ -34,6 +34,8 @@ export interface ActiveSeasonInfo {
   id: string;
   name: string;
   gameId: string;
+  /** When staff locked this season's rosters; null while unlocked. */
+  rostersLockedAt: Date | null;
 }
 
 /** A game a manager may work on at a school, together with its active season. */
@@ -42,6 +44,26 @@ export interface AuthorizedGameScope {
   gameSlug: string;
   seasonId: string;
   seasonName: string;
+  /** True while staff have locked this season's rosters against manager changes. */
+  rostersLocked: boolean;
+}
+
+export const ROSTERS_LOCKED_ERROR =
+  'Rosters for this season are locked by EZ Esports staff. Contact an admin to request changes.';
+
+/**
+ * Refuses a roster change while the season is locked. Staff admins are exempt so EZ Esports can
+ * still correct a roster after locking. Every manager roster mutation funnels through this via
+ * `assertManagerForRoster` or the create path; reads must not call it.
+ */
+export function assertSeasonRostersUnlocked(
+  context: Pick<SchoolManagerContext, 'isStaffAdmin'>,
+  season: { rostersLockedAt: Date | null } | null
+): void {
+  if (context.isStaffAdmin) return;
+  if (season?.rostersLockedAt) {
+    throw new Error(ROSTERS_LOCKED_ERROR);
+  }
 }
 
 export const NO_ACTIVE_SEASON_ERROR =
@@ -262,7 +284,12 @@ async function resolveGame(idOrSlug: string): Promise<{ id: string; slug: string
 /** The game's single active season, or null when none is active. */
 export async function getActiveSeasonForGame(gameId: string): Promise<ActiveSeasonInfo | null> {
   const [season] = await db
-    .select({ id: schema.seasons.id, name: schema.seasons.name, gameId: schema.seasons.gameId })
+    .select({
+      id: schema.seasons.id,
+      name: schema.seasons.name,
+      gameId: schema.seasons.gameId,
+      rostersLockedAt: schema.seasons.rostersLockedAt,
+    })
     .from(schema.seasons)
     .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
     .limit(1);
@@ -307,7 +334,12 @@ export async function getAuthorizedGameScopes(
   if (!school) return [];
 
   const activeSeasons = await db
-    .select({ id: schema.seasons.id, name: schema.seasons.name, gameId: schema.seasons.gameId })
+    .select({
+      id: schema.seasons.id,
+      name: schema.seasons.name,
+      gameId: schema.seasons.gameId,
+      rostersLockedAt: schema.seasons.rostersLockedAt,
+    })
     .from(schema.seasons)
     .where(eq(schema.seasons.isActive, true));
   if (activeSeasons.length === 0) return [];
@@ -325,6 +357,7 @@ export async function getAuthorizedGameScopes(
         gameSlug: game.slug,
         seasonId: season.id,
         seasonName: season.name,
+        rostersLocked: !!season.rostersLockedAt,
       });
     }
   }
@@ -410,9 +443,14 @@ export async function assertManagerForSchool(
  * Traces a roster -> team -> schoolId and asserts school manager authorization.
  * A manager may only touch rosters whose team belongs to the game's active season and whose
  * affiliation matches it; a past-season roster is refused. Staff admins may touch any roster.
+ * Locked seasons refuse managers by default (this guard is the mutation guard); read-only
+ * callers pass `{ allowLocked: true }`.
  * Returns the resolved context, roster, and team records.
  */
-export async function assertManagerForRoster(rosterId: string): Promise<{
+export async function assertManagerForRoster(
+  rosterId: string,
+  options?: { allowLocked?: boolean }
+): Promise<{
   context: SchoolManagerContext;
   roster: typeof schema.rosters.$inferSelect;
   team: typeof schema.teams.$inferSelect;
@@ -438,6 +476,9 @@ export async function assertManagerForRoster(rosterId: string): Promise<{
       throw new Error(
         'Forbidden: This roster belongs to a past season and can no longer be changed from the portal'
       );
+    }
+    if (!options?.allowLocked) {
+      assertSeasonRostersUnlocked(context, activeSeason);
     }
   }
   return {

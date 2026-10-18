@@ -72,6 +72,13 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     ? [...new Set(scopes.map((s) => s.seasonName))].join(', ')
     : undefined;
 
+  // Games whose season staff have locked; the UI disables roster changes for them (the server
+  // enforces it regardless). Staff admins are never locked out, so scopes === null yields none.
+  const lockedGameIds = scopes ? scopes.filter((s) => s.rostersLocked).map((s) => s.gameId) : [];
+  const lockedSeasonLabel = scopes
+    ? [...new Set(scopes.filter((s) => s.rostersLocked).map((s) => s.seasonName))].join(', ')
+    : '';
+
   // Load initial invites, submissions, rosters, and eligible player pool for the active school
   const [initialInvites, initialSubmissions, initialRosters, initialPlayerPool, tourCompleted] = await Promise.all([
     getSchoolInvites(activeSchool.schoolId, paramGameId),
@@ -93,6 +100,8 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialPlayerPool={initialPlayerPool}
         selectedGameId={paramGameId}
         seasonLabel={seasonLabel}
+        lockedGameIds={lockedGameIds}
+        lockedSeasonLabel={lockedSeasonLabel}
         tourCompleted={tourCompleted}
       />
     </PortalShell>

@@ -166,3 +166,41 @@ export async function deleteSeason(id: string) {
     return { success: false, error: sanitizeDbError(error) };
   }
 }
+
+// --- SEASON ROSTER LOCK ---
+
+/**
+ * Sets or clears `seasons.rosters_locked_at`. The manager portal reads the column straight from
+ * the database on every request (no unstable_cache), so the change is effective immediately;
+ * `revalidateLeague` still refreshes the `seasons`/`teams` tags and the admin pages.
+ */
+async function setSeasonRostersLocked(seasonId: string, locked: boolean) {
+  await requirePermission(Permissions.MANAGE_LEAGUE);
+  try {
+    if (!seasonId) {
+      return { success: false, error: 'Season is required.' };
+    }
+    const updated = await db
+      .update(schema.seasons)
+      .set({ rostersLockedAt: locked ? new Date() : null })
+      .where(eq(schema.seasons.id, seasonId))
+      .returning({ id: schema.seasons.id });
+    if (updated.length === 0) {
+      return { success: false, error: 'Season not found.' };
+    }
+    revalidateLeague();
+    revalidatePath('/portal');
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+export async function lockSeasonRosters(seasonId: string) {
+  return setSeasonRostersLocked(seasonId, true);
+}
+
+export async function unlockSeasonRosters(seasonId: string) {
+  return setSeasonRostersLocked(seasonId, false);
+}

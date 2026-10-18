@@ -119,3 +119,8 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
 - Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.
 
+## Season roster lock (spec-020)
+
+- Migration `0050_season_rosters_locked` is not applied to production; apply it (after confirming with the user) before the PR's code deploys. It collides in number space with open PR #252's `0049`; re-check journal `idx` / `when` ordering on whichever merges second.
+- The lock is per season with no actor or reason recorded, and no scheduled auto-lock.
+- Invite approval is refused whenever the game's season is locked, even if it would have enrolled nobody; revisit if staff want approvals to continue during a lock.

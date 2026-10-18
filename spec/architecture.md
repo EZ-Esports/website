@@ -81,6 +81,8 @@ One tour definition (`app/(portal)/portal/tour/steps.ts`) targets stable `data-t
 ## Manager portal season scope
 School managers are scoped by season, not just school and game (spec-019). Season names and `school_managers.academic_year` are both `YYYY-YY` (`app/lib/season-name.ts`), so a manager reaches a game only when a row's `academic_year` equals that game's active season name. The checks live in `app/lib/onboarding/manager-auth.ts` (`managerMatchesActiveSeason`, `assertManagerForSchool`, `assertManagerForRoster`, `getAuthorizedGameScopes`) and `portal-actions.ts` reads filter through the resulting scopes. A staff admin means the ADMINISTRATOR permission, checked before manager rows; a `staff_members` row alone never grants the all-season view.
 
+**Season roster lock (spec-020).** `seasons.rosters_locked_at` (null = unlocked) freezes a season's rosters for school managers. The check lives in `manager-auth.ts`: `assertManagerForRoster` refuses a locked season by default (reads pass `{ allowLocked: true }`), `createSchoolRoster` and the default-roster branch of `reviewPlayerInvite` call `assertSeasonRostersUnlocked`, and staff admins are exempt. Staff toggle it with `lockSeasonRosters` / `unlockSeasonRosters` (MANAGE_LEAGUE). The portal reads the column uncached, so a toggle applies on the next request; the actions still `updateTag('seasons')`.
+
 ## Frontend
 
 - **Tokens.** July rewrite PRs #11–#13: two-layer semantic tokens (`:root` + `@theme inline` in `globals.css`), primitives under `components/ui/`, admin denser via `admin/styles.ts`. Bridge aliases kept old pages compiling until PR #13 deleted them.

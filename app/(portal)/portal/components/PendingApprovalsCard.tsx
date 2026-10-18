@@ -20,6 +20,8 @@ interface PendingApprovalsCardProps {
   setSelectedRoleMap: React.Dispatch<
     React.SetStateAction<Record<string, 'player' | 'sub' | 'captain'>>
   >;
+  /** Games whose rosters are locked: approving enrolls onto a roster, so it is disabled. */
+  lockedGameIds?: string[];
   onApprove: (inviteId: string) => void;
   onReject: (inviteId: string) => void;
 }
@@ -34,6 +36,7 @@ export function PendingApprovalsCard({
   setSelectedRosterMap,
   selectedRoleMap,
   setSelectedRoleMap,
+  lockedGameIds = [],
   onApprove,
   onReject,
 }: PendingApprovalsCardProps) {
@@ -69,6 +72,7 @@ export function PendingApprovalsCard({
             const gameRosters = rosters.filter((r) => r.gameId === sub.gameId);
             const isApproving = approvingId === sub.id;
             const isRejecting = rejectingId === sub.id;
+            const isLocked = !!sub.gameId && lockedGameIds.includes(sub.gameId);
 
             return (
               <div
@@ -183,11 +187,16 @@ export function PendingApprovalsCard({
                     </Button>
                     <Button
                       onPress={() => onApprove(sub.id)}
-                      isDisabled={isApproving || isRejecting}
+                      isDisabled={isApproving || isRejecting || isLocked}
                       className="min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
                     >
                       {isApproving ? 'Approving...' : 'Approve & Enroll'}
                     </Button>
+                    {isLocked && (
+                      <p className="basis-full text-right text-[11px] text-amber-300">
+                        Rosters are locked, so players cannot be approved onto them right now.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

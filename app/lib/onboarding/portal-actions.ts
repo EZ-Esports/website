@@ -7,6 +7,7 @@ import { eq, and, desc, inArray } from 'drizzle-orm';
 import {
   assertManagerForSchool,
   assertManagerForRoster,
+  assertSeasonRostersUnlocked,
   getAuthorizedGameScopes,
   getActiveSeasonForGame,
   NO_ACTIVE_SEASON_ERROR,
@@ -369,6 +370,15 @@ export async function reviewPlayerInvite(
     }
   }
 
+  // Approving an invite is the intake path onto a roster. While the season is locked it is
+  // refused outright (before the invite changes state) rather than accepting the player and
+  // silently skipping enrollment, which would strand an accepted-but-unrostered student.
+  // Rejecting stays allowed. An explicit rosterId is already covered by assertManagerForRoster.
+  if (action === 'approve' && invite.memberId && invite.gameId && !rosterId) {
+    const inviteSeason = await getActiveSeasonForGame(invite.gameId);
+    assertSeasonRostersUnlocked(reviewContext, inviteSeason);
+  }
+
   if (action === 'approve') {
     await db
       .update(schema.playerInvites)
@@ -594,7 +604,7 @@ export async function getRosterEligibility(params: {
     throw new Error('Roster ID is required');
   }
 
-  const { roster } = await assertManagerForRoster(rosterId);
+  const { roster } = await assertManagerForRoster(rosterId, { allowLocked: true });
 
   const rosterPlayers = await db
     .select({
@@ -989,7 +999,7 @@ export async function createSchoolRoster(
   }
 
   // 1. Manager authorization and tenancy check
-  await assertManagerForSchool(schoolId, gameId);
+  const createContext = await assertManagerForSchool(schoolId, gameId);
 
   // 2. Fetch game details
   const [game] = await db
@@ -1011,6 +1021,7 @@ export async function createSchoolRoster(
   if (!season) {
     throw new Error(`${NO_ACTIVE_SEASON_ERROR}.`);
   }
+  assertSeasonRostersUnlocked(createContext, season);
 
   // 4. Find or create the Team for (schoolId, gameId, season.id)
   let [team] = await db

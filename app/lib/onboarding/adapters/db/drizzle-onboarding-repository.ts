@@ -108,7 +108,10 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
 
     if (!row) return null;
     const [season] = await db
-      .select({ isActive: schema.seasons.isActive })
+      .select({
+        isActive: schema.seasons.isActive,
+        rostersLockedAt: schema.seasons.rostersLockedAt,
+      })
       .from(schema.seasons)
       .where(eq(schema.seasons.id, row.team.seasonId))
       .limit(1);
@@ -118,7 +121,17 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
       gameId: row.team.gameId,
       name: row.roster.name,
       isActiveSeason: season?.isActive ?? false,
+      isSeasonLocked: !!season?.rostersLockedAt,
     };
+  }
+
+  async isActiveSeasonLocked(gameId: string): Promise<boolean> {
+    const [season] = await db
+      .select({ rostersLockedAt: schema.seasons.rostersLockedAt })
+      .from(schema.seasons)
+      .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
+      .limit(1);
+    return !!season?.rostersLockedAt;
   }
 
   async findSchoolRosters(

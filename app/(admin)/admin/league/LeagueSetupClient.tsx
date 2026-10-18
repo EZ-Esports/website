@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { cancelBtn, chip, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
+import { cancelBtn, chip, chipButton, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
 import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
+  lockSeasonRosters, unlockSeasonRosters,
 } from './actions';
 
 interface DBGame {
@@ -25,6 +26,8 @@ interface DBSeason {
   name: string;
   isActive: boolean;
   standingsFormat?: string;
+  /** Set while staff have locked this season's rosters against manager changes. */
+  rostersLockedAt?: Date | string | null;
 }
 
 type ActionResult = { success: boolean; error?: string };
@@ -218,6 +221,17 @@ export default function LeagueSetupClient({
                       gameName={game?.displayName ?? 'Unknown Game'}
                       isPending={isPending}
                       onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), 'Season updated.')}
+                      onToggleLock={() => {
+                        const locking = !s.rostersLockedAt;
+                        const message = locking
+                          ? `Lock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.`
+                          : `Unlock rosters for ${game?.displayName ?? 'this game'} ${s.name}? School managers will be able to change rosters again.`;
+                        if (!window.confirm(message)) return;
+                        runAction(
+                          () => (locking ? lockSeasonRosters(s.id) : unlockSeasonRosters(s.id)),
+                          locking ? 'Rosters locked.' : 'Rosters unlocked.',
+                        );
+                      }}
                       onDelete={() =>
                         confirmDelete(
                           `Delete season "${s.name}"? Seasons with existing matches cannot be deleted until those matches are removed or reassigned. This is permanent.`,
@@ -300,14 +314,17 @@ function SeasonRow({
   gameName,
   isPending,
   onUpdate,
+  onToggleLock,
   onDelete,
 }: {
   season: DBSeason;
   gameName: string;
   isPending: boolean;
   onUpdate: (fd: FormData) => Promise<boolean>;
+  onToggleLock: () => void;
   onDelete: () => void;
 }) {
+  const locked = !!season.rostersLockedAt;
   const [editing, setEditing] = useState(false);
 
   return (
@@ -366,9 +383,26 @@ function SeasonRow({
               {season.isActive ? 'Active' : 'Inactive'}
             </span>
             <span className={`${chip('neutral')} capitalize`}>{season.standingsFormat ?? 'divided'}</span>
+            {locked && (
+              <span className={chip('warning')}>
+                <FiLock aria-hidden className="h-3 w-3" />
+                Rosters locked
+              </span>
+            )}
           </div>
           {/* Row actions stay visible (touch has no hover). */}
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onToggleLock}
+              disabled={isPending}
+              className={chipButton(locked ? 'warning' : 'ghost')}
+              aria-label={locked ? `Unlock rosters for season ${season.name}` : `Lock rosters for season ${season.name}`}
+              title={locked ? 'Let school managers change rosters again' : 'Stop school managers from changing rosters'}
+            >
+              {locked ? <FiUnlock aria-hidden className="h-3.5 w-3.5" /> : <FiLock aria-hidden className="h-3.5 w-3.5" />}
+              {locked ? 'Unlock rosters' : 'Lock rosters'}
+            </button>
             <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit season ${season.name}`} />
             <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete season ${season.name}`} title={`Delete season ${season.name}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
           </div>
