@@ -22,6 +22,7 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 | `/terms` | Terms of Service (PR #194, #191). Linked from the footer and the apply consent checkboxes. |
 | `/gallery` | Public full gallery (PR #138, #100), linked from the homepage Showcase CTA. Thumbnails load `unoptimized` ([spec-014](spec-014-gallery-thumbnails.md)). |
 | `/careers`, `/careers/[slug]`, `/careers/apply/general` | Public job postings and the application form, managed in `/admin/careers`. |
+| `/handbook` | Student Handbook ([spec-019](spec-019-student-handbook-page.md)). Footer link only. Staff-uploaded PDF (viewer + download) over a built-in text version; text version alone until a PDF is uploaded. Managed from Website Content > Page Content in the admin. |
 | `/privacy` | Privacy policy + Privacy erasure intake modal/action (`a1aeca6` PR #142 / #103). Covers phone, Discord, and staff application resumes: private storage, links for authorized staff and administrators that expire shortly after creation, and deletion when an application is declined or on request (a manual runbook for now) ([spec-007](spec-007-staff-application-resume.md)). |
 | `/login` | Staff login (footer “Staff Login”). Rate limited per IP and per IP+account (PR #131); uses `useActionState` and never reflects errors into the URL (PR #193). |
 | `/portal`, `/portal/login` | School Manager Portal and its own login; see the portal section below. |

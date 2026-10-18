@@ -111,3 +111,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
 - The `'2025-2026'` default is still hard-coded in `staff-manager-service.ts` and the admin Provision / Assign tabs (`ProvisionInviteTab.tsx`, `AssignExistingManagerTab.tsx`), with tests asserting it. Bump or derive it from today's date in a separate change.
 - The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.
+
+## Student Handbook page (spec-019)
+
+- Unverified in production: that Supabase serves the public PDF object with headers that allow framing (inline viewer); the Open/Download links work regardless.
+- 4 MB upload cap (Vercel body limit); larger handbooks need a signed direct-to-storage upload. There is no "remove PDF" button, only replace.
+- The fallback text in `app/lib/handbook-content.ts` is code and goes stale each season; the pamphlet lists Game Regulations with Operations' description copied verbatim, so that entry was left without one pending leadership confirmation.
