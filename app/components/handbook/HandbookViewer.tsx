@@ -143,7 +143,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const [pdf, setPdf] = useState<LoadedHandbookPdf | null>(null);
   const [pdfFailed, setPdfFailed] = useState(false);
   const [current, setCurrent] = useState(0);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1.5);
   const [textMode, setTextMode] = useState(false);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -321,10 +321,8 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const showPdfButtons = Boolean(pdfUrl);
   const page = pages[current];
   const zoomOptions = [
-    { value: 1, label: narrow ? 'Fit width' : 'Fit screen' },
-    { value: 1.25, label: '125%' },
     { value: 1.5, label: '150%' },
-    { value: 2, label: '200%' },
+    { value: 1, label: narrow ? 'Fit width' : 'Full page' },
   ];
 
   return (
