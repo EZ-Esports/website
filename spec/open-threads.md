@@ -121,6 +121,6 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Season roster lock (spec-020)
 
-- Migration `0050_season_rosters_locked` is not applied to production; apply it (after confirming with the user) before the PR's code deploys. It follows `0049` (already applied to production and merged via #252), journal `idx` 50.
+- Migration `0050_season_rosters_locked` was applied to production on 18 Oct 2026 (before #256 merged). Resolved.
 - The lock is per season with no actor or reason recorded, and no scheduled auto-lock.
 - Invite approval is refused whenever the game's season is locked, even if it would have enrolled nobody; revisit if staff want approvals to continue during a lock.
