@@ -20,6 +20,8 @@ export const HANDBOOK_STORAGE_FOLDER = 'handbook';
  */
 export const HANDBOOK_MAX_BYTES = 4 * 1024 * 1024;
 
+export const HANDBOOK_DOWNLOAD_NAME = 'EZ-Esports-Student-Handbook.pdf';
+
 export const HANDBOOK_ACCEPT = 'application/pdf,.pdf';
 
 const HANDBOOK_KEY_REGEX = /^handbook\/\d{10,16}\.pdf$/;

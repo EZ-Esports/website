@@ -72,8 +72,8 @@ export default function HandbookUploader({ currentUrl }: HandbookUploaderProps) 
         </h2>
         <p className="mt-0.5 text-xs text-foreground-secondary">
           Export the handbook document as a PDF (4 MB max) and upload it. It replaces the previous file and appears on{' '}
-          <span className="font-medium text-accent">the Student Handbook page</span> with a download link and inline viewer.
-          Until one is uploaded, that page shows the built-in text version.
+          <span className="font-medium text-accent">the Student Handbook page</span> as a page viewer (with search, zoom and Download PDF).
+          Until one is uploaded, that page shows the bundled 2026-27 pages.
         </p>
       </div>
 
@@ -86,7 +86,7 @@ export default function HandbookUploader({ currentUrl }: HandbookUploaderProps) 
             </a>
           </>
         ) : (
-          'No PDF uploaded yet. The page is showing the built-in text version.'
+          'No PDF uploaded yet. The page is showing the bundled 2026-27 pages.'
         )}
       </p>
 

@@ -430,3 +430,9 @@ select:not([multiple]):not([size]) {
   }
   .welcome-ring { display: none; }
 }
+
+/* Handbook viewer: a page eases in when the spread changes. */
+@keyframes handbook-arrive {
+  from { opacity: 0.6; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}

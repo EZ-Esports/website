@@ -35,6 +35,7 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.33.0",
     "next": "^16.3.8",
+    "pdfjs-dist": "6.3.289",
     "postgres": "^3.4.9",
     "react": "19.2.3",
     "react-aria": "^3.50.0",

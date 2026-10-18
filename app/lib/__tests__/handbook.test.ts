@@ -6,7 +6,8 @@ import {
   isHandbookStorageKey,
   validateHandbookUpload,
 } from '../handbook';
-import { HANDBOOK_SECTIONS } from '../handbook-content';
+import { BUNDLED_CHAPTERS, BUNDLED_HANDBOOK_PAGES } from '../handbook-pages';
+import { resolveHandbookLink } from '../handbook-viewer';
 import { FOOTER_LINKS, ROUTES } from '../constants';
 
 const pdfBytes = new TextEncoder().encode('%PDF-1.7\n...');
@@ -46,11 +47,21 @@ describe('handbook site wiring', () => {
     expect(FOOTER_LINKS.some((l) => l.href === ROUTES.handbook)).toBe(true);
   });
 
-  it('ships the pamphlet sections as fallback content', () => {
-    const titles = HANDBOOK_SECTIONS.map((s) => s.title).join('|');
-    expect(titles).toContain('Key Links');
-    expect(titles).toContain('Key Dates');
-    expect(titles).toContain('#1 Rule');
-    expect(new Set(HANDBOOK_SECTIONS.map((s) => s.id)).size).toBe(HANDBOOK_SECTIONS.length);
+  it('ships the seven pamphlet pages with text and link boxes as fallback content', () => {
+    expect(BUNDLED_HANDBOOK_PAGES).toHaveLength(7);
+    const text = BUNDLED_HANDBOOK_PAGES.map((p) => p.text).join(' ');
+    expect(text).toContain('Key Links');
+    expect(text).toContain('Key Dates');
+    expect(text).toContain('#1 Rule');
+    expect(BUNDLED_HANDBOOK_PAGES.some((p) => p.links.length > 0)).toBe(true);
+    for (const chapter of BUNDLED_CHAPTERS) expect(chapter.page).toBeLessThan(BUNDLED_HANDBOOK_PAGES.length);
+  });
+
+  it('only ships pamphlet link targets the viewer will render', () => {
+    for (const page of BUNDLED_HANDBOOK_PAGES) {
+      for (const link of page.links) {
+        expect(link.uri === undefined ? link.page !== undefined : resolveHandbookLink(link.uri) !== null).toBe(true);
+      }
+    }
   });
 });

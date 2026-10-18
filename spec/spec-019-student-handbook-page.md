@@ -4,26 +4,32 @@
 
 ## Context & Motivation
 
-Leadership publishes a yearly Student Handbook (key links, games, the three communities, the season timeline, the #1 rule) as a Google Doc and an interactive HTML pamphlet. Students had no page on the site for it. Staff edit the doc and export a PDF, so the site needs a public page that shows that PDF, plus a way for staff to swap it without a deploy.
+Leadership publishes a yearly Student Handbook (key links, games, the three communities, the season timeline, the #1 rule) as a Google Doc and an interactive HTML pamphlet (a page-by-page viewer). Students had no page on the site for it. Staff edit the doc and export a PDF, so the site needs a public page that shows that PDF and a way for staff to swap it without a deploy.
 
 ## Design Decisions
 
-- **Route `/handbook`**, a normal marketing page (nav up top, Hero, `Section`). Linked from the **footer only** (`FOOTER_LINKS`, "Student Handbook"); the top nav is unchanged. Added to `ROUTES`, `HERO_ROUTES` (transparent header over the Hero) and the sitemap.
-- **Two sources, one page.** The page always has a built-in text version (`app/lib/handbook-content.ts`, converted from the pamphlet's seven pages, Oct 18 2026 edition). Staff-uploaded PDF present: the PDF leads (Open PDF, Download PDF, inline `<iframe>` viewer, fallback links) and the text version collapses into a `<details>` labelled as possibly older than the PDF. No PDF (or CMS read fails): the text version is the page, with a Google Docs link. The text version is also what search engines, screen readers and phones (which often show only page one of an embedded PDF) get.
-- **No schema change.** The PDF's storage key is one `page_content` row, key `handbook_pdf`, created by an upsert (`setHandbookPdfKey`), so no seed or migration is needed for it to exist. `/admin/content` filters that row out of the text-block list; `savePageContentWithHistory` refuses to edit it as free text.
-- **Upload flow mirrors gallery images.** Step 1, `POST /api/handbook` (MANAGE_CONTENT, 10 per minute per IP, `%PDF-` magic-byte check, PDF-only, 4 MB cap, public `admin-uploads` bucket, key `handbook/<timestamp>.pdf`). Step 2, server action `saveHandbookPdf(storageKey)` (MANAGE_CONTENT) re-validates the key against the exact generated shape (`isHandbookStorageKey`), upserts the row, calls `updateTag('page-content')`, revalidates `/admin/content` and `/handbook`, then best-effort deletes the superseded object. A failed save leaves the old handbook live.
-- **4 MB cap** because the multipart request must fit Vercel's 4.5 MB body limit (same reasoning as resumes, spec-007). A larger PDF needs a signed direct-to-storage upload; not built.
-- **CSP:** `frame-src` gains `https://*.supabase.co` so the viewer can load the public bucket object. `object-src 'none'` is unchanged, so the viewer is an `<iframe>`, not `<object>`.
-- **Cache:** `getCachedHandbookPdfKey` uses the existing `page-content` tag; no new tag.
+- **Route `/handbook`**, a normal marketing page (site nav and footer unchanged, no Hero). Linked from the **footer only** (`FOOTER_LINKS`, "Student Handbook"); top nav unchanged. In `ROUTES` and the sitemap. Title is the bare "Student Handbook" (the layout template adds the site name). `export const revalidate = 60` so a DB failure (which renders the bundled pages) heals within a minute instead of freezing until a deploy.
+- **Pamphlet-style viewer** (`app/components/handbook/HandbookViewer.tsx`, client): sidebar with a "Having trouble viewing? Open in Google Docs" button, chapter list, search with per-page results; toolbar with page counter, "Two pages" toggle (cover alone, then pairs; single page under 760 px) and zoom (Fit/125/150/200%); one- or two-page spread with percent-positioned clickable link boxes; Previous/Next, left/right arrow keys, page-number dots; mobile "Contents & search" toggle; print styles (controls hidden, pages stacked); labelled controls. Styled with site tokens. Pure logic (link safety, spread paging, fit width, search, rect conversion) is in `app/lib/handbook-viewer.ts` and tested.
+- **Two page sources, one viewer.**
+  - **Staff PDF uploaded:** rendered in the browser with **pdf.js** (`pdfjs-dist` 6.3.289, dynamically imported by `app/lib/handbook-pdf.ts`, same-origin worker emitted by the bundler). Each page is a canvas; Link annotations become overlay boxes (http/https/mailto plus in-document jumps); `getTextContent` feeds search; the PDF outline, when present, becomes the chapter list.
+  - **No PDF, DB read failure, or pdf.js failure:** the bundled pamphlet pages. The seven designed pages are JPEGs under `public/handbook/` (1224 px wide, about 1.2 MB total), with the pamphlet's link boxes, extracted text and chapter list in `app/lib/handbook-pages.ts`. When an uploaded PDF fails to load a notice explains and links to "Open the PDF directly".
+  - The earlier iframe viewer was removed: the site's `frame-ancestors 'none'` / `X-Frame-Options: DENY` blocks framing PDFs, so it rendered blank.
+- **Open PDF / Download PDF** buttons appear only when a PDF exists. Download adds Supabase's `?download=<filename>` so it saves instead of navigating.
+- **CSP:** pdf.js fetches the PDF from Supabase under the existing `connect-src https://*.supabase.co`. Added `worker-src 'self' blob:` (explicit, because `strict-dynamic` makes the `script-src` fallback unreliable for workers). `frame-src` is unchanged. Requires the Supabase public bucket to answer cross-origin GETs (it sends permissive CORS).
+- **Link safety:** link targets from the pamphlet data and from PDF annotations are untrusted; only `http(s):` and `mailto:` render (`resolveHandbookLink`). http(s) open in a new tab with `noopener noreferrer`; mailto does not open a tab.
+- **No schema change.** The PDF's storage key is one `page_content` row, key `handbook_pdf`, created by an upsert (`setHandbookPdfKey`). `/admin/content` filters that row out of the text-block list and `savePageContentWithHistory` refuses to edit it as free text.
+- **Upload flow mirrors gallery images.** `POST /api/handbook` (MANAGE_CONTENT, 10 per minute per IP, `%PDF-` magic bytes, PDF only, 4 MB cap, public `admin-uploads` bucket, key `handbook/<timestamp>.pdf`), then server action `saveHandbookPdf(storageKey)` (MANAGE_CONTENT) re-validates the key shape (`isHandbookStorageKey`), upserts the row, `updateTag('page-content')`, revalidates `/admin/content` and `/handbook`, and best-effort deletes the superseded object. A failed save leaves the old handbook live. 4 MB because the multipart request must fit Vercel's 4.5 MB body limit.
 
 ## Invariants & Boundaries
 
-- Only keys matching `^handbook/\d{10,16}\.pdf$` are ever stored or rendered; the public URL is built server-side from the project URL, bucket and key.
-- The fallback text is code, not CMS: refreshing it means editing `handbook-content.ts`. Staff-facing edits are PDF only. A removal button is not built (replace only).
-- The source pamphlet repeats Operations' description under Game Regulations; the page lists Game Regulations without a description rather than copying the duplicate. Confirm the intended text with leadership.
-- Non-goals: page-by-page viewer, search, per-game handbooks (Valorant and LoL handbooks are sent by email), versioned PDF history.
+- Only keys matching `^handbook/\d{10,16}\.pdf$` are stored or rendered; the public URL is built server-side from project URL, bucket and key.
+- The bundled pages are the 2026-27 edition as designed (images are the source of truth, including the pamphlet's wording under Game Regulations). They go stale each season; refresh by replacing `public/handbook/page-N.jpg` and `handbook-pages.ts`, or just upload a PDF.
+- No "remove PDF" control (replace only). PDFs over 4 MB are not supported.
+- pdf.js standard-font and CMap data are not bundled: a PDF that relies on non-embedded standard fonts may render with substitute fonts. Exports from Google Docs embed fonts.
+- Non-goals: per-game handbooks (sent by email), versioned PDF history, server-side PDF rendering.
 
 ## Verification
 
-- `npx tsc --noEmit`, `npm run lint`, `npx vitest run` (new: `app/lib/__tests__/handbook.test.ts`, `app/api/handbook/__tests__/route.test.ts`, `app/(admin)/admin/content/__tests__/handbook-actions.test.ts`, `app/(marketing)/handbook/__tests__/page.test.tsx`; CSP test updated).
-- Visual: `/handbook` with no `DATABASE_URL` renders the text version and the footer link. With a PDF uploaded, check the iframe renders (Supabase serves the object cross-origin; confirm its response headers allow framing) and that Download works.
+- `npx tsc --noEmit`, `npm run lint`, `npx vitest run` (new/updated: `handbook.test.ts`, `handbook-viewer.test.ts`, `api/handbook/__tests__/route.test.ts`, `admin/content/__tests__/handbook-actions.test.ts`, `(marketing)/handbook/__tests__/page.test.tsx`, `csp.test.ts`).
+- Dev server: `/handbook` renders the bundled pages (spread, Next, chips); with a temporary local sample PDF the pdf.js path rendered canvas pages, a link overlay and per-page search; pointing at a missing file showed the failure notice and bundled pages. The temporary override and sample file were removed before commit.
+- Not verified: a real upload through Supabase (CORS for pdf.js, `?download=` behavior) in production.

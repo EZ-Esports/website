@@ -114,6 +114,6 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Student Handbook page (spec-019)
 
-- Unverified in production: that Supabase serves the public PDF object with headers that allow framing (inline viewer); the Open/Download links work regardless.
-- 4 MB upload cap (Vercel body limit); larger handbooks need a signed direct-to-storage upload. There is no "remove PDF" button, only replace.
-- The fallback text in `app/lib/handbook-content.ts` is code and goes stale each season; the pamphlet lists Game Regulations with Operations' description copied verbatim, so that entry was left without one pending leadership confirmation.
+- Unverified in production: a real Supabase upload being read by pdf.js (public-bucket CORS) and the `?download=` filename behavior. On any pdf.js failure the page shows the bundled pages plus an Open PDF link.
+- 4 MB upload cap (Vercel body limit); larger handbooks need a signed direct-to-storage upload. No "remove PDF" button, only replace.
+- The bundled page images and text (`public/handbook/`, `app/lib/handbook-pages.ts`) are the 2026-27 edition and go stale each season. pdf.js standard-font/CMap data is not bundled.

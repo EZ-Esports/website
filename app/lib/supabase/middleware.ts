@@ -9,8 +9,10 @@ export function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline';",
     "img-src 'self' data: blob: https://*.supabase.co https://*.ytimg.com https://*.youtube.com;",
     "font-src 'self' data:;",
-    "frame-src 'self' https://*.supabase.co https://www.youtube-nocookie.com https://www.youtube.com https://player.twitch.tv;",
+    "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.twitch.tv;",
     "connect-src 'self' https://*.supabase.co https://va.vercel-scripts.com https://vitals.vercel-insights.com;",
+    // pdf.js (handbook viewer) runs its parser in a same-origin worker; script-src's strict-dynamic would otherwise be the fallback.
+    "worker-src 'self' blob:;",
     "object-src 'none';",
     "base-uri 'self';",
     "form-action 'self';",

@@ -42,7 +42,6 @@ export const HERO_ROUTES = [
   ROUTES.sponsors,
   ROUTES.privacy,
   ROUTES.rules,
-  ROUTES.handbook,
 ];
 
 /** Check if current route features a full dark hero header section. */
