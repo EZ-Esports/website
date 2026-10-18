@@ -1,6 +1,6 @@
 # Spec-018: manager_invites table
 
-**Issue:** #224. **Branch:** `refactor/manager-invites-table`. **PR:** not opened. **Status:** Code ready, migration `0049` **not applied to production**.
+**Issue:** #224. **Branch:** `refactor/manager-invites-table`. **PR:** #252 (merged 18 Oct 2026). **Status:** Shipped. Migration `0049` was applied to production on 18 Oct 2026.
 
 ## Problem
 
