@@ -7,9 +7,11 @@ const mockRedirect = vi.fn((url: string) => {
 const mockRevalidatePath = vi.fn();
 const mockHeaders = vi.fn();
 const mockSignInWithPassword = vi.fn();
+const mockSignOut = vi.fn();
 const mockCreateClient = vi.fn().mockResolvedValue({
   auth: {
     signInWithPassword: mockSignInWithPassword,
+    signOut: mockSignOut,
   },
 });
 
@@ -99,7 +101,7 @@ describe('login server action', () => {
   });
 
   describe('school managers', () => {
-    it('redirects a manager with no staff row to /portal', async () => {
+    it('rejects a manager with no staff row and signs them out', async () => {
       mockSignInWithPassword.mockResolvedValueOnce({
         data: { user: { id: 'manager-user', email: 'manager@example.com' } },
         error: null,
@@ -108,7 +110,11 @@ describe('login server action', () => {
 
       const fd = createFormData({ email: 'manager@example.com', password: 'correctpassword' });
 
-      await expect(login(null, fd)).rejects.toThrow('REDIRECT:/portal');
+      const result = await login(null, fd);
+
+      expect(result).toEqual({ error: expect.stringContaining('School Manager') });
+      expect(mockSignOut).toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
       expect(mockResolveDestination).toHaveBeenCalledWith('manager-user', 'manager@example.com');
     });
 
