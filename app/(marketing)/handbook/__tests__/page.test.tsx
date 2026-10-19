@@ -32,7 +32,11 @@ describe('Student Handbook page (/handbook)', () => {
     expect(html).toContain('Open in Google Docs');
     expect(html).toContain('Search the handbook');
     expect(html).toContain('Page zoom');
-    expect(html).toContain('100%');
+    // Default zoom is Full page; 150% and 200% scale up from it.
+    expect(html).toMatch(/<option value="1" selected="">Full page<\/option>/);
+    expect(html).toContain('>150%<');
+    expect(html).toContain('>200%<');
+    expect(html).not.toContain('>100%<');
     expect(html).toContain('Go to page 7');
     expect(html).toContain('4. Key Dates and Timeline');
     expect(html).toContain('href="#page-2"');

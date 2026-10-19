@@ -9,6 +9,12 @@ import type { HandbookChapter, HandbookLink, HandbookViewerPage } from '@/app/li
 import {
   LETTER_ASPECT,
   NARROW_MAX_WIDTH,
+  canShowSpread,
+  previousSpreadStart,
+  spreadAnnouncement,
+  spreadCounterLabel,
+  spreadSize,
+  spreadStart,
   fitSheetWidth,
   linkifyText,
   parsePageHash,
@@ -43,6 +49,9 @@ const bundledPages: HandbookViewerPage[] = BUNDLED_HANDBOOK_PAGES.map((p) => ({
  * lying on a desk; swap this one class to change it (e.g. 'bg-surface-sunken' for dark).
  */
 const VIEWER_BACKDROP = 'bg-[#e9e6e6]';
+
+/** Gutter between the two pages of a spread, in px. */
+const SPREAD_GAP = 2;
 
 const toolbarBase =
   'rounded-lg border px-3 py-2 text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-35 disabled:cursor-default cursor-pointer';
@@ -143,7 +152,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const [pdf, setPdf] = useState<LoadedHandbookPdf | null>(null);
   const [pdfFailed, setPdfFailed] = useState(false);
   const [current, setCurrent] = useState(0);
-  const [zoom, setZoom] = useState(1.5);
+  const [zoom, setZoom] = useState(1);
   const [textMode, setTextMode] = useState(false);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -232,11 +241,18 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
     setCurrent((c) => Math.min(c, pages.length - 1));
   }, [pages.length]);
 
+  // Two pages at once like an open book: the cover alone, then pairs; an odd last page alone.
+  const spread = canShowSpread(windowWidth, box.w);
+  const start = spreadStart(current, pages.length, spread);
+  const size = spreadSize(start, pages.length, spread);
+  const shown = Array.from({ length: size }, (_, i) => start + i);
+
   const go = useCallback(
     (index: number) => {
-      const target = Math.max(0, Math.min(pages.length - 1, index));
+      const target = spreadStart(index, pages.length, spread);
       setCurrent(target);
       // replaceState: a long read would otherwise bury the Back button under one entry per page turn.
+      // The hash names the first page of the spread.
       window.history.replaceState(window.history.state, '', `#page-${target + 1}`);
       const el = sectionRef.current;
       if (el) {
@@ -247,12 +263,14 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
       const viewer = viewerRef.current;
       if (viewer) viewer.scrollLeft = 0;
     },
-    [pages.length],
+    [pages.length, spread],
   );
 
   const last = pages.length - 1;
-  const next = useCallback(() => go(current + 1), [go, current]);
-  const previous = useCallback(() => go(current - 1), [go, current]);
+  const hasNext = start + size - 1 < last;
+  const hasPrevious = start > 0;
+  const next = useCallback(() => go(start + size), [go, start, size]);
+  const previous = useCallback(() => go(previousSpreadStart(start, spread)), [go, start, spread]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -260,17 +278,17 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
       if (textMode) return;
       if (target && /INPUT|SELECT|TEXTAREA/.test(target.tagName)) return;
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (e.key === 'ArrowRight' && current < last) {
+      if (e.key === 'ArrowRight' && hasNext) {
         e.preventDefault();
         next();
-      } else if (e.key === 'ArrowLeft' && current > 0) {
+      } else if (e.key === 'ArrowLeft' && hasPrevious) {
         e.preventDefault();
         previous();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [next, previous, current, last, textMode]);
+  }, [next, previous, hasNext, hasPrevious, textMode]);
 
   // Move focus into the text view when it opens; closing leaves focus on the toggle that was pressed.
   useEffect(() => {
@@ -286,16 +304,16 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
     touchRef.current = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
   };
   const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchRef.current;
+    const touchStart = touchRef.current;
     touchRef.current = null;
-    if (!start || e.changedTouches.length !== 1) return;
+    if (!touchStart || e.changedTouches.length !== 1) return;
     const viewer = viewerRef.current;
     // When the page is zoomed (pinch or the menu) sideways drags pan; they must not turn the page.
     if ((window.visualViewport?.scale ?? 1) > 1.02 || (viewer && viewer.scrollWidth > viewer.clientWidth + 1)) return;
     const t = e.changedTouches[0];
-    const dir = swipeDirection(t.clientX - start.x, t.clientY - start.y, Date.now() - start.t);
-    if (dir === -1 && current < last) next();
-    if (dir === 1 && current > 0) previous();
+    const dir = swipeDirection(t.clientX - touchStart.x, t.clientY - touchStart.y, Date.now() - touchStart.t);
+    if (dir === -1 && hasNext) next();
+    if (dir === 1 && hasPrevious) previous();
   };
 
   const hits = useMemo(
@@ -309,19 +327,20 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
     return structureHandbookText(pages.map((p) => p.text), headings);
   }, [textMode, pages, chapters, source]);
 
-  // Phones fill the width (readable text, pinch to zoom further); larger screens fit the whole page on screen.
+  // Phones fill the width (readable text, pinch to zoom further); larger screens fit the whole page, or both pages of
+  // a spread, on screen. Zoom multiplies that fit size, so 'Full page' is always the smallest view.
   const sheetWidth = fitSheetWidth({
     availableWidth: box.w,
     availableHeight: narrow ? 99999 : box.h,
-    count: 1,
-    aspect: pages[current]?.aspect ?? LETTER_ASPECT,
+    count: size,
+    aspect: pages[start]?.aspect ?? LETTER_ASPECT,
     zoom,
+    gap: SPREAD_GAP,
   });
 
   const showPdfButtons = Boolean(pdfUrl);
-  const page = pages[current];
   const zoomOptions = [
-    { value: 1.5, label: '100%' },
+    { value: 1.5, label: '150%' },
     { value: 2, label: '200%' },
     { value: 1, label: narrow ? 'Fit width' : 'Full page' },
   ];
@@ -401,7 +420,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
           {chapters.length > 0 && (
             <nav aria-label="Handbook sections" className="grid grid-cols-2 gap-1 md:grid-cols-1">
               {chapters.map((chapter, i) => {
-                const active = chapter.page === current;
+                const active = chapter.page >= start && chapter.page < start + size;
                 return (
                   <button
                     key={`${chapter.label}-${i}`}
@@ -476,16 +495,16 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
           <div className="sticky top-[88px] z-30 -mx-1 mb-3 flex flex-wrap items-center gap-2 bg-surface/95 px-1 py-2 backdrop-blur print:hidden">
             {!textMode && (
               <span className="mr-auto text-xs sm:text-sm text-foreground-secondary">
-                {source === 'loading' ? 'Loading handbook…' : `Page ${current + 1} / ${pages.length}`}
+                {source === 'loading' ? 'Loading handbook…' : spreadCounterLabel(start, size, pages.length)}
               </span>
             )}
             {textMode && <span className="mr-auto text-xs sm:text-sm text-foreground-secondary">Text version</span>}
             {!textMode && (
               <>
-                <button type="button" onClick={previous} disabled={current === 0} className={toolbarControl}>
+                <button type="button" onClick={previous} disabled={!hasPrevious} className={toolbarControl}>
                   ← Previous
                 </button>
-                <button type="button" onClick={next} disabled={current >= last} className={toolbarControl}>
+                <button type="button" onClick={next} disabled={!hasNext} className={toolbarControl}>
                   Next →
                 </button>
                 <label>
@@ -518,7 +537,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
 
           {/* Announces page turns for screen readers; the visible counter above is not a live region so it is not read twice. */}
           <p role="status" aria-live="polite" className="sr-only">
-            {!textMode && source !== 'loading' ? `Page ${current + 1} of ${pages.length}` : ''}
+            {!textMode && source !== 'loading' ? spreadAnnouncement(start, size, pages.length) : ''}
           </p>
 
           {textMode ? (
@@ -572,26 +591,37 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
               ) : (
                 <div className="m-auto flex w-max min-w-full shrink-0 items-start justify-center print:block print:w-full">
                   <div
-                    key={`${source}-${current}`}
-                    id={`handbook-page-${current + 1}`}
-                    className="relative shrink-0 bg-white shadow-xl shadow-black/30 ring-1 ring-black/10 motion-safe:animate-[handbook-arrive_0.22s_ease-out] print:!w-full print:shadow-none print:break-after-page"
-                    style={{ width: box.w > 0 ? sheetWidth : 'min(100%, 520px)' }}
+                    key={`${source}-${start}`}
+                    className="relative flex shrink-0 items-start motion-safe:animate-[handbook-arrive_0.22s_ease-out] print:block print:w-full"
+                    style={{ gap: SPREAD_GAP }}
                   >
-                    {source === 'pdf' && pdf ? (
-                      <PdfCanvas pdf={pdf} index={current} width={sheetWidth} label={`Handbook page ${current + 1}`} />
-                    ) : (
-                      // Plain <img>: static, pre-sized files the browser caches; optimization would only resample the designed pages.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={BUNDLED_HANDBOOK_PAGES[current].image}
-                        alt={`Original handbook page ${current + 1}. Use Read as text for the full text.`}
-                        width={1224}
-                        height={1584}
-                        className="block h-auto w-full"
-                      />
-                    )}
-                    {/* Edge turn zones: tap/click the outer 15% to turn pages. Aria-hidden and unfocusable, since Previous/Next and the arrow keys already cover keyboard and screen reader users. */}
-                    {current > 0 && (
+                    {shown.map((index) => (
+                      <div
+                        key={index}
+                        id={`handbook-page-${index + 1}`}
+                        className="relative shrink-0 bg-white shadow-xl shadow-black/30 ring-1 ring-black/10 print:!w-full print:shadow-none print:break-after-page"
+                        style={{ width: box.w > 0 ? sheetWidth : 'min(100%, 520px)' }}
+                      >
+                        {source === 'pdf' && pdf ? (
+                          <PdfCanvas pdf={pdf} index={index} width={sheetWidth} label={`Handbook page ${index + 1}`} />
+                        ) : (
+                          // Plain <img>: static, pre-sized files the browser caches; optimization would only resample the designed pages.
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={BUNDLED_HANDBOOK_PAGES[index].image}
+                            alt={`Original handbook page ${index + 1}. Use Read as text for the full text.`}
+                            width={1224}
+                            height={1584}
+                            className="block h-auto w-full"
+                          />
+                        )}
+                        {pages[index].links.map((link, i) => (
+                          <LinkBox key={i} link={link} onGo={go} />
+                        ))}
+                      </div>
+                    ))}
+                    {/* Edge turn zones: tap/click the outer 15% of the whole spread to turn pages. Aria-hidden and unfocusable, since Previous/Next and the arrow keys already cover keyboard and screen reader users. Link boxes sit above them (z-[2]). */}
+                    {hasPrevious && (
                       <button
                         type="button"
                         tabIndex={-1}
@@ -600,7 +630,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
                         className="absolute inset-y-0 left-0 z-[1] w-[15%] cursor-pointer bg-transparent hover:bg-black/5 print:hidden"
                       />
                     )}
-                    {current < last && (
+                    {hasNext && (
                       <button
                         type="button"
                         tabIndex={-1}
@@ -609,9 +639,6 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
                         className="absolute inset-y-0 right-0 z-[1] w-[15%] cursor-pointer bg-transparent hover:bg-black/5 print:hidden"
                       />
                     )}
-                    {page.links.map((link, i) => (
-                      <LinkBox key={i} link={link} onGo={go} />
-                    ))}
                   </div>
                 </div>
               )}
@@ -621,18 +648,18 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
           {!textMode && (
             <>
               <div className="mt-3 flex items-center justify-between gap-3 print:hidden">
-                <button type="button" onClick={previous} disabled={current === 0} className={toolbarControl}>
+                <button type="button" onClick={previous} disabled={!hasPrevious} className={toolbarControl}>
                   ← Previous
                 </button>
                 <span className="hidden text-xs text-foreground-muted sm:inline">Use ← → or tap the page edges to turn pages</span>
-                <button type="button" onClick={next} disabled={current >= last} className={toolbarControl}>
+                <button type="button" onClick={next} disabled={!hasNext} className={toolbarControl}>
                   Next →
                 </button>
               </div>
 
               <div className="mt-3 flex flex-wrap justify-center gap-2 print:hidden" aria-label="Choose a page" role="group">
                 {pages.map((_, i) => {
-                  const active = i === current;
+                  const active = i >= start && i < start + size;
                   return (
                     <button
                       key={i}
