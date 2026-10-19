@@ -62,7 +62,7 @@ export async function login(
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -75,6 +75,15 @@ export async function login(
 
   // Clear caches and enter the staff portal. Permission assignment is not a
   // login prerequisite, so zero-permission members land on the waiting state.
+  // School managers without a staff row go to their portal instead, so signing
+  // in here never creates a staff directory entry for them.
   revalidatePath('/', 'layout');
-  return redirect('/admin');
+  const user = data?.user;
+  let destination: string = '/admin';
+  if (user?.id && user.email) {
+    // Loaded lazily so the DB client is only touched once credentials are valid.
+    const { resolvePostLoginDestination } = await import('@/app/lib/manager-identity');
+    destination = await resolvePostLoginDestination(user.id, user.email);
+  }
+  return redirect(destination);
 }

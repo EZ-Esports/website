@@ -6,6 +6,7 @@ import { staffAuditLogs, staffMembers, staffRevocations, userRoles, roles } from
 import { calculateEffectiveStaffAccess, hasPermission, Permissions } from '@/app/lib/roles';
 import { ADMIN_SECTION_PERMISSIONS, type AdminSectionHref } from '@/app/lib/staff-access';
 import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
+import { isActiveSchoolManager } from '@/app/lib/manager-identity';
 
 export interface StaffIdentity {
   id: string;
@@ -45,8 +46,13 @@ async function recordStaffAuditEvent(
  * Signups remain invite-only, so a missing row represents an interrupted old
  * invite/seed flow and can be repaired safely. We never transfer an existing
  * email's roles to a different auth user id automatically.
+ *
+ * Returns null, without creating a row, for an active school manager who has no
+ * staff row: managers are portal-only users and merely reaching /admin must not
+ * enrol them in the staff directory. Existing staff rows are never touched, so
+ * someone who is both staff and manager keeps working.
  */
-export async function ensureStaffMember(userId: string, email: string | undefined): Promise<string> {
+export async function ensureStaffMember(userId: string, email: string | undefined): Promise<string | null> {
   if (!email) {
     throw new StaffSetupError('Your authenticated account has no email address. Ask an Owner to repair the account.');
   }
@@ -115,6 +121,10 @@ export async function ensureStaffMember(userId: string, email: string | undefine
       throw new StaffSetupError('This staff email belongs to a different identity. Ask an Owner to reconcile the account.');
     }
 
+    if (await isActiveSchoolManager(tx, userId, normalizedEmail)) {
+      return null;
+    }
+
     await tx
       .insert(staffMembers)
       .values({ userId, email: normalizedEmail, invitedBy: null })
@@ -149,6 +159,10 @@ export const getStaff = cache(async (): Promise<StaffIdentity | null> => {
 
   const userId = claims.sub as string;
   const email = await ensureStaffMember(userId, claims.email as string | undefined);
+  // Portal-only school manager: authenticated, but not in the staff directory.
+  if (email === null) {
+    return null;
+  }
 
   const assignedRoles = await db
     .select({
@@ -176,6 +190,19 @@ export const getStaff = cache(async (): Promise<StaffIdentity | null> => {
   );
 
   return { id: userId, email, permissions, isOwner, highestRolePosition };
+});
+
+/**
+ * True when the signed-in identity is an active school manager. Used after
+ * getStaff() returns null to tell "send to the portal" apart from "send to
+ * /login": a manager is signed in and must not be bounced to the login form.
+ */
+export const isPortalOnlyManager = cache(async (): Promise<boolean> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (error || !claims?.sub || !claims.email) return false;
+  return isActiveSchoolManager(db, claims.sub as string, claims.email as string);
 });
 
 /** Require an authenticated staff identity, regardless of assigned roles. */
