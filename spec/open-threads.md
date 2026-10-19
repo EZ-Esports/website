@@ -95,7 +95,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views. Implemented in [spec-022](spec-022-hide-season-outcomes.md) (PR #261); migration `0051` is applied to production. Staff must press "Publish results" for each active season once its data is complete. Retiring a season (explicitly or by activating a new one) publishes it in the same write. Open: tournament brackets and tournament rows in Latest Results are not gated.
 - [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
 - [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Addressed in spec-019 (in review); invite scoping is still open, see below.
-- [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should get a `staff_members` row when they reach `/admin` or `/login`.
+- [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should not get a `staff_members` row when they reach `/admin` or `/login`. Fixed in [spec-023](spec-023-manager-no-staff-row.md) (PR #264): no row is created for managers; the staff login rejects them and `/admin` routes them to `/portal`. Open: manager staff rows created before the fix remain and are not cleaned up automatically.
 - [#240](https://github.com/EZ-Esports/website/issues/240): link school names in Season standing and the Standings tab to team pages.
 - [#241](https://github.com/EZ-Esports/website/issues/241): show high school alongside university on leadership cards.
 - [#242](https://github.com/EZ-Esports/website/issues/242): in-site match reporting instead of Discord text channel reporting.
@@ -115,7 +115,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 ## Manager portal season scope (spec-019)
 
 - **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to the active season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
-- **#233 interplay.** Managers can be given role-less `staff_members` rows. The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way when #233 lands.
+- **#233 interplay.** Managers can still hold role-less `staff_members` rows (legacy, or granted deliberately). The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way. New manager logins no longer create such rows (spec-023).
 - The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
 - Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.
 

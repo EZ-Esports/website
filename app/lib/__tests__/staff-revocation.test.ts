@@ -48,7 +48,7 @@ vi.mock('@/app/lib/supabase/server', () => ({
 }));
 
 import { ensureStaffMember, StaffSetupError } from '@/app/lib/auth';
-import { staffAuditLogs, staffMembers, staffRevocations } from '@/app/lib/db/schema';
+import { members, schoolManagers, staffAuditLogs, staffMembers, staffRevocations } from '@/app/lib/db/schema';
 
 describe('durable staff revocation', () => {
   beforeEach(() => {
@@ -74,6 +74,8 @@ describe('durable staff revocation', () => {
       [],
       [],
       [],
+      [], // school_managers by user id
+      [], // members by email
       [{ email: 'zero-role@example.com' }],
     );
 
@@ -85,6 +87,8 @@ describe('durable staff revocation', () => {
       staffRevocations,
       staffMembers,
       staffMembers,
+      schoolManagers,
+      members,
       staffMembers,
     ]);
     expect(database.db.insert).toHaveBeenCalledWith(staffMembers);

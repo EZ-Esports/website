@@ -62,7 +62,7 @@ export async function login(
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -75,6 +75,29 @@ export async function login(
 
   // Clear caches and enter the staff portal. Permission assignment is not a
   // login prerequisite, so zero-permission members land on the waiting state.
+  // School managers without a staff row are rejected: the staff and manager
+  // portals are separate, and signing in here must never create a staff
+  // directory entry for them.
   revalidatePath('/', 'layout');
+  const user = data?.user;
+  if (user?.id && user.email) {
+    let destination: string = '/admin';
+    // Loaded lazily so the DB client is only touched once credentials are valid.
+    try {
+      const { resolvePostLoginDestination } = await import('@/app/lib/manager-identity');
+      destination = await resolvePostLoginDestination(user.id, user.email);
+    } catch (lookupError) {
+      // The user is already signed in. Fall through to /admin; its layout
+      // blocks row-less managers, so this fails safe.
+      console.error('Post-login destination lookup failed', lookupError);
+    }
+    if (destination === '/portal') {
+      await supabase.auth.signOut();
+      return {
+        error:
+          'This account is a School Manager account. Please sign in through the School Manager Portal.',
+      };
+    }
+  }
   return redirect('/admin');
 }
