@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
-import { asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 
 /** All provisioned staff members, oldest first. */
 export const listStaffMembers = async () => {
@@ -102,3 +102,49 @@ export const listPendingStaffInvites = async () => {
     };
   });
 };
+
+/** Any query surface that can run selects: the pool or a transaction handle. */
+type Selectable = Pick<typeof db, 'select'>;
+
+/** True when the auth identity already has a staff directory row. */
+export async function hasStaffMemberRow(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ userId: schema.staffMembers.userId })
+    .from(schema.staffMembers)
+    .where(eq(schema.staffMembers.userId, userId))
+    .limit(1);
+  return Boolean(row);
+}
+
+/**
+ * True when the auth identity is an active school manager, either directly
+ * (`school_managers.user_id`) or through the member record that shares its
+ * email, mirroring the portal login check. Staff-only accounts are never
+ * managers, so a false result must not be read as "not staff".
+ */
+export async function isActiveSchoolManager(
+  userId: string,
+  email: string,
+  executor: Selectable = db,
+): Promise<boolean> {
+  const [byUser] = await executor
+    .select({ id: schema.schoolManagers.id })
+    .from(schema.schoolManagers)
+    .where(and(eq(schema.schoolManagers.userId, userId), eq(schema.schoolManagers.isActive, true)))
+    .limit(1);
+  if (byUser) return true;
+
+  const [member] = await executor
+    .select({ id: schema.members.id })
+    .from(schema.members)
+    .where(sql`lower(${schema.members.email}) = ${email.trim().toLowerCase()}`)
+    .limit(1);
+  if (!member) return false;
+
+  const [byMember] = await executor
+    .select({ id: schema.schoolManagers.id })
+    .from(schema.schoolManagers)
+    .where(and(eq(schema.schoolManagers.memberId, member.id), eq(schema.schoolManagers.isActive, true)))
+    .limit(1);
+  return Boolean(byMember);
+}

@@ -6,7 +6,7 @@ import { staffAuditLogs, staffMembers, staffRevocations, userRoles, roles } from
 import { calculateEffectiveStaffAccess, hasPermission, Permissions } from '@/app/lib/roles';
 import { ADMIN_SECTION_PERMISSIONS, type AdminSectionHref } from '@/app/lib/staff-access';
 import { STAFF_REVOCATION_LOCK_KEY } from '@/app/lib/staff-revocation';
-import { isActiveSchoolManager } from '@/app/lib/manager-identity';
+import { isActiveSchoolManager } from '@/app/lib/db/staff';
 
 export interface StaffIdentity {
   id: string;
@@ -121,7 +121,7 @@ export async function ensureStaffMember(userId: string, email: string | undefine
       throw new StaffSetupError('This staff email belongs to a different identity. Ask an Owner to reconcile the account.');
     }
 
-    if (await isActiveSchoolManager(tx, userId, normalizedEmail)) {
+    if (await isActiveSchoolManager(userId, normalizedEmail, tx)) {
       return null;
     }
 
@@ -202,7 +202,7 @@ export const isPortalOnlyManager = cache(async (): Promise<boolean> => {
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
   if (error || !claims?.sub || !claims.email) return false;
-  return isActiveSchoolManager(db, claims.sub as string, claims.email as string);
+  return isActiveSchoolManager(claims.sub as string, claims.email as string);
 });
 
 /** Require an authenticated staff identity, regardless of assigned roles. */
