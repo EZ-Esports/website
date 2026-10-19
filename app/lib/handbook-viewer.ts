@@ -6,8 +6,16 @@ import type { HandbookLink } from './handbook-viewer-types';
 
 export const LETTER_ASPECT = 612 / 792;
 
-/** Below this viewport width the viewer fits the page to the screen width, not its height. */
+/** Viewports this wide or narrower fit the page to the screen width, not its height, and show one page at a time. */
 export const NARROW_MAX_WIDTH = 767;
+
+/** Narrowest viewer box (px) that still shows two pages side by side at a legible size (about 280 px each). */
+export const SPREAD_MIN_BOX_WIDTH = 560;
+
+/** Two pages at once only on non-phone screens whose viewer box can hold both legibly. */
+export function canShowSpread(viewportWidth: number, boxWidth: number): boolean {
+  return viewportWidth > NARROW_MAX_WIDTH && boxWidth >= SPREAD_MIN_BOX_WIDTH;
+}
 
 export interface ResolvedHandbookLink {
   href: string;
@@ -46,6 +54,36 @@ export function fitSheetWidth(opts: {
   const w = Math.max(20, availableWidth);
   const h = Math.max(20, availableHeight);
   return Math.max(10, Math.min((w - (count - 1) * gap) / count, h * aspect)) * zoom;
+}
+
+/**
+ * Index of the first page of the spread that contains `index`. Page 0 (the cover)
+ * stands alone; the rest pair up (1-2, 3-4, ...) in two-page mode.
+ */
+export function spreadStart(index: number, pageCount: number, spread: boolean): number {
+  const clamped = Math.max(0, Math.min(pageCount - 1, index));
+  if (spread && clamped > 0) return 1 + 2 * Math.floor((clamped - 1) / 2);
+  return clamped;
+}
+
+/** Pages shown by the spread starting at `start`: the cover and an odd last page stand alone. */
+export function spreadSize(start: number, pageCount: number, spread: boolean): 1 | 2 {
+  return spread && start > 0 && start + 1 < pageCount ? 2 : 1;
+}
+
+/** Start of the spread before the one starting at `start`. */
+export function previousSpreadStart(start: number, spread: boolean): number {
+  return Math.max(0, start - (spread && start > 1 ? 2 : 1));
+}
+
+/** Visible counter text: 'Page 1 / 7' or 'Pages 2–3 / 7'. */
+export function spreadCounterLabel(start: number, size: number, total: number): string {
+  return size > 1 ? `Pages ${start + 1}–${start + size} / ${total}` : `Page ${start + 1} / ${total}`;
+}
+
+/** Screen-reader text for the live region: 'Page 1 of 7' or 'Pages 2 and 3 of 7'. */
+export function spreadAnnouncement(start: number, size: number, total: number): string {
+  return size > 1 ? `Pages ${start + 1} and ${start + size} of ${total}` : `Page ${start + 1} of ${total}`;
 }
 
 export interface HandbookSearchHit {

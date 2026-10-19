@@ -31,8 +31,11 @@ describe('Student Handbook page (/handbook)', () => {
     expect(html).toContain('src="/handbook/page-1.jpg"');
     expect(html).toContain('Open in Google Docs');
     expect(html).toContain('Search the handbook');
-    expect(html).toContain('Page zoom');
-    expect(html).toContain('100%');
+    // Zoom is gesture-driven (trackpad pinch / Ctrl+scroll over the pages): no menu or buttons, and the reset
+    // button only appears once zoomed in.
+    expect(html).not.toContain('<select');
+    expect(html).not.toContain('Zoom in');
+    expect(html).not.toContain('Reset zoom');
     expect(html).toContain('Go to page 7');
     expect(html).toContain('4. Key Dates and Timeline');
     expect(html).toContain('href="#page-2"');
