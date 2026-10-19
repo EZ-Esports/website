@@ -72,6 +72,13 @@ describe('spreads', () => {
     expect(previousSpreadStart(5, false)).toBe(4);
   });
 
+  it('handles one- and two-page documents', () => {
+    expect(spreadSize(0, 1, true)).toBe(1);
+    expect(spreadSize(0, 2, true)).toBe(1);
+    expect(spreadSize(1, 2, true)).toBe(1);
+    expect(spreadStart(1, 2, true)).toBe(1);
+  });
+
   it('needs a non-phone screen and a roomy enough box', () => {
     expect(canShowSpread(1280, 900)).toBe(true);
     expect(canShowSpread(767, 900)).toBe(false);

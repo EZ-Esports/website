@@ -411,7 +411,8 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
     availableWidth: box.w,
     availableHeight: narrow ? 99999 : box.h,
     count: size,
-    aspect: pages[start]?.aspect ?? LETTER_ASPECT,
+    // The tallest page in view (smallest width/height ratio) sets the width, so a spread never overflows the box.
+    aspect: Math.min(...(shown.length ? shown.map((i) => pages[i]?.aspect ?? LETTER_ASPECT) : [LETTER_ASPECT])),
     zoom: effectiveZoom,
     gap: SPREAD_GAP,
   });
