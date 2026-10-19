@@ -216,3 +216,66 @@ export async function lockSeasonRosters(seasonId: string) {
 export async function unlockSeasonRosters(seasonId: string) {
   return setSeasonRostersLocked(seasonId, false);
 }
+
+// --- SEASON OUTCOMES PUBLICATION ---
+
+/**
+ * Sets or clears `seasons.outcomes_finalized_at`, which gates every public view of
+ * the season's scores, results, standings and records (see `areOutcomesPublic`).
+ * Public reads sit behind the `seasons`, `matches`, `teams` and `rosters` tags and
+ * several per-route pages, so all of them are refreshed here.
+ */
+async function setSeasonOutcomesFinalized(seasonId: string, finalized: boolean) {
+  await requirePermission(Permissions.MANAGE_LEAGUE);
+  try {
+    if (!seasonId) {
+      return { success: false, error: 'Season is required.' };
+    }
+    // Publishing only stamps an unpublished season, so a repeat keeps the original timestamp.
+    const updated = await db
+      .update(schema.seasons)
+      .set({ outcomesFinalizedAt: finalized ? new Date() : null })
+      .where(
+        finalized
+          ? and(eq(schema.seasons.id, seasonId), isNull(schema.seasons.outcomesFinalizedAt))
+          : eq(schema.seasons.id, seasonId)
+      )
+      .returning({ id: schema.seasons.id });
+    if (updated.length === 0) {
+      const [existing] = await db
+        .select({ id: schema.seasons.id })
+        .from(schema.seasons)
+        .where(eq(schema.seasons.id, seasonId))
+        .limit(1);
+      if (!existing) {
+        return { success: false, error: 'Season not found.' };
+      }
+    }
+    revalidateLeague();
+    updateTag('matches');
+    updateTag('rosters');
+    for (const path of [
+      '/[game]/varsity',
+      '/[game]/junior-varsity',
+      '/[game]/standings',
+      '/[game]/schedule',
+      '/[game]/teams',
+      '/[game]/teams/[school]',
+    ]) {
+      revalidatePath(path, 'page');
+    }
+    revalidatePath('/archives');
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+export async function publishSeasonOutcomes(seasonId: string) {
+  return setSeasonOutcomesFinalized(seasonId, true);
+}
+
+export async function hideSeasonOutcomes(seasonId: string) {
+  return setSeasonOutcomesFinalized(seasonId, false);
+}

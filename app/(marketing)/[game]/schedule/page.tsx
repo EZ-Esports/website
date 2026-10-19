@@ -6,11 +6,12 @@ import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
 import FilterTabs from '@/app/components/ui/FilterTabs';
 import Button from '@/app/components/ui/Button';
-import { getMatchesPage, getSeasonMatches, getSeasonsWithGames } from '@/app/lib/db/queries';
+import { getPublicMatchesPage, getPublicSeasonMatches, getSeasonsWithGames } from '@/app/lib/db/queries';
 import { normalizeSort, resolveSelectedSeason, toMatchesPageDto, toScheduleCalendarItem } from '@/app/lib/db/match-page';
 import CalendarSchedule from './CalendarSchedule';
 import ArchiveMatchList from './ArchiveMatchList';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
+import { OUTCOMES_PENDING_NOTICE } from '@/app/lib/season-outcomes';
 
 
 interface SchedulePageProps {
@@ -49,14 +50,16 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
 
   const selectedSeason = resolveSelectedSeason(seasons, seasonParam);
   const isArchived = Boolean(selectedSeason && !selectedSeason.isActive);
+  // The data below is already redacted server-side; this only drives copy.
+  const outcomesHidden = Boolean(selectedSeason && !selectedSeason.outcomesPublic);
 
   // Active season -> full-season calendar; archived -> lazy-loaded list.
-  let calendarMatches: Awaited<ReturnType<typeof getSeasonMatches>> = [];
-  let archivePage: Awaited<ReturnType<typeof getMatchesPage>> = { items: [], nextCursor: null };
+  let calendarMatches: Awaited<ReturnType<typeof getPublicSeasonMatches>> = [];
+  let archivePage: Awaited<ReturnType<typeof getPublicMatchesPage>> = { items: [], nextCursor: null };
   if (selectedSeason && !isArchived) {
-    calendarMatches = await getSeasonMatches(selectedSeason.id, division);
+    calendarMatches = await getPublicSeasonMatches(selectedSeason.id, division);
   } else if (selectedSeason) {
-    archivePage = await getMatchesPage({
+    archivePage = await getPublicMatchesPage({
       seasonId: selectedSeason.id,
       division,
       sort,
@@ -86,6 +89,11 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
         <p className="text-xs text-foreground-muted -mt-8 mb-8 text-center font-medium">
           All match times are Eastern Time (ET).
         </p>
+        {outcomesHidden && (
+          <p className="mb-6 text-center text-sm font-medium text-foreground-secondary" role="note">
+            {OUTCOMES_PENDING_NOTICE}
+          </p>
+        )}
 
         {/* Filters: division tabs, season picker, sort (archive only) */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
@@ -127,6 +135,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             sort={sort}
             initialItems={toMatchesPageDto(archivePage).items}
             initialCursor={archivePage.nextCursor}
+            outcomesHidden={outcomesHidden}
           />
         ) : (
           <CalendarSchedule
@@ -134,6 +143,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             matches={schedule}
             gameSlug={game}
             division={division}
+            outcomesHidden={outcomesHidden}
           />
         )}
       </Section>

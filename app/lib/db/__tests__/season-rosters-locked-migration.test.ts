@@ -22,7 +22,7 @@ describe('seasons.rosters_locked_at migration (0050)', () => {
     const entry = journal.entries.find((e) => e.tag === TAG);
     expect(entry).toBeDefined();
     expect(existsSync(resolve(migrationsDir, `${entry!.tag}.sql`))).toBe(true);
-    for (const other of journal.entries.filter((e) => e !== entry)) {
+    for (const other of journal.entries.filter((e) => e.idx < entry!.idx)) {
       expect(entry!.when).toBeGreaterThan(other.when);
     }
     expect(new Set(journal.entries.map((e) => e.idx)).size).toBe(journal.entries.length);

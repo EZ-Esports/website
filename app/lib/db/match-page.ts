@@ -373,6 +373,8 @@ export interface SeasonStandingsResult {
    * second question to know how to label them.
    */
   standingsFormat: StandingsFormat;
+  /** False when staff have not published this season's outcomes; `rows` are then neutral (no stats, alphabetical). */
+  outcomesPublic: boolean;
   rows: StandingRow[];
 }
 

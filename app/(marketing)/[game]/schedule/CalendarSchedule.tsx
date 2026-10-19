@@ -13,6 +13,8 @@ interface CalendarScheduleProps {
   matches: ScheduleCalendarItem[];
   gameSlug: string;
   division: string;
+  /** Season outcomes are unpublished; matches arrive without scores and read as plain "Completed". */
+  outcomesHidden?: boolean;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -21,7 +23,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export default function CalendarSchedule({ matches, gameSlug, division }: CalendarScheduleProps) {
+export default function CalendarSchedule({ matches, gameSlug, division, outcomesHidden = false }: CalendarScheduleProps) {
   // Pre-process matches once to map them to America/New_York YYYY-MM-DD
   const processedMatches = useMemo(() => {
     return matches.map(m => {
@@ -399,7 +401,7 @@ export default function CalendarSchedule({ matches, gameSlug, division }: Calend
                           ) : match.result ? (
                             <Badge>{match.result}</Badge>
                           ) : (
-                            <Badge variant="neutral" size="sm">Final</Badge>
+                            <Badge variant="neutral" size="sm">{outcomesHidden ? 'Completed' : 'Final'}</Badge>
                           )}
                           {!match.forfeit && match.homeScore !== null && match.awayScore !== null && (
                             <span className="text-xs text-foreground-secondary font-bold">
