@@ -82,8 +82,14 @@ export async function login(
   let destination: string = '/admin';
   if (user?.id && user.email) {
     // Loaded lazily so the DB client is only touched once credentials are valid.
-    const { resolvePostLoginDestination } = await import('@/app/lib/manager-identity');
-    destination = await resolvePostLoginDestination(user.id, user.email);
+    try {
+      const { resolvePostLoginDestination } = await import('@/app/lib/manager-identity');
+      destination = await resolvePostLoginDestination(user.id, user.email);
+    } catch (lookupError) {
+      // The user is already signed in. Fall back to /admin; its layout sends
+      // row-less managers on to /portal, so this only costs an extra redirect.
+      console.error('Post-login destination lookup failed', lookupError);
+    }
   }
   return redirect(destination);
 }
