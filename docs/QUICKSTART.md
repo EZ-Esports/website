@@ -17,6 +17,8 @@ The app uses Supabase. Create a `.env` file with the required variables — **pi
 
 ### First deploy / bootstrap
 
+For deploying or transferring the site to a new Vercel account without downtime, see the [Vercel Handover Guide](dev/VERCEL_HANDOVER.md).
+
 After running migrations, seed an existing Supabase Auth identity as the first Owner. Other staff identities are created through invite acceptance and may initially have no roles:
 
 ```bash
