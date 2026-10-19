@@ -1,6 +1,6 @@
 # spec-023 — School managers do not get a staff row
 
-**Status:** Implemented on branch `worktree-fix-233-manager-staff-row`, PR TBD (issue #233). **Date:** 19 Oct 2026. **Scope:** `app/lib/auth.ts`, `app/lib/db/staff.ts` (DAL: `hasStaffMemberRow`, `isActiveSchoolManager`), `app/lib/manager-identity.ts` (destination logic, no queries), `app/(admin)/admin/layout.tsx`, `app/(marketing)/login/actions.ts`, `app/lib/supabase/middleware.ts`. No migration, no data change.
+**Status:** Implemented on branch `worktree-fix-233-manager-staff-row`, [PR #264](https://github.com/EZ-Esports/website/pull/264) (issue #233). **Date:** 19 Oct 2026. **Scope:** `app/lib/auth.ts`, `app/lib/db/staff.ts` (DAL: `hasStaffMemberRow`, `isActiveSchoolManager`), `app/lib/manager-identity.ts` (destination logic, no queries), `app/(admin)/admin/layout.tsx`, `app/(marketing)/login/actions.ts`, `app/lib/supabase/middleware.ts`. No migration, no data change.
 
 ## Context & Motivation
 
