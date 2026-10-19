@@ -29,7 +29,7 @@ import {
   PendingLabel,
 } from '@/app/components/admin/AdminUI';
 import { cx } from '@/app/lib/cx';
-import { fetchMatchesPage } from '@/app/lib/match-actions';
+import { fetchStaffMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
 
@@ -64,7 +64,7 @@ interface AdminMatchExplorerProps {
 
 /**
  * Server-driven match manager: facet changes and pagination go through the
- * fetchMatchesPage action instead of shipping every match to the client.
+ * fetchStaffMatchesPage action instead of shipping every match to the client.
  * Inline score/status editing and deletion are preserved per row.
  */
 export default function AdminMatchExplorer({ seasons, games, initialPage }: AdminMatchExplorerProps) {
@@ -107,7 +107,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
     }
     const timer = setTimeout(() => {
       startLoading(async () => {
-        const page = await fetchMatchesPage(request);
+        const page = await fetchStaffMatchesPage(request);
         setItems(page.items);
         setCursor(page.nextCursor);
       });
@@ -118,7 +118,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
   const loadMore = () => {
     if (!cursor) return;
     startLoading(async () => {
-      const page = await fetchMatchesPage({ ...request, cursor });
+      const page = await fetchStaffMatchesPage({ ...request, cursor });
       setItems((prev) => [...prev, ...page.items]);
       setCursor(page.nextCursor);
     });

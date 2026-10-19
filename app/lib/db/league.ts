@@ -4,6 +4,7 @@ import { db } from './index';
 import * as schema from './schema';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { canonicalGameSlug } from '../constants';
+import { areOutcomesPublic } from '../season-outcomes';
 
 export const getCachedGames = unstable_cache(
   async () => {
@@ -41,6 +42,7 @@ export const getSeasonsWithGames = unstable_cache(
         id: schema.seasons.id,
         name: schema.seasons.name,
         isActive: schema.seasons.isActive,
+        outcomesFinalizedAt: schema.seasons.outcomesFinalizedAt,
         gameId: schema.games.id,
         gameSlug: schema.games.slug,
         gameName: schema.games.displayName,
@@ -49,8 +51,11 @@ export const getSeasonsWithGames = unstable_cache(
       .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
       .orderBy(asc(schema.games.slug), desc(schema.seasons.name));
 
-    return rows.map((r) => ({
+    // Only the boolean leaves this cached function: the timestamp is staff
+    // bookkeeping, and a Date would round-trip through the cache as a string.
+    return rows.map(({ outcomesFinalizedAt, ...r }) => ({
       ...r,
+      outcomesPublic: areOutcomesPublic({ outcomesFinalizedAt }),
       gameSlug: canonicalGameSlug(r.gameSlug),
     }));
   },
@@ -109,13 +114,24 @@ export async function createSeasonInDb(values: {
       // Invariant: at most one active season per game. Retire other active seasons for this game.
       await tx
         .update(schema.seasons)
-        .set({ isActive: false })
+        .set(retireSeasonSet)
         .where(and(eq(schema.seasons.gameId, values.gameId), eq(schema.seasons.isActive, true)));
     }
     const res = await tx.insert(schema.seasons).values(values).returning();
     return res[0];
   });
 }
+
+/**
+ * Retiring a season is what ends it, so its results go public in the same
+ * write. Otherwise archiving would silently blank a finished season's scores
+ * until someone remembered to press Publish (migration 0051 applies the same
+ * rule to seasons already retired). `coalesce` keeps an earlier publish stamp.
+ */
+const retireSeasonSet = {
+  isActive: false,
+  outcomesFinalizedAt: sql`coalesce(${schema.seasons.outcomesFinalizedAt}, now())`,
+};
 
 export async function updateSeasonInDb(
   id: string,
@@ -137,7 +153,7 @@ export async function updateSeasonInDb(
         // Invariant: at most one active season per game. Retire other active seasons for this game.
         await tx
           .update(schema.seasons)
-          .set({ isActive: false })
+          .set(retireSeasonSet)
           .where(
             and(
               eq(schema.seasons.gameId, current[0].gameId),
@@ -150,7 +166,7 @@ export async function updateSeasonInDb(
 
     const res = await tx
       .update(schema.seasons)
-      .set(values)
+      .set(values.isActive === false ? { ...values, ...retireSeasonSet } : values)
       .where(eq(schema.seasons.id, id))
       .returning();
     return res[0];

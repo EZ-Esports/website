@@ -1,12 +1,18 @@
 'use server';
 
 /**
- * Public, read-only server action for lazy-loading match pages from client
- * components (public schedule + admin match list). Untrusted identifiers and
- * enums are validated here since this is a network-facing entry point; sort
- * and limit clamping live in getMatchesPage itself.
+ * Server actions for lazy-loading match pages from client components. Untrusted
+ * identifiers and enums are validated here since these are network-facing entry
+ * points; sort and limit clamping live in getMatchesPage itself.
+ *
+ * `fetchMatchesPage` is the public schedule's action: anyone can call it, so it
+ * strips the outcome of every match in a season staff have not published
+ * (the client-supplied season id is never trusted to decide that).
+ * `fetchStaffMatchesPage` is the admin list's action and returns everything,
+ * but only to staff allowed into Matches & Standings.
  */
-import { getMatchesPage } from './db/queries';
+import { getMatchesPage, getPublicMatchesPage } from './db/queries';
+import { getStaffForAdminSection } from './auth';
 import {
   COMBINED_DIVISION,
   DIVISIONS,
@@ -42,7 +48,7 @@ const dateOrUndefined = (v: string | undefined) => {
   return Number.isNaN(d.getTime()) ? undefined : d;
 };
 
-export async function fetchMatchesPage(request: MatchPageRequest): Promise<MatchPageResponse> {
+function toParams(request: MatchPageRequest) {
   const cursor =
     request.cursor &&
     UUID_RE.test(request.cursor.id) &&
@@ -56,7 +62,7 @@ export async function fetchMatchesPage(request: MatchPageRequest): Promise<Match
       ? request.division
       : undefined;
 
-  const page = await getMatchesPage({
+  return {
     gameId: uuidOrUndefined(request.gameId),
     seasonId: uuidOrUndefined(request.seasonId),
     division: validDivision,
@@ -70,7 +76,20 @@ export async function fetchMatchesPage(request: MatchPageRequest): Promise<Match
     sort: request.sort as MatchSort | undefined,
     cursor,
     limit: request.limit,
-  });
+  };
+}
 
-  return toMatchesPageDto(page);
+/**
+ * Public: outcomes of unpublished seasons are redacted server-side. The status
+ * filter is ignored here (the public list never sends one) because filtering a
+ * hidden season by `forfeit` would reveal which matches were forfeits.
+ */
+export async function fetchMatchesPage(request: MatchPageRequest): Promise<MatchPageResponse> {
+  return toMatchesPageDto(await getPublicMatchesPage({ ...toParams(request), status: undefined }));
+}
+
+/** Staff only: unredacted, for Admin -> Matches & Standings. */
+export async function fetchStaffMatchesPage(request: MatchPageRequest): Promise<MatchPageResponse> {
+  if (!(await getStaffForAdminSection('/admin/matches'))) throw new Error('Forbidden');
+  return toMatchesPageDto(await getMatchesPage(toParams(request)));
 }

@@ -2,7 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, eq, inArray, isNull, sql, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import {
   canonicalDivision,
   isDerivedStandings,
@@ -16,6 +16,7 @@ import {
   type SeasonStandingsResult,
   type StandingsFormat,
 } from './match-page';
+import { areOutcomesPublic, redactStandingRows } from '../season-outcomes';
 
 /**
  * `canonicalDivision` as a SQL expression, so a division filter can be pushed
@@ -28,14 +29,39 @@ export const canonicalDivisionSql = (column: SQLWrapper) =>
 export const hubDivisionSql = (column: SQLWrapper) =>
   sql<HubDivision>`case when ${column} in ('JV', 'B') then 'JV' else 'Varsity' end`;
 
-/** One season's declared standings format. */
-export async function readStandingsFormat(seasonId: string): Promise<StandingsFormat> {
+/**
+ * One season's declared standings format and whether its outcomes are public.
+ * An unknown season is reported as hidden (see `areOutcomesPublic`).
+ */
+export async function readSeasonStandingsMeta(
+  seasonId: string
+): Promise<{ standingsFormat: StandingsFormat; outcomesPublic: boolean }> {
   const rows = await db
-    .select({ standingsFormat: schema.seasons.standingsFormat })
+    .select({
+      standingsFormat: schema.seasons.standingsFormat,
+      outcomesFinalizedAt: schema.seasons.outcomesFinalizedAt,
+    })
     .from(schema.seasons)
     .where(eq(schema.seasons.id, seasonId))
     .limit(1);
-  return toStandingsFormat(rows[0]?.standingsFormat);
+  return {
+    standingsFormat: toStandingsFormat(rows[0]?.standingsFormat),
+    outcomesPublic: areOutcomesPublic(rows[0]),
+  };
+}
+
+/** One season's declared standings format. */
+export async function readStandingsFormat(seasonId: string): Promise<StandingsFormat> {
+  return (await readSeasonStandingsMeta(seasonId)).standingsFormat;
+}
+
+/** Ids of seasons whose outcomes staff have published. Uncached: a 15-row table, and a toggle must apply at once. */
+export async function getOutcomesPublicSeasonIds(): Promise<Set<string>> {
+  const rows = await db
+    .select({ id: schema.seasons.id })
+    .from(schema.seasons)
+    .where(isNotNull(schema.seasons.outcomesFinalizedAt));
+  return new Set(rows.map((r) => r.id));
 }
 
 export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
@@ -132,7 +158,8 @@ export async function getSeasonStandingsFor(
   division: string,
   standingsFormat?: StandingsFormat
 ): Promise<SeasonStandingsResult> {
-  const format = standingsFormat ?? (await readStandingsFormat(seasonId));
+  const meta = await readSeasonStandingsMeta(seasonId);
+  const format = standingsFormat ?? meta.standingsFormat;
   const combined = format === 'combined';
   const wanted = canonicalDivision(division);
   const snapshot = await buildSeasonStandingsSnapshotQuery({
@@ -141,30 +168,37 @@ export async function getSeasonStandingsFor(
     combined,
   });
 
+  let result: SeasonStandingsResult;
   if (snapshot.length > 0) {
-    return {
+    result = {
       source: 'snapshot',
       standingsFormat: format,
+      outcomesPublic: meta.outcomesPublic,
       rows: snapshot.map((r) => ({
         ...r,
         division: combined ? canonicalDivision(r.division) : wanted,
       })),
     };
+  } else {
+    const computed = await buildSeasonStandingsComputedQuery({
+      seasonId,
+      division: wanted,
+      combined,
+    });
+    result = {
+      source: 'computed',
+      standingsFormat: format,
+      outcomesPublic: meta.outcomesPublic,
+      rows: rankComputedStandings(
+        computed.map((r) => ({ ...r, division: combined ? canonicalDivision(r.division) : wanted }))
+      ),
+    };
   }
 
-  const computed = await buildSeasonStandingsComputedQuery({
-    seasonId,
-    division: wanted,
-    combined,
-  });
-
-  return {
-    source: 'computed',
-    standingsFormat: format,
-    rows: rankComputedStandings(
-      computed.map((r) => ({ ...r, division: combined ? canonicalDivision(r.division) : wanted }))
-    ),
-  };
+  // Redacted here, in the data layer, so a public page cannot forget to: the
+  // only readers of this function are public views (the staff editor reads
+  // `getSeasonStandingsForEditor`).
+  return meta.outcomesPublic ? result : { ...result, rows: redactStandingRows(result.rows) };
 }
 
 /**
@@ -200,6 +234,7 @@ export async function getTeamStandingsRecords(
           .select({
             id: schema.seasons.id,
             standingsFormat: schema.seasons.standingsFormat,
+            outcomesFinalizedAt: schema.seasons.outcomesFinalizedAt,
           })
           .from(schema.seasons)
           .where(inArray(schema.seasons.id, seasonIds))
@@ -215,11 +250,17 @@ export async function getTeamStandingsRecords(
   const formatBySeasonId = new Map(
     seasonFormats.map((s) => [s.id, toStandingsFormat(s.standingsFormat)])
   );
+  // A hidden season publishes no record at all: both the snapshot and the
+  // computed fallback below skip it, so callers see their "Unpublished" state.
+  const hiddenSeasonIds = new Set(
+    seasonFormats.filter((s) => !areOutcomesPublic(s)).map((s) => s.id)
+  );
   const seasonsWithSnapshot = new Set(snapshotRows.map((s) => s.seasonId));
   const recordMap = new Map<string, { wins: number; losses: number }>();
 
   // 1. Fill from snapshot for seasons that have snapshot rows
   for (const team of teamsList) {
+    if (hiddenSeasonIds.has(team.seasonId)) continue;
     if (seasonsWithSnapshot.has(team.seasonId)) {
       const format = formatBySeasonId.get(team.seasonId) ?? 'divided';
       const teamSnapshots = snapshotRows.filter(
@@ -244,7 +285,7 @@ export async function getTeamStandingsRecords(
   for (const comp of computedRows) {
     if (!comp.teamId) continue;
     const team = teamById.get(comp.teamId);
-    if (!team) continue;
+    if (!team || hiddenSeasonIds.has(team.seasonId)) continue;
 
     const canonical = canonicalDivision(comp.division);
     const keyCanonical = `${comp.teamId}-${canonical}`;
@@ -269,7 +310,7 @@ export const getCachedRosters = unstable_cache(
 );
 
 export async function getGameSeasonSummary(seasonId: string) {
-  const [snapshot, standingsFormat] = await Promise.all([
+  const [snapshotRaw, { standingsFormat, outcomesPublic }] = await Promise.all([
     db
       .select({
         schoolName: schema.schools.name,
@@ -285,8 +326,11 @@ export async function getGameSeasonSummary(seasonId: string) {
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
       .where(eq(schema.seasonStandings.seasonId, seasonId))
       .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name)),
-    readStandingsFormat(seasonId),
+    readSeasonStandingsMeta(seasonId),
   ]);
+  // Neutral (alphabetical, stat-free) rows while outcomes are hidden. This also
+  // gets `getSeasonStandingsFor`'s fallback rows, which redact themselves.
+  const snapshot = outcomesPublic ? snapshotRaw : redactStandingRows(snapshotRaw);
   const combined = standingsFormat === 'combined';
 
   const hasSnapshot = (division: HubDivision) =>
@@ -308,20 +352,23 @@ export async function getGameSeasonSummary(seasonId: string) {
   const varsityTeams = teamOrParticipant(varsityRows);
   const jvTeams = teamOrParticipant(jvRows);
 
+  // Hidden outcomes list every team alphabetically, not a "top five": which
+  // five survive a cut would itself reveal the ranking.
   const topFive = (rows: typeof varsityTeams) =>
-    rows.slice(0, 5).map((r, i) => ({
-      rank: r.rank ?? i + 1,
+    (outcomesPublic ? rows.slice(0, 5) : rows).map((r, i) => ({
+      rank: outcomesPublic ? (r.rank ?? i + 1) : null,
       team: r.schoolName,
       teamLabel: r.playerName ? `${r.playerName} (${r.schoolName})` : standingsTeamLabel(r, standingsFormat),
       division: canonicalDivision(r.division),
-      wins: r.wins ?? 0,
-      losses: r.losses ?? 0,
-      winPct: r.winPct ?? 0,
+      wins: outcomesPublic ? (r.wins ?? 0) : null,
+      losses: outcomesPublic ? (r.losses ?? 0) : null,
+      winPct: outcomesPublic ? (r.winPct ?? 0) : null,
     }));
 
   return {
     standingsFormat,
-    standingsReconstructed: isDerivedStandings(snapshot),
+    outcomesPublic,
+    standingsReconstructed: outcomesPublic && isDerivedStandings(snapshot),
     topTeams: topFive(varsityTeams),
     standingsSource: {
       Varsity: hasSnapshot('Varsity') ? ('snapshot' as const) : ('computed' as const),

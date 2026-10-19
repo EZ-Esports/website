@@ -112,6 +112,13 @@ export const seasons = pgTable('seasons', {
   // approval onto a roster); staff admins still can. Kept per season row so that
   // locking one game's season never affects another game's.
   rostersLockedAt: timestamp('rosters_locked_at'),
+  // Null = this season's match outcomes (scores, results, standings, records)
+  // are HIDDEN on every public view; set = published. Historical imports and
+  // in-progress seasons have incomplete results, so the public site must not
+  // present partial numbers as truth. Staff flip it per season from League
+  // Setup; admin and portal views always see everything. Migration 0051
+  // stamped every already-archived (inactive) season so its results stay public.
+  outcomesFinalizedAt: timestamp('outcomes_finalized_at'),
   ...auditColumns,
 }, (table) => [
   index('seasons_game_id_idx').on(table.gameId),

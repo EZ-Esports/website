@@ -34,7 +34,13 @@ import {
 } from './match-page';
 import { FORM_LENGTH, buildFormGuide, type FormOutcome } from '@/app/lib/game-hub-form';
 import { getActiveSeasonForGame, getSeasonsWithGames } from './league';
-import { canonicalDivisionSql, hubDivisionSql, getGameSeasonSummary } from './standings';
+import {
+  canonicalDivisionSql,
+  getGameSeasonSummary,
+  getOutcomesPublicSeasonIds,
+  hubDivisionSql,
+} from './standings';
+import { redactHiddenMatches } from '../season-outcomes';
 import { canonicalGameSlug, dbGameSlug } from '../constants';
 
 /** Default page size for public-facing paginated lists. */
@@ -152,6 +158,17 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
   };
 }
 
+/**
+ * Public schedule page: same rows, but a season whose outcomes are not
+ * published has its scores, MVP, notes and forfeit flag stripped here. Public
+ * code must use this (and `getPublicSeasonMatches`), not the raw
+ * `getMatchesPage`, which is for staff views.
+ */
+export async function getPublicMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+  const [page, publicIds] = await Promise.all([getMatchesPage(params), getOutcomesPublicSeasonIds()]);
+  return { ...page, items: redactHiddenMatches(page.items, publicIds) };
+}
+
 export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
   const conditions = [eq(schema.matches.seasonId, seasonId)];
   if (division && division !== COMBINED_DIVISION) {
@@ -194,6 +211,15 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
  */
 export async function getSeasonMatches(seasonId: string, division?: string) {
   return buildSeasonMatchesQuery(seasonId, division);
+}
+
+/** Public counterpart of `getSeasonMatches`; see `getPublicMatchesPage`. */
+export async function getPublicSeasonMatches(seasonId: string, division?: string) {
+  const [matches, publicIds] = await Promise.all([
+    getSeasonMatches(seasonId, division),
+    getOutcomesPublicSeasonIds(),
+  ]);
+  return redactHiddenMatches(matches, publicIds);
 }
 
 /** Count of all scheduled matches (for dashboard). */
@@ -250,6 +276,8 @@ export const getCachedRecentResults = unstable_cache(
       .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
       .where(
         and(
+          // Seasons whose outcomes staff have not published contribute nothing.
+          isNotNull(schema.seasons.outcomesFinalizedAt),
           inArray(schema.matches.status, ['completed', 'forfeit']),
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
@@ -352,7 +380,8 @@ export async function getArchiveIndex() {
   const championBySeason = pickChampionsBySeason(champions);
 
   return seasons.map((s) => {
-    const c = championBySeason.get(s.id);
+    // No champion until staff publish the season's outcomes.
+    const c = s.outcomesPublic ? championBySeason.get(s.id) : undefined;
     return {
       ...s,
       matchCount: countBySeason.get(s.id) ?? 0,
@@ -482,16 +511,19 @@ export interface GameHubData {
     result: string;
     forfeit: boolean;
   }[];
+  /** Stat fields are null (and the list alphabetical) while `outcomesPublic` is false. */
   topTeams: {
-    rank: number;
+    rank: number | null;
     team: string;
     teamLabel: string;
     division: CanonicalDivision;
-    wins: number;
-    losses: number;
-    winPct: number;
+    wins: number | null;
+    losses: number | null;
+    winPct: number | null;
     form: FormOutcome[];
   }[];
+  /** False when the active season's outcomes are unpublished; results and form are then empty. */
+  outcomesPublic: boolean;
   seasonName: string | null;
   standingsFormat: StandingsFormat;
   standingsReconstructed: boolean;
@@ -508,6 +540,7 @@ export async function getGameHubData(
   let seasonName: string | null = null;
   let standingsFormat: StandingsFormat = 'divided';
   let standingsReconstructed = false;
+  let outcomesPublic = true;
 
   const gameRow = await db
     .select()
@@ -555,9 +588,11 @@ export async function getGameHubData(
 
       standingsFormat = summary.standingsFormat;
       standingsReconstructed = summary.standingsReconstructed;
+      outcomesPublic = summary.outcomesPublic;
       const shownTeams = summary.topTeamsByDivision[division];
 
       const formRows =
+        !outcomesPublic ||
         summary.standingsSource[division] === 'snapshot' ||
         summary.standingsFormat === 'combined' ||
         shownTeams.length === 0
@@ -588,7 +623,9 @@ export async function getGameHubData(
         };
       }
 
-      recentResults = completedRows.map((r) => {
+      // `completedRows` is fetched in parallel with the summary, so it is
+      // dropped (not never-fetched) when the summary reports hidden outcomes.
+      recentResults = (outcomesPublic ? completedRows : []).map((r) => {
         const home = r.homeScore ?? 0;
         const away = r.awayScore ?? 0;
         const outcome: FormOutcome = home > away ? 'W' : home < away ? 'L' : 'D';
@@ -615,6 +652,7 @@ export async function getGameHubData(
     seasonName,
     standingsFormat,
     standingsReconstructed,
+    outcomesPublic,
     division,
   };
 }

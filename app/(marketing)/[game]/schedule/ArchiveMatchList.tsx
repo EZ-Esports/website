@@ -15,9 +15,19 @@ interface ArchiveMatchListProps {
   sort: 'asc' | 'desc';
   initialItems: MatchPageItemDto[];
   initialCursor: MatchCursor | null;
+  /** Season outcomes are unpublished; rows arrive without scores and read as plain "Completed". */
+  outcomesHidden?: boolean;
 }
 
-function StatusBadge({ match }: { match: MatchPageItemDto }) {
+function StatusBadge({ match, outcomesHidden }: { match: MatchPageItemDto; outcomesHidden: boolean }) {
+  // The server already turned a hidden season's forfeits into plain completed matches.
+  if (outcomesHidden && match.status === 'completed') {
+    return (
+      <Badge variant="neutral" size="sm">
+        Completed
+      </Badge>
+    );
+  }
   if (match.status === 'forfeit') {
     return (
       <Badge variant="warning">
@@ -50,6 +60,7 @@ export default function ArchiveMatchList({
   sort,
   initialItems,
   initialCursor,
+  outcomesHidden = false,
 }: ArchiveMatchListProps) {
   const [items, setItems] = useState(initialItems);
   const [cursor, setCursor] = useState(initialCursor);
@@ -108,7 +119,7 @@ export default function ArchiveMatchList({
               </div>
             </div>
             <div className="text-right shrink-0">
-              <StatusBadge match={match} />
+              <StatusBadge match={match} outcomesHidden={outcomesHidden} />
             </div>
           </Card>
         ))}
