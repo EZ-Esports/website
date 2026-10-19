@@ -1,6 +1,6 @@
 # spec-022 — Hide season outcomes until staff publish them
 
-**Status:** Code ready, not merged. Migration `0051` applied to the local DB only; **not applied to production**. **PR:** TBD (issue #228). **Date:** 18 Oct 2026. **Scope:** `seasons.outcomes_finalized_at` (migration `0051`), `app/lib/season-outcomes.ts`, `app/lib/db/{standings,matches,league,match-page}.ts`, `app/lib/match-actions.ts`, public standings / schedule / game hub / team pages / homepage / archives, Admin -> League Setup.
+**Status:** Shipped. Migration `0051` applied to production 18 Oct 2026 (backup of `seasons` first; 11 inactive seasons stamped, 4 active left hidden). **PR:** #261 (issue #228). **Date:** 18 Oct 2026. **Scope:** `seasons.outcomes_finalized_at` (migration `0051`), `app/lib/season-outcomes.ts`, `app/lib/db/{standings,matches,league,match-page}.ts`, `app/lib/match-actions.ts`, public standings / schedule / game hub / team pages / homepage / archives, Admin -> League Setup.
 
 **Deploy order:** apply `0051` to production (after a backup) **before** the code deploys. Every `db.select().from(schema.seasons)` selects the new column, so the code without the column breaks the whole site (same hazard as `0050`).
 
@@ -32,7 +32,7 @@ Historical imports were schedule-only and in-progress seasons have partial resul
 - Staff/portal reads (`getMatchesPage`, `getSeasonStandingsForEditor`, `getCachedRosters`, `getStaffMatches`, `getCachedMatches`) stay raw. New public reads of scores or standings must go through the gated functions above.
 - `getSeasonsWithGames` (cached, tag `seasons`) exposes only the boolean `outcomesPublic`, not the timestamp (a Date would round-trip through the cache as a string).
 - Unknown season = hidden.
-- Non-goals: tournament (bracket) games and `tournament_matches` are not gated; deactivating a season does **not** auto-publish it (staff must publish; a season retired later reads hidden until they do); match-level or division-level publication.
+- Non-goals: tournament (bracket) games and `tournament_matches` are not gated; deactivating a season publishes it (`retireSeasonSet` in `app/lib/db/league.ts` coalesces `outcomes_finalized_at` to `now()` for an explicit deactivate and for the auto-retire when another season is activated or created; staff can still Hide it afterwards); match-level or division-level publication.
 
 ## Verification
 
