@@ -48,6 +48,9 @@ const bundledPages: HandbookViewerPage[] = BUNDLED_HANDBOOK_PAGES.map((p) => ({
  * The panel behind the page. A light neutral so the white page reads as a sheet
  * lying on a desk; swap this one class to change it (e.g. 'bg-surface-sunken' for dark).
  */
+/** Zoom levels, as multiples of the Full page fit. */
+const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3];
+
 const VIEWER_BACKDROP = 'bg-[#e9e6e6]';
 
 /** Gutter between the two pages of a spread, in px. */
@@ -339,11 +342,8 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   });
 
   const showPdfButtons = Boolean(pdfUrl);
-  const zoomOptions = [
-    { value: 1.5, label: '150%' },
-    { value: 2, label: '200%' },
-    { value: 1, label: narrow ? 'Fit width' : 'Full page' },
-  ];
+  const zoomIndex = ZOOM_STEPS.indexOf(zoom);
+  const zoomLabel = zoom === 1 ? (narrow ? 'Fit width' : 'Full page') : `${Math.round(zoom * 100)}%`;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 pb-10">
@@ -507,21 +507,29 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
                 <button type="button" onClick={next} disabled={!hasNext} className={toolbarControl}>
                   Next →
                 </button>
-                <label>
-                  <span className="sr-only">Page zoom</span>
-                  <select
-                    aria-label="Page zoom"
-                    value={zoom}
-                    onChange={(e) => setZoom(Number(e.target.value))}
+                <div className="flex items-center gap-1" role="group" aria-label="Page zoom">
+                  <button
+                    type="button"
+                    aria-label="Zoom out"
+                    disabled={zoomIndex <= 0}
+                    onClick={() => setZoom(ZOOM_STEPS[Math.max(0, zoomIndex - 1)])}
                     className={toolbarControl}
                   >
-                    {zoomOptions.map((z) => (
-                      <option key={z.value} value={z.value}>
-                        {z.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    −
+                  </button>
+                  <span className="min-w-[4.5rem] text-center text-xs sm:text-sm text-foreground-secondary" aria-live="polite">
+                    {zoomLabel}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Zoom in"
+                    disabled={zoomIndex >= ZOOM_STEPS.length - 1}
+                    onClick={() => setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, zoomIndex + 1)])}
+                    className={toolbarControl}
+                  >
+                    +
+                  </button>
+                </div>
               </>
             )}
             <button
