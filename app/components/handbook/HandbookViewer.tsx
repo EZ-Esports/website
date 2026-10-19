@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cx } from '@/app/lib/cx';
 import { HANDBOOK_DOWNLOAD_NAME } from '@/app/lib/handbook';
 import Button from '@/app/components/ui/Button';
@@ -48,8 +48,10 @@ const bundledPages: HandbookViewerPage[] = BUNDLED_HANDBOOK_PAGES.map((p) => ({
  * The panel behind the page. A light neutral so the white page reads as a sheet
  * lying on a desk; swap this one class to change it (e.g. 'bg-surface-sunken' for dark).
  */
-/** Zoom levels, as multiples of the Full page fit. */
-const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3];
+/** Zoom is continuous, as a multiple of the Full page fit; trackpad pinch or Ctrl+scroll over the pages drives it. */
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 4;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 
 const VIEWER_BACKDROP = 'bg-[#e9e6e6]';
 
@@ -163,6 +165,9 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [windowWidth, setWindowWidth] = useState(1024);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef(1);
+  // Where the cursor sat when a zoom started, so the point under it stays put as the pages grow.
+  const anchorRef = useRef<{ cx: number; oy: number; r: number } | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const textRef = useRef<HTMLElement>(null);
   const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -228,6 +233,55 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
     };
   }, [textMode]);
 
+  useLayoutEffect(() => {
+    zoomRef.current = zoom;
+    const anchor = anchorRef.current;
+    anchorRef.current = null;
+    const el = viewerRef.current;
+    if (!anchor || !el) return;
+    el.scrollLeft = (el.scrollLeft + anchor.cx) * anchor.r - anchor.cx;
+    if (anchor.oy > 0) window.scrollBy(0, anchor.oy * (anchor.r - 1));
+  }, [zoom]);
+
+  // Pinch on a trackpad arrives as Ctrl+wheel (Safari: gesture events). Over the pages it zooms only the document;
+  // plain scrolling is left alone so the page keeps scrolling normally.
+  useEffect(() => {
+    const el = viewerRef.current;
+    if (!el) return;
+    const zoomAt = (next: number, clientX: number, clientY: number) => {
+      const current = zoomRef.current;
+      const target = clampZoom(next);
+      if (Math.abs(target - current) < 0.001) return;
+      const rect = el.getBoundingClientRect();
+      anchorRef.current = { cx: clientX - rect.left, oy: Math.max(0, clientY - rect.top), r: target / current };
+      setZoom(target);
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const dy = Math.max(-25, Math.min(25, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY));
+      zoomAt(zoomRef.current * Math.exp(-dy * 0.012), e.clientX, e.clientY);
+    };
+    let gestureStart = 1;
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      gestureStart = zoomRef.current;
+    };
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      const g = e as Event & { scale: number; clientX: number; clientY: number };
+      zoomAt(gestureStart * g.scale, g.clientX, g.clientY);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('gesturestart', onGestureStart);
+    el.addEventListener('gesturechange', onGestureChange);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('gesturestart', onGestureStart);
+      el.removeEventListener('gesturechange', onGestureChange);
+    };
+  }, [textMode, source]);
+
   // The URL hash is the current page: read on load (and again once a PDF's page count is known) and on hashchange.
   useEffect(() => {
     const apply = () => {
@@ -280,7 +334,24 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
       const target = e.target as HTMLElement | null;
       if (textMode) return;
       if (target && /INPUT|SELECT|TEXTAREA/.test(target.tagName)) return;
-      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      // Keyboard zoom for people without a trackpad: + / - step the zoom, 0 resets to Full page.
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        setZoom((z) => clampZoom(z * 1.25));
+        return;
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        setZoom((z) => clampZoom(z / 1.25));
+        return;
+      }
+      if (e.key === '0') {
+        e.preventDefault();
+        setZoom(1);
+        return;
+      }
+      if (e.shiftKey) return;
       if (e.key === 'ArrowRight' && hasNext) {
         e.preventDefault();
         next();
@@ -342,8 +413,6 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   });
 
   const showPdfButtons = Boolean(pdfUrl);
-  const zoomIndex = ZOOM_STEPS.indexOf(zoom);
-  const zoomLabel = zoom === 1 ? (narrow ? 'Fit width' : 'Full page') : `${Math.round(zoom * 100)}%`;
 
   return (
     <div className="container mx-auto max-w-7xl px-4 pb-10">
@@ -507,29 +576,16 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
                 <button type="button" onClick={next} disabled={!hasNext} className={toolbarControl}>
                   Next →
                 </button>
-                <div className="flex items-center gap-1" role="group" aria-label="Page zoom">
+                {zoom > 1.01 && (
                   <button
                     type="button"
-                    aria-label="Zoom out"
-                    disabled={zoomIndex <= 0}
-                    onClick={() => setZoom(ZOOM_STEPS[Math.max(0, zoomIndex - 1)])}
+                    onClick={() => setZoom(1)}
                     className={toolbarControl}
+                    aria-label={`Reset zoom, currently ${Math.round(zoom * 100)}%`}
                   >
-                    −
+                    {narrow ? 'Fit width' : 'Full page'} ({Math.round(zoom * 100)}%)
                   </button>
-                  <span className="min-w-[4.5rem] text-center text-xs sm:text-sm text-foreground-secondary" aria-live="polite">
-                    {zoomLabel}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Zoom in"
-                    disabled={zoomIndex >= ZOOM_STEPS.length - 1}
-                    onClick={() => setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, zoomIndex + 1)])}
-                    className={toolbarControl}
-                  >
-                    +
-                  </button>
-                </div>
+                )}
               </>
             )}
             <button
