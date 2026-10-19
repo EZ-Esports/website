@@ -49,6 +49,8 @@ const bundledPages: HandbookViewerPage[] = BUNDLED_HANDBOOK_PAGES.map((p) => ({
  * lying on a desk; swap this one class to change it (e.g. 'bg-surface-sunken' for dark).
  */
 /** Zoom is continuous, as a multiple of the Full page fit; trackpad pinch or Ctrl+scroll over the pages drives it. */
+/** The opening view: the whole page (or spread) at 110% of the exact fit. Pinching out can still reach the exact fit (1). */
+const DEFAULT_ZOOM = 1.1;
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 4;
 const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
@@ -157,7 +159,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const [pdf, setPdf] = useState<LoadedHandbookPdf | null>(null);
   const [pdfFailed, setPdfFailed] = useState(false);
   const [current, setCurrent] = useState(0);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [textMode, setTextMode] = useState(false);
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -165,7 +167,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [windowWidth, setWindowWidth] = useState(1024);
   const viewerRef = useRef<HTMLDivElement>(null);
-  const zoomRef = useRef(1);
+  const zoomRef = useRef(DEFAULT_ZOOM);
   // Where the cursor sat when a zoom started, so the point under it stays put as the pages grow.
   const anchorRef = useRef<{ cx: number; oy: number; r: number } | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -335,7 +337,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
       if (textMode) return;
       if (target && /INPUT|SELECT|TEXTAREA/.test(target.tagName)) return;
       if (e.altKey || e.ctrlKey || e.metaKey) return;
-      // Keyboard zoom for people without a trackpad: + / - step the zoom, 0 resets to Full page.
+      // Keyboard zoom for people without a trackpad: + / - step the zoom, 0 resets to the opening view.
       if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         setZoom((z) => clampZoom(z * 1.25));
@@ -348,7 +350,7 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
       }
       if (e.key === '0') {
         e.preventDefault();
-        setZoom(1);
+        setZoom(DEFAULT_ZOOM);
         return;
       }
       if (e.shiftKey) return;
@@ -402,13 +404,15 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
   }, [textMode, pages, chapters, source]);
 
   // Phones fill the width (readable text, pinch to zoom further); larger screens fit the whole page, or both pages of
-  // a spread, on screen. Zoom multiplies that fit size, so 'Full page' is always the smallest view.
+  // a spread, on screen. Zoom multiplies that fit size; the opening view is 110% of it.
+  // Phones fill the width exactly in the opening view; 110% there would only add a sideways scroll.
+  const effectiveZoom = narrow && Math.abs(zoom - DEFAULT_ZOOM) < 0.001 ? 1 : zoom;
   const sheetWidth = fitSheetWidth({
     availableWidth: box.w,
     availableHeight: narrow ? 99999 : box.h,
     count: size,
     aspect: pages[start]?.aspect ?? LETTER_ASPECT,
-    zoom,
+    zoom: effectiveZoom,
     gap: SPREAD_GAP,
   });
 
@@ -576,14 +580,14 @@ export default function HandbookViewer({ pdfUrl, downloadUrl, docsUrl, edition, 
                 <button type="button" onClick={next} disabled={!hasNext} className={toolbarControl}>
                   Next →
                 </button>
-                {zoom > 1.01 && (
+                {Math.abs(zoom - DEFAULT_ZOOM) > 0.01 && (
                   <button
                     type="button"
-                    onClick={() => setZoom(1)}
+                    onClick={() => setZoom(DEFAULT_ZOOM)}
                     className={toolbarControl}
                     aria-label={`Reset zoom, currently ${Math.round(zoom * 100)}%`}
                   >
-                    {narrow ? 'Fit width' : 'Full page'} ({Math.round(zoom * 100)}%)
+                    Reset zoom ({Math.round(zoom * 100)}%)
                   </button>
                 )}
               </>
