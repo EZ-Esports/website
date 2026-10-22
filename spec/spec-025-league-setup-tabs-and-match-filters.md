@@ -29,3 +29,7 @@ League Setup listed every season ever created in one stack, so the few current o
 ## Not verified
 
 Not exercised in a browser (the admin requires sign-in); the follow-ups above were not viewed in a browser either. The remount-on-navigation and no-loop behaviour is reasoned from Next's behaviour and covered only at the key-function level, not by a DOM test.
+
+## Back arrow on Matches & Standings (follow-up)
+
+The "View matches" link on a League Setup season row now carries `from=league`. `matchesBackLink` (`app/lib/admin-season-filters.ts`) turns that into the page header's back arrow ("League Setup"), pointing at the tab the season lives on (`/admin/league?status=inactive` for an inactive season, since its row is not on the default Active tab). Only the known value `league` counts; anything else shows no arrow, as does a plain sidebar visit to Matches & Standings. The explorer's `history.replaceState` write-back keeps `from`, so the arrow survives a reload. Pages nested below a section (news editors, a school's rosters) already render the header's `back` arrow. Not verified in a browser.

@@ -3,7 +3,7 @@ import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
-import { matchExplorerKey, parseMatchFilterParams } from '@/app/lib/admin-season-filters';
+import { matchExplorerKey, matchesBackLink, parseMatchFilterParams } from '@/app/lib/admin-season-filters';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
@@ -11,7 +11,7 @@ import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin
 export default async function AdminMatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ season?: string | string[]; game?: string | string[] }>;
+  searchParams: Promise<{ season?: string | string[]; game?: string | string[]; from?: string | string[] }>;
 }) {
   if (!(await getStaffForAdminSection('/admin/matches'))) return <PermissionDenied />;
 
@@ -56,6 +56,7 @@ export default async function AdminMatchesPage({
     <AdminPage>
       <AdminPageHeader
         route="/admin/matches"
+        back={matchesBackLink(rawParams.from, allSeasons.find((s) => s.id === initialFilters.seasonId)) ?? undefined}
         description="Schedule matches and input scores to recalculate team standings and seasonal records."
       />
 

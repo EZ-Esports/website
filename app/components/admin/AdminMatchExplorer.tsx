@@ -32,7 +32,7 @@ import { cx } from '@/app/lib/cx';
 import { fetchStaffMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
-import { matchFilterQuery, nextFiltersOnSeasonChange } from '@/app/lib/admin-season-filters';
+import { MATCHES_ORIGIN_PARAM, matchFilterQuery, nextFiltersOnSeasonChange } from '@/app/lib/admin-season-filters';
 
 const PAGE_SIZE = 25;
 
@@ -106,7 +106,11 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
   // Mirror the game / season selection into the URL (no navigation, so no
   // server refetch) so a reload or a copied link lands on the same view.
   useEffect(() => {
-    const qs = matchFilterQuery(gameMap.get(gameId)?.slug, seasonId);
+    const params = new URLSearchParams(matchFilterQuery(gameMap.get(gameId)?.slug, seasonId));
+    // Keep the League Setup origin so the back arrow survives a reload.
+    const origin = new URLSearchParams(window.location.search).get(MATCHES_ORIGIN_PARAM);
+    if (origin) params.set(MATCHES_ORIGIN_PARAM, origin);
+    const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
     if (url !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, '', url);

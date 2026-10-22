@@ -39,7 +39,28 @@ export function leagueStatusHref(status: SeasonStatusFilter): string {
 export function seasonMatchesHref(seasonId: string, gameSlug?: string | null): string {
   const params = new URLSearchParams({ season: seasonId });
   if (gameSlug) params.set('game', gameSlug);
+  params.set(MATCHES_ORIGIN_PARAM, 'league');
   return `/admin/matches?${params.toString()}`;
+}
+
+/**
+ * `from=league` marks a Matches & Standings visit that began on a League Setup
+ * season row, so the page can offer a back arrow. Only known values count.
+ */
+export const MATCHES_ORIGIN_PARAM = 'from';
+
+/**
+ * The back arrow for Matches & Standings when it was opened from League Setup:
+ * returns to the tab the season lives on (an inactive season's row is not on
+ * the default Active tab). Null for a plain visit or an unknown `from`.
+ */
+export function matchesBackLink(
+  from: string | string[] | undefined,
+  season?: { isActive: boolean } | null,
+): { href: string; label: string } | null {
+  const value = Array.isArray(from) ? from[0] : from;
+  if (value !== 'league') return null;
+  return { href: leagueStatusHref(season ? seasonTab(season.isActive) : 'active'), label: 'League Setup' };
 }
 
 export interface MatchFilterGame { id: string; slug: string }

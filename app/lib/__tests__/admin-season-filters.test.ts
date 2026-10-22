@@ -7,6 +7,7 @@ import {
   parseMatchFilterParams,
   parseSeasonStatus,
   seasonMatchesHref,
+  matchesBackLink,
 } from '@/app/lib/admin-season-filters';
 
 const S1 = '11111111-1111-4111-8111-111111111111';
@@ -48,10 +49,36 @@ describe('season status tabs', () => {
 
 describe('seasonMatchesHref', () => {
   it('links to matches filtered by season and game', () => {
-    expect(seasonMatchesHref(S1, 'valorant')).toBe(`/admin/matches?season=${S1}&game=valorant`);
+    expect(seasonMatchesHref(S1, 'valorant')).toBe(`/admin/matches?season=${S1}&game=valorant&from=league`);
   });
   it('omits the game when unknown', () => {
-    expect(seasonMatchesHref(S1)).toBe(`/admin/matches?season=${S1}`);
+    expect(seasonMatchesHref(S1)).toBe(`/admin/matches?season=${S1}&from=league`);
+  });
+});
+
+describe('matchesBackLink', () => {
+  it('returns to the Active tab for a league visit with no season', () => {
+    expect(matchesBackLink('league')).toEqual({ href: '/admin/league', label: 'League Setup' });
+  });
+  it('returns to the tab the season lives on', () => {
+    expect(matchesBackLink('league', { isActive: false })).toEqual({
+      href: '/admin/league?status=inactive',
+      label: 'League Setup',
+    });
+    expect(matchesBackLink('league', { isActive: true })?.href).toBe('/admin/league');
+  });
+  it('uses the first value of a repeated param', () => {
+    expect(matchesBackLink(['league', 'x'])?.label).toBe('League Setup');
+  });
+  it('is absent for a plain visit or an unknown origin', () => {
+    expect(matchesBackLink(undefined)).toBeNull();
+    expect(matchesBackLink('')).toBeNull();
+    expect(matchesBackLink('https://evil.example')).toBeNull();
+    expect(matchesBackLink(['x', 'league'])).toBeNull();
+  });
+  it('is produced by the View matches link for the page to read back', () => {
+    const from = new URL(seasonMatchesHref(S1, 'valorant'), 'http://x').searchParams.get('from');
+    expect(matchesBackLink(from ?? undefined)).not.toBeNull();
   });
 });
 
