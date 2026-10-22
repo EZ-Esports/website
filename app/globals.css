@@ -121,14 +121,15 @@ html {
   }
 }
 
-/* Photo heroes. Dark keeps the heavy grade and the stronger pink wash.
-   Light uses the same shape in white: a shadow behind the type, not a second
-   dark grade. `.hero-copy` then switches that type to the dark foreground,
+/* Photo heroes. Dark keeps the live site's grade: the dark vignette plus a
+   faint accent blush (18% of the dark-surface pink). A deeper magenta wash
+   was tried and looked unnatural on the photograph. Light uses that same
+   vignette in white. `.hero-copy` switches the type to the dark foreground,
    because the section itself stays `.theme-dark` (buttons, wordmark chrome). */
 .hero-photo-scrim {
   background:
     linear-gradient(0deg, rgba(13, 8, 9, 0.97) 0%, rgba(13, 8, 9, 0.6) 42%, rgba(13, 8, 9, 0.28) 70%, rgba(13, 8, 9, 0.62) 100%),
-    radial-gradient(ellipse at 75% 15%, color-mix(in srgb, #b5005a 22%, transparent) 0%, transparent 55%);
+    radial-gradient(ellipse at 75% 15%, color-mix(in srgb, var(--color-accent) 18%, transparent) 0%, transparent 55%);
 }
 
 .about-hero-scrim {
