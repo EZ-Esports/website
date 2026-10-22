@@ -17,7 +17,6 @@ import {
   HiOutlineSquares2X2,
   HiOutlineTrophy,
   HiOutlineUserGroup,
-  HiOutlineUsers,
 } from 'react-icons/hi2';
 import type { AdminSectionHref } from '@/app/lib/staff-access';
 
@@ -114,16 +113,10 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         description: 'Snapshotted standings for past seasons.',
       },
       {
-        label: 'Teams & Rosters',
-        href: '/admin/roster',
-        icon: HiOutlineUsers,
-        description: 'Teams, rosters, and players by school.',
-      },
-      {
         label: 'Schools',
         href: '/admin/schools',
         icon: HiOutlineAcademicCap,
-        description: 'Member schools and their crests.',
+        description: 'Member schools, their crests, and their rosters.',
       },
       {
         label: 'Student Demographics',
@@ -212,10 +205,10 @@ export function findActiveAdminNav(
 }
 
 /**
- * Routes of the pages nested below a section (the article editors under News).
+ * Routes of the pages nested below a section (the article editors under News, a school's rosters under Schools).
  * Keep in step with `NESTED_PAGE_TITLES`.
  */
-export type AdminNestedRoute = `/admin/news/${string}`;
+export type AdminNestedRoute = `/admin/news/${string}` | `/admin/schools/${string}`;
 
 /** Every route an `AdminPageHeader` may be given: a gated section or a nested page below one. */
 export type AdminPageRoute = AdminSectionHref | AdminNestedRoute;
@@ -223,6 +216,7 @@ export type AdminPageRoute = AdminSectionHref | AdminNestedRoute;
 /** Pages below a section that get their own title instead of the section's. */
 const NESTED_PAGE_TITLES: ReadonlyArray<{ matches: (pathname: string) => boolean; title: string }> = [
   { matches: (pathname) => pathname === '/admin/news/new', title: 'New Article' },
+  { matches: (pathname) => /^\/admin\/schools\/[^/]+\/rosters$/.test(pathname), title: 'School Rosters' },
   { matches: (pathname) => pathname.startsWith('/admin/news/'), title: 'Edit Article' },
 ];
 

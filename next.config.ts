@@ -26,11 +26,16 @@ const nextConfig: NextConfig = {
    * an unknown slug still falls through to the 404 it deserves.
    */
   async redirects() {
-    return GAME_SLUGS.map((slug) => ({
-      source: `/${slug}`,
-      destination: getGameDivisionRoute(slug, 'Varsity'),
-      permanent: true,
-    }));
+    return [
+      ...GAME_SLUGS.map((slug) => ({
+        source: `/${slug}`,
+        destination: getGameDivisionRoute(slug, 'Varsity'),
+        permanent: true,
+      })),
+      // The league-wide Teams & Rosters page was folded into Schools -> View rosters;
+      // keep bookmarks (and the old deep-link query strings) landing somewhere real.
+      { source: '/admin/roster', destination: '/admin/schools', permanent: true },
+    ];
   },
   images: {
     remotePatterns: [

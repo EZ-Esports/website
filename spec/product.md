@@ -59,12 +59,12 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 **Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md) and [spec-012](spec-012-admin-control-panel-nav.md). `AdminShell.tsx` has a 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`). It shows Overview, then three collapsible categories (RAC Disclosures), all from `app/lib/admin-nav.ts` and filtered by permission:
 
 - **People & Staffing:** Applications, Careers, Roles & Staff, Leadership Manager.
-- **League Operations:** League Setup, Matches & Standings, Standings Archive, Teams & Rosters, Schools, Student Demographics.
+- **League Operations:** League Setup, Matches & Standings, Standings Archive, Schools (each school has a read-only **View rosters** page at `/admin/schools/[schoolId]/rosters`, requires `MANAGE_ROSTERS`; [spec-024](spec-024-schools-roster-view.md)), Student Demographics. The standalone Teams & Rosters page was removed; `/admin/roster` redirects to Schools.
 - **Website Content:** News & Announcements, Gallery, Sponsors, Page Content.
 
 The nav scrolls on its own (`overflow-y-auto`) only when it outgrows a short viewport; Public Site and Sign Out stay pinned. The top bar is sticky and shows a `Staff portal › Category › Page` breadcrumb. Page content scrolls the document. No mobile drawer exists.
 
-**Page anatomy ([spec-013](spec-013-staff-portal-ui-overhaul.md)).** Every admin page renders `AdminPage` → `AdminPageHeader` (accent category eyebrow, one `h1`, accent rule, one-line description, primary action on the right) → `AdminSection` panels, with shared empty, loading (skeleton), notice, toast, permission-denied and error states. Long lists keep their filters in sticky section toolbars (Applications, News, Matches, Standings, Leadership, Teams & Rosters). Row actions are always visible.
+**Page anatomy ([spec-013](spec-013-staff-portal-ui-overhaul.md)).** Every admin page renders `AdminPage` → `AdminPageHeader` (accent category eyebrow, one `h1`, accent rule, one-line description, primary action on the right) → `AdminSection` panels, with shared empty, loading (skeleton), notice, toast, permission-denied and error states. Long lists keep their filters in sticky section toolbars (Applications, News, Matches, Standings, Leadership). Row actions are always visible.
 
 Server actions must authorize themselves. Middleware refreshes JWT on `/admin` and `/login` only — it does not protect `'use server'` dispatch (`dd934ef`).
 

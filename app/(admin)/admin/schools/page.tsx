@@ -10,6 +10,7 @@ import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import AddEntityForm from '@/app/components/admin/AddEntityForm';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { hasPermission, Permissions } from '@/app/lib/roles';
 import { getCachedGames } from '@/app/lib/db/queries';
 import { AdminCount, AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, RequiredMark } from '@/app/components/admin/AdminUI';
 import { input, label as labelClass, table, tableWrap, tbody, th, theadRow, thRight } from '@/app/components/admin/styles';
@@ -23,7 +24,9 @@ async function getAllSchools() {
 }
 
 export default async function SchoolsAdminPage() {
-  if (!(await getStaffForAdminSection('/admin/schools'))) return <PermissionDenied />;
+  const staff = await getStaffForAdminSection('/admin/schools');
+  if (!staff) return <PermissionDenied />;
+  const canViewRosters = hasPermission(staff.permissions, staff.isOwner, Permissions.MANAGE_ROSTERS);
 
   let schools: Awaited<ReturnType<typeof getAllSchools>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
@@ -103,7 +106,7 @@ export default async function SchoolsAdminPage() {
               </thead>
               <tbody className={tbody}>
                 {schools.map((school) => (
-                  <SchoolRow key={school.id} school={school} games={games} />
+                  <SchoolRow key={school.id} school={school} games={games} canViewRosters={canViewRosters} />
                 ))}
               </tbody>
             </table>

@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useTransition, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { FiUsers } from 'react-icons/fi';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { cancelBtn, chipButton, editIconBtn, chipDot, fieldError, focusRing, input, label as labelClass, saveBtn, td, tdRight, tr, trEditing } from '@/app/components/admin/styles';
+import { cancelBtn, chipButton, editIconBtn, chipDot, fieldError, focusRing, input, label as labelClass, saveBtn, secondaryBtnSm, td, tdRight, tr, trEditing } from '@/app/components/admin/styles';
 import { AdminNotice, PendingLabel, RequiredMark } from '@/app/components/admin/AdminUI';
 import { cx } from '@/app/lib/cx';
 import { updateSchool, toggleSchoolActive, deleteSchool } from '@/app/(admin)/admin/schools/actions';
@@ -25,10 +26,12 @@ const inputClass = input;
 
 interface SchoolRowProps {
   school: School;
+  /** Only true for staff holding MANAGE_ROSTERS; the target page re-checks it server-side. */
+  canViewRosters?: boolean;
   games?: Array<{ id: string; displayName: string; slug: string; name?: string }>;
 }
 
-export default function SchoolRow({ school, games }: SchoolRowProps) {
+export default function SchoolRow({ school, games, canViewRosters = false }: SchoolRowProps) {
   const [managersModalOpen, setManagersModalOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -158,6 +161,15 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
       </td>
       <td className={tdRight}>
         <div className="flex items-center justify-end gap-2">
+          {canViewRosters && (
+            <Link
+              href={`/admin/schools/${school.id}/rosters`}
+              aria-label={`View rosters for ${school.name}`}
+              className={cx(secondaryBtnSm, 'whitespace-nowrap')}
+            >
+              View rosters
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setManagersModalOpen(true)}
