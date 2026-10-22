@@ -7,9 +7,11 @@ const mockRedirect = vi.fn((url: string) => {
 const mockRevalidatePath = vi.fn();
 const mockHeaders = vi.fn();
 const mockSignInWithPassword = vi.fn();
+const mockSignOut = vi.fn();
 const mockCreateClient = vi.fn().mockResolvedValue({
   auth: {
     signInWithPassword: mockSignInWithPassword,
+    signOut: mockSignOut,
   },
 });
 
@@ -27,6 +29,11 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@/app/lib/supabase/server', () => ({
   createClient: () => mockCreateClient(),
+}));
+
+const mockResolveDestination = vi.fn();
+vi.mock('@/app/lib/manager-identity', () => ({
+  resolvePostLoginDestination: (...args: unknown[]) => mockResolveDestination(...args),
 }));
 
 import { login } from '../actions';
@@ -54,6 +61,7 @@ describe('login server action', () => {
     vi.clearAllMocks();
     _resetRateLimitStore();
     mockSignInWithPassword.mockResolvedValue({ error: null });
+    mockResolveDestination.mockResolvedValue('/admin');
     mockHeaderValues({ 'x-forwarded-for': '203.0.113.195' });
   });
 
@@ -89,6 +97,36 @@ describe('login server action', () => {
       });
       expect(mockRevalidatePath).toHaveBeenCalledWith('/', 'layout');
       expect(mockRedirect).toHaveBeenCalledWith('/admin');
+    });
+  });
+
+  describe('school managers', () => {
+    it('rejects a manager with no staff row and signs them out', async () => {
+      mockSignInWithPassword.mockResolvedValueOnce({
+        data: { user: { id: 'manager-user', email: 'manager@example.com' } },
+        error: null,
+      });
+      mockResolveDestination.mockResolvedValueOnce('/portal');
+
+      const fd = createFormData({ email: 'manager@example.com', password: 'correctpassword' });
+
+      const result = await login(null, fd);
+
+      expect(result).toEqual({ error: expect.stringContaining('School Manager') });
+      expect(mockSignOut).toHaveBeenCalled();
+      expect(mockRedirect).not.toHaveBeenCalled();
+      expect(mockResolveDestination).toHaveBeenCalledWith('manager-user', 'manager@example.com');
+    });
+
+    it('keeps staff on /admin', async () => {
+      mockSignInWithPassword.mockResolvedValueOnce({
+        data: { user: { id: 'staff-user', email: 'staff@example.com' } },
+        error: null,
+      });
+
+      const fd = createFormData({ email: 'staff@example.com', password: 'correctpassword' });
+
+      await expect(login(null, fd)).rejects.toThrow('REDIRECT:/admin');
     });
   });
 

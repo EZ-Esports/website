@@ -1,76 +1,52 @@
-# Open threads (as of `926b978`)
+# Open threads (as of `11ed110`)
 
 Things a later agent must **not** assume are finished. Only items grounded in git at this HEAD. If you close one, update this file.
+
+Resolved items are deleted, not struck through: their history lives in [timeline.md](timeline.md) and [incidents.md](incidents.md). Re-verify an item against the code before relying on it; this file has gone stale before (it once claimed there was no `/terms` page).
 
 ---
 
 ## Environment and backups
 
 - **Production is the only environment.** `.env` `DATABASE_URL` is live Supabase. No staging DB, no staging Vercel project. Seed/migrate guards (`assertSeedTargetAllowed`, `requireFreshBackup`) mitigate operator error; they do not create a safe playground. Test against a local Postgres with an explicit URL (`CLAUDE.md`). Gold upserts but still **prunes** archive-keyed matches/standings — operator discipline required.
-- **Off-site / encrypted / scheduled backups are not built.** PR #90 (`b638369`) shipped *local* scoped dumps before seed and migrate, plus `db/RESTORE.md` and prune. Completeness check is a byte floor plus pg_dump’s “dump complete” marker. The original off-site plan (cron, `age`, private bucket, restore drills) is deferred under **[issue #89](https://github.com/EZ-Esports/website/issues/89)** and children #81–#88. A day with no seed/migrate and a bad admin or `psql` edit has **zero** backup coverage. [`specs/db-backup-automation.md`](../specs/db-backup-automation.md) §5 is the list; its header “Ready for Implementation” refers to the local work that already landed. `RESTORE.md` asks for a scratch restore drill; not verified as executed.
-- **No cache-purge tool.** After UUID churn, the documented unblock is `revalidateTag` or an admin save-with-same-values. Era 3 did not add a dashboard or script.
+- **Off-site / encrypted / scheduled backups are not built, and are not planned.** PR #90 (`b638369`) shipped *local* scoped dumps before seed and migrate, plus `db/RESTORE.md` and prune. Completeness check is a byte floor plus pg_dump’s “dump complete” marker. The original off-site plan (cron, `age`, private bucket, restore drills) was parent issue #89 and children #81–#88; all were closed **not planned** on 2026-09-13. A day with no seed/migrate and a bad admin or `psql` edit has **zero** backup coverage. [`specs/db-backup-automation.md`](../specs/db-backup-automation.md) §5 is the list that was dropped; its header “Ready for Implementation” refers to the local work that already landed. `RESTORE.md` asks for a scratch restore drill; not verified as executed.
+- **No cache-purge tool.** After UUID churn, the documented unblock is `updateTag` or an admin save-with-same-values. No dashboard or script exists.
 
 ---
 
 ## Data that is still thin or one-shot
 
-- **osu!, Minecraft, TETR.IO have no seasons.** Slugs shipped `cdb552b` / PR #45. Homepage showcase excludes them until live seasons exist. Display name is TETR.IO (`f04641b`); slug remains `tetris`. Banners are still `/images/hero-background.jpg`. Hubs show `MigrationNotice` (`452073e`) and generic empty bento (`d047f99`) — that empty state is a product decision, not a missing recruitment page. Do not build standings/schedule as if archives exist. Pipeline README still defers Tetris/Minecraft Challonge brackets and notes incomplete 2024–25 Valorant/TFT chase.
-- **Historical match scores were never complete.** June import (`930299c`) was schedule-only. Gold pipeline skips derived standings when results are incomplete. Do not treat `roster_standings` as ground truth for every season.
-- **Leadership recovery after the July 30 cascade is not “the pipeline fixed it.”** Seventy destroyed rows needed an archived `staff_completeroster.csv` (gone from the repo; `CLAUDE.md` says ask the user before declaring it lost). The People tab at PR #59 had only 3 rows, unusable (missing role/year). ETL is wired (`2aece37`); sheet refill was still required. `npm run db:seed:leadership` merges into **legacy `leadership` only** — public `/leadership` reads `people` + `leadership_terms` via `getCachedLeadership()` and never that table, so a sheet refill + seed does **not** update the public page. The hop is `db/backfill-leadership.ts` (not in `package.json`); ongoing edits go through admin CMS. August’s `people` + `leadership_terms` backfill (`f14c7f4`, 201→112 profiles / 178 terms) is a *schema* recovery on whatever remained, not proof the wiped rows all came back. Merge still must not overwrite admin-edited bios.
-- **Gallery DB cleanup after set consolidation is pending.** `getCachedHomepageGallery` still defensively dedupes (`dc69fd4`). `set_id` is gone (`0022`); leftover duplicate rows were not a verified cleanup. **No public `/gallery`.** `feat/issue-100-view-full-gallery` exists locally and on origin; not merged.
-- **`db:seed` (non-gold) is officially deprecated / retired (`2e3e5d8` #146 / PR #180).** The destructive delete-and-reinsert logic was eliminated to prevent UUID churn and foreign key cascades. All database scripts now enforce `assertSeedTargetAllowed()`.
-
----
-
-## Resolved in September Hardening Sprint (PRs #142, #180–#184)
-
-The following items from the September 2026 Codebase Quality Audit have been implemented, reviewed with zero findings, and landed via dedicated PRs:
-
-- **[#103](https://github.com/EZ-Esports/website/issues/103) / PR #142**: Privacy erasure workflow implemented on `/privacy`, preflight database backup automated, and migration `0035_dazzling_omega_red.sql` applied.
-- **[#146](https://github.com/EZ-Esports/website/issues/146) / PR #180**: Database safety gates applied to `db/migrate.ts`, `drizzle.config.ts`, `db/seed-owner.ts`, `db/backfill-leadership.ts`, and `app/lib/db/seed-phase2.ts`. Retired UUID-churning `db/seed.ts` and gitignored `sharepoint/**/*.csv`.
-- **[#156](https://github.com/EZ-Esports/website/issues/156) / PR #181**: Staff role TOCTOU eliminated in `admin/team/actions.ts` using `pg_advisory_xact_lock` and re-reading fresh database roles inside `tx`.
-- **[#152](https://github.com/EZ-Esports/website/issues/152) / PR #182**: Client-controlled storage key deletion eliminated. Implemented section permissions (`Permissions.MANAGE_*`), deterministic scoped folders (`${section}/${entityId}/${timestamp}.${ext}`), server-derived deletes with path traversal protection, and `db/storage-clean.ts`.
-- **[#154](https://github.com/EZ-Esports/website/issues/154) / PR #183**: Dual source-of-truth bug in gallery reordering eradicated. Pure derived state (`draftOrder: string[] | null`) in `GalleryManagerClient.tsx`, removed 30-line `useEffect`, enforced `pg_advisory_xact_lock` and full ID set validation.
-- **[#148](https://github.com/EZ-Esports/website/issues/148) / PR #184**: America/New_York (ET) wall-time parsing standardized via `parseEastern` in `app/lib/dates.ts`, explicit "ET" schedule/calendar labeling, calendar month grid timezone anchoring, and forfeit/draw status normalization.
+- **osu! and Minecraft have no seasons.** Slugs shipped `cdb552b` / PR #45. Homepage showcase excludes them until live seasons exist. Banners are still `/images/hero-background.jpg`. Hubs show `MigrationNotice` (`452073e`) and generic empty bento (`d047f99`) — that empty state is a product decision, not a missing recruitment page. Do not build standings/schedule as if archives exist. (TETR.IO, slug `tetris`, now has four seasons: PR #206, #210.) The pipeline README still notes the incomplete 2024–25 Valorant/TFT chase.
+- **Historical match scores were never complete.** June import (`930299c`) was schedule-only. Gold pipeline skips derived standings when results are incomplete. Do not treat `roster_standings` as ground truth for every season. See also issue #228 and [spec-022](spec-022-hide-season-outcomes.md) (public views now hide outcomes until staff publish a season).
+- **Leadership recovery after the July 30 cascade is not “the pipeline fixed it.”** Seventy destroyed rows needed an archived `staff_completeroster.csv` (gone from the repo; `CLAUDE.md` says ask the user before declaring it lost). The People tab at PR #59 had only 3 rows, unusable (missing role/year). ETL is wired (`2aece37`); sheet refill was still required. Since PR #198, `npm run db:ingest:leadership` / `db:seed:leadership` merges into `people` + `leadership_terms` (what public `/leadership` reads) with a compatibility write to legacy `leadership`; its script header still describes the old behaviour. `npm run db:backfill:leadership` (`db/backfill-leadership.ts`) is the older one-shot hop; ongoing edits go through admin CMS. August’s `people` + `leadership_terms` backfill (`f14c7f4`, 201→112 profiles / 178 terms) is a *schema* recovery on whatever remained, not proof the wiped rows all came back. Merge still must not overwrite admin-edited bios.
+- **Gallery DB cleanup after set consolidation is unverified.** `getCachedHomepageGallery` still defensively dedupes (`dc69fd4`). `set_id` is gone (`0022`); leftover duplicate rows were not a verified cleanup. A public `/gallery` page exists on main.
 
 ---
 
 ## Staff application resume rollout (spec-007)
 
-- **Production setup done (2026-09-26):** the private `staff-resumes` bucket and migration `0036` are live. `fix/staff-apply-tidy` itself is not merged or deployed yet. Never edit `0036` in place; schema changes need a new migration.
+The resume feature itself is merged (PR #190, `9ba693b`); the private `staff-resumes` bucket and migration `0036` are live (2026-09-26). Never edit `0036` in place; schema changes need a new migration. What remains:
+
 - **Unauthenticated resume uploads can be spammed.** Anyone can POST `/api/apply/staff` with a valid PDF, and each accepted request stores a file (up to 4 MB) plus a row. The only brake is `rateLimit()` (5 per IP per 10 min), an in-memory Map that is per serverless instance and resets on cold start, so a distributed or patient sender can fill Storage and the Applications tab. Options: Cloudflare Turnstile (or similar) verified server-side before upload; a durable shared rate limiter (e.g. Upstash, which `rate-limit.ts` already points at); and/or a cleanup job that removes objects in `staff-resumes` with no matching `resume_storage_key` plus a Storage usage alert. Not started.
 - **Privacy erasure does not delete the PDF.** `erase_staff_application_privacy` removes the row (`'delete'`) or nulls `resume_storage_key` (`'redact'`), but the object in `staff-resumes` has to be removed separately, and the key must be read first. The manual runbook is in [spec-007](spec-007-staff-application-resume.md) item 9.
-- **Automate deletion on decline. Needed to keep the published retention promise without manual work.** `/privacy` now says an application and its resume are deleted once we decide not to move forward with it. Today, declining in `/admin/applications` only writes a status log, so every decline needs the manual runbook. Build:
+- **Automate deletion on decline. Needed to keep the published retention promise without manual work.** `/privacy` says an application and its resume are deleted once we decide not to move forward with it. Declining in `/admin/applications` only writes a status log, so every decline needs the manual runbook. Build:
   - a server action, gated by `MANAGE_APPLICATIONS`, that on decline (or an explicit "delete") reads `resume_storage_key`, removes the PDF from `staff-resumes`, and only then runs `erase_staff_application_privacy(id, actor, 'delete')`; and
   - a periodic sweep that deletes objects in `staff-resumes` with no matching `resume_storage_key`, to catch failures between the two steps.
 
   Decide whether decline deletes immediately or after a short grace period, and update the policy wording if it becomes a grace period.
-- **Applications declined before this deploys.** The `/privacy` retention wording ("if we decide not to move forward, we delete it, including any resume") also covers applications already declined or soft-deleted in production. Nothing removes those today. At deploy, list staff applications with status "rejected" or `deleted_at` set and process each one with the runbook in [spec-007](spec-007-staff-application-resume.md) item 9 (read `resume_storage_key`, delete the PDF, then erase the row). Also note that downloaded resumes, exported CSVs, and `db/backups` dumps can outlive a deletion; `/privacy` Section 9 says some information may need to be retained, and backup retention is not yet specified.
-- **Division list vs recruiting copy: reconciled.** The per-game divisions are one "Game Regulations Division" with a director follow-up, and "Systems Engineering Division" and "Data Science Division" now sit beside the kept "Software Engineering Division" (spec-007 item 8). The list is nine divisions and no longer mirrors the Discord post word for word. The unmerged `feat/staff-application-divisions` (`9d78f35`) is superseded: it would reintroduce the retired "Games Division" and conflicts in the same files.
+- **Applications declined before this deployed.** The `/privacy` retention wording also covers applications already declined or soft-deleted in production. Nothing removes those today. List staff applications with status "rejected" or `deleted_at` set and process each one with the runbook in [spec-007](spec-007-staff-application-resume.md) item 9 (read `resume_storage_key`, delete the PDF, then erase the row). Also note that downloaded resumes, exported CSVs, and `db/backups` dumps can outlive a deletion; `/privacy` Section 9 says some information may need to be retained, and backup retention is not yet specified.
 - **Deferred by the user (not started):** screen-reader refinements to the resume picker, and a copy tidy (Step 3 description and placeholder, placement of the unpaid acknowledgement, the hardcoded "5th year in 2026–27").
-
----
-
-## Active Pipeline (Next Up)
-
-- **[#144](https://github.com/EZ-Esports/website/issues/144)**: Cache invalidation profile using Next.js 16 `updateTag` so CMS saves reliably invalidate public pages.
-- **[#143](https://github.com/EZ-Esports/website/issues/143)**: Canonicalize division filters (`A`/`B` vs `Varsity`/`JV`) across queries and forms.
-- **[#153](https://github.com/EZ-Esports/website/issues/153)**: Fix news View Live 404s (route ID vs slug).
 
 ---
 
 ## Product / legal gaps
 
-- **Custom domain `ezesports.org` is not the canonical app URL.** SEO/`metadataBase`/`sitemap` default to `ez-esports.vercel.app` (`1f82559`). README and `/privacy` still name `ezesports.org`. DNS/domain wiring was deferred in June and not closed later.
-- **No `/terms` on HEAD.** `5a18f66` (#104) adds Terms of Service but is **not an ancestor of `926b978`**. Apply consent on other branches (`feat/issue-105`, `feat/issue-106`) may link to `/terms`. Parental media release / NY Ed Law § 2-D (`9603475`, `8215457` on those branches) is likewise unmerged. `/rules` at HEAD is the 12 Sep page (`6732658`), not the 17 Aug draft.
-- **Login rate limiting — not in the repo.** `login/actions.ts` is plain `signInWithPassword`. In-process `rateLimit()` covers `/api/apply`, staff apply, uploads, and staff invites only, and resets on serverless cold start.
+- **Custom domain `ezesports.org`:** `CANONICAL_APP_URL` in `app/lib/constants.ts` is now `https://ezesports.org`, and the sitemap/`metadataBase` follow it. Not verified from code: that DNS and Vercel actually serve the domain and redirect the `ez-esports.vercel.app` host to it. Tracked with the SEO work in [issue #244](https://github.com/EZ-Esports/website/issues/244).
+- **Parental media release / NY Ed Law § 2-D and rules/Parents' Bill of Rights are unmerged.** `origin/feat/issue-105-league-rules` and `origin/feat/issue-106-parents-bill-of-rights` are not ancestors of `main` (`9603475`, `8215457` live on those branches). `/terms` and `/rules` exist on main; check the branches before assuming their content is what ships.
 - **Advisor roster RBAC — not in the repo.** Form collects advisor fields; there is no advisor-scoped permission model. Access is twelve `MANAGE_*` flags plus `ADMINISTRATOR`.
-- **CSP omitted.** `0442af1` (#129) shipped X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, HSTS. **No Content-Security-Policy.** Markdown XSS is render-time (`926b978`), not a CSP `script-src` story.
-- **Apply metadata mismatch.** Header CTA and apply heading: “Submit Interest” (`3afc647` #94, `f9eeabc` #95). Page `<title>` and `Navigation.tsx` dropdown: still “Apply to Play.” `/about` hero and bottom CTAs still “Apply Now”; footer link label is “Apply.”
-- **Student-founded vs student-run.** Homepage heading/pillar `3959d7e`. Footer + `/privacy` still say “student-run.” Body copy on the same homepage section says “student-led.” `/about` scoreboard, operations card, and divisions heading still say student-run.
-- **Apply-form copy** still names Clash Royale / Smash as leagues and “Tetris” in the other-clubs prompt.
-- **Destructive admin color token.** PR #13 kept raw `red-*` for destructive actions; noted for a later token pass, not done.
-- **Application `message` column retained**; pre-jsonb rows may have `details: null`; admin modal/CSV fall back to `message`.
+- **Apply metadata mismatch.** Header CTA and apply heading: “Submit Interest” (`3afc647` #94, `f9eeabc` #95). Page `<title>` (`apply/page.tsx`) and the `Navigation.tsx` dropdown: still “Apply to Play.” `/about` hero and bottom CTAs still “Apply Now”; footer link label is “Apply.”
+- **Student-founded vs student-run.** Homepage heading/pillar `3959d7e`. Footer, `/privacy`, `/terms` still say “student-run.” Body copy on the same homepage section says “student-led.” `/about` scoreboard, operations card, and “Ten Student-Run Divisions” heading still say student-run.
+- **Destructive admin color token.** PR #13 kept raw `red-*` for destructive actions (e.g. `ImageUpload`, `InviteRow`, `ProvisionInviteTab`); noted for a later token pass, not done.
 
 ---
 
@@ -81,28 +57,18 @@ The following items from the September 2026 Codebase Quality Audit have been imp
 - **February schema leftovers.** No `match_details` JSONB, no `team_staff`/`org_staff` split, no unified `people` for players. `people` is leadership-only.
 - **No `.github/dependabot.yml`**; alerts are manual PRs.
 - **Next.js agent-rules block** in `CLAUDE.md` is regenerated by `next dev` — treating it as hand-edited source fights the generator.
-- **Remove `experimental.reactDebugChannel: false`.** Added `f5e26ed` on Next ^16.2.6 for a Firefox dev refresh loop; comment says remove after stable 16.3+. Still present at HEAD while `package.json` is `next` ^16.3.5 — verify whether it is still needed before deleting.
+- **Remove `experimental.reactDebugChannel: false`.** Added `f5e26ed` on Next ^16.2.6 for a Firefox dev refresh loop; comment says remove after stable 16.3+. Still present in `next.config` while `package.json` is `next` ^16.3.8 — verify whether it is still needed before deleting.
 
 ---
 
-## `CLAUDE.md` drift
+## Team role editor: permission bits the actor lacks
 
-- Seed wording still says `db:seed` and `db:seed:gold` both delete-and-reinsert. Gold upserts since `9219ef5`. The file is still the operator law for production, cache, PII, and “ask before unrecoverable”; do not “fix” it casually in a drive-by, but do not implement a wipe because the first paragraph sounds like one.
-- Cache-tag list omits `people`, which `queries.ts` uses.
----
-
-## Admin hover-gated row actions
-
-- Resolved in [spec-013](spec-013-staff-portal-ui-overhaul.md) (2 Oct 2026): Roster Explorer and League Setup row actions are always visible.
-
-## Team role editor saves destroy role data (resolved)
-
-Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-overhaul.md), incidents section 17): the editor's fields are held in state, so tab switches no longer drop data and the Owner and system roles save. Still true: permission bits the actor lacks are disabled and are left out of the saved bitmask, so saving a role that holds one removes it (unless the escalation guard rejects first). Preserving them would need a server-side merge, because `updateRole` rejects any submitted bit the actor lacks.
+Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-overhaul.md), incidents section 17): permission bits the actor lacks are disabled and are left out of the saved bitmask, so saving a role that holds one removes it (unless the escalation guard rejects first). Preserving them would need a server-side merge, because `updateRole` rejects any submitted bit the actor lacks.
 
 ## Staff portal follow-ups from spec-013 (need behaviour changes)
 
 - Inline-create pages (Schools, Sponsors, Gallery) could move "Add …" into a header button that opens a dialog, which needs close-on-success wiring in `AddEntityForm`.
-- League Setup, Team and Roster Explorer still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
+- `LeagueSetupClient`, `RosterExplorer`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
 
 ## Dependency drift
 
@@ -110,11 +76,57 @@ Resolved in the PR #218 review follow-ups ([spec-013](spec-013-staff-portal-ui-o
 
 ## Gallery thumbnail rollout (spec-014)
 
-- Migration `0046_gallery_image_thumbnails` is **applied** in production; `npm run db:backfill:gallery-thumbnails` has only been dry-run (it then saw 3 own-folder rows; the extended backfill also covers 29 legacy root-key and 3 local-static live rows). Run it dry first, then `--apply`, then save any gallery row in `/admin/gallery` to refresh the Data Cache. Until then existing rows show full-size files (unoptimized).
+- Migration `0046_gallery_image_thumbnails` is **applied** in production; `npm run db:backfill:gallery-thumbnails` has only been dry-run (it then saw 3 own-folder rows; the extended backfill also covers 29 legacy root-key and 3 local-static live rows). Run it dry first, then `--apply`, then save any gallery row in `/admin/gallery` to refresh the Data Cache. Until then existing rows show full-size files (unoptimized). Not re-verified against production since.
 - Sponsor logos and leadership avatars stay unoptimized without thumbnails; revisit only if they grow.
-- The other tsx db scripts that import `app/lib/db` (seed-gold, seed-leadership, backfill-leadership, seed-owner, storage-clean) likely hit the same `server-only` launch crash (incidents section 20); decide whether to add `--conditions=react-server` to them.
+- The other tsx db scripts that import `app/lib/db` (seed-gold, seed-leadership, backfill-leadership, seed-owner, storage-clean) likely hit the same `server-only` launch crash (incidents section 20); decide whether to add `--conditions=react-server` to them (only the gallery thumbnail backfill has it today).
 
 ## Manager portal tour (spec-015)
 
 - Migration `0048_school_manager_tour_completed` (adds nullable `school_managers.tour_completed_at`) is **applied to production** (14 Oct 2026, right after merging #227). Remaining: run the manual checks in spec-015 against real data (first visit, completion stamped on all of a person's rows, second manager at the same school still sees it, staff admin sees no tour). Staff admins with no `school_managers` row never auto-start the tour but can still replay it from the Tutorial button (confirmed by reading `PortalTour.tsx`; deliberate).
 - `drizzle-kit generate` aborts because `db/migrations/meta/0041_snapshot.json` and `0042_snapshot.json` point at the same parent snapshot; migrations 0043-0048 were hand-written. Repair the snapshot chain so future migrations can be generated.
+
+---
+
+## Open GitHub issues
+
+Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issue list` for the current state.
+
+- [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`. Shipped in #252 ([spec-018](spec-018-manager-invites-table.md)); migration `0049` was applied to production on 18 Oct 2026 after a full backup. Resolved.
+- [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views. Implemented in [spec-022](spec-022-hide-season-outcomes.md) (PR #261); migration `0051` is applied to production. Staff must press "Publish results" for each active season once its data is complete. Retiring a season (explicitly or by activating a new one) publishes it in the same write. Open: tournament brackets and tournament rows in Latest Results are not gated.
+- [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
+- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Addressed in spec-019 (in review); invite scoping is still open, see below.
+- [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should not get a `staff_members` row when they reach `/admin` or `/login`. Fixed in [spec-023](spec-023-manager-no-staff-row.md) (PR #264): no row is created for managers; the staff login rejects them and `/admin` routes them to `/portal`. Open: manager staff rows created before the fix remain and are not cleaned up automatically.
+- [#240](https://github.com/EZ-Esports/website/issues/240): link school names in Season standing and the Standings tab to team pages.
+- [#241](https://github.com/EZ-Esports/website/issues/241): show high school alongside university on leadership cards.
+- [#242](https://github.com/EZ-Esports/website/issues/242): in-site match reporting instead of Discord text channel reporting.
+- [#243](https://github.com/EZ-Esports/website/issues/243): school roster locking on the manager side.
+- [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
+- [#247](https://github.com/EZ-Esports/website/issues/247): Riot Sign-On (OAuth) and consent for student onboarding. On hold until Riot approves the production key.
+- [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
+- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and guild membership check in the join wizard (spec-011 designed it; only the honor-system checkbox is built).
+- [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
+
+## Onboarding draft and season defaults (spec-017)
+
+- `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
+- (Resolved in spec-019: the hard-coded `'2025-2026'` default is gone; manager seasons are `YYYY-YY` and default to `DEFAULT_MANAGER_SEASON`.) Bump or derive it from today's date in a separate change.
+- The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.
+
+## Manager portal season scope (spec-019)
+
+- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to the active season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
+- **#233 interplay.** Managers can still hold role-less `staff_members` rows (legacy, or granted deliberately). The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way. New manager logins no longer create such rows (spec-023).
+- The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
+- Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.
+
+## Season roster lock (spec-020)
+
+- Migration `0050_season_rosters_locked` was applied to production on 18 Oct 2026 (before #256 merged). Resolved.
+- The lock is per season with no actor or reason recorded, and no scheduled auto-lock.
+- Invite approval is refused whenever the game's season is locked, even if it would have enrolled nobody; revisit if staff want approvals to continue during a lock.
+
+## Student Handbook page (spec-021)
+
+- Unverified in production: a real Supabase upload being read by pdf.js (public-bucket CORS) and the `?download=` filename behavior. On any pdf.js failure the page shows the bundled pages plus an Open PDF link.
+- The stored handbook is capped at 4 MB (Vercel body limit). Picks up to 50 MB are shrunk in the browser by recompressing large raster images; a PDF still over 4 MB after two passes (for example mostly vector or CMYK/indexed images, which are skipped) is refused with its size. A signed direct-to-storage upload would lift the cap. Compression was exercised in the dev server on the real file but no upload was made. No "remove PDF" button, only replace.
+- The bundled page images and text (`public/handbook/`, `app/lib/handbook-pages.ts`) are the 2026-27 edition and go stale each season. pdf.js standard-font/CMap data is not bundled.

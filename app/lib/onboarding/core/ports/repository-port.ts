@@ -26,8 +26,7 @@ export interface GameRecord {
 export interface PlayerInviteRecord {
   id: string;
   schoolId: string;
-  gameId: string | null;
-  role: string;
+  gameId: string;
   tokenHash: string;
   intendedFirstName: string;
   intendedLastName: string;
@@ -38,6 +37,23 @@ export interface PlayerInviteRecord {
   submittedAt: Date | string | null;
   reviewedAt: Date | string | null;
   rejectionReason: string | null;
+  createdAt: Date | string;
+}
+
+export interface ManagerInviteRecord {
+  id: string;
+  schoolId: string;
+  tokenHash: string;
+  intendedFirstName: string;
+  intendedLastName: string;
+  invitedByUserId: string;
+  status: string;
+  submissionDraft: Record<string, unknown> | null;
+  expiresAt: Date | string | null;
+  submittedAt: Date | string | null;
+  reviewedAt: Date | string | null;
+  rejectionReason: string | null;
+  memberId: string | null;
   createdAt: Date | string;
 }
 
@@ -73,9 +89,26 @@ export interface OnboardingRepositoryPort {
   findGameBySlug(slug: string): Promise<GameRecord | null>;
 
   // Roster & Player queries
-  findSchoolRosters(schoolId: string, gameIds?: string[] | null): Promise<SchoolRosterWithPlayers[]>;
+  findSchoolRosters(
+    schoolId: string,
+    gameIds?: string[] | null,
+    options?: { activeSeasonOnly?: boolean }
+  ): Promise<SchoolRosterWithPlayers[]>;
   findSchoolPlayerPool(schoolId: string, gameId?: string): Promise<SchoolPlayerPoolItem[]>;
-  findRosterById(rosterId: string): Promise<{ id: string; schoolId: string; gameId: string; name: string } | null>;
+  findRosterById(
+    rosterId: string
+  ): Promise<{
+    id: string;
+    schoolId: string;
+    gameId: string;
+    name: string;
+    /** Whether the roster's team belongs to its game's active season. */
+    isActiveSeason?: boolean;
+    /** Whether staff have locked the roster's season against manager changes. */
+    isSeasonLocked?: boolean;
+  } | null>;
+  /** Whether the game's active season has its rosters locked (false when none is active). */
+  isActiveSeasonLocked?(gameId: string): Promise<boolean>;
 
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;
@@ -159,8 +192,8 @@ export interface OnboardingRepositoryPort {
     invitedByUserId: string;
     expiresAt: Date;
     draft?: Record<string, unknown>;
-  }): Promise<PlayerInviteRecord>;
-  listSchoolManagerInvites(schoolId: string): Promise<PlayerInviteRecord[]>;
+  }): Promise<ManagerInviteRecord>;
+  listSchoolManagerInvites(schoolId: string): Promise<ManagerInviteRecord[]>;
   revokeManagerInvite(inviteId: string): Promise<void>;
 
   // Audit

@@ -19,6 +19,8 @@ export interface WizardFormData {
   email: string;
   password?: string;
   graduationYear: number;
+  /** Manager only: season the manager is applying for, e.g. "2026-27". */
+  academicYear?: string;
   discordUsername: string;
   discordJoinedConfirmed: boolean;
   discordConnected: boolean;
@@ -41,6 +43,17 @@ export interface WizardFormData {
   };
   codeOfConductAccepted: boolean;
 }
+
+/** Anticipated graduation years offered to everyone (students and managers), with grade for 2026-2027. */
+export const GRADUATION_YEAR_OPTIONS = [
+  { value: 2027, label: 'Class of 2027 (12th Grade / Senior)' },
+  { value: 2028, label: 'Class of 2028 (11th Grade / Junior)' },
+  { value: 2029, label: 'Class of 2029 (10th Grade / Sophomore)' },
+  { value: 2030, label: 'Class of 2030 (9th Grade / Freshman)' },
+] as const;
+
+/** Seasons a School Manager can apply for (`YYYY-YY`, shared with the rest of the app). */
+export { MANAGER_SEASON_OPTIONS, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
 
 export const CAREER_INTEREST_OPTIONS = [
   'Competitive Esports Player',

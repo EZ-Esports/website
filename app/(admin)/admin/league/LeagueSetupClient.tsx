@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { cancelBtn, chip, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
+import { cancelBtn, chip, chipButton, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
 import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
+  lockSeasonRosters, unlockSeasonRosters,
+  publishSeasonOutcomes, hideSeasonOutcomes,
 } from './actions';
 
 interface DBGame {
@@ -25,6 +28,10 @@ interface DBSeason {
   name: string;
   isActive: boolean;
   standingsFormat?: string;
+  /** Set while staff have locked this season's rosters against manager changes. */
+  rostersLockedAt?: Date | string | null;
+  /** Set once staff publish this season's results; null keeps scores, standings and records off the public site. */
+  outcomesFinalizedAt?: Date | string | null;
 }
 
 type ActionResult = { success: boolean; error?: string };
@@ -50,6 +57,8 @@ export default function LeagueSetupClient({
 }) {
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [lockTarget, setLockTarget] = useState<{ seasonId: string; locking: boolean; title: string; message: string } | null>(null);
+  const [outcomesTarget, setOutcomesTarget] = useState<{ seasonId: string; publishing: boolean; title: string; message: string } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -156,7 +165,7 @@ export default function LeagueSetupClient({
         id="seasons"
         variant="flush"
         title={<>Seasons<AdminCount>{seasons.length}</AdminCount></>}
-        description="Matches and team registrations attach to a season. Active seasons show on the public site."
+        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager can only work on the active season that matches their affiliation (YYYY-YY). Scores, results, standings and records stay hidden from the public until you publish a season's results."
       >
         {games.length === 0 ? (
           <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="Create a game first before adding seasons." />
@@ -176,8 +185,16 @@ export default function LeagueSetupClient({
                   ))}
                 </select>
               </Field>
-              <Field label="Season name">
-                <input name="name" required placeholder="Spring 2025" className={input} />
+              <Field label="Season name" help="Format YYYY-YY, e.g. 2025-26.">
+                <input
+                  name="name"
+                  required
+                  placeholder="2025-26"
+                  maxLength={7}
+                  pattern="\d{4}-\d{2}"
+                  title="Format YYYY-YY, for example 2025-26"
+                  className={input}
+                />
               </Field>
               <Field label="Active?">
                 <select name="isActive" defaultValue="true" className={input}>
@@ -210,6 +227,29 @@ export default function LeagueSetupClient({
                       gameName={game?.displayName ?? 'Unknown Game'}
                       isPending={isPending}
                       onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), 'Season updated.')}
+                      onToggleLock={() => {
+                        const locking = !s.rostersLockedAt;
+                        const message = locking
+                          ? `School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${s.isActive ? '' : ' This season is inactive, so locking has no effect on managers until it is activated.'}`
+                          : 'School managers will be able to change rosters again.';
+                        setLockTarget({
+                          seasonId: s.id,
+                          locking,
+                          title: `${locking ? 'Lock' : 'Unlock'} rosters for ${game?.displayName ?? 'this game'} ${s.name}?`,
+                          message,
+                        });
+                      }}
+                      onToggleOutcomes={() => {
+                        const publishing = !s.outcomesFinalizedAt;
+                        setOutcomesTarget({
+                          seasonId: s.id,
+                          publishing,
+                          title: `${publishing ? 'Publish' : 'Hide'} results for ${game?.displayName ?? 'this game'} ${s.name}?`,
+                          message: publishing
+                            ? 'Scores, match results, standings, team records and champions for this season will become visible on the public site, the homepage and the archive. Only publish once the results for the season are complete.'
+                            : 'Scores, match results, standings, team records and champions for this season will be removed from the public site. Schedules and team lists stay. Staff views are not affected.',
+                        });
+                      }}
                       onDelete={() =>
                         confirmDelete(
                           `Delete season "${s.name}"? Seasons with existing matches cannot be deleted until those matches are removed or reassigned. This is permanent.`,
@@ -225,6 +265,50 @@ export default function LeagueSetupClient({
           </>
         )}
       </AdminSection>
+
+      <ConfirmActionDialog
+        isOpen={outcomesTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setOutcomesTarget(null);
+        }}
+        title={outcomesTarget?.title ?? ''}
+        message={outcomesTarget?.message ?? ''}
+        confirmLabel={outcomesTarget?.publishing ? 'Publish results' : 'Hide results'}
+        pendingLabel={outcomesTarget?.publishing ? 'Publishing…' : 'Hiding…'}
+        isPending={isPending}
+        icon={outcomesTarget?.publishing ? <FiEye className="h-5 w-5" /> : <FiEyeOff className="h-5 w-5" />}
+        onConfirm={async () => {
+          if (!outcomesTarget) return;
+          const { seasonId, publishing } = outcomesTarget;
+          await runAction(
+            () => (publishing ? publishSeasonOutcomes(seasonId) : hideSeasonOutcomes(seasonId)),
+            publishing ? 'Results published.' : 'Results hidden.',
+          );
+          setOutcomesTarget(null);
+        }}
+      />
+
+      <ConfirmActionDialog
+        isOpen={lockTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setLockTarget(null);
+        }}
+        title={lockTarget?.title ?? ''}
+        message={lockTarget?.message ?? ''}
+        confirmLabel={lockTarget?.locking ? 'Lock rosters' : 'Unlock rosters'}
+        pendingLabel={lockTarget?.locking ? 'Locking…' : 'Unlocking…'}
+        isPending={isPending}
+        icon={lockTarget?.locking ? <FiLock className="h-5 w-5" /> : <FiUnlock className="h-5 w-5" />}
+        onConfirm={async () => {
+          if (!lockTarget) return;
+          const { seasonId, locking } = lockTarget;
+          await runAction(
+            () => (locking ? lockSeasonRosters(seasonId) : unlockSeasonRosters(seasonId)),
+            locking ? 'Rosters locked.' : 'Rosters unlocked.',
+          );
+          setLockTarget(null);
+        }}
+      />
     </div>
   );
 }
@@ -292,14 +376,20 @@ function SeasonRow({
   gameName,
   isPending,
   onUpdate,
+  onToggleLock,
+  onToggleOutcomes,
   onDelete,
 }: {
   season: DBSeason;
   gameName: string;
   isPending: boolean;
   onUpdate: (fd: FormData) => Promise<boolean>;
+  onToggleLock: () => void;
+  onToggleOutcomes: () => void;
   onDelete: () => void;
 }) {
+  const locked = !!season.rostersLockedAt;
+  const published = !!season.outcomesFinalizedAt;
   const [editing, setEditing] = useState(false);
 
   return (
@@ -321,7 +411,15 @@ function SeasonRow({
             <input type="hidden" name="gameId" value={season.gameId} />
           </Field>
           <Field label="Season name">
-            <input name="name" required defaultValue={season.name} autoFocus className={input} />
+            <input
+              name="name"
+              required
+              defaultValue={season.name}
+              autoFocus
+              placeholder="2025-26"
+              title="Format YYYY-YY, for example 2025-26"
+              className={input}
+            />
           </Field>
           <Field label="Active?">
             <select name="isActive" defaultValue={season.isActive ? 'true' : 'false'} className={input}>
@@ -341,7 +439,7 @@ function SeasonRow({
           </div>
         </form>
       ) : (
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-foreground">{season.name}</span>
             <span className="text-sm text-foreground-secondary">{gameName}</span>
@@ -350,9 +448,41 @@ function SeasonRow({
               {season.isActive ? 'Active' : 'Inactive'}
             </span>
             <span className={`${chip('neutral')} capitalize`}>{season.standingsFormat ?? 'divided'}</span>
+            <span className={chip(published ? 'success' : 'neutral')}>
+              {published ? <FiEye aria-hidden className="h-3 w-3" /> : <FiEyeOff aria-hidden className="h-3 w-3" />}
+              {published ? 'Results public' : 'Results hidden'}
+            </span>
+            {locked && (
+              <span className={chip('warning')}>
+                <FiLock aria-hidden className="h-3 w-3" />
+                Rosters locked
+              </span>
+            )}
           </div>
           {/* Row actions stay visible (touch has no hover). */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleLock}
+              disabled={isPending}
+              className={chipButton(locked ? 'warning' : 'ghost')}
+              aria-label={locked ? `Unlock rosters for season ${season.name}` : `Lock rosters for season ${season.name}`}
+              title={locked ? 'Let school managers change rosters again' : 'Stop school managers from changing rosters'}
+            >
+              {locked ? <FiUnlock aria-hidden className="h-3.5 w-3.5" /> : <FiLock aria-hidden className="h-3.5 w-3.5" />}
+              {locked ? 'Unlock rosters' : 'Lock rosters'}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleOutcomes}
+              disabled={isPending}
+              className={chipButton(published ? 'ghost' : 'warning')}
+              aria-label={published ? `Hide results for season ${season.name}` : `Publish results for season ${season.name}`}
+              title={published ? 'Remove scores, standings and records from the public site' : 'Show scores, standings and records on the public site'}
+            >
+              {published ? <FiEyeOff aria-hidden className="h-3.5 w-3.5" /> : <FiEye aria-hidden className="h-3.5 w-3.5" />}
+              {published ? 'Hide results' : 'Publish results'}
+            </button>
             <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit season ${season.name}`} />
             <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete season ${season.name}`} title={`Delete season ${season.name}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
           </div>

@@ -18,7 +18,7 @@ Theme tokens live in `app/globals.css` under `:root`, mapped into Tailwind
 via `@theme inline`. Use the token classes (`bg-surface`, `text-foreground`,
 `border-line`, etc.) rather than literal hex values, so a component
 follows the public theme. The header control sets `.theme-light` on `<html>`
-for the light appearance (see spec-017). The same class on a subtree (the
+for the light appearance (see spec-024). The same class on a subtree (the
 apply forms) still scopes the light tokens to that container when the rest
 of the site is dark. `.theme-dark` pins the dark tokens on a surface that
 must not follow the page (the header, a photo hero, a lightbox). Use the

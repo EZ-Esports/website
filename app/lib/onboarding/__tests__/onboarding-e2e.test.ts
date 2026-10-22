@@ -21,11 +21,13 @@ const mocks = vi.hoisted(() => {
     schoolsStore: [] as any[],
     gamesStore: [] as any[],
     teamsStore: [] as any[],
+    seasonsStore: [] as any[],
     rostersStore: [] as any[],
     playersStore: [] as any[],
     membersStore: [] as any[],
     schoolManagersStore: [] as any[],
     playerInvitesStore: [] as any[],
+    managerInvitesStore: [] as any[],
     playerIdentitiesStore: [] as any[],
     studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
@@ -134,6 +136,9 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.games) {
           return state.gamesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
+        if (currentTable === schema.seasons) {
+          return state.seasonsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
+        }
         if (currentTable === schema.teams) {
           return state.teamsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
@@ -205,8 +210,25 @@ const mocks = vi.hoisted(() => {
                 schoolName: school?.name || 'School Name',
                 schoolSlug: school?.slug || 'school-slug',
                 gameId: game?.id || inv.gameId,
-                gameName: game?.displayName || (inv.role === 'manager' ? 'School Manager' : 'Game Name'),
-                gameSlug: game?.slug || (inv.role === 'manager' ? 'manager' : 'game-slug'),
+                gameName: game?.displayName || 'Game Name',
+                gameSlug: game?.slug || 'game-slug',
+              };
+            });
+          }
+          return rows;
+        }
+
+        if (currentTable === schema.managerInvites) {
+          const rows = state.managerInvitesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
+          if (joins.length > 0) {
+            return rows.map((inv) => {
+              const school = state.schoolsStore.find((s) => s.id === inv.schoolId);
+              return {
+                ...inv,
+                invite: inv,
+                schoolId: school?.id || inv.schoolId,
+                schoolName: school?.name || 'School Name',
+                schoolSlug: school?.slug || 'school-slug',
               };
             });
           }
@@ -238,6 +260,10 @@ const mocks = vi.hoisted(() => {
 
         if (tbl === schema.playerInvites) {
           state.playerInvitesStore.push(record);
+          return [record];
+        }
+        if (tbl === schema.managerInvites) {
+          state.managerInvitesStore.push(record);
           return [record];
         }
         if (tbl === schema.members) {
@@ -303,6 +329,7 @@ const mocks = vi.hoisted(() => {
         }
 
         if (tbl === schema.playerInvites) return updateStore(state.playerInvitesStore);
+        if (tbl === schema.managerInvites) return updateStore(state.managerInvitesStore);
         if (tbl === schema.schoolManagers) return updateStore(state.schoolManagersStore);
         if (tbl === schema.members) return updateStore(state.membersStore);
         return [];
@@ -435,6 +462,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
     id: 'team-stuy-val-uuid',
     schoolId: stuySchool.id,
     gameId: valorantGame.id,
+    seasonId: 'season-val-2026',
     name: 'Stuyvesant Valorant',
   };
 
@@ -460,11 +488,13 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
     mocks.state.schoolsStore = [stuySchool, bxsciSchool];
     mocks.state.gamesStore = [valorantGame];
     mocks.state.teamsStore = [stuyTeam];
+    mocks.state.seasonsStore = [{ id: 'season-val-2026', gameId: valorantGame.id, name: '2026-27', isActive: true }];
     mocks.state.rostersStore = [stuyRoster];
     mocks.state.playersStore = [];
     mocks.state.membersStore = [];
     mocks.state.schoolManagersStore = [];
     mocks.state.playerInvitesStore = [];
+    mocks.state.managerInvitesStore = [];
     mocks.state.playerIdentitiesStore = [];
     mocks.state.studentDemographicsStore = [];
     mocks.state.staffMembersStore = [
@@ -530,7 +560,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
         firstName: 'Alex',
         lastName: 'Chen',
         email: 'alex.chen@stuy.edu',
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         managedGames: null,
         isPrimaryContact: true,
       });
@@ -587,7 +617,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
 
       // 4b: Manager assigned in school_managers with member_id FK
       const managerRow = mocks.state.schoolManagersStore.find(
-        (sm) => sm.schoolId === stuySchool.id && sm.academicYear === '2025-2026'
+        (sm) => sm.schoolId === stuySchool.id && sm.academicYear === '2026-27'
       );
       expect(managerRow).toBeDefined();
       expect(managerRow?.memberId).toBe(createdMember?.id);
@@ -642,7 +672,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
         userId: managerUserId,
         memberId: managerMemberId,
         managedGames: null,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         isPrimaryContact: true,
         isActive: true,
         createdAt: new Date(),
@@ -749,7 +779,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
         userId: managerUserId,
         memberId: managerMemberId,
         managedGames: null,
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         isPrimaryContact: true,
         isActive: true,
         createdAt: new Date(),
@@ -769,7 +799,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
         userId: managerUserId,
         memberId: managerMemberId,
         email: 'alex.chen@stuy.edu',
-        academicYear: '2025-2026',
+        academicYear: '2026-27',
         managedGames: ['valorant'],
         isPrimaryContact: true,
       });

@@ -51,7 +51,7 @@ export default function CareerApplyForm({
     linkedin: '',
     workSamples: '',
     referredBy: '',
-    availability: '10~20hrs / week',
+    availability: '10~15hrs / week',
     agreedToTerms: false,
     agreedToPrivacy: false,
     acknowledgedUnpaidVolunteer: false,
@@ -437,7 +437,7 @@ export default function CareerApplyForm({
                 onChange={handleTextChange}
                 className="w-full bg-surface border border-line rounded-lg px-3.5 py-2.5 text-xs text-foreground focus:outline-none focus:border-accent transition-colors"
               >
-                <option value="10~20hrs / week">10~20hrs</option>
+                <option value="10~15hrs / week">10~15hrs</option>
               </select>
             </div>
 

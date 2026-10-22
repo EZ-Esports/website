@@ -20,6 +20,7 @@ import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
 import { cx } from '@/app/lib/cx';
 import { planGameHubLayout, type GameHubTileId } from '@/app/lib/game-hub-layout';
 import FormGuide from '@/app/components/ui/FormGuide';
+import { OUTCOMES_PENDING_NOTICE } from '@/app/lib/season-outcomes';
 
 
 const HUB_DESCRIPTIONS: Record<GameSlug, string> = {
@@ -117,6 +118,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
     seasonName,
     standingsFormat,
     standingsReconstructed,
+    outcomesPublic,
   } = await getGameHubData(slug, division);
 
   /**
@@ -426,11 +428,17 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               // asserts a Varsity-only table that this competition never
               // produced, and the JV route asserts the same about the other half.
               title={
-                isTournament
-                  ? 'Group Stage Standings'
-                  : combinedStandings
-                    ? 'Season standings'
-                    : `${divisionLabel(division)} standings`
+                !outcomesPublic
+                  ? isTournament
+                    ? 'Participants'
+                    : combinedStandings
+                      ? 'Season teams'
+                      : `${divisionLabel(division)} teams`
+                  : isTournament
+                    ? 'Group Stage Standings'
+                    : combinedStandings
+                      ? 'Season standings'
+                      : `${divisionLabel(division)} standings`
               }
               // Likewise the link: `?division=Varsity` names a division the
               // season does not have, and the standings page's only tab is
@@ -449,10 +457,12 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               <Table>
                 <thead className="border-b border-line">
                   <tr>
-                    <Th>Rank</Th>
+                    {outcomesPublic && <Th>Rank</Th>}
                     <Th>Team</Th>
-                    <Th className="whitespace-nowrap">W&ndash;L</Th>
-                    <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
+                    {outcomesPublic && <Th className="whitespace-nowrap">W&ndash;L</Th>}
+                    {outcomesPublic && (
+                      <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
+                    )}
                     {/* Form needs ~150px (five chips plus the cell's px-6) beyond
                         the four columns already here, and the tile is half of a
                         four-column grid (486px at `lg`), of which five `px-6`
@@ -474,31 +484,38 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                     // Rank alone is unique within one table, but a combined
                     // table holds one school twice, so the squad rides along in
                     // the key rather than leaving it to the rank to stay unique.
-                    <Tr key={`${entry.rank}-${entry.division}`} interactive>
+                    <Tr key={`${entry.rank ?? index}-${entry.division}-${entry.teamLabel}`} interactive>
                       {/* The leader carries the game's accent, the one place
-                          the table earns colour. */}
-                      <Td
-                        className={cx(
-                          'font-bold whitespace-nowrap border-l-2',
-                          index === 0 ? 'border-l-[var(--game-accent)]' : 'border-l-transparent'
-                        )}
-                      >
-                        {RANK_MEDALS[entry.rank] && (
-                          <span aria-hidden="true">{RANK_MEDALS[entry.rank]} </span>
-                        )}
-                        {entry.rank}
-                      </Td>
+                          the table earns colour. Hidden outcomes have no
+                          leader: the list is alphabetical. */}
+                      {outcomesPublic && entry.rank !== null && (
+                        <Td
+                          className={cx(
+                            'font-bold whitespace-nowrap border-l-2',
+                            index === 0 ? 'border-l-[var(--game-accent)]' : 'border-l-transparent'
+                          )}
+                        >
+                          {RANK_MEDALS[entry.rank] && (
+                            <span aria-hidden="true">{RANK_MEDALS[entry.rank]} </span>
+                          )}
+                          {entry.rank}
+                        </Td>
+                      )}
                       {/* `teamLabel`, not `team`: `team` is the raw school name
                           the form guide was keyed by, and only the label carries
                           the squad that tells a combined table's two Brooklyn
                           Technical rows apart. */}
                       <Td className="font-bold text-foreground">{entry.teamLabel}</Td>
-                      <Td className="font-medium whitespace-nowrap">
-                        {entry.wins}&ndash;{entry.losses}
-                      </Td>
-                      <Td className="hidden sm:table-cell font-bold text-foreground text-right whitespace-nowrap">
-                        {(entry.winPct * 100).toFixed(1)}%
-                      </Td>
+                      {outcomesPublic && entry.wins !== null && entry.losses !== null && (
+                        <Td className="font-medium whitespace-nowrap">
+                          {entry.wins}&ndash;{entry.losses}
+                        </Td>
+                      )}
+                      {outcomesPublic && entry.winPct !== null && (
+                        <Td className="hidden sm:table-cell font-bold text-foreground text-right whitespace-nowrap">
+                          {(entry.winPct * 100).toFixed(1)}%
+                        </Td>
+                      )}
                       {/* Blank for a school with no completed matches in this
                           division: the tile says so by showing nothing rather
                           than five losses. */}
@@ -517,6 +534,11 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                   reconstructed, so there is no separate match history to build
                   chips from. `px-6` because the tile body is `flush` for the
                   table. */}
+              {!outcomesPublic && (
+                <p className="px-6 py-3 text-[11px] font-semibold text-foreground-muted" role="note">
+                  {OUTCOMES_PENDING_NOTICE}
+                </p>
+              )}
               {standingsReconstructed && (
                 <p className="px-6 pt-3 text-[11px] font-semibold text-foreground-muted">
                   Reconstructed from match results

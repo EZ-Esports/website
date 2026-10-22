@@ -6,6 +6,7 @@ import {
   assignExistingManager,
   type RegisteredManagerAccount,
 } from '@/app/(admin)/admin/schools/manager-actions';
+import { DEFAULT_MANAGER_SEASON, SEASON_NAME_OPTIONS } from '@/app/lib/season-name';
 import { input } from '@/app/components/admin/styles';
 import type { GameItem } from './types';
 import { chip, label as labelClass, labelText, primaryBtn, secondaryBtnSm, textLinkSm } from '../styles';
@@ -35,7 +36,7 @@ export function AssignExistingManagerTab({
 }: AssignExistingManagerTabProps) {
   const [managerSearchQuery, setManagerSearchQuery] = useState('');
   const [selectedManager, setSelectedManager] = useState<RegisteredManagerAccount | null>(null);
-  const [assignYear, setAssignYear] = useState('2025-2026');
+  const [assignYear, setAssignYear] = useState<string>(DEFAULT_MANAGER_SEASON);
   const [assignIsPrimary, setAssignIsPrimary] = useState(false);
   const [assignAllGames, setAssignAllGames] = useState(true);
   const [assignSelectedGames, setAssignSelectedGames] = useState<string[]>([]);
@@ -236,15 +237,9 @@ export function AssignExistingManagerTab({
               >
                 Academic Year
               </label>
-              <input
-                id="assign-year"
-                type="text"
-                value={assignYear}
-                onChange={(e) => setAssignYear(e.target.value)}
-                placeholder="2025-2026"
-                required
-                className={input}
-              />
+              <select id="assign-year" value={assignYear} onChange={(e) => setAssignYear(e.target.value)} required className={input}>
+                {SEASON_NAME_OPTIONS.map((season) => (<option key={season} value={season}>{season}</option>))}
+              </select>
             </div>
 
             {/* Scoped Games Selection */}

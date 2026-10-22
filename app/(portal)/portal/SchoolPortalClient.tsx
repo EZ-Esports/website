@@ -39,6 +39,12 @@ interface SchoolPortalClientProps {
   initialRosters: SchoolRosterDetails[];
   initialPlayerPool?: SchoolPoolPlayer[];
   selectedGameId?: string;
+  /** Active season name(s) the manager is working in; undefined for a staff admin. */
+  seasonLabel?: string;
+  /** Games whose season rosters are locked by staff (always empty for staff admins). */
+  lockedGameIds?: string[];
+  /** Name(s) of the locked season(s), for the banner. */
+  lockedSeasonLabel?: string;
   /** Whether this account has already finished or skipped the guided tour. */
   tourCompleted: boolean;
 }
@@ -52,6 +58,9 @@ export default function SchoolPortalClient({
   initialRosters,
   initialPlayerPool = [],
   selectedGameId: initialGameId,
+  seasonLabel,
+  lockedGameIds = [],
+  lockedSeasonLabel = '',
   tourCompleted,
 }: SchoolPortalClientProps) {
   // --- Game Selection Tab ---
@@ -514,6 +523,7 @@ export default function SchoolPortalClient({
       {/* Top Banner & Title */}
       <PortalHeader
         schoolName={activeSchool.schoolName}
+        seasonLabel={seasonLabel}
         actions={
           <PortalTour
             tourCompleted={tourCompleted}
@@ -559,6 +569,7 @@ export default function SchoolPortalClient({
             setSelectedRosterMap={setSelectedRosterMap}
             selectedRoleMap={selectedRoleMap}
             setSelectedRoleMap={setSelectedRoleMap}
+            lockedGameIds={lockedGameIds}
             onApprove={handleApprove}
             onReject={handleReject}
           />
@@ -569,6 +580,9 @@ export default function SchoolPortalClient({
       <RostersSection
         rosters={filteredRosters}
         schoolName={activeSchool.schoolName}
+        lockedGameIds={lockedGameIds}
+        lockedSeasonLabel={lockedSeasonLabel}
+        allGameIds={games.map((g) => g.id)}
         eligibilityResults={eligibilityResults}
         evaluatingRosterId={evaluatingRosterId}
         onOpenCreateRosterModal={() => {
@@ -624,7 +638,7 @@ export default function SchoolPortalClient({
       <CreateRosterModal
         isOpen={isCreateRosterOpen}
         schoolName={activeSchool.schoolName}
-        games={games}
+        games={games.filter((g) => !lockedGameIds.includes(g.id))}
         defaultGameId={selectedGame}
         isCreating={isCreatingRoster}
         createError={createRosterError}

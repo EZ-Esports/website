@@ -35,7 +35,7 @@ surfaces — it fails contrast on light backgrounds. On light surfaces, use
 bug in this codebase (see `uiux` skill, case study 1).
 
 Theme switching is the public header toggle (light or dark). No choice follows the OS. An explicit light choice sets
-`.theme-light` on `<html>` ([spec-017](../../../../spec/spec-017-light-dark-theme.md)).
+`.theme-light` on `<html>` ([spec-024](../../../../spec/spec-024-light-dark-theme.md)).
 The same class on a subtree still scopes the light tokens to that container
 (the apply forms stay light when the rest of the site is dark). `.theme-dark`
 pins the dark tokens on a surface that must not follow the page — the header,

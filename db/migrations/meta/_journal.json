@@ -344,6 +344,27 @@
       "when": 1790882000003,
       "tag": "0048_school_manager_tour_completed",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790882000004,
+      "tag": "0049_manager_invites_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790882000005,
+      "tag": "0050_season_rosters_locked",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1790882000006,
+      "tag": "0051_season_outcomes_finalized",
+      "breakpoints": true
     }
   ]
 }

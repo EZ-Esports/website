@@ -18,6 +18,7 @@ import {
 } from '@/app/lib/db/match-page';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
 import SeasonFormatNotice from '@/app/components/ui/SeasonFormatNotice';
+import { OUTCOMES_PENDING_NOTICE } from '@/app/lib/season-outcomes';
 
 
 interface StandingsPageProps {
@@ -51,9 +52,11 @@ function RankCell({ rank }: { rank: number | null }) {
 function TeamStandingsTable({
   rows,
   standingsFormat,
+  outcomesPublic,
 }: {
   rows: StandingRow[];
   standingsFormat: StandingsFormat;
+  outcomesPublic: boolean;
 }) {
   /*
    * Only a combined table names the squad on each row (`standingsTeamLabel`
@@ -64,6 +67,29 @@ function TeamStandingsTable({
    * entered two squads, so without it three names appear twice, identically, at
    * two different ranks.
    */
+  if (!outcomesPublic) {
+    // Rows arrive alphabetical and stat-free (see redactStandingRows); no rank
+    // or medal column, so nothing here implies an order of finish.
+    return (
+      <Table>
+        <thead className="bg-surface-sunken/60 border-b border-line">
+          <tr>
+            <Th>Team</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((entry) => (
+            <Tr key={`${entry.division}-${entry.schoolName}`} interactive>
+              <Td className="font-bold text-foreground">
+                {standingsTeamLabel(entry, standingsFormat)}
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+    );
+  }
+
   return (
     <Table>
       <thead className="bg-surface-sunken/60 border-b border-line">
@@ -101,7 +127,33 @@ function TeamStandingsTable({
 }
 
 /** Individual (per-player) standings, e.g. TFT point leaderboards. */
-function PlayerStandingsTable({ rows }: { rows: StandingRow[] }) {
+function PlayerStandingsTable({ rows, outcomesPublic }: { rows: StandingRow[]; outcomesPublic: boolean }) {
+  if (!outcomesPublic) {
+    return (
+      <Table>
+        <thead className="bg-surface-sunken/60 border-b border-line">
+          <tr>
+            <Th>Player</Th>
+            <Th>School</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((entry) => (
+            <Tr key={`${entry.schoolName}-${entry.playerName}`} interactive>
+              <Td className="font-bold text-foreground">
+                {entry.playerName}
+                {entry.playerIgn && (
+                  <span className="text-foreground-muted font-medium ml-2">{entry.playerIgn}</span>
+                )}
+              </Td>
+              <Td className="font-medium">{entry.schoolName}</Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+    );
+  }
+
   return (
     <Table>
       <thead className="bg-surface-sunken/60 border-b border-line">
@@ -158,6 +210,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
   let source: 'snapshot' | 'computed' = 'computed';
   let standingsFormat: StandingsFormat = 'divided';
   let division = divisionParam ?? 'Varsity';
+  let outcomesPublic = true;
 
   const seasons = (await getSeasonsWithGames()).filter((s) => s.gameSlug === game);
 
@@ -186,6 +239,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
     standings = effective.rows;
     source = effective.source;
     standingsFormat = effective.standingsFormat;
+    outcomesPublic = effective.outcomesPublic;
   }
 
   // Individual standings layout only applies to games that are inherently individual
@@ -202,7 +256,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
    * false claim about a table this pipeline tallied from match rows itself, and
    * the difference is exactly what a reader needs to weigh the numbers.
    */
-  const isReconstructedTable = isDerivedStandings(standings);
+  const isReconstructedTable = outcomesPublic && isDerivedStandings(standings);
 
   return (
     <main>
@@ -211,9 +265,13 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
           as="h1"
           title={`${gameConfig.displayName} Standings`}
           lead={
-            isArchived
-              ? `Final standings from the ${selectedSeason?.name} season`
-              : 'Current season standings for all teams'
+            !outcomesPublic
+              ? isArchived
+                ? `Teams from the ${selectedSeason?.name} season`
+                : 'Teams competing this season'
+              : isArchived
+                ? `Final standings from the ${selectedSeason?.name} season`
+                : 'Current season standings for all teams'
           }
         />
 
@@ -251,6 +309,12 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
             division tabs go" at the moment the reader asks it. */}
         {standingsFormat === 'combined' && <SeasonFormatNotice className="mb-4" />}
 
+        {!outcomesPublic && (
+          <p className="mb-4 text-sm font-medium text-foreground-secondary" role="note">
+            {OUTCOMES_PENDING_NOTICE}
+          </p>
+        )}
+
         {/* Standings Table */}
         <div className="bg-surface-raised/60 border border-line rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
           {standings.length === 0 ? (
@@ -258,9 +322,13 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               No standings recorded for this season and division yet.
             </div>
           ) : isIndividual ? (
-            <PlayerStandingsTable rows={standings} />
+            <PlayerStandingsTable rows={standings} outcomesPublic={outcomesPublic} />
           ) : (
-            <TeamStandingsTable rows={standings} standingsFormat={standingsFormat} />
+            <TeamStandingsTable
+              rows={standings}
+              standingsFormat={standingsFormat}
+              outcomesPublic={outcomesPublic}
+            />
           )}
         </div>
 
@@ -269,7 +337,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
             Reconstructed from match results
           </p>
         ) : (
-          source === 'snapshot' && (
+          outcomesPublic && source === 'snapshot' && (
             <p className="mt-4 text-xs text-foreground-muted font-semibold">
               Final standings imported from the league archive.
             </p>

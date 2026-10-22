@@ -3,6 +3,9 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { asc, desc } from 'drizzle-orm';
 import ContentEditor from './ContentEditor';
+import HandbookUploader from './HandbookUploader';
+import { HANDBOOK_PDF_CONTENT_KEY, isHandbookStorageKey } from '@/app/lib/handbook';
+import { BUCKET, buildPublicObjectUrl } from '@/app/lib/storage-constants';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
@@ -26,13 +29,13 @@ async function getAllPageContent() {
 export default async function ContentAdminPage() {
   if (!(await getStaffForAdminSection('/admin/content'))) return <PermissionDenied />;
 
-  let rows: Awaited<ReturnType<typeof getAllPageContent>> = [];
+  let allRows: Awaited<ReturnType<typeof getAllPageContent>> = [];
   let historyRows: { id: string; contentKey: string; previousContent: string; savedAt: Date }[] = [];
   let dbConfigured = false;
 
   try {
     if (process.env.DATABASE_URL) {
-      rows = await getAllPageContent();
+      allRows = await getAllPageContent();
       historyRows = await db
         .select()
         .from(schema.pageContentHistory)
@@ -43,6 +46,13 @@ export default async function ContentAdminPage() {
     // db not reachable
   }
 
+  // The handbook row stores a storage key and is managed by its own uploader, not the text editor.
+  const rows = allRows.filter((row) => row.key !== HANDBOOK_PDF_CONTENT_KEY);
+  const handbookKey = allRows.find((row) => row.key === HANDBOOK_PDF_CONTENT_KEY)?.content;
+  const handbookUrl = isHandbookStorageKey(handbookKey)
+    ? buildPublicObjectUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, BUCKET, handbookKey)
+    : null;
+
   return (
     <AdminPage>
       <AdminPageHeader
@@ -52,6 +62,12 @@ export default async function ContentAdminPage() {
       />
 
       {!dbConfigured && <DbErrorNotice variant="not-configured" />}
+
+      {dbConfigured && (
+        <section aria-labelledby="handbook-heading" className="mb-4 rounded-2xl bg-admin-panel p-5">
+          <HandbookUploader currentUrl={handbookUrl} />
+        </section>
+      )}
 
       {rows.length === 0 ? (
         <div className="rounded-2xl bg-admin-panel">

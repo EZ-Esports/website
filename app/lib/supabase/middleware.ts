@@ -11,6 +11,8 @@ export function buildCsp(nonce: string): string {
     "font-src 'self' data:;",
     "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.twitch.tv;",
     "connect-src 'self' https://*.supabase.co https://va.vercel-scripts.com https://vitals.vercel-insights.com;",
+    // pdf.js (handbook viewer) runs its parser in a same-origin worker; script-src's strict-dynamic would otherwise be the fallback.
+    "worker-src 'self' blob:;",
     "object-src 'none';",
     "base-uri 'self';",
     "form-action 'self';",
@@ -68,7 +70,10 @@ export async function updateSession(request: NextRequest) {
   const user = data?.claims ?? null;
 
   // The /admin server layout is the sole portal access gate. Middleware only
-  // refreshes auth state and keeps authenticated staff off the login form.
+  // refreshes auth state and keeps authenticated users off the login form.
+  // Every signed-in visitor goes to /admin: telling staff from school managers
+  // needs a database lookup, which this claims-only session refresh avoids.
+  // The /admin layout redirects managers on to /portal.
   if (request.nextUrl.pathname.startsWith('/login')) {
     if (user) {
       const url = request.nextUrl.clone();

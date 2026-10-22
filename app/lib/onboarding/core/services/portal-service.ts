@@ -8,8 +8,25 @@ import type {
 } from '../domain/types';
 import { generateCryptoToken, assertManagerTenancy } from '../domain/invariants';
 
+const ROSTERS_LOCKED_MESSAGE =
+  'Rosters for this season are locked by EZ Esports staff. Contact an admin to request changes.';
+
 export class PortalService implements SchoolManagerPortalUseCase {
   constructor(private readonly repo: OnboardingRepositoryPort) {}
+
+  /** A manager may only act on rosters of the active season; super admins are unrestricted. */
+  private assertRosterInActiveSeason(
+    context: SchoolManagerContext,
+    roster: { isActiveSeason?: boolean; isSeasonLocked?: boolean }
+  ): void {
+    if (context.isSuperAdmin) return;
+    if (roster.isActiveSeason === false) {
+      throw new Error('Unauthorized: This roster belongs to a past season');
+    }
+    if (roster.isSeasonLocked) {
+      throw new Error(ROSTERS_LOCKED_MESSAGE);
+    }
+  }
 
   async getSchoolPortalData(context: SchoolManagerContext): Promise<{
     schoolId: string;
@@ -20,7 +37,9 @@ export class PortalService implements SchoolManagerPortalUseCase {
     pendingSubmissions: any[];
   }> {
     const school = await this.repo.findSchoolById(context.schoolId);
-    const rosters = await this.repo.findSchoolRosters(context.schoolId, context.managedGames);
+    const rosters = await this.repo.findSchoolRosters(context.schoolId, context.managedGames, {
+      activeSeasonOnly: !context.isSuperAdmin,
+    });
     const pendingInvites = await this.repo.listSchoolInvites(context.schoolId);
     const pendingSubmissions = await this.repo.listPendingSubmissions(context.schoolId);
 
@@ -121,6 +140,17 @@ export class PortalService implements SchoolManagerPortalUseCase {
       if (!roster || roster.schoolId !== invite.schoolId) {
         return { success: false, error: 'Target roster does not belong to authorized school.' };
       }
+      this.assertRosterInActiveSeason(context, roster);
+    }
+
+    // Approval is the intake onto a roster, so a locked season refuses it for managers.
+    if (
+      !targetRosterId &&
+      !context.isSuperAdmin &&
+      invite.gameId &&
+      (await this.repo.isActiveSeasonLocked?.(invite.gameId))
+    ) {
+      throw new Error(ROSTERS_LOCKED_MESSAGE);
     }
 
     const result = await this.repo.approveInviteAndEnroll({
@@ -163,6 +193,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     }
 
     assertManagerTenancy(context, roster.schoolId, roster.gameId);
+    this.assertRosterInActiveSeason(context, roster);
 
     const enrolled = await this.repo.enrollPlayerToRoster({
       rosterId,
@@ -190,6 +221,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     if (!roster) return { success: false, error: 'Roster not found.' };
 
     assertManagerTenancy(context, roster.schoolId, roster.gameId);
+    this.assertRosterInActiveSeason(context, roster);
     await this.repo.removePlayerFromRoster(params);
     return { success: true };
   }
@@ -206,6 +238,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     if (!roster) return { success: false, error: 'Roster not found.' };
 
     assertManagerTenancy(context, roster.schoolId, roster.gameId);
+    this.assertRosterInActiveSeason(context, roster);
     await this.repo.updateRosterPlayerRole(params);
     return { success: true };
   }
@@ -222,6 +255,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     if (!roster) return { success: false, error: 'Roster not found.' };
 
     assertManagerTenancy(context, roster.schoolId, roster.gameId);
+    this.assertRosterInActiveSeason(context, roster);
     await this.repo.emergencySwapSub(params);
     return { success: true };
   }

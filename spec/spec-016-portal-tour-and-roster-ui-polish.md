@@ -1,6 +1,6 @@
 # spec-016: Portal tour placement and roster card layout
 
-**Issue:** #229. **Branch:** `fix/229-portal-tour-roster-ui`. **Status:** In Review.
+**Issue:** #229. **Branch:** `fix/229-portal-tour-roster-ui`. **PR:** #232. **Status:** Shipped.
 
 ## Problems
 

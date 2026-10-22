@@ -1,4 +1,4 @@
-import { getStaff, StaffSetupError, type StaffIdentity } from '@/app/lib/auth';
+import { getStaff, isPortalOnlyManager, StaffSetupError, type StaffIdentity } from '@/app/lib/auth';
 import { getAllowedAdminHrefs } from '@/app/lib/staff-access';
 import AdminShell from './AdminShell';
 import { redirect } from 'next/navigation';
@@ -24,7 +24,9 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   if (!staff) {
-    redirect('/login');
+    // A signed-in school manager has no staff row by design; sending them to
+    // /login would only bounce back here, so route them to their own portal.
+    redirect((await isPortalOnlyManager()) ? '/portal' : '/login');
   }
 
   const allowedHrefs = getAllowedAdminHrefs(staff.permissions, staff.isOwner);

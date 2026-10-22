@@ -1,12 +1,13 @@
 # spec-011: Player Onboarding, School Manager Portal, and Hexagonal Tournament Verification (V1)
 
-- **Status:** Proposed
-- **PR:** not opened yet (worktree `feat/player-onboarding-v1`)
+- **Status:** Shipped
+- **PR:** #216 (merged 2026-10-02); follow-ups in #217 and #232
 - **Date:** 2026-09-30
+- **Implementation note (2026-10-16):** Only the V1 honor-system path shipped. `DiscordRestAdapter` (`adapters/discord-rest.ts`) and `RiotSignOnAdapter` were never written; only the `CommunityPlatformPort` interface and `riot-manual.ts` exist. There is no Discord OAuth, no `guilds.join`, no bot token, no Riot Sign-On and no stored PUUID. The wizard submits `inGuild: true` unconditionally, so the "Live Discord Guild Check" and "verified Riot ID" gates below are satisfied by self-report. Treat the Discord OAuth and RSO sections as design, not behaviour. Follow-ups: #249 (Discord OAuth), #247 (Riot Sign-On, blocked on the production Riot key).
 - **Scope:** 
   - Schema & Migrations: `app/lib/db/schema.ts`, `db/migrations/0037_player_onboarding_and_manager_portal.sql`
   - Auth & RBAC: `app/lib/roles.ts`, `app/lib/staff-access.ts`, `app/lib/auth.ts`
-  - Core Domain & Hexagonal Ports: `app/lib/onboarding/ports.ts`, `app/lib/onboarding/adapters/riot-manual.ts`, `app/lib/onboarding/adapters/discord-rest.ts`
+  - Core Domain & Hexagonal Ports: `app/lib/onboarding/ports.ts`, `app/lib/onboarding/adapters/riot-manual.ts` (`discord-rest.ts` is planned, not written)
   - Portal Surface: `app/(portal)/portal/...` (Manager Dashboard, Roster Management, Approve/Reject Queue)
   - Player Onboarding Surface: `app/(marketing)/join/[schoolSlug]/[gameSlug]/page.tsx`, `app/(marketing)/join/onboarding-wizard.tsx`
   - Staff CMS: `app/(admin)/admin/schools/actions.ts`, `app/(admin)/admin/roster/...`, `app/components/admin/SchoolManagerModal.tsx`

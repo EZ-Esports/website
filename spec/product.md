@@ -1,8 +1,8 @@
-# Product (as of `926b978`)
+# Product (as of `11ed110`)
 
 EZ Esports is the public site and staff CMS for a NYC high-school esports league. Mission, audience, and “what we are not” live in [`soul.md`](../soul.md) (`c0180bc`) — do not paraphrase that file into design copy. This file is the surface map and how it grew.
 
-`SITE_CONFIG.name` is “NYC High School Esports League”; `company` is “EZ Esports” (`app/lib/constants.ts`). Hosted on Vercel. Canonical metadata URL is `https://ez-esports.vercel.app` (`1f82559`). README and `/privacy` still say `ezesports.org`; that domain is not wired in code. There is no staging app and no staging database. See [open-threads.md](open-threads.md).
+`SITE_CONFIG.name` is “NYC High School Esports League”; `company` is “EZ Esports” (`app/lib/constants.ts`). Hosted on Vercel. `CANONICAL_APP_URL` (`app/lib/constants.ts`) is `https://ezesports.org`, which `metadataBase`, the sitemap and robots follow (earlier it was `ez-esports.vercel.app`, `1f82559`). Whether DNS and Vercel serve that domain and redirect the old host is not verifiable from code; see [open-threads.md](open-threads.md). There is no staging app and no staging database.
 
 ---
 
@@ -18,21 +18,26 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 | `/sponsors` | Tiered sponsors + Embla marquee. |
 | `/apply` | School **Submit Interest** form (Google Form parity). Header/heading `3afc647` / `f9eeabc`. Page `<title>` and `Navigation.tsx` dropdown still say “Apply to Play.” |
 | `/apply/staff` | Staff application (`d6518cc`). Nine divisions (Software Engineering, Systems Engineering, Data Science, Marketing, Operations, Development, Productions Crew (label now "Productions Crew: Observer, shoutcaster, and/or graphics producer", spec-008), Legal, Game Regulations), where Game Regulations Division asks a required open-answer follow-up ("Which game director position are you interested in?", 500-character cap). The why-join answer shows its character limit (1,500); the Game Regulations answer (500) and Other links (1,000) are capped without a notice. Required PDF resume (private `staff-resumes` bucket), optional LinkedIn (linkedin.com hosts only) and "Other links", required unpaid-volunteer acknowledgement, recruiting intro with the mission statement, an "Unpaid volunteer" tag, and no future-pay wording ([spec-007](spec-007-staff-application-resume.md)). Optional "Referred by" name (50 chars) at the bottom of Role & Resume ([spec-008](spec-008-staff-application-referral.md)). Admin opens resumes via a 60 s signed URL. |
-| `/rules` | League Rulebook & Code of Conduct (`6732658`). Linked from apply consent. |
-| `/privacy` | Privacy policy + Privacy erasure intake modal/action (`a1aeca6` PR #142 / #103). Covers phone, Discord, and staff application resumes: private storage, links for authorized staff and administrators that expire shortly after creation, and deletion when an application is declined or on request (a manual runbook for now) ([spec-007](spec-007-staff-application-resume.md)). **No `/terms` on this branch.** |
-| `/login` | Staff login (footer “Staff Login”). |
+| `/rules` | League Rulebook & Code of Conduct (`6732658`, PR #132). Linked from apply consent. |
+| `/terms` | Terms of Service (PR #194, #191). Linked from the footer and the apply consent checkboxes. |
+| `/gallery` | Public full gallery (PR #138, #100), linked from the homepage Showcase CTA. Thumbnails load `unoptimized` ([spec-014](spec-014-gallery-thumbnails.md)). |
+| `/careers`, `/careers/[slug]`, `/careers/apply/general` | Public job postings and the application form, managed in `/admin/careers`. |
+| `/{game}/standings`, `/{game}/schedule`, hub, team pages, `/archives`, homepage Latest Results | Scores, standings, records, champions and recent results appear only for seasons staff have published (Admin -> League Setup -> Publish results, [spec-022](spec-022-hide-season-outcomes.md)); until then pages list teams neutrally with a "Results will be published once the season is complete." notice. Archived seasons were backfilled as published. |
+| `/handbook` | Student Handbook ([spec-021](spec-021-student-handbook-page.md)). Footer link only. Pamphlet-style viewer (two-page spreads on tablets/desktop, one page on phones; pinch/Ctrl+scroll zoom from Full page) over a staff-uploaded PDF (pdf.js, Open/Download buttons) or, with none uploaded, the bundled 2026-27 pages. Managed from Website Content > Page Content in the admin. |
+| `/privacy` | Privacy policy + Privacy erasure intake modal/action (`a1aeca6` PR #142 / #103). Covers phone, Discord, and staff application resumes: private storage, links for authorized staff and administrators that expire shortly after creation, and deletion when an application is declined or on request (a manual runbook for now) ([spec-007](spec-007-staff-application-resume.md)). |
+| `/login` | Staff login (footer “Staff Login”). Rate limited per IP and per IP+account (PR #131); uses `useActionState` and never reflects errors into the URL (PR #193). |
+| `/portal`, `/portal/login` | School Manager Portal and its own login; see the portal section below. |
 | `/accept-invite` | Token landing for hashed staff invites (`0849963`, PR #8). Linked from `InviteStaffForm`; not in `ROUTES`; outside marketing layout (`force-dynamic`). |
 | `/{game}` | **308** to `/{game}/varsity` (`next.config.ts`, PR #46). Not a page. |
 | `/{game}/varsity`, `/junior-varsity` | Bento hub (`c759fa3`, `GameHubView`). Division is a path segment (`0b6adf7`). |
+| `/{game}/bracket` | Tournament-model games (TFT, osu!, TETR.IO): stage and elimination-bracket view built with `bracketry` ([spec-010](spec-010-decoupled-tournament-brackets.md), PR #211, #212). |
 | `/{game}/standings`, `/schedule` | Current + archived competition. PR #184: explicit Eastern Time ("ET") labeling, America/New_York calendar month grid calculation, completed forfeit display, and draw score normalization. Combined LoL seasons (`standings_format`) render one table on both division routes (`0dde508`, `19acf7d`) with `SeasonFormatNotice`. Form-guide chips `9ce5ed9`. Season badge “Latest” `bbd58d9`. |
 | `/{game}/teams`, `/{game}/teams/[school]` | Filterable rosters (`6d4ce96`); school detail (`c2e86ee`). |
-| `/join/[schoolSlug]/[gameSlug]` | Player onboarding wizard. Validates single-use cryptographic token, checks email, connects Discord with auto-guild membership validation, verifies Riot ID (`Name#Tag`) with tracker preview, saves drafts, and collects student demographic survey into encrypted vault ([spec-011](spec-011-player-onboarding-and-manager-portal.md)). |
+| `/join/[schoolSlug]/[gameSlug]` | Player onboarding wizard. Validates single-use cryptographic token, checks email, collects a Discord username behind an honor-system "I joined the server" checkbox (no Discord OAuth or live guild check yet, issue #249), checks the Riot ID format (`Name#Tag`) with tracker preview (no Riot Sign-On yet, issue #247), saves drafts, and collects student demographic survey into encrypted vault ([spec-011](spec-011-player-onboarding-and-manager-portal.md)). |
 
-Games in `app/lib/constants.ts`: Valorant, League of Legends, Teamfight Tactics (full archive/seasons), plus **osu!**, **Minecraft**, **TETR.IO** (slug `tetris`, display name `f04641b`). The last three have hubs only — no seasons, excluded from `getGamesForShowcase`, banners are placeholder `/images/hero-background.jpg`. Empty hubs are the same bento grid with a blank “This season” tile (`d047f99` removed the founding-season recruitment layout `c759fa3` had gated). `MigrationNotice` (`452073e`) still shows on competition pages.
+Games in `app/lib/constants.ts`: Valorant and League of Legends (`competitionModel: 'team'`, Varsity/JV), Teamfight Tactics, osu! and TETR.IO (`'tournament'`), and Minecraft (`'team'`, no JV). TETR.IO (slug `tetris`, display name `f04641b`) became forward-facing in PR #210 with four aggregated seasons (PR #206). osu! and Minecraft still have hubs only: no seasons, excluded from `getGamesForShowcase`, placeholder banners `/images/hero-background.jpg`. Empty hubs are the same bento grid with a blank “This season” tile (`d047f99` removed the founding-season recruitment layout `c759fa3` had gated). `MigrationNotice` (`452073e`) still shows on competition pages.
 
-**Appearance ([spec-017](spec-017-light-dark-theme.md)).** With no choice, the public site follows the operating system. The header toggles light and dark (`ez-theme` cookie). Light swaps the semantic tokens on `<html>`. The header, photo heroes, and photo lightboxes stay dark so the white wordmark and type on photographs stay readable, and the heavy photo grade is the dark appearance only. `/apply` and `/apply/staff` keep their own light form surface. The staff portal and the school manager portal do not follow the public theme.
-
-**No public `/gallery`.** Photos render via homepage `MediaGrid` plus `/admin/gallery`. `feat/issue-100-view-full-gallery` exists on origin and is **not** an ancestor of HEAD.
+**Appearance ([spec-024](spec-024-light-dark-theme.md)).** With no choice, the public site follows the operating system. The header toggles light and dark (`ez-theme` cookie). Light swaps the semantic tokens on `<html>`. The header and photo lightboxes stay dark so the white wordmark stays readable. Light mode hero type is dark on a white shadow; the heavy dark photo grade stays on the dark appearance. `/apply` and `/apply/staff` keep their own light form surface. The staff portal and the school manager portal do not follow the public theme.
 
 ---
 
@@ -47,15 +52,17 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 | Matches, standings, roster, schools | Competition data. Standings editor exists because archives are snapshotted in `season_standings`, not only computed. Matches parse kickoffs via `parseEastern` (PR #184). |
 | News | Draft / publish / archive. |
 | Leadership | People profiles, terms, avatars. Scoped storage folders `${section}/${entityId}/` (PR #182). |
-| Gallery, sponsors, content | CMS tables; saves call `revalidateTag`. Scoped storage paths (PR #182). Gallery reorder uses derived state (`draftOrder`) and advisory-locked full ID list validation (PR #183). |
-| Applications | Detail modal, status via append-only events, CSV export (`9353bf5`). |
+| Gallery, sponsors, content | CMS tables; saves call `updateTag` (PR #195). Scoped storage paths (PR #182). Gallery reorder uses derived state (`draftOrder`) and advisory-locked full ID list validation (PR #183). |
+| Applications | Detail modal built on structured `details` (the legacy `message` column was dropped in PR #201), status via append-only events and a status machine (PR #200), CSV export (`9353bf5`). |
+| Careers | Job postings and general applications (`/admin/careers`). |
+| Student Demographics | Gated by `Permissions.VIEW_STUDENT_DEMOGRAPHICS`. |
 | Team | Staff invites and roles. Role assign/edit/revoke guarded by transactional lock-then-re-read pattern against TOCTOU races (PR #181). |
 
 **Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md) and [spec-012](spec-012-admin-control-panel-nav.md). `AdminShell.tsx` has a 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`). It shows Overview, then three collapsible categories (RAC Disclosures), all from `app/lib/admin-nav.ts` and filtered by permission:
 
-- **People & Staffing:** Applications, Careers, Roles & Staff, Leadership.
-- **League Operations:** League Setup, Matches, Standings Archive, Teams & Rosters, Schools, Student Demographics.
-- **Website Content:** News, Gallery, Sponsors, Page Content.
+- **People & Staffing:** Applications, Careers, Roles & Staff, Leadership Manager.
+- **League Operations:** League Setup, Matches & Standings, Standings Archive, Teams & Rosters, Schools, Student Demographics.
+- **Website Content:** News & Announcements, Gallery, Sponsors, Page Content.
 
 The nav scrolls on its own (`overflow-y-auto`) only when it outgrows a short viewport; Public Site and Sign Out stay pinned. The top bar is sticky and shows a `Staff portal › Category › Page` breadcrumb. Page content scrolls the document. No mobile drawer exists.
 
@@ -67,13 +74,13 @@ Server actions must authorize themselves. Middleware refreshes JWT on `/admin` a
 
 ## Apply / legal
 
-`/apply` is intake, not enrollment — that is why the CTA is “Submit Interest.” Payload is versioned `details jsonb`: `v1` (early team-registration) and `v2` (club-officer, Google Form shape). Legacy `message` text remains as fallback. Rows are append-only; status changes are event-log inserts, not in-place overwrites (`a107a01`, `6df7d59`). Admin CSV export RFC-4180-escapes and prefixes formula-injection (`=`, `+`, `-`, `@`) — `app/lib/csv.ts`, CWE-1236.
+`/apply` is intake, not enrollment — that is why the CTA is “Submit Interest.” Payload is versioned `details jsonb`: `v1` (early team-registration) and `v2` (club-officer, Google Form shape) for school interest; staff applications add `v3` and `v4` ([spec-007](spec-007-staff-application-resume.md)). The legacy `message` text column was removed (PR #169, #201); old rows are rendered from `details`. Rows are append-only; status changes are event-log inserts, not in-place overwrites (`a107a01`, `6df7d59`). Admin CSV export RFC-4180-escapes and prefixes formula-injection (`=`, `+`, `-`, `@`) — `app/lib/csv.ts`, CWE-1236.
 
 `/rules` existed for hours on 17 Aug (`5fb8608`) and was pulled the same day (`a2b6cf1`). The page at HEAD is the 12 Sep republication. For ~four weeks the consent checkbox had no live rules link. `1e0e8d1` (#80) added remaining Google Form questions and dropped the Notice banner plus staff Discord contact mentions.
 
-Login rate limiting, advisor-roster RBAC, CSP, and `/terms` **did not ship on this branch.** Apply POST, staff apply, uploads, and staff invites *do* have an in-process `rateLimit()` (`app/lib/rate-limit.ts`); login (`signInWithPassword`) does not. `/terms` (`5a18f66` #104) is not an ancestor of `926b978`.
+Security posture: baseline headers in `next.config.ts` (PR #129) plus a per-request nonce Content-Security-Policy built in `app/lib/supabase/middleware.ts` (`buildCsp`, PR #141). Apply POST, staff apply, uploads, staff invites, `/login` and `/portal/login` all call the in-process `rateLimit()` (`app/lib/rate-limit.ts`; resets on serverless cold start). Advisor-roster RBAC did **not** ship: there is no advisor-scoped permission model.
 
-Apply-form copy still names Clash Royale / Smash as organized leagues and says “Tetris” in the other-clubs prompt — those titles are not in `GAMES`.
+The other-clubs prompt in the apply form names “Super Smash Bros. Ultimate, Tetris” as examples; those titles are not in `GAMES`.
 
 ---
 
@@ -93,7 +100,7 @@ Dedicated portal for vetted school managers and staff administrators ([spec-011]
 - Multi-tenancy scoped by academic year and game assignments with admin override.
 - Cryptographically secure single-use player invite token generation (`player_invites`).
 - Zero-PII Approve / Reject queue (hides minor demographic PII, protecting `student_demographics` behind `Permissions.VIEW_STUDENT_DEMOGRAPHICS`).
-- Live 5-Point Eligibility Validation Gate (roster caps, single captain, 100% Riot verified, 100% Discord connected and present in guild).
+- Live 5-Point Eligibility Validation Gate (roster caps, single captain, 100% Riot ID entered, 100% Discord username entered and flagged in guild; both are self-reported today because the wizard submits `inGuild: true` and nothing checks Riot or Discord).
 - Match-day emergency substitute swapper with atomic role exchange.
 - Guided tour ([spec-015](spec-015-manager-portal-guided-tour.md)): auto-starts on a manager's first visit (full tour: pick a game, invite players, approvals, rosters), and a Tutorial button in the page header replays the full tour or one section. Skip/Esc asks for confirmation. The tour card always stays fully in the viewport (bottom sheet on phones, docked when the target is taller than the screen; [spec-016](spec-016-portal-tour-and-roster-ui-polish.md)). Each roster card's eligibility button is "Check Eligibility" (runs the 5-point check; "Checking..." while running). Finishing or skipping the first-run tour is stored per account, so switching schools never replays it.
 
@@ -105,8 +112,8 @@ Dedicated portal for vetted school managers and staff administrators ([spec-011]
 2. **Jun 2026** — Same URLs, DB-backed, with static fallbacks. Admin CMS, school wall, gallery/sponsors/page copy, apply API, image upload, calendar schedule, invite/RBAC. Archives leave the header.
 3. **Jul 2026** — Archives become a first-class product (standings snapshots, Command Deck, combined LoL tables). Token + RAC rewrite. Bento hub. Three extra games; recruitment layout added then removed. Staff apply. `soul.md` states the nonprofit frame. Bare `/{game}` becomes a 308 to varsity.
 4. **Aug 2026** — Teams UX (filters, school pages). Apply form matches the canonical Google Form and stores structured JSON. Leadership becomes people + terms. Gallery rewritten four times in ~two weeks, landing on the marquee. CTA language moves to interest-capture; SEO/nav labels lag.
-5. **Sep 2026** — Legal and security catch up to a site that already collected applications: `/rules`, footer IP disclaimers, headers (no CSP), markdown XSS hardening, youtube-nocookie.
-6. **Sep 2026 (late)** — Player Onboarding & School Manager Portal (`/portal`, `/join/[schoolSlug]/[gameSlug]`, `spec-011`). Replaces external Google Forms with authenticated single-use invite workflows, automated Discord/Riot verification, FERPA-compliant demographic isolation (`Permissions.VIEW_STUDENT_DEMOGRAPHICS`), and live roster eligibility gates.
+5. **Sep 2026** — Legal and security catch up to a site that already collected applications: `/rules`, `/terms`, footer IP disclaimers, headers and a nonce CSP, login rate limiting, markdown XSS hardening, youtube-nocookie.
+6. **Sep–Oct 2026** — Tournament-model games get brackets (spec-010); Player Onboarding & School Manager Portal (`/portal`, `/join/[schoolSlug]/[gameSlug]`, `spec-011`). Replaces external Google Forms with authenticated single-use invite workflows, Discord/Riot identity capture (self-reported; real verification is tracked in #247 and #249), FERPA-compliant demographic isolation (`Permissions.VIEW_STUDENT_DEMOGRAPHICS`), and live roster eligibility gates. The staff portal gets the Control Panel sidebar and UI overhaul (spec-012/013), then gallery thumbnails (spec-014) and the manager tour (spec-015/016).
 
-[`docs/QUICKSTART.md`](../docs/QUICKSTART.md) still describes `constants.ts` as the data source, a public `/[game]/roster` route, and a `[game]/page.tsx` hub. Use this file + `app/(marketing)` for the current map.
+[`docs/QUICKSTART.md`](../docs/QUICKSTART.md) covers local setup and where things live; this file is the route and surface map.
 

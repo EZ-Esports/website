@@ -8,6 +8,7 @@ import {
   FiCopy,
 } from 'react-icons/fi';
 import { generateManagerInvite } from '@/app/(admin)/admin/schools/manager-actions';
+import { DEFAULT_MANAGER_SEASON, SEASON_NAME_OPTIONS } from '@/app/lib/season-name';
 import { input } from '@/app/components/admin/styles';
 import type { GameItem, ManagerInviteItem } from './types';
 import { adminButton, inputSm, label as labelClass, primaryBtn, primaryBtnSm } from '../styles';
@@ -37,7 +38,7 @@ export function ProvisionInviteTab({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [academicYear, setAcademicYear] = useState('2025-2026');
+  const [academicYear, setAcademicYear] = useState<string>(DEFAULT_MANAGER_SEASON);
   const [allGames, setAllGames] = useState(true);
   const [selectedGames, setSelectedGames] = useState<string[]>([]);
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
@@ -216,15 +217,9 @@ export function ProvisionInviteTab({
               >
                 Academic Year
               </label>
-              <input
-                id="invite-year"
-                type="text"
-                value={academicYear}
-                onChange={(e) => setAcademicYear(e.target.value)}
-                placeholder="2025-2026"
-                required
-                className={input}
-              />
+              <select id="invite-year" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} required className={input}>
+                {SEASON_NAME_OPTIONS.map((season) => (<option key={season} value={season}>{season}</option>))}
+              </select>
             </div>
           </div>
 

@@ -35,6 +35,8 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.33.0",
     "next": "^16.3.8",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "6.3.289",
     "postgres": "^3.4.9",
     "react": "19.2.3",
     "react-aria": "^3.50.0",
@@ -70,6 +72,7 @@
     "picomatch@2": "^2.3.2",
     "picomatch@4": "^4.0.4",
     "postcss": "^8.5.10",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "source-map-js": "^1.2.2"
   }
 }

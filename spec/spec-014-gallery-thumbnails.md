@@ -1,6 +1,6 @@
 # spec-014: Gallery Thumbnails and Unoptimized Image Delivery
 
-- **Status:** In Review
+- **Status:** Shipped (migration `0046` applied; the legacy-row backfill has only been dry-run, see [open-threads.md](open-threads.md))
 - **PR:** #220 (branch `fix/restore-unoptimized-images` on the remote; `fix/image-quota-unoptimized-thumbnails` locally) — the `unoptimized` restore and the thumbnail work ship together
 - **Date:** 2026-10-12
 - **Scope:** gallery photo storage, upload route, gallery admin actions, public marquee/grid/lightbox rendering, one additive migration (`0046`, applied in production) and an operator backfill script (run with `--apply` on 2026-10-12: 35 rows).
