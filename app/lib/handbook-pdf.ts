@@ -5,7 +5,7 @@
  */
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import type { HandbookChapter, HandbookViewerPage } from './handbook-viewer-types';
-import { LETTER_ASPECT, resolveHandbookLink, viewportRectToLink } from './handbook-viewer';
+import { LETTER_ASPECT, joinPdfTextItems, resolveHandbookLink, viewportRectToLink } from './handbook-viewer';
 
 export interface LoadedHandbookPdf {
   pages: HandbookViewerPage[];
@@ -80,7 +80,7 @@ export async function loadHandbookPdf(url: string): Promise<LoadedHandbookPdf> {
       }
     }
     const content = await page.getTextContent();
-    const text = content.items.map((item) => ('str' in item ? item.str : '')).join(' ').replace(/\s+/g, ' ').trim();
+    const text = joinPdfTextItems(content.items.filter((item) => 'str' in item));
     pages.push({ text, links, aspect: viewport.width / viewport.height || LETTER_ASPECT });
   }
 

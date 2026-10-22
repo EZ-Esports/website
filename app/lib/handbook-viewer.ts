@@ -219,3 +219,72 @@ export function swipeDirection(dx: number, dy: number, ms: number): -1 | 0 | 1 {
   if (ms > 800 || Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return 0;
   return dx < 0 ? -1 : 1;
 }
+
+/** Typographic ligature code points (U+FB00-FB06) and their plain-letter spellings. */
+const LIGATURES: Record<string, string> = {
+  'ﬀ': 'ff',
+  'ﬁ': 'fi',
+  'ﬂ': 'fl',
+  'ﬃ': 'ffi',
+  'ﬄ': 'ffl',
+  'ﬅ': 'st',
+  'ﬆ': 'st',
+};
+
+/** Expands ligature glyphs so search and reading see ordinary letters. */
+export function normalizeLigatures(text: string): string {
+  return text.replace(/[ﬀ-ﬆ]/g, (c) => LIGATURES[c] ?? c);
+}
+
+/** The slice of a pdf.js TextItem needed to decide where words break. */
+export interface PdfTextItemLike {
+  str: string;
+  /** Affine transform [a, b, c, d, e, f]; e/f are the baseline origin. */
+  transform?: number[];
+  width?: number;
+  height?: number;
+  hasEOL?: boolean;
+}
+
+/** A gap wider than this fraction of the font height counts as a real word space. */
+const WORD_GAP_RATIO = 0.15;
+
+/**
+ * Joins pdf.js text items into one page string. pdf.js emits a new item per
+ * font/style run (and often around ligature glyphs), so blindly joining with a
+ * space turned "modified" into "modi fi ed". A space is inserted only at a real
+ * gap, a line change, or an end-of-line marker; ligatures are expanded.
+ */
+export function joinPdfTextItems(items: readonly PdfTextItemLike[]): string {
+  let out = '';
+  let prev: PdfTextItemLike | null = null;
+  let breakPending = false;
+  for (const item of items) {
+    const str = item.str ?? '';
+    if (str === '') {
+      if (item.hasEOL) breakPending = true;
+      continue;
+    }
+    if (prev && out) {
+      let space = breakPending || !!prev.hasEOL;
+      if (!space) {
+        if (prev.transform && item.transform) {
+          const px = prev.transform[4];
+          const py = prev.transform[5];
+          const x = item.transform[4];
+          const y = item.transform[5];
+          const size = Math.max(prev.height || 0, item.height || 0) || 10;
+          if (Math.abs(y - py) > size * 0.5) space = true;
+          else if (x - (px + (prev.width ?? 0)) > size * WORD_GAP_RATIO) space = true;
+        } else {
+          space = true; // no geometry: keep the old, safe behaviour
+        }
+      }
+      if (space) out += ' ';
+    }
+    out += str;
+    breakPending = false;
+    prev = item;
+  }
+  return normalizeLigatures(out).replace(/\s+/g, ' ').trim();
+}
