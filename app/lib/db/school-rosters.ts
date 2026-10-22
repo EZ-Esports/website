@@ -4,6 +4,7 @@ import { db } from './index';
 import * as schema from './schema';
 import {
   buildSeasonBlocks,
+  type RosterEditOptions,
   type RosterViewPlayer,
   type RosterViewRoster,
   type SchoolRosterTeamInput,
@@ -11,10 +12,10 @@ import {
 } from '@/app/lib/school-roster-view';
 
 /**
- * Read-only roster data for one school, across every game and season, for the
- * staff Schools -> View rosters page. Deliberately uncached (admin reads are
- * raw so an edit elsewhere shows immediately) and limited to the columns the
- * admin roster views already show. `student_demographics` is never joined: it
+ * Roster data for one school, across every game and season, for the staff
+ * Schools & Rosters page (where staff also edit it). Deliberately uncached
+ * (admin reads are raw so an edit shows immediately) and limited to the
+ * columns the admin roster views already show. `student_demographics` is never joined: it
  * has its own permission (VIEW_STUDENT_DEMOGRAPHICS). Callers must have already
  * checked MANAGE_ROSTERS.
  */
@@ -52,6 +53,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
     ? await db
         .select({
           id: schema.players.id,
+          memberId: schema.players.memberId,
           rosterId: schema.players.rosterId,
           role: schema.players.role,
           ign: schema.players.ign,
@@ -70,6 +72,9 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
     const list = playersByRoster.get(p.rosterId) ?? [];
     list.push({
       id: p.id,
+      memberId: p.memberId,
+      firstName: p.firstName,
+      lastName: p.lastName,
       name: `${p.firstName} ${p.lastName}`.trim(),
       ign: p.ign,
       discord: p.discord,
@@ -101,4 +106,34 @@ export async function getSchoolForRosterView(schoolId: string) {
     .where(and(eq(schema.schools.id, schoolId), isNull(schema.schools.deletedAt)))
     .limit(1);
   return school ?? null;
+}
+
+/** What the staff editing controls need beyond the rosters themselves. Never reads demographics. */
+export async function getRosterEditOptions(schoolId: string): Promise<RosterEditOptions> {
+  const [members, games, seasons] = await Promise.all([
+    db
+      .select({
+        id: schema.members.id,
+        firstName: schema.members.firstName,
+        lastName: schema.members.lastName,
+        discord: schema.members.discord,
+        graduationYear: schema.members.graduationYear,
+      })
+      .from(schema.members)
+      .where(eq(schema.members.schoolId, schoolId))
+      .orderBy(asc(schema.members.firstName), asc(schema.members.lastName)),
+    db
+      .select({ id: schema.games.id, slug: schema.games.slug, name: schema.games.displayName })
+      .from(schema.games)
+      .orderBy(asc(schema.games.displayName)),
+    db
+      .select({
+        id: schema.seasons.id,
+        gameId: schema.seasons.gameId,
+        name: schema.seasons.name,
+        isActive: schema.seasons.isActive,
+      })
+      .from(schema.seasons),
+  ]);
+  return { members, games, seasons };
 }

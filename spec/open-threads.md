@@ -68,7 +68,7 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 ## Staff portal follow-ups from spec-013 (need behaviour changes)
 
 - Inline-create pages (Schools, Sponsors, Gallery) could move "Add …" into a header button that opens a dialog, which needs close-on-success wiring in `AddEntityForm`.
-- `LeagueSetupClient`, `RosterExplorer`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
+- `LeagueSetupClient`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
 
 ## Dependency drift
 
@@ -133,5 +133,5 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Schools roster view (spec-024)
 
-- **No staff UI to create or edit members, teams or rosters.** The league-wide Teams & Rosters page (`RosterExplorer`) was the only staff surface for `createMember`/`updateMember`/`deleteMember`, `createTeam`/`deleteTeam`, `createRoster`/`updateRoster`/`deleteRoster` and `createRosterMember`/`updateRosterMember`/`deleteRosterMember`. The actions in `app/(admin)/admin/roster/actions.ts` and the `RosterExplorer` component are intentionally kept (unmounted) so an editor can be re-attached to the new school page. Meanwhile staff who are also school managers (or ADMINISTRATOR, spec-019) can create/delete rosters and enroll/remove/re-role players through `/portal`, but the portal cannot edit member records, create teams directly, or change a division.
+- **Staff roster editing lives in Schools & Rosters ([spec-027](spec-027-schools-roster-editing.md)).** The old gap (no staff UI to create or edit members, teams or rosters) is closed. Still absent by choice: deleting a member, unregistering a team, and editing a member's email or school from the staff UI (the actions were dropped with `RosterExplorer`).
 - **Roster-only roles cannot reach the view.** The page requires `MANAGE_ROSTERS`, but it is reached from Schools, which needs `MANAGE_SCHOOLS`. A role with only `MANAGE_ROSTERS` can open the URL directly but has no nav path.

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allowedRosterDivisions,
+  parseRosterFilters,
+  rosterFilterQuery,
+  storedDivision,
   buildGameOptions,
   buildSeasonBlocks,
   defaultExpandedKeys,
@@ -14,6 +18,9 @@ const roster = (id: string, name: string, division: string, players = 0): Roster
   division,
   players: Array.from({ length: players }, (_, i) => ({
     id: `${id}-p${i}`,
+    memberId: `${id}-m${i}`,
+    firstName: 'Player',
+    lastName: String(i),
     name: `Player ${i}`,
     ign: null,
     discord: null,
@@ -63,14 +70,34 @@ describe('buildSeasonBlocks', () => {
     expect(noVarsity.columns.map((c) => [c.division, c.missing])).toEqual([['Varsity', true], ['JV', false]]);
   });
 
-  it('gives a game with no JV division one Varsity column, folding "All" onto it', () => {
+  it('renders a no-JV game (Minecraft) like every other game: Varsity left, JV placeholder right', () => {
     const [b] = buildSeasonBlocks([
       team({ teamId: 't', gameSlug: 'minecraft', gameName: 'Minecraft', rosters: [roster('r1', 'Squad', 'All', 2)] }),
     ]);
-    expect(b.layout).toBe('single');
-    expect(b.columns).toHaveLength(1);
-    expect(b.columns[0].division).toBe('Varsity');
-    expect(b.columns[0].rosters).toHaveLength(1);
+    expect(b.layout).toBe('divided');
+    expect(b.jvSupported).toBe(false);
+    expect(b.columns.map((c) => c.division)).toEqual(['Varsity', 'JV']);
+    expect(b.columns[0].rosters.map((r) => r.id)).toEqual(['r1']);
+    expect(b.columns[0].supported).toBe(true);
+    expect(b.columns[1]).toMatchObject({ missing: true, supported: false });
+  });
+
+  it('does not fold a JV/B roster of a no-JV game into Varsity', () => {
+    const [b] = buildSeasonBlocks([
+      team({
+        teamId: 't', gameSlug: 'minecraft', gameName: 'Minecraft',
+        rosters: [roster('v', 'Main', 'A'), roster('j', 'Extra', 'B'), roster('j2', 'Extra 2', 'JV')],
+      }),
+    ]);
+    expect(b.columns[0].rosters.map((r) => r.id)).toEqual(['v']);
+    expect(b.columns[1].rosters.map((r) => r.id).sort()).toEqual(['j', 'j2']);
+    expect(b.columns[1]).toMatchObject({ missing: false, supported: true });
+  });
+
+  it('keeps JV supported for games with a split', () => {
+    const [b] = buildSeasonBlocks([team({ teamId: 't', rosters: [roster('r1', 'Varsity', 'A')] })]);
+    expect(b.jvSupported).toBe(true);
+    expect(b.columns[1]).toMatchObject({ missing: true, supported: true });
   });
 
   it('keeps tournament-model games out of the Varsity/JV layout', () => {
@@ -121,5 +148,41 @@ describe('game filter', () => {
   });
   it('lists each game once, alphabetically', () => {
     expect(buildGameOptions(blocks).map((g) => g.name)).toEqual(['League of Legends', 'Valorant']);
+  });
+});
+
+describe('allowed roster divisions', () => {
+  it('offers Varsity+JV, Varsity only, or All by game', () => {
+    expect(allowedRosterDivisions('valorant')).toEqual(['Varsity', 'JV']);
+    expect(allowedRosterDivisions('minecraft')).toEqual(['Varsity']);
+    expect(allowedRosterDivisions('osu')).toEqual(['All']);
+  });
+  it('stores A/B/All', () => {
+    expect([storedDivision('Varsity'), storedDivision('JV'), storedDivision('All')]).toEqual(['A', 'B', 'All']);
+  });
+});
+
+describe('URL filters', () => {
+  const slugs = ['valorant', 'minecraft'];
+  it('defaults when absent and ignores unknown values', () => {
+    expect(parseRosterFilters({}, slugs)).toEqual({ game: '', division: 'both', phone: 'Varsity' });
+    expect(parseRosterFilters({ game: 'nope', division: 'x', phone: 'both' }, slugs)).toEqual({
+      game: '', division: 'both', phone: 'Varsity',
+    });
+  });
+  it('accepts valid values and takes the first of repeated params', () => {
+    expect(parseRosterFilters({ game: 'minecraft', division: 'JV', phone: 'jv' }, slugs)).toEqual({
+      game: 'minecraft', division: 'JV', phone: 'JV',
+    });
+    expect(parseRosterFilters({ game: ['valorant', 'minecraft'], division: 'varsity' }, slugs)).toMatchObject({
+      game: 'valorant', division: 'Varsity',
+    });
+  });
+  it('round-trips and leaves defaults out of the URL', () => {
+    expect(rosterFilterQuery({ game: '', division: 'both', phone: 'Varsity' })).toBe('');
+    expect(rosterFilterQuery({ game: 'minecraft', division: 'JV', phone: 'Varsity' })).toBe('game=minecraft&division=jv');
+    expect(rosterFilterQuery({ game: '', division: 'both', phone: 'JV' })).toBe('phone=jv');
+    const f = { game: 'valorant', division: 'both' as const, phone: 'JV' as const };
+    expect(parseRosterFilters(Object.fromEntries(new URLSearchParams(rosterFilterQuery(f))), slugs)).toEqual(f);
   });
 });
