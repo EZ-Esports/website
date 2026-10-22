@@ -158,7 +158,7 @@ function SeasonBlockView({
 
   return (
     <section
-      className="rounded-2xl bg-admin-panel ring-1 ring-transparent transition-[background-color,box-shadow] duration-150 hover:bg-surface-raised/40 hover:ring-accent/40 hover:shadow-[inset_3px_0_0_var(--color-accent)] focus-within:ring-accent/40 motion-reduce:transition-none"
+      className="rounded-2xl bg-admin-panel ring-1 ring-transparent transition-[background-color,box-shadow] duration-150 hover:bg-surface-raised/40 hover:ring-accent/40 focus-within:ring-accent/40 motion-reduce:transition-none"
       aria-label={`${block.gameName} ${block.seasonName}`}
     >
       <h3>
