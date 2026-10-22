@@ -45,7 +45,8 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     );
   }
 
-  // A manager works only on each managed game's active season; staff admins (null) see everything.
+  // A manager works only on each managed game's season matching their affiliation by name (active
+  // or not, spec-026); staff admins (null) see everything.
   const scopes = await getAuthorizedGameScopes(context, activeSchool.schoolId);
   const paramGameId = resolveRequestedGameId(scopes, requestedGameId);
   if (scopes && scopes.length === 0) {
@@ -54,7 +55,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         <div className="p-8 text-center border border-zinc-800 rounded-xl bg-zinc-900/50">
           <h2 className="text-xl font-bold text-white mb-2">No Managed Season</h2>
           <p className="text-sm text-zinc-400">
-            None of your games for {activeSchool.schoolName} has an active season that matches your
+            No season exists yet for your games at {activeSchool.schoolName} under your
             affiliation ({[...new Set(activeSchool.affiliations.map((a) => a.academicYear))].join(', ')}).
             Please contact an EZ Esports administrator.
           </p>
@@ -71,6 +72,8 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
   const seasonLabel = scopes
     ? [...new Set(scopes.map((s) => s.seasonName))].join(', ')
     : undefined;
+
+  const hasInactiveSeason = scopes ? scopes.some((s) => !s.seasonIsActive) : false;
 
   // Games whose season staff have locked; the UI disables roster changes for them (the server
   // enforces it regardless). Staff admins are never locked out, so scopes === null yields none.
@@ -100,6 +103,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialPlayerPool={initialPlayerPool}
         selectedGameId={paramGameId}
         seasonLabel={seasonLabel}
+        hasInactiveSeason={hasInactiveSeason}
         lockedGameIds={lockedGameIds}
         lockedSeasonLabel={lockedSeasonLabel}
         tourCompleted={tourCompleted}

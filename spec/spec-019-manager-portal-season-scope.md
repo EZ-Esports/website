@@ -1,6 +1,6 @@
 # spec-019 — Manager portal season scope and `YYYY-YY` season names
 
-**Status:** In Review (branch `fix/manager-portal-season-scope`, PR TBD). **Date:** 17 Oct 2026. **Issue:** #230. **Scope:** `app/lib/season-name.ts`, `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService`, League Setup, join wizard, admin manager tabs, portal page. No migration.
+**Status:** Season rule superseded by [spec-026](spec-026-manager-season-by-name.md) (22 Oct 2026). Originally: In Review (branch `fix/manager-portal-season-scope`, PR TBD). **Date:** 17 Oct 2026. **Issue:** #230. **Scope:** `app/lib/season-name.ts`, `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService`, League Setup, join wizard, admin manager tabs, portal page. No migration.
 
 ## Context & motivation
 
@@ -21,7 +21,7 @@ A school manager could see and edit rosters, invites and enrollments from every 
 ## Invariants & boundaries
 
 - Season names are `YYYY-YY`; never reintroduce `YYYY-YYYY` or a conversion helper.
-- Portal season access = equality between the manager row and the game's active season name. Do not widen to inactive seasons.
+- Portal season access = equality between the manager row and a season name of the game. **Superseded by [spec-026](spec-026-manager-season-by-name.md):** the season is resolved by name regardless of `is_active` (this spec's "active season only" rule no longer holds; the "Matching rule", "Enforcement points" and hexagonal bullets above describe the pre-026 behavior).
 - Staff admin = ADMINISTRATOR permission, not a `staff_members` row.
 - **Not scoped (decision for the user):** `player_invites` has no season column. Invites are limited to currently managed games, not to one season, so a manager still sees past-season invites for a game they currently manage. Scoping by `created_at >= season.created_at` was rejected as unsound (a season row is often created or activated well before or after its invites). Fix options: add `player_invites.season_id` (needs a migration) or derive it from the draft/roster.
 - Other places that read rosters without the manager context (public site, staff admin) are unaffected.

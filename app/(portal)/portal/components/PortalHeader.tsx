@@ -4,13 +4,15 @@ import { HiOutlineShieldCheck } from 'react-icons/hi2';
 
 interface PortalHeaderProps {
   schoolName: string;
-  /** Active season(s) the manager is scoped to, e.g. "2026-27". */
+  /** Season(s) the manager is scoped to by their affiliation, e.g. "2026-27". */
   seasonLabel?: string;
+  /** True when any of those seasons is not its game's active season (a past or upcoming season). */
+  hasInactiveSeason?: boolean;
   /** Page-level controls shown beside the compliance badge (the Tutorial menu). */
   actions?: React.ReactNode;
 }
 
-export function PortalHeader({ schoolName, seasonLabel, actions }: PortalHeaderProps) {
+export function PortalHeader({ schoolName, seasonLabel, hasInactiveSeason, actions }: PortalHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
       <div>
@@ -24,6 +26,11 @@ export function PortalHeader({ schoolName, seasonLabel, actions }: PortalHeaderP
             <>
               <span className="text-zinc-600">&bull;</span>
               <span className="text-xs text-zinc-300 font-medium">Season {seasonLabel}</span>
+              {hasInactiveSeason ? (
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">
+                  Not the active season
+                </span>
+              ) : null}
             </>
           ) : null}
         </div>

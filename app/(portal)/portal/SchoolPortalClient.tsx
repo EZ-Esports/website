@@ -39,8 +39,10 @@ interface SchoolPortalClientProps {
   initialRosters: SchoolRosterDetails[];
   initialPlayerPool?: SchoolPoolPlayer[];
   selectedGameId?: string;
-  /** Active season name(s) the manager is working in; undefined for a staff admin. */
+  /** Season name(s) the manager is working in (matched by name); undefined for a staff admin. */
   seasonLabel?: string;
+  /** Whether any of the manager's seasons is not its game's active season. */
+  hasInactiveSeason?: boolean;
   /** Games whose season rosters are locked by staff (always empty for staff admins). */
   lockedGameIds?: string[];
   /** Name(s) of the locked season(s), for the banner. */
@@ -59,6 +61,7 @@ export default function SchoolPortalClient({
   initialPlayerPool = [],
   selectedGameId: initialGameId,
   seasonLabel,
+  hasInactiveSeason = false,
   lockedGameIds = [],
   lockedSeasonLabel = '',
   tourCompleted,
@@ -524,6 +527,7 @@ export default function SchoolPortalClient({
       <PortalHeader
         schoolName={activeSchool.schoolName}
         seasonLabel={seasonLabel}
+        hasInactiveSeason={hasInactiveSeason}
         actions={
           <PortalTour
             tourCompleted={tourCompleted}

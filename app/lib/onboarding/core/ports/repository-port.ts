@@ -92,7 +92,7 @@ export interface OnboardingRepositoryPort {
   findSchoolRosters(
     schoolId: string,
     gameIds?: string[] | null,
-    options?: { activeSeasonOnly?: boolean }
+    options?: { seasonName?: string }
   ): Promise<SchoolRosterWithPlayers[]>;
   findSchoolPlayerPool(schoolId: string, gameId?: string): Promise<SchoolPlayerPoolItem[]>;
   findRosterById(
@@ -102,13 +102,13 @@ export interface OnboardingRepositoryPort {
     schoolId: string;
     gameId: string;
     name: string;
-    /** Whether the roster's team belongs to its game's active season. */
-    isActiveSeason?: boolean;
+    /** Name (`YYYY-YY`) of the roster's season; a manager matches it against their academic year. */
+    seasonName?: string;
     /** Whether staff have locked the roster's season against manager changes. */
     isSeasonLocked?: boolean;
   } | null>;
-  /** Whether the game's active season has its rosters locked (false when none is active). */
-  isActiveSeasonLocked?(gameId: string): Promise<boolean>;
+  /** Whether the game's season with this name has its rosters locked (false when none exists). */
+  isSeasonLockedByName?(gameId: string, seasonName: string): Promise<boolean>;
 
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;

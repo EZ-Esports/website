@@ -6,6 +6,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import {
   assertManagerForSchool,
+  assertManagerForSchoolGame,
   assertManagerForRoster,
   assertSeasonRostersUnlocked,
   getAuthorizedGameScopes,
@@ -42,8 +43,8 @@ export async function generateInviteToken(): Promise<{ token: string; tokenHash:
 }
 
 /**
- * Asserts school (and optional game) authorization and resolves which games' active seasons the
- * caller may read. `scopes` is null for a staff admin (unrestricted, all seasons).
+ * Asserts school (and optional game) authorization and resolves which games' seasons (the
+ * manager's own, matched by name; spec-026) the caller may read. `scopes` is null for a staff admin (unrestricted, all seasons).
  */
 async function resolveManagerScope(
   schoolId: string,
@@ -149,7 +150,7 @@ export async function getSchoolInvites(
     whereConditions.push(eq(schema.playerInvites.gameId, gameId));
   }
   // Invites carry no season column, so a manager is limited to the games they currently manage
-  // (an active season matching their affiliation) rather than to a single season.
+  // (a season of that game matching their affiliation by name) rather than to a single season (spec-019 open gap).
   if (scopes) {
     whereConditions.push(inArray(schema.playerInvites.gameId, scopes.map((g) => g.gameId)));
   }
@@ -357,10 +358,16 @@ export async function reviewPlayerInvite(
     throw new Error(`Invite ${inviteId} not found`);
   }
 
-  const reviewContext = await assertManagerForSchool(invite.schoolId, invite.gameId ?? undefined);
-  // Without a game there is no active season to match, so only staff admins may review it.
+  const { context: reviewContext, season: managerSeason } = invite.gameId
+    ? await assertManagerForSchoolGame(invite.schoolId, invite.gameId)
+    : { context: await assertManagerForSchool(invite.schoolId), season: null };
+  // The season invite approval enrolls into: the manager's resolved season, or for a staff admin
+  // the game's active season (unchanged behavior).
+  const approvalSeason =
+    invite.gameId && !managerSeason ? await getActiveSeasonForGame(invite.gameId) : managerSeason;
+  // Without a game there is no season to match, so only staff admins may review it.
   if (!invite.gameId && !reviewContext.isStaffAdmin) {
-    throw new Error('Forbidden: This invite is not tied to a game in your active season');
+    throw new Error('Forbidden: This invite is not tied to a game in your season');
   }
 
   if (rosterId) {
@@ -375,8 +382,7 @@ export async function reviewPlayerInvite(
   // silently skipping enrollment, which would strand an accepted-but-unrostered student.
   // Rejecting stays allowed. An explicit rosterId is already covered by assertManagerForRoster.
   if (action === 'approve' && invite.memberId && invite.gameId && !rosterId) {
-    const inviteSeason = await getActiveSeasonForGame(invite.gameId);
-    assertSeasonRostersUnlocked(reviewContext, inviteSeason);
+    assertSeasonRostersUnlocked(reviewContext, approvalSeason);
   }
 
   if (action === 'approve') {
@@ -393,9 +399,9 @@ export async function reviewPlayerInvite(
 
     if (invite.memberId) {
       if (!targetRosterId && invite.gameId) {
-        // Find the school's team for the game's ACTIVE season; a past season's roster is never a target
-        const activeSeason = await getActiveSeasonForGame(invite.gameId);
-        const [team] = activeSeason
+        // Find the school's team for the approver's season (a manager's resolved season, a staff
+        // admin's active season); no other season's roster is ever the default target
+        const [team] = approvalSeason
           ? await db
               .select({ id: schema.teams.id })
               .from(schema.teams)
@@ -403,7 +409,7 @@ export async function reviewPlayerInvite(
                 and(
                   eq(schema.teams.schoolId, invite.schoolId),
                   eq(schema.teams.gameId, invite.gameId),
-                  eq(schema.teams.seasonId, activeSeason.id)
+                  eq(schema.teams.seasonId, approvalSeason.id)
                 )
               )
               .limit(1)
@@ -859,7 +865,7 @@ export async function getSchoolRosters(
   if (gameId) {
     whereConditions.push(eq(schema.teams.gameId, gameId));
   }
-  // A manager sees only the rosters of each managed game's active season; staff admins see all.
+  // A manager sees only the rosters of each managed game's resolved season (matched by name); staff admins see all.
   if (scopes) {
     whereConditions.push(inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId)));
   }
@@ -976,8 +982,9 @@ export interface CreateSchoolRosterResult {
 
 /**
  * Creates a new competition roster for a school and game directly from the School Manager Portal.
- * Rosters are only ever created in the game's active season (never an old or auto-created one); the
- * season's team record is found or created on demand.
+ * A manager creates in their resolved season for the game (matched by name; it may be inactive but
+ * must exist, never auto-created); a staff admin creates in the game's active season. The season's
+ * team record is found or created on demand.
  */
 export async function createSchoolRoster(
   params: CreateSchoolRosterParams
@@ -999,7 +1006,10 @@ export async function createSchoolRoster(
   }
 
   // 1. Manager authorization and tenancy check
-  const createContext = await assertManagerForSchool(schoolId, gameId);
+  const { context: createContext, season: managerSeason } = await assertManagerForSchoolGame(
+    schoolId,
+    gameId
+  );
 
   // 2. Fetch game details
   const [game] = await db
@@ -1016,8 +1026,10 @@ export async function createSchoolRoster(
     throw new Error(`Game ${gameId} not found`);
   }
 
-  // 3. The game's active season is the only one a roster can be created in
-  const season = await getActiveSeasonForGame(gameId);
+  // 3. A manager creates in their resolved season (matched by name, active or not; it must
+  // already exist). A staff admin creates in the game's active season. No fallback or
+  // auto-creation either way.
+  const season = managerSeason ?? (await getActiveSeasonForGame(gameId));
   if (!season) {
     throw new Error(`${NO_ACTIVE_SEASON_ERROR}.`);
   }

@@ -90,14 +90,15 @@ export async function findRosterWithTeam(rosterId: string) {
 }
 
 /**
- * Active and roster-lock state of a season. A missing season is reported as inactive and
- * unlocked.
+ * Name, active flag and roster-lock state of a season. A missing season is reported with a null
+ * name, inactive and unlocked.
  */
 export async function getSeasonRosterState(
   seasonId: string
-): Promise<{ isActive: boolean; isLocked: boolean }> {
+): Promise<{ name: string | null; isActive: boolean; isLocked: boolean }> {
   const [season] = await db
     .select({
+      name: schema.seasons.name,
       isActive: schema.seasons.isActive,
       rostersLockedAt: schema.seasons.rostersLockedAt,
     })
@@ -105,17 +106,24 @@ export async function getSeasonRosterState(
     .where(eq(schema.seasons.id, seasonId))
     .limit(1);
   return {
+    name: season?.name ?? null,
     isActive: season?.isActive ?? false,
     isLocked: !!season?.rostersLockedAt,
   };
 }
 
-/** Whether the game's active season has its rosters locked (false when none is active). */
-export async function isActiveSeasonRostersLocked(gameId: string): Promise<boolean> {
+/**
+ * Whether the game's season with this name has its rosters locked (false when the game has no
+ * such season). Active or not: a manager's season is identified by name (spec-026).
+ */
+export async function isSeasonRostersLockedByName(
+  gameId: string,
+  seasonName: string
+): Promise<boolean> {
   const [season] = await db
     .select({ rostersLockedAt: schema.seasons.rostersLockedAt })
     .from(schema.seasons)
-    .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
+    .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.name, seasonName)))
     .limit(1);
   return !!season?.rostersLockedAt;
 }
@@ -123,28 +131,28 @@ export async function isActiveSeasonRostersLocked(gameId: string): Promise<boole
 /**
  * Loads the teams, rosters, players and identities behind a school's rosters.
  * Returns null when the school has no teams or no rosters (or, with
- * `activeSeasonOnly`, when no season is active).
+ * `seasonName`, when no season of that name exists).
  */
 export async function loadSchoolRosterData(
   schoolId: string,
   gameIds?: string[] | null,
-  options?: { activeSeasonOnly?: boolean }
+  options?: { seasonName?: string }
 ) {
   const whereConditions = [eq(schema.teams.schoolId, schoolId)];
   if (gameIds && gameIds.length > 0) {
     whereConditions.push(inArray(schema.teams.gameId, gameIds));
   }
-  if (options?.activeSeasonOnly) {
-    // Managers only ever see the game's active season; past seasons stay admin-only.
-    const activeSeasons = await db
+  if (options?.seasonName) {
+    // Managers only see seasons matching their affiliation by name (active or not).
+    const namedSeasons = await db
       .select({ id: schema.seasons.id })
       .from(schema.seasons)
-      .where(eq(schema.seasons.isActive, true));
-    if (activeSeasons.length === 0) return null;
+      .where(eq(schema.seasons.name, options.seasonName));
+    if (namedSeasons.length === 0) return null;
     whereConditions.push(
       inArray(
         schema.teams.seasonId,
-        activeSeasons.map((s) => s.id)
+        namedSeasons.map((s) => s.id)
       )
     );
   }

@@ -114,7 +114,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Manager portal season scope (spec-019)
 
-- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to the active season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
+- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to a season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
 - **#233 interplay.** Managers can still hold role-less `staff_members` rows (legacy, or granted deliberately). The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way. New manager logins no longer create such rows (spec-023).
 - The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
 - Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.

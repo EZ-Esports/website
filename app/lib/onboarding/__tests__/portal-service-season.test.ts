@@ -14,35 +14,44 @@ const baseContext: SchoolManagerContext = {
   isPrimaryContact: true,
 };
 
-function makeRepo(isActiveSeason: boolean) {
+function makeRepo(seasonName: string) {
   return {
     findSchoolById: vi.fn(async () => ({ id: 's1', name: 'School', slug: 'school' })),
     findSchoolRosters: vi.fn(async () => []),
     listSchoolInvites: vi.fn(async () => []),
     listPendingSubmissions: vi.fn(async () => []),
-    findRosterById: vi.fn(async () => ({ id: 'r1', schoolId: 's1', gameId: 'g1', name: 'Varsity', isActiveSeason })),
+    findRosterById: vi.fn(async () => ({ id: 'r1', schoolId: 's1', gameId: 'g1', name: 'Varsity', seasonName })),
     removePlayerFromRoster: vi.fn(async () => undefined),
     updateRosterPlayerRole: vi.fn(async () => undefined),
   };
 }
 
-describe('PortalService season scoping (hexagonal path)', () => {
-  it('asks the repository for active-season rosters only when the actor is a manager', async () => {
-    const repo = makeRepo(true);
+describe('PortalService season scoping by name (hexagonal path, spec-026)', () => {
+  it('asks the repository for the rosters of the manager season name, unrestricted for a super admin', async () => {
+    const repo = makeRepo('2026-27');
     const service = new PortalService(repo as any);
     await service.getSchoolPortalData(baseContext);
-    expect(repo.findSchoolRosters).toHaveBeenCalledWith('s1', null, { activeSeasonOnly: true });
+    expect(repo.findSchoolRosters).toHaveBeenCalledWith('s1', null, { seasonName: '2026-27' });
 
     await service.getSchoolPortalData({ ...baseContext, isSuperAdmin: true });
-    expect(repo.findSchoolRosters).toHaveBeenLastCalledWith('s1', null, { activeSeasonOnly: false });
+    expect(repo.findSchoolRosters).toHaveBeenLastCalledWith('s1', null, { seasonName: undefined });
   });
 
-  it('refuses mutations on a past-season roster for a manager but not for a super admin', async () => {
-    const repo = makeRepo(false);
+  it('allows mutations on a roster whose season name matches, even when that season is not active', async () => {
+    // The repository reports only the name; whether the season is active is irrelevant.
+    const repo = makeRepo('2026-27');
     const service = new PortalService(repo as any);
     await expect(
       service.removePlayerFromRoster(baseContext, { rosterId: 'r1', playerId: 'p1' })
-    ).rejects.toThrow(/past season/);
+    ).resolves.toEqual({ success: true });
+  });
+
+  it('refuses mutations on a roster of another season for a manager but not for a super admin', async () => {
+    const repo = makeRepo('2025-26');
+    const service = new PortalService(repo as any);
+    await expect(
+      service.removePlayerFromRoster(baseContext, { rosterId: 'r1', playerId: 'p1' })
+    ).rejects.toThrow(/different season/);
     expect(repo.removePlayerFromRoster).not.toHaveBeenCalled();
 
     await expect(

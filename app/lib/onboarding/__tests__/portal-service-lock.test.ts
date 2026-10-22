@@ -17,12 +17,12 @@ const baseContext: SchoolManagerContext = {
 function makeRepo(locked: boolean) {
   return {
     findRosterById: vi.fn(async () => ({
-      id: 'r1', schoolId: 's1', gameId: 'g1', name: 'Varsity', isActiveSeason: true, isSeasonLocked: locked,
+      id: 'r1', schoolId: 's1', gameId: 'g1', name: 'Varsity', seasonName: '2026-27', isSeasonLocked: locked,
     })),
     findInviteById: vi.fn(async () => ({
       id: 'i1', schoolId: 's1', gameId: 'g1', submissionDraft: { ign: 'x' },
     })),
-    isActiveSeasonLocked: vi.fn(async () => locked),
+    isSeasonLockedByName: vi.fn(async () => locked),
     enrollPlayerToRoster: vi.fn(async () => ({})),
     removePlayerFromRoster: vi.fn(async () => undefined),
     updateRosterPlayerRole: vi.fn(async () => undefined),
@@ -61,6 +61,13 @@ describe('PortalService season roster lock (hexagonal path)', () => {
     const adminCtx = { ...baseContext, isSuperAdmin: true };
     await expect(admin.removePlayerFromRoster(adminCtx, { rosterId: 'r1', playerId: 'p' })).resolves.toEqual({ success: true });
     await expect(admin.reviewPlayerInvite(adminCtx, { inviteId: 'i1', decision: 'approved' })).resolves.toMatchObject({ success: true });
+  });
+
+  it('asks for the lock of the manager own season name (so a locked past season stays locked)', async () => {
+    const repo = makeRepo(true);
+    const ctx = { ...baseContext, academicYear: '2025-26' };
+    await expect(new PortalService(repo as any).reviewPlayerInvite(ctx, { inviteId: 'i1', decision: 'approved' })).rejects.toThrow(/locked/);
+    expect(repo.isSeasonLockedByName).toHaveBeenCalledWith('g1', '2025-26');
   });
 
   it('still lets a manager reject while locked', async () => {
