@@ -157,7 +157,10 @@ function SeasonBlockView({
   const playerCount = block.rosters.reduce((n, r) => n + r.players.length, 0);
 
   return (
-    <section className="rounded-2xl bg-admin-panel" aria-label={`${block.gameName} ${block.seasonName}`}>
+    <section
+      className="rounded-2xl bg-admin-panel ring-1 ring-transparent transition-[background-color,box-shadow] duration-150 hover:bg-surface-raised/40 hover:ring-accent/40 hover:shadow-[inset_3px_0_0_var(--color-accent)] focus-within:ring-accent/40 motion-reduce:transition-none"
+      aria-label={`${block.gameName} ${block.seasonName}`}
+    >
       <h3>
         <button
           type="button"
@@ -165,7 +168,7 @@ function SeasonBlockView({
           aria-controls={panelId}
           onClick={onToggle}
           className={cx(
-            'flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-5 py-3 text-left transition-colors duration-150 hover:bg-surface-raised/40',
+            'flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-5 py-3 text-left',
             focusRing,
           )}
         >
