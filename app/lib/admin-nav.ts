@@ -107,12 +107,6 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         description: 'Schedule fixtures and enter results.',
       },
       {
-        label: 'Standings Archive',
-        href: '/admin/standings',
-        icon: HiOutlineChartBar,
-        description: 'Snapshotted standings for past seasons.',
-      },
-      {
         label: 'Schools & Rosters',
         href: '/admin/schools',
         icon: HiOutlineAcademicCap,
@@ -123,6 +117,12 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         href: '/admin/demographics',
         icon: HiOutlineFingerPrint,
         description: 'Restricted equity and survey data for enrolled students.',
+      },
+      {
+        label: 'Standings Archive',
+        href: '/admin/standings',
+        icon: HiOutlineChartBar,
+        description: 'Snapshotted standings for past seasons.',
       },
     ],
   },

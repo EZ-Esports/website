@@ -19,7 +19,7 @@ The user asked for the Windows Control Panel "Category" view: a few categories, 
    |---|---|
    | (standalone) | Overview `/admin` |
    | People & Staffing | Applications, Careers, Roles & Staff, Leadership Manager |
-   | League Operations | League Setup, Matches & Standings, Standings Archive, Schools & Rosters (the old Teams & Rosters page was folded into it by spec-024), Student Demographics |
+   | League Operations | League Setup, Matches & Standings, Schools & Rosters (the old Teams & Rosters page was folded into it by spec-024), Student Demographics, Standings Archive (last) |
    | Website Content | News & Announcements, Gallery, Sponsors, Page Content |
 
 2. **Pure, tested helpers in the same module.**
