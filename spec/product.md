@@ -37,6 +37,8 @@ EZ Esports is the public site and staff CMS for a NYC high-school esports league
 
 Games in `app/lib/constants.ts`: Valorant and League of Legends (`competitionModel: 'team'`, Varsity/JV), Teamfight Tactics, osu! and TETR.IO (`'tournament'`), and Minecraft (`'team'`, no JV). TETR.IO (slug `tetris`, display name `f04641b`) became forward-facing in PR #210 with four aggregated seasons (PR #206). osu! and Minecraft still have hubs only: no seasons, excluded from `getGamesForShowcase`, placeholder banners `/images/hero-background.jpg`. Empty hubs are the same bento grid with a blank “This season” tile (`d047f99` removed the founding-season recruitment layout `c759fa3` had gated). `MigrationNotice` (`452073e`) still shows on competition pages.
 
+**Appearance ([spec-024](spec-024-light-dark-theme.md)).** With no choice, the public site follows the operating system. The header toggles light and dark (`ez-theme` cookie). Light swaps the semantic tokens on `<html>`. The header and photo lightboxes stay dark so the white wordmark stays readable. Light mode hero type is dark on a white shadow; the heavy dark photo grade stays on the dark appearance. `/apply` and `/apply/staff` keep their own light form surface. The staff portal and the school manager portal do not follow the public theme.
+
 ---
 
 ## Staff CMS (`/admin`)

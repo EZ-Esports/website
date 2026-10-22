@@ -4,7 +4,19 @@ html {
   scrollbar-gutter: stable;
 }
 
-:root {
+/* Dark tokens are the default (`:root`). `.theme-light` on `<html>` is the
+   public light theme. Surfaces that must stay dark when that class is set —
+   the header (the wordmark is white), photo heroes, photo lightboxes, and the
+   staff and manager portals — restate these variables on themselves. Admin
+   dialogs portal to `document.body`, so the reset also lives on
+   `.admin-modal-overlay` and `.admin-popover`, not only on `.admin-shell`. */
+:root,
+.theme-dark,
+.admin-shell,
+.admin-modal-overlay,
+.admin-popover {
+  color-scheme: dark;
+
   /* Surfaces */
   --surface: #111111; /* Midnight graphite dark background */
   --surface-raised: #1c1c1c; /* Elevated graphite, matching v1 background */
@@ -50,8 +62,11 @@ html {
   --admin-panel: color-mix(in srgb, var(--surface-raised) 60%, var(--surface));
 }
 
-/* Re-scopes the raw vars for the apply form subtree (light, brand-pink-as-accent look). */
+/* Light theme. Set on `<html>` by the theme control, and on the apply forms
+   so those pages stay a light document when the rest of the site is dark. */
 .theme-light {
+  color-scheme: light;
+
   --surface: #ffffff;
   --surface-raised: #fdf5f5;
   --surface-sunken: #f7eded;
@@ -74,6 +89,161 @@ html {
   --danger-on-tint: #b91c1c;
 
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234a2e3b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* No class on `<html>` means "follow the OS". Explicit dark sets `.theme-dark`
+   on `<html>`, which excludes this rule. Keep these values identical to
+   `.theme-light` above. */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) {
+    color-scheme: light;
+
+    --surface: #ffffff;
+    --surface-raised: #fdf5f5;
+    --surface-sunken: #f7eded;
+
+    --foreground: #2d0015;
+    --foreground-secondary: #4a2e3b;
+    --foreground-muted: #6b5560;
+
+    --line: #f4cccc;
+
+    --accent: #b5005a;
+    --accent-secondary: #4f46e5;
+    --on-accent: #ffffff;
+
+    --success: #047857;
+    --warning: #b45309;
+    --danger: #dc2626;
+    --danger-on-tint: #b91c1c;
+
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234a2e3b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  }
+}
+
+/* Photo heroes. Dark keeps the live site's grade: the dark vignette plus a
+   faint accent blush (18% of the dark-surface pink). A deeper magenta wash
+   was tried and looked unnatural on the photograph. Light uses that same
+   vignette in white. `.hero-copy` switches the type to the dark foreground,
+   because the section itself stays `.theme-dark` (buttons, wordmark chrome). */
+.hero-photo-scrim {
+  background:
+    linear-gradient(0deg, rgba(13, 8, 9, 0.97) 0%, rgba(13, 8, 9, 0.6) 42%, rgba(13, 8, 9, 0.28) 70%, rgba(13, 8, 9, 0.62) 100%),
+    radial-gradient(ellipse at 75% 15%, color-mix(in srgb, var(--color-accent) 18%, transparent) 0%, transparent 55%);
+}
+
+.about-hero-scrim {
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.72) 0%, rgba(10, 10, 10, 0.22) 30%, rgba(10, 10, 10, 0.5) 72%, rgba(10, 10, 10, 0.95) 100%);
+}
+
+html.theme-light .hero-photo-scrim {
+  /* Floor of 0.58 white keeps #4a2e3b body text at ≥4.5:1 even over a dark building. */
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 42%, rgba(255, 255, 255, 0.58) 70%, rgba(255, 255, 255, 0.72) 100%);
+}
+
+html.theme-light .about-hero-scrim {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 30%, rgba(255, 255, 255, 0.72) 72%, rgba(255, 255, 255, 0.94) 100%);
+}
+
+html.theme-light .hero-copy {
+  --foreground: #2d0015;
+  --foreground-secondary: #4a2e3b;
+  --accent: #b5005a;
+  text-shadow: 0 2px 18px rgba(255, 255, 255, 0.95), 0 1px 2px rgba(255, 255, 255, 0.9);
+  filter: none;
+}
+
+html.theme-light .about-hero-scanline {
+  opacity: 0;
+}
+
+/* The wordmark and nav are light-on-dark. Over a light hero that fails
+   WCAG, so the bar stays solid whenever the page is light. */
+html.theme-light .site-header {
+  background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+  border-bottom-color: var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.hero-band-scrim {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 20%, transparent 100%);
+}
+
+html.theme-light .hero-band-scrim {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 45%, rgba(255, 255, 255, 0.7) 100%);
+}
+
+html.theme-light .hero-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(45, 0, 21, 0.16);
+}
+
+/* Pale pink (#f4cccc) is the dark-surface accent. On the light photo it
+   fails non-text contrast, so hero buttons use the light-surface accent.
+   Hover of the clipped CTA turns the fill white, so the label flips dark. */
+html.theme-light .hero-actions {
+  --accent: #b5005a;
+  --on-accent: #ffffff;
+}
+
+html.theme-light .hero-actions .group:hover {
+  --on-accent: #1c1c1c;
+}
+
+html.theme-light .hero-actions :is(a, button).bg-accent:hover {
+  background-color: #8a0046;
+  color: #ffffff;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not(.theme-dark) .hero-photo-scrim {
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 42%, rgba(255, 255, 255, 0.58) 70%, rgba(255, 255, 255, 0.72) 100%);
+  }
+
+  html:not(.theme-dark) .about-hero-scrim {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 30%, rgba(255, 255, 255, 0.72) 72%, rgba(255, 255, 255, 0.94) 100%);
+  }
+
+  html:not(.theme-dark) .site-header {
+    background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+    border-bottom-color: var(--line);
+    backdrop-filter: blur(12px);
+  }
+
+  html:not(.theme-dark) .hero-band-scrim {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 45%, rgba(255, 255, 255, 0.7) 100%);
+  }
+
+  html:not(.theme-dark) .hero-card {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: rgba(45, 0, 21, 0.16);
+  }
+
+  html:not(.theme-dark) .hero-actions {
+    --accent: #b5005a;
+    --on-accent: #ffffff;
+  }
+
+  html:not(.theme-dark) .hero-actions .group:hover {
+    --on-accent: #1c1c1c;
+  }
+
+  html:not(.theme-dark) .hero-actions :is(a, button).bg-accent:hover {
+    background-color: #8a0046;
+    color: #ffffff;
+  }
+
+  html:not(.theme-dark) .hero-copy {
+    --foreground: #2d0015;
+    --foreground-secondary: #4a2e3b;
+    --accent: #b5005a;
+    text-shadow: 0 2px 18px rgba(255, 255, 255, 0.95), 0 1px 2px rgba(255, 255, 255, 0.9);
+    filter: none;
+  }
+
+  html:not(.theme-dark) .about-hero-scanline {
+    opacity: 0;
+  }
 }
 
 @theme inline {
@@ -105,6 +275,7 @@ html {
 body {
   background: var(--surface);
   color: var(--foreground);
+  transition: background-color 200ms ease, color 200ms ease;
   font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
 }
