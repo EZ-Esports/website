@@ -43,7 +43,7 @@ export default async function SchoolRostersPage({ params }: SchoolRostersPagePro
         eyebrow="League Operations"
         title={school ? `${school.name} rosters` : 'School rosters'}
         description="Every roster this school has fielded, newest season first. Read-only: the manager portal is where rosters are changed."
-        back={{ href: '/admin/schools', label: 'Schools' }}
+        back={{ href: '/admin/schools', label: 'Schools & Rosters' }}
       />
       {dbError || !school ? (
         <DbErrorNotice variant="error" />

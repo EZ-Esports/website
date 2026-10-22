@@ -3,12 +3,19 @@ import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
+import { parseMatchFilterParams } from '@/app/lib/admin-season-filters';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
 
-export default async function AdminMatchesPage() {
+export default async function AdminMatchesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string | string[]; game?: string | string[] }>;
+}) {
   if (!(await getStaffForAdminSection('/admin/matches'))) return <PermissionDenied />;
+
+  const rawParams = await searchParams;
 
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
   let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
@@ -16,16 +23,24 @@ export default async function AdminMatchesPage() {
   let allSeasons: Awaited<ReturnType<typeof getStaffSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let initialPage: MatchPageResponse = { items: [], nextCursor: null };
+  let initialFilters = { gameId: '', seasonId: '' };
   let dbError = false;
 
   try {
-    const [firstPage, teamsRes, rostersRes, activeSeasonsRes, allSeasonsRes, gamesRes] = await Promise.all([
-      getMatchesPage({ sort: 'desc', limit: 25 }),
+    // Game and season come first: the URL filters decide which first page to load.
+    const [allSeasonsRes, gamesRes] = await Promise.all([getStaffSeasons(), getCachedGames()]);
+    initialFilters = parseMatchFilterParams(rawParams, gamesRes, allSeasonsRes);
+    const [firstPage, teamsRes, rostersRes, activeSeasonsRes] = await Promise.all([
+      // Raw staff read (spec-022): never the redacting public query.
+      getMatchesPage({
+        sort: 'desc',
+        limit: 25,
+        gameId: initialFilters.gameId || undefined,
+        seasonId: initialFilters.seasonId || undefined,
+      }),
       getCachedTeams(),
       getCachedRosters(),
       getCachedSeasons(),
-      getStaffSeasons(),
-      getCachedGames(),
     ]);
     initialPage = toMatchesPageDto(firstPage);
     teams = teamsRes;
@@ -68,6 +83,8 @@ export default async function AdminMatchesPage() {
               seasons={allSeasons}
               games={games}
               initialPage={initialPage}
+              initialGameId={initialFilters.gameId}
+              initialSeasonId={initialFilters.seasonId}
             />
           </div>
         </div>

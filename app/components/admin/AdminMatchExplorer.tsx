@@ -32,6 +32,7 @@ import { cx } from '@/app/lib/cx';
 import { fetchStaffMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
+import { matchFilterQuery } from '@/app/lib/admin-season-filters';
 
 const PAGE_SIZE = 25;
 
@@ -54,12 +55,16 @@ interface Season {
 interface Game {
   id: string;
   shortName: string;
+  slug: string;
 }
 
 interface AdminMatchExplorerProps {
   seasons: Season[];
   games: Game[];
   initialPage: MatchPageResponse;
+  /** Game / season selected by the URL (already validated server-side); '' = all. */
+  initialGameId?: string;
+  initialSeasonId?: string;
 }
 
 /**
@@ -67,9 +72,9 @@ interface AdminMatchExplorerProps {
  * fetchStaffMatchesPage action instead of shipping every match to the client.
  * Inline score/status editing and deletion are preserved per row.
  */
-export default function AdminMatchExplorer({ seasons, games, initialPage }: AdminMatchExplorerProps) {
-  const [gameId, setGameId] = useState('');
-  const [seasonId, setSeasonId] = useState('');
+export default function AdminMatchExplorer({ seasons, games, initialPage, initialGameId = '', initialSeasonId = '' }: AdminMatchExplorerProps) {
+  const [gameId, setGameId] = useState(initialGameId);
+  const [seasonId, setSeasonId] = useState(initialSeasonId);
   const [division, setDivision] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -97,6 +102,16 @@ export default function AdminMatchExplorer({ seasons, games, initialPage }: Admi
     }),
     [gameId, seasonId, division, status, search, sort]
   );
+
+  // Mirror the game / season selection into the URL (no navigation, so no
+  // server refetch) so a reload or a copied link lands on the same view.
+  useEffect(() => {
+    const qs = matchFilterQuery(gameMap.get(gameId)?.slug, seasonId);
+    const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
+    if (url !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, [gameId, seasonId, gameMap]);
 
   // Reload page 1 whenever facets change (debounced for the search box).
   const isFirstRender = useRef(true);

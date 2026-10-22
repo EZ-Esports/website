@@ -1,18 +1,26 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiEye, FiEyeOff, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
+import Link from 'next/link';
+import { FiEye, FiEyeOff, FiList, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { cancelBtn, chip, chipButton, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
-import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
+import { AdminCount, AdminEmptyState, AdminField, AdminFilterTabs, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
   lockSeasonRosters, unlockSeasonRosters,
   publishSeasonOutcomes, hideSeasonOutcomes,
 } from './actions';
+import {
+  countSeasonsByStatus,
+  filterSeasonsByStatus,
+  leagueStatusHref,
+  seasonMatchesHref,
+  type SeasonStatusFilter,
+} from '@/app/lib/admin-season-filters';
 
 interface DBGame {
   id: string;
@@ -51,10 +59,15 @@ const addStrip = 'border-b border-line/60 px-5 pb-5';
 export default function LeagueSetupClient({
   games,
   seasons,
+  seasonStatus = 'active',
 }: {
   games: DBGame[];
   seasons: DBSeason[];
+  /** Which seasons tab is selected (from `?status=`, validated by the page). */
+  seasonStatus?: SeasonStatusFilter;
 }) {
+  const seasonCounts = countSeasonsByStatus(seasons);
+  const visibleSeasons = filterSeasonsByStatus(seasons, seasonStatus);
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [lockTarget, setLockTarget] = useState<{ seasonId: string; locking: boolean; title: string; message: string } | null>(null);
@@ -165,6 +178,20 @@ export default function LeagueSetupClient({
         id="seasons"
         variant="flush"
         title={<>Seasons<AdminCount>{seasons.length}</AdminCount></>}
+        toolbar={
+          games.length > 0 && seasons.length > 0 ? (
+            <AdminFilterTabs
+              label="Filter seasons by status"
+              items={(['active', 'inactive', 'all'] as const).map((key) => ({
+                key,
+                label: key === 'active' ? 'Active' : key === 'inactive' ? 'Inactive' : 'All',
+                href: leagueStatusHref(key),
+                active: seasonStatus === key,
+                count: seasonCounts[key],
+              }))}
+            />
+          ) : undefined
+        }
         description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager can only work on the active season that matches their affiliation (YYYY-YY). Scores, results, standings and records stay hidden from the public until you publish a season's results."
       >
         {games.length === 0 ? (
@@ -216,15 +243,23 @@ export default function LeagueSetupClient({
             {/* Seasons list */}
             {seasons.length === 0 ? (
               <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="No seasons yet." description="Add one above." />
+            ) : visibleSeasons.length === 0 ? (
+              <AdminEmptyState
+                compact
+                icon={<HiOutlineCalendarDays />}
+                title={`No ${seasonStatus} seasons.`}
+                description={seasonStatus === 'active' ? 'Every season is inactive. Switch to Inactive or All to see them.' : 'Every season is active. Switch to Active or All to see them.'}
+              />
             ) : (
               <ul className={listStack}>
-                {seasons.map((s) => {
+                {visibleSeasons.map((s) => {
                   const game = games.find((g) => g.id === s.gameId);
                   return (
                     <SeasonRow
                       key={s.id}
                       season={s}
                       gameName={game?.displayName ?? 'Unknown Game'}
+                      matchesHref={seasonMatchesHref(s.id, game?.slug)}
                       isPending={isPending}
                       onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), 'Season updated.')}
                       onToggleLock={() => {
@@ -374,6 +409,7 @@ function GameRow({
 function SeasonRow({
   season,
   gameName,
+  matchesHref,
   isPending,
   onUpdate,
   onToggleLock,
@@ -382,6 +418,8 @@ function SeasonRow({
 }: {
   season: DBSeason;
   gameName: string;
+  /** Matches & Standings pre-filtered to this season and game. */
+  matchesHref: string;
   isPending: boolean;
   onUpdate: (fd: FormData) => Promise<boolean>;
   onToggleLock: () => void;
@@ -461,6 +499,15 @@ function SeasonRow({
           </div>
           {/* Row actions stay visible (touch has no hover). */}
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={matchesHref}
+              className={chipButton('ghost')}
+              aria-label={`View matches for ${gameName} season ${season.name}`}
+              title="Open Matches & Standings filtered to this season"
+            >
+              <FiList aria-hidden className="h-3.5 w-3.5" />
+              View matches
+            </Link>
             <button
               type="button"
               onClick={onToggleLock}

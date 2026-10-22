@@ -113,7 +113,7 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         description: 'Snapshotted standings for past seasons.',
       },
       {
-        label: 'Schools',
+        label: 'Schools & Rosters',
         href: '/admin/schools',
         icon: HiOutlineAcademicCap,
         description: 'Member schools, their crests, and their rosters.',
