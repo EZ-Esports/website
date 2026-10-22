@@ -136,11 +136,12 @@ html {
 }
 
 html.theme-light .hero-photo-scrim {
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.62) 42%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.55) 100%);
+  /* Floor of 0.58 white keeps #4a2e3b body text at ≥4.5:1 even over a dark building. */
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 42%, rgba(255, 255, 255, 0.58) 70%, rgba(255, 255, 255, 0.72) 100%);
 }
 
 html.theme-light .about-hero-scrim {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.28) 30%, rgba(255, 255, 255, 0.55) 72%, rgba(255, 255, 255, 0.94) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 30%, rgba(255, 255, 255, 0.72) 72%, rgba(255, 255, 255, 0.94) 100%);
 }
 
 html.theme-light .hero-copy {
@@ -155,13 +156,80 @@ html.theme-light .about-hero-scanline {
   opacity: 0;
 }
 
+/* The wordmark and nav are light-on-dark. Over a light hero that fails
+   WCAG, so the bar stays solid whenever the page is light. */
+html.theme-light .site-header {
+  background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+  border-bottom-color: var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.hero-band-scrim {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 20%, transparent 100%);
+}
+
+html.theme-light .hero-band-scrim {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 45%, rgba(255, 255, 255, 0.7) 100%);
+}
+
+html.theme-light .hero-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(45, 0, 21, 0.16);
+}
+
+/* Pale pink (#f4cccc) is the dark-surface accent. On the light photo it
+   fails non-text contrast, so hero buttons use the light-surface accent.
+   Hover of the clipped CTA turns the fill white, so the label flips dark. */
+html.theme-light .hero-actions {
+  --accent: #b5005a;
+  --on-accent: #ffffff;
+}
+
+html.theme-light .hero-actions .group:hover {
+  --on-accent: #1c1c1c;
+}
+
+html.theme-light .hero-actions :is(a, button).bg-accent:hover {
+  background-color: #8a0046;
+  color: #ffffff;
+}
+
 @media (prefers-color-scheme: light) {
   html:not(.theme-dark) .hero-photo-scrim {
-    background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.62) 42%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.55) 100%);
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 42%, rgba(255, 255, 255, 0.58) 70%, rgba(255, 255, 255, 0.72) 100%);
   }
 
   html:not(.theme-dark) .about-hero-scrim {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.28) 30%, rgba(255, 255, 255, 0.55) 72%, rgba(255, 255, 255, 0.94) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 30%, rgba(255, 255, 255, 0.72) 72%, rgba(255, 255, 255, 0.94) 100%);
+  }
+
+  html:not(.theme-dark) .site-header {
+    background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+    border-bottom-color: var(--line);
+    backdrop-filter: blur(12px);
+  }
+
+  html:not(.theme-dark) .hero-band-scrim {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.58) 45%, rgba(255, 255, 255, 0.7) 100%);
+  }
+
+  html:not(.theme-dark) .hero-card {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: rgba(45, 0, 21, 0.16);
+  }
+
+  html:not(.theme-dark) .hero-actions {
+    --accent: #b5005a;
+    --on-accent: #ffffff;
+  }
+
+  html:not(.theme-dark) .hero-actions .group:hover {
+    --on-accent: #1c1c1c;
+  }
+
+  html:not(.theme-dark) .hero-actions :is(a, button).bg-accent:hover {
+    background-color: #8a0046;
+    color: #ffffff;
   }
 
   html:not(.theme-dark) .hero-copy {

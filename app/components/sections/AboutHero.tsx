@@ -82,7 +82,7 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
           )}
 
           {(primaryCTA || secondaryCTA) && (
-            <div className="flex flex-wrap gap-3 mt-8">
+            <div className="hero-actions flex flex-wrap gap-3 mt-8">
               {primaryCTA && (
                 <CutCTA href={primaryCTA.href} variant="primary" external={primaryCTA.external}>
                   {primaryCTA.label}

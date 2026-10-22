@@ -48,10 +48,11 @@ export default function Header() {
     >
       Skip to main content
     </a>
-    {/* theme-dark: the wordmark is white, and this bar sits on photographs,
-        so it keeps the dark tokens when the page itself is light. */}
+    {/* theme-dark: the wordmark is white, so this bar keeps the dark tokens
+        when the page is light. In light mode `.site-header` is solid — a
+        transparent bar over the light hero fails WCAG. */}
     <header
-      className={`theme-dark z-50 w-full border-b transition-colors duration-300 fixed top-0 py-3 ${
+      className={`site-header theme-dark z-50 w-full border-b transition-colors duration-300 fixed top-0 py-3 ${
         showDarkBg
           ? 'bg-surface/95 border-line backdrop-blur-md'
           : 'bg-transparent border-transparent'

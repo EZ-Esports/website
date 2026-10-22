@@ -55,35 +55,33 @@ export default function Hero({
         />
         {/* Darkens the top of the image so the transparent header's white nav text
             stays readable against the (sometimes pale) background photo. */}
-        <div
-          className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.55)_0%,rgba(0,0,0,0.15)_20%,transparent_100%)]"
-        />
+        <div className="hero-band-scrim absolute inset-0" />
       </div>
 
       {/* Hero Content Container */}
       <div className="relative z-10 w-full flex items-center justify-center px-4">
         {isLarge ? (
-          <div className="max-w-3xl mx-auto rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden text-center w-full bg-white/5 backdrop-blur-md border border-white/15">
+          <div className="hero-card max-w-3xl mx-auto rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden text-center w-full bg-white/5 backdrop-blur-md border border-white/15">
             {/* Soft internal card glow */}
             <div className="absolute -top-24 -left-24 w-60 h-60 bg-accent/12 rounded-full blur-[80px] pointer-events-none z-0" />
             <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-accent-secondary/12 rounded-full blur-[80px] pointer-events-none z-0" />
 
             <div className="relative z-10 flex flex-col items-center">
               {/* Heading */}
-              <h1 className="font-black tracking-tight text-foreground text-3xl sm:text-4xl md:text-[46px] leading-[1.1] drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]">
+              <h1 className="hero-copy font-black tracking-tight text-foreground text-3xl sm:text-4xl md:text-[46px] leading-[1.1] drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]">
                 {renderTitle(title)}
               </h1>
 
               {/* Subtitle */}
               {subtitle && (
-                <p className="text-foreground-secondary font-medium max-w-3xl mx-auto leading-relaxed mt-6 text-sm sm:text-base md:text-lg drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.4)]">
+                <p className="hero-copy text-foreground-secondary font-medium max-w-3xl mx-auto leading-relaxed mt-6 text-sm sm:text-base md:text-lg drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.4)]">
                   {subtitle}
                 </p>
               )}
 
               {/* CTAs */}
               {primaryCTA && (
-                <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
+                <div className="hero-actions flex flex-wrap items-center justify-center gap-4 mt-8">
                   <Button
                     href={primaryCTA.href}
                     variant="primary"
@@ -103,13 +101,13 @@ export default function Hero({
         ) : (
           <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
             {/* Heading */}
-            <h1 className="font-black tracking-tight text-foreground text-2xl sm:text-3xl md:text-4xl">
+            <h1 className="hero-copy font-black tracking-tight text-foreground text-2xl sm:text-3xl md:text-4xl">
               {renderTitle(title)}
             </h1>
 
             {/* Subtitle */}
             {subtitle && (
-              <p className="text-foreground/90 font-medium max-w-3xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm">
+              <p className="hero-copy text-foreground font-medium max-w-3xl mx-auto leading-relaxed mt-4 text-xs sm:text-sm">
                 {subtitle}
               </p>
             )}

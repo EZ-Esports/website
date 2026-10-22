@@ -96,7 +96,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
           )}
 
           {(primaryCTA || secondaryCTA) && (
-            <div className="flex flex-wrap gap-3 mt-[26px]">
+            <div className="hero-actions flex flex-wrap gap-3 mt-[26px]">
               {primaryCTA && (
                 <CutCTA href={primaryCTA.href} variant="primary" external={primaryCTA.external}>
                   {renderCTAIcon(primaryCTA.label)}
