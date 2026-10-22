@@ -70,6 +70,22 @@ describe('PortalService season roster lock (hexagonal path)', () => {
     expect(repo.isSeasonLockedByName).toHaveBeenCalledWith('g1', '2025-26');
   });
 
+  it('a past season is reported as view-only before the lock, and an upcoming locked season still reports the lock', async () => {
+    const repo = makeRepo(true);
+    (repo.findRosterById as any).mockResolvedValue({
+      id: 'r1', schoolId: 's1', gameId: 'g1', name: 'Varsity', seasonName: '2026-27', isSeasonLocked: true, isSeasonPast: true,
+    });
+    await expect(
+      new PortalService(repo as any).removePlayerFromRoster(baseContext, { rosterId: 'r1', playerId: 'p' })
+    ).rejects.toThrow(/past season and is view-only/);
+    (repo.findRosterById as any).mockResolvedValue({
+      id: 'r1', schoolId: 's1', gameId: 'g1', name: 'Varsity', seasonName: '2026-27', isSeasonLocked: true, isSeasonPast: false,
+    });
+    await expect(
+      new PortalService(repo as any).removePlayerFromRoster(baseContext, { rosterId: 'r1', playerId: 'p' })
+    ).rejects.toThrow(/locked by EZ Esports staff/);
+  });
+
   it('still lets a manager reject while locked', async () => {
     const repo = makeRepo(true);
     await expect(

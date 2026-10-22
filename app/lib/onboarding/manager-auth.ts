@@ -4,6 +4,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { Permissions, hasPermission, calculateEffectiveStaffAccess } from '@/app/lib/roles';
 import { eq, and, isNull, sql } from 'drizzle-orm';
+import { isPastSeason, pastSeasonViewOnlyError } from '@/app/lib/season-name';
 
 /** One `school_managers` row's grant at a school: a season (`YYYY-YY`) and the games it covers. */
 export interface ManagerAffiliation {
@@ -38,6 +39,8 @@ export interface SeasonInfo {
   isActive: boolean;
   /** When staff locked this season's rosters; null while unlocked. */
   rostersLockedAt: Date | null;
+  /** A past season (see `isPastSeason`, spec-028): managers may only view it. */
+  isPast: boolean;
 }
 
 /** A game a manager may work on at a school, together with the manager's resolved season. */
@@ -50,6 +53,12 @@ export interface AuthorizedGameScope {
   seasonIsActive: boolean;
   /** True while staff have locked this season's rosters against manager changes. */
   rostersLocked: boolean;
+  /** True when the resolved season is a past season (spec-028). */
+  seasonIsPast: boolean;
+  /** True when the manager may only view this scope (a past season). The UI disables writes. */
+  readOnly: boolean;
+  /** Why the scope is read-only (the same text the server throws), else null. */
+  readOnlyReason: string | null;
 }
 
 export const ROSTERS_LOCKED_ERROR =
@@ -70,6 +79,22 @@ export function assertSeasonRostersUnlocked(
   }
 }
 
+/**
+ * Refuses any season-data change while the manager's season is a past season (spec-028). Staff
+ * admins are exempt. Mutations reach this through `assertManagerForSchool` /
+ * `assertManagerForSchoolGame` / `assertManagerForRoster` by default; reads opt out with
+ * `allowPast: true`.
+ */
+export function assertSeasonNotPast(
+  context: Pick<SchoolManagerContext, 'isStaffAdmin'>,
+  season: { name: string; isPast: boolean } | null
+): void {
+  if (context.isStaffAdmin) return;
+  if (season?.isPast) {
+    throw new Error(pastSeasonViewOnlyError(season.name));
+  }
+}
+
 /** Staff-admin paths that still target the game's active season (for example roster creation). */
 export const NO_ACTIVE_SEASON_ERROR =
   'No active season for this game; ask an EZ Esports admin to activate one';
@@ -85,6 +110,13 @@ const SEASON_COLUMNS = {
   isActive: schema.seasons.isActive,
   rostersLockedAt: schema.seasons.rostersLockedAt,
 };
+
+type SeasonRow = Omit<SeasonInfo, 'isPast'>;
+
+/** Adds the past/view-only flag to every season of ONE game (needs all of the game's seasons). */
+function withPastFlag(gameSeasons: SeasonRow[]): SeasonInfo[] {
+  return gameSeasons.map((s) => ({ ...s, isPast: isPastSeason(s, gameSeasons) }));
+}
 
 type ManagerRow = {
   schoolId: string;
@@ -305,7 +337,8 @@ export async function getActiveSeasonForGame(gameId: string): Promise<SeasonInfo
     .from(schema.seasons)
     .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
     .limit(1);
-  return season ?? null;
+  // An active season is never past.
+  return season ? { ...season, isPast: false } : null;
 }
 
 function affiliationCoversGame(
@@ -341,7 +374,11 @@ export function resolveManagerSeason<S extends { name: string }>(
 }
 
 async function getSeasonsForGame(gameId: string): Promise<SeasonInfo[]> {
-  return db.select(SEASON_COLUMNS).from(schema.seasons).where(eq(schema.seasons.gameId, gameId));
+  const rows: SeasonRow[] = await db
+    .select(SEASON_COLUMNS)
+    .from(schema.seasons)
+    .where(eq(schema.seasons.gameId, gameId));
+  return withPastFlag(rows);
 }
 
 /**
@@ -356,7 +393,7 @@ export async function getAuthorizedGameScopes(
   const school = context.managedSchools.find((s) => s.schoolId === schoolId);
   if (!school) return [];
 
-  const allSeasons: SeasonInfo[] = await db.select(SEASON_COLUMNS).from(schema.seasons);
+  const allSeasons: SeasonRow[] = await db.select(SEASON_COLUMNS).from(schema.seasons);
   if (allSeasons.length === 0) return [];
 
   const games = await db
@@ -368,7 +405,7 @@ export async function getAuthorizedGameScopes(
     const season = resolveManagerSeason(
       school.affiliations,
       game,
-      allSeasons.filter((s) => s.gameId === game.id)
+      withPastFlag(allSeasons.filter((s) => s.gameId === game.id))
     );
     if (season) {
       scopes.push({
@@ -378,6 +415,9 @@ export async function getAuthorizedGameScopes(
         seasonName: season.name,
         seasonIsActive: !!season.isActive,
         rostersLocked: !!season.rostersLockedAt,
+        seasonIsPast: season.isPast,
+        readOnly: season.isPast,
+        readOnlyReason: season.isPast ? pastSeasonViewOnlyError(season.name) : null,
       });
     }
   }
@@ -422,7 +462,7 @@ async function assertManagerForGame(
 async function assertManagerForSchoolWithSeason(
   schoolId: string,
   gameId: string | undefined,
-  options?: { allowStaffAdmin?: boolean }
+  options?: { allowStaffAdmin?: boolean; allowPast?: boolean }
 ): Promise<{ context: SchoolManagerContext; season: SeasonInfo | null }> {
   const context = await getSchoolManagerContext(undefined, {
     allowStaffAdmin: options?.allowStaffAdmin ?? true,
@@ -442,6 +482,10 @@ async function assertManagerForSchoolWithSeason(
   }
 
   const season = gameId ? await assertManagerForGame(school, schoolId, gameId) : null;
+  // Default-deny writes on a past season (spec-028); reads opt out with `allowPast`.
+  if (!options?.allowPast) {
+    assertSeasonNotPast(context, season);
+  }
   return { context, season };
 }
 
@@ -450,11 +494,13 @@ async function assertManagerForSchoolWithSeason(
  * when given, game. For a game the user must hold a manager row that covers it and whose season
  * (by name, active or not) exists for the game. Staff admins pass unconditionally.
  * Throws an Error with 'Forbidden' if unauthorized.
+ * This is also a mutation guard: when the manager's season for the game is a past season it throws
+ * the view-only error unless the caller passes `{ allowPast: true }` (reads only; spec-028).
  */
 export async function assertManagerForSchool(
   schoolId: string,
   gameId?: string,
-  options?: { allowStaffAdmin?: boolean }
+  options?: { allowStaffAdmin?: boolean; allowPast?: boolean }
 ): Promise<SchoolManagerContext> {
   return (await assertManagerForSchoolWithSeason(schoolId, gameId, options)).context;
 }
@@ -466,7 +512,7 @@ export async function assertManagerForSchool(
 export async function assertManagerForSchoolGame(
   schoolId: string,
   gameId: string,
-  options?: { allowStaffAdmin?: boolean }
+  options?: { allowStaffAdmin?: boolean; allowPast?: boolean }
 ): Promise<{ context: SchoolManagerContext; season: SeasonInfo | null }> {
   return assertManagerForSchoolWithSeason(schoolId, gameId, options);
 }
@@ -476,13 +522,13 @@ export async function assertManagerForSchoolGame(
  * A manager may only touch rosters whose team belongs to their resolved season for the game
  * (matched by name, active or not); any other season's roster is refused. Staff admins may touch
  * any roster.
- * Locked seasons refuse managers by default (this guard is the mutation guard); read-only
- * callers pass `{ allowLocked: true }`.
+ * Locked seasons and past (view-only, spec-028) seasons refuse managers by default (this guard is
+ * the mutation guard); read-only callers pass `{ allowLocked: true, allowPast: true }`.
  * Returns the resolved context, roster, and team records.
  */
 export async function assertManagerForRoster(
   rosterId: string,
-  options?: { allowLocked?: boolean }
+  options?: { allowLocked?: boolean; allowPast?: boolean }
 ): Promise<{
   context: SchoolManagerContext;
   roster: typeof schema.rosters.$inferSelect;
@@ -502,15 +548,20 @@ export async function assertManagerForRoster(
     throw new Error(`Roster not found: ${rosterId}`);
   }
 
+  // allowPast here only so the different-season error keeps precedence; the past check follows.
   const { context, season } = await assertManagerForSchoolWithSeason(
     row.team.schoolId,
-    row.team.gameId
+    row.team.gameId,
+    { allowPast: true }
   );
   if (!context.isStaffAdmin) {
     if (!season || row.team.seasonId !== season.id) {
       throw new Error(
         'Forbidden: This roster belongs to a different season than your manager affiliation and cannot be changed from the portal'
       );
+    }
+    if (!options?.allowPast) {
+      assertSeasonNotPast(context, season);
     }
     if (!options?.allowLocked) {
       assertSeasonRostersUnlocked(context, season);

@@ -106,9 +106,13 @@ export interface OnboardingRepositoryPort {
     seasonName?: string;
     /** Whether staff have locked the roster's season against manager changes. */
     isSeasonLocked?: boolean;
+    /** Whether the roster's season is a past (view-only) season for managers (spec-028). */
+    isSeasonPast?: boolean;
   } | null>;
   /** Whether the game's season with this name has its rosters locked (false when none exists). */
   isSeasonLockedByName?(gameId: string, seasonName: string): Promise<boolean>;
+  /** Whether the game's season with this name is a past (view-only) season (false when none exists). */
+  isSeasonPastByName?(gameId: string, seasonName: string): Promise<boolean>;
 
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;

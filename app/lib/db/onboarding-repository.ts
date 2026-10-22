@@ -2,6 +2,7 @@ import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { isPastSeason } from '@/app/lib/season-name';
 import type {
   CompetitiveRole,
   PlayerSubmissionDraft,
@@ -90,26 +91,45 @@ export async function findRosterWithTeam(rosterId: string) {
 }
 
 /**
- * Name, active flag and roster-lock state of a season. A missing season is reported with a null
- * name, inactive and unlocked.
+ * Name, active flag, roster-lock state and past/view-only state (spec-028) of a season. A missing
+ * season is reported with a null name, inactive, unlocked and not past.
  */
 export async function getSeasonRosterState(
   seasonId: string
-): Promise<{ name: string | null; isActive: boolean; isLocked: boolean }> {
+): Promise<{ name: string | null; isActive: boolean; isLocked: boolean; isPast: boolean }> {
   const [season] = await db
     .select({
       name: schema.seasons.name,
+      gameId: schema.seasons.gameId,
       isActive: schema.seasons.isActive,
       rostersLockedAt: schema.seasons.rostersLockedAt,
     })
     .from(schema.seasons)
     .where(eq(schema.seasons.id, seasonId))
     .limit(1);
+  if (!season) return { name: null, isActive: false, isLocked: false, isPast: false };
+  const gameSeasons = await db
+    .select({ name: schema.seasons.name, isActive: schema.seasons.isActive })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.gameId, season.gameId));
   return {
-    name: season?.name ?? null,
-    isActive: season?.isActive ?? false,
-    isLocked: !!season?.rostersLockedAt,
+    name: season.name,
+    isActive: season.isActive,
+    isLocked: !!season.rostersLockedAt,
+    isPast: isPastSeason(season, gameSeasons),
   };
+}
+
+/**
+ * Whether the game's season with this name is a past (view-only) season (false when none exists).
+ */
+export async function isSeasonPastByName(gameId: string, seasonName: string): Promise<boolean> {
+  const gameSeasons = await db
+    .select({ name: schema.seasons.name, isActive: schema.seasons.isActive })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.gameId, gameId));
+  const season = gameSeasons.find((s) => s.name === seasonName);
+  return season ? isPastSeason(season, gameSeasons) : false;
 }
 
 /**

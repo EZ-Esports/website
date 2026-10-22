@@ -22,6 +22,8 @@ interface PendingApprovalsCardProps {
   >;
   /** Games whose rosters are locked: approving enrolls onto a roster, so it is disabled. */
   lockedGameIds?: string[];
+  /** Games whose season is a past season: approving and rejecting are both disabled (spec-028). */
+  viewOnlyGameIds?: string[];
   onApprove: (inviteId: string) => void;
   onReject: (inviteId: string) => void;
 }
@@ -37,6 +39,7 @@ export function PendingApprovalsCard({
   selectedRoleMap,
   setSelectedRoleMap,
   lockedGameIds = [],
+  viewOnlyGameIds = [],
   onApprove,
   onReject,
 }: PendingApprovalsCardProps) {
@@ -73,6 +76,7 @@ export function PendingApprovalsCard({
             const isApproving = approvingId === sub.id;
             const isRejecting = rejectingId === sub.id;
             const isLocked = !!sub.gameId && lockedGameIds.includes(sub.gameId);
+            const isViewOnly = !!sub.gameId && viewOnlyGameIds.includes(sub.gameId);
 
             return (
               <div
@@ -180,18 +184,23 @@ export function PendingApprovalsCard({
                   <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:self-auto">
                     <Button
                       onPress={() => onReject(sub.id)}
-                      isDisabled={isRejecting || isApproving}
+                      isDisabled={isRejecting || isApproving || isViewOnly}
                       className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                     >
                       Reject
                     </Button>
                     <Button
                       onPress={() => onApprove(sub.id)}
-                      isDisabled={isApproving || isRejecting || isLocked}
+                      isDisabled={isApproving || isRejecting || isLocked || isViewOnly}
                       className="min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
                     >
                       {isApproving ? 'Approving...' : 'Approve & Enroll'}
                     </Button>
+                    {isViewOnly && (
+                      <p className="basis-full text-right text-[11px] text-amber-300">
+                        This is a past season and is view only, so applications cannot be approved or rejected.
+                      </p>
+                    )}
                     {isLocked && (
                       <p className="basis-full text-right text-[11px] text-amber-300">
                         Rosters are locked, so players cannot be approved onto them right now.

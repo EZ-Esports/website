@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from 'react-aria-components';
-import { HiOutlineLockClosed, HiOutlinePlus } from 'react-icons/hi2';
+import { HiOutlineEye, HiOutlineLockClosed, HiOutlinePlus } from 'react-icons/hi2';
 import type {
   SchoolRosterDetails,
   RosterEligibilityResult,
@@ -15,6 +15,10 @@ interface RostersSectionProps {
   lockedGameIds?: string[];
   /** Locked season name(s) for the banner. */
   lockedSeasonLabel?: string;
+  /** Games whose season is a past season: view only, all write controls disabled (spec-028). */
+  viewOnlyGameIds?: string[];
+  /** Past season name(s) for the view-only banner. */
+  viewOnlySeasonLabel?: string;
   /** Every game id shown in the portal, to tell when creation is locked everywhere. */
   allGameIds?: string[];
   eligibilityResults: Record<string, RosterEligibilityResult>;
@@ -37,6 +41,8 @@ export function RostersSection({
   schoolName,
   lockedGameIds = [],
   lockedSeasonLabel = '',
+  viewOnlyGameIds = [],
+  viewOnlySeasonLabel = '',
   allGameIds = [],
   eligibilityResults,
   evaluatingRosterId,
@@ -51,7 +57,10 @@ export function RostersSection({
   const anyLocked = lockedGameIds.length > 0;
   // Creating is only pointless when every visible game is locked; otherwise the modal offers
   // just the unlocked games.
-  const createLocked = anyLocked && allGameIds.every((id) => lockedGameIds.includes(id));
+  const anyViewOnly = viewOnlyGameIds.length > 0;
+  const createLocked =
+    (anyLocked || anyViewOnly) &&
+    allGameIds.every((id) => lockedGameIds.includes(id) || viewOnlyGameIds.includes(id));
   return (
     <div data-tour="rosters" className="min-w-0 space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -71,6 +80,23 @@ export function RostersSection({
           <span>Create Roster</span>
         </Button>
       </div>
+
+      {anyViewOnly && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200"
+        >
+          <HiOutlineEye className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            <span className="font-bold">
+              You are viewing {viewOnlySeasonLabel || 'a past season'}. This is a past season, so it is view only.
+            </span>{' '}
+            Players cannot be enrolled, removed, swapped or re-roled, rosters cannot be created or
+            deleted, and invites cannot be created or reviewed. You can still view rosters and check
+            eligibility.
+          </p>
+        </div>
+      )}
 
       {anyLocked && (
         <div
@@ -105,7 +131,7 @@ export function RostersSection({
             <RosterCard
               key={roster.id}
               roster={roster}
-              locked={lockedGameIds.includes(roster.gameId)}
+              locked={lockedGameIds.includes(roster.gameId) || viewOnlyGameIds.includes(roster.gameId)}
               gateResult={eligibilityResults[roster.id]}
               isEvaluating={evaluatingRosterId === roster.id}
               onOpenEnrollModal={onOpenEnrollModal}

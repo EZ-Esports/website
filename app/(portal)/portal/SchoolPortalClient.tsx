@@ -41,8 +41,14 @@ interface SchoolPortalClientProps {
   selectedGameId?: string;
   /** Season name(s) the manager is working in (matched by name); undefined for a staff admin. */
   seasonLabel?: string;
-  /** Whether any of the manager's seasons is not its game's active season. */
-  hasInactiveSeason?: boolean;
+  /** Whether any of the manager's seasons is a past season (view-only, spec-028). */
+  hasPastSeason?: boolean;
+  /** Whether any of the manager's seasons is inactive but upcoming (still editable). */
+  hasUpcomingSeason?: boolean;
+  /** Games whose season is a past season: every write control is disabled (server enforces it). */
+  viewOnlyGameIds?: string[];
+  /** Name(s) of the view-only season(s), for the banner. */
+  viewOnlySeasonLabel?: string;
   /** Games whose season rosters are locked by staff (always empty for staff admins). */
   lockedGameIds?: string[];
   /** Name(s) of the locked season(s), for the banner. */
@@ -61,7 +67,10 @@ export default function SchoolPortalClient({
   initialPlayerPool = [],
   selectedGameId: initialGameId,
   seasonLabel,
-  hasInactiveSeason = false,
+  hasPastSeason = false,
+  hasUpcomingSeason = false,
+  viewOnlyGameIds = [],
+  viewOnlySeasonLabel = '',
   lockedGameIds = [],
   lockedSeasonLabel = '',
   tourCompleted,
@@ -527,7 +536,8 @@ export default function SchoolPortalClient({
       <PortalHeader
         schoolName={activeSchool.schoolName}
         seasonLabel={seasonLabel}
-        hasInactiveSeason={hasInactiveSeason}
+        hasPastSeason={hasPastSeason}
+        hasUpcomingSeason={hasUpcomingSeason}
         actions={
           <PortalTour
             tourCompleted={tourCompleted}
@@ -558,6 +568,7 @@ export default function SchoolPortalClient({
             schoolSlug={activeSchool.schoolSlug}
             inviteGameId={inviteGameId}
             setInviteGameId={setInviteGameId}
+            viewOnlyGameIds={viewOnlyGameIds}
             onInviteCreated={(newInvite) => setInvites((prev) => [newInvite, ...prev])}
           />
         </div>
@@ -574,6 +585,7 @@ export default function SchoolPortalClient({
             selectedRoleMap={selectedRoleMap}
             setSelectedRoleMap={setSelectedRoleMap}
             lockedGameIds={lockedGameIds}
+            viewOnlyGameIds={viewOnlyGameIds}
             onApprove={handleApprove}
             onReject={handleReject}
           />
@@ -586,6 +598,8 @@ export default function SchoolPortalClient({
         schoolName={activeSchool.schoolName}
         lockedGameIds={lockedGameIds}
         lockedSeasonLabel={lockedSeasonLabel}
+        viewOnlyGameIds={viewOnlyGameIds}
+        viewOnlySeasonLabel={viewOnlySeasonLabel}
         allGameIds={games.map((g) => g.id)}
         eligibilityResults={eligibilityResults}
         evaluatingRosterId={evaluatingRosterId}
@@ -642,7 +656,7 @@ export default function SchoolPortalClient({
       <CreateRosterModal
         isOpen={isCreateRosterOpen}
         schoolName={activeSchool.schoolName}
-        games={games.filter((g) => !lockedGameIds.includes(g.id))}
+        games={games.filter((g) => !lockedGameIds.includes(g.id) && !viewOnlyGameIds.includes(g.id))}
         defaultGameId={selectedGame}
         isCreating={isCreatingRoster}
         createError={createRosterError}

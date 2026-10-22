@@ -50,7 +50,8 @@ async function resolveManagerScope(
   schoolId: string,
   gameId?: string
 ): Promise<{ scopes: AuthorizedGameScope[] | null }> {
-  const context = await assertManagerForSchool(schoolId, gameId);
+  // Reads: a past (view-only) season stays readable (spec-028).
+  const context = await assertManagerForSchool(schoolId, gameId, { allowPast: true });
   const scopes = await getAuthorizedGameScopes(context, schoolId);
   return { scopes };
 }
@@ -71,6 +72,7 @@ export async function createPlayerInvite(
     throw new Error('Student first and last names are required');
   }
 
+  // Mutation: refused on a past (view-only) season by default (spec-028).
   const context = await assertManagerForSchool(schoolId, gameId);
 
   const { token, tokenHash } = await generateInviteToken();
@@ -610,7 +612,7 @@ export async function getRosterEligibility(params: {
     throw new Error('Roster ID is required');
   }
 
-  const { roster } = await assertManagerForRoster(rosterId, { allowLocked: true });
+  const { roster } = await assertManagerForRoster(rosterId, { allowLocked: true, allowPast: true });
 
   const rosterPlayers = await db
     .select({

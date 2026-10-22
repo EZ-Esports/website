@@ -1,6 +1,6 @@
 # spec-020 — Season roster lock
 
-**Status:** Shipped (PR #256, squash `125db67`, merged 18 Oct 2026; spec-019 / #255 and spec-018 / #252 merged earlier). Migration `0050` was applied to production on 18 Oct 2026. **Date:** 18 Oct 2026. **Scope:** `seasons.rosters_locked_at` (migration `0050`), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService` / repository, League Setup, manager portal roster UI.
+**Status:** Shipped (PR #256, squash `125db67`, merged 18 Oct 2026; spec-019 / #255 and spec-018 / #252 merged earlier). Migration `0050` was applied to production on 18 Oct 2026. **Date:** 18 Oct 2026. **Note:** [spec-028](spec-028-manager-past-season-view-only.md) adds a separate view-only rule for past seasons, folded into the same guards (`allowPast` beside `allowLocked`); on a past season the view-only error is reported before the lock error. **Scope:** `seasons.rosters_locked_at` (migration `0050`), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService` / repository, League Setup, manager portal roster UI.
 
 **Migration `0050_season_rosters_locked` was applied to production on 18 Oct 2026**, after a full backup and before PR #256 merged (the code must not deploy before 0050: any `db.select().from(schema.seasons)`, for example `app/lib/db/league.ts`, selects the new column, so the public site and the staff admin would break, not just the portal). Verified afterwards with read-only queries: the column exists (nullable, no default), all 15 seasons are intact and none are locked.
 

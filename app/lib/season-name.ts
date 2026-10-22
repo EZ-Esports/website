@@ -40,3 +40,34 @@ export const MANAGER_SEASON_OPTIONS = ['2026-27', '2027-28', '2028-29', '2029-30
 export const DEFAULT_MANAGER_SEASON: string = MANAGER_SEASON_OPTIONS[0];
 
 export const SEASON_NAME_ERROR = 'Season must be in the format YYYY-YY (for example 2026-27).';
+
+/**
+ * Whether `season` is a PAST season of its game, which school managers may only view (spec-028).
+ * This is the one place the definition lives; change the policy here and nowhere else.
+ *
+ * `gameSeasons` are all seasons of the same game (including `season`). Names are `YYYY-YY`, which
+ * sort lexicographically, so "older" is a plain string comparison.
+ * - An active season is never past.
+ * - If the game has an active season: past = inactive AND older than the active season. An inactive
+ *   season NEWER than the active one is an upcoming/prep season and stays editable (staff prepare
+ *   seasons in advance).
+ * - If the game has no active season: past = inactive AND some season of the game is newer by name.
+ *   The newest season is the current one and is not past.
+ */
+export function isPastSeason(
+  season: { name: string; isActive: boolean },
+  gameSeasons: ReadonlyArray<{ name: string; isActive: boolean }>
+): boolean {
+  if (season.isActive) return false;
+  const activeNames = gameSeasons.filter((s) => s.isActive).map((s) => s.name);
+  if (activeNames.length > 0) {
+    const newestActive = activeNames.reduce((a, b) => (b > a ? b : a));
+    return season.name < newestActive;
+  }
+  return gameSeasons.some((s) => s.name > season.name);
+}
+
+/** Error shown when a manager tries to change data of a past (view-only) season. */
+export function pastSeasonViewOnlyError(seasonName: string): string {
+  return `${seasonName} is a past season and is view-only.`;
+}

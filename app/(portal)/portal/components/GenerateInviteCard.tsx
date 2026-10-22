@@ -21,6 +21,8 @@ interface GenerateInviteCardProps {
   schoolSlug: string;
   inviteGameId: string;
   setInviteGameId: (id: string) => void;
+  /** Games whose season is a past season: invites cannot be created for them (spec-028). */
+  viewOnlyGameIds?: string[];
   onInviteCreated: (invite: SchoolInviteItem) => void;
 }
 
@@ -30,6 +32,7 @@ export function GenerateInviteCard({
   schoolSlug,
   inviteGameId,
   setInviteGameId,
+  viewOnlyGameIds = [],
   onInviteCreated,
 }: GenerateInviteCardProps) {
   const [firstName, setFirstName] = useState('');
@@ -54,7 +57,10 @@ export function GenerateInviteCard({
     }
   };
 
+  const isViewOnly = viewOnlyGameIds.includes(inviteGameId);
+
   const handleGenerateInvite = () => {
+    if (isViewOnly) return;
     if (!firstName.trim() || !lastName.trim()) {
       setGenerateError('Please enter student first and last name.');
       return;
@@ -197,9 +203,15 @@ export function GenerateInviteCard({
           </select>
         </div>
 
+        {isViewOnly && (
+          <p role="status" className="text-xs text-amber-300">
+            This game&apos;s season is a past season and is view only, so new invites cannot be created.
+          </p>
+        )}
+
         <Button
           onPress={handleGenerateInvite}
-          isDisabled={isGenerating}
+          isDisabled={isGenerating || isViewOnly}
           className="w-full py-2.5 px-4 bg-[#f4cccc] hover:bg-[#e6b8b8] text-zinc-950 font-bold text-sm rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
         >
           {isGenerating ? (

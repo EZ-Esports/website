@@ -61,11 +61,16 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
       name: row.roster.name,
       seasonName: season.name ?? undefined,
       isSeasonLocked: season.isLocked,
+      isSeasonPast: season.isPast,
     };
   }
 
   async isSeasonLockedByName(gameId: string, seasonName: string): Promise<boolean> {
     return dal.isSeasonRostersLockedByName(gameId, seasonName);
+  }
+
+  async isSeasonPastByName(gameId: string, seasonName: string): Promise<boolean> {
+    return dal.isSeasonPastByName(gameId, seasonName);
   }
 
   async findSchoolRosters(

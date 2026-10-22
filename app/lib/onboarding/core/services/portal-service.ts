@@ -6,6 +6,7 @@ import type {
   SchoolPlayerPoolItem,
   SchoolRosterWithPlayers,
 } from '../domain/types';
+import { pastSeasonViewOnlyError } from '@/app/lib/season-name';
 import { generateCryptoToken, assertManagerTenancy } from '../domain/invariants';
 
 const ROSTERS_LOCKED_MESSAGE =
@@ -20,14 +21,31 @@ export class PortalService implements SchoolManagerPortalUseCase {
    */
   private assertRosterInManagerSeason(
     context: SchoolManagerContext,
-    roster: { seasonName?: string; isSeasonLocked?: boolean }
+    roster: { seasonName?: string; isSeasonLocked?: boolean; isSeasonPast?: boolean }
   ): void {
     if (context.isSuperAdmin) return;
     if (roster.seasonName !== undefined && roster.seasonName !== context.academicYear) {
       throw new Error('Unauthorized: This roster belongs to a different season than your affiliation');
     }
+    if (roster.isSeasonPast) {
+      throw new Error(pastSeasonViewOnlyError(context.academicYear));
+    }
     if (roster.isSeasonLocked) {
       throw new Error(ROSTERS_LOCKED_MESSAGE);
+    }
+  }
+
+  /**
+   * Season-level (not roster-level) writes such as invites: a manager whose own season for the game
+   * is past is view-only (spec-028). Super admins are exempt.
+   */
+  private async assertGameSeasonEditable(
+    context: SchoolManagerContext,
+    gameId: string | null | undefined
+  ): Promise<void> {
+    if (context.isSuperAdmin || !gameId) return;
+    if (await this.repo.isSeasonPastByName?.(gameId, context.academicYear)) {
+      throw new Error(pastSeasonViewOnlyError(context.academicYear));
     }
   }
 
@@ -79,6 +97,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     }
 
     assertManagerTenancy(context, context.schoolId, gameId);
+    await this.assertGameSeasonEditable(context, gameId);
 
     const school = await this.repo.findSchoolById(context.schoolId);
     const game = await this.repo.findGameById(gameId);
@@ -128,6 +147,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     }
 
     assertManagerTenancy(context, invite.schoolId, invite.gameId);
+    await this.assertGameSeasonEditable(context, invite.gameId);
 
     if (decision === 'rejected') {
       await this.repo.revokePlayerInvite(inviteId);
@@ -268,6 +288,7 @@ export class PortalService implements SchoolManagerPortalUseCase {
     if (!invite) return { success: false, error: 'Invite not found.' };
 
     assertManagerTenancy(context, invite.schoolId, invite.gameId);
+    await this.assertGameSeasonEditable(context, invite.gameId);
     await this.repo.revokePlayerInvite(inviteId);
     return { success: true };
   }
