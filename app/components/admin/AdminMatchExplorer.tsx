@@ -32,7 +32,7 @@ import { cx } from '@/app/lib/cx';
 import { fetchStaffMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
-import { matchFilterQuery } from '@/app/lib/admin-season-filters';
+import { matchFilterQuery, nextFiltersOnSeasonChange } from '@/app/lib/admin-season-filters';
 
 const PAGE_SIZE = 25;
 
@@ -166,6 +166,12 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
     });
   };
 
+  const handleSeasonChange = (id: string) => {
+    const next = nextFiltersOnSeasonChange(id, gameId, seasons);
+    setGameId(next.gameId);
+    setSeasonId(next.seasonId);
+  };
+
   const handleGameChange = (id: string) => {
     setGameId(id);
     // Reset the season facet if it belongs to a different game.
@@ -202,7 +208,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
               ))}
             </select>
 
-            <select aria-label="Season" value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={selectClass}>
+            <select aria-label="Season" value={seasonId} onChange={(e) => handleSeasonChange(e.target.value)} className={selectClass}>
               <option value="">All seasons</option>
               {seasonOptions.map((s) => (
                 <option key={s.id} value={s.id}>

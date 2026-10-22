@@ -87,3 +87,57 @@ export function matchFilterQuery(gameSlug: string | undefined, seasonId: string)
   if (gameSlug) params.set('game', gameSlug);
   return params.toString();
 }
+
+/** Which League Setup tab (other than All) a season lives under. */
+export function seasonTab(isActive: boolean): Exclude<SeasonStatusFilter, 'all'> {
+  return isActive ? 'active' : 'inactive';
+}
+
+/** Whether a season is listed on the given tab ('all' lists everything). */
+export function seasonMatchesTab(isActive: boolean, status: SeasonStatusFilter): boolean {
+  return status === 'all' || seasonTab(isActive) === status;
+}
+
+export interface SeasonMovedHint {
+  tab: Exclude<SeasonStatusFilter, 'all'>;
+  text: string;
+  actionLabel: string;
+  href: string;
+}
+
+/**
+ * After a season is created or edited, the hint to show when it no longer
+ * appears on the tab staff are looking at; null when it still does.
+ */
+export function seasonMovedHint(isActive: boolean, current: SeasonStatusFilter): SeasonMovedHint | null {
+  if (seasonMatchesTab(isActive, current)) return null;
+  const tab = seasonTab(isActive);
+  const name = tab === 'active' ? 'Active' : 'Inactive';
+  return { tab, text: `It is now under the ${name} tab.`, actionLabel: `Show ${name}`, href: leagueStatusHref(tab) };
+}
+
+/**
+ * Next game / season state when the explorer's Season select changes. Picking
+ * a season selects its game (so the UI matches what a reload would show);
+ * "All seasons" ('') keeps the current game.
+ */
+export function nextFiltersOnSeasonChange(
+  seasonId: string,
+  currentGameId: string,
+  seasons: { id: string; gameId: string }[],
+): { gameId: string; seasonId: string } {
+  if (!seasonId) return { gameId: currentGameId, seasonId: '' };
+  const gameId = seasons.find((s) => s.id === seasonId)?.gameId;
+  return { gameId: gameId || currentGameId, seasonId };
+}
+
+/**
+ * React key for the Matches explorer, derived from the server-validated
+ * filters only. When a navigation changes them (sidebar link, "View matches"
+ * deep link) the explorer remounts with fresh state and first page. The
+ * explorer's own history.replaceState writes never re-run the server page, so
+ * they cannot change this key.
+ */
+export function matchExplorerKey(initialGameId: string, initialSeasonId: string): string {
+  return `${initialGameId || 'all'}:${initialSeasonId || 'all'}`;
+}

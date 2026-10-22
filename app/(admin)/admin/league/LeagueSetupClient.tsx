@@ -18,6 +18,7 @@ import {
   countSeasonsByStatus,
   filterSeasonsByStatus,
   leagueStatusHref,
+  seasonMovedHint,
   seasonMatchesHref,
   type SeasonStatusFilter,
 } from '@/app/lib/admin-season-filters';
@@ -43,6 +44,7 @@ interface DBSeason {
 }
 
 type ActionResult = { success: boolean; error?: string };
+type ToastContent = { message: string; action?: { label: string; href: string } };
 
 /** Label-wrapped field with the admin label style (spec-013). */
 function Field({ label, children, help }: { label: string; children: React.ReactNode; help?: React.ReactNode }) {
@@ -69,21 +71,31 @@ export default function LeagueSetupClient({
   const seasonCounts = countSeasonsByStatus(seasons);
   const visibleSeasons = filterSeasonsByStatus(seasons, seasonStatus);
   const [isPending, startTransition] = useTransition();
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; action?: { label: string; href: string } } | null>(null);
   const [lockTarget, setLockTarget] = useState<{ seasonId: string; locking: boolean; title: string; message: string } | null>(null);
   const [outcomesTarget, setOutcomesTarget] = useState<{ seasonId: string; publishing: boolean; title: string; message: string } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    if (type === 'success') setTimeout(() => setToast(null), 3500);
+  const showToast = (message: string, type: 'success' | 'error' = 'success', action?: { label: string; href: string }) => {
+    setToast({ message, type, action });
+    // Longer when there is a link to read and use.
+    if (type === 'success') setTimeout(() => setToast(null), action ? 9000 : 3500);
   };
 
-  const runAction = (action: () => Promise<ActionResult>, successMsg: string): Promise<boolean> =>
+  /** Success toast for a season save, with a hint when the season left the tab being viewed. */
+  const seasonToast = (base: string, fd: FormData): ToastContent => {
+    const hint = seasonMovedHint(fd.get('isActive') === 'true', seasonStatus);
+    return hint
+      ? { message: `${base} ${hint.text}`, action: { label: hint.actionLabel, href: hint.href } }
+      : { message: base };
+  };
+
+  const runAction = (action: () => Promise<ActionResult>, successMsg: ToastContent | string): Promise<boolean> =>
     new Promise((resolve) => {
       startTransition(async () => {
         const res = await action();
         if (res?.success) {
-          showToast(successMsg);
+          const c = typeof successMsg === 'string' ? { message: successMsg } : successMsg;
+          showToast(c.message, 'success', c.action);
           resolve(true);
         } else {
           showToast(res?.error || 'Something went wrong.', 'error');
@@ -95,7 +107,7 @@ export default function LeagueSetupClient({
   const runForm = (
     e: React.FormEvent<HTMLFormElement>,
     action: (fd: FormData) => Promise<ActionResult>,
-    successMsg: string,
+    successMsg: ToastContent | string | ((fd: FormData) => ToastContent),
     opts?: { reset?: boolean; onSuccess?: () => void },
   ) => {
     e.preventDefault();
@@ -104,7 +116,8 @@ export default function LeagueSetupClient({
     startTransition(async () => {
       const res = await action(fd);
       if (res?.success) {
-        showToast(successMsg);
+        const c = typeof successMsg === 'function' ? successMsg(fd) : typeof successMsg === 'string' ? { message: successMsg } : successMsg;
+        showToast(c.message, 'success', c.action);
         if (opts?.reset) form.reset();
         opts?.onSuccess?.();
       } else {
@@ -200,7 +213,7 @@ export default function LeagueSetupClient({
           <>
             {/* Add season form */}
             <form
-              onSubmit={(e) => runForm(e, createSeason, 'Season created.', { reset: true })}
+              onSubmit={(e) => runForm(e, createSeason, (fd) => seasonToast('Season created.', fd), { reset: true })}
               aria-label="Add season"
               className={`${addStrip} grid grid-cols-1 items-end gap-3 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto]`}
             >
@@ -261,7 +274,7 @@ export default function LeagueSetupClient({
                       gameName={game?.displayName ?? 'Unknown Game'}
                       matchesHref={seasonMatchesHref(s.id, game?.slug)}
                       isPending={isPending}
-                      onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), 'Season updated.')}
+                      onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), seasonToast('Season updated.', fd))}
                       onToggleLock={() => {
                         const locking = !s.rostersLockedAt;
                         const message = locking
