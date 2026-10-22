@@ -205,7 +205,7 @@ export default function LeagueSetupClient({
             />
           ) : undefined
         }
-        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager can only work on the active season that matches their affiliation (YYYY-YY). Scores, results, standings and records stay hidden from the public until you publish a season's results."
+        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager works on the season whose name matches their affiliation (YYYY-YY), active or not. Scores, results, standings and records stay hidden from the public until you publish a season's results."
       >
         {games.length === 0 ? (
           <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="Create a game first before adding seasons." />

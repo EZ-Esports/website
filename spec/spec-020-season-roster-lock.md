@@ -15,7 +15,7 @@ Staff need to freeze a game's rosters mid-season (for example once the bracket o
 - **Data:** nullable `seasons.rosters_locked_at timestamp`; null = unlocked. Per season row. A manager's season is the one named by their affiliation, active or not ([spec-026](spec-026-manager-season-by-name.md)), so locking a season locks it for the managers who work in it; other seasons and games are untouched.
 - **Guard:** `assertSeasonRostersUnlocked(context, season)` in `manager-auth.ts` throws `ROSTERS_LOCKED_ERROR` ("Rosters for this season are locked by EZ Esports staff. Contact an admin to request changes.") for non-staff-admins when `rostersLockedAt` is set. `getActiveSeasonForGame` now returns `rostersLockedAt`. `getAuthorizedGameScopes` returns `rostersLocked` per game scope for the UI.
 - **Default-deny on rosters:** `assertManagerForRoster(rosterId, { allowLocked? })` is the mutation guard and refuses a locked season unless the caller passes `allowLocked: true`. Only `getRosterEligibility` (a read) passes it. A new mutation that calls the guard is therefore protected without remembering the lock.
-- **Create path:** `createSchoolRoster` calls the guard after resolving the game's active season.
+- **Create path:** `createSchoolRoster` calls the guard after resolving the manager's season for the game (spec-026).
 - **Staff admins (ADMINISTRATOR) are exempt** and can still edit locked rosters. School managers who are not staff admins are not.
 
 ### Enforcement per action (manager, season locked)
@@ -32,7 +32,7 @@ Staff need to freeze a game's rosters mid-season (for example once the bracket o
 | `reviewPlayerInvite` reject | allowed |
 | `getSchoolRosters`, `getRosterEligibility`, `getSchoolPlayerPool`, invites reads | allowed |
 
-**Invite approval decision:** approval is the intake onto a roster, so for a manager it is refused outright while the game's active season is locked (when the invite has a member and a game), rather than accepting the invite and skipping enrollment, which would leave an accepted-but-unrostered student with no obvious next step. The invite stays `submitted`, so the manager can approve after the unlock; rejecting still works. Staff admins can approve while locked. Trade-off: an approval that would have enrolled nobody (no team yet) is also refused during a lock; accepted as the simpler, safer rule.
+**Invite approval decision:** approval is the intake onto a roster, so for a manager it is refused outright while the manager's season for the game is locked (when the invite has a member and a game), rather than accepting the invite and skipping enrollment, which would leave an accepted-but-unrostered student with no obvious next step. The invite stays `submitted`, so the manager can approve after the unlock; rejecting still works. Staff admins can approve while locked. Trade-off: an approval that would have enrolled nobody (no team yet) is also refused during a lock; accepted as the simpler, safer rule.
 
 - **Best-effort at request start:** the lock is read when the guard runs, not held for the whole mutation. A request that passed the check just before staff locked can still commit. Closing that window needs a `FOR SHARE` read of the season row inside the mutation's transaction; not done.
 - **Lifecycle:** a new season starts unlocked (null column). Superseded by [spec-026](spec-026-manager-season-by-name.md): the lock is no longer dormant when a season is inactive; it applies to the manager's resolved season (by name), active or not. Locking is idempotent: a repeat lock keeps the first timestamp.

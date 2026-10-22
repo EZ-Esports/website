@@ -3,7 +3,7 @@
  * (for example `2025-26`): the starting year, a hyphen, and the last two digits of the
  * following year. The archive already uses this shape, and school manager affiliation
  * (`school_managers.academic_year`) is stored in the same shape so the portal can match a
- * manager to a game's active season with plain string equality and no conversion.
+ * manager to a season of the game with plain string equality and no conversion.
  */
 
 const SEASON_NAME_PATTERN = /^(\d{4})-(\d{2})$/;
