@@ -141,6 +141,6 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Onboarding consent (spec-029)
 
-- **Migration `0052` is not applied to production.** Until `npm run db:migrate` runs (after a backup and with the user's go-ahead), deploying this code makes every onboarding submission fail on the missing `onboarding_consents` table. Apply the migration before or with the deploy.
+- **Migration `0052` was applied to production on 2026-10-23**, after PR #269 merged and with a fresh pre-migration backup (`members`, `schools`). Verified read-only afterwards: `onboarding_consents` exists with 15 columns and 0 rows. Onboarding submissions were failing on the missing table in the window between the merge and the migration. No real submission has been run end to end against the deployed site yet.
 - **Legal to confirm:** adults currently see only the Terms of Service acknowledgment (the supplied form is a guardian authorization). Confirm that is sufficient, and whether managers or adults need anything else.
 - **No staff view or export of consent records**, no guardian confirmation email, and no re-consent for members onboarded before `0052`.
