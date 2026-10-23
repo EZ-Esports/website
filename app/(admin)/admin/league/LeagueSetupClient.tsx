@@ -1,18 +1,27 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { FiEye, FiEyeOff, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
+import Link from 'next/link';
+import { FiEye, FiEyeOff, FiList, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { cancelBtn, chip, chipButton, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
-import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
+import { AdminCount, AdminEmptyState, AdminField, AdminFilterTabs, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
 import {
   createGame, updateGame, deleteGame,
   createSeason, updateSeason, deleteSeason,
   lockSeasonRosters, unlockSeasonRosters,
   publishSeasonOutcomes, hideSeasonOutcomes,
 } from './actions';
+import {
+  countSeasonsByStatus,
+  filterSeasonsByStatus,
+  leagueStatusHref,
+  seasonMovedHint,
+  seasonMatchesHref,
+  type SeasonStatusFilter,
+} from '@/app/lib/admin-season-filters';
 
 interface DBGame {
   id: string;
@@ -35,6 +44,7 @@ interface DBSeason {
 }
 
 type ActionResult = { success: boolean; error?: string };
+type ToastContent = { message: string; action?: { label: string; href: string } };
 
 /** Label-wrapped field with the admin label style (spec-013). */
 function Field({ label, children, help }: { label: string; children: React.ReactNode; help?: React.ReactNode }) {
@@ -51,26 +61,41 @@ const addStrip = 'border-b border-line/60 px-5 pb-5';
 export default function LeagueSetupClient({
   games,
   seasons,
+  seasonStatus = 'active',
 }: {
   games: DBGame[];
   seasons: DBSeason[];
+  /** Which seasons tab is selected (from `?status=`, validated by the page). */
+  seasonStatus?: SeasonStatusFilter;
 }) {
+  const seasonCounts = countSeasonsByStatus(seasons);
+  const visibleSeasons = filterSeasonsByStatus(seasons, seasonStatus);
   const [isPending, startTransition] = useTransition();
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; action?: { label: string; href: string } } | null>(null);
   const [lockTarget, setLockTarget] = useState<{ seasonId: string; locking: boolean; title: string; message: string } | null>(null);
   const [outcomesTarget, setOutcomesTarget] = useState<{ seasonId: string; publishing: boolean; title: string; message: string } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    if (type === 'success') setTimeout(() => setToast(null), 3500);
+  const showToast = (message: string, type: 'success' | 'error' = 'success', action?: { label: string; href: string }) => {
+    setToast({ message, type, action });
+    // Longer when there is a link to read and use.
+    if (type === 'success') setTimeout(() => setToast(null), action ? 9000 : 3500);
   };
 
-  const runAction = (action: () => Promise<ActionResult>, successMsg: string): Promise<boolean> =>
+  /** Success toast for a season save, with a hint when the season left the tab being viewed. */
+  const seasonToast = (base: string, fd: FormData): ToastContent => {
+    const hint = seasonMovedHint(fd.get('isActive') === 'true', seasonStatus);
+    return hint
+      ? { message: `${base} ${hint.text}`, action: { label: hint.actionLabel, href: hint.href } }
+      : { message: base };
+  };
+
+  const runAction = (action: () => Promise<ActionResult>, successMsg: ToastContent | string): Promise<boolean> =>
     new Promise((resolve) => {
       startTransition(async () => {
         const res = await action();
         if (res?.success) {
-          showToast(successMsg);
+          const c = typeof successMsg === 'string' ? { message: successMsg } : successMsg;
+          showToast(c.message, 'success', c.action);
           resolve(true);
         } else {
           showToast(res?.error || 'Something went wrong.', 'error');
@@ -82,7 +107,7 @@ export default function LeagueSetupClient({
   const runForm = (
     e: React.FormEvent<HTMLFormElement>,
     action: (fd: FormData) => Promise<ActionResult>,
-    successMsg: string,
+    successMsg: ToastContent | string | ((fd: FormData) => ToastContent),
     opts?: { reset?: boolean; onSuccess?: () => void },
   ) => {
     e.preventDefault();
@@ -91,7 +116,8 @@ export default function LeagueSetupClient({
     startTransition(async () => {
       const res = await action(fd);
       if (res?.success) {
-        showToast(successMsg);
+        const c = typeof successMsg === 'function' ? successMsg(fd) : typeof successMsg === 'string' ? { message: successMsg } : successMsg;
+        showToast(c.message, 'success', c.action);
         if (opts?.reset) form.reset();
         opts?.onSuccess?.();
       } else {
@@ -165,7 +191,21 @@ export default function LeagueSetupClient({
         id="seasons"
         variant="flush"
         title={<>Seasons<AdminCount>{seasons.length}</AdminCount></>}
-        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager can only work on the active season that matches their affiliation (YYYY-YY). Scores, results, standings and records stay hidden from the public until you publish a season's results."
+        toolbar={
+          games.length > 0 && seasons.length > 0 ? (
+            <AdminFilterTabs
+              label="Filter seasons by status"
+              items={(['active', 'inactive', 'all'] as const).map((key) => ({
+                key,
+                label: key === 'active' ? 'Active' : key === 'inactive' ? 'Inactive' : 'All',
+                href: leagueStatusHref(key),
+                active: seasonStatus === key,
+                count: seasonCounts[key],
+              }))}
+            />
+          ) : undefined
+        }
+        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager works on the season whose name matches their affiliation (YYYY-YY), active or not. Scores, results, standings and records stay hidden from the public until you publish a season's results."
       >
         {games.length === 0 ? (
           <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="Create a game first before adding seasons." />
@@ -173,7 +213,7 @@ export default function LeagueSetupClient({
           <>
             {/* Add season form */}
             <form
-              onSubmit={(e) => runForm(e, createSeason, 'Season created.', { reset: true })}
+              onSubmit={(e) => runForm(e, createSeason, (fd) => seasonToast('Season created.', fd), { reset: true })}
               aria-label="Add season"
               className={`${addStrip} grid grid-cols-1 items-end gap-3 md:grid-cols-[1.5fr_1.5fr_1fr_1fr_auto]`}
             >
@@ -216,21 +256,29 @@ export default function LeagueSetupClient({
             {/* Seasons list */}
             {seasons.length === 0 ? (
               <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="No seasons yet." description="Add one above." />
+            ) : visibleSeasons.length === 0 ? (
+              <AdminEmptyState
+                compact
+                icon={<HiOutlineCalendarDays />}
+                title={`No ${seasonStatus} seasons.`}
+                description={seasonStatus === 'active' ? 'Every season is inactive. Switch to Inactive or All to see them.' : 'Every season is active. Switch to Active or All to see them.'}
+              />
             ) : (
               <ul className={listStack}>
-                {seasons.map((s) => {
+                {visibleSeasons.map((s) => {
                   const game = games.find((g) => g.id === s.gameId);
                   return (
                     <SeasonRow
                       key={s.id}
                       season={s}
                       gameName={game?.displayName ?? 'Unknown Game'}
+                      matchesHref={seasonMatchesHref(s.id, game?.slug)}
                       isPending={isPending}
-                      onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), 'Season updated.')}
+                      onUpdate={(fd) => runAction(() => updateSeason(s.id, fd), seasonToast('Season updated.', fd))}
                       onToggleLock={() => {
                         const locking = !s.rostersLockedAt;
                         const message = locking
-                          ? `School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${s.isActive ? '' : ' This season is inactive, so locking has no effect on managers until it is activated.'}`
+                          ? `School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${s.isActive ? '' : ' This season is inactive; managers whose affiliation names it are still locked out.'}`
                           : 'School managers will be able to change rosters again.';
                         setLockTarget({
                           seasonId: s.id,
@@ -374,6 +422,7 @@ function GameRow({
 function SeasonRow({
   season,
   gameName,
+  matchesHref,
   isPending,
   onUpdate,
   onToggleLock,
@@ -382,6 +431,8 @@ function SeasonRow({
 }: {
   season: DBSeason;
   gameName: string;
+  /** Matches & Standings pre-filtered to this season and game. */
+  matchesHref: string;
   isPending: boolean;
   onUpdate: (fd: FormData) => Promise<boolean>;
   onToggleLock: () => void;
@@ -461,6 +512,15 @@ function SeasonRow({
           </div>
           {/* Row actions stay visible (touch has no hover). */}
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={matchesHref}
+              className={chipButton('ghost')}
+              aria-label={`View matches for ${gameName} season ${season.name}`}
+              title="Open Matches & Standings filtered to this season"
+            >
+              <FiList aria-hidden className="h-3.5 w-3.5" />
+              View matches
+            </Link>
             <button
               type="button"
               onClick={onToggleLock}

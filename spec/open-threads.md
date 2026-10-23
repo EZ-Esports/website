@@ -68,7 +68,7 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 ## Staff portal follow-ups from spec-013 (need behaviour changes)
 
 - Inline-create pages (Schools, Sponsors, Gallery) could move "Add …" into a header button that opens a dialog, which needs close-on-success wiring in `AddEntityForm`.
-- `LeagueSetupClient`, `RosterExplorer`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
+- `LeagueSetupClient`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
 
 ## Dependency drift
 
@@ -94,7 +94,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`. Shipped in #252 ([spec-018](spec-018-manager-invites-table.md)); migration `0049` was applied to production on 18 Oct 2026 after a full backup. Resolved.
 - [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views. Implemented in [spec-022](spec-022-hide-season-outcomes.md) (PR #261); migration `0051` is applied to production. Staff must press "Publish results" for each active season once its data is complete. Retiring a season (explicitly or by activating a new one) publishes it in the same write. Open: tournament brackets and tournament rows in Latest Results are not gated.
 - [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
-- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Addressed in spec-019 (in review); invite scoping is still open, see below.
+- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Resolved for the portal by [spec-019](spec-019-manager-portal-season-scope.md), refined by [spec-026](spec-026-manager-season-by-name.md) (season resolved by name) and [spec-028](spec-028-manager-past-season-view-only.md) (inactive seasons view-only), PR #267. Invite scoping is still open, see "Manager portal season scope" below.
 - [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should not get a `staff_members` row when they reach `/admin` or `/login`. Fixed in [spec-023](spec-023-manager-no-staff-row.md) (PR #264): no row is created for managers; the staff login rejects them and `/admin` routes them to `/portal`. Open: manager staff rows created before the fix remain and are not cleaned up automatically.
 - [#240](https://github.com/EZ-Esports/website/issues/240): link school names in Season standing and the Standings tab to team pages.
 - [#241](https://github.com/EZ-Esports/website/issues/241): show high school alongside university on leadership cards.
@@ -114,9 +114,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Manager portal season scope (spec-019)
 
-- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to the active season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
+- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to a season; invites of the manager's OTHER seasons for a managed game remain visible (the only remaining cross-season leak in the portal; read-only for inactive seasons, but still shown). A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
 - **#233 interplay.** Managers can still hold role-less `staff_members` rows (legacy, or granted deliberately). The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way. New manager logins no longer create such rows (spec-023).
-- The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
+- Renaming a season in League Setup silently re-maps or orphans managers whose `academic_year` matches the old or new name (spec-026 open item): there is no cross-check or warning.
+- [#266](https://github.com/EZ-Esports/website/issues/266): approving a player invite with an explicit `rosterId` checks the roster's school but not that the roster's game matches the invite's game. It stays inside the manager's school, and the roster's own season and lock are enforced. Tracked separately for the player-invites PR.
 - Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.
 
 ## Season roster lock (spec-020)
@@ -130,3 +131,8 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Unverified in production: a real Supabase upload being read by pdf.js (public-bucket CORS) and the `?download=` filename behavior. On any pdf.js failure the page shows the bundled pages plus an Open PDF link.
 - The stored handbook is capped at 4 MB (Vercel body limit). Picks up to 50 MB are shrunk in the browser by recompressing large raster images; a PDF still over 4 MB after two passes (for example mostly vector or CMYK/indexed images, which are skipped) is refused with its size. A signed direct-to-storage upload would lift the cap. Compression was exercised in the dev server on the real file but no upload was made. No "remove PDF" button, only replace.
 - The bundled page images and text (`public/handbook/`, `app/lib/handbook-pages.ts`) are the 2026-27 edition and go stale each season. pdf.js standard-font/CMap data is not bundled.
+
+## Schools roster view (spec-024)
+
+- **Staff roster editing lives in Schools & Rosters ([spec-027](spec-027-schools-roster-editing.md)).** The old gap (no staff UI to create or edit members, teams or rosters) is closed. Still absent by choice: deleting a member, unregistering a team, and editing a member's email or school from the staff UI (the actions were dropped with `RosterExplorer`).
+- **Roster-only roles cannot reach the view.** The page requires `MANAGE_ROSTERS`, but it is reached from Schools, which needs `MANAGE_SCHOOLS`. A role with only `MANAGE_ROSTERS` can open the URL directly but has no nav path.

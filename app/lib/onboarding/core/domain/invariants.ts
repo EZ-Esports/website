@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import type { CompetitiveRole, SchoolManagerContext } from './types';
 
 // ============================================================================
 // HEXAGONAL ARCHITECTURE: DOMAIN INVARIANTS & POLICIES
@@ -19,45 +18,6 @@ export function generateCryptoToken(): { token: string; tokenHash: string } {
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = hashToken(token);
   return { token, tokenHash };
-}
-
-/**
- * Normalizes competitive roles to database representation.
- * In the database, role is 'captain' or 'player' or null, with isCaptain boolean flag.
- */
-export function normalizeCompetitiveRole(role: CompetitiveRole | string): {
-  dbRole: string;
-  isCaptain: boolean;
-} {
-  const normalized = role.trim().toLowerCase();
-  if (normalized === 'captain') {
-    return { dbRole: 'captain', isCaptain: true };
-  }
-  return { dbRole: normalized || 'player', isCaptain: false };
-}
-
-/**
- * Validates that an actor has authorization to manage the specified school & game.
- */
-export function assertManagerTenancy(
-  context: SchoolManagerContext,
-  targetSchoolId: string,
-  targetGameId?: string | null
-): void {
-  if (context.isSuperAdmin) {
-    return;
-  }
-  if (context.schoolId !== targetSchoolId) {
-    throw new Error(`Unauthorized: Manager not authorized for school ${targetSchoolId}`);
-  }
-  if (
-    targetGameId &&
-    context.managedGames &&
-    context.managedGames.length > 0 &&
-    !context.managedGames.includes(targetGameId)
-  ) {
-    throw new Error(`Unauthorized: Manager not authorized for game ${targetGameId}`);
-  }
 }
 
 /**

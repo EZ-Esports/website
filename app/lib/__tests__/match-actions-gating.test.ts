@@ -58,3 +58,24 @@ describe('match page server actions', () => {
     expect(mocks.getPublicMatchesPage).not.toHaveBeenCalled();
   });
 });
+
+describe('staff match reads stay raw with season and game filters (spec-022, spec-025)', () => {
+  it('passes game and season through the raw query, never the redacting one', async () => {
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    const GAME = '22222222-2222-4222-8222-222222222222';
+    await fetchStaffMatchesPage({ gameId: GAME, seasonId: SEASON, status: 'completed' });
+    const params = mocks.getMatchesPage.mock.calls.at(-1)![0];
+    expect(params).toMatchObject({ gameId: GAME, seasonId: SEASON, status: 'completed' });
+    expect(mocks.getPublicMatchesPage).not.toHaveBeenCalled();
+  });
+
+  it('ignores a malformed game or season id instead of erroring', async () => {
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    await fetchStaffMatchesPage({ gameId: 'nope', seasonId: 'x' });
+    const params = mocks.getMatchesPage.mock.calls.at(-1)![0];
+    expect(params.gameId).toBeUndefined();
+    expect(params.seasonId).toBeUndefined();
+  });
+});

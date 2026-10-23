@@ -69,7 +69,7 @@ export const members = pgTable('members', {
   // admin-created member collide with the first on a shared NULL.
   //
   // For the same reason, migration 0026 only backfills this where the derived key
-  // is unambiguous: createMember has no duplicate check, so two same-named members
+  // is unambiguous: the admin UI (createPlayer) has no duplicate check, so two same-named members
   // at one school are legal, and stamping both would abort the migration on a
   // duplicate key — as well as claiming an archive origin neither row has.
   memberKey: text('member_key'),

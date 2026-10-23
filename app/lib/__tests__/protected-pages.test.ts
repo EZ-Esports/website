@@ -6,7 +6,6 @@ const protectedPages = [
   'league/page.tsx',
   'matches/page.tsx',
   'standings/page.tsx',
-  'roster/page.tsx',
   'news/page.tsx',
   'news/new/page.tsx',
   'news/[id]/page.tsx',
@@ -38,5 +37,20 @@ describe('protected admin pages', () => {
     expect(requirePermIndex).toBeGreaterThan(-1);
     expect(requirePermIndex).toBeLessThan(storageIndex);
     expect(source).toContain("{ status: 403 }");
+  });
+});
+
+describe('school rosters page', () => {
+  it('checks MANAGE_ROSTERS and denies before loading any roster data', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/(admin)/admin/schools/[schoolId]/rosters/page.tsx'),
+      'utf8',
+    );
+    const componentStart = source.indexOf('export default');
+    const guard = source.indexOf('getStaffWithPermission(ADMIN_ROSTER_VIEW_PERMISSION)', componentStart);
+    const dataBlock = source.indexOf('try {', componentStart);
+    expect(guard).toBeGreaterThan(componentStart);
+    expect(guard).toBeLessThan(dataBlock);
+    expect(source.slice(guard, guard + 160)).toContain('PermissionDenied');
   });
 });

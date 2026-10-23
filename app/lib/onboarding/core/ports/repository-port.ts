@@ -1,9 +1,4 @@
-import type {
-  CompetitiveRole,
-  SchoolPlayerPoolItem,
-  SchoolRosterWithPlayers,
-  PlayerSubmissionDraft,
-} from '../domain/types';
+import type { PlayerSubmissionDraft } from '../domain/types';
 
 // ============================================================================
 // HEXAGONAL ARCHITECTURE: REPOSITORY (DRIVEN) PORT
@@ -88,86 +83,10 @@ export interface OnboardingRepositoryPort {
   findGameById(gameId: string): Promise<GameRecord | null>;
   findGameBySlug(slug: string): Promise<GameRecord | null>;
 
-  // Roster & Player queries
-  findSchoolRosters(
-    schoolId: string,
-    gameIds?: string[] | null,
-    options?: { activeSeasonOnly?: boolean }
-  ): Promise<SchoolRosterWithPlayers[]>;
-  findSchoolPlayerPool(schoolId: string, gameId?: string): Promise<SchoolPlayerPoolItem[]>;
-  findRosterById(
-    rosterId: string
-  ): Promise<{
-    id: string;
-    schoolId: string;
-    gameId: string;
-    name: string;
-    /** Whether the roster's team belongs to its game's active season. */
-    isActiveSeason?: boolean;
-    /** Whether staff have locked the roster's season against manager changes. */
-    isSeasonLocked?: boolean;
-  } | null>;
-  /** Whether the game's active season has its rosters locked (false when none is active). */
-  isActiveSeasonLocked?(gameId: string): Promise<boolean>;
-
   // Invite operations
   findInviteByTokenHash(tokenHash: string): Promise<PlayerInviteRecord | null>;
-  findInviteById(inviteId: string): Promise<PlayerInviteRecord | null>;
-  createPlayerInvite(params: {
-    schoolId: string;
-    gameId: string;
-    tokenHash: string;
-    intendedFirstName: string;
-    intendedLastName: string;
-    invitedByUserId: string;
-    expiresAt: Date;
-  }): Promise<PlayerInviteRecord>;
   updateInviteDraft(inviteId: string, draft: Partial<PlayerSubmissionDraft>): Promise<void>;
   submitInvite(inviteId: string, finalDraft: PlayerSubmissionDraft): Promise<void>;
-  listSchoolInvites(schoolId: string, gameId?: string): Promise<PlayerInviteRecord[]>;
-  listPendingSubmissions(schoolId: string, gameId?: string): Promise<PlayerInviteRecord[]>;
-  revokePlayerInvite(inviteId: string): Promise<void>;
-
-  // Approval & Roster mutations
-  approveInviteAndEnroll(params: {
-    inviteId: string;
-    schoolId: string;
-    gameId: string;
-    draft: PlayerSubmissionDraft;
-    targetRosterId?: string | null;
-    competitiveRole: CompetitiveRole;
-  }): Promise<{
-    memberId: string;
-    playerId?: string;
-    demographicsId: string;
-    identityId?: string;
-  }>;
-
-  enrollPlayerToRoster(params: {
-    rosterId: string;
-    schoolId: string;
-    gameId: string;
-    memberId: string;
-    ign?: string | null;
-    role: CompetitiveRole;
-  }): Promise<{ playerId: string; rosterId: string; memberId: string; role: string; isCaptain: boolean }>;
-
-  updateRosterPlayerRole(params: {
-    rosterId: string;
-    playerId: string;
-    role: CompetitiveRole;
-  }): Promise<{ success: boolean }>;
-
-  removePlayerFromRoster(params: {
-    rosterId: string;
-    playerId: string;
-  }): Promise<{ success: boolean }>;
-
-  emergencySwapSub(params: {
-    rosterId: string;
-    currentStarterId: string;
-    substitutePlayerId: string;
-  }): Promise<{ success: boolean }>;
 
   // Manager provisioning
   findSchoolManagers(schoolId: string): Promise<any[]>;

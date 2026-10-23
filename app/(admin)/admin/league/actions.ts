@@ -32,7 +32,8 @@ function revalidateLeague() {
   updateTag('teams');
   revalidatePath('/admin/league');
   revalidatePath('/admin/matches');
-  revalidatePath('/admin/roster');
+  // The per-school roster pages (/admin/schools/[schoolId]/rosters) show seasons and games.
+  revalidatePath('/admin/schools', 'layout');
   revalidatePath('/');
 }
 

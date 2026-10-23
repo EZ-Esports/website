@@ -59,12 +59,12 @@ Supabase Auth is identity. Authorization is `staff_members` / roles + granular p
 **Shell layout.** See [spec-001](spec-001-admin-sidebar-pinning.md) and [spec-012](spec-012-admin-control-panel-nav.md). `AdminShell.tsx` has a 16rem left sidebar pinned to the viewport (`sticky top-0 h-dvh self-start`). It shows Overview, then three collapsible categories (RAC Disclosures), all from `app/lib/admin-nav.ts` and filtered by permission:
 
 - **People & Staffing:** Applications, Careers, Roles & Staff, Leadership Manager.
-- **League Operations:** League Setup, Matches & Standings, Standings Archive, Teams & Rosters, Schools, Student Demographics.
+- **League Operations:** League Setup (seasons list has Active / Inactive / All tabs via `?status=` and a "View matches" link per season; [spec-025](spec-025-league-setup-tabs-and-match-filters.md)), Matches & Standings (game and season filters live in `?game=&season=`), Schools & Rosters (each school has a **View rosters** page at `/admin/schools/[schoolId]/rosters`, requires `MANAGE_ROSTERS`, where staff also add/edit/remove teams, rosters and players, exempt from the manager roster lock; filters live in `?game=&division=&phone=`; [spec-024](spec-024-schools-roster-view.md), [spec-027](spec-027-schools-roster-editing.md)), Student Demographics, Standings Archive (last). The standalone Teams & Rosters page was removed; `/admin/roster` redirects to Schools.
 - **Website Content:** News & Announcements, Gallery, Sponsors, Page Content.
 
 The nav scrolls on its own (`overflow-y-auto`) only when it outgrows a short viewport; Public Site and Sign Out stay pinned. The top bar is sticky and shows a `Staff portal › Category › Page` breadcrumb. Page content scrolls the document. No mobile drawer exists.
 
-**Page anatomy ([spec-013](spec-013-staff-portal-ui-overhaul.md)).** Every admin page renders `AdminPage` → `AdminPageHeader` (accent category eyebrow, one `h1`, accent rule, one-line description, primary action on the right) → `AdminSection` panels, with shared empty, loading (skeleton), notice, toast, permission-denied and error states. Long lists keep their filters in sticky section toolbars (Applications, News, Matches, Standings, Leadership, Teams & Rosters). Row actions are always visible.
+**Page anatomy ([spec-013](spec-013-staff-portal-ui-overhaul.md)).** Every admin page renders `AdminPage` → `AdminPageHeader` (accent category eyebrow, one `h1`, accent rule, one-line description, primary action on the right) → `AdminSection` panels, with shared empty, loading (skeleton), notice, toast, permission-denied and error states. Long lists keep their filters in sticky section toolbars (Applications, News, Matches, Standings, Leadership). Row actions are always visible.
 
 Server actions must authorize themselves. Middleware refreshes JWT on `/admin` and `/login` only — it does not protect `'use server'` dispatch (`dd934ef`).
 
@@ -95,7 +95,7 @@ The other-clubs prompt in the apply form names “Super Smash Bros. Ultimate, Te
 ## School Manager Portal (`/portal`)
 
 Dedicated portal for vetted school managers and staff administrators ([spec-011](spec-011-player-onboarding-and-manager-portal.md)).
-- Multi-tenancy scoped by academic year and game assignments with admin override.
+- Multi-tenancy scoped by school, game assignments and academic year with admin override. A manager works in each game's season whose name equals their affiliation (`YYYY-YY`), whether or not it is the active season; the header shows the season with an "Inactive season - View only" chip when it is not the game's active season ([spec-026](spec-026-manager-season-by-name.md)). An inactive season (older or newer than the active one) is view only for managers: a banner explains it and every write control (Create Roster, Enroll, Emergency Sub, Delete, Remove, role, invite creation, Approve and Reject) is disabled, while rosters, the player pool, invites and Check Eligibility stay readable; the active season behaves as before (roster lock still applies) and staff admins are exempt ([spec-028](spec-028-manager-past-season-view-only.md)).
 - Cryptographically secure single-use player invite token generation (`player_invites`).
 - Zero-PII Approve / Reject queue (hides minor demographic PII, protecting `student_demographics` behind `Permissions.VIEW_STUDENT_DEMOGRAPHICS`).
 - Live 5-Point Eligibility Validation Gate (roster caps, single captain, 100% Riot ID entered, 100% Discord username entered and flagged in guild; both are self-reported today because the wizard submits `inGuild: true` and nothing checks Riot or Discord).

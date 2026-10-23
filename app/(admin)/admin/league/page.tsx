@@ -2,11 +2,18 @@ import LeagueSetupClient from './LeagueSetupClient';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
+import { parseSeasonStatus } from '@/app/lib/admin-season-filters';
 import { getLeagueAdminData } from '@/app/lib/db/queries';
 import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
-export default async function LeagueSetupPage() {
+export default async function LeagueSetupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string | string[] }>;
+}) {
   if (!(await getStaffForAdminSection('/admin/league'))) return <PermissionDenied />;
+
+  const status = parseSeasonStatus((await searchParams).status);
 
   let games: Awaited<ReturnType<typeof getLeagueAdminData>>['games'] = [];
   let seasons: Awaited<ReturnType<typeof getLeagueAdminData>>['seasons'] = [];
@@ -33,7 +40,7 @@ export default async function LeagueSetupPage() {
 
       {dbError && <DbErrorNotice variant="not-configured" />}
 
-      {!dbError && <LeagueSetupClient games={games} seasons={seasons} />}
+      {!dbError && <LeagueSetupClient games={games} seasons={seasons} seasonStatus={status} />}
     </AdminPage>
   );
 }

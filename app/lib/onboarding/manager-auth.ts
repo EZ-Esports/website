@@ -4,6 +4,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { Permissions, hasPermission, calculateEffectiveStaffAccess } from '@/app/lib/roles';
 import { eq, and, isNull, sql } from 'drizzle-orm';
+import { inactiveSeasonViewOnlyError } from '@/app/lib/season-name';
 
 /** One `school_managers` row's grant at a school: a season (`YYYY-YY`) and the games it covers. */
 export interface ManagerAffiliation {
@@ -30,22 +31,30 @@ export interface SchoolManagerContext {
   managedSchools: ManagedSchoolInfo[];
 }
 
-export interface ActiveSeasonInfo {
+export interface SeasonInfo {
   id: string;
   name: string;
   gameId: string;
+  /** Whether this is the game's active season. An inactive season is view-only for managers (spec-028). */
+  isActive: boolean;
   /** When staff locked this season's rosters; null while unlocked. */
   rostersLockedAt: Date | null;
 }
 
-/** A game a manager may work on at a school, together with its active season. */
+/** A game a manager may work on at a school, together with the manager's resolved season. */
 export interface AuthorizedGameScope {
   gameId: string;
   gameSlug: string;
   seasonId: string;
   seasonName: string;
+  /** False when the manager's season is not the game's active season (older or newer): view-only. */
+  seasonIsActive: boolean;
   /** True while staff have locked this season's rosters against manager changes. */
   rostersLocked: boolean;
+  /** True when the manager may only view this scope (an inactive season). The UI disables writes. */
+  readOnly: boolean;
+  /** Why the scope is read-only (the same text the server throws), else null. */
+  readOnlyReason: string | null;
 }
 
 export const ROSTERS_LOCKED_ERROR =
@@ -66,8 +75,37 @@ export function assertSeasonRostersUnlocked(
   }
 }
 
+/**
+ * Refuses any season-data change while the manager's season is inactive (older or newer than the
+ * game's active season; spec-028). Staff admins are exempt. Mutations reach this through
+ * `assertManagerForSchool` / `assertManagerForSchoolGame` / `assertManagerForRoster` by default;
+ * reads opt out with `allowInactive: true`.
+ */
+export function assertSeasonActive(
+  context: Pick<SchoolManagerContext, 'isStaffAdmin'>,
+  season: { name: string; isActive: boolean } | null
+): void {
+  if (context.isStaffAdmin) return;
+  if (season && !season.isActive) {
+    throw new Error(inactiveSeasonViewOnlyError(season.name));
+  }
+}
+
+/** Staff-admin paths that still target the game's active season (for example roster creation). */
 export const NO_ACTIVE_SEASON_ERROR =
   'No active season for this game; ask an EZ Esports admin to activate one';
+
+/** A manager's season (their affiliation's `YYYY-YY`) does not exist for this game. */
+export const NO_MANAGED_SEASON_ERROR =
+  'Your season for this game does not exist yet; ask an EZ Esports admin to create it';
+
+const SEASON_COLUMNS = {
+  id: schema.seasons.id,
+  name: schema.seasons.name,
+  gameId: schema.seasons.gameId,
+  isActive: schema.seasons.isActive,
+  rostersLockedAt: schema.seasons.rostersLockedAt,
+};
 
 type ManagerRow = {
   schoolId: string;
@@ -147,8 +185,8 @@ async function isStaffAdminUser(userId: string): Promise<boolean> {
  * - A user with the ADMINISTRATOR permission is a staff admin and sees every school and season,
  *   even when they also hold `school_managers` rows (unless `options.allowStaffAdmin` is false).
  * - Otherwise access comes from active `school_managers` rows linked to the user's ID or member
- *   record. Each row grants one season (`academic_year`, `YYYY-YY`); the per-game season check
- *   itself lives in `assertManagerForSchool` / `getAuthorizedGameScopes`.
+ *   record. Each row grants one season by name (`academic_year`, `YYYY-YY`, active or not); the
+ *   per-game resolution lives in `resolveManagerSeason` (spec-026).
  * - If optional `schoolId` is specified, ensures the user has authorization for that specific
  *   school (or returns null).
  */
@@ -281,15 +319,10 @@ async function resolveGame(idOrSlug: string): Promise<{ id: string; slug: string
   return game ?? null;
 }
 
-/** The game's single active season, or null when none is active. */
-export async function getActiveSeasonForGame(gameId: string): Promise<ActiveSeasonInfo | null> {
+/** The game's single active season, or null when none is active. Not used for manager scoping. */
+export async function getActiveSeasonForGame(gameId: string): Promise<SeasonInfo | null> {
   const [season] = await db
-    .select({
-      id: schema.seasons.id,
-      name: schema.seasons.name,
-      gameId: schema.seasons.gameId,
-      rostersLockedAt: schema.seasons.rostersLockedAt,
-    })
+    .select(SEASON_COLUMNS)
     .from(schema.seasons)
     .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
     .limit(1);
@@ -306,23 +339,34 @@ function affiliationCoversGame(
 }
 
 /**
- * Pure matching rule for the manager portal: a manager may work on a game only through the
- * game's ACTIVE season, and only when one of their rows' `academic_year` equals that season's
- * name (both `YYYY-YY`) and that row covers the game.
+ * Pure season-resolution rule for the manager portal (spec-026). A manager's season for a game is
+ * the game's season whose `name` equals the `academic_year` (`YYYY-YY`) of one of their rows that
+ * covers the game. `seasons.is_active` plays no part. When several rows match several seasons,
+ * the newest by name wins (`YYYY-YY` sorts lexicographically). Returns null when no season of the
+ * game has a matching name. Change the multi-match policy here and nowhere else.
  */
-export function managerMatchesActiveSeason(
+export function resolveManagerSeason<S extends { name: string }>(
   affiliations: ManagerAffiliation[],
   game: { id: string; slug: string },
-  activeSeason: { name: string } | null
-): boolean {
-  if (!activeSeason) return false;
-  return affiliations.some(
-    (a) => a.academicYear === activeSeason.name && affiliationCoversGame(a, game)
+  gameSeasons: S[]
+): S | null {
+  const names = new Set(
+    affiliations.filter((a) => affiliationCoversGame(a, game)).map((a) => a.academicYear)
   );
+  let best: S | null = null;
+  for (const season of gameSeasons) {
+    if (!names.has(season.name)) continue;
+    if (!best || season.name > best.name) best = season;
+  }
+  return best;
+}
+
+async function getSeasonsForGame(gameId: string): Promise<SeasonInfo[]> {
+  return db.select(SEASON_COLUMNS).from(schema.seasons).where(eq(schema.seasons.gameId, gameId));
 }
 
 /**
- * Games (with their active season) a manager can see and act on at a school.
+ * Games (with the manager's resolved season) a manager can see and act on at a school.
  * Returns null for a staff admin, who is unrestricted and sees every season.
  */
 export async function getAuthorizedGameScopes(
@@ -333,31 +377,30 @@ export async function getAuthorizedGameScopes(
   const school = context.managedSchools.find((s) => s.schoolId === schoolId);
   if (!school) return [];
 
-  const activeSeasons = await db
-    .select({
-      id: schema.seasons.id,
-      name: schema.seasons.name,
-      gameId: schema.seasons.gameId,
-      rostersLockedAt: schema.seasons.rostersLockedAt,
-    })
-    .from(schema.seasons)
-    .where(eq(schema.seasons.isActive, true));
-  if (activeSeasons.length === 0) return [];
+  const allSeasons: SeasonInfo[] = await db.select(SEASON_COLUMNS).from(schema.seasons);
+  if (allSeasons.length === 0) return [];
 
   const games = await db
     .select({ id: schema.games.id, slug: schema.games.slug })
     .from(schema.games);
 
   const scopes: AuthorizedGameScope[] = [];
-  for (const season of activeSeasons) {
-    const game = games.find((g) => g.id === season.gameId);
-    if (game && managerMatchesActiveSeason(school.affiliations, game, season)) {
+  for (const game of games) {
+    const season = resolveManagerSeason(
+      school.affiliations,
+      game,
+      allSeasons.filter((s) => s.gameId === game.id)
+    );
+    if (season) {
       scopes.push({
         gameId: game.id,
         gameSlug: game.slug,
         seasonId: season.id,
         seasonName: season.name,
+        seasonIsActive: !!season.isActive,
         rostersLocked: !!season.rostersLockedAt,
+        readOnly: !season.isActive,
+        readOnlyReason: season.isActive ? null : inactiveSeasonViewOnlyError(season.name),
       });
     }
   }
@@ -378,44 +421,32 @@ export function resolveRequestedGameId(
   return scopes.some((s) => s.gameId === requested) ? requested : undefined;
 }
 
-/** Validates the game-level season grant and returns the game's active season. */
+/**
+ * Validates the game-level grant and returns the manager's resolved season for the game: some
+ * row must cover the game, and the game must have a season named like that row's year.
+ */
 async function assertManagerForGame(
   school: ManagedSchoolInfo,
   schoolId: string,
   gameId: string
-): Promise<ActiveSeasonInfo> {
+): Promise<SeasonInfo> {
   const game = await resolveGame(gameId);
-  if (!game) {
+  if (!game || !school.affiliations.some((a) => affiliationCoversGame(a, game))) {
     throw new Error(`Forbidden: Not authorized for game ${gameId} at school ${schoolId}`);
   }
 
-  const season = await getActiveSeasonForGame(game.id);
+  const season = resolveManagerSeason(school.affiliations, game, await getSeasonsForGame(game.id));
   if (!season) {
-    throw new Error(NO_ACTIVE_SEASON_ERROR);
-  }
-
-  if (!managerMatchesActiveSeason(school.affiliations, game, season)) {
-    const coversGame = school.affiliations.some((a) => affiliationCoversGame(a, game));
-    throw new Error(
-      coversGame
-        ? `Forbidden: Your manager affiliation does not include the active season (${season.name}) for this game`
-        : `Forbidden: Not authorized for game ${gameId} at school ${schoolId}`
-    );
+    throw new Error(NO_MANAGED_SEASON_ERROR);
   }
   return season;
 }
 
-/**
- * Asserts that the authenticated user is an authorized manager for the specified school and,
- * when given, game. For a game the user must hold a manager row whose season equals the game's
- * active season. Staff admins pass unconditionally.
- * Throws an Error with 'Forbidden' if unauthorized.
- */
-export async function assertManagerForSchool(
+async function assertManagerForSchoolWithSeason(
   schoolId: string,
-  gameId?: string,
-  options?: { allowStaffAdmin?: boolean }
-): Promise<SchoolManagerContext> {
+  gameId: string | undefined,
+  options?: { allowStaffAdmin?: boolean; allowInactive?: boolean }
+): Promise<{ context: SchoolManagerContext; season: SeasonInfo | null }> {
   const context = await getSchoolManagerContext(undefined, {
     allowStaffAdmin: options?.allowStaffAdmin ?? true,
   });
@@ -423,8 +454,9 @@ export async function assertManagerForSchool(
     throw new Error('Unauthorized');
   }
 
+  // Staff admins (ADMINISTRATOR) are checked before any manager row and are not tied to a season.
   if (context.isStaffAdmin) {
-    return context;
+    return { context, season: null };
   }
 
   const school = context.managedSchools.find((s) => s.schoolId === schoolId);
@@ -432,24 +464,54 @@ export async function assertManagerForSchool(
     throw new Error(`Forbidden: Not authorized for school ${schoolId}`);
   }
 
-  if (gameId) {
-    await assertManagerForGame(school, schoolId, gameId);
+  const season = gameId ? await assertManagerForGame(school, schoolId, gameId) : null;
+  // Default-deny writes on an inactive season (spec-028); reads opt out with `allowInactive`.
+  if (!options?.allowInactive) {
+    assertSeasonActive(context, season);
   }
+  return { context, season };
+}
 
-  return context;
+/**
+ * Asserts that the authenticated user is an authorized manager for the specified school and,
+ * when given, game. For a game the user must hold a manager row that covers it and whose season
+ * (by name, active or not) exists for the game. Staff admins pass unconditionally.
+ * Throws an Error with 'Forbidden' if unauthorized.
+ * This is also a mutation guard: when the manager's season for the game is inactive it throws
+ * the view-only error unless the caller passes `{ allowInactive: true }` (reads only; spec-028).
+ */
+export async function assertManagerForSchool(
+  schoolId: string,
+  gameId?: string,
+  options?: { allowStaffAdmin?: boolean; allowInactive?: boolean }
+): Promise<SchoolManagerContext> {
+  return (await assertManagerForSchoolWithSeason(schoolId, gameId, options)).context;
+}
+
+/**
+ * Like `assertManagerForSchool` for a game, but also returns the manager's resolved season
+ * (null for a staff admin, who is not tied to one season).
+ */
+export async function assertManagerForSchoolGame(
+  schoolId: string,
+  gameId: string,
+  options?: { allowStaffAdmin?: boolean; allowInactive?: boolean }
+): Promise<{ context: SchoolManagerContext; season: SeasonInfo | null }> {
+  return assertManagerForSchoolWithSeason(schoolId, gameId, options);
 }
 
 /**
  * Traces a roster -> team -> schoolId and asserts school manager authorization.
- * A manager may only touch rosters whose team belongs to the game's active season and whose
- * affiliation matches it; a past-season roster is refused. Staff admins may touch any roster.
- * Locked seasons refuse managers by default (this guard is the mutation guard); read-only
- * callers pass `{ allowLocked: true }`.
+ * A manager may only touch rosters whose team belongs to their resolved season for the game
+ * (matched by name, active or not); any other season's roster is refused. Staff admins may touch
+ * any roster.
+ * Locked seasons and inactive (view-only, spec-028) seasons refuse managers by default (this guard is
+ * the mutation guard); read-only callers pass `{ allowLocked: true, allowInactive: true }`.
  * Returns the resolved context, roster, and team records.
  */
 export async function assertManagerForRoster(
   rosterId: string,
-  options?: { allowLocked?: boolean }
+  options?: { allowLocked?: boolean; allowInactive?: boolean }
 ): Promise<{
   context: SchoolManagerContext;
   roster: typeof schema.rosters.$inferSelect;
@@ -469,16 +531,23 @@ export async function assertManagerForRoster(
     throw new Error(`Roster not found: ${rosterId}`);
   }
 
-  const context = await assertManagerForSchool(row.team.schoolId, row.team.gameId);
+  // allowInactive here only so the different-season error keeps precedence; the inactive check follows.
+  const { context, season } = await assertManagerForSchoolWithSeason(
+    row.team.schoolId,
+    row.team.gameId,
+    { allowInactive: true }
+  );
   if (!context.isStaffAdmin) {
-    const activeSeason = await getActiveSeasonForGame(row.team.gameId);
-    if (!activeSeason || row.team.seasonId !== activeSeason.id) {
+    if (!season || row.team.seasonId !== season.id) {
       throw new Error(
-        'Forbidden: This roster belongs to a past season and can no longer be changed from the portal'
+        'Forbidden: This roster belongs to a different season than your manager affiliation and cannot be changed from the portal'
       );
     }
+    if (!options?.allowInactive) {
+      assertSeasonActive(context, season);
+    }
     if (!options?.allowLocked) {
-      assertSeasonRostersUnlocked(context, activeSeason);
+      assertSeasonRostersUnlocked(context, season);
     }
   }
   return {
