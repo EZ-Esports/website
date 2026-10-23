@@ -15,9 +15,9 @@ interface RostersSectionProps {
   lockedGameIds?: string[];
   /** Locked season name(s) for the banner. */
   lockedSeasonLabel?: string;
-  /** Games whose season is a past season: view only, all write controls disabled (spec-028). */
+  /** Games whose season is inactive: view only, all write controls disabled (spec-028). */
   viewOnlyGameIds?: string[];
-  /** Past season name(s) for the view-only banner. */
+  /** Inactive season name(s) for the view-only banner. */
   viewOnlySeasonLabel?: string;
   /** Every game id shown in the portal, to tell when creation is locked everywhere. */
   allGameIds?: string[];
@@ -89,7 +89,7 @@ export function RostersSection({
           <HiOutlineEye className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
             <span className="font-bold">
-              You are viewing {viewOnlySeasonLabel || 'a past season'}. This is a past season, so it is view only.
+              You are viewing {viewOnlySeasonLabel || 'an inactive season'}. This season is inactive, so it is view only.
             </span>{' '}
             Players cannot be enrolled, removed, swapped or re-roled, rosters cannot be created or
             deleted, and invites cannot be created or reviewed. You can still view rosters and check

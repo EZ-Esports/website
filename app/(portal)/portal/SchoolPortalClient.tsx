@@ -41,11 +41,9 @@ interface SchoolPortalClientProps {
   selectedGameId?: string;
   /** Season name(s) the manager is working in (matched by name); undefined for a staff admin. */
   seasonLabel?: string;
-  /** Whether any of the manager's seasons is a past season (view-only, spec-028). */
-  hasPastSeason?: boolean;
-  /** Whether any of the manager's seasons is inactive but upcoming (still editable). */
-  hasUpcomingSeason?: boolean;
-  /** Games whose season is a past season: every write control is disabled (server enforces it). */
+  /** Whether any of the manager's seasons is inactive (view-only, spec-028). */
+  hasInactiveSeason?: boolean;
+  /** Games whose season is inactive: every write control is disabled (server enforces it). */
   viewOnlyGameIds?: string[];
   /** Name(s) of the view-only season(s), for the banner. */
   viewOnlySeasonLabel?: string;
@@ -67,8 +65,7 @@ export default function SchoolPortalClient({
   initialPlayerPool = [],
   selectedGameId: initialGameId,
   seasonLabel,
-  hasPastSeason = false,
-  hasUpcomingSeason = false,
+  hasInactiveSeason = false,
   viewOnlyGameIds = [],
   viewOnlySeasonLabel = '',
   lockedGameIds = [],
@@ -536,8 +533,7 @@ export default function SchoolPortalClient({
       <PortalHeader
         schoolName={activeSchool.schoolName}
         seasonLabel={seasonLabel}
-        hasPastSeason={hasPastSeason}
-        hasUpcomingSeason={hasUpcomingSeason}
+        hasInactiveSeason={hasInactiveSeason}
         actions={
           <PortalTour
             tourCompleted={tourCompleted}

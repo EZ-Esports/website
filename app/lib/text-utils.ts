@@ -49,13 +49,29 @@ export function isValidEmail(value: string): boolean {
 }
 
 /**
+ * The error plus its `.cause` chain. drizzle-orm wraps driver errors in DrizzleQueryError with the
+ * Postgres error (code, constraint_name) on `.cause`; bounded to guard against cycles.
+ */
+export function dbErrorChain(err: unknown): unknown[] {
+  const chain: unknown[] = [];
+  let current: unknown = err;
+  for (let i = 0; i < 5 && current; i++) {
+    chain.push(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+/**
  * Map a raw DB/runtime error to a safe user-facing message.
  * Postgres error codes are exposed via the `code` property on the thrown error.
  *
  * Callers should still log the original error server-side before calling this.
  */
 export function sanitizeDbError(error: unknown): string {
-  const code = (error as Record<string, unknown>)?.code as string | undefined;
+  const code = dbErrorChain(error)
+    .map((e) => (e as { code?: unknown }).code)
+    .find((c): c is string => typeof c === 'string');
   switch (code) {
     case '23505': // unique_violation
       return 'A record with this information already exists.';

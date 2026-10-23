@@ -2,8 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AdminFilterTabs, AdminToast } from '@/app/components/admin/AdminUI';
 import {
+  DEFAULT_MATCH_FACETS,
   leagueStatusHref,
-  matchExplorerKey,
+  matchFacetsKey,
+  matchFetchDelayMs,
+  shouldAdoptServerPage,
+  nextMatchFilterSearch,
   nextFiltersOnSeasonChange,
   parseMatchFilterParams,
   seasonMatchesTab,
@@ -71,30 +75,6 @@ describe('Matches explorer: picking a season selects its game', () => {
   });
 });
 
-describe('Matches explorer remount key', () => {
-  it('is stable for identical validated filters', () => {
-    expect(matchExplorerKey('g-val', 's1')).toBe(matchExplorerKey('g-val', 's1'));
-  });
-
-  it('changes when the validated game or season changes, so the explorer remounts', () => {
-    const base = matchExplorerKey('g-val', 's1');
-    expect(matchExplorerKey('g-lol', 's1')).not.toBe(base);
-    expect(matchExplorerKey('g-val', 's2')).not.toBe(base);
-    expect(matchExplorerKey('', '')).not.toBe(base);
-  });
-
-  it('distinguishes "all games" from "game with all seasons" and never collides across fields', () => {
-    expect(matchExplorerKey('', '')).not.toBe(matchExplorerKey('g-val', ''));
-    expect(matchExplorerKey('g-val', '')).not.toBe(matchExplorerKey('', 'g-val'));
-  });
-
-  it('follows the server-validated filters: sidebar link (no query) differs from a deep link', () => {
-    const deep = parseMatchFilterParams({ season: seasons[1].id }, games, seasons);
-    const plain = parseMatchFilterParams({}, games, seasons);
-    expect(matchExplorerKey(deep.gameId, deep.seasonId)).not.toBe(matchExplorerKey(plain.gameId, plain.seasonId));
-  });
-});
-
 describe('rendered tabs and toast hint', () => {
   it('renders the season tabs with counts and marks only the selected one current', () => {
     const html = renderToStaticMarkup(
@@ -132,5 +112,103 @@ describe('rendered tabs and toast hint', () => {
     const html = renderToStaticMarkup(<AdminToast toast={{ message: 'Season updated.', type: 'success' }} />);
     expect(html).toContain('Season updated.');
     expect(html).not.toContain('<a ');
+  });
+});
+
+describe('nextMatchFilterSearch (URL is the source of truth)', () => {
+  const S1 = seasons[0].id;
+  const S2 = seasons[1].id;
+  const next = (cur: string, change: Parameters<typeof nextMatchFilterSearch>[1]) =>
+    new URLSearchParams(nextMatchFilterSearch(cur, change, games, seasons));
+
+  it('picking a season from a bare URL writes the season and its game', () => {
+    const q = next('', { season: S2 });
+    expect(q.get('season')).toBe(S2);
+    expect(q.get('game')).toBe('league-of-legends');
+  });
+
+  it('picking a game from a bare URL writes season=all (explicit all seasons)', () => {
+    const q = next('', { game: 'g-val' });
+    expect(q.get('game')).toBe('valorant');
+    expect(q.get('season')).toBe('all');
+  });
+
+  it('switching game drops a season of another game, keeps one of the same game', () => {
+    expect(next(`season=${S1}&game=valorant`, { game: 'g-lol' }).get('season')).toBe('all');
+    expect(next(`season=${S1}&game=valorant`, { game: 'g-val' }).get('season')).toBe(S1);
+  });
+
+  it('"All games" clears game and season', () => {
+    expect(nextMatchFilterSearch(`season=${S1}&game=valorant`, { game: '' }, games, seasons)).toBe('');
+  });
+
+  it('"All seasons" keeps the game', () => {
+    const q = next(`season=${S1}&game=valorant`, { season: '' });
+    expect(q.get('game')).toBe('valorant');
+    expect(q.get('season')).toBe('all');
+  });
+
+  it('preserves unrelated params such as from=league, with or without a leading "?"', () => {
+    expect(next(`?from=league&season=${S1}&game=valorant`, { season: S2 }).get('from')).toBe('league');
+    expect(next('from=league', { game: 'g-val' }).get('from')).toBe('league');
+  });
+
+  it('treats invalid current params like the server does (fall back safely)', () => {
+    const q = next('game=bogus&season=nope&from=league', { game: 'g-lol' });
+    expect(q.get('game')).toBe('league-of-legends');
+    expect(q.get('season')).toBe('all');
+    expect(q.get('from')).toBe('league');
+  });
+
+  it('rapid successive changes build on the latest URL: the last choice wins', () => {
+    let search = '';
+    search = nextMatchFilterSearch(search, { game: 'g-val' }, games, seasons);
+    search = nextMatchFilterSearch(search, { season: S2 }, games, seasons);
+    search = nextMatchFilterSearch(search, { game: 'g-val' }, games, seasons);
+    const parsed = new URLSearchParams(search);
+    expect(parseMatchFilterParams({ game: parsed.get('game') ?? undefined, season: parsed.get('season') ?? undefined }, games, seasons))
+      .toEqual({ gameId: 'g-val', seasonId: '' });
+  });
+
+  it('round-trips through parseMatchFilterParams for every change', () => {
+    for (const change of [{ game: 'g-val' }, { game: 'g-lol' }, { game: '' }, { season: S1 }, { season: S2 }, { season: '' }] as const) {
+      const q = new URLSearchParams(nextMatchFilterSearch(`season=${S1}&game=valorant`, change, games, seasons));
+      const got = parseMatchFilterParams({ game: q.get('game') ?? undefined, season: q.get('season') ?? undefined }, games, seasons);
+      if ('game' in change) expect(got.gameId).toBe(change.game);
+      else if (change.season) expect(got.seasonId).toBe(change.season);
+      else expect(got.seasonId).toBe('');
+    }
+  });
+});
+
+describe('explorer fetch/adoption helpers', () => {
+  const base = { ...DEFAULT_MATCH_FACETS, gameId: 'g1', seasonId: 's1' };
+
+  it('keys by value, not identity', () => {
+    expect(matchFacetsKey({ ...base })).toBe(matchFacetsKey(base));
+    expect(matchFacetsKey({ ...base, search: 'a' })).not.toBe(matchFacetsKey(base));
+  });
+
+  it('debounces only a pure search change', () => {
+    expect(matchFetchDelayMs(base, { ...base, search: 'ab' })).toBe(300);
+    expect(matchFetchDelayMs(base, { ...base, seasonId: 's2' })).toBe(0);
+    expect(matchFetchDelayMs(base, { ...base, gameId: 'g2', seasonId: '' })).toBe(0);
+    expect(matchFetchDelayMs(base, { ...base, search: 'ab', division: 'JV' })).toBe(0);
+    expect(matchFetchDelayMs(base, { ...base, division: 'JV' })).toBe(0);
+  });
+
+  it('adopts a server page only when game/season differ from the rows shown', () => {
+    expect(shouldAdoptServerPage({ gameId: 'g1', seasonId: 's2' }, base)).toBe(true);
+    expect(shouldAdoptServerPage({ gameId: 'g2', seasonId: '' }, base)).toBe(true);
+    expect(shouldAdoptServerPage({ gameId: 'g1', seasonId: 's1' }, base)).toBe(false);
+  });
+
+  it('does not adopt a server page for filters the explorer itself just wrote', () => {
+    const own = { gameId: 'g2', seasonId: '' };
+    // select change to g2 pending (shown still g1/s1); a refresh for g2 must not reset local facets
+    expect(shouldAdoptServerPage({ gameId: 'g2', seasonId: '' }, base, own)).toBe(false);
+    // a navigation to different filters is still adopted
+    expect(shouldAdoptServerPage({ gameId: 'g1', seasonId: 's2' }, base, own)).toBe(true);
+    expect(shouldAdoptServerPage({ gameId: 'g2', seasonId: '' }, base, null)).toBe(true);
   });
 });

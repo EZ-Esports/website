@@ -9,9 +9,8 @@ const mocks = vi.hoisted(() => ({
   getRosterEditOptions: vi.fn(async (_id: string) => ({ members: [], games: [], seasons: [] })),
 }));
 vi.mock('@/app/(admin)/admin/schools/[schoolId]/rosters/actions', () => ({
-  createMember: vi.fn(), createRoster: vi.fn(), createRosterMember: vi.fn(), createTeam: vi.fn(),
-  deleteRoster: vi.fn(), deleteRosterMember: vi.fn(), updateMember: vi.fn(), updateRoster: vi.fn(),
-  updateRosterMember: vi.fn(),
+  createPlayer: vi.fn(), createRoster: vi.fn(), createTeam: vi.fn(),
+  deleteRoster: vi.fn(), deleteRosterMember: vi.fn(), updatePlayer: vi.fn(), updateRoster: vi.fn(),
 }));
 
 // Mirror the real helper: resolve the identity only when it holds the permission.
@@ -147,5 +146,34 @@ describe('SchoolRostersView markup', () => {
     expect(out).toContain('Main');
     expect(out).not.toContain('No JV team this season');
     expect(out).not.toContain('has no JV division');
+  });
+
+  it('hides the JV "Add roster" button for a no-JV game even when it has a legacy JV roster', () => {
+    const render = (gameSlug: string, gameName: string, rosters: { id: string; name: string; division: string; players: [] }[]) =>
+      renderToStaticMarkup(
+        <SchoolRostersView
+          schoolId={SCHOOL_ID}
+          schoolName="Test High"
+          blocks={buildSeasonBlocks([{
+            teamId: 't', gameId: 'g', gameSlug, gameName, seasonId: 's', seasonName: '2025-26',
+            seasonIsActive: true, rostersLockedAt: null, rosters,
+          }])}
+          options={NO_OPTIONS}
+          initialFilters={DEFAULT_FILTERS}
+        />,
+      );
+    const count = (s: string) => s.split('Add roster').length - 1;
+    const legacy = render('minecraft', 'Minecraft', [
+      { id: 'a', name: 'Main', division: 'A', players: [] },
+      { id: 'b', name: 'Old JV', division: 'B', players: [] },
+    ]);
+    expect(legacy).toContain('Old JV');
+    expect(count(legacy)).toBe(1); // Varsity only
+    // A game with a JV split keeps both buttons.
+    const split = render('valorant', 'Valorant', [
+      { id: 'a', name: 'Varsity', division: 'A', players: [] },
+      { id: 'b', name: 'JV', division: 'B', players: [] },
+    ]);
+    expect(count(split)).toBe(2);
   });
 });

@@ -1,6 +1,6 @@
 # spec-020 — Season roster lock
 
-**Status:** Shipped (PR #256, squash `125db67`, merged 18 Oct 2026; spec-019 / #255 and spec-018 / #252 merged earlier). Migration `0050` was applied to production on 18 Oct 2026. **Date:** 18 Oct 2026. **Note:** [spec-028](spec-028-manager-past-season-view-only.md) adds a separate view-only rule for past seasons, folded into the same guards (`allowPast` beside `allowLocked`); on a past season the view-only error is reported before the lock error. **Scope:** `seasons.rosters_locked_at` (migration `0050`), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService` / repository, League Setup, manager portal roster UI.
+**Status:** Shipped (PR #256, squash `125db67`, merged 18 Oct 2026; spec-019 / #255 and spec-018 / #252 merged earlier). Migration `0050` was applied to production on 18 Oct 2026. **Date:** 18 Oct 2026. **Note:** [spec-028](spec-028-manager-past-season-view-only.md) adds a separate view-only rule for inactive seasons, folded into the same guards (`allowInactive` beside `allowLocked`); on an inactive season the view-only error is reported before the lock error. **Scope:** `seasons.rosters_locked_at` (migration `0050`), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, League Setup, manager portal roster UI.
 
 **Migration `0050_season_rosters_locked` was applied to production on 18 Oct 2026**, after a full backup and before PR #256 merged (the code must not deploy before 0050: any `db.select().from(schema.seasons)`, for example `app/lib/db/league.ts`, selects the new column, so the public site and the staff admin would break, not just the portal). Verified afterwards with read-only queries: the column exists (nullable, no default), all 15 seasons are intact and none are locked.
 
@@ -36,7 +36,7 @@ Staff need to freeze a game's rosters mid-season (for example once the bracket o
 
 - **Best-effort at request start:** the lock is read when the guard runs, not held for the whole mutation. A request that passed the check just before staff locked can still commit. Closing that window needs a `FOR SHARE` read of the season row inside the mutation's transaction; not done.
 - **Lifecycle:** a new season starts unlocked (null column). Superseded by [spec-026](spec-026-manager-season-by-name.md): the lock is no longer dormant when a season is inactive; it applies to the manager's resolved season (by name), active or not. Locking is idempotent: a repeat lock keeps the first timestamp.
-- **Hexagonal path (unused by the app, kept consistent):** `findRosterById` returns `isSeasonLocked`, the new optional `isActiveSeasonLocked(gameId)` repository method (thin delegations to the DAL functions `getSeasonRosterState` and `isActiveSeasonRostersLocked` in `app/lib/db/onboarding-repository.ts`; the adapter holds no queries) backs the default-roster approval check, and `PortalService` refuses non-super-admin enroll / remove / role / swap / approve while locked.
+- **Hexagonal path:** removed. The unused `PortalService` and the repository methods that mirrored the lock were deleted on 22 Oct 2026 (see [spec-028](spec-028-manager-past-season-view-only.md)); the lock lives in `manager-auth.ts` only.
 
 ### Staff UI (Admin -> League Setup)
 
@@ -52,13 +52,13 @@ The portal reads seasons and rosters straight from the database on each request 
 
 ## Invariants
 
-- The lock is checked in `manager-auth.ts` only (plus the invite-approval default-roster branch and the hexagonal service). Do not re-implement it per action.
+- The lock is checked in `manager-auth.ts` only (plus the invite-approval default-roster branch). Do not re-implement it per action.
 - Reads must never call the lock check; pass `allowLocked: true` when a read needs `assertManagerForRoster`.
 - Staff admin bypass is the ADMINISTRATOR permission, as in spec-019.
 
 ## Verification
 
-`npx tsc --noEmit`, `npx vitest run`, `npm run lint`. Tests: `milestone3-portal-actions.test.ts` section 9 (every manager mutation refused while locked with no write and allowed while unlocked, unlock restores access, staff admin allowed while locked, per-game isolation, reads and scopes while locked, invite approval refused / reject allowed / admin allowed), `portal-service-lock.test.ts` (hexagonal), `league/__tests__/season-lock-actions.test.ts` (MANAGE_LEAGUE required, set/clear, tags, result shape), `db/__tests__/season-rosters-locked-migration.test.ts`, and the opt-in `season-lock-local-db.test.ts` (`LOCAL_SEASON_DB_TEST=1` with a loopback `DATABASE_URL`; run once against `ezesports_test` after applying 0050). Not verified: the UI in a browser; `npm run build`.
+`npx tsc --noEmit`, `npx vitest run`, `npm run lint`. Tests: `milestone3-portal-actions.test.ts` section 9 (every manager mutation refused while locked with no write and allowed while unlocked, unlock restores access, staff admin allowed while locked, per-game isolation, reads and scopes while locked, invite approval refused / reject allowed / admin allowed), `league/__tests__/season-lock-actions.test.ts` (MANAGE_LEAGUE required, set/clear, tags, result shape), `db/__tests__/season-rosters-locked-migration.test.ts`, and the opt-in `season-lock-local-db.test.ts` (`LOCAL_SEASON_DB_TEST=1` with a loopback `DATABASE_URL`; run once against `ezesports_test` after applying 0050). Not verified: the UI in a browser; `npm run build`.
 
 ## Open
 

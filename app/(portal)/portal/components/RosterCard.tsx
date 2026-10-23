@@ -16,7 +16,7 @@ import type {
 
 interface RosterCardProps {
   roster: SchoolRosterDetails;
-  /** The roster's season is locked by staff or is a past (view-only) season: every change control is disabled. */
+  /** The roster's season is locked by staff or is an inactive (view-only) season: every change control is disabled. */
   locked?: boolean;
   gateResult?: RosterEligibilityResult;
   isEvaluating: boolean;

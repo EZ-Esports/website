@@ -331,7 +331,8 @@ function ColumnView({ column, block, className }: { column: DivisionColumn; bloc
     <div className={cx('min-w-0 space-y-3', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-foreground">{column.division}</h4>
-        {column.supported && <AddRosterControl block={block} division={column.division} />}
+        {/* No JV split for this game: never offer JV creation, even if a legacy JV roster exists (server refuses it). */}
+        {column.supported && (column.division === 'Varsity' || block.jvSupported) && <AddRosterControl block={block} division={column.division} />}
       </div>
       {column.missing ? (
         <Placeholder>{column.supported ? `No ${column.division} team this season` : 'No JV for this season'}</Placeholder>

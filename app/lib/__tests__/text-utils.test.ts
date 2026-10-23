@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slugify, safeUrl, sanitizeDbError, isValidEmail } from '../text-utils';
+import { slugify, safeUrl, sanitizeDbError, dbErrorChain, isValidEmail } from '../text-utils';
 
 // ---------------------------------------------------------------------------
 // slugify
@@ -94,6 +94,52 @@ describe('sanitizeDbError', () => {
   it('handles non-object errors gracefully', () => {
     expect(sanitizeDbError('plain string error')).toMatch(/unexpected error/i);
     expect(sanitizeDbError(null)).toMatch(/unexpected error/i);
+    expect(sanitizeDbError(undefined)).toMatch(/unexpected error/i);
+  });
+
+  it('reads the Postgres code from a wrapped error (DrizzleQueryError-shaped, code on .cause)', () => {
+    const wrapped = Object.assign(new Error('Failed query: insert ...'), { cause: { code: '23505', constraint_name: 'x' } });
+    expect(sanitizeDbError(wrapped)).toBe('A record with this information already exists.');
+  });
+
+  it('lets a top-level code win over a nested one', () => {
+    const err = { code: '23503', cause: { code: '23505' } };
+    expect(sanitizeDbError(err)).toMatch(/linked to other data/);
+  });
+
+  it('terminates on a cyclic cause chain', () => {
+    const a: { cause?: unknown } = {};
+    a.cause = a;
+    expect(sanitizeDbError(a)).toMatch(/unexpected error/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbErrorChain
+// ---------------------------------------------------------------------------
+describe('dbErrorChain', () => {
+  it('returns the error followed by its causes, outermost first', () => {
+    const inner = { code: '23505' };
+    const mid = { cause: inner };
+    const outer = { cause: mid };
+    expect(dbErrorChain(outer)).toEqual([outer, mid, inner]);
+  });
+
+  it('is bounded for cyclic causes', () => {
+    const a: { cause?: unknown } = {};
+    a.cause = a;
+    expect(dbErrorChain(a)).toHaveLength(5);
+  });
+
+  it('returns an empty chain for null, undefined and other falsy input', () => {
+    expect(dbErrorChain(null)).toEqual([]);
+    expect(dbErrorChain(undefined)).toEqual([]);
+    expect(dbErrorChain('')).toEqual([]);
+  });
+
+  it('wraps non-object input without throwing', () => {
+    expect(dbErrorChain('boom')).toEqual(['boom']);
+    expect(dbErrorChain(42)).toEqual([42]);
   });
 });
 

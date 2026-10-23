@@ -5,7 +5,7 @@ import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { and, count, eq, or, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
-import { sanitizeDbError } from '@/app/lib/text-utils';
+import { dbErrorChain, sanitizeDbError } from '@/app/lib/text-utils';
 import { memberInSchool, playerInSchool, rosterInSchool, teamInSchool } from '@/app/lib/db/roster-scope';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
 import { toHubDivision, type CanonicalDivision } from '@/app/lib/db/match-page';
@@ -56,63 +56,6 @@ function parseDivision(value: string): CanonicalDivision | null {
   if (value === 'JV' || value === 'B') return 'JV';
   if (value === 'All') return 'All';
   return null;
-}
-
-// --- MEMBER ACTIONS ---
-
-export async function createMember(schoolId: string, formData: FormData) {
-  await requireRosterPermission();
-  if (!UUID.test(schoolId)) return BAD_SCHOOL;
-  try {
-    const firstName = text(formData, 'firstName');
-    const lastName = text(formData, 'lastName');
-    const discord = text(formData, 'discord');
-    const gradYear = parseGradYear(text(formData, 'graduationYear'));
-
-    if (!firstName || !lastName) return { success: false, error: 'First and last name are required.' };
-    if (gradYear === 'invalid') return { success: false, error: 'Class year must be a four-digit year.' };
-
-    const [member] = await db
-      .insert(schema.members)
-      .values({ firstName, lastName, schoolId, discord: discord || null, graduationYear: gradYear })
-      .returning({ id: schema.members.id });
-
-    updateTag('members');
-    refreshSchoolRosters(schoolId);
-    return { success: true, memberId: member.id };
-  } catch (error: unknown) {
-    console.error(error);
-    return { success: false, error: sanitizeDbError(error) };
-  }
-}
-
-/** Edits name, Discord and class year only. Email and the school are never touched here. */
-export async function updateMember(schoolId: string, memberId: string, formData: FormData) {
-  await requireRosterPermission();
-  if (!UUID.test(schoolId)) return BAD_SCHOOL;
-  try {
-    const firstName = text(formData, 'firstName');
-    const lastName = text(formData, 'lastName');
-    const discord = text(formData, 'discord');
-    const gradYear = parseGradYear(text(formData, 'graduationYear'));
-
-    if (!firstName || !lastName) return { success: false, error: 'First and last name are required.' };
-    if (gradYear === 'invalid') return { success: false, error: 'Class year must be a four-digit year.' };
-    if (!(await memberInSchool(memberId, schoolId))) return NOT_FOUND;
-
-    await db
-      .update(schema.members)
-      .set({ firstName, lastName, discord: discord || null, graduationYear: gradYear })
-      .where(eq(schema.members.id, memberId));
-
-    updateTag('members');
-    updateTag('rosters');
-    refreshSchoolRosters(schoolId);
-    return { success: true };
-  } catch (error: unknown) {
-    console.error(error);
-    return { success: false, error: sanitizeDbError(error) };
-  }
 }
 
 // --- TEAM ACTIONS ---
@@ -262,13 +205,27 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
 // The partial unique index players_roster_one_captain_idx allows only one captain
 // per roster; translate its violation into actionable guidance.
 function isCaptainConflict(error: unknown): boolean {
-  const e = error as { constraint_name?: string; message?: string };
-  return e?.constraint_name === 'players_roster_one_captain_idx'
-    || (typeof e?.message === 'string' && e.message.includes('players_roster_one_captain_idx'));
+  // drizzle wraps the driver error: the Postgres error is on `.cause`, so check the whole chain.
+  return dbErrorChain(error).some((err) => {
+    const e = err as { constraint_name?: string; message?: string };
+    return e?.constraint_name === 'players_roster_one_captain_idx'
+      || (typeof e?.message === 'string' && e.message.includes('players_roster_one_captain_idx'));
+  });
 }
 const CAPTAIN_CONFLICT_MSG = 'This roster already has a captain. Demote the current captain before assigning a new one.';
 
-export async function createRosterMember(schoolId: string, formData: FormData) {
+/** Failure for the one-save player actions: nothing was committed, and the toast says so. */
+function playerFail(error: string) {
+  return { success: false as const, error: `${error} Nothing was saved.` };
+}
+
+/**
+ * Adds a player to a roster in ONE save. The form either names an existing school member
+ * (`memberId`) or carries new-member fields (`firstName`, `lastName`, `discord`, `graduationYear`);
+ * the member insert and the player insert share one transaction, so a failed player insert
+ * (duplicate member on the roster, a second captain) leaves no orphan member behind.
+ */
+export async function createPlayer(schoolId: string, formData: FormData) {
   await requireRosterPermission();
   if (!UUID.test(schoolId)) return BAD_SCHOOL;
   try {
@@ -276,56 +233,103 @@ export async function createRosterMember(schoolId: string, formData: FormData) {
     const memberId = text(formData, 'memberId');
     const role = parseRole(text(formData, 'role'));
     const ign = text(formData, 'ign');
+    const firstName = text(formData, 'firstName');
+    const lastName = text(formData, 'lastName');
+    const discord = text(formData, 'discord');
+    const gradYear = parseGradYear(text(formData, 'graduationYear'));
 
-    if (!rosterId || !memberId || !role) return { success: false, error: 'Roster, Member, and Role are required.' };
+    if (!rosterId || !role) return playerFail('Roster and Role are required.');
+    if (!memberId) {
+      if (!firstName || !lastName) return playerFail('Pick a member, or enter a first and last name.');
+      if (gradYear === 'invalid') return playerFail('Class year must be a four-digit year.');
+    }
 
-    // Both the roster and the member must belong to this school.
-    if (!(await rosterInSchool(rosterId, schoolId)) || !(await memberInSchool(memberId, schoolId))) return NOT_FOUND;
+    const outcome = await db.transaction(async (tx) => {
+      // The roster and any existing member must belong to this school.
+      if (!(await rosterInSchool(rosterId, schoolId, tx))) return 'not-found' as const;
+      if (memberId && !(await memberInSchool(memberId, schoolId, tx))) return 'not-found' as const;
 
-    await db.insert(schema.players).values({
-      rosterId,
-      memberId,
-      role,
-      ign: ign || null,
-      // Captain is a role, not a separate flag. Keep the boolean in sync so any
-      // consumer reading isCaptain agrees with the displayed role.
-      isCaptain: role === 'captain',
+      let memberIdToUse = memberId;
+      if (!memberId) {
+        const [member] = await tx
+          .insert(schema.members)
+          .values({ firstName, lastName, schoolId, discord: discord || null, graduationYear: gradYear as number | null })
+          .returning({ id: schema.members.id });
+        memberIdToUse = member.id;
+      }
+
+      await tx.insert(schema.players).values({
+        rosterId,
+        memberId: memberIdToUse,
+        role,
+        ign: ign || null,
+        // Captain is a role, not a separate flag. Keep the boolean in sync so any
+        // consumer reading isCaptain agrees with the displayed role.
+        isCaptain: role === 'captain',
+      });
+      return 'ok' as const;
     });
+    if (outcome === 'not-found') return playerFail(NOT_FOUND.error);
 
+    if (!memberId) updateTag('members');
     updateTag('players');
     updateTag('rosters');
     refreshSchoolRosters(schoolId);
-    return { success: true };
+    return { success: true as const };
   } catch (error: unknown) {
     console.error(error);
-    if (isCaptainConflict(error)) return { success: false, error: CAPTAIN_CONFLICT_MSG };
-    return { success: false, error: 'Failed to register player. Note: A member can only be registered once per roster.' };
+    if (isCaptainConflict(error)) return playerFail(CAPTAIN_CONFLICT_MSG);
+    return playerFail('Failed to register player. Note: A member can only be registered once per roster.');
   }
 }
 
-export async function updateRosterMember(schoolId: string, playerId: string, formData: FormData) {
+/**
+ * Edits a player in ONE save: role and in-game name (this roster) plus the member's name, Discord
+ * and class year. The member is derived from the player row, never taken from the form, and both
+ * updates share one transaction so a failed role change (a second captain) does not leave the
+ * member details half-edited. Email and the school are never touched.
+ */
+export async function updatePlayer(schoolId: string, playerId: string, formData: FormData) {
   await requireRosterPermission();
   if (!UUID.test(schoolId)) return BAD_SCHOOL;
   try {
     const role = parseRole(text(formData, 'role'));
     const ign = text(formData, 'ign');
-    if (!role) return { success: false, error: 'Pick a valid role.' };
-    if (!(await playerInSchool(playerId, schoolId))) return NOT_FOUND;
+    const firstName = text(formData, 'firstName');
+    const lastName = text(formData, 'lastName');
+    const discord = text(formData, 'discord');
+    const gradYear = parseGradYear(text(formData, 'graduationYear'));
 
-    await db
-      .update(schema.players)
-      // Captaincy is derived from the role so the two never disagree.
-      .set({ role, ign: ign || null, isCaptain: role === 'captain' })
-      .where(eq(schema.players.id, playerId));
+    if (!role) return playerFail('Pick a valid role.');
+    if (!firstName || !lastName) return playerFail('First and last name are required.');
+    if (gradYear === 'invalid') return playerFail('Class year must be a four-digit year.');
 
+    const outcome = await db.transaction(async (tx) => {
+      const player = await playerInSchool(playerId, schoolId, tx);
+      if (!player || !(await memberInSchool(player.memberId, schoolId, tx))) return 'not-found' as const;
+
+      await tx
+        .update(schema.players)
+        // Captaincy is derived from the role so the two never disagree.
+        .set({ role, ign: ign || null, isCaptain: role === 'captain' })
+        .where(eq(schema.players.id, playerId));
+      await tx
+        .update(schema.members)
+        .set({ firstName, lastName, discord: discord || null, graduationYear: gradYear })
+        .where(eq(schema.members.id, player.memberId));
+      return 'ok' as const;
+    });
+    if (outcome === 'not-found') return playerFail(NOT_FOUND.error);
+
+    updateTag('members');
     updateTag('players');
     updateTag('rosters');
     refreshSchoolRosters(schoolId);
-    return { success: true };
+    return { success: true as const };
   } catch (error: unknown) {
     console.error(error);
-    if (isCaptainConflict(error)) return { success: false, error: CAPTAIN_CONFLICT_MSG };
-    return { success: false, error: sanitizeDbError(error) };
+    if (isCaptainConflict(error)) return playerFail(CAPTAIN_CONFLICT_MSG);
+    return playerFail(sanitizeDbError(error));
   }
 }
 

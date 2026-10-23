@@ -1,6 +1,6 @@
 # spec-019 — Manager portal season scope and `YYYY-YY` season names
 
-**Status:** Season rule superseded by [spec-026](spec-026-manager-season-by-name.md) (22 Oct 2026). Originally: In Review (branch `fix/manager-portal-season-scope`, PR TBD). **Date:** 17 Oct 2026. **Issue:** #230. **Scope:** `app/lib/season-name.ts`, `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, hexagonal `PortalService`, League Setup, join wizard, admin manager tabs, portal page. No migration.
+**Status:** Season rule superseded by [spec-026](spec-026-manager-season-by-name.md) (22 Oct 2026). Originally: In Review (branch `fix/manager-portal-season-scope`, PR TBD). **Date:** 17 Oct 2026. **Issue:** #230. **Scope:** `app/lib/season-name.ts`, `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, League Setup, join wizard, admin manager tabs, portal page. No migration.
 
 ## Context & motivation
 
@@ -15,17 +15,17 @@ A school manager could see and edit rosters, invites and enrollments from every 
 - **Staff admin bypass:** the ADMINISTRATOR permission (via `calculateEffectiveStaffAccess`) is checked first, before manager rows, so an admin who also holds a manager row still gets `isStaffAdmin: true`, every school and every season. Deliberately NOT "any `staff_members` row": managers can get role-less staff rows (#233) and that would leak. `allowStaffAdmin: false` still forces manager scoping.
 - **Enforcement points:** `assertManagerForSchool(schoolId, gameId)` applies the matching rule whenever a game is given; `assertManagerForRoster` additionally requires `team.seasonId` to be the game's active season (past-season rosters are refused for delete, enroll, remove, role change, emergency swap, eligibility). Reads: `getSchoolRosters` filters `teams.season_id` to the managed games' active seasons (and returns `seasonId` / `seasonName`); `getSchoolPlayerPool` only shows enrollments in those seasons; `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages. `reviewPlayerInvite`'s default roster lookup uses the active season's team only.
 - **`createSchoolRoster`:** no fallback to the latest season and no season auto-creation; no active season is an error. `updateTag` / `CACHE_TAGS` behaviour unchanged.
-- **Hexagonal path** (unused by the app, kept consistent): `findSchoolRosters(..., {activeSeasonOnly})`, `findRosterById` returns `isActiveSeason`, and `PortalService` refuses non-super-admin mutations on past-season rosters.
+- **Hexagonal path:** removed. The unused `PortalService` / repository-port mirror of these rules was deleted on 22 Oct 2026 (see [spec-028](spec-028-manager-past-season-view-only.md)); the live guards in `manager-auth.ts` / `portal-actions.ts` are the only implementation.
 - **UI:** the portal header shows `Season 2026-27`; a manager with no matching active season sees a "No Managed Season" card; the game tabs list only managed games. Staff admins see no season chip and all games.
 
 ## Invariants & boundaries
 
 - Season names are `YYYY-YY`; never reintroduce `YYYY-YYYY` or a conversion helper.
-- Portal season access = equality between the manager row and a season name of the game. **Superseded by [spec-026](spec-026-manager-season-by-name.md):** the season is resolved by name regardless of `is_active` (this spec's "active season only" rule no longer holds; the "Matching rule", "Enforcement points" and hexagonal bullets above describe the pre-026 behavior).
+- Portal season access = equality between the manager row and a season name of the game. **Superseded by [spec-026](spec-026-manager-season-by-name.md):** the season is resolved by name regardless of `is_active` (this spec's "active season only" rule no longer holds; the "Matching rule", "Enforcement points" and hexagonal-path bullets above describe the pre-026 behavior).
 - Staff admin = ADMINISTRATOR permission, not a `staff_members` row.
 - **Not scoped (decision for the user):** `player_invites` has no season column. Invites are limited to currently managed games, not to one season, so a manager still sees past-season invites for a game they currently manage. Scoping by `created_at >= season.created_at` was rejected as unsound (a season row is often created or activated well before or after its invites). Fix options: add `player_invites.season_id` (needs a migration) or derive it from the draft/roster.
 - Other places that read rosters without the manager context (public site, staff admin) are unaffected.
 
 ## Verification
 
-`npx tsc --noEmit`, `npx vitest run`, `npm run lint`. Tests: `app/lib/__tests__/season-name.test.ts` (validator), `milestone3-portal-actions.test.ts` section 8 (matching rule, multi-row, per-game, no active season, staff admin with a manager row sees all, past-season mutations refused, rosters / pool scoped, `createSchoolRoster` errors without an active season), `portal-service-season.test.ts` (hexagonal), `app/(admin)/admin/league/__tests__/season-actions.test.ts`, plus updated wizard and staff-manager tests for the new format. Manual: League Setup season name is a text input that rejects bad formats; join wizard season options read `2026-27`.
+`npx tsc --noEmit`, `npx vitest run`, `npm run lint`. Tests: `app/lib/__tests__/season-name.test.ts` (validator), `milestone3-portal-actions.test.ts` section 8 (matching rule, multi-row, per-game, no active season, staff admin with a manager row sees all, past-season mutations refused, rosters / pool scoped, `createSchoolRoster` errors without an active season), `app/(admin)/admin/league/__tests__/season-actions.test.ts`, plus updated wizard and staff-manager tests for the new format. Manual: League Setup season name is a text input that rejects bad formats; join wizard season options read `2026-27`.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
 import { HiArrowsUpDown, HiOutlineCalendarDays } from 'react-icons/hi2';
@@ -32,9 +33,28 @@ import { cx } from '@/app/lib/cx';
 import { fetchStaffMatchesPage } from '@/app/lib/match-actions';
 import type { MatchCursor, MatchPageItemDto, MatchPageResponse } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
-import { MATCHES_ORIGIN_PARAM, matchFilterQuery, nextFiltersOnSeasonChange } from '@/app/lib/admin-season-filters';
+import {
+  DEFAULT_MATCH_FACETS,
+  matchFacetsKey,
+  matchFetchDelayMs,
+  nextMatchFilterSearch,
+  parseMatchFilterParams,
+  shouldAdoptServerPage,
+  type MatchFacets,
+  type MatchFilterChange,
+} from '@/app/lib/admin-season-filters';
 
 const PAGE_SIZE = 25;
+
+const pageRequest = (f: MatchFacets) => ({
+  gameId: f.gameId || undefined,
+  seasonId: f.seasonId || undefined,
+  division: f.division || undefined,
+  status: f.status || undefined,
+  search: f.search || undefined,
+  sort: f.sort,
+  limit: PAGE_SIZE,
+});
 
 /** "Wed, Sep 23, 2026" in Eastern time: the fixtures column has no room for the long month name. */
 const shortDate = new Intl.DateTimeFormat('en-US', {
@@ -61,20 +81,25 @@ interface Game {
 interface AdminMatchExplorerProps {
   seasons: Season[];
   games: Game[];
+  /** Server's first page for the URL's validated filters; replaced on each server render. */
   initialPage: MatchPageResponse;
-  /** Game / season selected by the URL (already validated server-side); '' = all. */
-  initialGameId?: string;
-  initialSeasonId?: string;
+  /** The validated game/season `initialPage` was loaded for. */
+  initialFilters: { gameId: string; seasonId: string };
 }
 
 /**
- * Server-driven match manager: facet changes and pagination go through the
- * fetchStaffMatchesPage action instead of shipping every match to the client.
- * Inline score/status editing and deletion are preserved per row.
+ * Game and season come from the address (`?game=&season=`), validated by
+ * parseMatchFilterParams: picking one rewrites the URL (history.replaceState, no
+ * server re-render), links change it, and the component only reads it. Division,
+ * status, search and sort are local. Facet changes and pagination go through
+ * fetchStaffMatchesPage. Inline score/status editing and deletion are per row.
  */
-export default function AdminMatchExplorer({ seasons, games, initialPage, initialGameId = '', initialSeasonId = '' }: AdminMatchExplorerProps) {
-  const [gameId, setGameId] = useState(initialGameId);
-  const [seasonId, setSeasonId] = useState(initialSeasonId);
+export default function AdminMatchExplorer({ seasons, games, initialPage, initialFilters }: AdminMatchExplorerProps) {
+  const searchParams = useSearchParams();
+  const { gameId, seasonId } = useMemo(
+    () => parseMatchFilterParams({ game: searchParams.get('game') ?? undefined, season: searchParams.get('season') ?? undefined }, games, seasons),
+    [searchParams, games, seasons]
+  );
   const [division, setDivision] = useState('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -82,64 +107,111 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
 
   const [items, setItems] = useState<MatchPageItemDto[]>(initialPage.items);
   const [cursor, setCursor] = useState<MatchCursor | null>(initialPage.nextCursor);
+  // The facets `items` were loaded for; differs from `facets` while a refetch is pending.
+  const [loaded, setLoaded] = useState<MatchFacets>({ ...DEFAULT_MATCH_FACETS, ...initialFilters });
+  const [seenPage, setSeenPage] = useState(initialPage);
+  // Game/season this component itself wrote to the URL via a select while its fetch is pending;
+  // a server refresh landing for exactly those filters must not reset the local facets.
+  const [ownWrite, setOwnWrite] = useState<{ gameId: string; seasonId: string } | null>(null);
+  // Key of the requested facets whose refetch failed; the old rows and `loaded` stay as they were.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
   const [isLoading, startLoading] = useTransition();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // A link navigation re-renders the server page with a new initialPage for the new URL
+  // filters: show it now (no stale rows, no refetch) and reset local facets as a remount
+  // would. Select changes use replaceState, so they never get here; a refresh for the
+  // filters already shown is ignored.
+  if (seenPage !== initialPage) {
+    setSeenPage(initialPage);
+    if (shouldAdoptServerPage(initialFilters, loaded, ownWrite)) {
+      setDivision(DEFAULT_MATCH_FACETS.division);
+      setStatus(DEFAULT_MATCH_FACETS.status);
+      setSearch(DEFAULT_MATCH_FACETS.search);
+      setSort(DEFAULT_MATCH_FACETS.sort);
+      setItems(initialPage.items);
+      setCursor(initialPage.nextCursor);
+      setLoaded({ ...DEFAULT_MATCH_FACETS, ...initialFilters });
+      setLoadError(null);
+      setOwnWrite(null);
+    }
+  }
 
   const seasonMap = useMemo(() => new Map(seasons.map((s) => [s.id, s])), [seasons]);
   const gameMap = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
   const seasonOptions = gameId ? seasons.filter((s) => s.gameId === gameId) : seasons;
 
-  const request = useMemo(
-    () => ({
-      gameId: gameId || undefined,
-      seasonId: seasonId || undefined,
-      division: division || undefined,
-      status: status || undefined,
-      search: search || undefined,
-      sort,
-      limit: PAGE_SIZE,
-    }),
+  const facets = useMemo<MatchFacets>(
+    () => ({ gameId, seasonId, division, status, search, sort }),
     [gameId, seasonId, division, status, search, sort]
   );
+  const facetsKey = matchFacetsKey(facets);
+  const isStale = facetsKey !== matchFacetsKey(loaded);
+  // Changing any filter changes the key, so a failure never outlives the request it belongs to.
+  const refetchFailed = isStale && loadError === facetsKey;
+  const isRefetching = isLoading || (isStale && !refetchFailed);
+  // Rows of another game/season are hidden (skeleton); other facet changes just dim them.
+  const scopeStale = loaded.gameId !== gameId || loaded.seasonId !== seasonId;
 
-  // Mirror the game / season selection into the URL (no navigation, so no
-  // server refetch) so a reload or a copied link lands on the same view.
-  useEffect(() => {
-    const params = new URLSearchParams(matchFilterQuery(gameMap.get(gameId)?.slug, seasonId));
-    // Keep the League Setup origin so the back arrow survives a reload.
-    const origin = new URLSearchParams(window.location.search).get(MATCHES_ORIGIN_PARAM);
-    if (origin) params.set(MATCHES_ORIGIN_PARAM, origin);
-    const qs = params.toString();
-    const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
-    if (url !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
-      window.history.replaceState(window.history.state, '', url);
-    }
-  }, [gameId, seasonId, gameMap]);
+  // Write a filter change to the address. Computed from the live location (not the rendered
+  // searchParams) so rapid successive changes build on each other and the last choice wins.
+  // Next syncs history.replaceState into useSearchParams without re-running the server page.
+  const writeFilter = (change: MatchFilterChange) => {
+    const qs = nextMatchFilterSearch(window.location.search, change, games, seasons);
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+    const sp = new URLSearchParams(qs);
+    setOwnWrite(parseMatchFilterParams({ game: sp.get('game') ?? undefined, season: sp.get('season') ?? undefined }, games, seasons));
+  };
 
-  // Reload page 1 whenever facets change (debounced for the search box).
-  const isFirstRender = useRef(true);
+  // Reload page 1 when the requested facets differ from the loaded ones (only the search
+  // box is debounced). Every run bumps fetchSeq, so responses from superseded requests
+  // and in-flight "Load more" calls are discarded. A failed refetch leaves rows, cursor and
+  // `loaded` untouched (so requested != loaded keeps the stale state visible) and records the
+  // failure; the Retry button bumps retryTick to run the effect again for the same facets.
+  const fetchSeq = useRef(0);
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+    const seq = ++fetchSeq.current;
+    if (matchFacetsKey(facets) === matchFacetsKey(loaded)) return;
     const timer = setTimeout(() => {
       startLoading(async () => {
-        const page = await fetchStaffMatchesPage(request);
-        setItems(page.items);
-        setCursor(page.nextCursor);
+        try {
+          const page = await fetchStaffMatchesPage(pageRequest(facets));
+          if (seq !== fetchSeq.current) return;
+          setItems(page.items);
+          setCursor(page.nextCursor);
+          setLoaded(facets);
+          setLoadError(null);
+          setOwnWrite(null);
+        } catch {
+          if (seq !== fetchSeq.current) return;
+          setLoadError(matchFacetsKey(facets));
+          setToast({ message: 'Could not load matches.', type: 'error' });
+        }
       });
-    }, 300);
+    }, matchFetchDelayMs(loaded, facets));
     return () => clearTimeout(timer);
-  }, [request]);
+  }, [facets, loaded, retryTick]);
+
+  const retry = () => {
+    setToast(null);
+    setLoadError(null);
+    setRetryTick((n) => n + 1);
+  };
 
   const loadMore = () => {
-    if (!cursor) return;
+    if (!cursor || isStale) return;
+    const seq = fetchSeq.current;
     startLoading(async () => {
-      const page = await fetchStaffMatchesPage({ ...request, cursor });
-      setItems((prev) => [...prev, ...page.items]);
-      setCursor(page.nextCursor);
+      try {
+        const page = await fetchStaffMatchesPage({ ...pageRequest(loaded), cursor });
+        if (seq !== fetchSeq.current) return; // filters changed while loading
+        setItems((prev) => [...prev, ...page.items]);
+        setCursor(page.nextCursor);
+      } catch {
+        if (seq === fetchSeq.current) setToast({ message: 'Could not load more matches.', type: 'error' });
+      }
     });
   };
 
@@ -170,18 +242,6 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
     });
   };
 
-  const handleSeasonChange = (id: string) => {
-    const next = nextFiltersOnSeasonChange(id, gameId, seasons);
-    setGameId(next.gameId);
-    setSeasonId(next.seasonId);
-  };
-
-  const handleGameChange = (id: string) => {
-    setGameId(id);
-    // Reset the season facet if it belongs to a different game.
-    if (id && seasonId && seasonMap.get(seasonId)?.gameId !== id) setSeasonId('');
-  };
-
   const scoreInput =
     'h-8 w-8 rounded-md border border-line/70 bg-surface-sunken text-center text-sm font-semibold tabular-nums text-foreground transition-[border-color,box-shadow] duration-150 hover:border-line focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/15';
 
@@ -205,14 +265,14 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
         }
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
-            <select aria-label="Game" value={gameId} onChange={(e) => handleGameChange(e.target.value)} className={selectClass}>
+            <select aria-label="Game" value={gameId} onChange={(e) => writeFilter({ game: e.target.value })} className={selectClass}>
               <option value="">All games</option>
               {games.map((g) => (
                 <option key={g.id} value={g.id}>{g.shortName}</option>
               ))}
             </select>
 
-            <select aria-label="Season" value={seasonId} onChange={(e) => handleSeasonChange(e.target.value)} className={selectClass}>
+            <select aria-label="Season" value={seasonId} onChange={(e) => writeFilter({ season: e.target.value })} className={selectClass}>
               <option value="">All seasons</option>
               {seasonOptions.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -247,7 +307,7 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
               {sort === 'desc' ? 'Newest first' : 'Oldest first'}
             </button>
 
-            {isLoading && (
+            {isRefetching && (
               <span role="status" className="ml-auto inline-flex items-center gap-1.5 text-xs text-foreground-secondary">
                 <AdminSpinner /> Loading…
               </span>
@@ -255,15 +315,21 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
           </div>
         }
       >
-        {items.length === 0 ? (
-          isLoading ? (
+        {refetchFailed && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-line/60 bg-surface-sunken px-5 py-3 text-sm text-foreground">
+            <span>Could not load matches for these filters.{scopeStale ? '' : ' Showing the previous results.'}</span>
+            <button type="button" onClick={retry} className={secondaryBtnSm}>Retry</button>
+          </div>
+        )}
+        {scopeStale || items.length === 0 ? (
+          (scopeStale || isLoading || isStale) && !refetchFailed ? (
             <AdminSkeletonRows rows={5} />
-          ) : (
+          ) : scopeStale ? null : (
             <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="No matches found for these filters." />
           )
         ) : (
           // Dimmed (not hidden) while a filter change loads, so the layout never jumps.
-          <div className={cx(tableWrap, 'transition-opacity duration-200', isLoading && 'opacity-60')} aria-busy={isLoading}>
+          <div className={cx(tableWrap, 'transition-opacity duration-200', (isLoading || isStale) && 'opacity-60')} aria-busy={isRefetching}>
             <table className={table}>
               <thead>
                 <tr className={theadRow}>
@@ -379,13 +445,13 @@ export default function AdminMatchExplorer({ seasons, games, initialPage, initia
         )}
 
         <div className="flex items-center justify-center border-t border-line/60 px-5 py-4">
-          {cursor ? (
-            <button type="button" onClick={loadMore} disabled={isLoading} aria-busy={isLoading} className={secondaryBtnSm}>
+          {scopeStale ? null : cursor ? (
+            <button type="button" onClick={loadMore} disabled={isLoading || isStale} aria-busy={isLoading} className={secondaryBtnSm}>
               <PendingLabel pending={isLoading} label={`Load ${PAGE_SIZE} more`} pendingLabel="Loading…" />
             </button>
           ) : (
             <span className="text-xs text-foreground-secondary">
-              {items.length > 0 ? 'All matching fixtures loaded' : ''}
+              {items.length > 0 && !scopeStale ? 'All matching fixtures loaded' : ''}
             </span>
           )}
         </div>

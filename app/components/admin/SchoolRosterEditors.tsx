@@ -3,15 +3,13 @@
 import { createContext, useContext, useState, useTransition, type FormEvent, type ReactNode } from 'react';
 import { FiPlus } from 'react-icons/fi';
 import {
-  createMember,
+  createPlayer,
   createRoster,
-  createRosterMember,
   createTeam,
   deleteRoster,
   deleteRosterMember,
-  updateMember,
+  updatePlayer,
   updateRoster,
-  updateRosterMember,
 } from '@/app/(admin)/admin/schools/[schoolId]/rosters/actions';
 import { toHubDivision } from '@/app/lib/db/match-page';
 import type { RosterEditOptions, RosterViewPlayer, RosterViewRoster, SeasonBlock } from '@/app/lib/school-roster-view';
@@ -259,19 +257,8 @@ export function AddPlayerPanel({ roster, onClose }: { roster: RosterViewRoster; 
     e.preventDefault();
     const data = fd(e.currentTarget);
     data.set('rosterId', roster.id);
-    if (mode === 'existing') {
-      run(() => createRosterMember(schoolId, data), 'Player added.', onClose);
-      return;
-    }
-    run(async () => {
-      const created = await createMember(schoolId, data);
-      if (!created.success || typeof created.memberId !== 'string') return created;
-      data.set('memberId', created.memberId);
-      const added = await createRosterMember(schoolId, data);
-      return added.success
-        ? added
-        : { success: false, error: `Member created, but adding them to the roster failed: ${added.error} Add them from "Existing member".` };
-    }, 'Player added.', onClose);
+    // One server action, one transaction: a new member is only kept if the player is added too.
+    run(() => createPlayer(schoolId, data), 'Player added.', onClose);
   };
 
   return (
@@ -336,11 +323,7 @@ export function PlayerEditForm({ player, rosterName, onClose }: { player: Roster
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = fd(e.currentTarget);
-    run(async () => {
-      const roleRes = await updateRosterMember(schoolId, player.id, data);
-      if (!roleRes.success) return roleRes;
-      return updateMember(schoolId, player.memberId, data);
-    }, 'Player updated.', onClose);
+    run(() => updatePlayer(schoolId, player.id, data), 'Player updated.', onClose);
   };
   return (
     <form onSubmit={submit} aria-label={`Edit ${player.name} on ${rosterName}`} className="admin-fade-in flex flex-wrap items-end gap-3 py-2">

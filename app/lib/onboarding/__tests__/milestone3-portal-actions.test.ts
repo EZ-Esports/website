@@ -1273,15 +1273,16 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       ).rejects.toThrow(/season for this game does not exist/);
     });
 
-    it('creates in an inactive (upcoming) season when its name matches the affiliation', async () => {
+    it('refuses to create in an inactive season even when it is newer than the active one (view-only, spec-028)', async () => {
       mocks.state.seasonsStore = [
         { id: 'season-25', gameId: valGameId, name: '2025-26', isActive: true },
         { id: 'season-26', gameId: valGameId, name: '2026-27', isActive: false },
       ];
       mocks.state.teamsStore = [];
-      const res = await createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alpha Team' });
-      expect(res.success).toBe(true);
-      expect(mocks.state.teamsStore[0].seasonId).toBe('season-26');
+      await expect(
+        createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alpha Team' })
+      ).rejects.toThrow(/2026-27 is an inactive season and is view-only/);
+      expect(mocks.state.teamsStore).toHaveLength(0);
     });
 
     it('rejects roster creation if user does not manage the target school (Anti-IDOR / Tenancy check)', async () => {
@@ -1444,16 +1445,19 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       });
     });
 
-    it('an upcoming INACTIVE season is visible and editable when its name matches the affiliation', async () => {
-      // The newer season is inactive and the older one is active: the manager's 2026-27 is upcoming.
+    it('an inactive season NEWER than the active one is visible but view-only when its name matches the affiliation', async () => {
+      // The newer season is inactive and the older one is active: the manager's 2026-27 is newer than the active one.
       mocks.state.seasonsStore.find((s) => s.id === 'season-val-past').isActive = true;
       mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
       const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
       expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({
-        seasonId: 'season-val-now', seasonIsActive: false, seasonIsPast: false, readOnly: false, readOnlyReason: null,
+        seasonId: 'season-val-now', seasonIsActive: false, readOnly: true,
+        readOnlyReason: '2026-27 is an inactive season and is view-only.',
       });
-      await expect(updateRosterPlayerRole({ rosterId: rosterActive, playerId: 'pl-now', role: 'sub' })).resolves.toMatchObject({ success: true });
-      await expect(createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' })).resolves.toBeDefined();
+      expect((await getSchoolRosters(schoolId)).map((r) => r.id)).toEqual([rosterActive]);
+      const viewOnly = /2026-27 is an inactive season and is view-only/;
+      await expect(updateRosterPlayerRole({ rosterId: rosterActive, playerId: 'pl-now', role: 'sub' })).rejects.toThrow(viewOnly);
+      await expect(createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' })).rejects.toThrow(viewOnly);
     });
 
     it('a PAST INACTIVE season is visible when its name matches the affiliation but view-only (spec-028)', async () => {
@@ -1471,7 +1475,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(pool[0].enrolledRosters.map((r) => r.rosterId)).toEqual([rosterPast]);
 
       await expect(getRosterEligibility({ rosterId: rosterPast })).resolves.toBeDefined();
-      const viewOnly = /2025-26 is a past season and is view-only/;
+      const viewOnly = /2025-26 is an inactive season and is view-only/;
       await expect(updateRosterPlayerRole({ rosterId: rosterPast, playerId: 'pl-past', role: 'sub' })).rejects.toThrow(viewOnly);
       await expect(removePlayerFromRoster({ rosterId: rosterPast, playerId: 'pl-past' })).rejects.toThrow(viewOnly);
       await expect(createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' })).rejects.toThrow(viewOnly);
@@ -1487,10 +1491,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(mocks.state.playersStore.some((p) => p.id === 'pl-past')).toBe(true);
     });
 
-    it('createSchoolRoster creates in the resolved inactive (upcoming) season, never the active one', async () => {
-      // Manager's 2026-27 is inactive and newer than the active 2025-26 -> upcoming.
-      mocks.state.seasonsStore.find((s) => s.id === 'season-val-past').isActive = true;
-      mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
+    it('createSchoolRoster creates in the resolved (active) season of the manager, never another one', async () => {
       mocks.state.teamsStore = [];
       const res = await createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alumni' });
       expect(res.success).toBe(true);
@@ -1498,9 +1499,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(team?.seasonId).toBe('season-val-now');
     });
 
-    it('invite approval enrolls into the resolved inactive (upcoming) season default roster', async () => {
-      mocks.state.seasonsStore.find((s) => s.id === 'season-val-past').isActive = true;
-      mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
+    it('invite approval enrolls into the resolved (active) season default roster', async () => {
       mocks.state.playersStore = [];
       mocks.state.membersStore.push({ id: 'm-inv', schoolId, firstName: 'In', lastName: 'Vite', discord: 'in#1', graduationYear: 2027 });
       mocks.state.playerInvitesStore = [
@@ -1772,27 +1771,24 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
     });
 
-    it('the lock applies to the resolved INACTIVE (upcoming) season, and only to it', async () => {
-      // 2025-26 is active; the manager's 2026-27 is inactive but newer (upcoming); 2027-28 is another upcoming season.
-      mocks.state.seasonsStore.push({ id: 'season-val-old', gameId: valGameId, name: '2025-26', isActive: true, rostersLockedAt: null });
+    it('the lock applies to the resolved (active) season, and only to it', async () => {
+      // The manager's 2026-27 is active; 2025-26 and 2027-28 are other (inactive) seasons of the game.
+      mocks.state.seasonsStore.push({ id: 'season-val-old', gameId: valGameId, name: '2025-26', isActive: false, rostersLockedAt: null });
       mocks.state.seasonsStore.push({ id: 'season-val-next', gameId: valGameId, name: '2027-28', isActive: false, rostersLockedAt: null });
-      mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
-      lockSeason('season-val-now'); // the manager's season (2026-27) is upcoming and locked
+      lockSeason('season-val-now'); // the manager's season (2026-27) is locked
       await expect(deleteSchoolRoster(emptyRosterId)).rejects.toThrow(LOCKED);
       await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
       await expect(getSchoolRosters(schoolId, valGameId)).resolves.toBeDefined();
       const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
-      expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({ seasonIsActive: false, rostersLocked: true });
+      expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({ seasonIsActive: true, rostersLocked: true });
 
-      // A lock on the active season the manager does NOT work in is irrelevant to them.
+      // A lock on another season of the game the manager does NOT work in is irrelevant to them.
       unlockSeason('season-val-now');
       lockSeason('season-val-next');
       await expect(deleteSchoolRoster(emptyRosterId)).resolves.toMatchObject({ success: true });
     });
 
-    it('invite approval into a locked inactive resolved season is refused', async () => {
-      mocks.state.seasonsStore.push({ id: 'season-val-old', gameId: valGameId, name: '2025-26', isActive: true, rostersLockedAt: null });
-      mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
+    it('invite approval into a locked resolved season is refused', async () => {
       lockSeason('season-val-now');
       mocks.state.playerInvitesStore = [
         { id: 'inv-lock2', schoolId, gameId: valGameId, memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
@@ -1849,11 +1845,11 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
   });
 
-  describe('10. Past seasons are view-only for managers (spec-028)', () => {
-    const VIEW_ONLY = /2025-26 is a past season and is view-only\./;
+  describe('10. Inactive seasons are view-only for managers (spec-028)', () => {
+    const VIEW_ONLY = /2025-26 is an inactive season and is view-only\./;
     const LOCKED = /locked by EZ Esports staff/;
-    // Valorant seasons: 2025-26 (inactive, older than the active one -> PAST), 2026-27 (active),
-    // 2027-28 (inactive, newer than the active one -> UPCOMING, editable).
+    // Valorant seasons: 2025-26 (inactive, older than the active one), 2026-27 (active),
+    // 2027-28 (inactive, newer than the active one). Both inactive seasons are view-only.
     const tags: Record<string, { season: string; name: string }> = {
       past: { season: 'season-val-past', name: '2025-26' },
       now: { season: 'season-val-now', name: '2026-27' },
@@ -1929,18 +1925,18 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       mocks.state.playerInvitesStore = seedInvites();
     });
 
-    it.each(writes('past'))('%s is refused for a manager on a PAST season, with no write', async (_name, run) => {
+    it.each(writes('past'))('%s is refused for a manager on an OLDER inactive season, with no write', async (_name, run) => {
       const before = snapshot();
       await expect(run()).rejects.toThrow(VIEW_ONLY);
       expect(snapshot()).toBe(before);
     });
 
-    it('the view-only error takes precedence over the roster lock on a past season', async () => {
+    it('the view-only error takes precedence over the roster lock on an inactive season', async () => {
       mocks.state.seasonsStore.find((s) => s.id === 'season-val-past').rostersLockedAt = new Date();
       await expect(deleteSchoolRoster('r-past-empty')).rejects.toThrow(VIEW_ONLY);
     });
 
-    it('reads stay allowed on a past season and the scope reports it', async () => {
+    it('reads stay allowed on an inactive season and the scope reports it', async () => {
       expect((await getSchoolRosters(schoolId)).map((r) => r.id).sort()).toEqual(['r-past', 'r-past-empty']);
       expect((await getSchoolRosters(schoolId, valGameId)).length).toBe(2);
       await expect(getRosterEligibility({ rosterId: 'r-past' })).resolves.toBeDefined();
@@ -1950,24 +1946,25 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
 
       const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
       expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({
-        seasonName: '2025-26', seasonIsActive: false, seasonIsPast: true, readOnly: true,
-        readOnlyReason: '2025-26 is a past season and is view-only.',
+        seasonName: '2025-26', seasonIsActive: false, readOnly: true,
+        readOnlyReason: '2025-26 is an inactive season and is view-only.',
       });
     });
 
-    it('assertManagerForRoster / assertManagerForSchool refuse by default and allow reads with allowPast', async () => {
+    it('assertManagerForRoster / assertManagerForSchool refuse by default and allow reads with allowInactive', async () => {
       await expect(assertManagerForRoster('r-past', { allowLocked: true })).rejects.toThrow(VIEW_ONLY);
       await expect(assertManagerForRoster('r-past')).rejects.toThrow(VIEW_ONLY);
-      await expect(assertManagerForRoster('r-past', { allowPast: true })).resolves.toMatchObject({ roster: { id: 'r-past' } });
+      await expect(assertManagerForRoster('r-past', { allowInactive: true })).resolves.toMatchObject({ roster: { id: 'r-past' } });
       await expect(assertManagerForSchool(schoolId, valGameId)).rejects.toThrow(VIEW_ONLY);
-      await expect(assertManagerForSchool(schoolId, valGameId, { allowPast: true })).resolves.toMatchObject({ isStaffAdmin: false });
+      await expect(assertManagerForSchool(schoolId, valGameId, { allowInactive: true })).resolves.toMatchObject({ isStaffAdmin: false });
       await expect(assertManagerForSchool(schoolId)).resolves.toMatchObject({ isStaffAdmin: false });
     });
 
-    it.each(writes('up'))('%s still works for a manager on an UPCOMING inactive season', async (name, run) => {
+    it.each(writes('up'))('%s is refused for a manager on a NEWER inactive season, with no write', async (_name, run) => {
       pointManagerAt('2027-28');
-      await expect(run()).resolves.toBeDefined();
-      void name;
+      const before = snapshot();
+      await expect(run()).rejects.toThrow(/2027-28 is an inactive season and is view-only/);
+      expect(snapshot()).toBe(before);
     });
 
     it.each(writes('now'))('%s still works for a manager on the ACTIVE season', async (_name, run) => {
@@ -1975,27 +1972,39 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(run()).resolves.toBeDefined();
     });
 
-    it('an upcoming season scope is neutral (not past, not read-only)', async () => {
+    it('a newer inactive season scope is read-only too, and only that season is exposed', async () => {
       pointManagerAt('2027-28');
       const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
       expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({
-        seasonIsActive: false, seasonIsPast: false, readOnly: false, readOnlyReason: null,
+        seasonName: '2027-28', seasonIsActive: false, readOnly: true,
+        readOnlyReason: '2027-28 is an inactive season and is view-only.',
       });
+      expect((await getSchoolRosters(schoolId, valGameId)).map((r) => r.id).sort()).toEqual(['r-up', 'r-up-empty']);
+      await expect(getRosterEligibility({ rosterId: 'r-up' })).resolves.toBeDefined();
+      // Another season's roster is a different season, not merely view-only.
+      await expect(getRosterEligibility({ rosterId: 'r-now' })).rejects.toThrow(/different season/);
+      await expect(getRosterEligibility({ rosterId: 'r-past' })).rejects.toThrow(/different season/);
     });
 
-    it('the lock still works on an upcoming season', async () => {
+    it('view-only takes precedence over the lock on a newer inactive season', async () => {
       pointManagerAt('2027-28');
       mocks.state.seasonsStore.find((s) => s.id === 'season-val-up').rostersLockedAt = new Date();
-      await expect(deleteSchoolRoster('r-up-empty')).rejects.toThrow(LOCKED);
+      await expect(deleteSchoolRoster('r-up-empty')).rejects.toThrow(/2027-28 is an inactive season and is view-only/);
+    });
+
+    it('the lock still works on the active season', async () => {
+      pointManagerAt('2026-27');
+      mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').rostersLockedAt = new Date();
+      await expect(deleteSchoolRoster('r-now-empty')).rejects.toThrow(LOCKED);
       await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
     });
 
-    it('with no active season the newest season is editable and older ones are view-only', async () => {
+    it('with no active season every season of the game is view-only, newest included', async () => {
       mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
       pointManagerAt('2027-28');
-      await expect(deleteSchoolRoster('r-up-empty')).resolves.toMatchObject({ success: true });
+      await expect(deleteSchoolRoster('r-up-empty')).rejects.toThrow(/2027-28 is an inactive season and is view-only/);
       pointManagerAt('2026-27');
-      await expect(deleteSchoolRoster('r-now-empty')).rejects.toThrow(/2026-27 is a past season and is view-only/);
+      await expect(deleteSchoolRoster('r-now-empty')).rejects.toThrow(/2026-27 is an inactive season and is view-only/);
     });
 
     it('two rows: the newest season by name wins, so a manager with a past and a current row can edit', async () => {
@@ -2004,13 +2013,15 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(deleteSchoolRoster('r-past-empty')).rejects.toThrow(/different season/);
     });
 
-    it('a staff admin (even with a past manager row) can still change a past season', async () => {
+    it('a staff admin (even with an inactive-season manager row) can still change inactive seasons', async () => {
       makeAdmin();
       const seedP = JSON.parse(JSON.stringify(mocks.state.playersStore));
-      for (const [name, run] of writes('past')) {
-        mocks.state.playersStore = JSON.parse(JSON.stringify(seedP));
-        mocks.state.playerInvitesStore = seedInvites();
-        await expect(run(), name).resolves.toBeDefined();
+      for (const tag of ['past', 'up']) {
+        for (const [name, run] of writes(tag)) {
+          mocks.state.playersStore = JSON.parse(JSON.stringify(seedP));
+          mocks.state.playerInvitesStore = seedInvites();
+          await expect(run(), name).resolves.toBeDefined();
+        }
       }
     });
 

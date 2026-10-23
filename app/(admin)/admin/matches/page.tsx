@@ -3,7 +3,7 @@ import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
-import { matchExplorerKey, matchesBackLink, parseMatchFilterParams } from '@/app/lib/admin-season-filters';
+import { matchesBackLink, parseMatchFilterParams } from '@/app/lib/admin-season-filters';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
@@ -81,12 +81,10 @@ export default async function AdminMatchesPage({
           {/* Matches list column */}
           <div className="min-w-0 lg:col-span-2">
             <AdminMatchExplorer
-              key={matchExplorerKey(initialFilters.gameId, initialFilters.seasonId)}
               seasons={allSeasons}
               games={games}
               initialPage={initialPage}
-              initialGameId={initialFilters.gameId}
-              initialSeasonId={initialFilters.seasonId}
+              initialFilters={initialFilters}
             />
           </div>
         </div>

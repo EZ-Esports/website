@@ -6,15 +6,13 @@ interface PortalHeaderProps {
   schoolName: string;
   /** Season(s) the manager is scoped to by their affiliation, e.g. "2026-27". */
   seasonLabel?: string;
-  /** True when any of those seasons is a past season, which is view-only (spec-028). */
-  hasPastSeason?: boolean;
-  /** True when any of those seasons is inactive but upcoming (editable; staff prepare it ahead). */
-  hasUpcomingSeason?: boolean;
+  /** True when any of those seasons is inactive (older or newer than the active one): view-only (spec-028). */
+  hasInactiveSeason?: boolean;
   /** Page-level controls shown beside the compliance badge (the Tutorial menu). */
   actions?: React.ReactNode;
 }
 
-export function PortalHeader({ schoolName, seasonLabel, hasPastSeason, hasUpcomingSeason, actions }: PortalHeaderProps) {
+export function PortalHeader({ schoolName, seasonLabel, hasInactiveSeason, actions }: PortalHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
       <div>
@@ -28,14 +26,9 @@ export function PortalHeader({ schoolName, seasonLabel, hasPastSeason, hasUpcomi
             <>
               <span className="text-zinc-600">&bull;</span>
               <span className="text-xs text-zinc-300 font-medium">Season {seasonLabel}</span>
-              {hasPastSeason ? (
+              {hasInactiveSeason ? (
                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">
-                  Past season &bull; View only
-                </span>
-              ) : null}
-              {hasUpcomingSeason ? (
-                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-300 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5">
-                  Upcoming season
+                  Inactive season &bull; View only
                 </span>
               ) : null}
             </>

@@ -152,13 +152,85 @@ export function nextFiltersOnSeasonChange(
   return { gameId: gameId || currentGameId, seasonId };
 }
 
+export type MatchFilterChange = { game: string } | { season: string };
+
 /**
- * React key for the Matches explorer, derived from the server-validated
- * filters only. When a navigation changes them (sidebar link, "View matches"
- * deep link) the explorer remounts with fresh state and first page. The
- * explorer's own history.replaceState writes never re-run the server page, so
- * they cannot change this key.
+ * Query string (no leading "?") after the explorer's Game or Season select
+ * changes. The address is the source of truth: the current filters are parsed
+ * from `currentSearch` (the same validation as the server), the change is
+ * applied (a game change drops a season of another game; a season change also
+ * selects its game; "" = all), and only `game` / `season` are rewritten. Every
+ * other param (`from`, ...) keeps its value and its relative order to the other
+ * params; game and season are re-appended at the end.
  */
-export function matchExplorerKey(initialGameId: string, initialSeasonId: string): string {
-  return `${initialGameId || 'all'}:${initialSeasonId || 'all'}`;
+export function nextMatchFilterSearch(
+  currentSearch: string,
+  change: MatchFilterChange,
+  games: MatchFilterGame[],
+  seasons: MatchFilterSeason[],
+): string {
+  const current = new URLSearchParams(currentSearch.startsWith('?') ? currentSearch.slice(1) : currentSearch);
+  const { gameId, seasonId } = parseMatchFilterParams(
+    { game: current.get('game') ?? undefined, season: current.get('season') ?? undefined },
+    games,
+    seasons,
+  );
+
+  let next: { gameId: string; seasonId: string };
+  if ('season' in change) {
+    next = nextFiltersOnSeasonChange(change.season, gameId, seasons);
+  } else {
+    const keepSeason = !!change.game && (!seasonId || seasons.find((s) => s.id === seasonId)?.gameId === change.game);
+    next = { gameId: change.game, seasonId: keepSeason ? seasonId : '' };
+  }
+
+  const filters = new URLSearchParams(matchFilterQuery(games.find((g) => g.id === next.gameId)?.slug, next.seasonId));
+  const out = new URLSearchParams();
+  for (const [k, v] of current) if (k !== 'game' && k !== 'season') out.append(k, v);
+  for (const [k, v] of filters) out.set(k, v);
+  return out.toString();
+}
+
+/** The explorer's full filter state; game and season come from the URL, the rest is local. */
+export interface MatchFacets {
+  gameId: string;
+  seasonId: string;
+  division: string;
+  status: string;
+  search: string;
+  sort: 'asc' | 'desc';
+}
+
+export const DEFAULT_MATCH_FACETS: Pick<MatchFacets, 'division' | 'status' | 'search' | 'sort'> = {
+  division: '',
+  status: '',
+  search: '',
+  sort: 'desc',
+};
+
+/** Value-equality key for a facet set (compare loaded rows against what is requested). */
+export function matchFacetsKey(f: MatchFacets): string {
+  return JSON.stringify([f.gameId, f.seasonId, f.division, f.status, f.search, f.sort]);
+}
+
+/** Debounce only a pure search-text change; any other facet change refetches at once. */
+export function matchFetchDelayMs(loaded: MatchFacets, next: MatchFacets, searchDebounceMs = 300): number {
+  const sameBesidesSearch = matchFacetsKey({ ...loaded, search: '' }) === matchFacetsKey({ ...next, search: '' });
+  return sameBesidesSearch && loaded.search !== next.search ? searchDebounceMs : 0;
+}
+
+/**
+ * A new server page (link navigation or router refresh) replaces the shown rows only
+ * when its game/season differ from the rows already shown; a refresh for the filters
+ * the client already displays keeps local division/search state and loaded pages.
+ */
+export function shouldAdoptServerPage(
+  server: { gameId: string; seasonId: string },
+  shown: { gameId: string; seasonId: string },
+  ownWrite?: { gameId: string; seasonId: string } | null,
+): boolean {
+  // A refresh that lands for filters this component just wrote itself (select change whose
+  // fetch is still pending) is not a navigation: adopting would reset division/status/search/sort.
+  if (ownWrite && server.gameId === ownWrite.gameId && server.seasonId === ownWrite.seasonId) return false;
+  return server.gameId !== shown.gameId || server.seasonId !== shown.seasonId;
 }

@@ -73,10 +73,9 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
     ? [...new Set(scopes.map((s) => s.seasonName))].join(', ')
     : undefined;
 
-  // Past seasons are view-only for managers (spec-028); an inactive season that is not past is an
-  // upcoming one and stays editable. Staff admins (scopes === null) have neither.
-  const hasPastSeason = scopes ? scopes.some((s) => s.seasonIsPast) : false;
-  const hasUpcomingSeason = scopes ? scopes.some((s) => !s.seasonIsActive && !s.seasonIsPast) : false;
+  // An inactive season (older or newer than the game's active one) is view-only for managers
+  // (spec-028). Staff admins (scopes === null) are never view-only.
+  const hasInactiveSeason = scopes ? scopes.some((s) => !s.seasonIsActive) : false;
   const viewOnlyScopes = scopes ? scopes.filter((s) => s.readOnly) : [];
   const viewOnlyGameIds = viewOnlyScopes.map((s) => s.gameId);
   const viewOnlySeasonLabel = [...new Set(viewOnlyScopes.map((s) => s.seasonName))].join(', ');
@@ -109,8 +108,7 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialPlayerPool={initialPlayerPool}
         selectedGameId={paramGameId}
         seasonLabel={seasonLabel}
-        hasPastSeason={hasPastSeason}
-        hasUpcomingSeason={hasUpcomingSeason}
+        hasInactiveSeason={hasInactiveSeason}
         viewOnlyGameIds={viewOnlyGameIds}
         viewOnlySeasonLabel={viewOnlySeasonLabel}
         lockedGameIds={lockedGameIds}

@@ -21,7 +21,7 @@ interface GenerateInviteCardProps {
   schoolSlug: string;
   inviteGameId: string;
   setInviteGameId: (id: string) => void;
-  /** Games whose season is a past season: invites cannot be created for them (spec-028). */
+  /** Games whose season is inactive: invites cannot be created for them (spec-028). */
   viewOnlyGameIds?: string[];
   onInviteCreated: (invite: SchoolInviteItem) => void;
 }
@@ -205,7 +205,7 @@ export function GenerateInviteCard({
 
         {isViewOnly && (
           <p role="status" className="text-xs text-amber-300">
-            This game&apos;s season is a past season and is view only, so new invites cannot be created.
+            This game&apos;s season is inactive and is view only, so new invites cannot be created.
           </p>
         )}
 

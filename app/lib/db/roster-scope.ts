@@ -3,16 +3,21 @@ import { and, eq } from 'drizzle-orm';
 import { db } from './index';
 import * as schema from './schema';
 
+type TransactionExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+/** The shared connection, or the transaction a multi-write action is running in. */
+export type DbOrTx = typeof db | TransactionExecutor;
+
 /**
  * School-scope checks for the staff roster editing actions. Every id an
  * action receives (team, roster, player, member) is resolved through the
  * school it claims to belong to, so a staff form for school A can never
  * write to school B's data by swapping an id. Each returns null/false when the
- * row does not exist or belongs elsewhere.
+ * row does not exist or belongs elsewhere. Each takes an optional executor so a
+ * multi-write action can resolve ids inside its own transaction.
  */
 
-export async function teamInSchool(teamId: string, schoolId: string) {
-  const [row] = await db
+export async function teamInSchool(teamId: string, schoolId: string, executor: DbOrTx = db) {
+  const [row] = await executor
     .select({ id: schema.teams.id, gameSlug: schema.games.slug })
     .from(schema.teams)
     .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
@@ -21,8 +26,8 @@ export async function teamInSchool(teamId: string, schoolId: string) {
   return row ?? null;
 }
 
-export async function rosterInSchool(rosterId: string, schoolId: string) {
-  const [row] = await db
+export async function rosterInSchool(rosterId: string, schoolId: string, executor: DbOrTx = db) {
+  const [row] = await executor
     .select({
       id: schema.rosters.id,
       division: schema.rosters.division,
@@ -36,9 +41,9 @@ export async function rosterInSchool(rosterId: string, schoolId: string) {
   return row ?? null;
 }
 
-export async function playerInSchool(playerId: string, schoolId: string) {
-  const [row] = await db
-    .select({ id: schema.players.id, rosterId: schema.players.rosterId })
+export async function playerInSchool(playerId: string, schoolId: string, executor: DbOrTx = db) {
+  const [row] = await executor
+    .select({ id: schema.players.id, rosterId: schema.players.rosterId, memberId: schema.players.memberId })
     .from(schema.players)
     .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
     .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
@@ -47,8 +52,8 @@ export async function playerInSchool(playerId: string, schoolId: string) {
   return row ?? null;
 }
 
-export async function memberInSchool(memberId: string, schoolId: string): Promise<boolean> {
-  const [row] = await db
+export async function memberInSchool(memberId: string, schoolId: string, executor: DbOrTx = db): Promise<boolean> {
+  const [row] = await executor
     .select({ id: schema.members.id })
     .from(schema.members)
     .where(and(eq(schema.members.id, memberId), eq(schema.members.schoolId, schoolId)))

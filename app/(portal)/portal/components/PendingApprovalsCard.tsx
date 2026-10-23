@@ -22,7 +22,7 @@ interface PendingApprovalsCardProps {
   >;
   /** Games whose rosters are locked: approving enrolls onto a roster, so it is disabled. */
   lockedGameIds?: string[];
-  /** Games whose season is a past season: approving and rejecting are both disabled (spec-028). */
+  /** Games whose season is inactive: approving and rejecting are both disabled (spec-028). */
   viewOnlyGameIds?: string[];
   onApprove: (inviteId: string) => void;
   onReject: (inviteId: string) => void;
@@ -198,7 +198,7 @@ export function PendingApprovalsCard({
                     </Button>
                     {isViewOnly && (
                       <p className="basis-full text-right text-[11px] text-amber-300">
-                        This is a past season and is view only, so applications cannot be approved or rejected.
+                        This season is inactive and is view only, so applications cannot be approved or rejected.
                       </p>
                     )}
                     {isLocked && (
