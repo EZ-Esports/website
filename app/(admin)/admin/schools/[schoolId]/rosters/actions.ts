@@ -3,7 +3,7 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, count, eq, or, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { memberInSchool, playerInSchool, rosterInSchool, teamInSchool } from '@/app/lib/db/roster-scope';
@@ -223,10 +223,31 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
   if (!UUID.test(schoolId)) return BAD_SCHOOL;
   try {
     if (!(await rosterInSchool(rosterId, schoolId))) return NOT_FOUND;
-    await db.delete(schema.rosters).where(eq(schema.rosters.id, rosterId));
+
+    // matches.home_roster_id / away_roster_id are ON DELETE CASCADE: deleting a roster would
+    // silently delete every match it played (scores, standings). Refuse instead.
+    const [{ n: matchCount }] = await db
+      .select({ n: count() })
+      .from(schema.matches)
+      .where(or(eq(schema.matches.homeRosterId, rosterId), eq(schema.matches.awayRosterId, rosterId)));
+    if (matchCount > 0) {
+      return {
+        success: false as const,
+        error: `This roster has ${matchCount} ${matchCount === 1 ? 'match' : 'matches'}. Delete or reassign ${matchCount === 1 ? 'it' : 'them'} under Matches & Standings first.`,
+      };
+    }
+
+    // The NOT EXISTS guard closes the window where a match is created after the count above.
+    await db.delete(schema.rosters).where(
+      and(
+        eq(schema.rosters.id, rosterId),
+        sql`not exists (select 1 from ${schema.matches} where ${schema.matches.homeRosterId} = ${rosterId} or ${schema.matches.awayRosterId} = ${rosterId})`,
+      ),
+    );
     updateTag('rosters');
     updateTag('players');
     updateTag('teams');
+    updateTag('matches');
     refreshSchoolRosters(schoolId);
     revalidatePath('/');
     return { success: true };

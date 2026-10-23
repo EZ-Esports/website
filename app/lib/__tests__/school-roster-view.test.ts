@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allowedRosterDivisions,
+  mergeRosterFilterQuery,
   parseRosterFilters,
   rosterFilterQuery,
   storedDivision,
@@ -184,5 +185,37 @@ describe('URL filters', () => {
     expect(rosterFilterQuery({ game: '', division: 'both', phone: 'JV' })).toBe('phone=jv');
     const f = { game: 'valorant', division: 'both' as const, phone: 'JV' as const };
     expect(parseRosterFilters(Object.fromEntries(new URLSearchParams(rosterFilterQuery(f))), slugs)).toEqual(f);
+  });
+});
+
+describe('mergeRosterFilterQuery', () => {
+  const defaults = { game: '', division: 'both', phone: 'Varsity' } as const;
+
+  it('preserves foreign params and sets only the filters', () => {
+    const qs = mergeRosterFilterQuery('?tab=x&utm=1', { game: 'valorant', division: 'JV', phone: 'Varsity' });
+    const sp = new URLSearchParams(qs);
+    expect(sp.get('tab')).toBe('x');
+    expect(sp.get('utm')).toBe('1');
+    expect(sp.get('game')).toBe('valorant');
+    expect(sp.get('division')).toBe('jv');
+    expect(sp.has('phone')).toBe(false);
+  });
+
+  it('removes defaults and stale filter params but keeps foreign ones', () => {
+    expect(mergeRosterFilterQuery('?game=valorant&division=jv&phone=jv&tab=x', defaults)).toBe('tab=x');
+  });
+
+  it('returns an empty string when nothing is left', () => {
+    expect(mergeRosterFilterQuery('?game=valorant&division=varsity', defaults)).toBe('');
+    expect(mergeRosterFilterQuery('', defaults)).toBe('');
+  });
+
+  it('round trips with parseRosterFilters, with or without the leading ?', () => {
+    const f = { game: 'valorant', division: 'both', phone: 'JV' } as const;
+    const qs = mergeRosterFilterQuery('foo=bar', f);
+    const sp = new URLSearchParams(qs);
+    expect(parseRosterFilters({ game: sp.get('game'), division: sp.get('division'), phone: sp.get('phone') }, ['valorant'])).toEqual(f);
+    expect(sp.get('foo')).toBe('bar');
+    expect(mergeRosterFilterQuery('?foo=bar', f)).toBe(qs);
   });
 });

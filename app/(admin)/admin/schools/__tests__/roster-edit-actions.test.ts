@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   writes: [] as Array<{ op: string; values?: unknown }>,
   seasonRow: [{ gameId: 'g1' }] as Array<{ gameId: string }>,
+  matchCount: 0,
   teamInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; gameSlug: string } | null> =>
     id === 'team-ok' ? { id, gameSlug: 'valorant' } : id === 'team-mc' ? { id, gameSlug: 'minecraft' } : null),
   rosterInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; division: string; gameSlug: string } | null> =>
@@ -45,7 +46,13 @@ vi.mock('@/app/lib/db', () => {
   });
   return {
     db: {
-      select: () => ({ from: () => ({ where: () => ({ limit: async () => mocks.seasonRow }) }) }),
+      // `.where()` is awaited directly by the match count and chained into `.limit()` by the season lookup.
+      select: () => ({
+        from: () => ({
+          where: () =>
+            Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow }),
+        }),
+      }),
       insert: () => chain('insert'),
       update: () => chain('update'),
       delete: () => chain('delete'),
@@ -179,6 +186,52 @@ describe('school roster edit actions: school scoping', () => {
   it('does not check the season roster lock (staff are exempt)', async () => {
     const src = readFileSync(join(__dirname, '../[schoolId]/rosters/actions.ts'), 'utf8');
     expect(src).not.toMatch(/rostersLockedAt|assertRostersUnlocked|isRostersLocked/);
+  });
+});
+
+describe('deleteRoster: matches protection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.writes.length = 0;
+    mocks.matchCount = 0;
+    mocks.requirePermission.mockImplementation(async () => ({}));
+  });
+
+  it('refuses a roster that has matches (home or away) and deletes nothing', async () => {
+    mocks.matchCount = 3;
+    const res = await deleteRoster(SCHOOL, 'roster-ok');
+    expect(res).toMatchObject({ success: false });
+    expect((res as { error: string }).error).toContain('3 matches');
+    expect((res as { error: string }).error).toContain('Matches & Standings');
+    expect(mocks.writes.filter((w) => w.op === 'delete')).toHaveLength(0);
+    expect(mocks.updateTag).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('counts both the home and the away side of the match', () => {
+    const src = readFileSync(join(__dirname, '../[schoolId]/rosters/actions.ts'), 'utf8');
+    const body = src.slice(src.indexOf('export async function deleteRoster('), src.indexOf('// --- PLAYER'));
+    expect(body).toMatch(/homeRosterId, rosterId/);
+    expect(body).toMatch(/awayRosterId, rosterId/);
+  });
+
+  it('deletes a roster without matches and invalidates matches along with the other tags', async () => {
+    const res = await deleteRoster(SCHOOL, 'roster-ok');
+    expect(res).toMatchObject({ success: true });
+    expect(mocks.writes.filter((w) => w.op === 'delete')).toHaveLength(1);
+    for (const tag of ['rosters', 'players', 'teams', 'matches']) expect(mocks.updateTag).toHaveBeenCalledWith(tag);
+  });
+
+  it('checks permission first and stays school-scoped', async () => {
+    mocks.requirePermission.mockRejectedValueOnce(new Error('Forbidden'));
+    mocks.matchCount = 0;
+    await expect(deleteRoster(SCHOOL, 'roster-ok')).rejects.toThrow('Forbidden');
+    expect(mocks.rosterInSchool).not.toHaveBeenCalled();
+
+    const res = await deleteRoster(SCHOOL, OTHER_ROSTER);
+    expect(res).toMatchObject({ success: false });
+    expect(mocks.rosterInSchool).toHaveBeenCalledWith(OTHER_ROSTER, SCHOOL);
+    expect(mocks.writes).toHaveLength(0);
   });
 });
 

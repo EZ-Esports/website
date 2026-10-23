@@ -5,7 +5,7 @@ import { HiChevronDown, HiOutlineLockClosed, HiOutlineLockOpen, HiOutlineUsers }
 import {
   buildGameOptions,
   defaultExpandedKeys,
-  rosterFilterQuery,
+  mergeRosterFilterQuery,
   type DivisionColumn,
   type DivisionFilter,
   type PhoneDivision,
@@ -70,7 +70,7 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
 
   // Mirror the filters into the URL without a navigation or refetch; defaults stay out of it.
   useEffect(() => {
-    const qs = rosterFilterQuery({ game: gameSlug, division, phone: phoneDivision });
+    const qs = mergeRosterFilterQuery(window.location.search, { game: gameSlug, division, phone: phoneDivision });
     const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
     if (url !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, '', url);

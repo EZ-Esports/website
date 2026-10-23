@@ -238,6 +238,18 @@ export function rosterFilterQuery(f: RosterViewFilters): string {
   return sp.toString();
 }
 
+/**
+ * Applies the filters to an existing query string (with or without a leading '?') and returns the
+ * new one (no '?'). Only `game`, `division` and `phone` are set or removed; every other param is kept.
+ */
+export function mergeRosterFilterQuery(currentSearch: string, f: RosterViewFilters): string {
+  const sp = new URLSearchParams(currentSearch);
+  for (const key of ['game', 'division', 'phone']) sp.delete(key);
+  const own = new URLSearchParams(rosterFilterQuery(f));
+  own.forEach((value, key) => sp.set(key, value));
+  return sp.toString();
+}
+
 /** What the staff editing controls need beyond the rosters themselves. Display fields only; never demographics. */
 export interface RosterEditOptions {
   /** The school's members, for the add-player picker. */

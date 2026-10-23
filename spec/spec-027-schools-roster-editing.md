@@ -24,6 +24,12 @@
 - Editing a player is also two writes (player role/IGN, then member details).
 - Staff edits on a locked season are deliberate.
 
+## Review follow-ups
+
+- **Roster delete is blocked when matches exist.** `matches.home_roster_id` / `away_roster_id` are ON DELETE CASCADE, so a plain delete would have wiped every match the roster played, with scores and standings. `deleteRoster` (after permission and the school-scope check) counts matches where the roster is home or away and refuses with "This roster has N matches. Delete or reassign them under Matches & Standings first."; the DELETE itself carries a `NOT EXISTS` guard on matches so one created in between is not cascaded. A roster without matches is deleted and invalidates `rosters`, `players`, `teams` and `matches` (plus the path revalidation). The confirm dialog now says it removes the roster's players and that a roster with matches cannot be deleted. Audit: `deleteRoster` is the only staff delete in these actions that reaches matches; `deleteRosterMember` only removes a `players` row (nothing references players), `members` are `restrict`, and `deleteTeam` was dropped, so no other path cascades to matches.
+- **Filter write-back keeps other params.** `mergeRosterFilterQuery(currentSearch, filters)` (pure, `app/lib/school-roster-view.ts`) starts from the current query string and sets or removes only `game`, `division` and `phone` (defaults stay out); every other param and the hash survive `replaceState`.
+- Tests added: deleteRoster match protection (home/away count, no delete, permission first, school-scoped, `matches` tag) in `roster-edit-actions.test.ts`; `mergeRosterFilterQuery` cases in `school-roster-view.test.ts`. Still not verified in a browser.
+
 ## Tests
 
 `app/(admin)/admin/schools/__tests__/roster-edit-actions.test.ts` (every action requires MANAGE_ROSTERS before any lookup or write, refreshes the new paths, cross-school ids refused, JV refused on a no-JV game, no lock check, no `revalidatePath('/admin/roster')` anywhere under `app/`), `app/lib/__tests__/school-roster-view.test.ts` (no-JV shaping, JV not folded, URL parse/serialize, allowed divisions), `rosters-page.test.tsx` (gate, server-side filter validation, edit controls on a locked season, no-JV markup).
