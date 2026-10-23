@@ -2,6 +2,7 @@
 
 import { FiShield } from 'react-icons/fi';
 import { CAREER_INTEREST_OPTIONS, RACE_ETHNICITY_OPTIONS } from '../../types';
+import { MIN_BIRTH_DATE } from '@/app/lib/onboarding/consent';
 import { RequiredMark } from '../RequiredMark';
 
 interface DemographicsStepProps {
@@ -105,7 +106,13 @@ export function DemographicsStep({
               id="demo-birthdate"
               type="date"
               value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
+              onChange={(e) => {
+                // Native date inputs accept 5-6 digit years while typing; keep it to 4.
+                if (/^\d{5,}-/.test(e.target.value)) return;
+                setBirthDate(e.target.value);
+              }}
+              min={MIN_BIRTH_DATE}
+              max={new Date().toISOString().slice(0, 10)}
               className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               required
             />

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {
   findInviteForSubmission,
   findStaffUserIdByEmail,
+  insertOnboardingConsent,
   markManagerInviteAccepted,
   markPlayerInviteSubmitted,
   runOnboardingTransaction,
@@ -13,6 +14,12 @@ import {
 } from '@/app/lib/db/onboarding';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
+import {
+  calculateAge,
+  isPlausibleBirthDate,
+  validateConsent,
+  type NormalizedConsent,
+} from '../consent';
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
 import type {
   PlayerOnboardingSubmission,
@@ -23,7 +30,10 @@ import type {
 /**
  * Validates player/manager onboarding submission inputs before database persistence.
  */
-export function validateSubmissionInputs(submission: PlayerOnboardingSubmission): {
+export function validateSubmissionInputs(
+  submission: PlayerOnboardingSubmission,
+  now: Date = new Date()
+): {
   email: string;
   legalFirstName: string;
   legalLastName: string;
@@ -31,6 +41,7 @@ export function validateSubmissionInputs(submission: PlayerOnboardingSubmission)
   birthDateObj: Date;
   discordUsername: string;
   discordUserId: string;
+  consent: NormalizedConsent;
 } {
   const email = (submission.email || '').trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -53,9 +64,16 @@ export function validateSubmissionInputs(submission: PlayerOnboardingSubmission)
   }
 
   const birthDateObj = new Date(submission.birthDate);
-  if (isNaN(birthDateObj.getTime())) {
+  if (!isPlausibleBirthDate(birthDateObj, now)) {
     throw new Error('A valid date of birth is required.');
   }
+
+  // Consent is enforced here, server-side, so it cannot be skipped by calling the action directly.
+  // Age comes from the stored date of birth, never from a client-supplied age.
+  const consent = validateConsent(submission.consent, {
+    age: calculateAge(birthDateObj, now),
+    fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
+  });
 
   const discordUsername = (submission.discordUsername || '').trim();
   if (!discordUsername) {
@@ -72,6 +90,7 @@ export function validateSubmissionInputs(submission: PlayerOnboardingSubmission)
     birthDateObj,
     discordUsername,
     discordUserId,
+    consent,
   };
 }
 
@@ -249,7 +268,18 @@ export async function processOnboardingSubmission(
       submission,
     });
 
-    // 3d. Role-specific finalization
+    // 3d. Consent record (ToS acknowledgment + guardian authorization for under-18s).
+    // signedAt is stamped here on the server, never accepted from the client.
+    await insertOnboardingConsent(tx, {
+      memberId: createdOrUpdatedMemberId,
+      schoolId: invite.schoolId,
+      inviteKind: isManager ? 'manager' : 'player',
+      inviteId: invite.id,
+      ...validated.consent,
+      signedAt: new Date(),
+    });
+
+    // 3e. Role-specific finalization
     if (isManager) {
       await provisionManagerAccount(tx, {
         email: validated.email,

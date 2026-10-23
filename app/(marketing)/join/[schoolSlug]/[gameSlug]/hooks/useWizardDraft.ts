@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { saveOnboardingDraft } from '@/app/lib/onboarding/wizard-actions';
 import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/riot-manual';
 import {
+  calculateAge,
+  isMinorAge,
+  isPlausibleBirthDate,
+  validateConsent,
+  type ConsentSubmission,
+} from '@/app/lib/onboarding/consent';
+import {
   DEFAULT_MANAGER_SEASON,
   GRADUATION_YEAR_OPTIONS,
   MANAGER_SEASON_OPTIONS,
@@ -103,11 +110,38 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     Boolean(initialDraft.codeOfConductAccepted)
   );
 
+  // Step 5: Terms of Service and (under 18) parent/guardian authorization.
+  // Deliberately not restored from drafts: guardian PII and the signature are only held in memory until submit.
+  const [tosAcknowledged, setTosAcknowledged] = useState(false);
+  const [participantNameEdit, setParticipantNameEdit] = useState<string | null>(null);
+  const [guardianFullName, setGuardianFullName] = useState('');
+  const [guardianRelationship, setGuardianRelationship] = useState('');
+  const [guardianEmail, setGuardianEmail] = useState('');
+  const [guardianSignature, setGuardianSignature] = useState('');
+
   // Computed state
+  const birthDateValue = birthDate ? new Date(birthDate) : null;
+  const age =
+    birthDateValue && isPlausibleBirthDate(birthDateValue) ? calculateAge(birthDateValue) : null;
+  const isMinor = age !== null && isMinorAge(age);
+  // Prefilled from the Step 1 legal name until the signer edits it.
+  const participantLegalName =
+    participantNameEdit ?? `${legalFirstName.trim()} ${legalLastName.trim()}`.trim();
   const isRiotIdValid = RIOT_ID_REGEX.test(riotId.trim());
   const trackerUrl = isRiotIdValid
     ? deriveTrackerUrl(inviteData.gameSlug, riotId.trim())
     : null;
+
+  function buildConsent(): ConsentSubmission {
+    return {
+      tosAcknowledged,
+      participantLegalName,
+      guardianFullName,
+      guardianRelationship,
+      guardianEmail,
+      guardianSignature,
+    };
+  }
 
   function buildCurrentPayload(): WizardFormData {
     return {
@@ -237,10 +271,32 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       setErrorMessage('Please provide your date of birth.');
       return false;
     }
+    if (!isPlausibleBirthDate(new Date(birthDate))) {
+      setErrorMessage('Please enter a valid date of birth (4-digit year).');
+      return false;
+    }
     if (!codeOfConductAccepted) {
       setErrorMessage(
         'You must accept the EZ Esports Code of Conduct and Tournament Rules.'
       );
+      return false;
+    }
+    return true;
+  }
+
+  function validateStep5(): boolean {
+    setErrorMessage(null);
+    if (age === null) {
+      setErrorMessage('Please go back and provide your date of birth.');
+      return false;
+    }
+    try {
+      validateConsent(buildConsent(), {
+        age,
+        fallbackParticipantName: participantLegalName,
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message);
       return false;
     }
     return true;
@@ -297,6 +353,21 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     codeOfConductAccepted,
     setCodeOfConductAccepted,
 
+    tosAcknowledged,
+    setTosAcknowledged,
+    participantLegalName,
+    setParticipantLegalName: setParticipantNameEdit,
+    guardianFullName,
+    setGuardianFullName,
+    guardianRelationship,
+    setGuardianRelationship,
+    guardianEmail,
+    setGuardianEmail,
+    guardianSignature,
+    setGuardianSignature,
+    age,
+    isMinor,
+
     // Status
     saveDraftPending,
     saveStatus,
@@ -308,10 +379,12 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
 
     // Actions
     buildCurrentPayload,
+    buildConsent,
     handleSaveDraft,
     validateStep1,
     validateStep2,
     validateStep3,
     validateStep4,
+    validateStep5,
   };
 }

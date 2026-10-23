@@ -600,6 +600,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           inGuild: true,
           birthDate: new Date('1990-05-15'),
           codeOfConductAccepted: true,
+          consent: { tosAcknowledged: true },
         },
       });
 
@@ -724,6 +725,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           inGuild: true,
           birthDate: new Date('2008-03-21'),
           codeOfConductAccepted: true,
+          consent: { tosAcknowledged: true },
         },
       });
 

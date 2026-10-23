@@ -136,3 +136,11 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 - **Staff roster editing lives in Schools & Rosters ([spec-027](spec-027-schools-roster-editing.md)).** The old gap (no staff UI to create or edit members, teams or rosters) is closed. Still absent by choice: deleting a member, unregistering a team, and editing a member's email or school from the staff UI (the actions were dropped with `RosterExplorer`).
 - **Roster-only roles cannot reach the view.** The page requires `MANAGE_ROSTERS`, but it is reached from Schools, which needs `MANAGE_SCHOOLS`. A role with only `MANAGE_ROSTERS` can open the URL directly but has no nav path.
+
+---
+
+## Onboarding consent (spec-029)
+
+- **Migration `0052` is not applied to production.** Until `npm run db:migrate` runs (after a backup and with the user's go-ahead), deploying this code makes every onboarding submission fail on the missing `onboarding_consents` table. Apply the migration before or with the deploy.
+- **Legal to confirm:** adults currently see only the Terms of Service acknowledgment (the supplied form is a guardian authorization). Confirm that is sufficient, and whether managers or adults need anything else.
+- **No staff view or export of consent records**, no guardian confirmation email, and no re-consent for members onboarded before `0052`.

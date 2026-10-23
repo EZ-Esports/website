@@ -374,3 +374,11 @@ export async function markPlayerInviteSubmitted(
     })
     .where(eq(schema.playerInvites.id, inviteId));
 }
+
+/** Appends the signed consent record for an onboarding submission. */
+export async function insertOnboardingConsent(
+  tx: OnboardingTx,
+  values: typeof schema.onboardingConsents.$inferInsert
+): Promise<void> {
+  await tx.insert(schema.onboardingConsents).values(values);
+}
