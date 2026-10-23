@@ -1,6 +1,6 @@
 # spec-029: Onboarding consent form (Terms of Service and guardian authorization)
 
-- **Status:** Implemented on branch `worktree-onboarding-consent-forms`, not yet merged. Migration `0052` written, **not applied to production**.
+- **Status:** Merged (PR #269). Migration `0052` applied to production on 2026-10-23.
 - **Date:** 2026-10-23
 - **Why:** Legal requires the EZ Esports Onboarding Consent Form in both the manager and the student onboarding wizards, recorded in the database and enforced server-side.
 
