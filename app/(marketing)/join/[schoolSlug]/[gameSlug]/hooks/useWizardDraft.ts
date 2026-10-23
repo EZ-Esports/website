@@ -6,6 +6,7 @@ import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/r
 import {
   calculateAge,
   isMinorAge,
+  isPlausibleBirthDate,
   validateConsent,
   type ConsentSubmission,
 } from '@/app/lib/onboarding/consent';
@@ -121,7 +122,7 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
   // Computed state
   const birthDateValue = birthDate ? new Date(birthDate) : null;
   const age =
-    birthDateValue && !isNaN(birthDateValue.getTime()) ? calculateAge(birthDateValue) : null;
+    birthDateValue && isPlausibleBirthDate(birthDateValue) ? calculateAge(birthDateValue) : null;
   const isMinor = age !== null && isMinorAge(age);
   // Prefilled from the Step 1 legal name until the signer edits it.
   const participantLegalName =
@@ -268,6 +269,10 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     setErrorMessage(null);
     if (!birthDate) {
       setErrorMessage('Please provide your date of birth.');
+      return false;
+    }
+    if (!isPlausibleBirthDate(new Date(birthDate))) {
+      setErrorMessage('Please enter a valid date of birth (4-digit year).');
       return false;
     }
     if (!codeOfConductAccepted) {

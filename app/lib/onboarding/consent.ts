@@ -90,6 +90,18 @@ function newYorkToday(now: Date): { year: number; month: number; day: number } {
   return { year: pick('year'), month: pick('month'), day: pick('day') };
 }
 
+/** Earliest date of birth accepted; guards against 5-6 digit years from native date inputs. */
+export const MIN_BIRTH_DATE = '1900-01-01';
+
+/** True for a `YYYY-MM-DD` date of birth between MIN_BIRTH_DATE and now. */
+export function isPlausibleBirthDate(birthDate: Date, now: Date = new Date()): boolean {
+  return (
+    !isNaN(birthDate.getTime()) &&
+    birthDate.getTime() >= new Date(MIN_BIRTH_DATE).getTime() &&
+    birthDate.getTime() <= now.getTime()
+  );
+}
+
 /**
  * Whole years between a date of birth and today (New York calendar date).
  * The date of birth is read as a calendar date from its UTC components, which is

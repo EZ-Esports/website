@@ -7,6 +7,7 @@ import {
   calculateAge,
   formatConsentIntro,
   isMinorAge,
+  isPlausibleBirthDate,
   validateConsent,
 } from '../consent';
 
@@ -60,6 +61,22 @@ describe('calculateAge', () => {
   it('treats 18 as an adult', () => {
     expect(isMinorAge(17)).toBe(true);
     expect(isMinorAge(18)).toBe(false);
+  });
+});
+
+describe('isPlausibleBirthDate', () => {
+  const now = new Date('2026-10-23T16:00:00Z');
+
+  it('accepts ordinary dates of birth', () => {
+    expect(isPlausibleBirthDate(new Date('2010-05-01'), now)).toBe(true);
+  });
+
+  it('rejects 5-6 digit years, pre-1900 dates, future dates and invalid dates', () => {
+    expect(isPlausibleBirthDate(new Date('+275760-01-01'), now)).toBe(false);
+    expect(isPlausibleBirthDate(new Date('+020100-05-01'), now)).toBe(false);
+    expect(isPlausibleBirthDate(new Date('1899-12-31'), now)).toBe(false);
+    expect(isPlausibleBirthDate(new Date('2030-01-01'), now)).toBe(false);
+    expect(isPlausibleBirthDate(new Date('not a date'), now)).toBe(false);
   });
 });
 

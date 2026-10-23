@@ -16,6 +16,7 @@ import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
   calculateAge,
+  isPlausibleBirthDate,
   validateConsent,
   type NormalizedConsent,
 } from '../consent';
@@ -63,11 +64,7 @@ export function validateSubmissionInputs(
   }
 
   const birthDateObj = new Date(submission.birthDate);
-  if (isNaN(birthDateObj.getTime())) {
-    throw new Error('A valid date of birth is required.');
-  }
-
-  if (birthDateObj.getTime() > now.getTime()) {
+  if (!isPlausibleBirthDate(birthDateObj, now)) {
     throw new Error('A valid date of birth is required.');
   }
 

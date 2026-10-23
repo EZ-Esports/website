@@ -26,8 +26,8 @@ interface ConsentStepProps {
 }
 
 const inputClass =
-  'w-full min-h-[44px] px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent';
-const labelClass = 'block text-xs font-semibold text-foreground-muted mb-1.5';
+  'w-full min-h-[44px] px-3.5 py-2.5 rounded-lg bg-surface-raised border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent';
+const labelClass = 'block text-xs font-semibold text-foreground-secondary mb-1.5';
 const sectionHeadingClass = 'text-sm font-bold text-foreground';
 
 /** Display-only date; the stored signing timestamp is stamped by the server. */
@@ -75,13 +75,13 @@ export function ConsentStep({
           Step 5: {isMinor ? CONSENT_TEXT.guardianHeading : 'Terms of Service'}
         </h2>
         {isMinor && age !== null && (
-          <p className="text-xs sm:text-sm text-foreground-muted mt-1 leading-relaxed">
+          <p className="text-xs sm:text-sm text-foreground-secondary mt-1 leading-relaxed">
             {formatConsentIntro(age)}
           </p>
         )}
       </div>
 
-      <p className="text-xs sm:text-sm text-foreground-muted">
+      <p className="text-xs sm:text-sm text-foreground-secondary">
         {CONSENT_TEXT.termsLinkLead} {termsLink}
       </p>
 
@@ -90,7 +90,7 @@ export function ConsentStep({
         <h3 id="consent-tos-heading" className={sectionHeadingClass}>
           {CONSENT_TEXT.tosHeading}
         </h3>
-        <label className="flex items-start gap-3 cursor-pointer p-3.5 rounded-xl bg-surface border border-border hover:border-accent/40 transition-colors">
+        <label className="flex items-start gap-3 cursor-pointer p-3.5 rounded-xl bg-surface-raised border border-border hover:border-accent/40 transition-colors">
           <input
             type="checkbox"
             checked={tosAcknowledged}
@@ -140,7 +140,7 @@ export function ConsentStep({
             <h3 id="consent-authorization-heading" className={sectionHeadingClass}>
               {CONSENT_TEXT.authorizationHeading}
             </h3>
-            <p className="text-xs text-foreground-muted">{CONSENT_TEXT.authorizationLead}</p>
+            <p className="text-xs text-foreground-secondary">{CONSENT_TEXT.authorizationLead}</p>
             <ul className="list-disc pl-5 space-y-2 text-xs text-foreground leading-relaxed">
               {CONSENT_TEXT.authorizationItems.map((item) => (
                 <li key={item}>{item}</li>
@@ -213,7 +213,7 @@ export function ConsentStep({
             <h3 id="consent-signature-heading" className={sectionHeadingClass}>
               {CONSENT_TEXT.signatureHeading}
             </h3>
-            <p className="text-xs text-foreground-muted leading-relaxed">
+            <p className="text-xs text-foreground-secondary leading-relaxed">
               {CONSENT_TEXT.signatureIntro}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
