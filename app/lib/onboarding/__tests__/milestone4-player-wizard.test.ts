@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'node:crypto';
 import * as schema from '@/app/lib/db/schema';
+import { CONSENT_FORM_VERSION } from '@/app/lib/onboarding/consent';
 import { Permissions } from '@/app/lib/roles';
 import { ForbiddenPiiAccessError } from '@/app/lib/db/queries';
 
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => {
     studentDemographicsStore: [] as any[],
     schoolManagersStore: [] as any[],
     staffMembersStore: [] as any[],
+    onboardingConsentsStore: [] as any[],
   };
 
   function extractConditions(clause: any): Array<{ col: string; op: 'eq' | 'in' | 'isNull'; val?: any }> {
@@ -89,6 +91,7 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.studentDemographics) return state.studentDemographicsStore;
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.staffMembers) return state.staffMembersStore;
+    if (tbl === schema.onboardingConsents) return state.onboardingConsentsStore;
     return null;
   }
 
@@ -306,6 +309,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     mocks.state.studentDemographicsStore = [];
     mocks.state.schoolManagersStore = [];
     mocks.state.staffMembersStore = [];
+    mocks.state.onboardingConsentsStore = [];
   });
 
   describe('1. Token Hashing & Verification', () => {
@@ -548,6 +552,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         feedback: 'Excited for the upcoming season!',
       },
       codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
     };
 
     it('atomically creates member, Riot identity, Discord identity, demographics vault, and marks invite submitted', async () => {
@@ -684,6 +689,115 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         })
       ).rejects.toThrow('valid date of birth is required');
     });
+
+    describe('consent (Terms of Service and guardian authorization)', () => {
+      const guardianConsent = {
+        tosAcknowledged: true,
+        participantLegalName: 'Riley Chen',
+        guardianFullName: 'Morgan Chen',
+        guardianRelationship: 'Parent',
+        guardianEmail: 'Morgan.Chen@example.com',
+        guardianSignature: 'MC',
+      };
+      // 15 years old on any date this suite runs after 2026.
+      const minorSubmission = () => ({
+        ...validSubmission,
+        birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 15, 0, 1)).toISOString().slice(0, 10),
+      });
+
+      it('records an adult ToS acknowledgment with a server-stamped date', async () => {
+        const before = Date.now();
+        const result = await submitPlayerOnboarding({ token: rawToken, submission: validSubmission });
+        const rows = mocks.state.onboardingConsentsStore;
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          memberId: result.memberId,
+          inviteKind: 'player',
+          inviteId: 'invite-pending-1',
+          isMinor: false,
+          tosAcknowledged: true,
+          participantLegalName: 'Alex Chen',
+          guardianFullName: null,
+          guardianSignature: null,
+        });
+        expect(rows[0].formVersion).toBe(CONSENT_FORM_VERSION);
+        expect(rows[0].signedAt.getTime()).toBeGreaterThanOrEqual(before);
+      });
+
+      it('rejects a submission with no consent object and persists nothing', async () => {
+        await expect(
+          submitPlayerOnboarding({
+            token: rawToken,
+            submission: { ...validSubmission, consent: undefined as any },
+          })
+        ).rejects.toThrow('Terms of Service');
+        expect(mocks.state.onboardingConsentsStore).toHaveLength(0);
+        expect(mocks.state.membersStore).toHaveLength(0);
+      });
+
+      it('rejects a submission when the Terms of Service box is unchecked', async () => {
+        await expect(
+          submitPlayerOnboarding({
+            token: rawToken,
+            submission: { ...validSubmission, consent: { tosAcknowledged: false } },
+          })
+        ).rejects.toThrow('Terms of Service');
+      });
+
+      it('rejects an under-18 submission without guardian authorization', async () => {
+        await expect(
+          submitPlayerOnboarding({
+            token: rawToken,
+            submission: { ...minorSubmission(), consent: { tosAcknowledged: true } },
+          })
+        ).rejects.toThrow(/legal name/i);
+        expect(mocks.state.onboardingConsentsStore).toHaveLength(0);
+      });
+
+      it('rejects an under-18 submission with an invalid guardian email', async () => {
+        await expect(
+          submitPlayerOnboarding({
+            token: rawToken,
+            submission: { ...minorSubmission(), consent: { ...guardianConsent, guardianEmail: 'nope' } },
+          })
+        ).rejects.toThrow('guardian email');
+      });
+
+      it('stores the full guardian authorization for an under-18 participant', async () => {
+        await submitPlayerOnboarding({
+          token: rawToken,
+          submission: { ...minorSubmission(), consent: guardianConsent },
+        });
+        expect(mocks.state.onboardingConsentsStore[0]).toMatchObject({
+          isMinor: true,
+          ageAtSigning: 15,
+          participantLegalName: 'Riley Chen',
+          guardianFullName: 'Morgan Chen',
+          guardianRelationship: 'Parent',
+          guardianEmail: 'morgan.chen@example.com',
+          guardianSignature: 'MC',
+        });
+      });
+
+      it('rejects a date of birth in the future', async () => {
+        await expect(
+          submitPlayerOnboarding({
+            token: rawToken,
+            submission: { ...validSubmission, birthDate: '2999-01-01' },
+          })
+        ).rejects.toThrow('valid date of birth');
+      });
+
+      it('never saves consent fields in the invite draft', async () => {
+        const saved = await saveOnboardingDraft({
+          token: rawToken,
+          draftData: { legalFirstName: 'Alex', consent: guardianConsent },
+        });
+        expect(saved.success).toBe(true);
+        const invite = mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1');
+        expect(invite.submissionDraft).toEqual({ legalFirstName: 'Alex' });
+      });
+    });
   });
 
   describe('5. Zero-PII Invariant & Permissions Protection', () => {
@@ -800,6 +914,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         birthDate: '1988-08-20',
         gender: 'Male',
         codeOfConductAccepted: true,
+        consent: { tosAcknowledged: true },
       };
 
       const result = await submitPlayerOnboarding({
@@ -852,6 +967,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
           inGuild: true,
           birthDate: '1988-08-20',
           codeOfConductAccepted: true,
+          consent: { tosAcknowledged: true },
         },
       });
 
@@ -878,6 +994,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
             inGuild: true,
             birthDate: '1988-08-20',
             codeOfConductAccepted: true,
+            consent: { tosAcknowledged: true },
           },
         })
       ).rejects.toThrow(/valid season/i);
@@ -899,6 +1016,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
             inGuild: true,
             birthDate: '1988-08-20',
             codeOfConductAccepted: true,
+            consent: { tosAcknowledged: true },
           },
         })
       ).rejects.toThrow(/valid season/i);
@@ -922,6 +1040,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         inGuild: true,
         birthDate: '1988-08-20',
         codeOfConductAccepted: true,
+        consent: { tosAcknowledged: true },
       };
 
       await submitPlayerOnboarding({

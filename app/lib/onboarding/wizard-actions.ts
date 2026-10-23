@@ -6,6 +6,7 @@ import {
   findInviteForValidation,
   updateInviteDraft,
 } from '@/app/lib/db/onboarding';
+import type { ConsentSubmission } from './consent';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
 
@@ -98,6 +99,8 @@ export interface PlayerOnboardingSubmission {
     [key: string]: any;
   };
   codeOfConductAccepted: boolean;
+  /** Terms of Service acknowledgment and, for under-18s, the guardian authorization. Validated server-side. */
+  consent: ConsentSubmission;
 }
 
 export interface SubmitPlayerOnboardingOptions {
@@ -131,6 +134,8 @@ const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
   'surveyDetails',
   'birthDate',
   'password',
+  // Guardian PII and signature are collected at final submit only, never persisted in the draft.
+  'consent',
 ]);
 
 /**

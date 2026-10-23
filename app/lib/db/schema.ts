@@ -841,6 +841,38 @@ export const studentDemographics = pgTable('student_demographics', {
   index('student_demographics_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
+// 5. Onboarding Consent Records (append-only audit trail of the Terms of Service
+// acknowledgment and, for participants under 18, the parent/guardian authorization
+// with electronic signature). Holds guardian PII: RLS on, no policies, service role only.
+export const onboardingConsents = pgTable('onboarding_consents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'set null' }),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  formVersion: text('form_version').notNull(),
+  isMinor: boolean('is_minor').notNull(),
+  ageAtSigning: integer('age_at_signing').notNull(),
+  tosAcknowledged: boolean('tos_acknowledged').notNull(),
+  participantLegalName: text('participant_legal_name').notNull(),
+  guardianFullName: text('guardian_full_name'),
+  guardianRelationship: text('guardian_relationship'),
+  guardianEmail: text('guardian_email'),
+  guardianSignature: text('guardian_signature'),
+  // Stamped by the server at submission; never taken from the client.
+  signedAt: timestamp('signed_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('onboarding_consents_invite_idx').on(t.inviteKind, t.inviteId),
+  index('onboarding_consents_member_id_idx').on(t.memberId),
+  check('onboarding_consents_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
+  check('onboarding_consents_tos_check', sql`${t.tosAcknowledged} = true`),
+  check(
+    'onboarding_consents_minor_guardian_check',
+    sql`not ${t.isMinor} or (${t.guardianFullName} is not null and ${t.guardianRelationship} is not null and ${t.guardianEmail} is not null and ${t.guardianSignature} is not null)`
+  ),
+]).enableRLS();
+
 export type SchoolManager = typeof schoolManagers.$inferSelect;
 export type NewSchoolManager = typeof schoolManagers.$inferInsert;
 export type PlayerInvite = typeof playerInvites.$inferSelect;
@@ -851,4 +883,6 @@ export type PlayerIdentity = typeof playerIdentities.$inferSelect;
 export type NewPlayerIdentity = typeof playerIdentities.$inferInsert;
 export type StudentDemographics = typeof studentDemographics.$inferSelect;
 export type NewStudentDemographics = typeof studentDemographics.$inferInsert;
+export type OnboardingConsent = typeof onboardingConsents.$inferSelect;
+export type NewOnboardingConsent = typeof onboardingConsents.$inferInsert;
 
