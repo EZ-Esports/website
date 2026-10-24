@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { createMatch } from '@/app/(admin)/admin/matches/actions';
-import { input, label as labelClass, primaryBtn } from '@/app/components/admin/styles';
+import { ghostBtn, input, label as labelClass, primaryBtn } from '@/app/components/admin/styles';
 import { AdminNotice, PendingLabel } from '@/app/components/admin/AdminUI';
 
 interface Season {
@@ -36,9 +36,13 @@ interface MatchScheduleFormProps {
   rosters: Roster[];
   teams: Team[];
   games: Game[];
+  /** Fired after createMatch succeeds (the dialog closes and shows the success toast). */
+  onSuccess?: () => void;
+  /** When given, a Cancel button sits beside the submit button. */
+  onCancel?: () => void;
 }
 
-export default function MatchScheduleForm({ seasons, rosters, teams, games }: MatchScheduleFormProps) {
+export default function MatchScheduleForm({ seasons, rosters, teams, games, onSuccess, onCancel }: MatchScheduleFormProps) {
   const [selectedSeasonId, setSelectedSeasonId] = useState(seasons[0]?.id || '');
   const [homeRosterId, setHomeRosterId] = useState('');
   const [awayRosterId, setAwayRosterId] = useState('');
@@ -65,6 +69,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
         form.reset();
         setHomeRosterId('');
         setAwayRosterId('');
+        onSuccess?.();
       } else {
         setFeedback({ message: res?.error || 'Could not schedule match.', type: 'error' });
       }
@@ -174,14 +179,21 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games }: Ma
         />
       </div>
 
-      <button
-        type="submit"
-        disabled={sameRoster || isPending || seasons.length === 0}
-        aria-busy={isPending}
-        className={`${primaryBtn} w-full`}
-      >
-        <PendingLabel pending={isPending} label="Schedule match" pendingLabel="Scheduling…" />
-      </button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {onCancel && (
+          <button type="button" onClick={onCancel} disabled={isPending} className={`${ghostBtn} min-h-11 sm:min-h-0`}>
+            Cancel
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={sameRoster || isPending || seasons.length === 0}
+          aria-busy={isPending}
+          className={`${primaryBtn} min-h-11 sm:min-h-0 ${onCancel ? '' : 'w-full'}`}
+        >
+          <PendingLabel pending={isPending} label="Schedule match" pendingLabel="Scheduling…" />
+        </button>
+      </div>
 
       {seasons.length === 0 && (
         <p className={hint}>
