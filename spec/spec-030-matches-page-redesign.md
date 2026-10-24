@@ -16,6 +16,7 @@ The nav label also said "Matches & Standings" although standings are not shown t
 ## Design Decisions
 
 - **Header:** `AdminPageHeader` (eyebrow = League Operations, h1 = Matches). Primary "Schedule match" opens `ScheduleMatchDialog` (ui `overlay.tsx` Overlay/Modal/Dialog) around the unchanged `MatchScheduleForm` (same `createMatch`, `parseEastern`, validation). On success the dialog closes, a toast shows, and page 1 plus totals reload.
+- **Schedule division:** the dialog form has a Division select after Season, listing the divisions the season's rosters actually have (canonical Varsity, JV, All; labels from `divisionLabel`, defaulting to the first). Home/Away list only that division's rosters; changing season or division clears both picks. `createMatch` independently refuses rosters of different divisions (`sameRosterDivision`, stored `A`/`B` equal Varsity/JV), so a crafted submit cannot pair them.
 - **Filters:** Game, Season (all seasons, "(current)" on active) and search stay visible. Division and Sort sit behind a "More filters" disclosure (`aria-expanded`) with a dot when either is non-default. URL behaviour from spec-025 is untouched (`parseMatchFilterParams`, `writeFilter` via `history.replaceState`, `fetchSeq`/stale/retry, "Load 25 more" cursor).
 - **Tabs (server-side):** `needs-results`, `upcoming`, `completed`, `all` (`MatchTab` in `db/match-page.ts`).
   - Needs results: `status = scheduled AND scheduledAt < now`.

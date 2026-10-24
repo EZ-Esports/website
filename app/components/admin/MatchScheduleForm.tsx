@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import { createMatch } from '@/app/(admin)/admin/matches/actions';
+import { divisionLabel, type CanonicalDivision } from '@/app/lib/db/match-page';
+import { rosterDivisionOptions, rostersInDivision } from '@/app/lib/admin-match-list';
 import { ghostBtn, input, label as labelClass, primaryBtn } from '@/app/components/admin/styles';
 import { AdminNotice, PendingLabel } from '@/app/components/admin/AdminUI';
 
@@ -44,6 +46,7 @@ interface MatchScheduleFormProps {
 
 export default function MatchScheduleForm({ seasons, rosters, teams, games, onSuccess, onCancel }: MatchScheduleFormProps) {
   const [selectedSeasonId, setSelectedSeasonId] = useState(seasons[0]?.id || '');
+  const [division, setDivision] = useState('');
   const [homeRosterId, setHomeRosterId] = useState('');
   const [awayRosterId, setAwayRosterId] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -79,14 +82,23 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
   const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
   const gameMap = useMemo(() => new Map(games.map(g => [g.id, g])), [games]);
 
-  // Filter rosters based on the selected season
-  const filteredRosters = useMemo(() => {
+  // Rosters of the selected season, then of the chosen division. The division
+  // options are the ones those rosters actually have, so the control matches
+  // what the manager portal shows for the season.
+  const seasonRosters = useMemo(() => {
     if (!selectedSeasonId) return rosters;
     return rosters.filter(r => {
       const team = teamMap.get(r.teamId);
       return team?.seasonId === selectedSeasonId;
     });
   }, [rosters, selectedSeasonId, teamMap]);
+  const divisionOptions = useMemo(() => rosterDivisionOptions(seasonRosters), [seasonRosters]);
+  // Default to the first available division (Varsity when present).
+  const activeDivision = divisionOptions.includes(division as CanonicalDivision) ? division : (divisionOptions[0] ?? '');
+  const filteredRosters = useMemo(
+    () => rostersInDivision(seasonRosters, activeDivision),
+    [seasonRosters, activeDivision]
+  );
 
   const inputClass = input;
   const hint = 'admin-fade-in text-xs leading-5 text-warning';
@@ -102,7 +114,12 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
           name="seasonId"
           required
           value={selectedSeasonId}
-          onChange={(e) => setSelectedSeasonId(e.target.value)}
+          onChange={(e) => {
+            setSelectedSeasonId(e.target.value);
+            setDivision('');
+            setHomeRosterId('');
+            setAwayRosterId('');
+          }}
           className={inputClass}
         >
           {seasons.map((s) => {
@@ -113,6 +130,28 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
               </option>
             );
           })}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="division" className={labelClass}>
+          Division
+        </label>
+        <select
+          id="division"
+          value={activeDivision}
+          disabled={divisionOptions.length === 0}
+          onChange={(e) => {
+            setDivision(e.target.value);
+            setHomeRosterId('');
+            setAwayRosterId('');
+          }}
+          className={inputClass}
+        >
+          {divisionOptions.length === 0 && <option value="">No rosters</option>}
+          {divisionOptions.map((d) => (
+            <option key={d} value={d}>{divisionLabel(d)}</option>
+          ))}
         </select>
       </div>
 

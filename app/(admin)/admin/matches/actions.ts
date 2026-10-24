@@ -7,6 +7,7 @@ import * as schema from '@/app/lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { parseEastern } from '@/app/lib/dates';
+import { sameRosterDivision } from '@/app/lib/admin-match-list';
 
 export type MatchActionResult = { success: boolean; error?: string };
 
@@ -41,6 +42,7 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
         rosterId: schema.rosters.id,
         seasonId: schema.teams.seasonId,
         gameId: schema.teams.gameId,
+        division: schema.rosters.division,
       })
       .from(schema.rosters)
       .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
@@ -54,6 +56,10 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
     }
     if (rosterTeams[0].gameId !== rosterTeams[1].gameId) {
       return { success: false, error: 'Both rosters must be from the same game.' };
+    }
+    // Validated here, not only in the form: a crafted submit must not pair Varsity with JV.
+    if (!sameRosterDivision(rosterTeams[0].division, rosterTeams[1].division)) {
+      return { success: false, error: 'Both rosters must be in the same division.' };
     }
 
     const scheduledAt = parseEastern(scheduledAtStr);

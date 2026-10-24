@@ -9,7 +9,14 @@ import {
   type MatchPageItemDto,
   type MatchStatus,
 } from '../db/match-page';
-import { applySavedMatch, groupMatchesByDay, parseScoreInput } from '../admin-match-list';
+import {
+  applySavedMatch,
+  groupMatchesByDay,
+  parseScoreInput,
+  rosterDivisionOptions,
+  rostersInDivision,
+  sameRosterDivision,
+} from '../admin-match-list';
 import {
   defaultMatchTab,
   hasActiveMoreFilters,
@@ -172,6 +179,23 @@ describe('local effect of a saved edit', () => {
   it('marking cancelled moves a row out of Upcoming', () => {
     const res = applySavedMatch([item('3', 'scheduled', FUTURE)], '3', { status: 'cancelled', homeScore: null, awayScore: null }, 'upcoming', NOW);
     expect(res.items).toHaveLength(0);
+  });
+});
+
+describe('schedule form division options', () => {
+  const rosters = [{ division: 'B' }, { division: 'All' }, { division: 'A' }, { division: 'JV' }];
+
+  it('lists the divisions present in canonical order: Varsity, JV, All', () => {
+    expect(rosterDivisionOptions(rosters)).toEqual(['Varsity', 'JV', 'All']);
+    expect(rosterDivisionOptions([{ division: 'B' }])).toEqual(['JV']);
+    expect(rosterDivisionOptions([])).toEqual([]);
+  });
+
+  it('filters rosters by canonical division across stored spellings', () => {
+    expect(rostersInDivision(rosters, 'JV')).toHaveLength(2);
+    expect(rostersInDivision(rosters, 'Varsity')).toEqual([{ division: 'A' }]);
+    expect(sameRosterDivision('A', 'Varsity')).toBe(true);
+    expect(sameRosterDivision('Varsity', 'JV')).toBe(false);
   });
 });
 

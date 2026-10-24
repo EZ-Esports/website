@@ -4,7 +4,34 @@
  * logic is unit testable and importable from the client explorer.
  */
 import { formatNY } from './dates';
-import { matchInTab, type MatchPageItemDto, type MatchStatus, type MatchTab } from './db/match-page';
+import {
+  DIVISIONS,
+  canonicalDivision,
+  matchInTab,
+  type CanonicalDivision,
+  type MatchPageItemDto,
+  type MatchStatus,
+  type MatchTab,
+} from './db/match-page';
+
+/**
+ * Schedule form: the divisions a season's rosters actually have, as canonical
+ * values (stored `A`/`B` become Varsity/JV) in display order Varsity, JV, All.
+ */
+export function rosterDivisionOptions(rosters: { division: string }[]): CanonicalDivision[] {
+  const found = new Set(rosters.map((r) => canonicalDivision(r.division)));
+  return DIVISIONS.filter((d) => found.has(d));
+}
+
+/** Rosters whose division is the chosen canonical one (any stored spelling). */
+export function rostersInDivision<T extends { division: string }>(rosters: T[], division: string): T[] {
+  return rosters.filter((r) => canonicalDivision(r.division) === division);
+}
+
+/** True when two stored roster divisions are the same competition division. */
+export function sameRosterDivision(a: string, b: string): boolean {
+  return canonicalDivision(a) === canonicalDivision(b);
+}
 
 export interface MatchDayGroup<T> {
   /** America/New_York calendar day, YYYY-MM-DD. */
