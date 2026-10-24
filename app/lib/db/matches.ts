@@ -302,6 +302,10 @@ export async function getSchoolMatchRows(params: {
 }): Promise<SchoolMatchRow[]> {
   const conditions: SQL[] = [
     or(eq(homeTeam.schoolId, params.schoolId), eq(awayTeam.schoolId, params.schoolId))!,
+    // A removed school's fixtures are hidden everywhere else, so the opponent's manager must not
+    // keep seeing a match against it.
+    isNull(homeSchool.deletedAt),
+    isNull(awaySchool.deletedAt),
   ];
   if (params.seasonIds) conditions.push(inArray(schema.matches.seasonId, params.seasonIds));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));

@@ -22,6 +22,11 @@ const TAB_CLASS =
   'data-[hovered]:text-zinc-300 data-[selected]:text-white data-[selected]:border-accent ' +
   'data-[focus-visible]:ring-2 data-[focus-visible]:ring-inset data-[focus-visible]:ring-accent';
 
+// The panel holds no focusable child, so RAC makes it a tab stop (and the keyboard route to a
+// horizontally scrolling table): it needs a visible focus ring.
+const PANEL_CLASS =
+  'pt-4 outline-none data-[focus-visible]:ring-2 data-[focus-visible]:ring-accent rounded-xl';
+
 function resultLabel(match: SchoolMatchItem): string | null {
   if (match.ownScore === null || match.opponentScore === null) return null;
   const outcome =
@@ -33,12 +38,14 @@ function MatchTable({
   matches,
   now,
   showGame,
+  showSeason,
   showResult,
   emptyText,
 }: {
   matches: SchoolMatchItem[];
   now: Date;
   showGame: boolean;
+  showSeason: boolean;
   showResult: boolean;
   emptyText: string;
 }) {
@@ -77,7 +84,10 @@ function MatchTable({
                     <span className="font-medium text-white">{match.opponentName}</span>
                     <span className="ml-2 text-zinc-500">{match.isHome ? 'Home' : 'Away'}</span>
                   </td>
-                  <td className="py-3 px-4 text-zinc-300">{match.division}</td>
+                  <td className="py-3 px-4 text-zinc-300">
+                    {match.division}
+                    {showSeason && <div className="text-zinc-500">{match.seasonName}</div>}
+                  </td>
                   {showGame && <td className="py-3 px-4 text-zinc-300">{match.gameName}</td>}
                   <td className="py-3 px-4">
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300">
@@ -100,6 +110,9 @@ function MatchTable({
 export function MatchesSection({ matches, nowIso, showGame }: MatchesSectionProps) {
   const now = new Date(nowIso);
   const { upcoming, past } = splitSchoolMatches(matches, now);
+  // Only a staff admin's list can span seasons; a manager works in one season per game.
+  const showSeason = new Set(matches.map((m) => `${m.gameId}|${m.seasonName}`)).size >
+    new Set(matches.map((m) => m.gameId)).size;
 
   return (
     <section className="space-y-4 pt-4 border-t border-zinc-800">
@@ -120,20 +133,22 @@ export function MatchesSection({ matches, nowIso, showGame }: MatchesSectionProp
             Past ({past.length})
           </Tab>
         </TabList>
-        <TabPanel id="upcoming" className="pt-4 outline-none">
+        <TabPanel id="upcoming" className={PANEL_CLASS}>
           <MatchTable
             matches={upcoming}
             now={now}
             showGame={showGame}
+            showSeason={showSeason}
             showResult={false}
             emptyText="No upcoming matches are scheduled yet."
           />
         </TabPanel>
-        <TabPanel id="past" className="pt-4 outline-none">
+        <TabPanel id="past" className={PANEL_CLASS}>
           <MatchTable
             matches={past}
             now={now}
             showGame={showGame}
+            showSeason={showSeason}
             showResult
             emptyText="No past matches yet."
           />

@@ -51,6 +51,14 @@ describe('toSchoolMatchItem', () => {
     });
   });
 
+  it('reads a school playing its own other squad from the home side', () => {
+    const item = toSchoolMatchItem(
+      row({ awaySchoolId: 'stuy', awaySchoolName: 'Stuyvesant' }),
+      'stuy'
+    );
+    expect(item).toMatchObject({ isHome: true, opponentName: 'Stuyvesant', ownScore: 2 });
+  });
+
   it('keeps redacted scores null', () => {
     const item = toSchoolMatchItem(row({ homeScore: null, awayScore: null }), 'tech');
     expect(item.ownScore).toBeNull();
