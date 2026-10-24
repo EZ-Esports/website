@@ -1,0 +1,144 @@
+'use client';
+
+import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
+import { formatNY } from '@/app/lib/dates';
+import {
+  schoolMatchStatusLabel,
+  splitSchoolMatches,
+  type SchoolMatchItem,
+} from '@/app/lib/school-matches';
+
+interface MatchesSectionProps {
+  matches: SchoolMatchItem[];
+  /** Server clock (ISO). The Upcoming/Past split and status labels must not depend on the browser clock. */
+  nowIso: string;
+  /** Show the Game column when the list spans more than one game. */
+  showGame: boolean;
+}
+
+const TAB_CLASS =
+  'min-h-[44px] px-4 flex items-center text-sm font-semibold cursor-pointer outline-none ' +
+  'text-zinc-500 border-b-2 border-transparent transition-colors ' +
+  'data-[hovered]:text-zinc-300 data-[selected]:text-white data-[selected]:border-accent ' +
+  'data-[focus-visible]:ring-2 data-[focus-visible]:ring-inset data-[focus-visible]:ring-accent';
+
+function resultLabel(match: SchoolMatchItem): string | null {
+  if (match.ownScore === null || match.opponentScore === null) return null;
+  const outcome =
+    match.ownScore > match.opponentScore ? 'W' : match.ownScore < match.opponentScore ? 'L' : 'D';
+  return `${outcome} ${match.ownScore}–${match.opponentScore}`;
+}
+
+function MatchTable({
+  matches,
+  now,
+  showGame,
+  showResult,
+  emptyText,
+}: {
+  matches: SchoolMatchItem[];
+  now: Date;
+  showGame: boolean;
+  showResult: boolean;
+  emptyText: string;
+}) {
+  const columns = 4 + (showGame ? 1 : 0) + (showResult ? 1 : 0);
+  return (
+    <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
+      <table className="w-full min-w-[34rem] text-left text-xs">
+        <thead>
+          <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950/60">
+            <th className="py-3 px-4 font-semibold">When</th>
+            <th className="py-3 px-4 font-semibold">Opponent</th>
+            <th className="py-3 px-4 font-semibold">Division</th>
+            {showGame && <th className="py-3 px-4 font-semibold">Game</th>}
+            <th className="py-3 px-4 font-semibold">Status</th>
+            {showResult && <th className="py-3 px-4 font-semibold">Result</th>}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-800/40">
+          {matches.length === 0 ? (
+            <tr>
+              <td colSpan={columns} className="py-6 text-center text-zinc-500">
+                {emptyText}
+              </td>
+            </tr>
+          ) : (
+            matches.map((match) => {
+              const when = new Date(match.scheduledAt);
+              const result = resultLabel(match);
+              return (
+                <tr key={match.id} className="hover:bg-zinc-800/20">
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    <div className="font-medium text-white">{formatNY(when, 'date-short')}</div>
+                    <div className="text-zinc-400">{formatNY(when, 'time')}</div>
+                  </td>
+                  <td className="py-3 px-4 text-zinc-200">
+                    <span className="font-medium text-white">{match.opponentName}</span>
+                    <span className="ml-2 text-zinc-500">{match.isHome ? 'Home' : 'Away'}</span>
+                  </td>
+                  <td className="py-3 px-4 text-zinc-300">{match.division}</td>
+                  {showGame && <td className="py-3 px-4 text-zinc-300">{match.gameName}</td>}
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300">
+                      {schoolMatchStatusLabel(match, now)}
+                    </span>
+                  </td>
+                  {showResult && (
+                    <td className="py-3 px-4 text-zinc-300 whitespace-nowrap">{result ?? '—'}</td>
+                  )}
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function MatchesSection({ matches, nowIso, showGame }: MatchesSectionProps) {
+  const now = new Date(nowIso);
+  const { upcoming, past } = splitSchoolMatches(matches, now);
+
+  return (
+    <section className="space-y-4 pt-4 border-t border-zinc-800">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="text-lg font-bold text-white">Matches</h2>
+        <span className="text-xs text-zinc-500">All times Eastern (ET)</span>
+      </div>
+
+      <Tabs>
+        <TabList
+          aria-label="Matches"
+          className="flex overflow-x-auto border-b border-zinc-800"
+        >
+          <Tab id="upcoming" className={TAB_CLASS}>
+            Upcoming ({upcoming.length})
+          </Tab>
+          <Tab id="past" className={TAB_CLASS}>
+            Past ({past.length})
+          </Tab>
+        </TabList>
+        <TabPanel id="upcoming" className="pt-4 outline-none">
+          <MatchTable
+            matches={upcoming}
+            now={now}
+            showGame={showGame}
+            showResult={false}
+            emptyText="No upcoming matches are scheduled yet."
+          />
+        </TabPanel>
+        <TabPanel id="past" className="pt-4 outline-none">
+          <MatchTable
+            matches={past}
+            now={now}
+            showGame={showGame}
+            showResult
+            emptyText="No past matches yet."
+          />
+        </TabPanel>
+      </Tabs>
+    </section>
+  );
+}

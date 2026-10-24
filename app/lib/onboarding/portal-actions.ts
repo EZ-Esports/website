@@ -15,6 +15,10 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
+import { getSchoolMatchRows } from '@/app/lib/db/matches';
+import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
+import { redactHiddenMatches } from '@/app/lib/season-outcomes';
+import { toSchoolMatchItem, type SchoolMatchItem } from '@/app/lib/school-matches';
 
 export interface CreatePlayerInviteParams {
   schoolId: string;
@@ -851,6 +855,30 @@ export interface SchoolRosterDetails {
   gameName: string;
   gameSlug: string;
   players: SchoolRosterPlayer[];
+}
+
+/**
+ * A school's matches (either side) for the portal's Matches section. A manager sees only each
+ * managed game's resolved season (matched by name; spec-026), including a view-only one
+ * (spec-028), and never a score or forfeit flag from a season staff have not published
+ * (spec-022); a staff admin sees every season, unredacted.
+ */
+export async function getSchoolMatches(
+  schoolId: string,
+  gameId?: string
+): Promise<SchoolMatchItem[]> {
+  const { scopes } = await resolveManagerScope(schoolId, gameId);
+  if (scopes && scopes.length === 0) return [];
+
+  const rows = await getSchoolMatchRows({
+    schoolId,
+    gameId,
+    seasonIds: scopes ? scopes.map((s) => s.seasonId) : undefined,
+  });
+  const visible = scopes
+    ? redactHiddenMatches(rows, await getOutcomesPublicSeasonIds())
+    : rows;
+  return visible.map((row) => toSchoolMatchItem(row, schoolId));
 }
 
 /**

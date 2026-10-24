@@ -67,6 +67,7 @@ Every `spec-00x` document must follow this structure:
 | [`spec-029`](spec-029-onboarding-consent-form.md) | Onboarding Consent Form (Terms of Service + guardian authorization) | PR #269 | 2026-10-23 | Implemented, merged | New wizard step 5 for players and managers: ToS acknowledgment for everyone, full parent/guardian authorization with e-signature when under 18 (age from the Step 4 date of birth). Validated server-side before any write; stored in new `onboarding_consents` (migration `0052`, applied to production 2026-10-23), versioned by `CONSENT_FORM_VERSION`. |
 
 | [`spec-030`](spec-030-matches-page-redesign.md) | Matches Page Redesign | Branch `feat/matches-page-redesign` | 2026-10-23 | In Progress | `/admin/matches` becomes a work queue: server-side status tabs (Needs results / Upcoming / Completed / All) with server counts, day-grouped read-only rows with an inline result editor and overflow menu, a Schedule match dialog, Division/Sort behind "More filters", nav label "Matches". Raw staff reads preserved; no migration. |
+| [`spec-031`](spec-031-manager-matches-view.md) | Manager Portal Matches View | Branch `feat/manager-matches-view` | 2026-10-24 | In Progress | Read-only Matches section in `/portal`: Upcoming/Past tabs, Eastern Time, opponent, division, game, status, scores hidden until the season is published. Scoped by the manager's season; no migration. Part 1 of #274. |
 
 ---
 

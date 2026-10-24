@@ -17,12 +17,14 @@ import {
   type SchoolPoolPlayer,
   type RosterEligibilityResult,
 } from '@/app/lib/onboarding/portal-actions';
+import type { SchoolMatchItem } from '@/app/lib/school-matches';
 import { PortalHeader } from './components/PortalHeader';
 import { GameTabs, type GameItem } from './components/GameTabs';
 import { GenerateInviteCard } from './components/GenerateInviteCard';
 import { PendingApprovalsCard } from './components/PendingApprovalsCard';
 import { RostersSection } from './components/RostersSection';
 import { InvitesHistoryTable } from './components/InvitesHistoryTable';
+import { MatchesSection } from './components/MatchesSection';
 import { EmergencySwapModal } from './components/EmergencySwapModal';
 import { EnrollPlayerModal } from './components/EnrollPlayerModal';
 import { CreateRosterModal } from './components/CreateRosterModal';
@@ -38,6 +40,9 @@ interface SchoolPortalClientProps {
   initialSubmissions: PendingSubmission[];
   initialRosters: SchoolRosterDetails[];
   initialPlayerPool?: SchoolPoolPlayer[];
+  /** The school's matches (read-only) and the server clock that splits them into Upcoming/Past. */
+  matches: SchoolMatchItem[];
+  matchesNowIso: string;
   selectedGameId?: string;
   /** Season name(s) the manager is working in (matched by name); undefined for a staff admin. */
   seasonLabel?: string;
@@ -63,6 +68,8 @@ export default function SchoolPortalClient({
   initialSubmissions,
   initialRosters,
   initialPlayerPool = [],
+  matches,
+  matchesNowIso,
   selectedGameId: initialGameId,
   seasonLabel,
   hasInactiveSeason = false,
@@ -131,6 +138,9 @@ export default function SchoolPortalClient({
 
   const filteredRosters =
     selectedGame === 'all' ? rosters : rosters.filter((r) => r.gameId === selectedGame);
+
+  const filteredMatches =
+    selectedGame === 'all' ? matches : matches.filter((m) => m.gameId === selectedGame);
 
   // --- Handlers ---
   const handleCopyLink = async (url: string) => {
@@ -609,6 +619,13 @@ export default function SchoolPortalClient({
         onUpdateRole={handleUpdateRole}
         onRemovePlayer={handleRemovePlayer}
         onDeleteRoster={handleDeleteRoster}
+      />
+
+      {/* Scheduled matches (read-only) */}
+      <MatchesSection
+        matches={filteredMatches}
+        nowIso={matchesNowIso}
+        showGame={selectedGame === 'all' && games.length > 1}
       />
 
       {/* Invites Sent Table */}
