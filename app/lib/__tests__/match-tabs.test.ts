@@ -162,6 +162,13 @@ describe('local effect of a saved edit', () => {
     expect(res.items[0]).toMatchObject({ status: 'completed', homeScore: 13, awayScore: 9 });
   });
 
+  it('applied to the latest list (functional update), rows appended meanwhile survive', () => {
+    const stale = list;
+    const latest = [...stale, item('9', 'scheduled', PAST)]; // "Load more" landed during the save
+    const res = applySavedMatch(latest, '1', { status: 'completed', homeScore: 1, awayScore: 0 }, 'needs-results', NOW);
+    expect(res.items.map((i) => i.id)).toEqual(['2', '9']);
+  });
+
   it('marking cancelled moves a row out of Upcoming', () => {
     const res = applySavedMatch([item('3', 'scheduled', FUTURE)], '3', { status: 'cancelled', homeScore: null, awayScore: null }, 'upcoming', NOW);
     expect(res.items).toHaveLength(0);

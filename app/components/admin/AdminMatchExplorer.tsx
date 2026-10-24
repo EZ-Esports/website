@@ -241,6 +241,11 @@ export default function AdminMatchExplorer({
   // the stale state visible) and records the failure; Retry bumps retryTick to run it again.
   const fetchSeq = useRef(0);
   const countsSeq = useRef(0);
+  const reloadSeq = useRef(0);
+  const loadedKeyRef = useRef(matchFacetsKey(loaded));
+  useEffect(() => {
+    loadedKeyRef.current = matchFacetsKey(loaded);
+  }, [loaded]);
   useEffect(() => {
     const seq = ++fetchSeq.current;
     if (matchFacetsKey(facets) === matchFacetsKey(loaded)) return;
@@ -292,21 +297,25 @@ export default function AdminMatchExplorer({
 
   /** Page 1 and totals for the loaded facets, e.g. after a match was scheduled. */
   const reload = () => {
-    const seq = ++fetchSeq.current;
+    // Own sequence guard: bumping fetchSeq here would discard a pending facet refetch
+    // (e.g. a debounced search) and leave `loaded` behind forever. The result is applied
+    // only if no newer reload started and the loaded facets are still the ones reloaded.
+    const seq = ++reloadSeq.current;
+    const key = matchFacetsKey(loaded);
     startLoading(async () => {
       try {
         const [page, nextCounts] = await Promise.all([
           fetchStaffMatchesPage(pageRequest(loaded)),
           fetchStaffMatchTabCounts(pageRequest(loaded)),
         ]);
-        if (seq !== fetchSeq.current) return;
+        if (seq !== reloadSeq.current || key !== loadedKeyRef.current) return;
         countsSeq.current++;
         setItems(page.items);
         setCursor(page.nextCursor);
         setCounts(nextCounts);
         setNowMs(Date.now());
       } catch {
-        if (seq === fetchSeq.current) setToast({ message: 'Could not refresh matches.', type: 'error' });
+        if (seq === reloadSeq.current) setToast({ message: 'Could not refresh matches.', type: 'error' });
       }
     });
   };
@@ -368,8 +377,8 @@ export default function AdminMatchExplorer({
       };
       const at = new Date();
       setNowMs(at.getTime());
-      const next = applySavedMatch(items, match.id, saved, loaded.tab, at);
-      setItems(next.items);
+      // Functional update: rows appended by a concurrent "Load more" while the save was in flight must survive.
+      setItems((prev) => applySavedMatch(prev, match.id, saved, loaded.tab, at).items);
       setToast({ message: successMessage, type: 'success' });
       void refreshCounts();
       setEditingId(null);
