@@ -34,7 +34,7 @@
     "embla-carousel-auto-scroll": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.33.0",
-    "next": "^16.3.8",
+    "next": "^16.4.3",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.3.289",
     "postgres": "^3.4.9",
