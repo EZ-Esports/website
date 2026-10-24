@@ -4,6 +4,7 @@ import { AdminFilterTabs, AdminToast } from '@/app/components/admin/AdminUI';
 import {
   DEFAULT_MATCH_FACETS,
   leagueStatusHref,
+  matchCountsKey,
   matchFacetsKey,
   matchFetchDelayMs,
   shouldAdoptServerPage,
@@ -182,11 +183,19 @@ describe('nextMatchFilterSearch (URL is the source of truth)', () => {
 });
 
 describe('explorer fetch/adoption helpers', () => {
-  const base = { ...DEFAULT_MATCH_FACETS, gameId: 'g1', seasonId: 's1' };
+  const base = { ...DEFAULT_MATCH_FACETS, gameId: 'g1', seasonId: 's1', tab: 'needs-results' as const };
 
   it('keys by value, not identity', () => {
     expect(matchFacetsKey({ ...base })).toBe(matchFacetsKey(base));
     expect(matchFacetsKey({ ...base, search: 'a' })).not.toBe(matchFacetsKey(base));
+    expect(matchFacetsKey({ ...base, tab: 'all' })).not.toBe(matchFacetsKey(base));
+  });
+
+  it('a tab or sort change refetches at once; counts only depend on game/season/division/search', () => {
+    expect(matchFetchDelayMs(base, { ...base, tab: 'completed' })).toBe(0);
+    expect(matchCountsKey({ ...base, search: '' })).toBe(matchCountsKey(base));
+    expect(matchCountsKey(base)).not.toBe(matchCountsKey({ ...base, division: 'JV' }));
+    expect(matchCountsKey(base)).not.toBe(matchCountsKey({ ...base, search: 'x' }));
   });
 
   it('debounces only a pure search change', () => {

@@ -176,7 +176,7 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
     if (matchCount > 0) {
       return {
         success: false as const,
-        error: `This roster has ${matchCount} ${matchCount === 1 ? 'match' : 'matches'}. Delete or reassign ${matchCount === 1 ? 'it' : 'them'} under Matches & Standings first.`,
+        error: `This roster has ${matchCount} ${matchCount === 1 ? 'match' : 'matches'}. Delete or reassign ${matchCount === 1 ? 'it' : 'them'} under Matches first.`,
       };
     }
 

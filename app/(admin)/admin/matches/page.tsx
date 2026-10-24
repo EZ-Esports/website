@@ -1,12 +1,11 @@
-import { getCachedTeams, getCachedRosters, getCachedSeasons, getStaffSeasons, getCachedGames, getMatchesPage } from '@/app/lib/db/queries';
-import MatchScheduleForm from '@/app/components/admin/MatchScheduleForm';
+import { getCachedTeams, getCachedRosters, getCachedSeasons, getStaffSeasons, getCachedGames, getMatchesPage, getMatchTabCounts } from '@/app/lib/db/queries';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
-import { toMatchesPageDto, type MatchPageResponse } from '@/app/lib/db/match-page';
-import { matchesBackLink, parseMatchFilterParams } from '@/app/lib/admin-season-filters';
+import { defaultSortForTab, toMatchesPageDto, type MatchPageResponse, type MatchTabCounts } from '@/app/lib/db/match-page';
+import { defaultMatchTab, matchesBackLink, parseMatchFilterParams } from '@/app/lib/admin-season-filters';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
-import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
+import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
 export default async function AdminMatchesPage({
   searchParams,
@@ -16,6 +15,7 @@ export default async function AdminMatchesPage({
   if (!(await getStaffForAdminSection('/admin/matches'))) return <PermissionDenied />;
 
   const rawParams = await searchParams;
+  const initialTab = defaultMatchTab(rawParams);
 
   let teams: Awaited<ReturnType<typeof getCachedTeams>> = [];
   let rosters: Awaited<ReturnType<typeof getCachedRosters>> = [];
@@ -23,26 +23,30 @@ export default async function AdminMatchesPage({
   let allSeasons: Awaited<ReturnType<typeof getStaffSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
   let initialPage: MatchPageResponse = { items: [], nextCursor: null };
+  let initialCounts: MatchTabCounts | null = null;
   let initialFilters = { gameId: '', seasonId: '' };
   let dbError = false;
+  // One clock for the first page, the totals and the first render, so the three agree on what is overdue.
+  const now = new Date();
 
   try {
     // Game and season come first: the URL filters decide which first page to load.
     const [allSeasonsRes, gamesRes] = await Promise.all([getStaffSeasons(), getCachedGames()]);
     initialFilters = parseMatchFilterParams(rawParams, gamesRes, allSeasonsRes);
-    const [firstPage, teamsRes, rostersRes, activeSeasonsRes] = await Promise.all([
+    const facets = {
+      gameId: initialFilters.gameId || undefined,
+      seasonId: initialFilters.seasonId || undefined,
+    };
+    const [firstPage, counts, teamsRes, rostersRes, activeSeasonsRes] = await Promise.all([
       // Raw staff read (spec-022): never the redacting public query.
-      getMatchesPage({
-        sort: 'desc',
-        limit: 25,
-        gameId: initialFilters.gameId || undefined,
-        seasonId: initialFilters.seasonId || undefined,
-      }),
+      getMatchesPage({ ...facets, tab: initialTab, now, sort: defaultSortForTab(initialTab), limit: 25 }),
+      getMatchTabCounts({ ...facets, now }),
       getCachedTeams(),
       getCachedRosters(),
       getCachedSeasons(),
     ]);
     initialPage = toMatchesPageDto(firstPage);
+    initialCounts = counts;
     teams = teamsRes;
     rosters = rostersRes;
     activeSeasons = activeSeasonsRes;
@@ -52,43 +56,32 @@ export default async function AdminMatchesPage({
     dbError = true;
   }
 
+  if (dbError) {
+    return (
+      <AdminPage>
+        <AdminPageHeader route="/admin/matches" description="Enter results for matches that have been played, and schedule what is next." />
+        <DbErrorNotice variant="error" />
+      </AdminPage>
+    );
+  }
+
   return (
-    <AdminPage>
-      <AdminPageHeader
-        route="/admin/matches"
-        back={matchesBackLink(rawParams.from, allSeasons.find((s) => s.id === initialFilters.seasonId)) ?? undefined}
-        description="Schedule matches and input scores to recalculate team standings and seasonal records."
-      />
-
-      {dbError && <DbErrorNotice variant="error" />}
-
-      {!dbError && (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-          {/* Scheduling column: stays in view while scrolling a long fixture list. */}
-          <AdminSection
-            className="lg:sticky lg:top-20 lg:col-span-1 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
-            title="Schedule a match"
-            description="Register a new scheduled event."
-          >
-            <MatchScheduleForm
-              seasons={activeSeasons}
-              rosters={rosters as any}
-              teams={teams}
-              games={games}
-            />
-          </AdminSection>
-
-          {/* Matches list column */}
-          <div className="min-w-0 lg:col-span-2">
-            <AdminMatchExplorer
-              seasons={allSeasons}
-              games={games}
-              initialPage={initialPage}
-              initialFilters={initialFilters}
-            />
-          </div>
-        </div>
-      )}
-    </AdminPage>
+    <AdminMatchExplorer
+      seasons={allSeasons}
+      games={games}
+      initialPage={initialPage}
+      initialFilters={initialFilters}
+      initialTab={initialTab}
+      initialCounts={initialCounts}
+      serverNow={now.toISOString()}
+      back={matchesBackLink(rawParams.from, allSeasons.find((s) => s.id === initialFilters.seasonId)) ?? undefined}
+      scheduleForm={{
+        seasons: activeSeasons,
+        // The form narrows its own roster shape; the cached query returns the full rows.
+        rosters: rosters as React.ComponentProps<typeof AdminMatchExplorer>['scheduleForm']['rosters'],
+        teams,
+        games,
+      }}
+    />
   );
 }

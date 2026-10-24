@@ -382,7 +382,7 @@ describe('deleteRoster: matches protection', () => {
     const res = await deleteRoster(SCHOOL, 'roster-ok');
     expect(res).toMatchObject({ success: false });
     expect((res as { error: string }).error).toContain('3 matches');
-    expect((res as { error: string }).error).toContain('Matches & Standings');
+    expect((res as { error: string }).error).toContain('under Matches first');
     expect(mocks.writes.filter((w) => w.op === 'delete')).toHaveLength(0);
     expect(mocks.updateTag).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();

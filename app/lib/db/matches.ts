@@ -23,12 +23,15 @@ import {
 import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
   COMBINED_DIVISION,
+  FINISHED_MATCH_STATUSES,
   canonicalDivision,
   clampPageLimit,
   normalizeSort,
   type CanonicalDivision,
   type HubDivision,
   type MatchesPage,
+  type MatchTab,
+  type MatchTabCounts,
   type MatchesPageParams,
   type StandingsFormat,
 } from './match-page';
@@ -70,6 +73,47 @@ const awayTeam = alias(schema.teams, 'away_team');
 const homeSchool = alias(schema.schools, 'home_school');
 const awaySchool = alias(schema.schools, 'away_school');
 
+/** The SQL mirror of `matchTabOf` (match-page.ts); keep the two in step. */
+export function matchTabCondition(tab: MatchTab, now: Date): SQL | undefined {
+  switch (tab) {
+    case 'needs-results':
+      return and(eq(schema.matches.status, 'scheduled'), lt(schema.matches.scheduledAt, now));
+    case 'upcoming':
+      return or(
+        eq(schema.matches.status, 'live'),
+        and(eq(schema.matches.status, 'scheduled'), gte(schema.matches.scheduledAt, now))
+      );
+    case 'completed':
+      return inArray(schema.matches.status, [...FINISHED_MATCH_STATUSES]);
+    default:
+      return undefined;
+  }
+}
+
+/** Every facet except the tab, sort and cursor: shared by the page query and the tab counts. */
+function facetConditions(params: MatchesPageParams): SQL[] {
+  const conditions: SQL[] = [];
+  if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
+  if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
+  if (params.division && params.division !== COMBINED_DIVISION) {
+    const targetDiv = canonicalDivision(params.division);
+    conditions.push(
+      or(
+        eq(canonicalDivisionSql(homeRoster.division), targetDiv),
+        eq(canonicalDivisionSql(awayRoster.division), targetDiv)
+      )!
+    );
+  }
+  if (params.status) conditions.push(eq(schema.matches.status, params.status));
+  if (params.from) conditions.push(gte(schema.matches.scheduledAt, params.from));
+  if (params.to) conditions.push(lte(schema.matches.scheduledAt, params.to));
+  if (params.search) {
+    const pattern = `%${params.search.replace(/[%_\\]/g, '\\$&')}%`;
+    conditions.push(or(ilike(homeSchool.name, pattern), ilike(awaySchool.name, pattern))!);
+  }
+  return conditions;
+}
+
 /**
  * Keyset-paginated match list with division + school names joined in.
  * Sorted by (scheduledAt, id); `cursor` is the sort key of the last row of
@@ -80,30 +124,16 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
   const sort = normalizeSort(params.sort);
   const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
 
-  const conditions = [];
-  if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
-  if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
-  if (params.division && params.division !== COMBINED_DIVISION) {
-    const targetDiv = canonicalDivision(params.division);
-    conditions.push(
-      or(
-        eq(canonicalDivisionSql(homeRoster.division), targetDiv),
-        eq(canonicalDivisionSql(awayRoster.division), targetDiv)
-      )
-    );
-  }
-  if (params.status) conditions.push(eq(schema.matches.status, params.status));
-  if (params.from) conditions.push(gte(schema.matches.scheduledAt, params.from));
-  if (params.to) conditions.push(lte(schema.matches.scheduledAt, params.to));
-  if (params.search) {
-    const pattern = `%${params.search.replace(/[%_\\]/g, '\\$&')}%`;
-    conditions.push(or(ilike(homeSchool.name, pattern), ilike(awaySchool.name, pattern)));
+  const conditions: SQL[] = facetConditions(params);
+  if (params.tab) {
+    const tabCondition = matchTabCondition(params.tab, params.now ?? new Date());
+    if (tabCondition) conditions.push(tabCondition);
   }
   if (params.cursor) {
     const ts = new Date(params.cursor.scheduledAt);
     const { id } = params.cursor;
     conditions.push(
-      sort === 'desc'
+      (sort === 'desc'
         ? or(
             lt(schema.matches.scheduledAt, ts),
             and(eq(schema.matches.scheduledAt, ts), lt(schema.matches.id, id))
@@ -111,7 +141,7 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
         : or(
             gt(schema.matches.scheduledAt, ts),
             and(eq(schema.matches.scheduledAt, ts), gt(schema.matches.id, id))
-          )
+          ))!
     );
   }
 
@@ -155,6 +185,43 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
       rows.length > limit && last
         ? { scheduledAt: last.scheduledAt.toISOString(), id: last.id }
         : null,
+  };
+}
+
+/**
+ * Per-tab totals for the staff Matches page, over the same facets (game, season,
+ * division, search) as the list and one consistent `now`, so a tab's badge equals
+ * the number of rows paging through that tab will deliver. Staff only: raw
+ * (unredacted) statuses, like `getMatchesPage`.
+ */
+export async function getMatchTabCounts(
+  params: Omit<MatchesPageParams, 'tab' | 'cursor' | 'sort' | 'limit'>
+): Promise<MatchTabCounts> {
+  const now = params.now ?? new Date();
+  const conditions = facetConditions(params);
+  const tally = (tab: Exclude<MatchTab, 'all'>) =>
+    sql<number>`count(*) filter (where ${matchTabCondition(tab, now)})`.mapWith(Number);
+  const [row] = await db
+    .select({
+      all: sql<number>`count(*)`.mapWith(Number),
+      needsResults: tally('needs-results'),
+      upcoming: tally('upcoming'),
+      completed: tally('completed'),
+    })
+    .from(schema.matches)
+    .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .where(conditions.length ? and(...conditions) : undefined);
+  return {
+    'needs-results': row?.needsResults ?? 0,
+    upcoming: row?.upcoming ?? 0,
+    completed: row?.completed ?? 0,
+    all: row?.all ?? 0,
   };
 }
 

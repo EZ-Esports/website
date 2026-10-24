@@ -207,11 +207,89 @@ export interface MatchCursor {
   id: string;
 }
 
+/**
+ * Staff Matches tabs. The tab is a server-side filter (never a client filter over
+ * loaded rows) so counts and pagination stay correct across pages.
+ *
+ * - `needs-results`: still `scheduled` but the start time has passed.
+ * - `upcoming`: `live`, or `scheduled` and not yet started.
+ * - `completed`: finished one way or another (`completed`, `forfeit`, `cancelled`).
+ * - `all`: no tab filter.
+ *
+ * "Past" is decided on UTC instants (`scheduledAt < now`), never on a wall-clock
+ * date, so it is the same in every timezone and across DST changes.
+ */
+export type MatchTab = 'needs-results' | 'upcoming' | 'completed' | 'all';
+
+export const MATCH_TABS: readonly MatchTab[] = ['needs-results', 'upcoming', 'completed', 'all'];
+
+export const MATCH_TAB_LABELS: Record<MatchTab, string> = {
+  'needs-results': 'Needs results',
+  upcoming: 'Upcoming',
+  completed: 'Completed',
+  all: 'All',
+};
+
+/** Statuses a finished match can have. Single source for the SQL and the pure bucket below. */
+export const FINISHED_MATCH_STATUSES: readonly MatchStatus[] = ['completed', 'forfeit', 'cancelled'];
+
+export function isMatchTab(value: unknown): value is MatchTab {
+  return typeof value === 'string' && (MATCH_TABS as readonly string[]).includes(value);
+}
+
+/** True when a scheduled start has passed at `now` (equal instants are not past). */
+export function isPastInstant(scheduledAt: Date | string, now: Date): boolean {
+  return new Date(scheduledAt).getTime() < now.getTime();
+}
+
+/** Scheduled, started already, and no result entered yet. */
+export function needsResult(match: { status: MatchStatus; scheduledAt: Date | string }, now: Date): boolean {
+  return match.status === 'scheduled' && isPastInstant(match.scheduledAt, now);
+}
+
+/** The one non-`all` tab a match belongs to. The SQL tab filter mirrors this exactly. */
+export function matchTabOf(
+  match: { status: MatchStatus; scheduledAt: Date | string },
+  now: Date
+): Exclude<MatchTab, 'all'> {
+  if (FINISHED_MATCH_STATUSES.includes(match.status)) return 'completed';
+  return needsResult(match, now) ? 'needs-results' : 'upcoming';
+}
+
+export function matchInTab(
+  match: { status: MatchStatus; scheduledAt: Date | string },
+  tab: MatchTab,
+  now: Date
+): boolean {
+  return tab === 'all' || matchTabOf(match, now) === tab;
+}
+
+/** Work queues read oldest first (the most overdue on top); history reads newest first. */
+export function defaultSortForTab(tab: MatchTab): MatchSort {
+  return tab === 'needs-results' || tab === 'upcoming' ? 'asc' : 'desc';
+}
+
+/** The sort to request: the staff member's explicit pick, else the tab's default. */
+export function effectiveSort(tab: MatchTab, pick: MatchSort | 'auto'): MatchSort {
+  return pick === 'auto' ? defaultSortForTab(tab) : pick;
+}
+
+export interface MatchTabCounts {
+  'needs-results': number;
+  upcoming: number;
+  completed: number;
+  all: number;
+}
+
 export interface MatchesPageParams {
   gameId?: string;
   seasonId?: string;
   division?: string;
   status?: MatchStatus;
+  /** Staff tab filter (see MatchTab); combined with `status` when both are given. */
+  tab?: MatchTab;
+  /** The instant "past" is measured against. Defaults to the time of the query. */
+  now?: Date;
   /** Case-insensitive substring match against either school name. */
   search?: string;
   from?: Date;

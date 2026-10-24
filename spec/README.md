@@ -66,6 +66,8 @@ Every `spec-00x` document must follow this structure:
 | [`spec-028`](spec-028-manager-past-season-view-only.md) | Manager Inactive Season View-Only (file slug says "past"; the rule was simplified) | Branch `feat/schools-roster-view` | 2026-10-22 | Implemented, not yet merged | A manager whose resolved season is INACTIVE (`seasons.is_active` false, older OR newer than the game's active season) can only view it: every write is refused by the existing guards (`allowInactive` opt-out for reads), UI shows a view-only banner and chip. Active season unchanged (roster lock still applies); staff admins exempt; no migration. No name comparison anywhere. |
 | [`spec-029`](spec-029-onboarding-consent-form.md) | Onboarding Consent Form (Terms of Service + guardian authorization) | PR #269 | 2026-10-23 | Implemented, merged | New wizard step 5 for players and managers: ToS acknowledgment for everyone, full parent/guardian authorization with e-signature when under 18 (age from the Step 4 date of birth). Validated server-side before any write; stored in new `onboarding_consents` (migration `0052`, applied to production 2026-10-23), versioned by `CONSENT_FORM_VERSION`. |
 
+| [`spec-030`](spec-030-matches-page-redesign.md) | Matches Page Redesign | Branch `feat/matches-page-redesign` | 2026-10-23 | In Progress | `/admin/matches` becomes a work queue: server-side status tabs (Needs results / Upcoming / Completed / All) with server counts, day-grouped read-only rows with an inline result editor and overflow menu, a Schedule match dialog, Division/Sort behind "More filters", nav label "Matches". Raw staff reads preserved; no migration. |
+
 ---
 
 Companion docs (read those, don’t copy them here):
