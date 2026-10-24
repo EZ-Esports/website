@@ -1,10 +1,12 @@
 /**
  * Pure helpers for the staff season filters (spec-025): the Active / Inactive /
  * All tabs on League Setup, the League Setup -> Matches deep link, and the
- * URL-param validation behind Matches & Standings' initial game / season.
+ * URL-param validation behind Matches' initial game / season.
  * Free of DB and Next imports so it is unit testable and importable from both
  * server pages and client components.
  */
+
+import type { MatchTab } from './db/match-page';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -39,18 +41,18 @@ export function leagueStatusHref(status: SeasonStatusFilter): string {
 export function seasonMatchesHref(seasonId: string, gameSlug?: string | null): string {
   const params = new URLSearchParams({ season: seasonId });
   if (gameSlug) params.set('game', gameSlug);
-  params.set(MATCHES_ORIGIN_PARAM, 'league');
+  params.set(MATCHES_ORIGIN_PARAM, MATCHES_ORIGIN_VALUE);
   return `/admin/matches?${params.toString()}`;
 }
 
 /**
- * `from=league` marks a Matches & Standings visit that began on a League Setup
+ * `from=league` marks a Matches visit that began on a League Setup
  * season row, so the page can offer a back arrow. Only known values count.
  */
 export const MATCHES_ORIGIN_PARAM = 'from';
 
 /**
- * The back arrow for Matches & Standings when it was opened from League Setup:
+ * The back arrow for Matches when it was opened from League Setup:
  * returns to the tab the season lives on (an inactive season's row is not on
  * the default Active tab). Null for a plain visit or an unknown `from`.
  */
@@ -59,7 +61,7 @@ export function matchesBackLink(
   season?: { isActive: boolean } | null,
 ): { href: string; label: string } | null {
   const value = Array.isArray(from) ? from[0] : from;
-  if (value !== 'league') return null;
+  if (value !== MATCHES_ORIGIN_VALUE) return null;
   return { href: leagueStatusHref(season ? seasonTab(season.isActive) : 'active'), label: 'League Setup' };
 }
 
@@ -72,7 +74,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 export const ALL_SEASONS_PARAM = 'all';
 
 /**
- * Resolve Matches & Standings' initial game and season from the URL. Unknown
+ * Resolve Matches' initial game and season from the URL. Unknown
  * slugs and ids are ignored (never an error). A season alone selects its game;
  * if a season and a game conflict, the season wins. A game with no season
  * param defaults to that game's active season (when it has one) unless
@@ -191,26 +193,60 @@ export function nextMatchFilterSearch(
   return out.toString();
 }
 
+/** The only `from` value the page understands (see `MATCHES_ORIGIN_PARAM`). */
+export const MATCHES_ORIGIN_VALUE = 'league';
+
+/**
+ * The status tab a Matches visit opens on. A plain visit is the work queue
+ * ("Needs results"). A visit that arrives with a season (League Setup's "View
+ * matches" link, which also sets `from=league`, or any `?season=<id>` link)
+ * is looking at that season's fixtures, so it opens on "All" instead of an
+ * often-empty queue. `season=all` is only the explorer's own "All seasons"
+ * marker and does not count as arriving with a season.
+ */
+export function defaultMatchTab(params: {
+  season?: string | string[];
+  from?: string | string[];
+}): MatchTab {
+  if (first(params.from) === MATCHES_ORIGIN_VALUE) return 'all';
+  const season = first(params.season)?.trim();
+  if (season && season !== ALL_SEASONS_PARAM) return 'all';
+  return 'needs-results';
+}
+
 /** The explorer's full filter state; game and season come from the URL, the rest is local. */
 export interface MatchFacets {
   gameId: string;
   seasonId: string;
   division: string;
-  status: string;
+  tab: MatchTab;
   search: string;
-  sort: 'asc' | 'desc';
+  /** 'auto' follows the tab's default order; an explicit pick overrides it. */
+  sort: 'auto' | 'asc' | 'desc';
 }
 
-export const DEFAULT_MATCH_FACETS: Pick<MatchFacets, 'division' | 'status' | 'search' | 'sort'> = {
+export const DEFAULT_MATCH_FACETS: Pick<MatchFacets, 'division' | 'search' | 'sort'> = {
   division: '',
-  status: '',
   search: '',
-  sort: 'desc',
+  sort: 'auto',
 };
+
+/** Whether Division or Sort (the "More filters" disclosure) differ from their defaults. */
+export function hasActiveMoreFilters(f: Pick<MatchFacets, 'division' | 'sort'>): boolean {
+  return f.division !== DEFAULT_MATCH_FACETS.division || f.sort !== DEFAULT_MATCH_FACETS.sort;
+}
 
 /** Value-equality key for a facet set (compare loaded rows against what is requested). */
 export function matchFacetsKey(f: MatchFacets): string {
-  return JSON.stringify([f.gameId, f.seasonId, f.division, f.status, f.search, f.sort]);
+  return JSON.stringify([f.gameId, f.seasonId, f.division, f.tab, f.search, f.sort]);
+}
+
+/**
+ * Key of the facets the tab totals depend on. The tab and sort are excluded: the
+ * counts cover every tab, so switching tab or sort never needs new totals.
+ */
+export function matchCountsKey(f: Pick<MatchFacets, 'gameId' | 'seasonId' | 'division' | 'search'>): string {
+  return JSON.stringify([f.gameId, f.seasonId, f.division, f.search]);
 }
 
 /** Debounce only a pure search-text change; any other facet change refetches at once. */
@@ -230,7 +266,7 @@ export function shouldAdoptServerPage(
   ownWrite?: { gameId: string; seasonId: string } | null,
 ): boolean {
   // A refresh that lands for filters this component just wrote itself (select change whose
-  // fetch is still pending) is not a navigation: adopting would reset division/status/search/sort.
+  // fetch is still pending) is not a navigation: adopting would reset division/tab/search/sort.
   if (ownWrite && server.gameId === ownWrite.gameId && server.seasonId === ownWrite.seasonId) return false;
   return server.gameId !== shown.gameId || server.seasonId !== shown.seasonId;
 }
