@@ -101,10 +101,10 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         description: 'Games and seasons everything else depends on.',
       },
       {
-        label: 'Matches & Standings',
+        label: 'Matches',
         href: '/admin/matches',
         icon: HiOutlineCalendarDays,
-        description: 'Schedule fixtures and enter results.',
+        description: 'Enter results for played matches and schedule what is next.',
       },
       {
         label: 'Schools & Rosters',

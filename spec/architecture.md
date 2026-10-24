@@ -68,6 +68,10 @@ All league competition occurs in NYC and canonicalizes to Eastern Time (`America
 
 ---
 
+## Staff match list: tabs and counts are server-side (spec-030)
+
+`getMatchesPage` accepts a `tab` (`needs-results | upcoming | completed | all`) and a `now`; "past" is a UTC-instant comparison against the server clock, mirrored by the pure `matchTabOf` in `db/match-page.ts`. Per-tab totals come from one aggregate (`getMatchTabCounts`) over the same facets, so counts and keyset pagination agree per tab. Staff-only actions `fetchStaffMatchesPage` / `fetchStaffMatchTabCounts`; the public `fetchMatchesPage` drops `tab` as it drops `status`.
+
 ## Caching
 
 `unstable_cache` tags at HEAD: `games`, `schools`, `members`, `teams`, `seasons`, `matches`, `rosters`, `players`, `news`, `leadership`, `people`, `tournaments`, `sponsors`, `page-content`, `gallery-images`. `recent-results` is a cache **key** on the League Pulse query, not a tag — its tags are `matches`, `schools`, `rosters`, `teams`, `games`, `seasons`. Admin mutators call `updateTag(tag)` (PR #195). Entries live in **Vercel Data Cache** and survive redeploys. UUID-changing seeds/migrations leave pages empty against a healthy DB — that is the July 30 failure mode. After `9219ef5`, gold upserts exist specifically so row IDs stay stable. There is still no dedicated cache-purge tool.

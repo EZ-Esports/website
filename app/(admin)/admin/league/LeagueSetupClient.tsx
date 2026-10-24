@@ -431,7 +431,7 @@ function SeasonRow({
 }: {
   season: DBSeason;
   gameName: string;
-  /** Matches & Standings pre-filtered to this season and game. */
+  /** Matches pre-filtered to this season and game. */
   matchesHref: string;
   isPending: boolean;
   onUpdate: (fd: FormData) => Promise<boolean>;
@@ -516,7 +516,7 @@ function SeasonRow({
               href={matchesHref}
               className={chipButton('ghost')}
               aria-label={`View matches for ${gameName} season ${season.name}`}
-              title="Open Matches & Standings filtered to this season"
+              title="Open Matches filtered to this season"
             >
               <FiList aria-hidden className="h-3.5 w-3.5" />
               View matches
