@@ -10,6 +10,7 @@ import {
   getPendingSubmissions,
   getSchoolRosters,
   getSchoolPlayerPool,
+  getSchoolMatches,
 } from '@/app/lib/onboarding/portal-actions';
 import { getCachedGames } from '@/app/lib/db/queries';
 import SchoolPortalClient from './SchoolPortalClient';
@@ -88,11 +89,19 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
   const lockedSeasonLabel = [...new Set(lockedScopes.map((s) => s.seasonName))].join(', ');
 
   // Load initial invites, submissions, rosters, and eligible player pool for the active school
-  const [initialInvites, initialSubmissions, initialRosters, initialPlayerPool, tourCompleted] = await Promise.all([
+  const [
+    initialInvites,
+    initialSubmissions,
+    initialRosters,
+    initialPlayerPool,
+    initialMatches,
+    tourCompleted,
+  ] = await Promise.all([
     getSchoolInvites(activeSchool.schoolId, paramGameId),
     getPendingSubmissions(activeSchool.schoolId, paramGameId),
     getSchoolRosters(activeSchool.schoolId, paramGameId),
     getSchoolPlayerPool(activeSchool.schoolId, paramGameId),
+    getSchoolMatches(activeSchool.schoolId, paramGameId),
     hasCompletedPortalTour(context.userId),
   ]);
 
@@ -106,6 +115,8 @@ export default async function PortalPage({ searchParams }: PortalPageProps) {
         initialSubmissions={initialSubmissions}
         initialRosters={initialRosters}
         initialPlayerPool={initialPlayerPool}
+        matches={initialMatches}
+        matchesNowIso={new Date().toISOString()}
         selectedGameId={paramGameId}
         seasonLabel={seasonLabel}
         hasInactiveSeason={hasInactiveSeason}

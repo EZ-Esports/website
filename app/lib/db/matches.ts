@@ -44,6 +44,7 @@ import {
   hubDivisionSql,
 } from './standings';
 import { redactHiddenMatches } from '../season-outcomes';
+import type { SchoolMatchRow } from '../school-matches';
 import { canonicalGameSlug, dbGameSlug } from '../constants';
 
 /** Default page size for public-facing paginated lists. */
@@ -287,6 +288,56 @@ export async function getPublicSeasonMatches(seasonId: string, division?: string
     getOutcomesPublicSeasonIds(),
   ]);
   return redactHiddenMatches(matches, publicIds);
+}
+
+/**
+ * Every match a school plays in (either side), oldest first, with raw outcomes. `seasonIds`
+ * restricts to those seasons (a manager's resolved seasons); omit it for a staff admin. Callers
+ * that are not staff must redact unpublished outcomes themselves (`redactHiddenMatches`).
+ */
+export async function getSchoolMatchRows(params: {
+  schoolId: string;
+  seasonIds?: string[];
+  gameId?: string;
+}): Promise<SchoolMatchRow[]> {
+  const conditions: SQL[] = [
+    or(eq(homeTeam.schoolId, params.schoolId), eq(awayTeam.schoolId, params.schoolId))!,
+    // A removed school's fixtures are hidden everywhere else, so the opponent's manager must not
+    // keep seeing a match against it.
+    isNull(homeSchool.deletedAt),
+    isNull(awaySchool.deletedAt),
+  ];
+  if (params.seasonIds) conditions.push(inArray(schema.matches.seasonId, params.seasonIds));
+  if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
+
+  return db
+    .select({
+      id: schema.matches.id,
+      seasonId: schema.matches.seasonId,
+      seasonName: schema.seasons.name,
+      gameId: schema.games.id,
+      gameName: schema.games.displayName,
+      scheduledAt: schema.matches.scheduledAt,
+      status: schema.matches.status,
+      homeScore: schema.matches.homeScore,
+      awayScore: schema.matches.awayScore,
+      division: canonicalDivisionSql(homeRoster.division),
+      homeSchoolId: homeSchool.id,
+      homeSchoolName: homeSchool.name,
+      awaySchoolId: awaySchool.id,
+      awaySchoolName: awaySchool.name,
+    })
+    .from(schema.matches)
+    .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+    .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .where(and(...conditions))
+    .orderBy(asc(schema.matches.scheduledAt), asc(schema.matches.id));
 }
 
 /** Count of all scheduled matches (for dashboard). */

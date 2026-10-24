@@ -7,8 +7,9 @@
  * the server, before data reaches a component: a number hidden by CSS or a
  * client-side `if` is still in the HTML and the RSC payload.
  *
- * Scope: only a season's `outcomes_finalized_at` decides. Staff and portal
- * views never call these; they read the raw tables.
+ * Scope: only a season's `outcomes_finalized_at` decides. Staff views never
+ * call these; they read the raw tables. The school manager portal is not
+ * staff: its match list redacts through here (staff admins in the portal do not).
  */
 /** Shown wherever a hidden season's standings, results or records would be. */
 export const OUTCOMES_PENDING_NOTICE = 'Results will be published once the season is complete.';
