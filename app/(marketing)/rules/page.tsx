@@ -301,17 +301,28 @@ export default function RulesPage() {
             <div className="space-y-3">
               <h3 className="text-lg font-bold text-foreground">4.3 Rescheduling Protocol</h3>
               <p>
-                Matches may only be rescheduled due to school-sanctioned events, campus closures, exam conflicts, or documented emergencies:
+                Reschedules are requested through the school manager portal and must be agreed to by both teams:
               </p>
               <ul className="list-disc pl-6 space-y-1.5 text-sm">
                 <li>
-                  Both team captains and/or faculty advisors must agree upon a proposed new match time in writing.
+                  <strong className="text-foreground">Proposal:</strong> The requesting team proposes at least two different dates and times,
+                  no two within one hour of each other. The opposing team must accept one of them.
                 </li>
                 <li>
-                  Reschedule requests must be submitted to League Operations via the designated portal at least 48 hours prior to the original match time.
+                  <strong className="text-foreground">On-Time Request (72+ hours):</strong> Requests must be submitted at least 72 hours before
+                  the scheduled start time. If a match rescheduled on time is still not played, the requesting team forfeits.
                 </li>
                 <li>
-                  All rescheduled matches must be completed before the subsequent week&apos;s round of regular season competition commences.
+                  <strong className="text-foreground">Late Request (under 72 hours):</strong> The opposing team may accept or decline at their
+                  discretion.
+                </li>
+                <li>
+                  <strong className="text-foreground">Final Once Agreed:</strong> Once both sides have agreed to reschedule, neither side may
+                  revert to the original date. A match cannot be rescheduled if both teams have already agreed to the original date.
+                </li>
+                <li>
+                  <strong className="text-foreground">Deadline:</strong> Rescheduled matches must be completed before the end of the regular
+                  season. Failure to report a score by the deadline results in a double forfeit.
                 </li>
               </ul>
             </div>
