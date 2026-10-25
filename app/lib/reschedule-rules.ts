@@ -98,7 +98,7 @@ export function rescheduleStatusLabel(status: RescheduleStatus): string {
     case 'pending_staff':
       return 'Waiting for staff';
     case 'approved':
-      return 'Approved';
+      return 'Rescheduled';
     case 'declined_opponent':
     case 'declined_staff':
       return 'Declined';

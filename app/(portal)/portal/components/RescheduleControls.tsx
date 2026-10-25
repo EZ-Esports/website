@@ -256,19 +256,95 @@ function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: 
   );
 }
 
-function CancelButton({ requestId, schoolId }: { requestId: string; schoolId: string }) {
-  const { pending, error, run } = useRescheduleAction();
+/**
+ * Read-only detail of a request this school is part of. The requester can cancel from here while
+ * the opponent has not answered, so cancelling is always a deliberate step after seeing what was sent.
+ */
+function ViewDialog({
+  match,
+  schoolId,
+  canCancel,
+}: {
+  match: SchoolMatchItem;
+  schoolId: string;
+  canCancel: boolean;
+}) {
+  const request = match.reschedule!;
+  const [open, setOpen] = useState(false);
+  const { pending, error, setError, run } = useRescheduleAction(() => setOpen(false));
+  const iAmRequester = request.requestedBySchoolId === schoolId;
+
   return (
-    <div className="space-y-1">
-      <Button
-        isDisabled={pending}
-        onPress={() => run(() => cancelReschedule({ requestId, schoolId }))}
-        className={`${QUIET_BUTTON} data-[disabled]:opacity-50`}
-      >
-        {pending ? 'Cancelling…' : 'Cancel request'}
-      </Button>
-      <ErrorNotice message={error} />
-    </div>
+    <DialogTrigger isOpen={open} onOpenChange={(next) => (setOpen(next), next || setError(null))}>
+      <Button className={QUIET_BUTTON}>View request</Button>
+      <Overlay isDismissable>
+        <Modal className={MODAL_CLASS}>
+          <Dialog className="outline-none space-y-4" aria-label="Reschedule request details">
+            <div>
+              <Heading className="font-bold text-white text-base">
+                {iAmRequester ? 'Your reschedule request' : 'Reschedule request'}
+              </Heading>
+              <p className="text-xs text-zinc-400">
+                vs {match.opponentName} · currently {when(match.scheduledAt)}
+              </p>
+            </div>
+            <p className="text-sm text-zinc-200">
+              {request.status === 'pending_opponent'
+                ? iAmRequester
+                  ? `Waiting for ${match.opponentName}`
+                  : `${request.requestedBySchoolName} requested a reschedule`
+                : rescheduleStatusLabel(request.status)}
+              {request.status === 'pending_staff' && (
+                <span className="block text-xs text-zinc-400">
+                  {match.opponentName} agreed. EZ Esports staff still have to approve it.
+                </span>
+              )}
+            </p>
+            {request.isLate && (
+              <p className="p-3 text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-lg">
+                Made with under 72 hours’ notice, so the other school could accept or decline at their
+                discretion.
+              </p>
+            )}
+            <p className="text-sm text-zinc-300">
+              <span className="text-zinc-500">Reason: </span>
+              {request.reason}
+            </p>
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-zinc-300">Proposed times (ET)</p>
+              <ul className="space-y-1.5">
+                {request.options.map((option) => (
+                  <li
+                    key={option.id}
+                    className="flex min-h-[44px] sm:min-h-0 items-center justify-between gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-200"
+                  >
+                    {when(option.proposedAt)}
+                    {option.id === request.acceptedOptionId && (
+                      <span className="text-[10px] font-bold text-emerald-400">Agreed</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <ErrorNotice message={error} />
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button onPress={() => setOpen(false)} className={QUIET_BUTTON}>
+                Close
+              </Button>
+              {canCancel && (
+                <Button
+                  isDisabled={pending}
+                  onPress={() => run(() => cancelReschedule({ requestId: request.id, schoolId }))}
+                  className={`${BUTTON} text-rose-300 border border-rose-800/60 hover:bg-rose-950/40 data-[disabled]:opacity-50`}
+                >
+                  {pending ? 'Cancelling…' : 'Cancel request'}
+                </Button>
+              )}
+            </div>
+          </Dialog>
+        </Modal>
+      </Overlay>
+    </DialogTrigger>
   );
 }
 
@@ -282,15 +358,25 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
 
   if (request && isOpenStatus(request.status)) {
     const accepted = request.options.find((o) => o.id === request.acceptedOptionId);
+    const waitingForMe = !iAmRequester && canOpponentRespond(request.status);
     return (
       <div className="space-y-1.5">
-        <div className="text-zinc-300">{rescheduleStatusLabel(request.status)}</div>
+        <div className="text-zinc-300">
+          {request.status === 'pending_staff'
+            ? 'Waiting for staff'
+            : iAmRequester
+              ? `Waiting for ${match.opponentName}`
+              : `${request.requestedBySchoolName} requested a reschedule`}
+        </div>
         {accepted && <div className="text-zinc-500">Agreed: {when(accepted.proposedAt)}</div>}
-        {!viewOnly && iAmRequester && canCancelRequest(request.status) && (
-          <CancelButton requestId={request.id} schoolId={schoolId} />
-        )}
-        {!viewOnly && !iAmRequester && canOpponentRespond(request.status) && (
+        {waitingForMe && !viewOnly ? (
           <RespondDialog match={match} schoolId={schoolId} />
+        ) : (
+          <ViewDialog
+            match={match}
+            schoolId={schoolId}
+            canCancel={!viewOnly && iAmRequester && canCancelRequest(request.status)}
+          />
         )}
       </div>
     );
@@ -301,6 +387,9 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
       {request && request.status !== 'cancelled' && (
         <div className="text-zinc-400">
           {rescheduleStatusLabel(request.status)}
+          {request.status === 'approved' && match.rescheduledFrom && (
+            <div className="text-zinc-500">Moved from {when(match.rescheduledFrom)}</div>
+          )}
           {request.staffNote && <div className="text-zinc-500">{request.staffNote}</div>}
         </div>
       )}

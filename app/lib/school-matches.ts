@@ -44,6 +44,8 @@ export interface SchoolMatchItem {
   sameSchool: boolean;
   /** The match's most recent reschedule request, open or resolved; null when it never had one. */
   reschedule: RescheduleRequestItem | null;
+  /** The time staff moved this match from (ISO), when an approved request ever moved it. */
+  rescheduledFrom: string | null;
 }
 
 /**
@@ -53,7 +55,8 @@ export interface SchoolMatchItem {
 export function toSchoolMatchItem(
   row: SchoolMatchRow,
   schoolId: string,
-  reschedule: RescheduleRequestItem | null = null
+  reschedule: RescheduleRequestItem | null = null,
+  rescheduledFrom: string | null = null
 ): SchoolMatchItem {
   const isHome = row.homeSchoolId === schoolId;
   return {
@@ -70,6 +73,7 @@ export function toSchoolMatchItem(
     opponentScore: isHome ? row.awayScore : row.homeScore,
     sameSchool: row.homeSchoolId === row.awaySchoolId,
     reschedule,
+    rescheduledFrom,
   };
 }
 
@@ -112,7 +116,7 @@ export function splitSchoolMatches(
 }
 
 export function schoolMatchStatusLabel(
-  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt'>,
+  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt'> & { rescheduledFrom?: string | null },
   now: Date
 ): string {
   switch (item.status) {
@@ -125,6 +129,8 @@ export function schoolMatchStatusLabel(
     case 'cancelled':
       return 'Cancelled';
     default:
-      return matchTabOf(item, now) === 'upcoming' ? 'Scheduled' : 'Awaiting result';
+      if (matchTabOf(item, now) !== 'upcoming') return 'Awaiting result';
+      // A moved match that has not been played yet reads "Rescheduled" instead of "Scheduled".
+      return item.rescheduledFrom ? 'Rescheduled' : 'Scheduled';
   }
 }

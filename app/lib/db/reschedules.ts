@@ -82,6 +82,34 @@ export async function getLatestRescheduleRequests(
   return latest;
 }
 
+/**
+ * For each match staff have moved, the time it moved from (ISO), taken from its most recent
+ * approved request. Kept apart from `getLatestRescheduleRequests` so the "rescheduled" marker
+ * survives a later request being declined or cancelled.
+ */
+export async function getRescheduledFrom(matchIds: string[]): Promise<Map<string, string>> {
+  const movedFrom = new Map<string, string>();
+  if (matchIds.length === 0) return movedFrom;
+
+  const rows = await db
+    .select({
+      matchId: schema.matchRescheduleRequests.matchId,
+      originalScheduledAt: schema.matchRescheduleRequests.originalScheduledAt,
+    })
+    .from(schema.matchRescheduleRequests)
+    .where(
+      and(
+        inArray(schema.matchRescheduleRequests.matchId, matchIds),
+        eq(schema.matchRescheduleRequests.status, 'approved')
+      )
+    )
+    .orderBy(desc(schema.matchRescheduleRequests.decidedAt), desc(schema.matchRescheduleRequests.id));
+  for (const row of rows) {
+    if (!movedFrom.has(row.matchId)) movedFrom.set(row.matchId, row.originalScheduledAt.toISOString());
+  }
+  return movedFrom;
+}
+
 /** Requests the opponent has accepted and staff still have to approve or decline, oldest first. */
 export async function getStaffRescheduleQueue(): Promise<StaffRescheduleItem[]> {
   const rows = await db

@@ -114,6 +114,15 @@ describe('schoolMatchStatusLabel', () => {
     expect(at('2026-10-30T22:00:00.000Z', 'cancelled')).toBe('Cancelled');
     expect(at('2026-10-24T11:00:00.000Z', 'live')).toBe('Live');
   });
+
+  it('calls an unplayed match that staff moved "Rescheduled", but never hides a result', () => {
+    const moved = (scheduledAt: string, status: SchoolMatchItem['status']) =>
+      schoolMatchStatusLabel({ status, scheduledAt, rescheduledFrom: '2026-10-20T22:00:00.000Z' }, NOW);
+    expect(moved('2026-10-30T22:00:00.000Z', 'scheduled')).toBe('Rescheduled');
+    expect(moved('2026-10-20T22:00:00.000Z', 'scheduled')).toBe('Awaiting result');
+    expect(moved('2026-10-22T22:00:00.000Z', 'completed')).toBe('Completed');
+    expect(moved('2026-10-30T22:00:00.000Z', 'cancelled')).toBe('Cancelled');
+  });
 });
 
 // --- getSchoolMatches: scoping and outcome redaction -------------------------------------------
@@ -124,6 +133,7 @@ const mocks = vi.hoisted(() => ({
   getSchoolMatchRows: vi.fn(),
   getOutcomesPublicSeasonIds: vi.fn(),
   getLatestRescheduleRequests: vi.fn(),
+  getRescheduledFrom: vi.fn(),
 }));
 
 vi.mock('@/app/lib/db', () => ({ db: {} }));
@@ -140,6 +150,7 @@ vi.mock('@/app/lib/onboarding/manager-auth', () => ({
 vi.mock('@/app/lib/db/matches', () => ({ getSchoolMatchRows: mocks.getSchoolMatchRows }));
 vi.mock('@/app/lib/db/reschedules', () => ({
   getLatestRescheduleRequests: mocks.getLatestRescheduleRequests,
+  getRescheduledFrom: mocks.getRescheduledFrom,
 }));
 vi.mock('@/app/lib/db/standings', () => ({
   getOutcomesPublicSeasonIds: mocks.getOutcomesPublicSeasonIds,
@@ -151,6 +162,7 @@ describe('getSchoolMatches', () => {
     mocks.assertManagerForSchool.mockResolvedValue({});
     mocks.getOutcomesPublicSeasonIds.mockResolvedValue(new Set<string>());
     mocks.getLatestRescheduleRequests.mockResolvedValue(new Map());
+    mocks.getRescheduledFrom.mockResolvedValue(new Map());
   });
 
   async function load(schoolId: string, gameId?: string) {
@@ -205,17 +217,31 @@ describe('getSchoolMatches', () => {
     expect(items.find((i) => i.id === 'without')!.reschedule).toBeNull();
   });
 
-  it('still returns the schedule when the reschedule lookup fails', async () => {
+  it('marks a match staff moved with the time it moved from, even when its latest request is not approved', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'moved' }), row({ id: 'plain' })]);
+    mocks.getRescheduledFrom.mockResolvedValue(new Map([['moved', '2026-10-20T22:00:00.000Z']]));
+
+    const items = await load('stuy');
+
+    expect(mocks.getRescheduledFrom).toHaveBeenCalledWith(['moved', 'plain']);
+    expect(items.find((i) => i.id === 'moved')!.rescheduledFrom).toBe('2026-10-20T22:00:00.000Z');
+    expect(items.find((i) => i.id === 'plain')!.rescheduledFrom).toBeNull();
+  });
+
+  it('still returns the schedule when the reschedule lookups fail', async () => {
     mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
     mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'm' })]);
     mocks.getLatestRescheduleRequests.mockRejectedValue(new Error('relation does not exist'));
+    mocks.getRescheduledFrom.mockRejectedValue(new Error('relation does not exist'));
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const items = await load('stuy');
 
     expect(items).toHaveLength(1);
     expect(items[0].reschedule).toBeNull();
-    expect(log).toHaveBeenCalled();
+    expect(items[0].rescheduledFrom).toBeNull();
+    expect(log).toHaveBeenCalledTimes(2);
     log.mockRestore();
   });
 

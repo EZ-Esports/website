@@ -32,6 +32,14 @@ const TAB_CLASS =
 const PANEL_CLASS =
   'pt-4 outline-none data-[focus-visible]:ring-2 data-[focus-visible]:ring-accent rounded-xl';
 
+function StatusChip({ label }: { label: string }) {
+  const tone =
+    label === 'Rescheduled'
+      ? 'bg-amber-400/10 text-amber-300 border border-amber-400/20'
+      : 'bg-zinc-800 text-zinc-300';
+  return <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tone}`}>{label}</span>;
+}
+
 function resultLabel(match: SchoolMatchItem): string | null {
   if (match.ownScore === null || match.opponentScore === null) return null;
   const outcome =
@@ -91,6 +99,12 @@ function MatchTable({
                   <td className="py-3 px-4 whitespace-nowrap">
                     <div className="font-medium text-white">{formatNY(when, 'date-short')}</div>
                     <div className="text-zinc-400">{formatNY(when, 'time')}</div>
+                    {match.rescheduledFrom && (
+                      <div className="mt-1 max-w-[11rem] whitespace-normal text-[11px] leading-snug text-amber-300">
+                        Rescheduled · was {formatNY(new Date(match.rescheduledFrom), 'date-short')},{' '}
+                        {formatNY(new Date(match.rescheduledFrom), 'time')}
+                      </div>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-zinc-200">
                     <span className="font-medium text-white">{match.opponentName}</span>
@@ -102,9 +116,7 @@ function MatchTable({
                   </td>
                   {showGame && <td className="py-3 px-4 text-zinc-300">{match.gameName}</td>}
                   <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300">
-                      {schoolMatchStatusLabel(match, now)}
-                    </span>
+                    <StatusChip label={schoolMatchStatusLabel(match, now)} />
                   </td>
                   {showResult && (
                     <td className="py-3 px-4 text-zinc-300 whitespace-nowrap">{result ?? '—'}</td>
