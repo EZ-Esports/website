@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Button,
   Dialog,
@@ -26,6 +27,7 @@ import {
   type TourSelection,
 } from './steps';
 import { computePanelPlacement, computeScrollDelta } from './placement';
+import { inertAllExcept } from './inert';
 import WelcomeModal from './WelcomeModal';
 
 interface PortalTourProps {
@@ -109,6 +111,7 @@ export default function PortalTour({ tourCompleted, accountId, schoolName }: Por
   const tutorialButtonRef = useRef<HTMLButtonElement>(null);
   const targetRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   const autoStarted = useRef(false);
 
   const step = session ? session.steps[session.index] : null;
@@ -241,6 +244,13 @@ export default function PortalTour({ tourCompleted, accountId, schoolName }: Por
   const isLast = session ? session.index === session.steps.length - 1 : false;
   const isOpen = Boolean(session && step && targetReady);
 
+  // The tour is view only: while a step shows, the page behind it cannot be clicked, tabbed to
+  // or activated, so a manager cannot send or cancel anything mid-tutorial.
+  useEffect(() => {
+    if (!isOpen || !layerRef.current) return;
+    return inertAllExcept(document.body, layerRef.current);
+  }, [isOpen]);
+
   const stepKey = step ? `${step.id}:${confirmingSkip ? 'confirm' : 'step'}` : '';
 
   // Bring the target (and room for the card) into view once the card is mounted and
@@ -326,6 +336,10 @@ export default function PortalTour({ tourCompleted, accountId, schoolName }: Por
         onDismiss={dismissWelcome}
       />
 
+      {/* Portalled to <body> so the rest of the page can be made inert (view only) around it. */}
+      {isOpen &&
+        createPortal(
+          <div ref={layerRef}>
       {isOpen && rect && (
         <div
           aria-hidden="true"
@@ -429,6 +443,9 @@ export default function PortalTour({ tourCompleted, accountId, schoolName }: Por
           </Dialog>
         </div>
       )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
