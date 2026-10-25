@@ -17,6 +17,26 @@ import { assertManagerForSchoolGame } from './manager-auth';
 
 export type RescheduleActionResult = { success: boolean; error?: string };
 
+/**
+ * A refusal whose message is safe to show. Next.js replaces the message of an error thrown from a
+ * server action with a generic one in production, so every refusal is returned as a result
+ * instead (see `withActionErrors`).
+ */
+class ActionError extends Error {}
+
+/** Turns a thrown refusal into a result, and an unexpected failure into a generic one. */
+async function withActionErrors(
+  run: () => Promise<RescheduleActionResult>
+): Promise<RescheduleActionResult> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof ActionError) return { success: false, error: error.message };
+    console.error('Reschedule action failed', error);
+    return { success: false, error: 'Something went wrong. Please try again.' };
+  }
+}
+
 const homeRoster = alias(schema.rosters, 'home_roster');
 const awayRoster = alias(schema.rosters, 'away_roster');
 const homeTeam = alias(schema.teams, 'home_team');
@@ -54,15 +74,22 @@ type LoadedMatch = NonNullable<Awaited<ReturnType<typeof loadMatch>>>;
  * staff portal, and acting here would blur which side a request came from.
  */
 async function authorizeForMatch(schoolId: string, match: LoadedMatch): Promise<{ userId: string }> {
-  const { context, season } = await assertManagerForSchoolGame(schoolId, match.gameId);
+  let authorized: Awaited<ReturnType<typeof assertManagerForSchoolGame>>;
+  try {
+    authorized = await assertManagerForSchoolGame(schoolId, match.gameId);
+  } catch (error) {
+    // The guard's own messages (not authorized, view-only season) are safe to show.
+    throw new ActionError(error instanceof Error ? error.message : 'You cannot do this.');
+  }
+  const { context, season } = authorized;
   if (context.isStaffAdmin) {
-    throw new Error('Staff review reschedules from the staff portal.');
+    throw new ActionError('Staff review reschedules from the staff portal.');
   }
   if (!season || season.id !== match.seasonId) {
-    throw new Error('Forbidden: this match is not in your season.');
+    throw new ActionError('This match is not in your season.');
   }
   if (match.homeSchoolId !== schoolId && match.awaySchoolId !== schoolId) {
-    throw new Error('Forbidden: your school is not playing in this match.');
+    throw new ActionError('Your school is not playing in this match.');
   }
   return { userId: context.userId };
 }
@@ -81,7 +108,7 @@ export interface RequestRescheduleParams {
   proposedTimes: string[];
 }
 
-export async function requestReschedule(
+async function requestRescheduleImpl(
   params: RequestRescheduleParams
 ): Promise<RescheduleActionResult> {
   const reason = params.reason?.trim() ?? '';
@@ -151,7 +178,7 @@ export interface RespondToRescheduleParams {
   optionId?: string;
 }
 
-export async function respondToReschedule(
+async function respondToRescheduleImpl(
   params: RespondToRescheduleParams
 ): Promise<RescheduleActionResult> {
   const request = await loadRequest(params.requestId);
@@ -166,8 +193,12 @@ export async function respondToReschedule(
   if (!canOpponentRespond(request.status as RescheduleStatus)) {
     return { success: false, error: 'This request is no longer waiting for your answer.' };
   }
-  if (match.status !== 'scheduled' || match.scheduledAt.getTime() !== request.originalScheduledAt.getTime()) {
-    return { success: false, error: 'The match has changed since this request was made.' };
+  // Declining stays possible after the match moved or started, so a stale request cannot sit
+  // open and block the match's next one; accepting would move a different match than was asked.
+  const matchUnchanged =
+    match.status === 'scheduled' && match.scheduledAt.getTime() === request.originalScheduledAt.getTime();
+  if (params.accept && !matchUnchanged) {
+    return { success: false, error: 'The match has changed since this request was made. Decline it.' };
   }
 
   const now = new Date();
@@ -226,7 +257,7 @@ export interface CancelRescheduleParams {
   schoolId: string;
 }
 
-export async function cancelReschedule(
+async function cancelRescheduleImpl(
   params: CancelRescheduleParams
 ): Promise<RescheduleActionResult> {
   const request = await loadRequest(params.requestId);
@@ -255,4 +286,22 @@ export async function cancelReschedule(
   return updated.length
     ? { success: true }
     : { success: false, error: 'The other school already agreed, so this can no longer be cancelled.' };
+}
+
+export async function requestReschedule(
+  params: RequestRescheduleParams
+): Promise<RescheduleActionResult> {
+  return withActionErrors(() => requestRescheduleImpl(params));
+}
+
+export async function respondToReschedule(
+  params: RespondToRescheduleParams
+): Promise<RescheduleActionResult> {
+  return withActionErrors(() => respondToRescheduleImpl(params));
+}
+
+export async function cancelReschedule(
+  params: CancelRescheduleParams
+): Promise<RescheduleActionResult> {
+  return withActionErrors(() => cancelRescheduleImpl(params));
 }

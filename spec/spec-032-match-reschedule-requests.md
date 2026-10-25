@@ -26,13 +26,22 @@ Rules page 4.3 sets the league's rescheduling rules (72 hours, two proposed time
 - Only a still-`scheduled`, not-yet-started match between two different schools can be requested. A match between two squads of one school is moved by staff.
 - Only the two schools' managers act, in the match's own season and game, and only on an active season (`assertManagerForSchoolGame` with its default write guard, so spec-028 view-only seasons are refused). Staff admins are refused here: they act from the staff portal.
 - Every state change is a conditional update (`where status = <expected>` and `returning`), so two simultaneous answers cannot both win; the loser gets "already resolved".
-- Approval runs in one transaction and refuses (rolling back) when the request is not `pending_staff`, the accepted time has passed, or the match is no longer `scheduled` at `original_scheduled_at`, so an approval never overwrites a newer schedule.
+- Approval runs in one transaction and refuses (rolling back) when the request is not `pending_staff`, the accepted time has passed, or the match is no longer `scheduled` at `original_scheduled_at`, so an approval never overwrites a newer schedule. Its closing write re-checks `status = 'pending_staff'`, so a decline committed in between wins and the match move rolls back.
+- The opponent can always decline, even after the match moved or started (only accepting needs the match unchanged), so a stale request cannot sit open and block the match's next one.
+- Manager actions return refusals as `{ success: false, error }` instead of throwing, because Next.js redacts a thrown server-action message in production (`ActionError` + `withActionErrors`); an unexpected failure is logged and shown as a generic message, so a missing table never surfaces raw SQL.
 
 ## Not enforced (staff judge it from the queue)
 
 - **Forfeits** for a missed on-time reschedule or a missed season deadline are never automated (decided 24 Oct); staff record them on the result.
 - **End of regular season:** `seasons` has no end date, so a proposed time past the season's end is not checked.
 - **"Cannot reschedule if both teams already agreed to the original date":** nothing records that agreement.
+
+## Known limits (accepted for now)
+
+- A user who manages both schools of a match could request and accept alone; staff approval is the backstop (and a reason to think twice before dropping that step).
+- After `approved`, either school may immediately request a new move of the same match; nothing limits repeat requests.
+- The approval guard compares `scheduled_at` for equality; a match time stored with sub-millisecond precision (only possible from raw SQL) would always read as "changed".
+- Staff admins viewing a school's portal see the request buttons; the server refuses them.
 
 ## Data
 

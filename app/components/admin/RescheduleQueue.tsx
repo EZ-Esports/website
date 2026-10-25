@@ -24,12 +24,16 @@ function RequestRow({ item }: { item: StaffRescheduleItem }) {
   const decide = (action: () => Promise<{ success: boolean; error?: string }>) => {
     setError(null);
     start(async () => {
-      const result = await action();
-      if (!result.success) {
-        setError(result.error ?? 'Something went wrong.');
-        return;
+      try {
+        const result = await action();
+        if (!result.success) {
+          setError(result.error ?? 'Something went wrong.');
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError('Something went wrong. Please try again.');
       }
-      router.refresh();
     });
   };
 

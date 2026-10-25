@@ -86,7 +86,7 @@ describe('approveReschedule', () => {
   });
 
   it('moves the match to the accepted time, closes the request, and refreshes the schedule caches', async () => {
-    mocks.queue.push([request()], [option()], [{ id: 'm1' }], []);
+    mocks.queue.push([request()], [option()], [{ id: 'm1' }], [{ id: 'req-1' }]);
     expect(await approveReschedule('req-1', '  Fine by us  ')).toEqual({ success: true });
 
     expect(mocks.updated[0]).toEqual({ scheduledAt: option().proposedAt });
@@ -97,6 +97,14 @@ describe('approveReschedule', () => {
     });
     expect(mocks.updateTag).toHaveBeenCalledWith('matches');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/matches');
+  });
+
+  it('does not overwrite a decline committed after the read, and reports it', async () => {
+    mocks.queue.push([request()], [option()], [{ id: 'm1' }], []);
+    const result = await approveReschedule('req-1');
+    expect(result.error).toMatch(/just resolved/);
+    // The match update ran inside the transaction; throwing here is what rolls it back.
+    expect(mocks.updateTag).not.toHaveBeenCalled();
   });
 
   it('refuses a request that is not waiting on staff', async () => {

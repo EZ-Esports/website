@@ -77,10 +77,21 @@ export async function approveReschedule(
         throw new DecisionError('The match has changed since this request was made. Decline it.');
       }
 
-      await tx
+      // Re-check the status in the write itself: a decline committed after the read above must
+      // win, and throwing here rolls back the match move.
+      const closed = await tx
         .update(schema.matchRescheduleRequests)
         .set({ status: 'approved', decidedByStaffId: staff.id, decidedAt: new Date(), staffNote })
-        .where(eq(schema.matchRescheduleRequests.id, request.id));
+        .where(
+          and(
+            eq(schema.matchRescheduleRequests.id, request.id),
+            eq(schema.matchRescheduleRequests.status, 'pending_staff')
+          )
+        )
+        .returning({ id: schema.matchRescheduleRequests.id });
+      if (closed.length === 0) {
+        throw new DecisionError('This request was just resolved by someone else.');
+      }
     });
   } catch (error) {
     if (error instanceof DecisionError) return { success: false, error: error.message };

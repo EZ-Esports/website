@@ -117,27 +117,40 @@ describe('requestReschedule', () => {
     expect(mocks.assertManagerForSchoolGame).toHaveBeenCalledWith('school-a', 'game-1');
   });
 
-  it('propagates an authorization failure', async () => {
+  it('returns an authorization failure with its message (thrown messages are redacted in production)', async () => {
     mocks.queue.push([match()]);
-    mocks.assertManagerForSchoolGame.mockRejectedValue(new Error('Forbidden: Not authorized for school school-a'));
-    await expect(requestReschedule(params)).rejects.toThrow(/Forbidden/);
+    mocks.assertManagerForSchoolGame.mockRejectedValue(
+      new Error('Season 2026-27 is view only.')
+    );
+    expect(await requestReschedule(params)).toEqual({ success: false, error: 'Season 2026-27 is view only.' });
     expect(mocks.inserted).toEqual([]);
   });
 
   it('refuses a staff admin', async () => {
     mocks.queue.push([match()]);
     asManager({ context: { userId: 'staff', isStaffAdmin: true }, season: null });
-    await expect(requestReschedule(params)).rejects.toThrow(/staff portal/);
+    expect((await requestReschedule(params)).error).toMatch(/staff portal/);
   });
 
   it("refuses a match outside the manager's season", async () => {
     mocks.queue.push([match({ seasonId: 'season-2' })]);
-    await expect(requestReschedule(params)).rejects.toThrow(/not in your season/);
+    expect((await requestReschedule(params)).error).toMatch(/not in your season/);
   });
 
   it('refuses a school that is not playing in the match', async () => {
     mocks.queue.push([match()]);
-    await expect(requestReschedule({ ...params, schoolId: 'school-z' })).rejects.toThrow(/not playing/);
+    const result = await requestReschedule({ ...params, schoolId: 'school-z' });
+    expect(result.error).toMatch(/not playing/);
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it('hides an unexpected failure behind a generic message', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.queue.push(new Error('relation "match_reschedule_requests" does not exist'));
+    const result = await requestReschedule(params);
+    expect(result).toEqual({ success: false, error: 'Something went wrong. Please try again.' });
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
   });
 
   it('leaves a match between two squads of one school to staff', async () => {
@@ -215,9 +228,17 @@ describe('respondToReschedule', () => {
     expect((await respondToReschedule(accept)).error).toMatch(/no longer waiting/);
   });
 
-  it('refuses once the match has been moved since the request', async () => {
+  it('refuses to accept once the match has been moved since the request', async () => {
     mocks.queue.push([request()], [match({ scheduledAt: new Date(MATCH_AT.getTime() + HOUR) })]);
     expect((await respondToReschedule(accept)).error).toMatch(/changed since/);
+    expect(mocks.updated).toEqual([]);
+  });
+
+  it('still lets the opponent decline after the match moved or started, so the request cannot get stuck', async () => {
+    mocks.queue.push([request()], [match({ status: 'live' })], [{ id: 'req-1' }]);
+    const result = await respondToReschedule({ requestId: 'req-1', schoolId: 'school-b', accept: false });
+    expect(result).toEqual({ success: true });
+    expect(mocks.updated[0]).toMatchObject({ status: 'declined_opponent' });
   });
 
   it('declines without needing an option', async () => {

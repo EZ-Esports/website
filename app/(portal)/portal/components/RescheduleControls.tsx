@@ -11,6 +11,7 @@ import {
   MIN_PROPOSED_TIMES,
   canCancelRequest,
   canOpponentRespond,
+  isLateRequest,
   isOpenStatus,
   rescheduleStatusLabel,
   validateProposedTimes,
@@ -88,7 +89,7 @@ function RequestDialog({ match, schoolId, now }: { match: SchoolMatchItem; schoo
     setReason('');
     setTimes(['', '']);
   });
-  const late = new Date(match.scheduledAt).getTime() - now.getTime() < 72 * 3600_000;
+  const late = isLateRequest(new Date(match.scheduledAt), now);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
