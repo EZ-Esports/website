@@ -586,6 +586,10 @@ export function buildFormGuideQuery(opts: {
           inArray(schema.matches.status, ['completed', 'forfeit']),
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
+          // The strip sits beside the regular-season W-L. A playoff counts on
+          // the schedule and in recent results, and it does not take a chip
+          // that belongs to a regular-season game.
+          eq(schema.matches.countsForStandings, true),
           isNull(homeSchool.deletedAt),
           isNull(awaySchool.deletedAt)
         )

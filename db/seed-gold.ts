@@ -58,6 +58,16 @@ const intOrNull = (v: string) => (v === '' ? null : parseInt(v, 10));
 const floatOrNull = (v: string) => (v === '' ? null : parseFloat(v));
 const orNull = (v: string) => (v === '' ? null : v);
 
+/**
+ * Sheet matches and rows from a gold file written before this column count.
+ * Only an explicit false — the manual playoff supplement — opts a match out
+ * of the regular-season table.
+ */
+export function countsForStandings(v: string | undefined): boolean {
+  if (v === undefined || v.trim() === '') return true;
+  return !['false', '0', 'no'].includes(v.trim().toLowerCase());
+}
+
 export interface GoldDiffRow {
   entity: string;
   incoming: number;
@@ -390,6 +400,7 @@ export async function calculateGoldDiff(
     status: schema.matches.status,
     mvp: schema.matches.mvp,
     notes: schema.matches.notes,
+    countsForStandings: schema.matches.countsForStandings,
   }).from(schema.matches).where(isNotNull(schema.matches.sourceKey));
   const existingMatchesByKey = new Map(existingMatches.map((m) => [m.sourceKey!, m]));
   let matchesInsert = 0, matchesUpdate = 0, matchesUnchanged = 0;
@@ -404,7 +415,8 @@ export async function calculateGoldDiff(
       ext.awayScore !== intOrNull(m.away_score) ||
       ext.status !== m.status ||
       ext.mvp !== orNull(m.mvp) ||
-      ext.notes !== orNull(m.notes)
+      ext.notes !== orNull(m.notes) ||
+      ext.countsForStandings !== countsForStandings(m.counts_for_standings)
     ) {
       matchesUpdate++;
     } else {
@@ -809,6 +821,7 @@ async function main() {
       status: m.status as (typeof schema.matchStatusEnum.enumValues)[number],
       mvp: orNull(m.mvp),
       notes: orNull(m.notes),
+      countsForStandings: countsForStandings(m.counts_for_standings),
       sourceKey: sourceKeys[i],
     })))
     .onConflictDoUpdate({
@@ -823,6 +836,7 @@ async function main() {
         status: sql`excluded.status`,
         mvp: sql`excluded.mvp`,
         notes: sql`excluded.notes`,
+        countsForStandings: sql`excluded.counts_for_standings`,
       },
     })
     .returning();
