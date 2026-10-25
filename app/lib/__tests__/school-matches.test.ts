@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  divisionOptions,
+  filterByDivision,
   schoolMatchStatusLabel,
   splitSchoolMatches,
   toSchoolMatchItem,
@@ -100,6 +102,41 @@ describe('splitSchoolMatches', () => {
   it('treats a match starting exactly now as upcoming', () => {
     const { upcoming } = splitSchoolMatches([item('now', NOW.toISOString(), 'scheduled')], NOW);
     expect(upcoming.map((m) => m.id)).toEqual(['now']);
+  });
+});
+
+describe('division filter', () => {
+  const mk = (id: string, division: string) => toSchoolMatchItem(row({ id, division }), 'stuy');
+  const items = [mk('a', 'JV'), mk('b', 'Varsity'), mk('c', 'JV'), mk('d', 'Varsity')];
+
+  it('lists the divisions present, Varsity before Junior Varsity, however the rows are ordered', () => {
+    expect(divisionOptions(items)).toEqual(['Varsity', 'Junior Varsity']);
+    expect(divisionOptions([mk('x', 'All'), mk('y', 'JV'), mk('z', 'Varsity')])).toEqual([
+      'Varsity',
+      'Junior Varsity',
+      'All',
+    ]);
+    expect(divisionOptions([])).toEqual([]);
+  });
+
+  it('keeps one division, or everything for null, without reordering', () => {
+    expect(filterByDivision(items, 'Junior Varsity').map((m) => m.id)).toEqual(['a', 'c']);
+    expect(filterByDivision(items, 'Varsity').map((m) => m.id)).toEqual(['b', 'd']);
+    expect(filterByDivision(items, null).map((m) => m.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(filterByDivision(items, 'All')).toEqual([]);
+  });
+
+  it('splits the filtered list into Upcoming and Past on its own', () => {
+    const later = (id: string, division: string, scheduledAt: Date) =>
+      toSchoolMatchItem(row({ id, division, scheduledAt }), 'stuy');
+    const mixed = [
+      later('jv-future', 'JV', new Date('2026-11-05T22:00:00.000Z')),
+      later('v-future', 'Varsity', new Date('2026-11-06T22:00:00.000Z')),
+      later('jv-past', 'JV', new Date('2026-10-01T22:00:00.000Z')),
+    ];
+    const { upcoming, past } = splitSchoolMatches(filterByDivision(mixed, 'Junior Varsity'), NOW);
+    expect(upcoming.map((m) => m.id)).toEqual(['jv-future']);
+    expect(past.map((m) => m.id)).toEqual(['jv-past']);
   });
 });
 

@@ -18,7 +18,7 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 ### Audience and shape
 
 - **Audience:** school managers only.
-- **One tour definition, split into named sections.** The tour is a single ordered list of steps grouped into sections (working names: *Pick a game*, *Invite players*, *Approvals*, *Rosters*). The first-run tour, the full replay and the per-feature replay all use this same definition and the same popover component. Copy lives next to the definition in code. No CMS, no markdown docs.
+- **One tour definition, split into named sections.** The tour is a single ordered list of steps grouped into sections (working names: *Pick a game*, *Invite players*, *Approvals*, *Rosters*; a *Matches* section was added later, see spec-032). The first-run tour, the full replay and the per-feature replay all use this same definition and the same popover component. Copy lives next to the definition in code. No CMS, no markdown docs.
 - **First run:** a school manager entering the portal for the first time gets the full tour automatically.
 - **Tutorial button (always present afterwards):** opens a small menu with *Full tour* plus one entry per section. Choosing a section plays only that section's slice, starting at its first step and ending at its last, then closes.
 

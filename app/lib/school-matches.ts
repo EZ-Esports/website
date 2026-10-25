@@ -115,6 +115,28 @@ export function splitSchoolMatches(
   return { upcoming, past };
 }
 
+/** Display order of division labels; one a future division adds sorts after these. */
+const DIVISION_ORDER = ['Varsity', 'Junior Varsity', 'All'];
+
+/** The division labels present in the list, in display order, for the portal's division filter. */
+export function divisionOptions(items: readonly Pick<SchoolMatchItem, 'division'>[]): string[] {
+  const rank = (d: string) => {
+    const i = DIVISION_ORDER.indexOf(d);
+    return i === -1 ? DIVISION_ORDER.length : i;
+  };
+  return [...new Set(items.map((m) => m.division))].sort(
+    (a, b) => rank(a) - rank(b) || a.localeCompare(b)
+  );
+}
+
+/** Keeps one division's matches; `null` means every division. */
+export function filterByDivision<T extends Pick<SchoolMatchItem, 'division'>>(
+  items: readonly T[],
+  division: string | null
+): T[] {
+  return division === null ? [...items] : items.filter((m) => m.division === division);
+}
+
 export function schoolMatchStatusLabel(
   item: Pick<SchoolMatchItem, 'status' | 'scheduledAt'> & { rescheduledFrom?: string | null },
   now: Date

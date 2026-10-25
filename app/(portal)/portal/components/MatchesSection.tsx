@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { formatNY } from '@/app/lib/dates';
 import {
+  divisionOptions,
+  filterByDivision,
   schoolMatchStatusLabel,
   splitSchoolMatches,
   type SchoolMatchItem,
@@ -80,7 +83,11 @@ function MatchTable({
             {showGame && <th className="py-3 px-4 font-semibold">Game</th>}
             <th className="py-3 px-4 font-semibold">Status</th>
             {showResult && <th className="py-3 px-4 font-semibold">Result</th>}
-            {showReschedule && <th className="py-3 px-4 font-semibold">Reschedule</th>}
+            {showReschedule && (
+              <th data-tour="reschedule" className="py-3 px-4 font-semibold">
+                Reschedule
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-800/40">
@@ -149,17 +156,41 @@ export function MatchesSection({
   showGame,
 }: MatchesSectionProps) {
   const now = new Date(nowIso);
-  const { upcoming, past } = splitSchoolMatches(matches, now);
+  const [pickedDivision, setPickedDivision] = useState<string | null>(null);
+  const divisions = divisionOptions(matches);
+  // The pick survives a game change only while that division still exists in the list.
+  const division = pickedDivision !== null && divisions.includes(pickedDivision) ? pickedDivision : null;
+  const { upcoming, past } = splitSchoolMatches(filterByDivision(matches, division), now);
   // Only a staff admin's list can span seasons; a manager works in one season per game.
   const showSeason = new Set(matches.map((m) => `${m.gameId}|${m.seasonName}`)).size >
     new Set(matches.map((m) => m.gameId)).size;
 
   return (
-    <section className="space-y-4 pt-4 border-t border-zinc-800">
+    <section data-tour="matches" className="space-y-4 pt-4 border-t border-zinc-800">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2 className="text-lg font-bold text-white">Matches</h2>
         <span className="text-xs text-zinc-500">All times Eastern (ET)</span>
       </div>
+
+      {divisions.length > 1 && (
+        <div role="group" aria-label="Filter by division" className="flex flex-wrap items-center gap-2">
+          {[null, ...divisions].map((option) => (
+            <button
+              key={option ?? 'all-divisions'}
+              type="button"
+              aria-pressed={division === option}
+              onClick={() => setPickedDivision(option)}
+              className={`px-4 py-2 min-h-[44px] sm:min-h-0 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                division === option
+                  ? 'bg-[#f4cccc] text-zinc-950 shadow-sm'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+              }`}
+            >
+              {option ?? 'All divisions'}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Tabs>
         <TabList
