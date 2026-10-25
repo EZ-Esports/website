@@ -1,0 +1,132 @@
+import 'server-only';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { db } from './index';
+import * as schema from './schema';
+import type {
+  RescheduleRequestItem,
+  RescheduleStatus,
+  StaffRescheduleItem,
+} from '../reschedule-rules';
+
+const homeRoster = alias(schema.rosters, 'home_roster');
+const awayRoster = alias(schema.rosters, 'away_roster');
+const homeTeam = alias(schema.teams, 'home_team');
+const awayTeam = alias(schema.teams, 'away_team');
+const homeSchool = alias(schema.schools, 'home_school');
+const awaySchool = alias(schema.schools, 'away_school');
+const requesterSchool = alias(schema.schools, 'requester_school');
+
+/**
+ * The most recent request for each match, with its proposed times. A match can have many
+ * resolved requests over time but at most one open one (a unique index), so the latest by
+ * creation is the open one when there is one. Matches without a request are absent.
+ */
+export async function getLatestRescheduleRequests(
+  matchIds: string[]
+): Promise<Map<string, RescheduleRequestItem>> {
+  const latest = new Map<string, RescheduleRequestItem>();
+  if (matchIds.length === 0) return latest;
+
+  const rows = await db
+    .select({
+      id: schema.matchRescheduleRequests.id,
+      matchId: schema.matchRescheduleRequests.matchId,
+      status: schema.matchRescheduleRequests.status,
+      isLate: schema.matchRescheduleRequests.isLate,
+      reason: schema.matchRescheduleRequests.reason,
+      requestedBySchoolId: schema.matchRescheduleRequests.requestedBySchoolId,
+      requestedBySchoolName: requesterSchool.name,
+      originalScheduledAt: schema.matchRescheduleRequests.originalScheduledAt,
+      acceptedOptionId: schema.matchRescheduleRequests.acceptedOptionId,
+      staffNote: schema.matchRescheduleRequests.staffNote,
+      createdAt: schema.matchRescheduleRequests.createdAt,
+    })
+    .from(schema.matchRescheduleRequests)
+    .innerJoin(requesterSchool, eq(schema.matchRescheduleRequests.requestedBySchoolId, requesterSchool.id))
+    .where(inArray(schema.matchRescheduleRequests.matchId, matchIds))
+    .orderBy(desc(schema.matchRescheduleRequests.createdAt), desc(schema.matchRescheduleRequests.id));
+
+  const picked = rows.filter((row) => {
+    if (latest.has(row.matchId)) return false;
+    latest.set(row.matchId, {
+      id: row.id,
+      matchId: row.matchId,
+      status: row.status as RescheduleStatus,
+      isLate: row.isLate,
+      reason: row.reason,
+      requestedBySchoolId: row.requestedBySchoolId,
+      requestedBySchoolName: row.requestedBySchoolName,
+      originalScheduledAt: row.originalScheduledAt.toISOString(),
+      options: [],
+      acceptedOptionId: row.acceptedOptionId,
+      staffNote: row.staffNote,
+      createdAt: row.createdAt.toISOString(),
+    });
+    return true;
+  });
+  if (picked.length === 0) return latest;
+
+  const options = await db
+    .select()
+    .from(schema.matchRescheduleOptions)
+    .where(inArray(schema.matchRescheduleOptions.requestId, picked.map((r) => r.id)))
+    .orderBy(schema.matchRescheduleOptions.proposedAt);
+  const byRequest = new Map(picked.map((r) => [r.id, latest.get(r.matchId)!]));
+  for (const option of options) {
+    byRequest.get(option.requestId)?.options.push({
+      id: option.id,
+      proposedAt: option.proposedAt.toISOString(),
+    });
+  }
+  return latest;
+}
+
+/** Requests the opponent has accepted and staff still have to approve or decline, oldest first. */
+export async function getStaffRescheduleQueue(): Promise<StaffRescheduleItem[]> {
+  const rows = await db
+    .select({
+      id: schema.matchRescheduleRequests.id,
+      matchId: schema.matchRescheduleRequests.matchId,
+      isLate: schema.matchRescheduleRequests.isLate,
+      reason: schema.matchRescheduleRequests.reason,
+      requestedBySchoolName: requesterSchool.name,
+      homeSchoolName: homeSchool.name,
+      awaySchoolName: awaySchool.name,
+      gameName: schema.games.displayName,
+      seasonName: schema.seasons.name,
+      currentScheduledAt: schema.matches.scheduledAt,
+      newScheduledAt: schema.matchRescheduleOptions.proposedAt,
+      createdAt: schema.matchRescheduleRequests.createdAt,
+    })
+    .from(schema.matchRescheduleRequests)
+    .innerJoin(schema.matches, eq(schema.matchRescheduleRequests.matchId, schema.matches.id))
+    .innerJoin(
+      schema.matchRescheduleOptions,
+      eq(schema.matchRescheduleRequests.acceptedOptionId, schema.matchRescheduleOptions.id)
+    )
+    .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+    .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+    .innerJoin(requesterSchool, eq(schema.matchRescheduleRequests.requestedBySchoolId, requesterSchool.id))
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .where(
+      and(
+        eq(schema.matchRescheduleRequests.status, 'pending_staff'),
+        isNull(homeSchool.deletedAt),
+        isNull(awaySchool.deletedAt)
+      )
+    )
+    .orderBy(schema.matchRescheduleRequests.createdAt, schema.matchRescheduleRequests.id);
+
+  return rows.map((row) => ({
+    ...row,
+    currentScheduledAt: row.currentScheduledAt.toISOString(),
+    newScheduledAt: row.newScheduledAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+  }));
+}

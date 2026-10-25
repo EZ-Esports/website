@@ -17,6 +17,8 @@ import {
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
+import { getLatestRescheduleRequests } from '@/app/lib/db/reschedules';
+import type { RescheduleRequestItem } from '@/app/lib/reschedule-rules';
 import { redactHiddenMatches } from '@/app/lib/season-outcomes';
 import { toSchoolMatchItem, type SchoolMatchItem } from '@/app/lib/school-matches';
 
@@ -878,7 +880,12 @@ export async function getSchoolMatches(
   const visible = scopes
     ? redactHiddenMatches(rows, await getOutcomesPublicSeasonIds())
     : rows;
-  return visible.map((row) => toSchoolMatchItem(row, schoolId));
+  // Fail soft: the schedule must still show if the reschedule lookup fails.
+  const requests = await getLatestRescheduleRequests(visible.map((row) => row.id)).catch((error) => {
+    console.error('Failed to load reschedule requests', error);
+    return new Map<string, RescheduleRequestItem>();
+  });
+  return visible.map((row) => toSchoolMatchItem(row, schoolId, requests.get(row.id) ?? null));
 }
 
 /**

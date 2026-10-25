@@ -7,9 +7,14 @@ import {
   splitSchoolMatches,
   type SchoolMatchItem,
 } from '@/app/lib/school-matches';
+import { RescheduleCell } from './RescheduleControls';
 
 interface MatchesSectionProps {
   matches: SchoolMatchItem[];
+  /** The school whose portal is open: the side that requests, responds or cancels reschedules. */
+  schoolId: string;
+  /** Games whose season is inactive for this manager: reschedule actions are hidden. */
+  viewOnlyGameIds: string[];
   /** Server clock (ISO). The Upcoming/Past split and status labels must not depend on the browser clock. */
   nowIso: string;
   /** Show the Game column when the list spans more than one game. */
@@ -40,6 +45,9 @@ function MatchTable({
   showGame,
   showSeason,
   showResult,
+  showReschedule,
+  schoolId,
+  viewOnlyGameIds,
   emptyText,
 }: {
   matches: SchoolMatchItem[];
@@ -47,12 +55,15 @@ function MatchTable({
   showGame: boolean;
   showSeason: boolean;
   showResult: boolean;
+  showReschedule: boolean;
+  schoolId: string;
+  viewOnlyGameIds: string[];
   emptyText: string;
 }) {
-  const columns = 4 + (showGame ? 1 : 0) + (showResult ? 1 : 0);
+  const columns = 4 + (showGame ? 1 : 0) + (showResult ? 1 : 0) + (showReschedule ? 1 : 0);
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
-      <table className="w-full min-w-[34rem] text-left text-xs">
+      <table className={`w-full text-left text-xs ${showReschedule ? 'min-w-[44rem]' : 'min-w-[34rem]'}`}>
         <thead>
           <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950/60">
             <th className="py-3 px-4 font-semibold">When</th>
@@ -61,6 +72,7 @@ function MatchTable({
             {showGame && <th className="py-3 px-4 font-semibold">Game</th>}
             <th className="py-3 px-4 font-semibold">Status</th>
             {showResult && <th className="py-3 px-4 font-semibold">Result</th>}
+            {showReschedule && <th className="py-3 px-4 font-semibold">Reschedule</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-800/40">
@@ -97,6 +109,16 @@ function MatchTable({
                   {showResult && (
                     <td className="py-3 px-4 text-zinc-300 whitespace-nowrap">{result ?? '—'}</td>
                   )}
+                  {showReschedule && (
+                    <td className="py-3 px-4 align-top">
+                      <RescheduleCell
+                        match={match}
+                        schoolId={schoolId}
+                        now={now}
+                        viewOnly={viewOnlyGameIds.includes(match.gameId)}
+                      />
+                    </td>
+                  )}
                 </tr>
               );
             })
@@ -107,7 +129,13 @@ function MatchTable({
   );
 }
 
-export function MatchesSection({ matches, nowIso, showGame }: MatchesSectionProps) {
+export function MatchesSection({
+  matches,
+  schoolId,
+  viewOnlyGameIds,
+  nowIso,
+  showGame,
+}: MatchesSectionProps) {
   const now = new Date(nowIso);
   const { upcoming, past } = splitSchoolMatches(matches, now);
   // Only a staff admin's list can span seasons; a manager works in one season per game.
@@ -140,6 +168,9 @@ export function MatchesSection({ matches, nowIso, showGame }: MatchesSectionProp
             showGame={showGame}
             showSeason={showSeason}
             showResult={false}
+            showReschedule
+            schoolId={schoolId}
+            viewOnlyGameIds={viewOnlyGameIds}
             emptyText="No upcoming matches are scheduled yet."
           />
         </TabPanel>
@@ -150,6 +181,9 @@ export function MatchesSection({ matches, nowIso, showGame }: MatchesSectionProp
             showGame={showGame}
             showSeason={showSeason}
             showResult
+            showReschedule={false}
+            schoolId={schoolId}
+            viewOnlyGameIds={viewOnlyGameIds}
             emptyText="No past matches yet."
           />
         </TabPanel>

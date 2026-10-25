@@ -100,6 +100,8 @@ interface AdminMatchExplorerProps {
   back?: { href: string; label: string };
   /** Active seasons, rosters and teams for the schedule dialog. */
   scheduleForm: ScheduleFormData;
+  /** Extra sections between the header and the filters (the reschedule queue). */
+  children?: React.ReactNode;
 }
 
 const STATUS_LABEL: Record<MatchStatus, string> = {
@@ -146,6 +148,7 @@ export default function AdminMatchExplorer({
   serverNow,
   back,
   scheduleForm,
+  children,
 }: AdminMatchExplorerProps) {
   const searchParams = useSearchParams();
   const { gameId, seasonId } = useMemo(
@@ -450,6 +453,8 @@ export default function AdminMatchExplorer({
         }}
         {...scheduleForm}
       />
+
+      {children}
 
       {/* Filters: the three most used stay visible; Division and Sort sit behind a disclosure. */}
       <div className="space-y-2">

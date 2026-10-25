@@ -68,6 +68,7 @@ Every `spec-00x` document must follow this structure:
 
 | [`spec-030`](spec-030-matches-page-redesign.md) | Matches Page Redesign | Branch `feat/matches-page-redesign` | 2026-10-23 | In Progress | `/admin/matches` becomes a work queue: server-side status tabs (Needs results / Upcoming / Completed / All) with server counts, day-grouped read-only rows with an inline result editor and overflow menu, a Schedule match dialog, Division/Sort behind "More filters", nav label "Matches". Raw staff reads preserved; no migration. |
 | [`spec-031`](spec-031-manager-matches-view.md) | Manager Portal Matches View | Branch `feat/manager-matches-view` | 2026-10-24 | In Progress | Read-only Matches section in `/portal`: Upcoming/Past tabs, Eastern Time, opponent, division, game, status, scores hidden until the season is published. Scoped by the manager's season; no migration. Part 1 of #274. |
+| [`spec-032`](spec-032-match-reschedule-requests.md) | Match Reschedule Requests | Branch `feat/reschedule-requests` | 2026-10-25 | In Progress | Managers request a reschedule in the portal (2-5 times, 72h late flag), the opponent accepts in the portal, staff approve from a queue on `/admin/matches`. Two new tables (migration 0053, not yet applied to production). Forfeits are not automated. Part 2 of #274. |
 
 ---
 

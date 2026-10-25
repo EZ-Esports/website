@@ -123,6 +123,7 @@ const mocks = vi.hoisted(() => ({
   getAuthorizedGameScopes: vi.fn(),
   getSchoolMatchRows: vi.fn(),
   getOutcomesPublicSeasonIds: vi.fn(),
+  getLatestRescheduleRequests: vi.fn(),
 }));
 
 vi.mock('@/app/lib/db', () => ({ db: {} }));
@@ -137,6 +138,9 @@ vi.mock('@/app/lib/onboarding/manager-auth', () => ({
   NO_ACTIVE_SEASON_ERROR: 'no active season',
 }));
 vi.mock('@/app/lib/db/matches', () => ({ getSchoolMatchRows: mocks.getSchoolMatchRows }));
+vi.mock('@/app/lib/db/reschedules', () => ({
+  getLatestRescheduleRequests: mocks.getLatestRescheduleRequests,
+}));
 vi.mock('@/app/lib/db/standings', () => ({
   getOutcomesPublicSeasonIds: mocks.getOutcomesPublicSeasonIds,
 }));
@@ -146,6 +150,7 @@ describe('getSchoolMatches', () => {
     vi.clearAllMocks();
     mocks.assertManagerForSchool.mockResolvedValue({});
     mocks.getOutcomesPublicSeasonIds.mockResolvedValue(new Set<string>());
+    mocks.getLatestRescheduleRequests.mockResolvedValue(new Map());
   });
 
   async function load(schoolId: string, gameId?: string) {
@@ -185,6 +190,33 @@ describe('getSchoolMatches', () => {
     const hidden = items.find((i) => i.id === 'hidden')!;
     expect(hidden).toMatchObject({ ownScore: null, opponentScore: null, status: 'completed' });
     expect(items.find((i) => i.id === 'public')).toMatchObject({ ownScore: 2, opponentScore: 1 });
+  });
+
+  it('attaches each match’s latest reschedule request', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'with' }), row({ id: 'without' })]);
+    const request = { id: 'req-1', matchId: 'with', status: 'pending_opponent' };
+    mocks.getLatestRescheduleRequests.mockResolvedValue(new Map([['with', request]]));
+
+    const items = await load('stuy');
+
+    expect(mocks.getLatestRescheduleRequests).toHaveBeenCalledWith(['with', 'without']);
+    expect(items.find((i) => i.id === 'with')!.reschedule).toBe(request);
+    expect(items.find((i) => i.id === 'without')!.reschedule).toBeNull();
+  });
+
+  it('still returns the schedule when the reschedule lookup fails', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'm' })]);
+    mocks.getLatestRescheduleRequests.mockRejectedValue(new Error('relation does not exist'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const items = await load('stuy');
+
+    expect(items).toHaveLength(1);
+    expect(items[0].reschedule).toBeNull();
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
   });
 
   it('gives a staff admin every season, unredacted', async () => {

@@ -624,6 +624,8 @@ export default function SchoolPortalClient({
       {/* Scheduled matches (read-only) */}
       <MatchesSection
         matches={filteredMatches}
+        schoolId={activeSchool.schoolId}
+        viewOnlyGameIds={viewOnlyGameIds}
         nowIso={matchesNowIso}
         showGame={selectedGame === 'all' && games.length > 1}
       />

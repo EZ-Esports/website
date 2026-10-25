@@ -5,6 +5,7 @@
  * server before the rows are mapped (see `season-outcomes.ts`).
  */
 import { matchTabOf, divisionLabel, type MatchStatus } from './db/match-page';
+import { isOpenStatus, type RescheduleRequestItem } from './reschedule-rules';
 
 /** The raw joined row a school-matches query returns, before it is turned into a portal item. */
 export interface SchoolMatchRow {
@@ -39,13 +40,21 @@ export interface SchoolMatchItem {
   /** Null while the season's outcomes are unpublished (or the match has no score yet). */
   ownScore: number | null;
   opponentScore: number | null;
+  /** Both sides are the same school (two squads): staff move these, a manager cannot request. */
+  sameSchool: boolean;
+  /** The match's most recent reschedule request, open or resolved; null when it never had one. */
+  reschedule: RescheduleRequestItem | null;
 }
 
 /**
  * A school playing itself (two squads of one school) is a legal pairing: the home side wins the
  * tie so the row still reads "vs <the school>" with a stable orientation.
  */
-export function toSchoolMatchItem(row: SchoolMatchRow, schoolId: string): SchoolMatchItem {
+export function toSchoolMatchItem(
+  row: SchoolMatchRow,
+  schoolId: string,
+  reschedule: RescheduleRequestItem | null = null
+): SchoolMatchItem {
   const isHome = row.homeSchoolId === schoolId;
   return {
     id: row.id,
@@ -59,7 +68,26 @@ export function toSchoolMatchItem(row: SchoolMatchRow, schoolId: string): School
     isHome,
     ownScore: isHome ? row.homeScore : row.awayScore,
     opponentScore: isHome ? row.awayScore : row.homeScore,
+    sameSchool: row.homeSchoolId === row.awaySchoolId,
+    reschedule,
   };
+}
+
+/**
+ * Whether the portal offers "Request reschedule" on this match: it must still be scheduled and
+ * not started, be between two different schools, and have no open request. Season view-only
+ * state is the caller's to apply (it is per game); the server re-checks everything regardless.
+ */
+export function canRequestReschedule(
+  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt' | 'sameSchool' | 'reschedule'>,
+  now: Date
+): boolean {
+  return (
+    item.status === 'scheduled' &&
+    new Date(item.scheduledAt).getTime() > now.getTime() &&
+    !item.sameSchool &&
+    !(item.reschedule && isOpenStatus(item.reschedule.status))
+  );
 }
 
 /**
