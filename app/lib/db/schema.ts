@@ -257,8 +257,9 @@ export const matchRescheduleRequests = pgTable('match_reschedule_requests', {
     .notNull(),
   requestedByUserId: uuid('requested_by_user_id').notNull(), // Supabase auth.users.id
   reason: text('reason').notNull(),
-  // 'pending_opponent' | 'pending_staff' | 'approved' | 'declined_opponent' | 'declined_staff'
-  // | 'cancelled'; the allowed set is enforced by a CHECK and mirrored in reschedule-rules.ts.
+  // 'pending_opponent' | 'pending_requester' | 'pending_staff' | 'approved' | 'declined_opponent'
+  // | 'declined_requester' | 'declined_staff' | 'cancelled'; the allowed set is enforced by a
+  // CHECK and mirrored in reschedule-rules.ts.
   status: text('status').default('pending_opponent').notNull(),
   // Fixed at creation: less than 72 hours before the match's start, so the opponent may decline
   // at their discretion. Stored so the answer survives the match later being moved.
@@ -267,8 +268,12 @@ export const matchRescheduleRequests = pgTable('match_reschedule_requests', {
   originalScheduledAt: timestamp('original_scheduled_at').notNull(),
   // Set when the opponent accepts one of the proposed times.
   acceptedOptionId: uuid('accepted_option_id'),
+  // The opponent's answer to the requester's times: an accept, a decline or a counter-offer.
   opponentRespondedByUserId: uuid('opponent_responded_by_user_id'),
   opponentRespondedAt: timestamp('opponent_responded_at'),
+  // The requester's answer to a counter-offer (an accept or a decline).
+  counterRespondedByUserId: uuid('counter_responded_by_user_id'),
+  counterRespondedAt: timestamp('counter_responded_at'),
   decidedByStaffId: text('decided_by_staff_id'),
   decidedAt: timestamp('decided_at'),
   staffNote: text('staff_note'),
@@ -280,23 +285,28 @@ export const matchRescheduleRequests = pgTable('match_reschedule_requests', {
   // At most one open request per match: a second attempt must wait for the first to resolve.
   uniqueIndex('match_reschedule_requests_one_open_per_match_idx')
     .on(t.matchId)
-    .where(sql`status in ('pending_opponent', 'pending_staff')`),
+    .where(sql`status in ('pending_opponent', 'pending_requester', 'pending_staff')`),
   check(
     'match_reschedule_requests_status_check',
-    sql`${t.status} in ('pending_opponent', 'pending_staff', 'approved', 'declined_opponent', 'declined_staff', 'cancelled')`
+    sql`${t.status} in ('pending_opponent', 'pending_requester', 'pending_staff', 'approved', 'declined_opponent', 'declined_requester', 'declined_staff', 'cancelled')`
   ),
 ]).enableRLS();
 
-// The times a request proposes (2 to 5, at least an hour apart; enforced in the action).
+// The times proposed on a request: the requester's first set (2 to 5, at least an hour apart;
+// enforced in the action) and, if the opponent counters, one more set of their own.
 export const matchRescheduleOptions = pgTable('match_reschedule_options', {
   id: uuid('id').defaultRandom().primaryKey(),
   requestId: uuid('request_id')
     .references(() => matchRescheduleRequests.id, { onDelete: 'cascade' })
     .notNull(),
   proposedAt: timestamp('proposed_at').notNull(),
+  // Which side proposed it. Only the other side's times can be picked: the opponent picks from
+  // the 'requester' set, and after a counter-offer the requester picks from the 'opponent' set.
+  proposedBy: text('proposed_by').default('requester').notNull(),
 }, (t) => [
   index('match_reschedule_options_request_id_idx').on(t.requestId),
   uniqueIndex('match_reschedule_options_request_time_idx').on(t.requestId, t.proposedAt),
+  check('match_reschedule_options_proposed_by_check', sql`${t.proposedBy} in ('requester', 'opponent')`),
 ]).enableRLS();
 
 // --- TOURNAMENTS ---

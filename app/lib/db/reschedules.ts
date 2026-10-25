@@ -77,6 +77,7 @@ export async function getLatestRescheduleRequests(
     byRequest.get(option.requestId)?.options.push({
       id: option.id,
       proposedAt: option.proposedAt.toISOString(),
+      proposedBy: option.proposedBy === 'opponent' ? 'opponent' : 'requester',
     });
   }
   return latest;

@@ -51,6 +51,7 @@ vi.mock('../manager-auth', () => ({ assertManagerForSchoolGame: mocks.assertMana
 
 import {
   cancelReschedule,
+  counterReschedule,
   requestReschedule,
   respondToReschedule,
 } from '../reschedule-actions';
@@ -272,8 +273,115 @@ describe('respondToReschedule', () => {
   });
 });
 
+describe('counterReschedule', () => {
+  const counter = {
+    requestId: 'req-1',
+    schoolId: 'school-b',
+    proposedTimes: ['2026-11-14T19:00', '2026-11-15T19:00'],
+  };
+  const offered = [{ proposedAt: new Date('2026-11-13T00:00:00.000Z') }, { proposedAt: new Date('2026-11-14T00:00:00.000Z') }];
+
+  it('refuses the requesting school, a request not waiting on the opponent, and a changed match', async () => {
+    mocks.queue.push([request()], [match()]);
+    expect((await counterReschedule({ ...counter, schoolId: 'school-a' })).error).toMatch(/other school has to answer/);
+    mocks.queue.push([request({ status: 'pending_requester' })], [match()]);
+    expect((await counterReschedule(counter)).error).toMatch(/no longer waiting/);
+    mocks.queue.push([request()], [match({ status: 'live' })]);
+    expect((await counterReschedule(counter)).error).toMatch(/changed since/);
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it('applies the same time rules as a request', async () => {
+    mocks.queue.push([request()], [match()]);
+    expect((await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00'] })).error).toMatch(/at least 2/);
+    mocks.queue.push([request()], [match()]);
+    const tooClose = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-14T19:30'] });
+    expect(tooClose.error).toMatch(/one hour apart/);
+  });
+
+  it('tells the opponent to accept a time the requester already offered', async () => {
+    // 19:00 ET on 12 Nov is 00:00 UTC on 13 Nov, which the requester already proposed.
+    mocks.queue.push([request()], [match()], offered);
+    const result = await counterReschedule({ ...counter, proposedTimes: ['2026-11-12T19:00', '2026-11-15T19:00'] });
+    expect(result.error).toMatch(/already proposed/);
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it('hands the choice to the requester and stores the times as the opponent’s', async () => {
+    mocks.queue.push([request()], [match()], offered, [{ id: 'req-1' }], []);
+    expect(await counterReschedule(counter)).toEqual({ success: true });
+    expect(mocks.updated[0]).toMatchObject({ status: 'pending_requester', opponentRespondedByUserId: 'user-1' });
+    const [options] = mocks.inserted as Record<string, unknown>[][];
+    expect(options).toHaveLength(2);
+    expect(options[0]).toMatchObject({ requestId: 'req-1', proposedBy: 'opponent' });
+  });
+
+  it('does not revive a request that was resolved in the meantime', async () => {
+    mocks.queue.push([request()], [match()], offered, []);
+    expect((await counterReschedule(counter)).error).toMatch(/already resolved/);
+    expect(mocks.inserted).toEqual([]);
+  });
+});
+
+describe('answering a counter-offer', () => {
+  const answer = { requestId: 'req-1', schoolId: 'school-a', accept: true, optionId: 'opt-9' };
+  const countered = () => request({ status: 'pending_requester' });
+  const counterOption = (over: Record<string, unknown> = {}) => ({
+    id: 'opt-9',
+    requestId: 'req-1',
+    proposedBy: 'opponent',
+    proposedAt: new Date(NOW.getTime() + 12 * 24 * HOUR),
+    ...over,
+  });
+
+  it('is the requester’s to answer, not the opponent’s', async () => {
+    mocks.queue.push([countered()], [match()]);
+    const result = await respondToReschedule({ ...answer, schoolId: 'school-b' });
+    expect(result.error).toMatch(/school that made the request has to answer/);
+    expect(mocks.updated).toEqual([]);
+  });
+
+  it('sends an accepted counter-time to staff and records the requester’s answer', async () => {
+    mocks.queue.push([countered()], [match()], [counterOption()], [{ id: 'req-1' }]);
+    expect(await respondToReschedule(answer)).toEqual({ success: true });
+    expect(mocks.updated[0]).toMatchObject({
+      status: 'pending_staff',
+      acceptedOptionId: 'opt-9',
+      counterRespondedByUserId: 'user-1',
+    });
+    expect(mocks.updated[0]).not.toHaveProperty('opponentRespondedByUserId');
+  });
+
+  it('lets the requester decline, which ends the request', async () => {
+    mocks.queue.push([countered()], [match()], [{ id: 'req-1' }]);
+    expect(await respondToReschedule({ ...answer, accept: false })).toEqual({ success: true });
+    expect(mocks.updated[0]).toMatchObject({ status: 'declined_requester' });
+  });
+
+  it('refuses a time that is not one of the opponent’s, or has passed', async () => {
+    mocks.queue.push([countered()], [match()], []);
+    expect((await respondToReschedule(answer)).error).toMatch(/not part of this request/);
+    mocks.queue.push([countered()], [match()], [counterOption({ proposedAt: new Date(NOW.getTime() - HOUR) })]);
+    expect((await respondToReschedule(answer)).error).toMatch(/already passed/);
+  });
+
+  it('refuses to accept after the match changed, but still lets the requester decline', async () => {
+    mocks.queue.push([countered()], [match({ status: 'live' })]);
+    expect((await respondToReschedule(answer)).error).toMatch(/changed since/);
+    mocks.queue.push([countered()], [match({ status: 'live' })], [{ id: 'req-1' }]);
+    expect(await respondToReschedule({ ...answer, accept: false })).toEqual({ success: true });
+  });
+});
+
 describe('cancelReschedule', () => {
   const cancel = { requestId: 'req-1', schoolId: 'school-a' };
+
+  it('lets either school cancel while a counter-offer is waiting', async () => {
+    mocks.queue.push([request({ status: 'pending_requester' })], [match()], [{ id: 'req-1' }]);
+    expect(await cancelReschedule({ ...cancel, schoolId: 'school-b' })).toEqual({ success: true });
+    mocks.queue.push([request({ status: 'pending_requester' })], [match()], [{ id: 'req-1' }]);
+    expect(await cancelReschedule(cancel)).toEqual({ success: true });
+  });
 
   it('lets the requester cancel while the opponent has not answered', async () => {
     mocks.queue.push([request()], [match()], [{ id: 'req-1' }]);
@@ -289,12 +397,12 @@ describe('cancelReschedule', () => {
 
   it('refuses once the opponent agreed, before touching the row', async () => {
     mocks.queue.push([request({ status: 'pending_staff' })], [match()]);
-    expect((await cancelReschedule(cancel)).error).toMatch(/already agreed/);
+    expect((await cancelReschedule(cancel)).error).toMatch(/already been agreed/);
     expect(mocks.updated).toEqual([]);
   });
 
   it('refuses when the opponent agreed between the read and the write', async () => {
     mocks.queue.push([request()], [match()], []);
-    expect((await cancelReschedule(cancel)).error).toMatch(/already agreed/);
+    expect((await cancelReschedule(cancel)).error).toMatch(/already been agreed/);
   });
 });

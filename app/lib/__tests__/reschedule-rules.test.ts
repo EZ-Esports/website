@@ -3,6 +3,7 @@ import {
   LATE_REQUEST_WINDOW_MS,
   canCancelRequest,
   canOpponentRespond,
+  canRequesterRespond,
   canStaffDecide,
   isLateRequest,
   isOpenStatus,
@@ -74,16 +75,16 @@ describe('validateProposedTimes', () => {
 });
 
 describe('status helpers', () => {
-  it('lets the requester cancel only before the opponent agrees', () => {
-    expect(canCancelRequest('pending_opponent')).toBe(true);
-    for (const status of RESCHEDULE_STATUSES.filter((s) => s !== 'pending_opponent')) {
-      expect(canCancelRequest(status)).toBe(false);
-    }
+  it('allows cancelling only until someone has agreed to a time', () => {
+    const cancellable = RESCHEDULE_STATUSES.filter(canCancelRequest);
+    expect(cancellable).toEqual(['pending_opponent', 'pending_requester']);
+    expect(canCancelRequest('pending_staff')).toBe(false);
+    expect(canCancelRequest('approved')).toBe(false);
   });
 
-  it('lets the opponent answer only while waiting for them', () => {
-    expect(canOpponentRespond('pending_opponent')).toBe(true);
-    expect(canOpponentRespond('pending_staff')).toBe(false);
+  it('lets the opponent answer only while waiting for them, and the requester only after a counter-offer', () => {
+    expect(RESCHEDULE_STATUSES.filter(canOpponentRespond)).toEqual(['pending_opponent']);
+    expect(RESCHEDULE_STATUSES.filter(canRequesterRespond)).toEqual(['pending_requester']);
   });
 
   it('lets staff decide only after the opponent agreed', () => {
@@ -92,15 +93,23 @@ describe('status helpers', () => {
     expect(canStaffDecide('approved')).toBe(false);
   });
 
-  it('counts only the two pending states as open', () => {
-    expect(RESCHEDULE_STATUSES.filter(isOpenStatus)).toEqual(['pending_opponent', 'pending_staff']);
+  it('counts only the pending states as open', () => {
+    expect(RESCHEDULE_STATUSES.filter(isOpenStatus)).toEqual([
+      'pending_opponent',
+      'pending_requester',
+      'pending_staff',
+    ]);
   });
 
-  it('labels every status, with both declines reading the same', () => {
+  it('labels every status, with every decline reading the same', () => {
     for (const status of RESCHEDULE_STATUSES) {
       expect(rescheduleStatusLabel(status)).toBeTruthy();
     }
-    expect(rescheduleStatusLabel('declined_opponent')).toBe(rescheduleStatusLabel('declined_staff'));
+    const declined = (['declined_opponent', 'declined_requester', 'declined_staff'] as const).map(
+      rescheduleStatusLabel
+    );
+    expect(new Set(declined)).toEqual(new Set(['Declined']));
+    expect(rescheduleStatusLabel('approved')).toBe('Rescheduled');
   });
 });
 
@@ -139,8 +148,10 @@ describe('canRequestReschedule', () => {
 
   it('refuses while a request is open but allows a new one after it resolved', () => {
     expect(canRequestReschedule({ ...base, reschedule: request('pending_opponent') }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, reschedule: request('pending_requester') }, NOW)).toBe(false);
     expect(canRequestReschedule({ ...base, reschedule: request('pending_staff') }, NOW)).toBe(false);
     expect(canRequestReschedule({ ...base, reschedule: request('declined_staff') }, NOW)).toBe(true);
+    expect(canRequestReschedule({ ...base, reschedule: request('declined_requester') }, NOW)).toBe(true);
     expect(canRequestReschedule({ ...base, reschedule: request('cancelled') }, NOW)).toBe(true);
   });
 });

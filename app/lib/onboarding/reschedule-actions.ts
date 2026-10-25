@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
@@ -9,6 +9,7 @@ import {
   MAX_REASON_LENGTH,
   canCancelRequest,
   canOpponentRespond,
+  canRequesterRespond,
   isLateRequest,
   validateProposedTimes,
   type RescheduleStatus,
@@ -171,13 +172,22 @@ async function loadRequest(requestId: string) {
 
 export interface RespondToRescheduleParams {
   requestId: string;
-  /** The responding (opposing) school. */
+  /**
+   * The school answering: the opposing school while the request waits on them, or the requesting
+   * school once the opponent has sent a counter-offer.
+   */
   schoolId: string;
   accept: boolean;
-  /** Required when accepting: one of the request's proposed times. */
+  /** Required when accepting: one of the times the other school proposed. */
   optionId?: string;
 }
 
+/**
+ * Accepts one of the other school's times, or declines. Who answers depends on the status: the
+ * opponent answers the requester's times (`pending_opponent`); after a counter-offer the
+ * requester answers the opponent's times (`pending_requester`). Either way an accept goes to
+ * staff, and a school can only pick times the other side proposed.
+ */
 async function respondToRescheduleImpl(
   params: RespondToRescheduleParams
 ): Promise<RescheduleActionResult> {
@@ -187,11 +197,19 @@ async function respondToRescheduleImpl(
   if (!match) return { success: false, error: 'Match not found.' };
   const { userId } = await authorizeForMatch(params.schoolId, match);
 
-  if (params.schoolId === request.requestedBySchoolId) {
-    return { success: false, error: 'The other school has to answer your request.' };
-  }
-  if (!canOpponentRespond(request.status as RescheduleStatus)) {
+  const status = request.status as RescheduleStatus;
+  const answeringCounter = canRequesterRespond(status);
+  if (!answeringCounter && !canOpponentRespond(status)) {
     return { success: false, error: 'This request is no longer waiting for your answer.' };
+  }
+  const isRequester = params.schoolId === request.requestedBySchoolId;
+  if (answeringCounter !== isRequester) {
+    return {
+      success: false,
+      error: answeringCounter
+        ? 'The school that made the request has to answer this counter-offer.'
+        : 'The other school has to answer your request.',
+    };
   }
   // Declining stays possible after the match moved or started, so a stale request cannot sit
   // open and block the match's next one; accepting would move a different match than was asked.
@@ -202,16 +220,19 @@ async function respondToRescheduleImpl(
   }
 
   const now = new Date();
-  const base = { opponentRespondedByUserId: userId, opponentRespondedAt: now };
+  const answer = answeringCounter
+    ? { counterRespondedByUserId: userId, counterRespondedAt: now }
+    : { opponentRespondedByUserId: userId, opponentRespondedAt: now };
+  const awaiting = answeringCounter ? 'pending_requester' : 'pending_opponent';
 
   if (!params.accept) {
     const updated = await db
       .update(schema.matchRescheduleRequests)
-      .set({ ...base, status: 'declined_opponent' })
+      .set({ ...answer, status: answeringCounter ? 'declined_requester' : 'declined_opponent' })
       .where(
         and(
           eq(schema.matchRescheduleRequests.id, request.id),
-          eq(schema.matchRescheduleRequests.status, 'pending_opponent')
+          eq(schema.matchRescheduleRequests.status, awaiting)
         )
       )
       .returning({ id: schema.matchRescheduleRequests.id });
@@ -227,7 +248,9 @@ async function respondToRescheduleImpl(
     .where(
       and(
         eq(schema.matchRescheduleOptions.id, params.optionId),
-        eq(schema.matchRescheduleOptions.requestId, request.id)
+        eq(schema.matchRescheduleOptions.requestId, request.id),
+        // Only the other school's times can be picked, never your own.
+        eq(schema.matchRescheduleOptions.proposedBy, answeringCounter ? 'opponent' : 'requester')
       )
     )
     .limit(1);
@@ -238,11 +261,11 @@ async function respondToRescheduleImpl(
 
   const updated = await db
     .update(schema.matchRescheduleRequests)
-    .set({ ...base, status: 'pending_staff', acceptedOptionId: option.id })
+    .set({ ...answer, status: 'pending_staff', acceptedOptionId: option.id })
     .where(
       and(
         eq(schema.matchRescheduleRequests.id, request.id),
-        eq(schema.matchRescheduleRequests.status, 'pending_opponent')
+        eq(schema.matchRescheduleRequests.status, awaiting)
       )
     )
     .returning({ id: schema.matchRescheduleRequests.id });
@@ -251,11 +274,85 @@ async function respondToRescheduleImpl(
     : { success: false, error: 'This request was already resolved.' };
 }
 
+export interface CounterRescheduleParams {
+  requestId: string;
+  /** The opposing school, answering the requester's times with its own. */
+  schoolId: string;
+  /** Eastern wall-clock times (`YYYY-MM-DDTHH:mm`), as a datetime-local input produces. */
+  proposedTimes: string[];
+}
+
+/**
+ * The opponent's third answer, besides accept and decline: propose 2 to 5 times of their own.
+ * One round only: the requester then picks one (or declines), and cannot counter again.
+ */
+async function counterRescheduleImpl(
+  params: CounterRescheduleParams
+): Promise<RescheduleActionResult> {
+  const request = await loadRequest(params.requestId);
+  if (!request) return { success: false, error: 'Request not found.' };
+  const match = await loadMatch(request.matchId);
+  if (!match) return { success: false, error: 'Match not found.' };
+  const { userId } = await authorizeForMatch(params.schoolId, match);
+
+  if (params.schoolId === request.requestedBySchoolId) {
+    return { success: false, error: 'The other school has to answer your request.' };
+  }
+  if (!canOpponentRespond(request.status as RescheduleStatus)) {
+    return { success: false, error: 'This request is no longer waiting for your answer.' };
+  }
+  const now = new Date();
+  if (match.status !== 'scheduled' || match.scheduledAt.getTime() !== request.originalScheduledAt.getTime()) {
+    return { success: false, error: 'The match has changed since this request was made. Decline it.' };
+  }
+
+  const times = (params.proposedTimes ?? []).map((t) => parseEastern(t));
+  const problem = validateProposedTimes(times, now, match.scheduledAt);
+  if (problem) return { success: false, error: problem };
+
+  // A time the requester already offered should simply be accepted, not countered.
+  const offered = await db
+    .select({ proposedAt: schema.matchRescheduleOptions.proposedAt })
+    .from(schema.matchRescheduleOptions)
+    .where(eq(schema.matchRescheduleOptions.requestId, request.id));
+  const offeredTimes = new Set(offered.map((o) => o.proposedAt.getTime()));
+  if (times.some((t) => offeredTimes.has(t.getTime()))) {
+    return { success: false, error: 'One of those times was already proposed. Accept it instead.' };
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      // Conditional so a request resolved in the meantime is not revived; throwing rolls back.
+      const moved = await tx
+        .update(schema.matchRescheduleRequests)
+        .set({ status: 'pending_requester', opponentRespondedByUserId: userId, opponentRespondedAt: now })
+        .where(
+          and(
+            eq(schema.matchRescheduleRequests.id, request.id),
+            eq(schema.matchRescheduleRequests.status, 'pending_opponent')
+          )
+        )
+        .returning({ id: schema.matchRescheduleRequests.id });
+      if (moved.length === 0) throw new ActionError('This request was already resolved.');
+      await tx
+        .insert(schema.matchRescheduleOptions)
+        .values(times.map((proposedAt) => ({ requestId: request.id, proposedAt, proposedBy: 'opponent' })));
+    });
+  } catch (error) {
+    if (error instanceof ActionError) throw error;
+    console.error('Failed to send counter-offer', error);
+    return { success: false, error: 'Could not send your times. Please try again.' };
+  }
+  return { success: true };
+}
+
 export interface CancelRescheduleParams {
   requestId: string;
-  /** The requesting school. */
+  /** The cancelling school: the requester, or either school once a counter-offer is waiting. */
   schoolId: string;
 }
+
+const NO_LONGER_CANCELLABLE = 'A time has already been agreed, so this can no longer be cancelled.';
 
 async function cancelRescheduleImpl(
   params: CancelRescheduleParams
@@ -266,11 +363,12 @@ async function cancelRescheduleImpl(
   if (!match) return { success: false, error: 'Match not found.' };
   await authorizeForMatch(params.schoolId, match);
 
-  if (params.schoolId !== request.requestedBySchoolId) {
+  const status = request.status as RescheduleStatus;
+  if (!canCancelRequest(status)) return { success: false, error: NO_LONGER_CANCELLABLE };
+  // Before the opponent answers it is the requester's request to withdraw. After a counter-offer
+  // nobody has agreed to anything, so either school may walk away (see canCancelRequest).
+  if (status === 'pending_opponent' && params.schoolId !== request.requestedBySchoolId) {
     return { success: false, error: 'Only the school that made the request can cancel it.' };
-  }
-  if (!canCancelRequest(request.status as RescheduleStatus)) {
-    return { success: false, error: 'The other school already agreed, so this can no longer be cancelled.' };
   }
 
   const updated = await db
@@ -279,13 +377,12 @@ async function cancelRescheduleImpl(
     .where(
       and(
         eq(schema.matchRescheduleRequests.id, request.id),
-        inArray(schema.matchRescheduleRequests.status, ['pending_opponent'])
+        // The status read above, re-checked in the write so a simultaneous agreement wins.
+        eq(schema.matchRescheduleRequests.status, status)
       )
     )
     .returning({ id: schema.matchRescheduleRequests.id });
-  return updated.length
-    ? { success: true }
-    : { success: false, error: 'The other school already agreed, so this can no longer be cancelled.' };
+  return updated.length ? { success: true } : { success: false, error: NO_LONGER_CANCELLABLE };
 }
 
 export async function requestReschedule(
@@ -298,6 +395,12 @@ export async function respondToReschedule(
   params: RespondToRescheduleParams
 ): Promise<RescheduleActionResult> {
   return withActionErrors(() => respondToRescheduleImpl(params));
+}
+
+export async function counterReschedule(
+  params: CounterRescheduleParams
+): Promise<RescheduleActionResult> {
+  return withActionErrors(() => counterRescheduleImpl(params));
 }
 
 export async function cancelReschedule(

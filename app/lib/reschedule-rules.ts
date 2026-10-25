@@ -20,18 +20,25 @@ export const MAX_STAFF_NOTE_LENGTH = 500;
 
 export const RESCHEDULE_STATUSES = [
   'pending_opponent',
+  // The opponent answered with times of their own; the requester now picks one or declines.
+  'pending_requester',
   'pending_staff',
   'approved',
   'declined_opponent',
+  'declined_requester',
   'declined_staff',
   'cancelled',
 ] as const;
 
 export type RescheduleStatus = (typeof RESCHEDULE_STATUSES)[number];
 
+/** Which school proposed a time: the one that made the request, or the opponent's counter-offer. */
+export type RescheduleProposer = 'requester' | 'opponent';
+
 /** A request that still blocks a new one for the same match. */
 export const OPEN_RESCHEDULE_STATUSES: readonly RescheduleStatus[] = [
   'pending_opponent',
+  'pending_requester',
   'pending_staff',
 ];
 
@@ -78,13 +85,25 @@ export function validateProposedTimes(
   return null;
 }
 
-/** Only the requesting school may cancel, and only before the opponent has agreed. */
+/**
+ * Either school may cancel until someone has agreed to a time. While the opponent has not
+ * answered, only the requester may (`pending_opponent`); once the opponent counters, nobody has
+ * agreed to anything yet, so either may walk away (`pending_requester`), which also stops a
+ * counter-offer the requester ignores from blocking the match's next request. The action
+ * enforces which school may cancel in which status.
+ */
 export function canCancelRequest(status: RescheduleStatus): boolean {
+  return status === 'pending_opponent' || status === 'pending_requester';
+}
+
+/** The opponent may accept one of the requester's times, decline, or counter with times of their own. */
+export function canOpponentRespond(status: RescheduleStatus): boolean {
   return status === 'pending_opponent';
 }
 
-export function canOpponentRespond(status: RescheduleStatus): boolean {
-  return status === 'pending_opponent';
+/** After a counter-offer the requester picks one of the opponent's times or declines. */
+export function canRequesterRespond(status: RescheduleStatus): boolean {
+  return status === 'pending_requester';
 }
 
 export function canStaffDecide(status: RescheduleStatus): boolean {
@@ -95,11 +114,14 @@ export function rescheduleStatusLabel(status: RescheduleStatus): string {
   switch (status) {
     case 'pending_opponent':
       return 'Waiting for opponent';
+    case 'pending_requester':
+      return 'Counter-offer sent';
     case 'pending_staff':
       return 'Waiting for staff';
     case 'approved':
       return 'Rescheduled';
     case 'declined_opponent':
+    case 'declined_requester':
     case 'declined_staff':
       return 'Declined';
     case 'cancelled':
@@ -111,6 +133,7 @@ export interface RescheduleOptionItem {
   id: string;
   /** ISO instant. */
   proposedAt: string;
+  proposedBy: RescheduleProposer;
 }
 
 /** A request as the manager portal shows it (serializable). */

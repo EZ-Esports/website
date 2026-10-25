@@ -11,14 +11,18 @@ import {
   MIN_PROPOSED_TIMES,
   canCancelRequest,
   canOpponentRespond,
+  canRequesterRespond,
   isLateRequest,
   isOpenStatus,
   rescheduleStatusLabel,
   validateProposedTimes,
+  type RescheduleOptionItem,
+  type RescheduleProposer,
 } from '@/app/lib/reschedule-rules';
 import { canRequestReschedule, type SchoolMatchItem } from '@/app/lib/school-matches';
 import {
   cancelReschedule,
+  counterReschedule,
   requestReschedule,
   respondToReschedule,
   type RescheduleActionResult,
@@ -41,6 +45,7 @@ const INPUT =
   'w-full min-h-[44px] sm:min-h-0 px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]';
 const MODAL_CLASS =
   'w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800 p-4 sm:p-6 max-h-[calc(100dvh-2rem)] overflow-y-auto shadow-2xl';
+const LATE_NOTICE = 'p-3 text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-lg';
 
 function when(iso: string): string {
   const date = new Date(iso);
@@ -80,6 +85,44 @@ function useRescheduleAction(onDone?: () => void) {
   return { pending, error, setError, run };
 }
 
+/** The 2 to 5 time pickers (Eastern Time) shared by a request and a counter-offer. */
+function ProposedTimesFields({
+  times,
+  setTimes,
+  hint,
+}: {
+  times: string[];
+  setTimes: (next: string[]) => void;
+  hint: string;
+}) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-xs font-semibold text-zinc-300">Proposed times (Eastern Time, ET)</legend>
+      <p className="text-[11px] text-zinc-500">{hint}</p>
+      {times.map((value, index) => (
+        <input
+          key={index}
+          type="datetime-local"
+          aria-label={`Proposed time ${index + 1}`}
+          value={value}
+          onChange={(e) => setTimes(times.map((t, i) => (i === index ? e.target.value : t)))}
+          required
+          className={INPUT}
+        />
+      ))}
+      {times.length < MAX_PROPOSED_TIMES && (
+        <button
+          type="button"
+          onClick={() => setTimes([...times, ''])}
+          className="text-xs text-[#f4cccc] hover:underline cursor-pointer min-h-[44px] sm:min-h-0"
+        >
+          Add another time
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
 function RequestDialog({ match, schoolId, now }: { match: SchoolMatchItem; schoolId: string; now: Date }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -116,7 +159,7 @@ function RequestDialog({ match, schoolId, now }: { match: SchoolMatchItem; schoo
               </p>
             </div>
             {late && (
-              <p className="p-3 text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-lg">
+              <p className={LATE_NOTICE}>
                 This is under 72 hours before the match, so {match.opponentName} may accept or decline
                 at their discretion.
               </p>
@@ -137,34 +180,11 @@ function RequestDialog({ match, schoolId, now }: { match: SchoolMatchItem; schoo
                   className={INPUT}
                 />
               </div>
-              <fieldset className="space-y-2">
-                <legend className="text-xs font-semibold text-zinc-300">
-                  Proposed times (Eastern Time, ET)
-                </legend>
-                <p className="text-[11px] text-zinc-500">
-                  Give at least {MIN_PROPOSED_TIMES} times, an hour or more apart. {match.opponentName} picks one.
-                </p>
-                {times.map((value, index) => (
-                  <input
-                    key={index}
-                    type="datetime-local"
-                    aria-label={`Proposed time ${index + 1}`}
-                    value={value}
-                    onChange={(e) => setTimes(times.map((t, i) => (i === index ? e.target.value : t)))}
-                    required
-                    className={INPUT}
-                  />
-                ))}
-                {times.length < MAX_PROPOSED_TIMES && (
-                  <button
-                    type="button"
-                    onClick={() => setTimes([...times, ''])}
-                    className="text-xs text-[#f4cccc] hover:underline cursor-pointer min-h-[44px] sm:min-h-0"
-                  >
-                    Add another time
-                  </button>
-                )}
-              </fieldset>
+              <ProposedTimesFields
+                times={times}
+                setTimes={setTimes}
+                hint={`Give at least ${MIN_PROPOSED_TIMES} times, an hour or more apart. ${match.opponentName} picks one, or suggests other times.`}
+              />
               <div className="flex flex-wrap justify-end gap-2">
                 <Button onPress={() => setOpen(false)} className={QUIET_BUTTON}>
                   Cancel
@@ -181,74 +201,159 @@ function RequestDialog({ match, schoolId, now }: { match: SchoolMatchItem; schoo
   );
 }
 
+/**
+ * The answer to the other school's times. The opponent answers the requester's times (accept,
+ * decline, or suggest their own); after a counter-offer the requester answers the opponent's
+ * times (accept or decline, no second counter).
+ */
 function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: string }) {
   const request = match.reschedule!;
+  const answeringCounter = canRequesterRespond(request.status);
+  const proposer: RescheduleProposer = answeringCounter ? 'opponent' : 'requester';
+  const choices = request.options.filter((o) => o.proposedBy === proposer);
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'pick' | 'counter'>('pick');
   const [optionId, setOptionId] = useState('');
-  const { pending, error, setError, run } = useRescheduleAction(() => setOpen(false));
+  const [times, setTimes] = useState<string[]>(['', '']);
+  const { pending, error, setError, run } = useRescheduleAction(() => {
+    setOpen(false);
+    setMode('pick');
+    setTimes(['', '']);
+  });
+
+  const sendCounter = (e: React.FormEvent) => {
+    e.preventDefault();
+    const problem = validateProposedTimes(
+      times.map((t) => parseEastern(t)),
+      new Date(),
+      new Date(match.scheduledAt)
+    );
+    if (problem) return setError(problem);
+    const offered = new Set(request.options.map((o) => new Date(o.proposedAt).getTime()));
+    if (times.some((t) => offered.has(parseEastern(t).getTime()))) {
+      return setError('One of those times was already proposed. Accept it instead.');
+    }
+    run(() => counterReschedule({ requestId: request.id, schoolId, proposedTimes: times }));
+  };
 
   return (
-    <DialogTrigger isOpen={open} onOpenChange={(next) => (setOpen(next), next || setError(null))}>
+    <DialogTrigger
+      isOpen={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          setError(null);
+          setMode('pick');
+        }
+      }}
+    >
       <Button className={PRIMARY_BUTTON}>Respond</Button>
       <Overlay isDismissable>
         <Modal className={MODAL_CLASS}>
-          <Dialog className="outline-none space-y-4" aria-label="Respond to reschedule request">
+          <Dialog
+            className="outline-none space-y-4"
+            aria-label={mode === 'counter' ? 'Suggest other times' : 'Respond to reschedule request'}
+          >
             <div>
-              <Heading className="font-bold text-white text-base">Reschedule request</Heading>
+              <Heading className="font-bold text-white text-base">
+                {mode === 'counter' ? 'Suggest other times' : answeringCounter ? 'Counter-offer' : 'Reschedule request'}
+              </Heading>
               <p className="text-xs text-zinc-400">
-                {request.requestedBySchoolName} asks to move your match · currently {when(match.scheduledAt)}
+                {answeringCounter
+                  ? `${match.opponentName} suggested other times for your match`
+                  : `${request.requestedBySchoolName} asks to move your match`}{' '}
+                · currently {when(match.scheduledAt)}
               </p>
             </div>
-            {request.isLate && (
-              <p className="p-3 text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-lg">
-                Made with under 72 hours’ notice, so you may accept or decline at your discretion.
-              </p>
-            )}
+            {request.isLate && !answeringCounter && <p className={LATE_NOTICE}>Made with under 72 hours’ notice, so you may accept or decline at your discretion.</p>}
             <p className="text-sm text-zinc-300">
-              <span className="text-zinc-500">Reason: </span>
+              <span className="text-zinc-500">{answeringCounter ? 'Your reason: ' : 'Reason: '}</span>
               {request.reason}
             </p>
             <ErrorNotice message={error} />
-            <fieldset className="space-y-2">
-              <legend className="text-xs font-semibold text-zinc-300">Pick a new time (ET)</legend>
-              {request.options.map((option) => (
-                <label
-                  key={option.id}
-                  className="flex min-h-[44px] items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm text-zinc-200 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name={`option-${request.id}`}
-                    value={option.id}
-                    checked={optionId === option.id}
-                    onChange={() => setOptionId(option.id)}
-                  />
-                  {when(option.proposedAt)}
-                </label>
-              ))}
-            </fieldset>
-            <p className="text-[11px] text-zinc-500">
-              Once you accept, staff still have to approve it, and neither school can go back to the
-              original time after that.
-            </p>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                isDisabled={pending}
-                onPress={() => run(() => respondToReschedule({ requestId: request.id, schoolId, accept: false }))}
-                className={QUIET_BUTTON}
-              >
-                Decline
-              </Button>
-              <Button
-                isDisabled={pending || !optionId}
-                onPress={() =>
-                  run(() => respondToReschedule({ requestId: request.id, schoolId, accept: true, optionId }))
-                }
-                className={`${PRIMARY_BUTTON} data-[disabled]:opacity-50`}
-              >
-                {pending ? 'Saving…' : 'Accept this time'}
-              </Button>
-            </div>
+
+            {mode === 'pick' ? (
+              <>
+                <fieldset className="space-y-2">
+                  <legend className="text-xs font-semibold text-zinc-300">
+                    {answeringCounter ? `Pick one of ${match.opponentName}’s times (ET)` : 'Pick a new time (ET)'}
+                  </legend>
+                  {choices.map((option) => (
+                    <label
+                      key={option.id}
+                      className="flex min-h-[44px] items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm text-zinc-200 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name={`option-${request.id}`}
+                        value={option.id}
+                        checked={optionId === option.id}
+                        onChange={() => setOptionId(option.id)}
+                      />
+                      {when(option.proposedAt)}
+                    </label>
+                  ))}
+                </fieldset>
+                <p className="text-[11px] text-zinc-500">
+                  Once you accept, staff still have to approve it, and neither school can go back to the
+                  original time after that.
+                </p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    isDisabled={pending}
+                    onPress={() =>
+                      run(() => respondToReschedule({ requestId: request.id, schoolId, accept: false }))
+                    }
+                    className={`${QUIET_BUTTON} data-[disabled]:opacity-50`}
+                  >
+                    Decline
+                  </Button>
+                  {!answeringCounter && (
+                    <Button
+                      isDisabled={pending}
+                      onPress={() => {
+                        setError(null);
+                        setMode('counter');
+                      }}
+                      className={`${QUIET_BUTTON} data-[disabled]:opacity-50`}
+                    >
+                      Suggest other times
+                    </Button>
+                  )}
+                  <Button
+                    isDisabled={pending || !optionId}
+                    onPress={() =>
+                      run(() => respondToReschedule({ requestId: request.id, schoolId, accept: true, optionId }))
+                    }
+                    className={`${PRIMARY_BUTTON} data-[disabled]:opacity-50`}
+                  >
+                    {pending ? 'Saving…' : 'Accept this time'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <form onSubmit={sendCounter} className="space-y-4">
+                <ProposedTimesFields
+                  times={times}
+                  setTimes={setTimes}
+                  hint={`Give at least ${MIN_PROPOSED_TIMES} times, an hour or more apart. ${request.requestedBySchoolName} picks one or declines, and cannot suggest more.`}
+                />
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    onPress={() => {
+                      setError(null);
+                      setMode('pick');
+                    }}
+                    className={QUIET_BUTTON}
+                  >
+                    Back
+                  </Button>
+                  <button type="submit" disabled={pending} className={`${PRIMARY_BUTTON} disabled:opacity-50`}>
+                    {pending ? 'Sending…' : 'Send these times'}
+                  </button>
+                </div>
+              </form>
+            )}
           </Dialog>
         </Modal>
       </Overlay>
@@ -256,9 +361,30 @@ function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: 
   );
 }
 
+function OptionList({ title, options, acceptedId }: { title: string; options: RescheduleOptionItem[]; acceptedId: string | null }) {
+  if (options.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold text-zinc-300">{title}</p>
+      <ul className="space-y-1.5">
+        {options.map((option) => (
+          <li
+            key={option.id}
+            className="flex min-h-[44px] sm:min-h-0 items-center justify-between gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-200"
+          >
+            {when(option.proposedAt)}
+            {option.id === acceptedId && <span className="text-[10px] font-bold text-emerald-400">Agreed</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
- * Read-only detail of a request this school is part of. The requester can cancel from here while
- * the opponent has not answered, so cancelling is always a deliberate step after seeing what was sent.
+ * Read-only detail of a request this school is part of. A school that may cancel (see
+ * `canCancelRequest`) does so from here, so cancelling is always a deliberate step after seeing
+ * what was sent.
  */
 function ViewDialog({
   match,
@@ -273,6 +399,19 @@ function ViewDialog({
   const [open, setOpen] = useState(false);
   const { pending, error, setError, run } = useRescheduleAction(() => setOpen(false));
   const iAmRequester = request.requestedBySchoolId === schoolId;
+  const requesterOptions = request.options.filter((o) => o.proposedBy === 'requester');
+  const counterOptions = request.options.filter((o) => o.proposedBy === 'opponent');
+
+  const statusLine =
+    request.status === 'pending_opponent'
+      ? iAmRequester
+        ? `Waiting for ${match.opponentName}`
+        : `${request.requestedBySchoolName} requested a reschedule`
+      : request.status === 'pending_requester'
+        ? iAmRequester
+          ? `${match.opponentName} suggested other times`
+          : `Waiting for ${match.opponentName} to choose`
+        : rescheduleStatusLabel(request.status);
 
   return (
     <DialogTrigger isOpen={open} onOpenChange={(next) => (setOpen(next), next || setError(null))}>
@@ -289,19 +428,15 @@ function ViewDialog({
               </p>
             </div>
             <p className="text-sm text-zinc-200">
-              {request.status === 'pending_opponent'
-                ? iAmRequester
-                  ? `Waiting for ${match.opponentName}`
-                  : `${request.requestedBySchoolName} requested a reschedule`
-                : rescheduleStatusLabel(request.status)}
+              {statusLine}
               {request.status === 'pending_staff' && (
                 <span className="block text-xs text-zinc-400">
-                  {match.opponentName} agreed. EZ Esports staff still have to approve it.
+                  Both schools agreed. EZ Esports staff still have to approve it.
                 </span>
               )}
             </p>
             {request.isLate && (
-              <p className="p-3 text-xs text-amber-300 bg-amber-950/30 border border-amber-800/40 rounded-lg">
+              <p className={LATE_NOTICE}>
                 Made with under 72 hours’ notice, so the other school could accept or decline at their
                 discretion.
               </p>
@@ -310,22 +445,16 @@ function ViewDialog({
               <span className="text-zinc-500">Reason: </span>
               {request.reason}
             </p>
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-zinc-300">Proposed times (ET)</p>
-              <ul className="space-y-1.5">
-                {request.options.map((option) => (
-                  <li
-                    key={option.id}
-                    className="flex min-h-[44px] sm:min-h-0 items-center justify-between gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-200"
-                  >
-                    {when(option.proposedAt)}
-                    {option.id === request.acceptedOptionId && (
-                      <span className="text-[10px] font-bold text-emerald-400">Agreed</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <OptionList
+              title={iAmRequester ? 'You proposed (ET)' : `${request.requestedBySchoolName} proposed (ET)`}
+              options={requesterOptions}
+              acceptedId={request.acceptedOptionId}
+            />
+            <OptionList
+              title={iAmRequester ? `${match.opponentName} suggested (ET)` : 'You suggested (ET)'}
+              options={counterOptions}
+              acceptedId={request.acceptedOptionId}
+            />
             <ErrorNotice message={error} />
             <div className="flex flex-wrap justify-end gap-2">
               <Button onPress={() => setOpen(false)} className={QUIET_BUTTON}>
@@ -358,25 +487,32 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
 
   if (request && isOpenStatus(request.status)) {
     const accepted = request.options.find((o) => o.id === request.acceptedOptionId);
-    const waitingForMe = !iAmRequester && canOpponentRespond(request.status);
+    // It is my turn when the opponent has to answer the requester, or the requester has to
+    // answer a counter-offer.
+    const myTurn =
+      (canOpponentRespond(request.status) && !iAmRequester) ||
+      (canRequesterRespond(request.status) && iAmRequester);
+    const label =
+      request.status === 'pending_staff'
+        ? 'Waiting for staff'
+        : request.status === 'pending_opponent'
+          ? iAmRequester
+            ? `Waiting for ${match.opponentName}`
+            : `${request.requestedBySchoolName} requested a reschedule`
+          : iAmRequester
+            ? `${match.opponentName} suggested other times`
+            : `Waiting for ${match.opponentName} to choose`;
+    // Before the opponent answers only the requester may cancel; after a counter-offer either may.
+    const mayCancel =
+      canCancelRequest(request.status) && (iAmRequester || request.status === 'pending_requester');
     return (
       <div className="space-y-1.5">
-        <div className="text-zinc-300">
-          {request.status === 'pending_staff'
-            ? 'Waiting for staff'
-            : iAmRequester
-              ? `Waiting for ${match.opponentName}`
-              : `${request.requestedBySchoolName} requested a reschedule`}
-        </div>
+        <div className="text-zinc-300">{label}</div>
         {accepted && <div className="text-zinc-500">Agreed: {when(accepted.proposedAt)}</div>}
-        {waitingForMe && !viewOnly ? (
+        {myTurn && !viewOnly ? (
           <RespondDialog match={match} schoolId={schoolId} />
         ) : (
-          <ViewDialog
-            match={match}
-            schoolId={schoolId}
-            canCancel={!viewOnly && iAmRequester && canCancelRequest(request.status)}
-          />
+          <ViewDialog match={match} schoolId={schoolId} canCancel={!viewOnly && mayCancel} />
         )}
       </div>
     );

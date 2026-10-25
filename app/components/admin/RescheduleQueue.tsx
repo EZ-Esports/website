@@ -58,7 +58,7 @@ function RequestRow({ item }: { item: StaffRescheduleItem }) {
         <span className="sr-only"> moves to </span>
         <span className="font-semibold tabular-nums text-white">{when(item.newScheduledAt)}</span>
         <span className="px-2">·</span>
-        requested by {item.requestedBySchoolName}, accepted by the other school
+        requested by {item.requestedBySchoolName}, both schools agreed
       </p>
       <p className="text-sm text-foreground-secondary">
         <span className="font-medium text-white">Reason: </span>
