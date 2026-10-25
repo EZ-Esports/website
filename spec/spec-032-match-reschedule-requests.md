@@ -44,6 +44,8 @@ Rules page 4.3 sets the league's rescheduling rules (72 hours, two proposed time
 - After `approved`, either school may immediately request a new move of the same match; nothing limits repeat requests.
 - The approval guard compares `scheduled_at` for equality; a match time stored with sub-millisecond precision (only possible from raw SQL) would always read as "changed".
 - Staff admins viewing a school's portal see the request buttons; the server refuses them.
+- While a tour step shows, the page is inert, which also blocks wheel and touch scrolling inside inner containers such as the matches table; a Matches step whose table is wider than a phone screen cannot be scrolled sideways during the tour (window scrolling still works).
+- The moved-from marker comes from the latest approved request; a later manual staff edit of a match's time leaves the "was ..." text unchanged.
 
 ## Data
 
@@ -66,6 +68,8 @@ Rules page 4.3 sets the league's rescheduling rules (72 hours, two proposed time
 ## Verification
 
 - `app/lib/__tests__/reschedule-rules.test.ts` (rules, boundaries, `canRequestReschedule`), `app/lib/onboarding/__tests__/reschedule-actions.test.ts` (authorization, each refusal, late flag, ET parsing, accept/decline/cancel races), `app/(admin)/admin/matches/__tests__/reschedule-actions.test.ts` (permission, approve transaction and stale guards, decline needs a note), and extended `school-matches.test.ts`. The actions run against a queued-result mock of the query builder, so they prove the control flow and the values written, not the SQL.
-- Migration 0053 was applied to an in-memory Postgres (PGlite) with stand-in `matches` and `schools` tables: the open-request unique index, status CHECK, option uniqueness, cascade delete and RLS all behave. It has not been run against a real Supabase database.
+- Migration 0053, in its final form (including counter-offers), was applied to an in-memory Postgres (PGlite) with stand-in `matches` and `schools` tables: the open-request unique index (also covering `pending_requester`), both CHECKs, option uniqueness, the `proposed_by` default, cascade delete and RLS all behave. It has not been run against a real Supabase database.
+- **0053 was amended in place** to add counter-offers, on the basis that it had never been applied anywhere. Every statement is `IF NOT EXISTS` and the journal will not re-run a recorded index, so if 0053 was ever applied in its earlier form (a Supabase branch, a dev database), the amendment silently does nothing there: add a `0054` for `proposed_by`, the `counter_responded_*` columns, the two statuses and the wider index predicate instead.
+- The action tests also assert the SQL parameters the actions filter by (a stand-in cannot run SQL but it can see its inputs): the opponent's accept is limited to `proposed_by = 'requester'` times and the requester's to `'opponent'` times, and every answer or cancel writes only over the status it read. `app/lib/db/__tests__/reschedules.test.ts` covers `getRescheduledFrom` (approved only, newest move wins). `tour/__tests__/inert.test.ts` covers the view-only lock helper; the lock's lifecycle inside `PortalTour` was checked in the browser, not by a unit test.
 - Rendered with mock data in a local dev server (no database): every request state in the Upcoming table, the request dialog (late notice, the one-hour validation message, focus inside, Escape closes), the response dialog, the staff queue, and the request dialog at 375px (fits, no page overflow). The accept, decline, cancel, approve and decline buttons were not exercised end to end because they call the real actions.
 - Not done: an end-to-end run with real data (needs a local Postgres with `0053` applied and a manager login).

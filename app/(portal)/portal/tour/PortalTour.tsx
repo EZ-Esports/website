@@ -247,8 +247,16 @@ export default function PortalTour({ tourCompleted, accountId, schoolName }: Por
   // The tour is view only: while a step shows, the page behind it cannot be clicked, tabbed to
   // or activated, so a manager cannot send or cancel anything mid-tutorial.
   useEffect(() => {
-    if (!isOpen || !layerRef.current) return;
-    return inertAllExcept(document.body, layerRef.current);
+    const layer = layerRef.current;
+    if (!isOpen || !layer) return;
+    const release = inertAllExcept(document.body, layer);
+    // Starting from the Tutorial menu, the menu's focus restore can win over the card's
+    // autoFocus and, with the page now inert, leave focus on <body>. Put it on the card so
+    // keyboard and screen-reader users land on the step.
+    if (!layer.contains(document.activeElement)) {
+      layer.querySelector<HTMLElement>('[role="dialog"]')?.focus();
+    }
+    return release;
   }, [isOpen]);
 
   const stepKey = step ? `${step.id}:${confirmingSkip ? 'confirm' : 'step'}` : '';

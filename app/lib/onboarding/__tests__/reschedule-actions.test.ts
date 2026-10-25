@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => {
   const queue: unknown[] = [];
   const inserted: unknown[][] = [];
   const updated: Record<string, unknown>[] = [];
+  // Every `where` condition passed to a query, in order, so a test can assert on the SQL
+  // parameters the action filtered by (the stand-in cannot run SQL, but it can see its inputs).
+  const wheres: unknown[] = [];
 
   function chain(onSet?: (v: Record<string, unknown>) => void): any {
     const proxy: any = new Proxy(function () {}, {
@@ -14,6 +17,12 @@ const mocks = vi.hoisted(() => {
           const result = queue.shift();
           if (result instanceof Error) return (_ok: unknown, bad: (e: unknown) => void) => bad(result);
           return (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok);
+        }
+        if (prop === 'where') {
+          return (condition: unknown) => {
+            wheres.push(condition);
+            return proxy;
+          };
         }
         if (prop === 'set') {
           return (v: Record<string, unknown>) => {
@@ -43,7 +52,15 @@ const mocks = vi.hoisted(() => {
       fn({ select: () => chain(), update: () => chain(), insert: () => insertBuilder() }),
   };
 
-  return { queue, inserted, updated, db, assertManagerForSchoolGame: vi.fn() };
+  /** The literal values bound as parameters anywhere inside a drizzle condition. */
+  function paramValues(node: any): unknown[] {
+    if (!node || typeof node !== 'object') return [];
+    if (Array.isArray(node.queryChunks)) return node.queryChunks.flatMap(paramValues);
+    if ('encoder' in node && 'value' in node) return [node.value];
+    return [];
+  }
+
+  return { queue, inserted, updated, wheres, paramValues, db, assertManagerForSchoolGame: vi.fn() };
 });
 
 vi.mock('@/app/lib/db', () => ({ db: mocks.db }));
@@ -97,6 +114,7 @@ beforeEach(() => {
   mocks.queue.length = 0;
   mocks.inserted.length = 0;
   mocks.updated.length = 0;
+  mocks.wheres.length = 0;
   mocks.assertManagerForSchoolGame.mockReset();
   asManager();
 });
@@ -373,8 +391,48 @@ describe('answering a counter-offer', () => {
   });
 });
 
+describe('which side’s times a school may pick (the SQL conditions the actions filter by)', () => {
+  const option = (over: Record<string, unknown> = {}) => ({
+    id: 'opt-1',
+    requestId: 'req-1',
+    proposedAt: new Date(NOW.getTime() + 11 * 24 * HOUR),
+    ...over,
+  });
+  const proposers = () => mocks.wheres.flatMap(mocks.paramValues).filter((v) => v === 'requester' || v === 'opponent');
+
+  it('limits the opponent to the requester’s times', async () => {
+    mocks.queue.push([request()], [match()], [option()], [{ id: 'req-1' }]);
+    await respondToReschedule({ requestId: 'req-1', schoolId: 'school-b', accept: true, optionId: 'opt-1' });
+    expect(proposers()).toEqual(['requester']);
+  });
+
+  it('limits the requester to the opponent’s times after a counter-offer', async () => {
+    mocks.queue.push([request({ status: 'pending_requester' })], [match()], [option()], [{ id: 'req-1' }]);
+    await respondToReschedule({ requestId: 'req-1', schoolId: 'school-a', accept: true, optionId: 'opt-1' });
+    expect(proposers()).toEqual(['opponent']);
+  });
+
+  it('writes each answer only over the status it read', async () => {
+    mocks.queue.push([request()], [match()], [{ id: 'req-1' }]);
+    await respondToReschedule({ requestId: 'req-1', schoolId: 'school-b', accept: false });
+    expect(mocks.wheres.flatMap(mocks.paramValues)).toContain('pending_opponent');
+
+    mocks.wheres.length = 0;
+    mocks.queue.push([request({ status: 'pending_requester' })], [match()], [{ id: 'req-1' }]);
+    await respondToReschedule({ requestId: 'req-1', schoolId: 'school-a', accept: false });
+    expect(mocks.wheres.flatMap(mocks.paramValues)).toContain('pending_requester');
+    expect(mocks.wheres.flatMap(mocks.paramValues)).not.toContain('pending_opponent');
+  });
+});
+
 describe('cancelReschedule', () => {
   const cancel = { requestId: 'req-1', schoolId: 'school-a' };
+
+  it('cancels only over the status it read', async () => {
+    mocks.queue.push([request({ status: 'pending_requester' })], [match()], [{ id: 'req-1' }]);
+    await cancelReschedule({ ...cancel, schoolId: 'school-b' });
+    expect(mocks.wheres.flatMap(mocks.paramValues)).toContain('pending_requester');
+  });
 
   it('lets either school cancel while a counter-offer is waiting', async () => {
     mocks.queue.push([request({ status: 'pending_requester' })], [match()], [{ id: 'req-1' }]);

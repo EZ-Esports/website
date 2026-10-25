@@ -18,6 +18,7 @@ import {
   validateProposedTimes,
   type RescheduleOptionItem,
   type RescheduleProposer,
+  type RescheduleRequestItem,
 } from '@/app/lib/reschedule-rules';
 import { canRequestReschedule, type SchoolMatchItem } from '@/app/lib/school-matches';
 import {
@@ -50,6 +51,20 @@ const LATE_NOTICE = 'p-3 text-xs text-amber-300 bg-amber-950/30 border border-am
 function when(iso: string): string {
   const date = new Date(iso);
   return `${formatNY(date, 'date-short')}, ${formatNY(date, 'time')}`;
+}
+
+/** The status for a resolved request, saying who declined so the other school is not left guessing. */
+function resolvedLabel(request: RescheduleRequestItem, match: SchoolMatchItem, iAmRequester: boolean): string {
+  switch (request.status) {
+    case 'declined_opponent':
+      return iAmRequester ? `Declined by ${match.opponentName}` : 'You declined';
+    case 'declined_requester':
+      return iAmRequester ? 'You declined' : `Declined by ${request.requestedBySchoolName}`;
+    case 'declined_staff':
+      return 'Declined by EZ Esports staff';
+    default:
+      return rescheduleStatusLabel(request.status);
+  }
 }
 
 function ErrorNotice({ message }: { message: string | null }) {
@@ -218,6 +233,7 @@ function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: 
   const { pending, error, setError, run } = useRescheduleAction(() => {
     setOpen(false);
     setMode('pick');
+    setOptionId('');
     setTimes(['', '']);
   });
 
@@ -244,6 +260,7 @@ function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: 
         if (!next) {
           setError(null);
           setMode('pick');
+          setOptionId('');
         }
       }}
     >
@@ -522,7 +539,7 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
     <div className="space-y-1.5">
       {request && request.status !== 'cancelled' && (
         <div className="text-zinc-400">
-          {rescheduleStatusLabel(request.status)}
+          {resolvedLabel(request, match, iAmRequester)}
           {request.status === 'approved' && match.rescheduledFrom && (
             <div className="text-zinc-500">Moved from {when(match.rescheduledFrom)}</div>
           )}
