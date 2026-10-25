@@ -2,8 +2,8 @@
 
 - **Spec ID:** spec-031
 - **Title:** Read-only "Matches" section in the school manager portal
-- **Status:** In Progress (code, tests, lint and build pass; not visually verified, see Verification)
-- **PR / Commit:** branch `feat/manager-matches-view`, PR TBD (also carries the rules 4.3 rewrite)
+- **Status:** Implemented, merged (see Verification for what was checked)
+- **PR / Commit:** [PR #275](https://github.com/EZ-Esports/website/pull/275) (also carries the rules 4.3 rewrite)
 - **Date:** 2026-10-24
 - **Scope:** `/portal` UI and one new query. No migration, no schema change. Part 1 of [#274](https://github.com/EZ-Esports/website/issues/274) (supersedes [#254](https://github.com/EZ-Esports/website/issues/254)); reschedule requests are PR 2.
 
