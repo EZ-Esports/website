@@ -15,6 +15,8 @@ export const TOUR_ANCHORS = [
   'approvals',
   'rosters',
   'create-roster',
+  'matches',
+  'reschedule',
   'tutorial-button',
 ] as const;
 
@@ -91,6 +93,24 @@ export const TOUR_SECTIONS: TourSection[] = [
         anchor: 'create-roster',
         title: 'Create a roster',
         body: 'Start here if your school has no roster for a game yet. Approved players can then be placed on it.',
+      },
+    ],
+  },
+  {
+    id: 'matches',
+    label: 'Matches',
+    steps: [
+      {
+        id: 'matches',
+        anchor: 'matches',
+        title: 'Your school’s matches',
+        body: 'Every match your school plays is listed here, in Eastern Time. Upcoming and Past are separate tabs, and when you play in both divisions you can filter by Varsity or Junior Varsity. Results stay hidden until the season is published.',
+      },
+      {
+        id: 'reschedule',
+        anchor: 'reschedule',
+        title: 'Ask to move a match',
+        body: 'Use Request reschedule on an upcoming match to propose at least two new times and give a reason. The other school picks one, or suggests times of their own for you to choose from. Then EZ Esports staff approve it. Under 72 hours’ notice, the other school can say no. Open View request to see or cancel yours until a time is agreed.',
       },
     ],
   },

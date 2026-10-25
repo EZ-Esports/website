@@ -5,6 +5,7 @@
  * server before the rows are mapped (see `season-outcomes.ts`).
  */
 import { matchTabOf, divisionLabel, type MatchStatus } from './db/match-page';
+import { isOpenStatus, type RescheduleRequestItem } from './reschedule-rules';
 
 /** The raw joined row a school-matches query returns, before it is turned into a portal item. */
 export interface SchoolMatchRow {
@@ -39,13 +40,24 @@ export interface SchoolMatchItem {
   /** Null while the season's outcomes are unpublished (or the match has no score yet). */
   ownScore: number | null;
   opponentScore: number | null;
+  /** Both sides are the same school (two squads): staff move these, a manager cannot request. */
+  sameSchool: boolean;
+  /** The match's most recent reschedule request, open or resolved; null when it never had one. */
+  reschedule: RescheduleRequestItem | null;
+  /** The time staff moved this match from (ISO), when an approved request ever moved it. */
+  rescheduledFrom: string | null;
 }
 
 /**
  * A school playing itself (two squads of one school) is a legal pairing: the home side wins the
  * tie so the row still reads "vs <the school>" with a stable orientation.
  */
-export function toSchoolMatchItem(row: SchoolMatchRow, schoolId: string): SchoolMatchItem {
+export function toSchoolMatchItem(
+  row: SchoolMatchRow,
+  schoolId: string,
+  reschedule: RescheduleRequestItem | null = null,
+  rescheduledFrom: string | null = null
+): SchoolMatchItem {
   const isHome = row.homeSchoolId === schoolId;
   return {
     id: row.id,
@@ -59,7 +71,27 @@ export function toSchoolMatchItem(row: SchoolMatchRow, schoolId: string): School
     isHome,
     ownScore: isHome ? row.homeScore : row.awayScore,
     opponentScore: isHome ? row.awayScore : row.homeScore,
+    sameSchool: row.homeSchoolId === row.awaySchoolId,
+    reschedule,
+    rescheduledFrom,
   };
+}
+
+/**
+ * Whether the portal offers "Request reschedule" on this match: it must still be scheduled and
+ * not started, be between two different schools, and have no open request. Season view-only
+ * state is the caller's to apply (it is per game); the server re-checks everything regardless.
+ */
+export function canRequestReschedule(
+  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt' | 'sameSchool' | 'reschedule'>,
+  now: Date
+): boolean {
+  return (
+    item.status === 'scheduled' &&
+    new Date(item.scheduledAt).getTime() > now.getTime() &&
+    !item.sameSchool &&
+    !(item.reschedule && isOpenStatus(item.reschedule.status))
+  );
 }
 
 /**
@@ -83,8 +115,30 @@ export function splitSchoolMatches(
   return { upcoming, past };
 }
 
+/** Display order of division labels; one a future division adds sorts after these. */
+const DIVISION_ORDER = ['Varsity', 'Junior Varsity', 'All'];
+
+/** The division labels present in the list, in display order, for the portal's division filter. */
+export function divisionOptions(items: readonly Pick<SchoolMatchItem, 'division'>[]): string[] {
+  const rank = (d: string) => {
+    const i = DIVISION_ORDER.indexOf(d);
+    return i === -1 ? DIVISION_ORDER.length : i;
+  };
+  return [...new Set(items.map((m) => m.division))].sort(
+    (a, b) => rank(a) - rank(b) || a.localeCompare(b)
+  );
+}
+
+/** Keeps one division's matches; `null` means every division. */
+export function filterByDivision<T extends Pick<SchoolMatchItem, 'division'>>(
+  items: readonly T[],
+  division: string | null
+): T[] {
+  return division === null ? [...items] : items.filter((m) => m.division === division);
+}
+
 export function schoolMatchStatusLabel(
-  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt'>,
+  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt'> & { rescheduledFrom?: string | null },
   now: Date
 ): string {
   switch (item.status) {
@@ -97,6 +151,8 @@ export function schoolMatchStatusLabel(
     case 'cancelled':
       return 'Cancelled';
     default:
-      return matchTabOf(item, now) === 'upcoming' ? 'Scheduled' : 'Awaiting result';
+      if (matchTabOf(item, now) !== 'upcoming') return 'Awaiting result';
+      // A moved match that has not been played yet reads "Rescheduled" instead of "Scheduled".
+      return item.rescheduledFrom ? 'Rescheduled' : 'Scheduled';
   }
 }

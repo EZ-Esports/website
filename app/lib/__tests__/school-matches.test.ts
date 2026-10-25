@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  divisionOptions,
+  filterByDivision,
   schoolMatchStatusLabel,
   splitSchoolMatches,
   toSchoolMatchItem,
@@ -103,6 +105,41 @@ describe('splitSchoolMatches', () => {
   });
 });
 
+describe('division filter', () => {
+  const mk = (id: string, division: string) => toSchoolMatchItem(row({ id, division }), 'stuy');
+  const items = [mk('a', 'JV'), mk('b', 'Varsity'), mk('c', 'JV'), mk('d', 'Varsity')];
+
+  it('lists the divisions present, Varsity before Junior Varsity, however the rows are ordered', () => {
+    expect(divisionOptions(items)).toEqual(['Varsity', 'Junior Varsity']);
+    expect(divisionOptions([mk('x', 'All'), mk('y', 'JV'), mk('z', 'Varsity')])).toEqual([
+      'Varsity',
+      'Junior Varsity',
+      'All',
+    ]);
+    expect(divisionOptions([])).toEqual([]);
+  });
+
+  it('keeps one division, or everything for null, without reordering', () => {
+    expect(filterByDivision(items, 'Junior Varsity').map((m) => m.id)).toEqual(['a', 'c']);
+    expect(filterByDivision(items, 'Varsity').map((m) => m.id)).toEqual(['b', 'd']);
+    expect(filterByDivision(items, null).map((m) => m.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(filterByDivision(items, 'All')).toEqual([]);
+  });
+
+  it('splits the filtered list into Upcoming and Past on its own', () => {
+    const later = (id: string, division: string, scheduledAt: Date) =>
+      toSchoolMatchItem(row({ id, division, scheduledAt }), 'stuy');
+    const mixed = [
+      later('jv-future', 'JV', new Date('2026-11-05T22:00:00.000Z')),
+      later('v-future', 'Varsity', new Date('2026-11-06T22:00:00.000Z')),
+      later('jv-past', 'JV', new Date('2026-10-01T22:00:00.000Z')),
+    ];
+    const { upcoming, past } = splitSchoolMatches(filterByDivision(mixed, 'Junior Varsity'), NOW);
+    expect(upcoming.map((m) => m.id)).toEqual(['jv-future']);
+    expect(past.map((m) => m.id)).toEqual(['jv-past']);
+  });
+});
+
 describe('schoolMatchStatusLabel', () => {
   it('labels each state', () => {
     const at = (scheduledAt: string, status: SchoolMatchItem['status']) =>
@@ -114,6 +151,15 @@ describe('schoolMatchStatusLabel', () => {
     expect(at('2026-10-30T22:00:00.000Z', 'cancelled')).toBe('Cancelled');
     expect(at('2026-10-24T11:00:00.000Z', 'live')).toBe('Live');
   });
+
+  it('calls an unplayed match that staff moved "Rescheduled", but never hides a result', () => {
+    const moved = (scheduledAt: string, status: SchoolMatchItem['status']) =>
+      schoolMatchStatusLabel({ status, scheduledAt, rescheduledFrom: '2026-10-20T22:00:00.000Z' }, NOW);
+    expect(moved('2026-10-30T22:00:00.000Z', 'scheduled')).toBe('Rescheduled');
+    expect(moved('2026-10-20T22:00:00.000Z', 'scheduled')).toBe('Awaiting result');
+    expect(moved('2026-10-22T22:00:00.000Z', 'completed')).toBe('Completed');
+    expect(moved('2026-10-30T22:00:00.000Z', 'cancelled')).toBe('Cancelled');
+  });
 });
 
 // --- getSchoolMatches: scoping and outcome redaction -------------------------------------------
@@ -123,6 +169,8 @@ const mocks = vi.hoisted(() => ({
   getAuthorizedGameScopes: vi.fn(),
   getSchoolMatchRows: vi.fn(),
   getOutcomesPublicSeasonIds: vi.fn(),
+  getLatestRescheduleRequests: vi.fn(),
+  getRescheduledFrom: vi.fn(),
 }));
 
 vi.mock('@/app/lib/db', () => ({ db: {} }));
@@ -137,6 +185,10 @@ vi.mock('@/app/lib/onboarding/manager-auth', () => ({
   NO_ACTIVE_SEASON_ERROR: 'no active season',
 }));
 vi.mock('@/app/lib/db/matches', () => ({ getSchoolMatchRows: mocks.getSchoolMatchRows }));
+vi.mock('@/app/lib/db/reschedules', () => ({
+  getLatestRescheduleRequests: mocks.getLatestRescheduleRequests,
+  getRescheduledFrom: mocks.getRescheduledFrom,
+}));
 vi.mock('@/app/lib/db/standings', () => ({
   getOutcomesPublicSeasonIds: mocks.getOutcomesPublicSeasonIds,
 }));
@@ -146,6 +198,8 @@ describe('getSchoolMatches', () => {
     vi.clearAllMocks();
     mocks.assertManagerForSchool.mockResolvedValue({});
     mocks.getOutcomesPublicSeasonIds.mockResolvedValue(new Set<string>());
+    mocks.getLatestRescheduleRequests.mockResolvedValue(new Map());
+    mocks.getRescheduledFrom.mockResolvedValue(new Map());
   });
 
   async function load(schoolId: string, gameId?: string) {
@@ -185,6 +239,47 @@ describe('getSchoolMatches', () => {
     const hidden = items.find((i) => i.id === 'hidden')!;
     expect(hidden).toMatchObject({ ownScore: null, opponentScore: null, status: 'completed' });
     expect(items.find((i) => i.id === 'public')).toMatchObject({ ownScore: 2, opponentScore: 1 });
+  });
+
+  it('attaches each match’s latest reschedule request', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'with' }), row({ id: 'without' })]);
+    const request = { id: 'req-1', matchId: 'with', status: 'pending_opponent' };
+    mocks.getLatestRescheduleRequests.mockResolvedValue(new Map([['with', request]]));
+
+    const items = await load('stuy');
+
+    expect(mocks.getLatestRescheduleRequests).toHaveBeenCalledWith(['with', 'without']);
+    expect(items.find((i) => i.id === 'with')!.reschedule).toBe(request);
+    expect(items.find((i) => i.id === 'without')!.reschedule).toBeNull();
+  });
+
+  it('marks a match staff moved with the time it moved from, even when its latest request is not approved', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'moved' }), row({ id: 'plain' })]);
+    mocks.getRescheduledFrom.mockResolvedValue(new Map([['moved', '2026-10-20T22:00:00.000Z']]));
+
+    const items = await load('stuy');
+
+    expect(mocks.getRescheduledFrom).toHaveBeenCalledWith(['moved', 'plain']);
+    expect(items.find((i) => i.id === 'moved')!.rescheduledFrom).toBe('2026-10-20T22:00:00.000Z');
+    expect(items.find((i) => i.id === 'plain')!.rescheduledFrom).toBeNull();
+  });
+
+  it('still returns the schedule when the reschedule lookups fail', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'm' })]);
+    mocks.getLatestRescheduleRequests.mockRejectedValue(new Error('relation does not exist'));
+    mocks.getRescheduledFrom.mockRejectedValue(new Error('relation does not exist'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const items = await load('stuy');
+
+    expect(items).toHaveLength(1);
+    expect(items[0].reschedule).toBeNull();
+    expect(items[0].rescheduledFrom).toBeNull();
+    expect(log).toHaveBeenCalledTimes(2);
+    log.mockRestore();
   });
 
   it('gives a staff admin every season, unredacted', async () => {
