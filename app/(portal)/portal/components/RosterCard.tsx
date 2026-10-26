@@ -9,7 +9,8 @@ import {
   HiOutlineXCircle,
   HiOutlineTrash,
 } from 'react-icons/hi2';
-import { MovePlayerControl } from './MovePlayerControl';
+import { MovePlayerControl, type MoveTarget } from './MovePlayerControl';
+import { MAX_ROSTER_PLAYERS, MAX_ROSTER_SUBS } from '@/app/lib/onboarding/roster-limits';
 import type {
   SchoolRosterDetails,
   RosterEligibilityResult,
@@ -33,7 +34,7 @@ interface RosterCardProps {
   /** Moves a player to a sibling roster of the same team (for example Varsity to JV). */
   onMovePlayer?: (fromRosterId: string, playerId: string, toRosterId: string) => void;
   /** The team's other rosters. A student is on one tier per game, so Move replaces a second Enroll. */
-  siblingRosters?: Array<{ id: string; name: string }>;
+  siblingRosters?: MoveTarget[];
   movingPlayerId?: string | null;
   onDeleteRoster?: (rosterId: string) => void;
 }
@@ -53,6 +54,10 @@ export function RosterCard({
   movingPlayerId = null,
   onDeleteRoster,
 }: RosterCardProps) {
+  const playerCount = roster.players.length;
+  const subCount = roster.players.filter((p) => p.role === 'sub').length;
+  // Adding to a full roster is refused by the server; the control says so up front.
+  const isFull = playerCount >= MAX_ROSTER_PLAYERS;
   return (
     <div className="min-w-0 p-4 sm:p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 shadow-lg space-y-4">
       {/* Title block and action row wrap instead of sharing one line, so the badge can
@@ -66,18 +71,19 @@ export function RosterCard({
             </span>
           </div>
           <p className="text-xs text-zinc-400 mt-0.5">
-            {roster.players.length} Competitors Enrolled
+            {playerCount}/{MAX_ROSTER_PLAYERS} players
+            {subCount > 0 ? ` (${subCount}/${MAX_ROSTER_SUBS} subs)` : ''}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button
             onPress={() => onOpenEnrollModal(roster)}
-            isDisabled={locked}
+            isDisabled={locked || isFull}
             className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <HiOutlineUserPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Enroll Player</span>
+            <span>{isFull ? `Roster full (${playerCount}/${MAX_ROSTER_PLAYERS})` : 'Enroll Player'}</span>
           </Button>
           <Button
             onPress={() => onOpenSwapModal(roster)}
@@ -151,7 +157,12 @@ export function RosterCard({
                       }`}
                     >
                       <option value="player">Starter</option>
-                      <option value="sub">Sub</option>
+                      <option
+                        value="sub"
+                        disabled={p.role !== 'sub' && subCount >= MAX_ROSTER_SUBS}
+                      >
+                        Sub
+                      </option>
                       <option value="captain">★ Captain</option>
                     </select>
                   </td>
@@ -175,6 +186,7 @@ export function RosterCard({
                       {onMovePlayer && (
                         <MovePlayerControl
                           playerName={p.playerName}
+                          playerIsSub={p.role === 'sub'}
                           rosterName={roster.name}
                           siblings={siblingRosters}
                           isDisabled={locked || movingPlayerId === p.id}

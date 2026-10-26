@@ -3,7 +3,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 
 vi.mock('@/app/lib/db/index', () => ({ db: {} }));
 
-import { lockRosterMember, memberOnRoster, siblingEnrollment } from '../roster-scope';
+import { lockRoster, lockRosterMember, memberOnRoster, rosterPlayerRoles, siblingEnrollment } from '../roster-scope';
 
 /**
  * A stand-in executor that records each query's table and WHERE clause and answers from a queue,
@@ -116,5 +116,23 @@ describe('lockRosterMember', () => {
     await lockRosterMember(executor, 'team-1', 'member-1');
     await lockRosterMember(executor, 'team-1', 'member-2');
     expect(executed[0].params).not.toEqual(executed[1].params);
+  });
+});
+
+describe('lockRoster and rosterPlayerRoles', () => {
+  it('lockRoster takes an advisory lock keyed on the roster, distinct from the member lock key', async () => {
+    const { executor, executed } = fakeExecutor([]);
+    await lockRoster(executor, 'roster-1');
+    await lockRosterMember(executor, 'team-1', 'member-1');
+    expect(executed[0].sql).toContain('pg_advisory_xact_lock');
+    expect(executed[0].params).toEqual(['roster:roster-1']);
+    expect(executed[0].params).not.toEqual(executed[1].params);
+  });
+
+  it('rosterPlayerRoles reads the roster\'s players by roster id', async () => {
+    const { executor, queries } = fakeExecutor([[{ id: 'p1', role: 'sub' }]]);
+    await expect(rosterPlayerRoles(executor, 'roster-1')).resolves.toEqual([{ id: 'p1', role: 'sub' }]);
+    expect(queries[0].sql).toContain('"roster_id" = $1');
+    expect(queries[0].params).toEqual(['roster-1']);
   });
 });

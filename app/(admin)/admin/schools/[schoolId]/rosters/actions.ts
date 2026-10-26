@@ -7,8 +7,10 @@ import { and, count, eq, or, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { dbErrorChain, sanitizeDbError } from '@/app/lib/text-utils';
 import {
-  lockRosterMember, memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool, siblingEnrollment, teamInSchool,
+  lockRoster, lockRosterMember, memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool,
+  rosterPlayerRoles, siblingEnrollment, teamInSchool,
 } from '@/app/lib/db/roster-scope';
+import { occupancyOf, rosterCapacityError } from '@/app/lib/onboarding/roster-limits';
 import { notifyRosterMembershipChanged } from '@/app/lib/onboarding/roster-membership-events';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
 import { toHubDivision, type CanonicalDivision } from '@/app/lib/db/match-page';
@@ -284,6 +286,17 @@ export async function createPlayer(schoolId: string, formData: FormData) {
         }
       }
 
+      // Roster size limits are league rules, so staff are held to them too. Counted under the
+      // roster lock (taken after the member lock, the same order everywhere).
+      await lockRoster(tx, rosterId);
+      const capacity = rosterCapacityError({
+        rosterName: roster.name,
+        occupancy: occupancyOf(await rosterPlayerRoles(tx, rosterId)),
+        role,
+        joining: true,
+      });
+      if (capacity) return { kind: 'conflict' as const, message: capacity };
+
       let memberIdToUse = memberId;
       if (!memberId) {
         const [member] = await tx
@@ -345,6 +358,20 @@ export async function updatePlayer(schoolId: string, playerId: string, formData:
       const player = await playerInSchool(playerId, schoolId, tx);
       if (!player || !(await memberInSchool(player.memberId, schoolId, tx))) return 'not-found' as const;
 
+      // Changing someone to sub needs a free substitute slot among the OTHER players (the
+      // player-count cap does not apply: nobody joins). Counted under the roster lock.
+      if (role === 'sub') {
+        const roster = await rosterInSchool(player.rosterId, schoolId, tx);
+        await lockRoster(tx, player.rosterId);
+        const capacity = rosterCapacityError({
+          rosterName: roster?.name ?? 'This roster',
+          occupancy: occupancyOf(await rosterPlayerRoles(tx, player.rosterId), playerId),
+          role,
+          joining: false,
+        });
+        if (capacity) return { kind: 'rejected' as const, message: capacity };
+      }
+
       await tx
         .update(schema.players)
         // Captaincy is derived from the role so the two never disagree.
@@ -354,9 +381,10 @@ export async function updatePlayer(schoolId: string, playerId: string, formData:
         .update(schema.members)
         .set({ firstName, lastName, discord: discord || null, graduationYear: gradYear })
         .where(eq(schema.members.id, player.memberId));
-      return { memberId: player.memberId };
+      return { kind: 'ok' as const, memberId: player.memberId };
     });
     if (outcome === 'not-found') return playerFail(NOT_FOUND.error);
+    if (outcome.kind === 'rejected') return playerFail(outcome.message);
 
     updateTag('members');
     updateTag('players');
@@ -412,12 +440,21 @@ export async function moveRosterMember(schoolId: string, playerId: string, toRos
       }
       // Serialize with concurrent adds/moves of this member within the team.
       await lockRosterMember(tx, from.teamId, player.memberId);
+      await lockRoster(tx, to.id);
       if (await memberOnRoster(player.memberId, to.id, tx)) {
         const name = await memberDisplayName(player.memberId, tx);
         return { error: `${name} is already on ${to.name}.` };
       }
 
       const wasCaptain = player.isCaptain || player.role === 'captain';
+      // Moving OUT of a full roster is fine; moving INTO one is not, and a sub needs a free sub slot.
+      const capacity = rosterCapacityError({
+        rosterName: to.name,
+        occupancy: occupancyOf(await rosterPlayerRoles(tx, to.id)),
+        role: wasCaptain ? 'player' : player.role,
+        joining: true,
+      });
+      if (capacity) return { error: capacity };
       // Guarded by the roster we read the player on: if someone else moved or removed the row in
       // the meantime nothing matches and we say so instead of overwriting their change.
       const updated = await tx

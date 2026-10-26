@@ -30,6 +30,7 @@ import {
   selectClass,
 } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
+import { MAX_ROSTER_PLAYERS, moveBlockedReason, moveMenuItems } from '@/app/lib/onboarding/roster-limits';
 
 type Result = { success: boolean; error?: string; [key: string]: unknown };
 
@@ -353,6 +354,8 @@ export function PlayerEditForm({ player, rosterName, onClose }: { player: Roster
 export interface SiblingRoster {
   id: string;
   name: string;
+  playerCount: number;
+  subCount: number;
 }
 
 /**
@@ -362,6 +365,7 @@ export interface SiblingRoster {
  * name starts with the visible text (label in name), then says whose row it is.
  */
 function MovePlayerControl({ player, rosterName, siblings }: { player: RosterViewPlayer; rosterName: string; siblings: SiblingRoster[] }) {
+  const playerIsSub = player.role === 'sub';
   const { schoolId, run, pending } = useEdit();
   if (siblings.length === 0) return null;
   const context = `${player.name} (currently ${rosterName})`;
@@ -372,21 +376,28 @@ function MovePlayerControl({ player, rosterName, siblings }: { player: RosterVie
     );
   if (siblings.length === 1) {
     const [target] = siblings;
+    // A full target is not offered: the button stays, disabled, and says why in its own text.
+    const blocked = moveBlockedReason(target, playerIsSub);
+    const visible = blocked ?? `Move to ${target.name}`;
     return (
       <button
         type="button"
         className={ghostBtnSm}
-        disabled={pending}
-        aria-label={`Move to ${target.name}: ${context}`}
+        disabled={pending || blocked !== null}
+        aria-label={`${visible}: ${context}`}
         onClick={() => move(target)}
       >
-        <FiCornerUpRight aria-hidden /> Move to {target.name}
+        <FiCornerUpRight aria-hidden /> {visible}
       </button>
     );
   }
   return (
     <MenuTrigger>
-      <Button isDisabled={pending} aria-label={`Move to…: ${context}`} className={ghostBtnSm}>
+      <Button
+        isDisabled={pending || siblings.every((x) => moveBlockedReason(x, playerIsSub) !== null)}
+        aria-label={`Move to…: ${context}`}
+        className={ghostBtnSm}
+      >
         <FiCornerUpRight aria-hidden /> Move to…
       </Button>
       <Popover className="admin-popover w-44" placement="bottom end">
@@ -398,14 +409,15 @@ function MovePlayerControl({ player, rosterName, siblings }: { player: RosterVie
           }}
           className="rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none"
         >
-          {siblings.map((x) => (
+          {moveMenuItems(siblings, playerIsSub).map((item) => (
             <MenuItem
-              key={x.id}
-              id={x.id}
-              textValue={x.name}
-              className="flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 py-2 text-left text-sm text-foreground-secondary outline-none transition-colors data-[focused]:bg-surface data-[focused]:text-foreground sm:min-h-0"
+              key={item.id}
+              id={item.id}
+              textValue={item.text}
+              isDisabled={item.isDisabled}
+              className="flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 py-2 text-left text-sm text-foreground-secondary outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[focused]:bg-surface data-[focused]:text-foreground sm:min-h-0"
             >
-              {x.name}
+              {item.text}
             </MenuItem>
           ))}
         </Menu>
@@ -443,10 +455,10 @@ export function PlayerRowActions({
   );
 }
 
-export function AddPlayerButton({ open, onClick }: { open: boolean; onClick: () => void }) {
+export function AddPlayerButton({ open, onClick, full = false, playerCount = 0 }: { open: boolean; onClick: () => void; full?: boolean; playerCount?: number }) {
   return (
-    <button type="button" className={primaryBtnSm} aria-expanded={open} onClick={onClick}>
-      <FiPlus aria-hidden /> Add player
+    <button type="button" className={primaryBtnSm} aria-expanded={open} disabled={full} onClick={onClick}>
+      <FiPlus aria-hidden /> {full ? `Roster full (${playerCount}/${MAX_ROSTER_PLAYERS})` : 'Add player'}
     </button>
   );
 }

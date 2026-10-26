@@ -472,7 +472,13 @@ export default function SchoolPortalClient({
     newRole: 'player' | 'sub' | 'captain'
   ) => {
     try {
-      await updateRosterPlayerRole({ rosterId, playerId, role: newRole });
+      const res = await updateRosterPlayerRole({ rosterId, playerId, role: newRole });
+      if (!res.success) {
+        // For example the roster already has its maximum number of subs; the select snaps back.
+        setRosterNotice({ kind: 'error', text: res.error });
+        return;
+      }
+      setRosterNotice(null);
       setRosters((prev) =>
         prev.map((r) => {
           if (r.id !== rosterId) return r;

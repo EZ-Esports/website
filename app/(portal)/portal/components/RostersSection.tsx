@@ -165,7 +165,12 @@ export function RostersSection({
               movingPlayerId={movingPlayerId}
               siblingRosters={rosters
                 .filter((r) => r.teamId === roster.teamId && r.id !== roster.id)
-                .map((r) => ({ id: r.id, name: r.name }))}
+                .map((r) => ({
+                  id: r.id,
+                  name: r.name,
+                  playerCount: r.players.length,
+                  subCount: r.players.filter((p) => p.role === 'sub').length,
+                }))}
               onDeleteRoster={onDeleteRoster}
             />
           ))}

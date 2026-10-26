@@ -15,7 +15,8 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
-import { lockRosterMember, siblingEnrollment } from '@/app/lib/db/roster-scope';
+import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
+import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
@@ -505,6 +506,7 @@ export async function reviewPlayerInvite(
         // Serialize enrolls and moves of this member within the team so the sibling check
         // below cannot race another write.
         await lockRosterMember(tx, targetTeamId!, invite.memberId!);
+        await lockRoster(tx, targetRosterId!);
 
         const [existingPlayer] = await tx
           .select()
@@ -526,6 +528,14 @@ export async function reviewPlayerInvite(
             };
           }
         }
+
+        const capacity = rosterCapacityError({
+          rosterName: targetRosterName ?? 'This roster',
+          occupancy: occupancyOf(await rosterPlayerRoles(tx, targetRosterId!), existingPlayer?.id),
+          role,
+          joining: !existingPlayer,
+        });
+        if (capacity) return { kind: 'conflict' as const, message: capacity };
 
         await tx
           .update(schema.playerInvites)
@@ -1452,6 +1462,8 @@ export async function enrollPlayerToRoster(
     // Serialize enrolls and moves of this member within the team so the sibling check below
     // cannot race another write.
     await lockRosterMember(tx, team.id, memberId);
+    // Then the roster lock (always in this order) so the size count below cannot race another add.
+    await lockRoster(tx, rosterId);
 
     const [existingPlayer] = await tx
       .select()
@@ -1472,6 +1484,15 @@ export async function enrollPlayerToRoster(
         return siblingConflictMessage(`${member.firstName} ${member.lastName}`, sibling.rosterName, roster.name);
       }
     }
+
+    // Roster size limits: a new row needs room; any change to sub needs a free substitute slot.
+    const capacity = rosterCapacityError({
+      rosterName: roster.name,
+      occupancy: occupancyOf(await rosterPlayerRoles(tx, rosterId), existingPlayer?.id),
+      role,
+      joining: !existingPlayer,
+    });
+    if (capacity) return capacity;
 
     if (isCaptain) {
       // Demote existing captain on this roster (if another player was captain)
@@ -1636,10 +1657,10 @@ const MOVE_RACE_MESSAGE =
  * transaction. The existing players row is updated in place, so its id, in-game name and bio
  * survive. Both rosters are authorized and lock-checked through `assertManagerForRoster`, and
  * must share a team: a move never crosses games, seasons or schools. A captain arrives as a
- * regular starter because captaincy is per roster; a sub stays a sub. Enrollment applies no
- * roster size cap, so neither does a move.
+ * regular starter because captaincy is per roster; a sub stays a sub. The target roster must have
+ * room under the size limits in roster-limits.ts (7 players, 2 subs).
  *
- * Expected rejections (wrong team, already on the target, a stale row) are RETURNED as
+ * Expected rejections (wrong team, already on the target, full target, a stale row) are RETURNED as
  * `{ success: false, error }` because Next.js hides thrown messages in production. Authorization,
  * lock and view-only failures from `assertManagerForRoster` and malformed input still throw: the
  * portal disables the controls in those states.
@@ -1680,6 +1701,8 @@ export async function movePlayerToRoster(
 
   const outcome = await db.transaction(async (tx) => {
     await lockRosterMember(tx, from.team.id, lockMemberId!);
+    // Count the TARGET roster under its own lock (after the member lock, same order as enroll).
+    await lockRoster(tx, toRosterId);
 
     const [player] = await tx
       .select()
@@ -1714,6 +1737,15 @@ export async function movePlayerToRoster(
     const wasCaptain = player.isCaptain || player.role === 'captain';
     // players_captain_role_check ties role='captain' to is_captain, so demote both together.
     const role = wasCaptain ? 'player' : player.role;
+
+    // Moving OUT of a full roster is fine; moving INTO one is not, and a sub needs a free sub slot.
+    const capacity = rosterCapacityError({
+      rosterName: to.roster.name,
+      occupancy: occupancyOf(await rosterPlayerRoles(tx, toRosterId)),
+      role,
+      joining: true,
+    });
+    if (capacity) return { kind: 'rejected' as const, error: capacity };
 
     // Guarded by the roster we read the player on: if someone else moved or removed the row
     // since, nothing matches and we report it instead of overwriting their change.
@@ -1757,18 +1789,23 @@ export interface UpdateRosterPlayerRoleParams {
 
 /**
  * Updates a player's role on a roster (Starter, Sub, or Captain).
- * Safely handles single-captain constraint with automatic promotion/demotion.
+ * Safely handles single-captain constraint with automatic promotion/demotion. Changing someone to
+ * sub is refused when the roster already has the maximum number of OTHER subs (they may keep being
+ * one); the player-count cap does not apply because nobody joins. The refusal is returned, not
+ * thrown, so the message survives in production.
  */
 export async function updateRosterPlayerRole(
   params: UpdateRosterPlayerRoleParams
-): Promise<{ success: boolean; playerId: string; role: string; isCaptain: boolean }> {
+): Promise<
+  { success: true; playerId: string; role: string; isCaptain: boolean } | RosterActionRejection
+> {
   const { rosterId, playerId, role } = params;
 
   if (!rosterId || !playerId || !role) {
     throw new Error('rosterId, playerId, and role are required');
   }
 
-  await assertManagerForRoster(rosterId);
+  const { roster } = await assertManagerForRoster(rosterId);
 
   const [targetPlayer] = await db
     .select()
@@ -1782,7 +1819,18 @@ export async function updateRosterPlayerRole(
 
   const isCaptain = role === 'captain';
 
-  await db.transaction(async (tx) => {
+  const rejection = await db.transaction(async (tx) => {
+    // Count the roster's substitutes under the roster lock so two role changes cannot both take
+    // the last slot.
+    await lockRoster(tx, rosterId);
+    const capacity = rosterCapacityError({
+      rosterName: roster.name,
+      occupancy: occupancyOf(await rosterPlayerRoles(tx, rosterId), playerId),
+      role,
+      joining: false,
+    });
+    if (capacity) return capacity;
+
     if (isCaptain) {
       // Demote any existing captain on this roster
       const currentCaptains = await tx
@@ -1817,7 +1865,9 @@ export async function updateRosterPlayerRole(
         updatedAt: new Date(),
       })
       .where(eq(schema.players.id, playerId));
+    return null;
   });
+  if (rejection) return reject(rejection);
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
   await notifyMembershipChanged([targetPlayer.memberId]);

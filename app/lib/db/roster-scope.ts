@@ -128,3 +128,21 @@ export async function memberDisplayName(memberId: string, executor: DbOrTx = db)
 export async function lockRosterMember(tx: TransactionExecutor, teamId: string, memberId: string): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`roster-member:${teamId}:${memberId}`}))`);
 }
+
+/**
+ * Serializes anything that counts a roster's players before adding one or changing a role to sub,
+ * so two concurrent requests cannot both see room. Always take it AFTER `lockRosterMember` when a
+ * transaction needs both (member lock first, then roster lock), so every transaction acquires the
+ * two kinds in the same order and cannot deadlock.
+ */
+export async function lockRoster(tx: TransactionExecutor, rosterId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`roster:${rosterId}`}))`);
+}
+
+/** The roster's players (id and role only), for counting against the roster size limits. */
+export async function rosterPlayerRoles(executor: DbOrTx, rosterId: string): Promise<Array<{ id: string; role: string }>> {
+  return executor
+    .select({ id: schema.players.id, role: schema.players.role })
+    .from(schema.players)
+    .where(eq(schema.players.rosterId, rosterId));
+}

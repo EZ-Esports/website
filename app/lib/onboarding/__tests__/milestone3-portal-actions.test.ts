@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as schema from '@/app/lib/db/schema';
 import { Permissions } from '@/app/lib/roles';
 
@@ -862,6 +863,38 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(gate.stats.subsCount).toBe(1);
     });
 
+    it('a full roster (7 players, 2 subs) is still eligible: eligibility has no maximum', async () => {
+      setupRosterWithPlayers({ totalCount: 7, captainCount: 1, subCount: 2 });
+
+      const gate = await getRosterEligibility({ rosterId });
+
+      expect(gate.eligible).toBe(true);
+      expect(gate.reasons).toEqual([]);
+      expect(gate.stats.totalPlayers).toBe(7);
+      expect(gate.stats.subsCount).toBe(2);
+      expect(gate.gateChecks).toEqual({ minSize: true, singleCaptain: true, riotLinked: true, discordLinked: true, inGuild: true });
+    });
+
+    it('an over-the-cap roster (9 players, 4 subs) gets no max-based reason either', async () => {
+      setupRosterWithPlayers({ totalCount: 9, captainCount: 1, subCount: 4 });
+
+      const gate = await getRosterEligibility({ rosterId });
+
+      expect(gate.eligible).toBe(true);
+      expect(gate.reasons.join(' ')).not.toMatch(/maximum|at most|more than|too many|exceed|full|cap\b/i);
+    });
+
+    it('getRosterEligibility does not reference the roster size limits (so nobody adds a maximum by accident)', () => {
+      const source = readFileSync(new URL('../portal-actions.ts', import.meta.url), 'utf8');
+      const start = source.indexOf('export async function getRosterEligibility');
+      const end = source.indexOf('export interface EmergencySwapSubParams');
+      expect(start).toBeGreaterThan(0);
+      expect(end).toBeGreaterThan(start);
+      const body = source.slice(start, end);
+      expect(body).not.toMatch(/MAX_ROSTER|roster-limits|rosterCapacityError|moveBlockedReason/);
+      expect(body).toContain('totalPlayers >= 6');
+    });
+
     it('fails Gate 1 if roster has fewer than 6 players or no substitute', async () => {
       // 5 starters, 0 subs
       setupRosterWithPlayers({ totalCount: 5, captainCount: 1, subCount: 0 });
@@ -1182,7 +1215,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         playerId: 'player-cap',
         role: 'sub',
       });
-
+      if (!result.success) throw new Error(result.error);
       expect(result.success).toBe(true);
       expect(result.role).toBe('sub');
       expect(result.isCaptain).toBe(false);
@@ -2406,6 +2439,262 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).resolves.toMatchObject({ success: false });
         expect(mocks.mockNotify).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('12. Roster size limits (7 players, 2 subs)', () => {
+    const val = 'team-val';
+    const varsity = 'roster-varsity';
+    const jv = 'roster-jv';
+    const inviteId = 'inv-cap';
+
+    const snapshot = () => JSON.stringify([mocks.state.playersStore, mocks.state.rostersStore]);
+
+    /** Puts `n` filler players on a roster, the last `subs` of them substitutes. */
+    const fill = (rosterId: string, n: number, subs = 0) => {
+      for (let i = 0; i < n; i++) {
+        const isSub = i >= n - subs;
+        mocks.state.playersStore.push({
+          id: `f-${rosterId}-${i}`,
+          rosterId,
+          memberId: `fm-${rosterId}-${i}`,
+          role: isSub ? 'sub' : 'player',
+          isCaptain: false,
+          ign: `F${i}`,
+        });
+      }
+    };
+
+    beforeEach(() => {
+      mocks.mockNotify.mockReset();
+      mocks.mockNotify.mockResolvedValue(undefined);
+      mocks.mockDb.execute.mockClear();
+      mocks.state.seasonsStore = [
+        { id: 'season-val-now', gameId: valGameId, name: '2026-27', isActive: true, rostersLockedAt: null },
+      ];
+      mocks.state.schoolManagersStore = [
+        { id: 'mgr-1', schoolId, userId: 'manager-user-1', managedGames: null, academicYear: '2026-27', isPrimaryContact: true, isActive: true },
+      ];
+      mocks.state.teamsStore = [{ id: val, schoolId, gameId: valGameId, seasonId: 'season-val-now' }];
+      mocks.state.rostersStore = [
+        { id: varsity, teamId: val, name: 'Varsity', division: 'A' },
+        { id: jv, teamId: val, name: 'JV', division: 'B' },
+      ];
+      mocks.state.membersStore = [
+        { id: 'm-new', schoolId, firstName: 'New', lastName: 'Kid', discord: 'n#1', graduationYear: 2027 },
+        { id: 'm-mover', schoolId, firstName: 'Mo', lastName: 'Ver', discord: 'm#1', graduationYear: 2027 },
+      ];
+      mocks.state.playersStore = [];
+      mocks.state.playerIdentitiesStore = [];
+      mocks.state.playerInvitesStore = [
+        {
+          id: inviteId,
+          schoolId,
+          gameId: valGameId,
+          memberId: 'm-new',
+          status: 'submitted',
+          intendedFirstName: 'New',
+          intendedLastName: 'Kid',
+          submissionDraft: { ign: 'New#1' },
+        },
+      ];
+    });
+
+    describe('enrolling', () => {
+      it('allows the 7th player and refuses the 8th, writing nothing', async () => {
+        fill(varsity, 6);
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' })).resolves.toMatchObject({ success: true });
+        expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+
+        mocks.mockNotify.mockClear();
+        const before = snapshot();
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-mover' })).resolves.toEqual({
+          success: false,
+          error: 'Varsity is full (7 of 7 players).',
+        });
+        expect(snapshot()).toBe(before);
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('refuses a third substitute but accepts the second', async () => {
+        fill(varsity, 4, 1);
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' })).resolves.toMatchObject({ success: true });
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-mover', role: 'sub' })).resolves.toEqual({
+          success: false,
+          error: 'Varsity already has 2 substitutes.',
+        });
+        // A starter still fits: the roster has 5 players, so this is the 6th.
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-mover', role: 'player' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('lets someone already on a full roster have their role edited (nobody joins)', async () => {
+        fill(varsity, 6);
+        mocks.state.playersStore.push({ id: 'pl-new', rosterId: varsity, memberId: 'm-new', role: 'player', isCaptain: false, ign: 'x' });
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('applies to invite approval: full roster', async () => {
+        fill(varsity, 7);
+        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity });
+        expect(res).toEqual({ success: false, error: 'Varsity is full (7 of 7 players).' });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('applies to invite approval: third substitute', async () => {
+        fill(varsity, 5, 2);
+        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity, role: 'sub' });
+        expect(res).toEqual({ success: false, error: 'Varsity already has 2 substitutes.' });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+      });
+
+      it('takes the member lock, then the roster lock, before counting', async () => {
+        fill(varsity, 3);
+        mocks.mockDb.select.mockClear();
+        await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' });
+        const locks = mocks.mockDb.execute.mock.calls.map((c: any[]) => JSON.stringify(c[0]));
+        expect(locks).toHaveLength(2);
+        expect(locks[0]).toContain(`roster-member:${val}:m-new`);
+        expect(locks[1]).toContain(`roster:${varsity}`);
+        const rosterLock = mocks.mockDb.execute.mock.invocationCallOrder[1];
+        const countCall = mocks.mockDb.select.mock.calls.findIndex(
+          (c: any[]) => c[0] && Object.keys(c[0]).sort().join() === 'id,role'
+        );
+        expect(countCall).toBeGreaterThanOrEqual(0);
+        expect(mocks.mockDb.select.mock.invocationCallOrder[countCall]).toBeGreaterThan(rosterLock);
+      });
+    });
+
+    describe('approving: locks and self-exclusion', () => {
+      it('takes the member lock, then the roster lock, before counting', async () => {
+        fill(varsity, 2);
+        mocks.mockDb.select.mockClear();
+        mocks.mockDb.execute.mockClear();
+        await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity });
+        const locks = mocks.mockDb.execute.mock.calls.map((c: any[]) => JSON.stringify(c[0]));
+        expect(locks).toHaveLength(2);
+        expect(locks[0]).toContain(`roster-member:${val}:m-new`);
+        expect(locks[1]).toContain(`roster:${varsity}`);
+        const rosterLock = mocks.mockDb.execute.mock.invocationCallOrder[1];
+        const countCall = mocks.mockDb.select.mock.calls.findIndex(
+          (c: any[]) => c[0] && Object.keys(c[0]).sort().join() === 'id,role'
+        );
+        expect(countCall).toBeGreaterThanOrEqual(0);
+        expect(mocks.mockDb.select.mock.invocationCallOrder[countCall]).toBeGreaterThan(rosterLock);
+      });
+
+      it('a student already on the roster as one of its 2 subs can be re-approved as a sub (they are not counted twice)', async () => {
+        fill(varsity, 4, 1);
+        mocks.state.playersStore.push({ id: 'pl-self', rosterId: varsity, memberId: 'm-new', role: 'sub', isCaptain: false, ign: 'x' });
+        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity, role: 'sub' });
+        expect(res).toMatchObject({ success: true });
+      });
+    });
+
+    describe('moving', () => {
+      beforeEach(() => {
+        mocks.state.playersStore.push({ id: 'pl-mover', rosterId: varsity, memberId: 'm-mover', role: 'player', isCaptain: false, ign: 'M' });
+      });
+
+      it('refuses a full target roster and leaves the player where they were', async () => {
+        fill(jv, 7);
+        const before = snapshot();
+        const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' });
+        expect(res).toEqual({ success: false, error: 'JV is full (7 of 7 players).' });
+        expect(snapshot()).toBe(before);
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('accepts a target with 6 players (becomes 7)', async () => {
+        fill(jv, 6);
+        await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('moving OUT of a full roster is fine', async () => {
+        fill(varsity, 6); // plus the mover: 7
+        await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('refuses a sub when the target already has 2 subs, but a starter may go', async () => {
+        fill(jv, 3, 2);
+        mocks.state.playersStore.push({ id: 'pl-sub', rosterId: varsity, memberId: 'm-new', role: 'sub', isCaptain: false, ign: 'S' });
+        await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })).resolves.toEqual({
+          success: false,
+          error: 'JV already has 2 substitutes.',
+        });
+        await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('takes the roster lock on the TARGET before counting it', async () => {
+        fill(jv, 2);
+        mocks.mockDb.select.mockClear();
+        mocks.mockDb.execute.mockClear();
+        await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' });
+        const locks = mocks.mockDb.execute.mock.calls.map((c: any[]) => JSON.stringify(c[0]));
+        expect(locks[0]).toContain(`roster-member:${val}:m-mover`);
+        expect(locks[1]).toContain(`roster:${jv}`);
+        const rosterLock = mocks.mockDb.execute.mock.invocationCallOrder[1];
+        const countCall = mocks.mockDb.select.mock.calls.findIndex(
+          (c: any[]) => c[0] && Object.keys(c[0]).sort().join() === 'id,role'
+        );
+        expect(mocks.mockDb.select.mock.invocationCallOrder[countCall]).toBeGreaterThan(rosterLock);
+      });
+    });
+
+    describe('role changes', () => {
+      beforeEach(() => {
+        fill(varsity, 4, 2); // two subs already
+        mocks.state.playersStore.push({ id: 'pl-starter', rosterId: varsity, memberId: 'm-new', role: 'player', isCaptain: false, ign: 'S' });
+      });
+
+      it('refuses changing a starter to sub when two OTHER subs exist, and changes nothing', async () => {
+        const before = snapshot();
+        const res = await updateRosterPlayerRole({ rosterId: varsity, playerId: 'pl-starter', role: 'sub' });
+        expect(res).toEqual({ success: false, error: 'Varsity already has 2 substitutes.' });
+        expect(snapshot()).toBe(before);
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('lets an existing sub keep being a sub (only OTHER players are counted)', async () => {
+        const subId = mocks.state.playersStore.find((p) => p.role === 'sub').id;
+        await expect(updateRosterPlayerRole({ rosterId: varsity, playerId: subId, role: 'sub' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('does not apply the player-count cap (7 players, role edit to captain works)', async () => {
+        mocks.state.playersStore.push(
+          { id: 'x1', rosterId: varsity, memberId: 'xm1', role: 'player', isCaptain: false, ign: 'x' },
+          { id: 'x2', rosterId: varsity, memberId: 'xm2', role: 'player', isCaptain: false, ign: 'x' }
+        );
+        expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+        await expect(updateRosterPlayerRole({ rosterId: varsity, playerId: 'pl-starter', role: 'captain' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('takes the roster lock before counting subs', async () => {
+        mocks.mockDb.select.mockClear();
+        mocks.mockDb.execute.mockClear();
+        await updateRosterPlayerRole({ rosterId: varsity, playerId: 'pl-starter', role: 'captain' });
+        expect(JSON.stringify(mocks.mockDb.execute.mock.calls[0][0])).toContain(`roster:${varsity}`);
+        const lock = mocks.mockDb.execute.mock.invocationCallOrder[0];
+        const countCall = mocks.mockDb.select.mock.calls.findIndex(
+          (c: any[]) => c[0] && Object.keys(c[0]).sort().join() === 'id,role'
+        );
+        expect(mocks.mockDb.select.mock.invocationCallOrder[countCall]).toBeGreaterThan(lock);
+      });
+    });
+
+    it('emergencySwapSub keeps the sub count unchanged, so a full 7/2 roster can still swap', async () => {
+      fill(varsity, 5, 1);
+      mocks.state.playersStore.push(
+        { id: 'pl-out', rosterId: varsity, memberId: 'm-new', role: 'player', isCaptain: false, ign: 'O' },
+        { id: 'pl-in', rosterId: varsity, memberId: 'm-mover', role: 'sub', isCaptain: false, ign: 'I' }
+      );
+      const subsBefore = mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.role === 'sub').length;
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+      expect(subsBefore).toBe(2);
+
+      await expect(emergencySwapSub({ rosterId: varsity, outPlayerId: 'pl-out', inPlayerId: 'pl-in' })).resolves.toMatchObject({ success: true });
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.role === 'sub')).toHaveLength(2);
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
     });
   });
 });
