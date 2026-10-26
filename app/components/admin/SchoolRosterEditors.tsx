@@ -1,13 +1,15 @@
 'use client';
 
 import { createContext, useContext, useState, useTransition, type FormEvent, type ReactNode } from 'react';
-import { FiPlus } from 'react-icons/fi';
+import { Button, Menu, MenuItem, MenuTrigger, Popover } from 'react-aria-components';
+import { FiCornerUpRight, FiPlus } from 'react-icons/fi';
 import {
   createPlayer,
   createRoster,
   createTeam,
   deleteRoster,
   deleteRosterMember,
+  moveRosterMember,
   updatePlayer,
   updateRoster,
 } from '@/app/(admin)/admin/schools/[schoolId]/rosters/actions';
@@ -28,6 +30,7 @@ import {
   selectClass,
 } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
+import { MAX_ROSTER_PLAYERS, moveBlockedReason, moveMenuItems } from '@/app/lib/onboarding/roster-limits';
 
 type Result = { success: boolean; error?: string; [key: string]: unknown };
 
@@ -348,10 +351,96 @@ export function PlayerEditForm({ player, rosterName, onClose }: { player: Roster
   );
 }
 
-export function PlayerRowActions({ player, rosterName, onEdit }: { player: RosterViewPlayer; rosterName: string; onEdit: () => void }) {
+export interface SiblingRoster {
+  id: string;
+  name: string;
+  playerCount: number;
+  subCount: number;
+}
+
+/**
+ * Moves a player to the team's other roster(s). One sibling is a plain "Move to JV" button; more
+ * than one (a team can have extra rosters) is a React Aria menu of the roster names. Staff are not
+ * blocked by the season roster lock, so this is never disabled for that reason. The accessible
+ * name starts with the visible text (label in name), then says whose row it is.
+ */
+function MovePlayerControl({ player, rosterName, siblings }: { player: RosterViewPlayer; rosterName: string; siblings: SiblingRoster[] }) {
+  const playerIsSub = player.role === 'sub';
+  const { schoolId, run, pending } = useEdit();
+  if (siblings.length === 0) return null;
+  const context = `${player.name} (currently ${rosterName})`;
+  const move = (target: SiblingRoster) =>
+    run(
+      () => moveRosterMember(schoolId, player.id, target.id),
+      `${player.name} moved to ${target.name}.`,
+    );
+  if (siblings.length === 1) {
+    const [target] = siblings;
+    // A full target is not offered: the button stays, disabled, and says why in its own text.
+    const blocked = moveBlockedReason(target, playerIsSub);
+    const visible = blocked ?? `Move to ${target.name}`;
+    return (
+      <button
+        type="button"
+        className={ghostBtnSm}
+        disabled={pending || blocked !== null}
+        aria-label={`${visible}: ${context}`}
+        onClick={() => move(target)}
+      >
+        <FiCornerUpRight aria-hidden /> {visible}
+      </button>
+    );
+  }
+  return (
+    <MenuTrigger>
+      <Button
+        isDisabled={pending || siblings.every((x) => moveBlockedReason(x, playerIsSub) !== null)}
+        aria-label={`Move to…: ${context}`}
+        className={ghostBtnSm}
+      >
+        <FiCornerUpRight aria-hidden /> Move to…
+      </Button>
+      <Popover className="admin-popover w-44" placement="bottom end">
+        <Menu
+          aria-label={`Move ${context} to`}
+          onAction={(key) => {
+            const target = siblings.find((x) => x.id === String(key));
+            if (target) move(target);
+          }}
+          className="rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none"
+        >
+          {moveMenuItems(siblings, playerIsSub).map((item) => (
+            <MenuItem
+              key={item.id}
+              id={item.id}
+              textValue={item.text}
+              isDisabled={item.isDisabled}
+              className="flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 py-2 text-left text-sm text-foreground-secondary outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[focused]:bg-surface data-[focused]:text-foreground sm:min-h-0"
+            >
+              {item.text}
+            </MenuItem>
+          ))}
+        </Menu>
+      </Popover>
+    </MenuTrigger>
+  );
+}
+
+export function PlayerRowActions({
+  player,
+  rosterName,
+  siblings = [],
+  onEdit,
+}: {
+  player: RosterViewPlayer;
+  rosterName: string;
+  siblings?: SiblingRoster[];
+  onEdit: () => void;
+}) {
   const { schoolId, notify } = useEdit();
   return (
     <div className="flex shrink-0 items-center gap-1.5">
+      <MovePlayerControl player={player} rosterName={rosterName} siblings={siblings} />
       <RowIconButton kind="edit" label={`Edit player ${player.name}`} onClick={onEdit} />
       <ConfirmDeleteButton
         label={`Remove player ${player.name}`}
@@ -366,10 +455,10 @@ export function PlayerRowActions({ player, rosterName, onEdit }: { player: Roste
   );
 }
 
-export function AddPlayerButton({ open, onClick }: { open: boolean; onClick: () => void }) {
+export function AddPlayerButton({ open, onClick, full = false, playerCount = 0 }: { open: boolean; onClick: () => void; full?: boolean; playerCount?: number }) {
   return (
-    <button type="button" className={primaryBtnSm} aria-expanded={open} onClick={onClick}>
-      <FiPlus aria-hidden /> Add player
+    <button type="button" className={primaryBtnSm} aria-expanded={open} disabled={full} onClick={onClick}>
+      <FiPlus aria-hidden /> {full ? `Roster full (${playerCount}/${MAX_ROSTER_PLAYERS})` : 'Add player'}
     </button>
   );
 }

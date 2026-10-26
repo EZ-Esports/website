@@ -1,6 +1,6 @@
 # spec-033: Discord OAuth and automatic server join in the player wizard
 
-- **Status:** Implemented on branch `feat/discord-oauth-onboarding` (not yet merged; no PR number yet)
+- **Status:** Implemented and merged in PR #281 (issue #249 part 1)
 - **Date:** 2026-10-26
 - **Issue:** [#249](https://github.com/EZ-Esports/website/issues/249) (part 1: identity and join; roles and live re-check remain open)
 - **Scope:** `app/lib/onboarding/adapters/discord-rest.ts`, `app/lib/onboarding/discord-verification.ts`, `app/lib/onboarding/discord-session.ts`, `app/api/discord/{start,callback}/route.ts`, `app/lib/onboarding/wizard/submission-pipeline.ts`, `app/lib/onboarding/wizard-actions.ts`, `app/lib/db/onboarding.ts` (`findDiscordIdentityOwner`), the join wizard Discord step.

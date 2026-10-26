@@ -30,6 +30,7 @@ import {
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { chip, chipDot, focusRing, segmentedGroup, segmentedItem, selectClass } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
+import { MAX_ROSTER_PLAYERS } from '@/app/lib/onboarding/roster-limits';
 
 interface SchoolRostersViewProps {
   schoolId: string;
@@ -356,16 +357,28 @@ const ROLE_LABEL: Record<string, string> = { captain: 'Captain', player: 'Player
 function RosterCard({ roster, block, showDivision = false }: { roster: RosterViewRoster; block: SeasonBlock; showDivision?: boolean }) {
   const [panel, setPanel] = useState<'edit' | 'add' | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  // Rosters of the same team: a player can be moved between them but never across games or seasons.
+  const siblings = block.rosters.filter((r) => r.id !== roster.id).map((r) => ({
+    id: r.id,
+    name: r.name,
+    playerCount: r.players.length,
+    subCount: r.players.filter((p) => p.role === 'sub').length,
+  }));
   return (
     <div className="min-w-0 rounded-xl bg-surface-sunken p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h5 className="text-sm font-semibold text-foreground">{roster.name}</h5>
         {showDivision && <span className={chip('neutral', 'sm')}>Div {roster.division}</span>}
         <span className="text-xs text-foreground-secondary">
-          {roster.players.length} {roster.players.length === 1 ? 'player' : 'players'}
+          {roster.players.length}/{MAX_ROSTER_PLAYERS} {roster.players.length === 1 ? 'player' : 'players'}
         </span>
         <div className="ml-auto flex items-center gap-1.5">
-          <AddPlayerButton open={panel === 'add'} onClick={() => setPanel(panel === 'add' ? null : 'add')} />
+          <AddPlayerButton
+            open={panel === 'add'}
+            full={roster.players.length >= MAX_ROSTER_PLAYERS}
+            playerCount={roster.players.length}
+            onClick={() => setPanel(panel === 'add' ? null : 'add')}
+          />
           <RowIconButton
             kind="edit"
             label={`Edit roster ${roster.name}`}
@@ -391,7 +404,7 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                     <span className="min-w-0 truncate text-sm font-medium text-foreground">{p.ign || p.name}</span>
                     <span className="flex shrink-0 items-center gap-2">
                       <span className={chip(p.role === 'captain' ? 'accent' : 'neutral', 'sm')}>{ROLE_LABEL[p.role] ?? p.role}</span>
-                      <PlayerRowActions player={p} rosterName={roster.name} onEdit={() => setEditingPlayer(p.id)} />
+                      <PlayerRowActions player={p} rosterName={roster.name} siblings={siblings} onEdit={() => setEditingPlayer(p.id)} />
                     </span>
                   </div>
                   <p className="mt-0.5 break-words text-xs text-foreground-secondary">

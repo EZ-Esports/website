@@ -33,6 +33,10 @@ interface RostersSectionProps {
     role: 'player' | 'sub' | 'captain'
   ) => void;
   onRemovePlayer: (rosterId: string, playerId: string) => void;
+  onMovePlayer?: (fromRosterId: string, playerId: string, toRosterId: string) => void;
+  movingPlayerId?: string | null;
+  /** Outcome of the last Move, rendered in a live region. */
+  notice?: { kind: 'success' | 'error'; text: string } | null;
   onDeleteRoster?: (rosterId: string) => void;
 }
 
@@ -52,6 +56,9 @@ export function RostersSection({
   onCheckRosterGate,
   onUpdateRole,
   onRemovePlayer,
+  onMovePlayer,
+  movingPlayerId = null,
+  notice = null,
   onDeleteRoster,
 }: RostersSectionProps) {
   const anyLocked = lockedGameIds.length > 0;
@@ -107,11 +114,26 @@ export function RostersSection({
           <p>
             <span className="font-bold">Rosters locked{lockedSeasonLabel ? ` for ${lockedSeasonLabel}` : ''}.</span>{' '}
             EZ Esports staff have locked rosters for this season, so players cannot be enrolled,
-            removed, swapped or re-roled, and rosters cannot be created or deleted. Contact an admin
+            removed, moved, swapped or re-roled, and rosters cannot be created or deleted. Contact an admin
             to request changes. You can still view rosters and check eligibility.
           </p>
         </div>
       )}
+
+      {/* Always mounted so screen readers register the region before its text changes. */}
+      <div role="status" aria-live="polite" className={notice ? '' : 'sr-only'}>
+        {notice && (
+          <p
+            className={`rounded-xl border p-3 text-xs ${
+              notice.kind === 'error'
+                ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+                : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+            }`}
+          >
+            {notice.text}
+          </p>
+        )}
+      </div>
 
       {rosters.length === 0 ? (
         <div className="p-8 text-center rounded-2xl bg-zinc-900/40 border border-zinc-800 text-zinc-400 text-sm space-y-3">
@@ -139,6 +161,16 @@ export function RostersSection({
               onCheckRosterGate={onCheckRosterGate}
               onUpdateRole={onUpdateRole}
               onRemovePlayer={onRemovePlayer}
+              onMovePlayer={onMovePlayer}
+              movingPlayerId={movingPlayerId}
+              siblingRosters={rosters
+                .filter((r) => r.teamId === roster.teamId && r.id !== roster.id)
+                .map((r) => ({
+                  id: r.id,
+                  name: r.name,
+                  playerCount: r.players.length,
+                  subCount: r.players.filter((p) => p.role === 'sub').length,
+                }))}
               onDeleteRoster={onDeleteRoster}
             />
           ))}

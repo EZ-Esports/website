@@ -338,6 +338,8 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
 
+    // Advisory lock taken by roster enrollment; nothing to serialize in memory.
+    execute: vi.fn(async () => []),
     transaction: vi.fn(async (callback: (tx: any) => Promise<any>) => {
       return callback(mockDb);
     }),

@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray } from 'drizzle-orm';
 import {
   assertManagerForSchool,
   assertManagerForSchoolGame,
@@ -15,12 +15,50 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
+import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
+import { occupancyOf, rosterCapacityError } from './roster-limits';
+import { notifyRosterMembershipChanged } from './roster-membership-events';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
 import { getLatestRescheduleRequests, getRescheduledFrom } from '@/app/lib/db/reschedules';
 import type { RescheduleRequestItem } from '@/app/lib/reschedule-rules';
 import { redactHiddenMatches } from '@/app/lib/season-outcomes';
 import { toSchoolMatchItem, type SchoolMatchItem } from '@/app/lib/school-matches';
+
+/**
+ * Tells the roster-membership seam about members whose roster changed. Call it only AFTER the
+ * transaction has committed; the change is already durable, so a failing consumer must never
+ * turn a successful action into an error.
+ */
+async function notifyMembershipChanged(memberIds: string[]): Promise<void> {
+  try {
+    await notifyRosterMembershipChanged(memberIds);
+  } catch (error) {
+    console.error(
+      'notifyRosterMembershipChanged failed:',
+      error instanceof Error ? error.message : 'unknown error'
+    );
+  }
+}
+
+/**
+ * A known, user-facing rejection of a roster action. Returned instead of thrown because Next.js
+ * omits the message of an error thrown from a server action in production, so a thrown rejection
+ * reaches the manager as a generic failure. Unexpected errors still throw.
+ */
+export interface RosterActionRejection {
+  success: false;
+  error: string;
+}
+
+function reject(error: string): RosterActionRejection {
+  return { success: false, error };
+}
+
+/** The league rule (one tier per game) as shown to a manager. */
+function siblingConflictMessage(playerName: string, onRoster: string, targetRoster: string): string {
+  return `${playerName} is already on ${onRoster}. Use Move to put them on ${targetRoster}.`;
+}
 
 export interface CreatePlayerInviteParams {
   schoolId: string;
@@ -332,14 +370,17 @@ export interface ReviewPlayerInviteParams {
   rejectionReason?: string;
 }
 
-export interface ReviewPlayerInviteResult {
-  success: boolean;
+export interface ReviewPlayerInviteSuccess {
+  success: true;
   status: 'accepted' | 'rejected';
   inviteId: string;
   rejectionReason?: string;
   enrolledPlayer?: SchoolRosterPlayer;
   targetRosterId?: string;
 }
+
+/** An approval can be refused (for example the student is already on a sibling roster); the invite then stays pending. */
+export type ReviewPlayerInviteResult = ReviewPlayerInviteSuccess | RosterActionRejection;
 
 /**
  * Reviews a submitted player application (approve or reject).
@@ -378,9 +419,10 @@ export async function reviewPlayerInvite(
     throw new Error('Forbidden: This invite is not tied to a game in your season');
   }
 
+  let explicitTarget: Awaited<ReturnType<typeof assertManagerForRoster>> | null = null;
   if (rosterId) {
-    const { team } = await assertManagerForRoster(rosterId);
-    if (team.schoolId !== invite.schoolId) {
+    explicitTarget = await assertManagerForRoster(rosterId);
+    if (explicitTarget.team.schoolId !== invite.schoolId) {
       throw new Error('Target roster does not belong to authorized school');
     }
   }
@@ -394,157 +436,193 @@ export async function reviewPlayerInvite(
   }
 
   if (action === 'approve') {
-    await db
-      .update(schema.playerInvites)
-      .set({
-        status: 'accepted',
-        reviewedAt: new Date(),
-      })
-      .where(eq(schema.playerInvites.id, inviteId));
-
     let enrolledPlayer: SchoolRosterPlayer | undefined = undefined;
     let targetRosterId = rosterId;
+    let targetTeamId = explicitTarget?.team.id;
+    let targetRosterName = explicitTarget?.roster.name;
 
-    if (invite.memberId) {
-      if (!targetRosterId && invite.gameId) {
-        // Find the school's team for the approver's season (a manager's resolved season, a staff
-        // admin's active season); no other season's roster is ever the default target
-        const [team] = approvalSeason
-          ? await db
-              .select({ id: schema.teams.id })
-              .from(schema.teams)
-              .where(
-                and(
-                  eq(schema.teams.schoolId, invite.schoolId),
-                  eq(schema.teams.gameId, invite.gameId),
-                  eq(schema.teams.seasonId, approvalSeason.id)
-                )
+    if (invite.memberId && !targetRosterId && invite.gameId) {
+      // Find the school's team for the approver's season (a manager's resolved season, a staff
+      // admin's active season); no other season's roster is ever the default target
+      const [team] = approvalSeason
+        ? await db
+            .select({ id: schema.teams.id })
+            .from(schema.teams)
+            .where(
+              and(
+                eq(schema.teams.schoolId, invite.schoolId),
+                eq(schema.teams.gameId, invite.gameId),
+                eq(schema.teams.seasonId, approvalSeason.id)
               )
-              .limit(1)
-          : [];
-
-        if (team) {
-          const [firstRoster] = await db
-            .select({ id: schema.rosters.id })
-            .from(schema.rosters)
-            .where(eq(schema.rosters.teamId, team.id))
-            .limit(1);
-          targetRosterId = firstRoster?.id;
-        }
-      }
-
-      if (targetRosterId) {
-        const isCaptain = role === 'captain';
-
-        // Check if existing player on this roster
-        const [existingPlayer] = await db
-          .select()
-          .from(schema.players)
-          .where(
-            and(
-              eq(schema.players.rosterId, targetRosterId),
-              eq(schema.players.memberId, invite.memberId)
             )
-          )
-          .limit(1);
+            .limit(1)
+        : [];
 
-        const [riotIdentity] = await db
+      if (team) {
+        // Oldest roster first, id as the tie-break, so the default target never depends on
+        // the order Postgres happens to return rows in.
+        const [firstRoster] = await db
+          .select({ id: schema.rosters.id, name: schema.rosters.name })
+          .from(schema.rosters)
+          .where(eq(schema.rosters.teamId, team.id))
+          .orderBy(asc(schema.rosters.createdAt), asc(schema.rosters.id))
+          .limit(1);
+        targetRosterId = firstRoster?.id;
+        targetRosterName = firstRoster?.name;
+        targetTeamId = team.id;
+      }
+    }
+
+    const enrolling = Boolean(invite.memberId && targetRosterId && targetTeamId);
+    const isCaptain = role === 'captain';
+
+    const [member] = invite.memberId
+      ? await db.select().from(schema.members).where(eq(schema.members.id, invite.memberId)).limit(1)
+      : [];
+    const [riotIdentity] = enrolling
+      ? await db
           .select({ providerUserId: schema.playerIdentities.providerUserId })
           .from(schema.playerIdentities)
           .where(
             and(
-              eq(schema.playerIdentities.memberId, invite.memberId),
+              eq(schema.playerIdentities.memberId, invite.memberId!),
               eq(schema.playerIdentities.provider, 'riot')
+            )
+          )
+          .limit(1)
+      : [];
+    const draft = invite.submissionDraft as Record<string, any> | null;
+    const ign = riotIdentity?.providerUserId ?? draft?.ign ?? null;
+    const playerName = member
+      ? `${member.firstName} ${member.lastName}`
+      : `${invite.intendedFirstName} ${invite.intendedLastName}`;
+
+    // The invite is accepted and the student rostered in ONE transaction, so a refused
+    // enrollment leaves the invite pending instead of accepted-but-unrostered.
+    const outcome = await db.transaction(async (tx) => {
+      let playerId: string | undefined;
+
+      if (enrolling) {
+        // Serialize enrolls and moves of this member within the team so the sibling check
+        // below cannot race another write.
+        await lockRosterMember(tx, targetTeamId!, invite.memberId!);
+        await lockRoster(tx, targetRosterId!);
+
+        const [existingPlayer] = await tx
+          .select()
+          .from(schema.players)
+          .where(
+            and(
+              eq(schema.players.rosterId, targetRosterId!),
+              eq(schema.players.memberId, invite.memberId!)
             )
           )
           .limit(1);
 
-        const draft = invite.submissionDraft as Record<string, any> | null;
-        const ign = riotIdentity?.providerUserId ?? draft?.ign ?? null;
+        if (!existingPlayer) {
+          const sibling = await siblingEnrollment(targetTeamId!, invite.memberId!, targetRosterId!, tx);
+          if (sibling) {
+            return {
+              kind: 'conflict' as const,
+              message: siblingConflictMessage(playerName, sibling.rosterName, targetRosterName ?? 'this roster'),
+            };
+          }
+        }
 
-        let playerId: string;
+        const capacity = rosterCapacityError({
+          rosterName: targetRosterName ?? 'This roster',
+          occupancy: occupancyOf(await rosterPlayerRoles(tx, targetRosterId!), existingPlayer?.id),
+          role,
+          joining: !existingPlayer,
+        });
+        if (capacity) return { kind: 'conflict' as const, message: capacity };
 
-        await db.transaction(async (tx) => {
-          if (isCaptain) {
-            // Demote any existing captain on this roster
-            const otherCaptains = await tx
-              .select()
-              .from(schema.players)
-              .where(
-                and(
-                  eq(schema.players.rosterId, targetRosterId!),
-                  eq(schema.players.isCaptain, true)
-                )
-              );
+        await tx
+          .update(schema.playerInvites)
+          .set({ status: 'accepted', reviewedAt: new Date() })
+          .where(eq(schema.playerInvites.id, inviteId));
 
-            for (const cap of otherCaptains) {
-              if (cap.memberId !== invite.memberId) {
-                await tx
-                  .update(schema.players)
-                  .set({
-                    role: 'player',
-                    isCaptain: false,
-                    updatedAt: new Date(),
-                  })
-                  .where(eq(schema.players.id, cap.id));
-              }
+        if (isCaptain) {
+          // Demote any existing captain on this roster
+          const otherCaptains = await tx
+            .select()
+            .from(schema.players)
+            .where(
+              and(
+                eq(schema.players.rosterId, targetRosterId!),
+                eq(schema.players.isCaptain, true)
+              )
+            );
+
+          for (const cap of otherCaptains) {
+            if (cap.memberId !== invite.memberId) {
+              await tx
+                .update(schema.players)
+                .set({ role: 'player', isCaptain: false, updatedAt: new Date() })
+                .where(eq(schema.players.id, cap.id));
             }
           }
+        }
 
-          if (!existingPlayer) {
-            const [inserted] = await tx
-              .insert(schema.players)
-              .values({
-                rosterId: targetRosterId!,
-                memberId: invite.memberId!,
-                role,
-                ign,
-                isCaptain,
-              })
-              .returning();
-            playerId = inserted.id;
-          } else {
-            playerId = existingPlayer.id;
-            await tx
-              .update(schema.players)
-              .set({
-                role,
-                isCaptain,
-                ign: ign ?? existingPlayer.ign,
-                updatedAt: new Date(),
-              })
-              .where(eq(schema.players.id, existingPlayer.id));
-          }
-        });
-
-        const [member] = await db
-          .select()
-          .from(schema.members)
-          .where(eq(schema.members.id, invite.memberId))
-          .limit(1);
-
-        const identities = await db
-          .select()
-          .from(schema.playerIdentities)
-          .where(eq(schema.playerIdentities.memberId, invite.memberId));
-
-        const discord = identities.find((i) => i.provider === 'discord');
-
-        enrolledPlayer = {
-          id: playerId!,
-          memberId: invite.memberId,
-          playerName: member ? `${member.firstName} ${member.lastName}` : `${invite.intendedFirstName} ${invite.intendedLastName}`,
-          ign: ign || 'Unlinked',
-          role,
-          isCaptain,
-          discordUsername: discord?.providerUsername || member?.discord || 'Unlinked',
-          inGuild: discord?.inGuild ?? false,
-          riotVerified: !!riotIdentity,
-        };
+        if (!existingPlayer) {
+          const [inserted] = await tx
+            .insert(schema.players)
+            .values({
+              rosterId: targetRosterId!,
+              memberId: invite.memberId!,
+              role,
+              ign,
+              isCaptain,
+            })
+            .returning();
+          playerId = inserted.id;
+        } else {
+          playerId = existingPlayer.id;
+          await tx
+            .update(schema.players)
+            .set({
+              role,
+              isCaptain,
+              ign: ign ?? existingPlayer.ign,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.players.id, existingPlayer.id));
+        }
+      } else {
+        await tx
+          .update(schema.playerInvites)
+          .set({ status: 'accepted', reviewedAt: new Date() })
+          .where(eq(schema.playerInvites.id, inviteId));
       }
+
+      return { kind: 'ok' as const, playerId };
+    });
+
+    if (outcome.kind === 'conflict') return reject(outcome.message);
+
+    if (enrolling && outcome.playerId) {
+      const identities = await db
+        .select()
+        .from(schema.playerIdentities)
+        .where(eq(schema.playerIdentities.memberId, invite.memberId!));
+
+      const discord = identities.find((i) => i.provider === 'discord');
+
+      enrolledPlayer = {
+        id: outcome.playerId,
+        memberId: invite.memberId!,
+        playerName,
+        ign: ign || 'Unlinked',
+        role,
+        isCaptain,
+        discordUsername: discord?.providerUsername || member?.discord || 'Unlinked',
+        inGuild: discord?.inGuild ?? false,
+        riotVerified: !!riotIdentity,
+      };
     }
 
     updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+    if (enrolledPlayer) await notifyMembershipChanged([invite.memberId!]);
     return {
       success: true,
       status: 'accepted',
@@ -824,6 +902,7 @@ export async function emergencySwapSub(
   });
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([outPlayer.memberId, inPlayer.memberId]);
 
   return {
     success: true,
@@ -1305,11 +1384,13 @@ export interface EnrollPlayerToRosterParams {
   ign?: string;
 }
 
-export interface EnrollPlayerToRosterResult {
-  success: boolean;
+export interface EnrollPlayerToRosterSuccess {
+  success: true;
   player: SchoolRosterPlayer;
   message?: string;
 }
+
+export type EnrollPlayerToRosterResult = EnrollPlayerToRosterSuccess | RosterActionRejection;
 
 /**
  * Enrolls an existing school player/member directly onto a specific team roster.
@@ -1375,21 +1456,44 @@ export async function enrollPlayerToRoster(
 
   const isCaptain = role === 'captain';
 
-  // 4. Handle Captain constraint or role conflicts
-  const [existingPlayer] = await db
-    .select()
-    .from(schema.players)
-    .where(
-      and(
-        eq(schema.players.rosterId, rosterId),
-        eq(schema.players.memberId, memberId)
+  // 4. Handle captain constraint, role edits and the one-tier-per-game rule
+  let playerId = '';
+  const conflict = await db.transaction(async (tx) => {
+    // Serialize enrolls and moves of this member within the team so the sibling check below
+    // cannot race another write.
+    await lockRosterMember(tx, team.id, memberId);
+    // Then the roster lock (always in this order) so the size count below cannot race another add.
+    await lockRoster(tx, rosterId);
+
+    const [existingPlayer] = await tx
+      .select()
+      .from(schema.players)
+      .where(
+        and(
+          eq(schema.players.rosterId, rosterId),
+          eq(schema.players.memberId, memberId)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  let playerId: string;
+    // League rule: one tier per game. A member already on a sibling roster is moved, not
+    // double-enrolled. A row already on THIS roster is a role/IGN edit and stays allowed.
+    if (!existingPlayer) {
+      const sibling = await siblingEnrollment(team.id, memberId, rosterId, tx);
+      if (sibling) {
+        return siblingConflictMessage(`${member.firstName} ${member.lastName}`, sibling.rosterName, roster.name);
+      }
+    }
 
-  await db.transaction(async (tx) => {
+    // Roster size limits: a new row needs room; any change to sub needs a free substitute slot.
+    const capacity = rosterCapacityError({
+      rosterName: roster.name,
+      occupancy: occupancyOf(await rosterPlayerRoles(tx, rosterId), existingPlayer?.id),
+      role,
+      joining: !existingPlayer,
+    });
+    if (capacity) return capacity;
+
     if (isCaptain) {
       // Demote existing captain on this roster (if another player was captain)
       const otherCaptains = await tx
@@ -1440,7 +1544,9 @@ export async function enrollPlayerToRoster(
         .returning();
       playerId = inserted.id;
     }
+    return null;
   });
+  if (conflict) return reject(conflict);
 
   // 5. Build SchoolRosterPlayer return object
   const identities = await db
@@ -1452,7 +1558,7 @@ export async function enrollPlayerToRoster(
   const discord = identities.find((i) => i.provider === 'discord');
 
   const rosterPlayer: SchoolRosterPlayer = {
-    id: playerId!,
+    id: playerId,
     memberId: member.id,
     playerName: `${member.firstName} ${member.lastName}`,
     ign: ign || riot?.providerUserId || 'Unlinked',
@@ -1464,6 +1570,7 @@ export async function enrollPlayerToRoster(
   };
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([memberId]);
 
   return {
     success: true,
@@ -1493,6 +1600,12 @@ export async function removePlayerFromRoster(
 
   await assertManagerForRoster(rosterId);
 
+  const [existing] = await db
+    .select({ memberId: schema.players.memberId })
+    .from(schema.players)
+    .where(and(eq(schema.players.id, playerId), eq(schema.players.rosterId, rosterId)))
+    .limit(1);
+
   await db
     .delete(schema.players)
     .where(
@@ -1503,8 +1616,169 @@ export async function removePlayerFromRoster(
     );
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  if (existing) await notifyMembershipChanged([existing.memberId]);
 
   return { success: true, playerId };
+}
+
+export interface MovePlayerToRosterParams {
+  /** The roster the player is on now. */
+  fromRosterId: string;
+  /** The sibling roster to move them to. */
+  toRosterId: string;
+  /** Identify the player row by its id, or by the member when the caller only has that. */
+  playerId?: string;
+  memberId?: string;
+}
+
+export interface MovePlayerToRosterSuccess {
+  success: true;
+  playerId: string;
+  memberId: string;
+  playerName: string;
+  fromRosterId: string;
+  fromRosterName: string;
+  toRosterId: string;
+  toRosterName: string;
+  /** The role the player has on the target roster (a moved captain becomes a starter). */
+  role: string;
+  isCaptain: boolean;
+  /** True when the player was captain of the source roster and was demoted by the move. */
+  wasCaptain: boolean;
+}
+
+export type MovePlayerToRosterResult = MovePlayerToRosterSuccess | RosterActionRejection;
+
+const MOVE_RACE_MESSAGE =
+  'This player was just moved or removed by someone else. Refresh the page and try again.';
+
+/**
+ * Moves a player to a sibling roster of the same team (for example Varsity to JV) in one
+ * transaction. The existing players row is updated in place, so its id, in-game name and bio
+ * survive. Both rosters are authorized and lock-checked through `assertManagerForRoster`, and
+ * must share a team: a move never crosses games, seasons or schools. A captain arrives as a
+ * regular starter because captaincy is per roster; a sub stays a sub. The target roster must have
+ * room under the size limits in roster-limits.ts (7 players, 2 subs).
+ *
+ * Expected rejections (wrong team, already on the target, full target, a stale row) are RETURNED as
+ * `{ success: false, error }` because Next.js hides thrown messages in production. Authorization,
+ * lock and view-only failures from `assertManagerForRoster` and malformed input still throw: the
+ * portal disables the controls in those states.
+ */
+export async function movePlayerToRoster(
+  params: MovePlayerToRosterParams
+): Promise<MovePlayerToRosterResult> {
+  const { fromRosterId, toRosterId, playerId, memberId } = params;
+
+  if (!fromRosterId || !toRosterId || (!playerId && !memberId)) {
+    throw new Error('fromRosterId, toRosterId, and a playerId or memberId are required');
+  }
+  if (fromRosterId === toRosterId) {
+    return reject('Pick a different roster to move the player to.');
+  }
+
+  // Both ends must be this manager's to change (auth, season scope, inactive and lock checks).
+  const from = await assertManagerForRoster(fromRosterId);
+  const to = await assertManagerForRoster(toRosterId);
+
+  if (from.team.id !== to.team.id) {
+    return reject(
+      'Players can only be moved between rosters of the same team (same school, game and season).'
+    );
+  }
+
+  // The lock below is keyed on (team, member), so resolve the member first.
+  let lockMemberId = memberId;
+  if (!lockMemberId) {
+    const [row] = await db
+      .select({ memberId: schema.players.memberId })
+      .from(schema.players)
+      .where(and(eq(schema.players.id, playerId!), eq(schema.players.rosterId, fromRosterId)))
+      .limit(1);
+    if (!row) return reject(`That player is not on ${from.roster.name}.`);
+    lockMemberId = row.memberId;
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    await lockRosterMember(tx, from.team.id, lockMemberId!);
+    // Count the TARGET roster under its own lock (after the member lock, same order as enroll).
+    await lockRoster(tx, toRosterId);
+
+    const [player] = await tx
+      .select()
+      .from(schema.players)
+      .where(
+        and(
+          playerId ? eq(schema.players.id, playerId) : eq(schema.players.memberId, memberId!),
+          eq(schema.players.rosterId, fromRosterId)
+        )
+      )
+      .limit(1);
+    if (!player) {
+      return { kind: 'rejected' as const, error: `That player is not on ${from.roster.name}.` };
+    }
+
+    const [member] = await tx
+      .select({ firstName: schema.members.firstName, lastName: schema.members.lastName })
+      .from(schema.members)
+      .where(eq(schema.members.id, player.memberId))
+      .limit(1);
+    const playerName = member ? `${member.firstName} ${member.lastName}` : 'That player';
+
+    const [alreadyThere] = await tx
+      .select({ id: schema.players.id })
+      .from(schema.players)
+      .where(and(eq(schema.players.rosterId, toRosterId), eq(schema.players.memberId, player.memberId)))
+      .limit(1);
+    if (alreadyThere) {
+      return { kind: 'rejected' as const, error: `${playerName} is already on ${to.roster.name}.` };
+    }
+
+    const wasCaptain = player.isCaptain || player.role === 'captain';
+    // players_captain_role_check ties role='captain' to is_captain, so demote both together.
+    const role = wasCaptain ? 'player' : player.role;
+
+    // Moving OUT of a full roster is fine; moving INTO one is not, and a sub needs a free sub slot.
+    const capacity = rosterCapacityError({
+      rosterName: to.roster.name,
+      occupancy: occupancyOf(await rosterPlayerRoles(tx, toRosterId)),
+      role,
+      joining: true,
+    });
+    if (capacity) return { kind: 'rejected' as const, error: capacity };
+
+    // Guarded by the roster we read the player on: if someone else moved or removed the row
+    // since, nothing matches and we report it instead of overwriting their change.
+    const updated = await tx
+      .update(schema.players)
+      .set({ rosterId: toRosterId, role, isCaptain: false, updatedAt: new Date() })
+      .where(and(eq(schema.players.id, player.id), eq(schema.players.rosterId, fromRosterId)))
+      .returning({ id: schema.players.id });
+    if (updated.length === 0) {
+      return { kind: 'rejected' as const, error: MOVE_RACE_MESSAGE };
+    }
+
+    return { kind: 'moved' as const, player, playerName, role, wasCaptain };
+  });
+
+  if (outcome.kind === 'rejected') return reject(outcome.error);
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([outcome.player.memberId]);
+
+  return {
+    success: true,
+    playerId: outcome.player.id,
+    memberId: outcome.player.memberId,
+    playerName: outcome.playerName,
+    fromRosterId,
+    fromRosterName: from.roster.name,
+    toRosterId,
+    toRosterName: to.roster.name,
+    role: outcome.role,
+    isCaptain: false,
+    wasCaptain: outcome.wasCaptain,
+  };
 }
 
 export interface UpdateRosterPlayerRoleParams {
@@ -1515,18 +1789,23 @@ export interface UpdateRosterPlayerRoleParams {
 
 /**
  * Updates a player's role on a roster (Starter, Sub, or Captain).
- * Safely handles single-captain constraint with automatic promotion/demotion.
+ * Safely handles single-captain constraint with automatic promotion/demotion. Changing someone to
+ * sub is refused when the roster already has the maximum number of OTHER subs (they may keep being
+ * one); the player-count cap does not apply because nobody joins. The refusal is returned, not
+ * thrown, so the message survives in production.
  */
 export async function updateRosterPlayerRole(
   params: UpdateRosterPlayerRoleParams
-): Promise<{ success: boolean; playerId: string; role: string; isCaptain: boolean }> {
+): Promise<
+  { success: true; playerId: string; role: string; isCaptain: boolean } | RosterActionRejection
+> {
   const { rosterId, playerId, role } = params;
 
   if (!rosterId || !playerId || !role) {
     throw new Error('rosterId, playerId, and role are required');
   }
 
-  await assertManagerForRoster(rosterId);
+  const { roster } = await assertManagerForRoster(rosterId);
 
   const [targetPlayer] = await db
     .select()
@@ -1540,7 +1819,18 @@ export async function updateRosterPlayerRole(
 
   const isCaptain = role === 'captain';
 
-  await db.transaction(async (tx) => {
+  const rejection = await db.transaction(async (tx) => {
+    // Count the roster's substitutes under the roster lock so two role changes cannot both take
+    // the last slot.
+    await lockRoster(tx, rosterId);
+    const capacity = rosterCapacityError({
+      rosterName: roster.name,
+      occupancy: occupancyOf(await rosterPlayerRoles(tx, rosterId), playerId),
+      role,
+      joining: false,
+    });
+    if (capacity) return capacity;
+
     if (isCaptain) {
       // Demote any existing captain on this roster
       const currentCaptains = await tx
@@ -1575,9 +1865,12 @@ export async function updateRosterPlayerRole(
         updatedAt: new Date(),
       })
       .where(eq(schema.players.id, playerId));
+    return null;
   });
+  if (rejection) return reject(rejection);
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([targetPlayer.memberId]);
 
   return {
     success: true,

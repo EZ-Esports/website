@@ -7,6 +7,7 @@ vi.mock('@/app/lib/onboarding/portal-actions', () => ({
   emergencySwapSub: vi.fn(),
   enrollPlayerToRoster: vi.fn(),
   removePlayerFromRoster: vi.fn(),
+  movePlayerToRoster: vi.fn(),
   updateRosterPlayerRole: vi.fn(),
   createSchoolRoster: vi.fn(),
   deleteSchoolRoster: vi.fn(),

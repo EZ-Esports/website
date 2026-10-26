@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { Permissions } from '@/app/lib/roles';
 import * as schema from '@/app/lib/db/schema';
 
@@ -11,7 +12,23 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(async (_p: bigint): Promise<unknown> => ({})),
   updateTag: vi.fn(),
   revalidatePath: vi.fn(),
-  writes: [] as Array<{ op: string; table?: unknown; values?: unknown }>,
+  writes: [] as Array<{ op: string; table?: unknown; values?: unknown; where?: unknown }>,
+  /** Order in which the advisory lock and the sibling check ran. */
+  order: [] as string[],
+  /** Rows an UPDATE ... RETURNING reports; [] simulates a concurrent move/removal. */
+  updateReturning: [{ id: 'player-ok' }] as Array<{ id: string }>,
+  /** The roster's players as the size-limit count sees them. */
+  rosterRoles: [] as Array<{ id: string; role: string }>,
+  lockRoster: vi.fn(async (_tx: unknown, _roster: string) => {
+    mocks.order.push('lockRoster');
+  }),
+  rosterPlayerRoles: vi.fn(async (_tx: unknown, _roster: string) => {
+    mocks.order.push('count');
+    return mocks.rosterRoles;
+  }),
+  lockRosterMember: vi.fn(async (_tx: unknown, _team: string, _member: string) => {
+    mocks.order.push('lock');
+  }),
   /** Makes the matching write throw, to prove the surrounding transaction rolls back. */
   failWrite: null as null | ((w: { op: string; table?: unknown }) => Error | null),
   rolledBack: 0,
@@ -19,13 +36,32 @@ const mocks = vi.hoisted(() => ({
   matchCount: 0,
   teamInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; gameSlug: string } | null> =>
     id === 'team-ok' ? { id, gameSlug: 'valorant' } : id === 'team-mc' ? { id, gameSlug: 'minecraft' } : null),
-  rosterInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; division: string; gameSlug: string } | null> =>
-    id === 'roster-ok' ? { id, division: 'A', gameSlug: 'valorant' }
-      : id === 'roster-mc' ? { id, division: 'All', gameSlug: 'minecraft' } : null),
+  rosterInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown): Promise<{ id: string; teamId: string; name: string; division: string; gameSlug: string } | null> =>
+    id === 'roster-ok' ? { id, teamId: 'team-ok', name: 'Varsity', division: 'A', gameSlug: 'valorant' }
+      : id === 'roster-jv' ? { id, teamId: 'team-ok', name: 'JV', division: 'B', gameSlug: 'valorant' }
+      : id === 'roster-lol' ? { id, teamId: 'team-lol', name: 'Varsity', division: 'A', gameSlug: 'league-of-legends' }
+      : id === 'roster-mc' ? { id, teamId: 'team-mc', name: 'Minecraft', division: 'All', gameSlug: 'minecraft' } : null),
   playerInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown) =>
-    id === 'player-ok' ? { id, rosterId: 'roster-ok', memberId: 'member-ok' }
-      : id === 'player-foreign-member' ? { id, rosterId: 'roster-ok', memberId: 'member-elsewhere' } : null),
+    id === 'player-ok' ? { id, rosterId: 'roster-ok', memberId: 'member-ok', role: 'sub', isCaptain: false }
+      : id === 'player-captain' ? { id, rosterId: 'roster-ok', memberId: 'member-captain', role: 'captain', isCaptain: true }
+      : id === 'player-foreign-member' ? { id, rosterId: 'roster-ok', memberId: 'member-elsewhere', role: 'player', isCaptain: false } : null),
   memberInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown) => id === 'member-ok'),
+  /** Sibling roster the member is already on, per test; null = on none. */
+  sibling: null as null | { playerId: string; rosterId: string; rosterName: string },
+  siblingEnrollment: vi.fn(async (_t: string, _m: string, _r: string, _tx?: unknown) => {
+    mocks.order.push('sibling');
+    return mocks.sibling;
+  }),
+  /** Members already on the TARGET roster of a move. */
+  onTarget: false,
+  memberOnRoster: vi.fn(async (_m: string, _r: string, _tx?: unknown) => {
+    mocks.order.push('onTarget');
+    return mocks.onTarget;
+  }),
+  memberDisplayName: vi.fn(async (_m: string, _tx?: unknown) => 'Ada Lovelace'),
+  /** Rows the deleteRoster pre-read of the roster's players returns. */
+  rosterPlayers: [] as Array<{ memberId: string }>,
+  notify: vi.fn(async (_ids: string[]) => {}),
 }));
 
 vi.mock('@/app/lib/auth', () => ({ requirePermission: mocks.requirePermission }));
@@ -35,13 +71,20 @@ vi.mock('@/app/lib/db/roster-scope', () => ({
   rosterInSchool: mocks.rosterInSchool,
   playerInSchool: mocks.playerInSchool,
   memberInSchool: mocks.memberInSchool,
+  siblingEnrollment: mocks.siblingEnrollment,
+  lockRosterMember: mocks.lockRosterMember,
+  lockRoster: mocks.lockRoster,
+  rosterPlayerRoles: mocks.rosterPlayerRoles,
+  memberOnRoster: mocks.memberOnRoster,
+  memberDisplayName: mocks.memberDisplayName,
 }));
+vi.mock('@/app/lib/onboarding/roster-membership-events', () => ({ notifyRosterMembershipChanged: mocks.notify }));
 vi.mock('@/app/lib/db', () => {
-  type Sink = Array<{ op: string; table?: unknown; values?: unknown }>;
+  type Sink = Array<{ op: string; table?: unknown; values?: unknown; where?: unknown }>;
   // `sink` is mocks.writes for the shared connection, or the transaction's staging list, which is
   // only copied into mocks.writes when the transaction callback resolves (commit) and dropped when
   // it throws (rollback).
-  const record = (sink: Sink, w: { op: string; table?: unknown; values?: unknown }) => {
+  const record = (sink: Sink, w: { op: string; table?: unknown; values?: unknown; where?: unknown }) => {
     const err = mocks.failWrite?.(w);
     if (err) throw err;
     sink.push(w);
@@ -53,8 +96,14 @@ vi.mock('@/app/lib/db', () => {
         return { returning: async () => [{ id: 'new-id' }], then: (r: (v: unknown) => void) => r(undefined) };
       },
       set: (values: unknown) => {
-        record(sink, { op, table, values });
-        return { where: async () => undefined };
+        const write: { op: string; table?: unknown; values?: unknown; where?: unknown } = { op, table, values };
+        record(sink, write);
+        return {
+          where: (clause: unknown) => {
+            write.where = clause;
+            return Object.assign(Promise.resolve(undefined), { returning: async () => mocks.updateReturning });
+          },
+        };
       },
       where: async () => {
         record(sink, { op, table });
@@ -63,9 +112,11 @@ vi.mock('@/app/lib/db', () => {
     return {
       // `.where()` is awaited directly by the match count and chained into `.limit()` by the season lookup.
       select: () => ({
-        from: () => ({
+        from: (table: unknown) => ({
           where: () =>
-            Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow }),
+            table === schema.players
+              ? Promise.resolve(mocks.rosterPlayers)
+              : Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow }),
         }),
       }),
       insert: (table: unknown) => chain('insert', table),
@@ -92,7 +143,7 @@ vi.mock('@/app/lib/db', () => {
 });
 
 import {
-  createPlayer, createRoster, createTeam, deleteRoster, deleteRosterMember, updatePlayer, updateRoster,
+  createPlayer, createRoster, createTeam, deleteRoster, deleteRosterMember, moveRosterMember, updatePlayer, updateRoster,
 } from '../[schoolId]/rosters/actions';
 
 const form = (o: Record<string, string>) => {
@@ -111,6 +162,7 @@ const calls: Record<string, Call> = {
   createPlayerNewMember: () => createPlayer(SCHOOL, form({ rosterId: 'roster-ok', firstName: 'A', lastName: 'B', role: 'player' })),
   updatePlayer: () => updatePlayer(SCHOOL, 'player-ok', form({ role: 'coach', firstName: 'A', lastName: 'B' })),
   deleteRosterMember: () => deleteRosterMember(SCHOOL, 'player-ok'),
+  moveRosterMember: () => moveRosterMember(SCHOOL, 'player-ok', 'roster-jv'),
 };
 
 describe('school roster edit actions: authorization', () => {
@@ -414,6 +466,269 @@ describe('deleteRoster: matches protection', () => {
     expect(mocks.writes).toHaveLength(0);
   });
 });
+
+describe('staff roster moves and the sibling-roster rule', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.writes.length = 0;
+    mocks.failWrite = null;
+    mocks.rolledBack = 0;
+    mocks.sibling = null;
+    mocks.onTarget = false;
+    mocks.rosterPlayers = [];
+    mocks.matchCount = 0;
+    mocks.order.length = 0;
+    mocks.rosterRoles = [];
+    mocks.updateReturning = [{ id: 'player-ok' }];
+    mocks.requirePermission.mockImplementation(async () => ({}));
+    mocks.notify.mockImplementation(async () => {});
+  });
+
+  const playerWrites = () => mocks.writes.filter((w) => w.op === 'update' && w.table === schema.players);
+
+  it('moves the row to the sibling roster, scoped to the school, and refreshes the right tags', async () => {
+    const res = await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+    expect(res).toEqual({ success: true, fromName: 'Varsity', toName: 'JV', wasCaptain: false });
+    expect(playerWrites()).toHaveLength(1);
+    expect(playerWrites()[0].values).toMatchObject({ rosterId: 'roster-jv', role: 'sub', isCaptain: false });
+    expect(mocks.playerInSchool).toHaveBeenCalledWith('player-ok', SCHOOL, expect.anything());
+    expect(mocks.rosterInSchool).toHaveBeenCalledWith('roster-jv', SCHOOL, expect.anything());
+    for (const tag of ['players', 'rosters']) expect(mocks.updateTag).toHaveBeenCalledWith(tag);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/admin/schools/${SCHOOL}/rosters`);
+  });
+
+  it('demotes a moved captain to a regular player (role and flag together)', async () => {
+    const res = await moveRosterMember(SCHOOL, 'player-captain', 'roster-jv');
+    expect(res).toMatchObject({ success: true, wasCaptain: true });
+    expect(playerWrites()[0].values).toMatchObject({ rosterId: 'roster-jv', role: 'player', isCaptain: false });
+  });
+
+  it('refuses a roster on another team (another game) and writes nothing', async () => {
+    const res = await moveRosterMember(SCHOOL, 'player-ok', 'roster-lol');
+    expect(res).toMatchObject({ success: false });
+    expect((res as { error: string }).error).toMatch(/same team/);
+    expect(mocks.writes).toHaveLength(0);
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it('refuses a target roster outside the school, a foreign player, and the same roster', async () => {
+    expect(await moveRosterMember(SCHOOL, 'player-ok', OTHER_ROSTER)).toMatchObject({ success: false });
+    expect(await moveRosterMember(SCHOOL, 'player-elsewhere', 'roster-jv')).toMatchObject({ success: false });
+    expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-ok')).toMatchObject({ success: false });
+    expect(mocks.writes).toHaveLength(0);
+  });
+
+  it('refuses when the member is already on the target roster', async () => {
+    mocks.onTarget = true;
+    const res = await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+    expect(res).toEqual({ success: false, error: 'Ada Lovelace is already on JV.' });
+    expect(mocks.writes).toHaveLength(0);
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it('needs MANAGE_ROSTERS and has no season-lock check (staff bypass the manager lock)', async () => {
+    mocks.requirePermission.mockRejectedValueOnce(new Error('Forbidden'));
+    await expect(moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).rejects.toThrow('Forbidden');
+    expect(mocks.requirePermission).toHaveBeenCalledWith(Permissions.MANAGE_ROSTERS);
+    expect(mocks.writes).toHaveLength(0);
+    expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).toMatchObject({ success: true });
+  });
+
+  it('createPlayer rejects an existing member who is already on a sibling roster', async () => {
+    mocks.sibling = { playerId: 'p', rosterId: 'roster-ok', rosterName: 'Varsity' };
+    const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-jv', memberId: 'member-ok', role: 'player' }));
+    expect(res).toEqual({
+      success: false,
+      error: 'Ada Lovelace is already on Varsity. Use Move to put them on JV. Nothing was saved.',
+    });
+    expect(mocks.siblingEnrollment).toHaveBeenCalledWith('team-ok', 'member-ok', 'roster-jv', expect.anything());
+    expect(mocks.writes).toHaveLength(0);
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it('createPlayer does not run the sibling check for a brand-new member', async () => {
+    mocks.sibling = { playerId: 'p', rosterId: 'roster-ok', rosterName: 'Varsity' };
+    const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-jv', firstName: 'A', lastName: 'B', role: 'player' }));
+    expect(res).toEqual({ success: true });
+    expect(mocks.siblingEnrollment).not.toHaveBeenCalled();
+  });
+
+  describe('concurrency: advisory lock and guarded update', () => {
+    it('createPlayer takes the (team, member) lock before the sibling check', async () => {
+      await createPlayer(SCHOOL, form({ rosterId: 'roster-jv', memberId: 'member-ok', role: 'player' }));
+      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), 'team-ok', 'member-ok');
+      expect(mocks.order).toEqual(['lock', 'sibling', 'lockRoster', 'count']);
+    });
+
+    it('moveRosterMember takes the (team, member) lock before checking the target roster', async () => {
+      await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), 'team-ok', 'member-ok');
+      expect(mocks.order).toEqual(['lock', 'lockRoster', 'onTarget', 'count']);
+    });
+
+    it('the UPDATE is restricted to the roster the player was read on, and zero rows is a known rejection', async () => {
+      mocks.updateReturning = [];
+      const res = await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+      expect(res).toEqual({
+        success: false,
+        error: 'This player was just moved or removed by someone else. Refresh the page and try again.',
+      });
+      // The condition names both the row and its source roster, so a concurrent move matches nothing.
+      const update = playerWrites()[0];
+      const { sql, params } = new PgDialect().sqlToQuery(update.where as never);
+      expect(sql).toMatch(/"id" = \$1/);
+      expect(sql).toMatch(/"roster_id" = \$2/);
+      expect(params).toEqual(['player-ok', 'roster-ok']);
+      expect(mocks.notify).not.toHaveBeenCalled();
+      expect(mocks.updateTag).not.toHaveBeenCalled();
+    });
+  });
+
+  it('updatePlayer (a role change) notifies the member', async () => {
+    const res = await updatePlayer(SCHOOL, 'player-ok', form({ role: 'captain', firstName: 'A', lastName: 'B' }));
+    expect(res).toEqual({ success: true });
+    expect(mocks.notify).toHaveBeenCalledWith(['member-ok']);
+  });
+
+  it('updatePlayer does not notify when the player is outside the school', async () => {
+    await updatePlayer(SCHOOL, 'player-elsewhere', form({ role: 'captain', firstName: 'A', lastName: 'B' }));
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  describe('roster size limits (7 players, 2 subs)', () => {
+    const rows = (n: number, subs = 0, prefix = 'r') =>
+      Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, role: i >= n - subs ? 'sub' : 'player' }));
+
+    it('createPlayer refuses an 8th player on a full roster and writes nothing', async () => {
+      mocks.rosterRoles = rows(7);
+      const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }));
+      expect(res).toEqual({ success: false, error: 'Varsity is full (7 of 7 players). Nothing was saved.' });
+      expect(mocks.writes).toHaveLength(0);
+      expect(mocks.notify).not.toHaveBeenCalled();
+      expect(mocks.updateTag).not.toHaveBeenCalled();
+    });
+
+    it('createPlayer accepts the 7th player', async () => {
+      mocks.rosterRoles = rows(6);
+      expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }))).toEqual({ success: true });
+    });
+
+    it('createPlayer applies the cap to a brand-new member too, without creating the member', async () => {
+      mocks.rosterRoles = rows(7);
+      const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', firstName: 'A', lastName: 'B', role: 'player' }));
+      expect(res).toMatchObject({ success: false });
+      expect(mocks.writes).toHaveLength(0);
+    });
+
+    it('createPlayer refuses a third sub but accepts a second', async () => {
+      mocks.rosterRoles = rows(5, 2);
+      expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'sub' }))).toEqual({
+        success: false,
+        error: 'Varsity already has 2 substitutes. Nothing was saved.',
+      });
+      mocks.rosterRoles = rows(5, 1);
+      expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'sub' }))).toEqual({ success: true });
+    });
+
+    it('updatePlayer refuses changing someone to sub when two OTHER subs exist', async () => {
+      mocks.rosterRoles = [...rows(3), { id: 's1', role: 'sub' }, { id: 's2', role: 'sub' }, { id: 'player-ok', role: 'player' }];
+      const res = await updatePlayer(SCHOOL, 'player-ok', form({ role: 'sub', firstName: 'A', lastName: 'B' }));
+      expect(res).toEqual({ success: false, error: 'Varsity already has 2 substitutes. Nothing was saved.' });
+      expect(playerWrites()).toHaveLength(0);
+      expect(mocks.notify).not.toHaveBeenCalled();
+    });
+
+    it('updatePlayer lets an existing sub stay a sub (only other players are counted)', async () => {
+      mocks.rosterRoles = [{ id: 's1', role: 'sub' }, { id: 'player-ok', role: 'sub' }, ...rows(4)];
+      expect(await updatePlayer(SCHOOL, 'player-ok', form({ role: 'sub', firstName: 'A', lastName: 'B' }))).toEqual({ success: true });
+    });
+
+    it('updatePlayer to a non-sub role is not capped and does not count at all', async () => {
+      mocks.rosterRoles = rows(7, 2);
+      expect(await updatePlayer(SCHOOL, 'player-ok', form({ role: 'captain', firstName: 'A', lastName: 'B' }))).toEqual({ success: true });
+      expect(mocks.rosterPlayerRoles).not.toHaveBeenCalled();
+    });
+
+    it('moveRosterMember refuses a full target roster', async () => {
+      mocks.rosterRoles = rows(7);
+      const res = await moveRosterMember(SCHOOL, 'player-captain', 'roster-jv');
+      expect(res).toEqual({ success: false, error: 'JV is full (7 of 7 players).' });
+      expect(mocks.writes).toHaveLength(0);
+      expect(mocks.notify).not.toHaveBeenCalled();
+    });
+
+    it('moveRosterMember refuses a sub when the target has 2 subs, but a starter may go', async () => {
+      mocks.rosterRoles = rows(5, 2);
+      // player-ok is a sub in the fixture.
+      expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).toEqual({ success: false, error: 'JV already has 2 substitutes.' });
+      // A captain arrives as a starter, so only the player-count cap could stop it.
+      expect(await moveRosterMember(SCHOOL, 'player-captain', 'roster-jv')).toMatchObject({ success: true });
+    });
+
+    it('moving OUT of a full roster is fine (only the target is counted)', async () => {
+      mocks.rosterRoles = rows(3);
+      expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).toMatchObject({ success: true });
+    });
+
+    it('takes the roster lock before counting (createPlayer, moveRosterMember, updatePlayer)', async () => {
+      await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', firstName: 'A', lastName: 'B', role: 'player' }));
+      expect(mocks.order).toEqual(['lockRoster', 'count']);
+      mocks.order.length = 0;
+      await updatePlayer(SCHOOL, 'player-ok', form({ role: 'sub', firstName: 'A', lastName: 'B' }));
+      expect(mocks.order).toEqual(['lockRoster', 'count']);
+      expect(mocks.lockRoster).toHaveBeenLastCalledWith(expect.anything(), 'roster-ok');
+    });
+  });
+
+  describe('post-commit notifications', () => {
+    it('move notifies the moved member once, after the transaction committed', async () => {
+      const order: string[] = [];
+      mocks.notify.mockImplementation(async () => {
+        order.push(`notify(writes=${mocks.writes.length})`);
+      });
+      await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+      expect(mocks.notify).toHaveBeenCalledTimes(1);
+      expect(mocks.notify).toHaveBeenCalledWith(['member-ok']);
+      // Staged writes are only copied into mocks.writes on commit, so a non-zero count proves it.
+      expect(order).toEqual(['notify(writes=1)']);
+    });
+
+    it('a throwing notify does not fail the committed action', async () => {
+      mocks.notify.mockRejectedValue(new Error('discord down'));
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).toMatchObject({ success: true });
+      expect(await deleteRosterMember(SCHOOL, 'player-ok')).toMatchObject({ success: true });
+      spy.mockRestore();
+    });
+
+    it('createPlayer notifies the existing member, and the new member id for a new member', async () => {
+      await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }));
+      expect(mocks.notify).toHaveBeenLastCalledWith(['member-ok']);
+      await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', firstName: 'A', lastName: 'B', role: 'player' }));
+      expect(mocks.notify).toHaveBeenLastCalledWith(['new-id']);
+    });
+
+    it('deleteRosterMember notifies the removed member; a rejected delete notifies nobody', async () => {
+      await deleteRosterMember(SCHOOL, 'player-ok');
+      expect(mocks.notify).toHaveBeenCalledWith(['member-ok']);
+      mocks.notify.mockClear();
+      await deleteRosterMember(SCHOOL, 'player-elsewhere');
+      expect(mocks.notify).not.toHaveBeenCalled();
+    });
+
+    it('deleteRoster notifies every member the cascade removed, and nobody when it is refused', async () => {
+      mocks.rosterPlayers = [{ memberId: 'm1' }, { memberId: 'm2' }];
+      await deleteRoster(SCHOOL, 'roster-ok');
+      expect(mocks.notify).toHaveBeenCalledWith(['m1', 'm2']);
+
+      mocks.notify.mockClear();
+      mocks.matchCount = 2;
+      await deleteRoster(SCHOOL, 'roster-ok');
+      expect(mocks.notify).not.toHaveBeenCalled();
+    });
+  });
+});
+
 
 describe('stale /admin/roster revalidation', () => {
   const walk = (dir: string, out: string[] = []) => {
