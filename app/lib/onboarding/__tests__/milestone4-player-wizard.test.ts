@@ -241,6 +241,22 @@ vi.mock('@/app/lib/db', () => ({
   db: mocks.mockDb,
 }));
 
+// Discord identity normally comes from the signed OAuth cookie (needs a request context).
+// Default: every invite token has a verified Discord account; `override` replaces it per test.
+const discordSession = vi.hoisted(() => ({ override: undefined as any }));
+vi.mock('@/app/lib/onboarding/discord-session', () => ({
+  readVerifiedDiscord: async (token: string) => {
+    if (discordSession.override !== undefined) return discordSession.override;
+    const { createHash } = await import('node:crypto');
+    return {
+      discordUserId: '123456789012345678',
+      discordUsername: 'alexchen',
+      inGuild: true,
+      inviteHash: createHash('sha256').update(token.trim()).digest('hex'),
+    };
+  },
+}));
+
 vi.mock('@/app/lib/cache', () => ({
   CACHE_TAGS: {
     ROSTERS: 'rosters',
@@ -261,6 +277,13 @@ import {
 } from '@/app/lib/onboarding/wizard-actions';
 import { getStudentDemographics } from '@/app/lib/db/queries';
 
+/** Success-path wrapper: expected rejections come back as `{success:false}`; surface them as errors here. */
+async function submitOk(params: Parameters<typeof submitPlayerOnboarding>[0]) {
+  const result = await submitPlayerOnboarding(params);
+  if (!result.success) throw new Error(result.error);
+  return result;
+}
+
 describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
   const schoolId = 'school-stuy-uuid';
   const gameId = 'game-val-uuid';
@@ -269,6 +292,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    discordSession.override = undefined;
 
     mocks.state.schoolsStore = [
       {
@@ -532,9 +556,9 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2026,
       riotId: 'Demon1#LFT1',
-      discordUsername: 'alexchen',
-      discordUserId: 'discord-snowflake-12345',
-      inGuild: true,
+      discordUsername: 'client-typed-handle',
+      discordUserId: '999999999999999999',
+      inGuild: false,
       birthDate: '2008-05-14',
       gender: 'Male',
       race: ['Asian'],
@@ -556,7 +580,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     };
 
     it('atomically creates member, Riot identity, Discord identity, demographics vault, and marks invite submitted', async () => {
-      const result = await submitPlayerOnboarding({
+      const result = await submitOk({
         token: rawToken,
         submission: validSubmission,
       });
@@ -590,7 +614,8 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         (i) => i.memberId === result.memberId && i.provider === 'discord'
       );
       expect(discordIdentity).toBeDefined();
-      expect(discordIdentity.providerUserId).toBe('discord-snowflake-12345');
+      // Identity comes from the verified OAuth cookie; client-supplied values are ignored.
+      expect(discordIdentity.providerUserId).toBe('123456789012345678');
       expect(discordIdentity.providerUsername).toBe('alexchen');
       expect(discordIdentity.inGuild).toBe(true);
 
@@ -631,7 +656,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         schoolId,
       });
 
-      const result = await submitPlayerOnboarding({
+      const result = await submitOk({
         token: rawToken,
         submission: validSubmission,
       });
@@ -644,7 +669,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('rejects submission with invalid Riot ID format', async () => {
       await expect(
-        submitPlayerOnboarding({
+        submitOk({
           token: rawToken,
           submission: {
             ...validSubmission,
@@ -656,7 +681,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('rejects submission if code of conduct is not accepted', async () => {
       await expect(
-        submitPlayerOnboarding({
+        submitOk({
           token: rawToken,
           submission: {
             ...validSubmission,
@@ -668,7 +693,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('rejects submission if email is invalid', async () => {
       await expect(
-        submitPlayerOnboarding({
+        submitOk({
           token: rawToken,
           submission: {
             ...validSubmission,
@@ -680,7 +705,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('rejects submission if birthdate is invalid', async () => {
       await expect(
-        submitPlayerOnboarding({
+        submitOk({
           token: rawToken,
           submission: {
             ...validSubmission,
@@ -707,7 +732,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       it('records an adult ToS acknowledgment with a server-stamped date', async () => {
         const before = Date.now();
-        const result = await submitPlayerOnboarding({ token: rawToken, submission: validSubmission });
+        const result = await submitOk({ token: rawToken, submission: validSubmission });
         const rows = mocks.state.onboardingConsentsStore;
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({
@@ -726,7 +751,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       it('rejects a submission with no consent object and persists nothing', async () => {
         await expect(
-          submitPlayerOnboarding({
+          submitOk({
             token: rawToken,
             submission: { ...validSubmission, consent: undefined as any },
           })
@@ -737,7 +762,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       it('rejects a submission when the Terms of Service box is unchecked', async () => {
         await expect(
-          submitPlayerOnboarding({
+          submitOk({
             token: rawToken,
             submission: { ...validSubmission, consent: { tosAcknowledged: false } },
           })
@@ -746,7 +771,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       it('rejects an under-18 submission without guardian authorization', async () => {
         await expect(
-          submitPlayerOnboarding({
+          submitOk({
             token: rawToken,
             submission: { ...minorSubmission(), consent: { tosAcknowledged: true } },
           })
@@ -756,7 +781,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       it('rejects an under-18 submission with an invalid guardian email', async () => {
         await expect(
-          submitPlayerOnboarding({
+          submitOk({
             token: rawToken,
             submission: { ...minorSubmission(), consent: { ...guardianConsent, guardianEmail: 'nope' } },
           })
@@ -764,7 +789,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       });
 
       it('stores the full guardian authorization for an under-18 participant', async () => {
-        await submitPlayerOnboarding({
+        await submitOk({
           token: rawToken,
           submission: { ...minorSubmission(), consent: guardianConsent },
         });
@@ -781,7 +806,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       it('rejects a date of birth in the future', async () => {
         await expect(
-          submitPlayerOnboarding({
+          submitOk({
             token: rawToken,
             submission: { ...validSubmission, birthDate: '2999-01-01' },
           })
@@ -797,6 +822,136 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         const invite = mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1');
         expect(invite.submissionDraft).toEqual({ legalFirstName: 'Alex' });
       });
+    });
+  });
+
+  describe('4b. Verified Discord requirement (players)', () => {
+    const submission: PlayerOnboardingSubmission = {
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.chen@nycstudents.net',
+      graduationYear: 2027,
+      riotId: 'Demon1#LFT1',
+      discordUsername: 'typed-by-client',
+      discordUserId: '555555555555555555',
+      inGuild: true,
+      birthDate: '2008-05-14',
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    };
+    const hashOf = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
+
+    it('rejects a player submission when no verified Discord cookie is present', async () => {
+      discordSession.override = null;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission });
+      expect(result).toMatchObject({ success: false, code: 'discord_required' });
+      expect(result.success === false && result.error).toContain('reconnect');
+      expect(mocks.state.membersStore.find((m) => m.email === submission.email)).toBeUndefined();
+      expect(mocks.state.playerIdentitiesStore.filter((i) => i.provider === 'discord')).toHaveLength(0);
+    });
+
+    it('rejects a verification that was issued for a different invite', async () => {
+      discordSession.override = {
+        discordUserId: '123456789012345678',
+        discordUsername: 'alexchen',
+        inGuild: true,
+        inviteHash: hashOf('some_other_invite_token'),
+      };
+      await expect(submitPlayerOnboarding({ token: rawToken, submission })).resolves.toMatchObject({
+        success: false,
+        code: 'discord_required',
+      });
+    });
+
+    it('an expired verification (cookie lapsed after the page loaded) asks the student to reconnect', async () => {
+      // readVerifiedDiscord returns null once the signed cookie has expired.
+      discordSession.override = null;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission });
+      expect(result).toMatchObject({ success: false, code: 'discord_required' });
+      expect(result.success === false && result.error).toMatch(/expired.*reconnect/i);
+    });
+
+    it('rejects when the verified account is not confirmed to be in the server', async () => {
+      discordSession.override = {
+        discordUserId: '123456789012345678',
+        discordUsername: 'alexchen',
+        inGuild: false,
+        inviteHash: hashOf(rawToken),
+      };
+      await expect(submitPlayerOnboarding({ token: rawToken, submission })).resolves.toMatchObject({
+        success: false,
+        code: 'discord_not_in_guild',
+      });
+    });
+
+    it('ignores client-supplied Discord id, handle and inGuild', async () => {
+      const result = await submitOk({ token: rawToken, submission });
+      const identity = mocks.state.playerIdentitiesStore.find(
+        (i) => i.memberId === result.memberId && i.provider === 'discord'
+      );
+      expect(identity.providerUserId).toBe('123456789012345678');
+      expect(identity.providerUsername).toBe('alexchen');
+      expect(identity.inGuild).toBe(true);
+      expect(mocks.state.membersStore.find((m) => m.id === result.memberId).discord).toBe('alexchen');
+    });
+
+    it('rejects a Discord account already linked to a different member', async () => {
+      mocks.state.membersStore.push({ id: 'other-member', email: 'someone.else@nycstudents.net' });
+      mocks.state.playerIdentitiesStore.push({
+        id: 'ident-other',
+        memberId: 'other-member',
+        provider: 'discord',
+        providerUserId: '123456789012345678',
+        providerUsername: 'someone',
+        inGuild: true,
+      });
+      const result = await submitPlayerOnboarding({ token: rawToken, submission });
+      expect(result).toMatchObject({ success: false, code: 'discord_already_linked' });
+      // Does not reveal who owns the id.
+      const text = JSON.stringify(result);
+      expect(text).not.toContain('other-member');
+      expect(text).not.toContain('someone');
+    });
+
+    it('maps a unique-violation race on the Discord identity index to the same friendly result', async () => {
+      const originalInsert = mocks.mockDb.insert.getMockImplementation()!;
+      mocks.mockDb.insert.mockImplementation((tbl: any) => {
+        if (tbl === schema.playerIdentities) {
+          return {
+            values: (data: any) => {
+              if (data.provider === 'discord') {
+                const err: any = new Error('duplicate key value violates unique constraint');
+                err.code = '23505';
+                err.constraint_name = 'player_identities_provider_user_idx';
+                throw err;
+              }
+              return originalInsert(tbl).values(data);
+            },
+          };
+        }
+        return originalInsert(tbl);
+      });
+      try {
+        const result = await submitPlayerOnboarding({ token: rawToken, submission });
+        expect(result).toMatchObject({ success: false, code: 'discord_already_linked' });
+      } finally {
+        mocks.mockDb.insert.mockImplementation(originalInsert);
+      }
+    });
+
+    it('does not swallow unrelated database errors', async () => {
+      const originalInsert = mocks.mockDb.insert.getMockImplementation()!;
+      mocks.mockDb.insert.mockImplementation((tbl: any) => {
+        if (tbl === schema.playerIdentities) {
+          throw Object.assign(new Error('boom'), { code: '23505', constraint_name: 'something_else' });
+        }
+        return originalInsert(tbl);
+      });
+      try {
+        await expect(submitPlayerOnboarding({ token: rawToken, submission })).rejects.toThrow('boom');
+      } finally {
+        mocks.mockDb.insert.mockImplementation(originalInsert);
+      }
     });
   });
 
@@ -917,7 +1072,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         consent: { tosAcknowledged: true },
       };
 
-      const result = await submitPlayerOnboarding({
+      const result = await submitOk({
         token: managerToken,
         submission: managerSubmission,
       });
@@ -952,7 +1107,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     });
 
     it('records the season the manager picked in the wizard, overriding the invite-seeded season', async () => {
-      const result = await submitPlayerOnboarding({
+      const result = await submitOk({
         token: managerToken,
         submission: {
           legalFirstName: 'Samuel',
@@ -980,7 +1135,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('rejects a malformed manager season', async () => {
       await expect(
-        submitPlayerOnboarding({
+        submitOk({
           token: managerToken,
           submission: {
             legalFirstName: 'Samuel',
@@ -1002,7 +1157,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('rejects the legacy YYYY-YYYY manager season format', async () => {
       await expect(
-        submitPlayerOnboarding({
+        submitOk({
           token: managerToken,
           submission: {
             legalFirstName: 'Samuel',
@@ -1043,7 +1198,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         consent: { tosAcknowledged: true },
       };
 
-      await submitPlayerOnboarding({
+      await submitOk({
         token: managerToken,
         submission: managerSubmission,
       });
