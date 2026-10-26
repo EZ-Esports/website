@@ -33,6 +33,8 @@ interface RostersSectionProps {
     role: 'player' | 'sub' | 'captain'
   ) => void;
   onRemovePlayer: (rosterId: string, playerId: string) => void;
+  onMovePlayer?: (fromRosterId: string, playerId: string, toRosterId: string) => void;
+  movingPlayerId?: string | null;
   onDeleteRoster?: (rosterId: string) => void;
 }
 
@@ -52,6 +54,8 @@ export function RostersSection({
   onCheckRosterGate,
   onUpdateRole,
   onRemovePlayer,
+  onMovePlayer,
+  movingPlayerId = null,
   onDeleteRoster,
 }: RostersSectionProps) {
   const anyLocked = lockedGameIds.length > 0;
@@ -107,7 +111,7 @@ export function RostersSection({
           <p>
             <span className="font-bold">Rosters locked{lockedSeasonLabel ? ` for ${lockedSeasonLabel}` : ''}.</span>{' '}
             EZ Esports staff have locked rosters for this season, so players cannot be enrolled,
-            removed, swapped or re-roled, and rosters cannot be created or deleted. Contact an admin
+            removed, moved, swapped or re-roled, and rosters cannot be created or deleted. Contact an admin
             to request changes. You can still view rosters and check eligibility.
           </p>
         </div>
@@ -139,6 +143,11 @@ export function RostersSection({
               onCheckRosterGate={onCheckRosterGate}
               onUpdateRole={onUpdateRole}
               onRemovePlayer={onRemovePlayer}
+              onMovePlayer={onMovePlayer}
+              movingPlayerId={movingPlayerId}
+              siblingRosters={rosters
+                .filter((r) => r.teamId === roster.teamId && r.id !== roster.id)
+                .map((r) => ({ id: r.id, name: r.name }))}
               onDeleteRoster={onDeleteRoster}
             />
           ))}

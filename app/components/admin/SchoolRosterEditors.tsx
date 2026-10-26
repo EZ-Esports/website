@@ -1,13 +1,14 @@
 'use client';
 
 import { createContext, useContext, useState, useTransition, type FormEvent, type ReactNode } from 'react';
-import { FiPlus } from 'react-icons/fi';
+import { FiCornerUpRight, FiPlus } from 'react-icons/fi';
 import {
   createPlayer,
   createRoster,
   createTeam,
   deleteRoster,
   deleteRosterMember,
+  moveRosterMember,
   updatePlayer,
   updateRoster,
 } from '@/app/(admin)/admin/schools/[schoolId]/rosters/actions';
@@ -348,10 +349,74 @@ export function PlayerEditForm({ player, rosterName, onClose }: { player: Roster
   );
 }
 
-export function PlayerRowActions({ player, rosterName, onEdit }: { player: RosterViewPlayer; rosterName: string; onEdit: () => void }) {
+export interface SiblingRoster {
+  id: string;
+  name: string;
+}
+
+/**
+ * Moves a player to the team's other roster(s). One sibling is a plain "Move to JV" button; more
+ * than one (a team can have extra rosters) is a labelled select. Staff are not blocked by the
+ * season roster lock, so this is never disabled for that reason.
+ */
+function MovePlayerControl({ player, siblings }: { player: RosterViewPlayer; siblings: SiblingRoster[] }) {
+  const { schoolId, run, pending } = useEdit();
+  if (siblings.length === 0) return null;
+  const move = (target: SiblingRoster) =>
+    run(
+      () => moveRosterMember(schoolId, player.id, target.id),
+      `${player.name} moved to ${target.name}.`,
+    );
+  if (siblings.length === 1) {
+    const [target] = siblings;
+    return (
+      <button
+        type="button"
+        className={ghostBtnSm}
+        disabled={pending}
+        aria-label={`Move ${player.name} to ${target.name}`}
+        onClick={() => move(target)}
+      >
+        <FiCornerUpRight aria-hidden /> Move to {target.name}
+      </button>
+    );
+  }
+  return (
+    <select
+      className={cx(selectClass, 'w-auto')}
+      aria-label={`Move ${player.name} to another roster`}
+      disabled={pending}
+      value=""
+      onChange={(e) => {
+        const target = siblings.find((s) => s.id === e.target.value);
+        if (target) move(target);
+      }}
+    >
+      <option value="">Move to…</option>
+      {siblings.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export function PlayerRowActions({
+  player,
+  rosterName,
+  siblings = [],
+  onEdit,
+}: {
+  player: RosterViewPlayer;
+  rosterName: string;
+  siblings?: SiblingRoster[];
+  onEdit: () => void;
+}) {
   const { schoolId, notify } = useEdit();
   return (
     <div className="flex shrink-0 items-center gap-1.5">
+      <MovePlayerControl player={player} siblings={siblings} />
       <RowIconButton kind="edit" label={`Edit player ${player.name}`} onClick={onEdit} />
       <ConfirmDeleteButton
         label={`Remove player ${player.name}`}

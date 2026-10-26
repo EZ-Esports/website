@@ -146,3 +146,12 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Legal to confirm:** adults currently see only the Terms of Service acknowledgment (the supplied form is a guardian authorization). Confirm that is sufficient, and whether managers or adults need anything else.
 - **No staff view or export of consent records**, no guardian confirmation email, and no re-consent for members onboarded before `0052`.
 - [#274](https://github.com/EZ-Esports/website/issues/274): (closed 25 Oct) manager portal match visibility ([spec-031](spec-031-manager-matches-view.md), PR #275) and reschedule requests ([spec-032](spec-032-match-reschedule-requests.md), PR #276; migration 0053 applied to production 25 Oct, live check passed). Follow-ups: [#277](https://github.com/EZ-Esports/website/issues/277) (friendly duplicate-request message lost) and [#278](https://github.com/EZ-Esports/website/issues/278) (foreign-key name truncated); `seasons` has no end date, so "complete before the end of the regular season" is not checked; nothing records "both teams already agreed to the original date"; the staff approval step may be dropped later (see spec-032). Decisions (24 Oct): no draft state (managers see a match as soon as staff create it); opponent manager confirms in the portal; a requester may cancel until the opponent has agreed; portal-only notifications (Discord bot pings later); all managers of the season may act, one manager per school; rules follow rules page 4.3 (72h, two proposed times at least an hour apart). Rules page 4.2 still says a 15-minute grace period while the official slide says 10 minutes: unresolved.
+
+---
+
+## Roster move (spec-033)
+
+- **One-tier rule is app-level only.** No database constraint; concurrent enrolls could double-enroll a member, and rows that violated the rule before this change remain. A cleanup query (members with players rows on two rosters of one team) has not been run against production.
+- **Manager error text in production is unverified.** The new manager actions throw like their neighbours; whether Next.js masks thrown server-action messages in production (hiding "already on Varsity") has not been checked. If it does, all manager rejections (lock, view-only, enroll) need a returned-result style.
+- **Not seen in a browser.** The Move control and its toast were verified by unit and render tests only.
+- **Seam has no consumer.** `notifyRosterMembershipChanged` is a no-op until the Discord role feature lands.

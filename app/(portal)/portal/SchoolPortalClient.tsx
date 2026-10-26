@@ -8,6 +8,7 @@ import {
   emergencySwapSub,
   enrollPlayerToRoster,
   removePlayerFromRoster,
+  movePlayerToRoster,
   updateRosterPlayerRole,
   createSchoolRoster,
   deleteSchoolRoster,
@@ -99,6 +100,8 @@ export default function SchoolPortalClient({
   const [selectedRosterMap, setSelectedRosterMap] = useState<Record<string, string>>({});
   const [selectedRoleMap, setSelectedRoleMap] = useState<Record<string, 'player' | 'sub' | 'captain'>>({});
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
+  // The player row whose move is in flight; its Move control is disabled so it cannot be double-fired.
+  const [movingPlayerId, setMovingPlayerId] = useState<string | null>(null);
 
   // --- Roster Gate Evaluation State ---
   const [eligibilityResults, setEligibilityResults] = useState<
@@ -364,6 +367,49 @@ export default function SchoolPortalClient({
     }
   };
 
+  const handleMovePlayer = async (fromRosterId: string, playerId: string, toRosterId: string) => {
+    setMovingPlayerId(playerId);
+    try {
+      const moved = await movePlayerToRoster({ fromRosterId, playerId, toRosterId });
+      setRosters((prev) => {
+        const source = prev.find((r) => r.id === fromRosterId);
+        const player = source?.players.find((p) => p.id === playerId);
+        if (!player) return prev;
+        // Same row, new roster: a moved captain arrives as a starter (captaincy is per roster).
+        const arrived = { ...player, role: moved.role, isCaptain: moved.isCaptain };
+        return prev.map((r) => {
+          if (r.id === fromRosterId) return { ...r, players: r.players.filter((p) => p.id !== playerId) };
+          if (r.id === toRosterId) return { ...r, players: [...r.players, arrived] };
+          return r;
+        });
+      });
+      setPlayerPool((prev) =>
+        prev.map((p) =>
+          p.memberId !== moved.memberId
+            ? p
+            : {
+                ...p,
+                enrolledRosters: p.enrolledRosters.map((er) =>
+                  er.rosterId === fromRosterId
+                    ? { ...er, rosterId: toRosterId, rosterName: moved.toRosterName, role: moved.role, isCaptain: moved.isCaptain }
+                    : er
+                ),
+              }
+        )
+      );
+      setApprovalFeedback(
+        `${moved.playerName} moved from ${moved.fromRosterName} to ${moved.toRosterName}.${
+          moved.wasCaptain ? ` They were captain, so choose a new captain for ${moved.fromRosterName}.` : ''
+        }`
+      );
+      setTimeout(() => setApprovalFeedback(null), 6000);
+    } catch (err: any) {
+      alert(`Failed to move player: ${err.message}`);
+    } finally {
+      setMovingPlayerId(null);
+    }
+  };
+
   const handleConfirmCreateRoster = ({
     gameId,
     name,
@@ -618,6 +664,8 @@ export default function SchoolPortalClient({
         onCheckRosterGate={handleCheckRosterGate}
         onUpdateRole={handleUpdateRole}
         onRemovePlayer={handleRemovePlayer}
+        onMovePlayer={handleMovePlayer}
+        movingPlayerId={movingPlayerId}
         onDeleteRoster={handleDeleteRoster}
       />
 

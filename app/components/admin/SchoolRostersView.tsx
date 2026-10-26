@@ -356,6 +356,8 @@ const ROLE_LABEL: Record<string, string> = { captain: 'Captain', player: 'Player
 function RosterCard({ roster, block, showDivision = false }: { roster: RosterViewRoster; block: SeasonBlock; showDivision?: boolean }) {
   const [panel, setPanel] = useState<'edit' | 'add' | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  // Rosters of the same team: a player can be moved between them but never across games or seasons.
+  const siblings = block.rosters.filter((r) => r.id !== roster.id).map((r) => ({ id: r.id, name: r.name }));
   return (
     <div className="min-w-0 rounded-xl bg-surface-sunken p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -391,7 +393,7 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                     <span className="min-w-0 truncate text-sm font-medium text-foreground">{p.ign || p.name}</span>
                     <span className="flex shrink-0 items-center gap-2">
                       <span className={chip(p.role === 'captain' ? 'accent' : 'neutral', 'sm')}>{ROLE_LABEL[p.role] ?? p.role}</span>
-                      <PlayerRowActions player={p} rosterName={roster.name} onEdit={() => setEditingPlayer(p.id)} />
+                      <PlayerRowActions player={p} rosterName={roster.name} siblings={siblings} onEdit={() => setEditingPlayer(p.id)} />
                     </span>
                   </div>
                   <p className="mt-0.5 break-words text-xs text-foreground-secondary">

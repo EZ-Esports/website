@@ -15,12 +15,30 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
+import { siblingEnrollment } from '@/app/lib/db/roster-scope';
+import { notifyRosterMembershipChanged } from './roster-membership-events';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
 import { getLatestRescheduleRequests, getRescheduledFrom } from '@/app/lib/db/reschedules';
 import type { RescheduleRequestItem } from '@/app/lib/reschedule-rules';
 import { redactHiddenMatches } from '@/app/lib/season-outcomes';
 import { toSchoolMatchItem, type SchoolMatchItem } from '@/app/lib/school-matches';
+
+/**
+ * Tells the roster-membership seam about members whose roster changed. Call it only AFTER the
+ * transaction has committed; the change is already durable, so a failing consumer must never
+ * turn a successful action into an error.
+ */
+async function notifyMembershipChanged(memberIds: string[]): Promise<void> {
+  try {
+    await notifyRosterMembershipChanged(memberIds);
+  } catch (error) {
+    console.error(
+      'notifyRosterMembershipChanged failed:',
+      error instanceof Error ? error.message : 'unknown error'
+    );
+  }
+}
 
 export interface CreatePlayerInviteParams {
   schoolId: string;
@@ -824,6 +842,7 @@ export async function emergencySwapSub(
   });
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([outPlayer.memberId, inPlayer.memberId]);
 
   return {
     success: true,
@@ -1390,6 +1409,17 @@ export async function enrollPlayerToRoster(
   let playerId: string;
 
   await db.transaction(async (tx) => {
+    // League rule: one tier per game. A member already on a sibling roster is moved, not
+    // double-enrolled. A row already on THIS roster is a role/IGN edit and stays allowed.
+    if (!existingPlayer) {
+      const sibling = await siblingEnrollment(team.id, memberId, rosterId, tx);
+      if (sibling) {
+        throw new Error(
+          `${member.firstName} ${member.lastName} is already on ${sibling.rosterName}. Use Move to put them on ${roster.name}.`
+        );
+      }
+    }
+
     if (isCaptain) {
       // Demote existing captain on this roster (if another player was captain)
       const otherCaptains = await tx
@@ -1464,6 +1494,7 @@ export async function enrollPlayerToRoster(
   };
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([memberId]);
 
   return {
     success: true,
@@ -1493,6 +1524,12 @@ export async function removePlayerFromRoster(
 
   await assertManagerForRoster(rosterId);
 
+  const [existing] = await db
+    .select({ memberId: schema.players.memberId })
+    .from(schema.players)
+    .where(and(eq(schema.players.id, playerId), eq(schema.players.rosterId, rosterId)))
+    .limit(1);
+
   await db
     .delete(schema.players)
     .where(
@@ -1503,8 +1540,128 @@ export async function removePlayerFromRoster(
     );
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  if (existing) await notifyMembershipChanged([existing.memberId]);
 
   return { success: true, playerId };
+}
+
+export interface MovePlayerToRosterParams {
+  /** The roster the player is on now. */
+  fromRosterId: string;
+  /** The sibling roster to move them to. */
+  toRosterId: string;
+  /** Identify the player row by its id, or by the member when the caller only has that. */
+  playerId?: string;
+  memberId?: string;
+}
+
+export interface MovePlayerToRosterResult {
+  success: true;
+  playerId: string;
+  memberId: string;
+  playerName: string;
+  fromRosterId: string;
+  fromRosterName: string;
+  toRosterId: string;
+  toRosterName: string;
+  /** The role the player has on the target roster (a moved captain becomes a starter). */
+  role: string;
+  isCaptain: boolean;
+  /** True when the player was captain of the source roster and was demoted by the move. */
+  wasCaptain: boolean;
+}
+
+/**
+ * Moves a player to a sibling roster of the same team (for example Varsity to JV) in one
+ * transaction. The existing players row is updated in place, so its id, in-game name and bio
+ * survive. Both rosters are authorized and lock-checked through `assertManagerForRoster`, and
+ * must share a team: a move never crosses games, seasons or schools. A captain arrives as a
+ * regular starter because captaincy is per roster; a sub stays a sub. Enrollment applies no
+ * roster size cap, so neither does a move.
+ *
+ * Known rejections throw an Error with a user-facing message, like the neighbouring actions.
+ */
+export async function movePlayerToRoster(
+  params: MovePlayerToRosterParams
+): Promise<MovePlayerToRosterResult> {
+  const { fromRosterId, toRosterId, playerId, memberId } = params;
+
+  if (!fromRosterId || !toRosterId || (!playerId && !memberId)) {
+    throw new Error('fromRosterId, toRosterId, and a playerId or memberId are required');
+  }
+  if (fromRosterId === toRosterId) {
+    throw new Error('Pick a different roster to move the player to.');
+  }
+
+  // Both ends must be this manager's to change (auth, season scope, inactive and lock checks).
+  const from = await assertManagerForRoster(fromRosterId);
+  const to = await assertManagerForRoster(toRosterId);
+
+  if (from.team.id !== to.team.id) {
+    throw new Error(
+      'Players can only be moved between rosters of the same team (same school, game and season).'
+    );
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    const [player] = await tx
+      .select()
+      .from(schema.players)
+      .where(
+        and(
+          playerId ? eq(schema.players.id, playerId) : eq(schema.players.memberId, memberId!),
+          eq(schema.players.rosterId, fromRosterId)
+        )
+      )
+      .limit(1);
+    if (!player) {
+      throw new Error(`That player is not on ${from.roster.name}.`);
+    }
+
+    const [member] = await tx
+      .select({ firstName: schema.members.firstName, lastName: schema.members.lastName })
+      .from(schema.members)
+      .where(eq(schema.members.id, player.memberId))
+      .limit(1);
+    const playerName = member ? `${member.firstName} ${member.lastName}` : 'That player';
+
+    const [alreadyThere] = await tx
+      .select({ id: schema.players.id })
+      .from(schema.players)
+      .where(and(eq(schema.players.rosterId, toRosterId), eq(schema.players.memberId, player.memberId)))
+      .limit(1);
+    if (alreadyThere) {
+      throw new Error(`${playerName} is already on ${to.roster.name}.`);
+    }
+
+    const wasCaptain = player.isCaptain || player.role === 'captain';
+    // players_captain_role_check ties role='captain' to is_captain, so demote both together.
+    const role = wasCaptain ? 'player' : player.role;
+
+    await tx
+      .update(schema.players)
+      .set({ rosterId: toRosterId, role, isCaptain: false, updatedAt: new Date() })
+      .where(eq(schema.players.id, player.id));
+
+    return { player, playerName, role, wasCaptain };
+  });
+
+  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
+  await notifyMembershipChanged([outcome.player.memberId]);
+
+  return {
+    success: true,
+    playerId: outcome.player.id,
+    memberId: outcome.player.memberId,
+    playerName: outcome.playerName,
+    fromRosterId,
+    fromRosterName: from.roster.name,
+    toRosterId,
+    toRosterName: to.roster.name,
+    role: outcome.role,
+    isCaptain: false,
+    wasCaptain: outcome.wasCaptain,
+  };
 }
 
 export interface UpdateRosterPlayerRoleParams {

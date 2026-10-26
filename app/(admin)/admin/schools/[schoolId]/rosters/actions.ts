@@ -6,7 +6,10 @@ import * as schema from '@/app/lib/db/schema';
 import { and, count, eq, or, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { dbErrorChain, sanitizeDbError } from '@/app/lib/text-utils';
-import { memberInSchool, playerInSchool, rosterInSchool, teamInSchool } from '@/app/lib/db/roster-scope';
+import {
+  memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool, siblingEnrollment, teamInSchool,
+} from '@/app/lib/db/roster-scope';
+import { notifyRosterMembershipChanged } from '@/app/lib/onboarding/roster-membership-events';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
 import { toHubDivision, type CanonicalDivision } from '@/app/lib/db/match-page';
 
@@ -33,6 +36,18 @@ const BAD_SCHOOL = { success: false as const, error: 'Invalid school.' };
 function refreshSchoolRosters(schoolId: string) {
   revalidatePath(`/admin/schools/${schoolId}/rosters`);
   revalidatePath('/admin/schools');
+}
+
+/**
+ * Tells the roster-membership seam who changed. Called only after the write has committed; the
+ * change is already durable, so a failing consumer must not turn it into an error.
+ */
+async function notifyMembershipChanged(memberIds: string[]): Promise<void> {
+  try {
+    await notifyRosterMembershipChanged(memberIds);
+  } catch (error) {
+    console.error('notifyRosterMembershipChanged failed:', error instanceof Error ? error.message : 'unknown error');
+  }
 }
 
 function text(formData: FormData, key: string): string {
@@ -180,6 +195,12 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
       };
     }
 
+    // Deleting a roster cascades to its players, so remember who was on it for the seam.
+    const affected = await db
+      .select({ memberId: schema.players.memberId })
+      .from(schema.players)
+      .where(eq(schema.players.rosterId, rosterId));
+
     // The NOT EXISTS guard closes the window where a match is created after the count above.
     await db.delete(schema.rosters).where(
       and(
@@ -193,6 +214,7 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
     updateTag('matches');
     refreshSchoolRosters(schoolId);
     revalidatePath('/');
+    await notifyMembershipChanged(affected.map((p) => p.memberId).filter(Boolean));
     return { success: true };
   } catch (error: unknown) {
     console.error(error);
@@ -246,8 +268,18 @@ export async function createPlayer(schoolId: string, formData: FormData) {
 
     const outcome = await db.transaction(async (tx) => {
       // The roster and any existing member must belong to this school.
-      if (!(await rosterInSchool(rosterId, schoolId, tx))) return 'not-found' as const;
+      const roster = await rosterInSchool(rosterId, schoolId, tx);
+      if (!roster) return 'not-found' as const;
       if (memberId && !(await memberInSchool(memberId, schoolId, tx))) return 'not-found' as const;
+
+      // One tier per game: a member already on a sibling roster is moved, not added a second time.
+      if (memberId) {
+        const sibling = await siblingEnrollment(roster.teamId, memberId, rosterId, tx);
+        if (sibling) {
+          const name = await memberDisplayName(memberId, tx);
+          return { kind: 'conflict' as const, message: `${name} is already on ${sibling.rosterName}. Use Move to put them on ${roster.name}.` };
+        }
+      }
 
       let memberIdToUse = memberId;
       if (!memberId) {
@@ -267,14 +299,16 @@ export async function createPlayer(schoolId: string, formData: FormData) {
         // consumer reading isCaptain agrees with the displayed role.
         isCaptain: role === 'captain',
       });
-      return 'ok' as const;
+      return { kind: 'ok' as const, memberId: memberIdToUse };
     });
     if (outcome === 'not-found') return playerFail(NOT_FOUND.error);
+    if (outcome.kind === 'conflict') return playerFail(outcome.message);
 
     if (!memberId) updateTag('members');
     updateTag('players');
     updateTag('rosters');
     refreshSchoolRosters(schoolId);
+    await notifyMembershipChanged([outcome.memberId]);
     return { success: true as const };
   } catch (error: unknown) {
     console.error(error);
@@ -337,14 +371,62 @@ export async function deleteRosterMember(schoolId: string, playerId: string) {
   await requireRosterPermission();
   if (!UUID.test(schoolId)) return BAD_SCHOOL;
   try {
-    if (!(await playerInSchool(playerId, schoolId))) return NOT_FOUND;
+    const player = await playerInSchool(playerId, schoolId);
+    if (!player) return NOT_FOUND;
     await db.delete(schema.players).where(eq(schema.players.id, playerId));
     updateTag('players');
     updateTag('rosters');
     refreshSchoolRosters(schoolId);
+    await notifyMembershipChanged([player.memberId]);
     return { success: true };
   } catch (error: unknown) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+/**
+ * Moves a player to a sibling roster of the same team (for example Varsity to JV), keeping the
+ * players row so the in-game name and bio survive. Staff bypass the season roster lock like every
+ * other action in this file. A captain arrives as a starter (captaincy is per roster). The move is
+ * refused across teams, onto a roster the member is already on, and for a player outside this school.
+ */
+export async function moveRosterMember(schoolId: string, playerId: string, toRosterId: string) {
+  await requireRosterPermission();
+  if (!UUID.test(schoolId)) return BAD_SCHOOL;
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const player = await playerInSchool(playerId, schoolId, tx);
+      if (!player) return { error: NOT_FOUND.error };
+      const from = await rosterInSchool(player.rosterId, schoolId, tx);
+      const to = await rosterInSchool(toRosterId, schoolId, tx);
+      if (!from || !to) return { error: NOT_FOUND.error };
+      if (from.id === to.id) return { error: 'Pick a different roster to move the player to.' };
+      if (from.teamId !== to.teamId) {
+        return { error: 'Players can only be moved between rosters of the same team (same school, game and season).' };
+      }
+      if (await memberOnRoster(player.memberId, to.id, tx)) {
+        const name = await memberDisplayName(player.memberId, tx);
+        return { error: `${name} is already on ${to.name}.` };
+      }
+
+      const wasCaptain = player.isCaptain || player.role === 'captain';
+      await tx
+        .update(schema.players)
+        // players_captain_role_check ties role='captain' to is_captain, so demote both together.
+        .set({ rosterId: to.id, role: wasCaptain ? 'player' : player.role, isCaptain: false, updatedAt: new Date() })
+        .where(eq(schema.players.id, playerId));
+      return { memberId: player.memberId, fromName: from.name, toName: to.name, wasCaptain };
+    });
+    if ('error' in outcome) return { success: false as const, error: outcome.error };
+
+    updateTag('players');
+    updateTag('rosters');
+    refreshSchoolRosters(schoolId);
+    await notifyMembershipChanged([outcome.memberId]);
+    return { success: true as const, fromName: outcome.fromName, toName: outcome.toName, wasCaptain: outcome.wasCaptain };
+  } catch (error: unknown) {
+    console.error(error);
+    return { success: false as const, error: sanitizeDbError(error) };
   }
 }

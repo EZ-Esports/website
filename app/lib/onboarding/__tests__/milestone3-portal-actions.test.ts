@@ -6,6 +6,7 @@ import { Permissions } from '@/app/lib/roles';
 // --- HOISTED MOCKS ---
 const mocks = vi.hoisted(() => {
   const mockUpdateCacheTags = vi.fn();
+  const mockNotify = vi.fn(async (_ids: string[]) => {});
 
   interface ClaimsUser {
     sub?: string;
@@ -334,6 +335,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     mockUpdateCacheTags,
+    mockNotify,
     mockDb,
     state,
     setClaims: (c: ClaimsUser | null) => {
@@ -355,6 +357,10 @@ vi.mock('@/app/lib/cache', () => ({
     TEAMS: 'teams',
   },
   updateCacheTags: mocks.mockUpdateCacheTags,
+}));
+
+vi.mock('@/app/lib/onboarding/roster-membership-events', () => ({
+  notifyRosterMembershipChanged: mocks.mockNotify,
 }));
 
 vi.mock('@/app/lib/supabase/server', () => ({
@@ -384,6 +390,7 @@ import {
   emergencySwapSub,
   enrollPlayerToRoster,
   removePlayerFromRoster,
+  movePlayerToRoster,
   updateRosterPlayerRole,
   getSchoolPlayerPool,
   createSchoolRoster,
@@ -2030,6 +2037,219 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       mocks.state.schoolManagersStore[0].managedGames = ['league-of-legends'];
       await expect(deleteSchoolRoster('r-past-empty')).rejects.toThrow(/Forbidden/);
       await expect(createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' })).rejects.toThrow(/Forbidden/);
+    });
+  });
+
+  describe('11. Moving players between sibling rosters (league rule: one tier per game)', () => {
+    const val = 'team-val';
+    const varsity = 'roster-varsity';
+    const jv = 'roster-jv';
+    const lolVarsity = 'roster-lol-varsity';
+    const LOCKED = /locked by EZ Esports staff/;
+
+    const memberIdsNotified = () => mocks.mockNotify.mock.calls.map((c) => c[0]);
+    const snapshot = () => JSON.stringify([mocks.state.playersStore, mocks.state.rostersStore]);
+
+    beforeEach(() => {
+      mocks.mockNotify.mockReset();
+      mocks.mockNotify.mockResolvedValue(undefined);
+      mocks.state.seasonsStore = [
+        { id: 'season-val-now', gameId: valGameId, name: '2026-27', isActive: true, rostersLockedAt: null },
+        { id: 'season-lol-now', gameId: lolGameId, name: '2026-27', isActive: true, rostersLockedAt: null },
+      ];
+      mocks.state.schoolManagersStore = [
+        { id: 'mgr-1', schoolId, userId: 'manager-user-1', managedGames: null, academicYear: '2026-27', isPrimaryContact: true, isActive: true },
+      ];
+      mocks.state.teamsStore = [
+        { id: val, schoolId, gameId: valGameId, seasonId: 'season-val-now' },
+        { id: 'team-lol', schoolId, gameId: lolGameId, seasonId: 'season-lol-now' },
+        { id: 'team-other', schoolId: otherSchoolId, gameId: valGameId, seasonId: 'season-val-now' },
+      ];
+      mocks.state.rostersStore = [
+        { id: varsity, teamId: val, name: 'Varsity', division: 'A' },
+        { id: jv, teamId: val, name: 'JV', division: 'B' },
+        { id: lolVarsity, teamId: 'team-lol', name: 'Varsity', division: 'A' },
+        { id: 'roster-other', teamId: 'team-other', name: 'Varsity', division: 'A' },
+      ];
+      mocks.state.membersStore = [
+        { id: 'm-cap', schoolId, firstName: 'Cap', lastName: 'Tain', discord: 'c#1', graduationYear: 2027 },
+        { id: 'm-sub', schoolId, firstName: 'Su', lastName: 'B', discord: 's#1', graduationYear: 2027 },
+        { id: 'm-new', schoolId, firstName: 'New', lastName: 'Kid', discord: 'n#1', graduationYear: 2027 },
+      ];
+      mocks.state.playersStore = [
+        { id: 'pl-cap', rosterId: varsity, memberId: 'm-cap', role: 'captain', isCaptain: true, ign: 'Cap#1', bio: 'hi' },
+        { id: 'pl-sub', rosterId: varsity, memberId: 'm-sub', role: 'sub', isCaptain: false, ign: 'Su#1' },
+        { id: 'pl-jvcap', rosterId: jv, memberId: 'm-jvcap', role: 'captain', isCaptain: true, ign: 'Jv#1' },
+      ];
+      mocks.state.playerIdentitiesStore = [];
+      mocks.state.playerInvitesStore = [];
+    });
+
+    it('moves the existing row to the sibling roster, keeping its id, ign and bio', async () => {
+      const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' });
+
+      expect(res).toMatchObject({
+        success: true,
+        playerId: 'pl-sub',
+        memberId: 'm-sub',
+        fromRosterId: varsity,
+        fromRosterName: 'Varsity',
+        toRosterId: jv,
+        toRosterName: 'JV',
+        role: 'sub',
+        wasCaptain: false,
+      });
+      const row = mocks.state.playersStore.find((p) => p.id === 'pl-sub');
+      expect(row).toMatchObject({ rosterId: jv, ign: 'Su#1', role: 'sub' });
+      expect(mocks.state.playersStore.filter((p) => p.memberId === 'm-sub')).toHaveLength(1);
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'teams');
+    });
+
+    it('can identify the player by member id instead of player id', async () => {
+      await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, memberId: 'm-sub' });
+      expect(mocks.state.playersStore.find((p) => p.id === 'pl-sub')?.rosterId).toBe(jv);
+    });
+
+    it('demotes a moved captain to a regular player on the new roster and leaves the old roster captain-less', async () => {
+      // JV already has a captain: the moved captain must not collide with it.
+      const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-cap' });
+
+      expect(res).toMatchObject({ wasCaptain: true, role: 'player', isCaptain: false });
+      const row = mocks.state.playersStore.find((p) => p.id === 'pl-cap');
+      expect(row).toMatchObject({ rosterId: jv, role: 'player', isCaptain: false });
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === jv && p.isCaptain)).toHaveLength(1);
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.isCaptain)).toHaveLength(0);
+    });
+
+    it('refuses a move to a roster on a different team (another game) and changes nothing', async () => {
+      const before = snapshot();
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: lolVarsity, playerId: 'pl-sub' })
+      ).rejects.toThrow(/same team/);
+      expect(snapshot()).toBe(before);
+      expect(mocks.mockNotify).not.toHaveBeenCalled();
+    });
+
+    it('refuses a move when the member is already on the target roster', async () => {
+      mocks.state.playersStore.push({ id: 'pl-sub-jv', rosterId: jv, memberId: 'm-sub', role: 'player', isCaptain: false, ign: 'x' });
+      const before = snapshot();
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })
+      ).rejects.toThrow(/Su B is already on JV/);
+      expect(snapshot()).toBe(before);
+      expect(mocks.mockNotify).not.toHaveBeenCalled();
+    });
+
+    it('refuses a player who is not on the source roster', async () => {
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-jvcap' })
+      ).rejects.toThrow(/not on Varsity/);
+    });
+
+    it('refuses a manager of a different school (either roster) with no write', async () => {
+      const before = snapshot();
+      await expect(
+        movePlayerToRoster({ fromRosterId: 'roster-other', toRosterId: jv, playerId: 'pl-sub' })
+      ).rejects.toThrow(/Forbidden/);
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: 'roster-other', playerId: 'pl-sub' })
+      ).rejects.toThrow(/Forbidden/);
+      expect(snapshot()).toBe(before);
+    });
+
+    it('refuses a manager while the season is locked, but a staff admin may still move', async () => {
+      mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').rostersLockedAt = new Date();
+      const before = snapshot();
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })
+      ).rejects.toThrow(LOCKED);
+      expect(snapshot()).toBe(before);
+
+      mocks.state.rolesStore.push({ id: 'role-admin', name: 'Admin', permissions: Permissions.ADMINISTRATOR, position: 5, isOwner: false });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })
+      ).resolves.toMatchObject({ success: true });
+    });
+
+    it('refuses to move onto the same roster', async () => {
+      await expect(
+        movePlayerToRoster({ fromRosterId: varsity, toRosterId: varsity, playerId: 'pl-sub' })
+      ).rejects.toThrow(/different roster/);
+    });
+
+    it('enrollPlayerToRoster rejects a member who is already on a sibling roster', async () => {
+      const before = snapshot();
+      await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).rejects.toThrow(
+        'Su B is already on Varsity. Use Move to put them on JV.'
+      );
+      expect(snapshot()).toBe(before);
+      expect(mocks.mockNotify).not.toHaveBeenCalled();
+    });
+
+    it('enrollPlayerToRoster still allows the same student on a different game (different team)', async () => {
+      const res = await enrollPlayerToRoster({ rosterId: lolVarsity, memberId: 'm-sub' });
+      expect(res.success).toBe(true);
+      expect(mocks.state.playersStore.filter((p) => p.memberId === 'm-sub')).toHaveLength(2);
+    });
+
+    it('enrollPlayerToRoster still lets a member already on THIS roster have their role edited', async () => {
+      const res = await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-sub', role: 'player' });
+      expect(res.success).toBe(true);
+      expect(mocks.state.playersStore.find((p) => p.id === 'pl-sub')?.role).toBe('player');
+    });
+
+    describe('roster membership notifications (post-commit seam)', () => {
+      it('move notifies exactly the moved member, after the transaction committed', async () => {
+        const order: string[] = [];
+        mocks.mockDb.transaction.mockImplementationOnce(async (cb: (tx: any) => Promise<any>) => {
+          const out = await cb(mocks.mockDb);
+          order.push('commit');
+          return out;
+        });
+        mocks.mockNotify.mockImplementation(async () => {
+          order.push('notify');
+        });
+
+        await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' });
+
+        expect(memberIdsNotified()).toEqual([['m-sub']]);
+        expect(order).toEqual(['commit', 'notify']);
+      });
+
+      it('a throwing notify does not fail a committed move', async () => {
+        mocks.mockNotify.mockRejectedValue(new Error('discord down'));
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        await expect(
+          movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })
+        ).resolves.toMatchObject({ success: true });
+        expect(mocks.state.playersStore.find((p) => p.id === 'pl-sub')?.rosterId).toBe(jv);
+        spy.mockRestore();
+      });
+
+      it('enroll notifies the enrolled member', async () => {
+        await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' });
+        expect(memberIdsNotified()).toEqual([['m-new']]);
+      });
+
+      it('remove notifies the removed member only when a row was there', async () => {
+        await removePlayerFromRoster({ rosterId: varsity, playerId: 'pl-sub' });
+        expect(memberIdsNotified()).toEqual([['m-sub']]);
+
+        mocks.mockNotify.mockClear();
+        await removePlayerFromRoster({ rosterId: varsity, playerId: 'pl-sub' });
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('emergency swap notifies both members', async () => {
+        await emergencySwapSub({ rosterId: varsity, outPlayerId: 'pl-cap', inPlayerId: 'pl-sub' });
+        expect(memberIdsNotified()).toEqual([['m-cap', 'm-sub']]);
+      });
+
+      it('a failed enroll (sibling rule) does not notify', async () => {
+        await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).rejects.toThrow();
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
     });
   });
 });

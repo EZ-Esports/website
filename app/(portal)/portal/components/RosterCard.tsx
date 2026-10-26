@@ -8,6 +8,7 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlineXCircle,
   HiOutlineTrash,
+  HiOutlineArrowUturnRight,
 } from 'react-icons/hi2';
 import type {
   SchoolRosterDetails,
@@ -29,6 +30,11 @@ interface RosterCardProps {
     role: 'player' | 'sub' | 'captain'
   ) => void;
   onRemovePlayer: (rosterId: string, playerId: string) => void;
+  /** Moves a player to a sibling roster of the same team (for example Varsity to JV). */
+  onMovePlayer?: (fromRosterId: string, playerId: string, toRosterId: string) => void;
+  /** The team's other rosters. A student is on one tier per game, so Move replaces a second Enroll. */
+  siblingRosters?: Array<{ id: string; name: string }>;
+  movingPlayerId?: string | null;
   onDeleteRoster?: (rosterId: string) => void;
 }
 
@@ -42,6 +48,9 @@ export function RosterCard({
   onCheckRosterGate,
   onUpdateRole,
   onRemovePlayer,
+  onMovePlayer,
+  siblingRosters = [],
+  movingPlayerId = null,
   onDeleteRoster,
 }: RosterCardProps) {
   return (
@@ -162,6 +171,36 @@ export function RosterCard({
                     )}
                   </td>
                   <td className="py-2.5 text-right">
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {onMovePlayer && siblingRosters.length === 1 && (
+                      <Button
+                        onPress={() => onMovePlayer(roster.id, p.id, siblingRosters[0].id)}
+                        isDisabled={locked || movingPlayerId === p.id}
+                        aria-label={`Move ${p.playerName} from ${roster.name} to ${siblingRosters[0].name}`}
+                        className="min-h-[44px] sm:min-h-0 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <HiOutlineArrowUturnRight className="w-3.5 h-3.5 text-sky-400 shrink-0" aria-hidden="true" />
+                        <span>Move to {siblingRosters[0].name}</span>
+                      </Button>
+                    )}
+                    {onMovePlayer && siblingRosters.length > 1 && (
+                      <select
+                        value=""
+                        disabled={locked || movingPlayerId === p.id}
+                        aria-label={`Move ${p.playerName} from ${roster.name} to another roster`}
+                        onChange={(e) => {
+                          if (e.target.value) onMovePlayer(roster.id, p.id, e.target.value);
+                        }}
+                        className="min-h-[44px] sm:min-h-0 px-2 py-1 text-[11px] font-semibold rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                      >
+                        <option value="">Move to…</option>
+                        {siblingRosters.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <Button
                       onPress={() => onRemovePlayer(roster.id, p.id)}
                       isDisabled={locked}
@@ -170,6 +209,7 @@ export function RosterCard({
                     >
                       <HiOutlineTrash className="w-3.5 h-3.5" />
                     </Button>
+                    </div>
                   </td>
                 </tr>
               ))
