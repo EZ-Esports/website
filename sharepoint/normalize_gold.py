@@ -24,10 +24,14 @@ loader:
     in COMBINED_STANDINGS which ran as one table; rows keep their own division
     either way, and assert_derived_standings_sound() refuses to write a tally
     that does not add up
+  - manual playoff supplements (sharepoint/manual/*.json) appended after the
+    sheet matches. Those rows set counts_for_standings to false so a knockout
+    does not rewrite the regular-season table
 
 Run: python3 normalize_gold.py  (from sharepoint/; stdlib only)
 """
 import csv
+import json
 import os
 import re
 from collections import defaultdict
@@ -82,6 +86,87 @@ SCHOOL_NAMES = {
 SCHOOL_REMAP = {'hchs': 'hunterhs'}
 
 DIVISION_LABELS = {'A': 'Varsity', 'B': 'JV', 'all': 'All'}
+
+# Discord (and other non-sheet) results that still belong on the schedule.
+# JSON, not CSV: sharepoint/**/*.csv is gitignored because the sheet dumps
+# carry student emails and Discord handles. This file is match results only.
+MANUAL_PLAYOFFS_PATH = os.path.join(
+    os.path.dirname(__file__), 'manual', 'valorant-2025-26-a-playoffs.json'
+)
+
+PLAYOFF_COLUMNS = (
+    'season', 'game_slug', 'home_division', 'away_division', 'scheduled_at',
+    'home_school_slug', 'away_school_slug', 'home_score', 'away_score',
+    'status', 'mvp', 'notes', 'counts_for_standings',
+)
+
+
+def school_by_slug():
+    """Canonical (slug, display name) pairs, keyed by the slug gold already writes."""
+    return {slugify(name): (slugify(name), name) for name in SCHOOL_NAMES.values()}
+
+
+def counts_for_standings(match):
+    """Sheet matches count. A blank cell counts. Only an explicit false opts out.
+
+    Playoff series are real matches — they belong on the schedule — and they
+    are not regular-season games. Leaving them in the derived table would
+    publish a champion who won the bracket rather than the season.
+    """
+    raw = str(match.get('counts_for_standings', 'true')).strip().lower()
+    return raw not in ('false', '0', 'no')
+
+
+def load_manual_playoff_matches(path=MANUAL_PLAYOFFS_PATH):
+    """Gold-shaped playoff rows. Fails closed: a bad supplement must not ship."""
+    with open(path, encoding='utf-8') as f:
+        rows = json.load(f)
+    if not isinstance(rows, list) or not rows:
+        raise ValueError(f'{path} must be a non-empty list of gold match rows')
+    known = school_by_slug()
+    seen = set()
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f'{path} row {i} is not an object')
+        extra = sorted(set(row) - set(PLAYOFF_COLUMNS))
+        missing = [column for column in PLAYOFF_COLUMNS if str(row.get(column, '')).strip() == '']
+        if extra or missing:
+            raise ValueError(f'{path} row {i} fields: missing {missing or "[]"}, extra {extra or "[]"}')
+        if str(row['counts_for_standings']).strip().lower() != 'false':
+            raise ValueError(f'{path} row {i} must set counts_for_standings to false')
+        if row['status'] not in ('completed', 'forfeit'):
+            raise ValueError(f'{path} row {i} has status {row["status"]!r}')
+        for slug in (row['home_school_slug'], row['away_school_slug']):
+            if slug not in known:
+                raise ValueError(f'{path} row {i} has unmapped school slug {slug!r}')
+        for side in ('home_score', 'away_score'):
+            if not str(row[side]).isdigit():
+                raise ValueError(f'{path} row {i} has a non-numeric {side}')
+        key = (
+            row['season'], row['game_slug'], row['home_school_slug'], row['home_division'],
+            row['away_school_slug'], row['away_division'], row['scheduled_at'],
+        )
+        if key in seen:
+            raise ValueError(f'{path} repeats natural key {key}')
+        seen.add(key)
+    return rows
+
+
+def merge_manual_playoffs(schools, season_keys, path=MANUAL_PLAYOFFS_PATH):
+    """Add playoff schools and seasons before gold decides which season is active.
+
+    Returns the playoff match rows so the caller can append them after the
+    sheet matches. File order is the source-key ordinal, and sheet rows have
+    to stay first so a playoff cannot renumber a match already in the archive.
+    """
+    rows = load_manual_playoff_matches(path)
+    known = school_by_slug()
+    school_set = set(schools)
+    for row in rows:
+        school_set.add(known[row['home_school_slug']])
+        school_set.add(known[row['away_school_slug']])
+        season_keys.add((row['game_slug'], row['season']))
+    return sorted(school_set), rows
 
 # Seasons whose (season, game) ran as ONE competition, even though their teams
 # carry A/B division labels. Grouping derived standings by division assumes
@@ -505,6 +590,9 @@ def main():
         season_keys.add((GAME_SLUGS[r['game_id']], r['season_id']))
     for s in silver_standings:
         season_keys.add((GAME_SLUGS[s['game_id']], s['season_id']))
+    # Before `latest` is chosen, so a playoff-only season can still be the
+    # active one, and so its schools exist when the seed resolves slugs.
+    schools, playoff_matches = merge_manual_playoffs(schools, season_keys)
     latest = {}
     for game_slug, season in season_keys:
         latest[game_slug] = max(latest.get(game_slug, ''), season)
@@ -618,7 +706,13 @@ def main():
             'home_school_slug': home_slug, 'away_school_slug': away_slug,
             'home_score': home_score, 'away_score': away_score, 'status': status,
             'mvp': (m['mvp'] or '').strip(), 'notes': (m['notes'] or '').strip(),
+            'counts_for_standings': 'true',
         })
+
+    # Sheet rows stay first. The source-key ordinal is file order, so appending
+    # here cannot renumber a match the archive already wrote.
+    for row in playoff_matches:
+        matches.append({column: str(row[column]) for column in PLAYOFF_COLUMNS})
 
     # --- rosters (only matches + players need roster rows)
     roster_keys = {k[:4] for k in players}
@@ -668,6 +762,7 @@ def main():
         and (m['season'], m['game_slug']) not in incomplete
         and m['status'] in ('completed', 'forfeit')
         and m['home_score'] != '' and m['away_score'] != ''
+        and counts_for_standings(m)
     ]
     derived = defaultdict(lambda: {'wins': 0, 'losses': 0})
     for m in counted_matches:
@@ -771,7 +866,7 @@ def main():
           sorted(members.values(), key=lambda m: m['member_key']))
     write('gold_players.csv', ['season', 'game_slug', 'school_slug', 'division', 'member_key', 'role', 'is_captain', 'ign', 'bio'],
           sorted(players.values(), key=lambda p: (p['season'], p['game_slug'], p['school_slug'], p['division'], p['member_key'])))
-    write('gold_matches.csv', ['season', 'game_slug', 'home_division', 'away_division', 'scheduled_at', 'home_school_slug', 'away_school_slug', 'home_score', 'away_score', 'status', 'mvp', 'notes'],
+    write('gold_matches.csv', ['season', 'game_slug', 'home_division', 'away_division', 'scheduled_at', 'home_school_slug', 'away_school_slug', 'home_score', 'away_score', 'status', 'mvp', 'notes', 'counts_for_standings'],
           matches)
     write('gold_standings.csv', ['season', 'game_slug', 'division', 'school_slug', 'rank', 'wins', 'losses', 'games_played', 'win_pct', 'points', 'player_name', 'player_ign', 'notes'],
           standings)

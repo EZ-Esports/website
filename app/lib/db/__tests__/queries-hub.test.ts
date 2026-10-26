@@ -238,6 +238,14 @@ describe('buildFormGuideQuery — attribution', () => {
     // A draw is a chip, so nothing may require the two scores to differ.
     expect(sql).not.toMatch(/"home_score" <> /);
   });
+
+  it('leaves playoff series out of the regular-season form strip', () => {
+    const { sql, params } = compileForm();
+    // Both sides of the union. A playoff still renders on the schedule; it
+    // must not replace a regular-season chip beside the W-L.
+    expect(sql.match(/"matches"\."counts_for_standings"/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(params.filter((p) => p === true)).toHaveLength(2);
+  });
 });
 
 /**

@@ -216,6 +216,12 @@ export const matches = pgTable('matches', {
   status: matchStatusEnum('status').default('scheduled').notNull(),
   mvp: text('mvp'), // match MVP as recorded in season sheets, e.g. 'Kyle "Kuli" Ng'
   notes: text('notes'), // reschedules, DQs, data-quality caveats
+  // Regular-season games count toward W-L. Playoff series are still matches
+  // (they show on the schedule) but they must not rewrite the season table:
+  // a bracket champion and a regular-season champion are different claims.
+  // Default true so admin-created fixtures and every archive row from before
+  // this column keep counting. The gold CSV owns the value for archive rows.
+  countsForStandings: boolean('counts_for_standings').default(true).notNull(),
   // Natural key for the gold archive. Format:
   //   `${season}|${game_slug}|${home_school_slug}|${home_division}` +
   //   `|${away_school_slug}|${away_division}|${scheduled_at}#${n}`
@@ -468,7 +474,9 @@ export const leadershipTerms = pgTable('leadership_terms', {
     .where(sql`deleted_at IS NULL`),
 ]).enableRLS();
 
-// View for rosters with dynamically computed standings (wins and losses)
+// View for rosters with dynamically computed standings (wins and losses).
+// counts_for_standings is false on playoff series, which stay on the schedule
+// and out of this table.
 export const rosterStandings = pgView('roster_standings', {
   id: uuid('id'),
   teamId: uuid('team_id'),
@@ -481,8 +489,8 @@ export const rosterStandings = pgView('roster_standings', {
 }).with({ securityInvoker: true }).as(sql`
   SELECT
     r.id, r.team_id, r.name, r.division, r.created_at, r.updated_at,
-    (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score > m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score > m.home_score AND m.status IN ('completed', 'forfeit')))::int as wins,
-    (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit')))::int as losses
+    (SELECT COUNT(*) FROM matches m WHERE m.counts_for_standings AND ((m.home_roster_id = r.id AND m.home_score > m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score > m.home_score AND m.status IN ('completed', 'forfeit'))))::int as wins,
+    (SELECT COUNT(*) FROM matches m WHERE m.counts_for_standings AND ((m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit'))))::int as losses
   FROM rosters r
 `);
 

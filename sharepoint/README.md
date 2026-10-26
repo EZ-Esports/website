@@ -68,7 +68,7 @@ openpyxl, requests). `normalize_gold.py` is stdlib-only.
 | 2022-23 | matches, rosters, standings | matches, rosters, standings | rosters, standings | matches (Challonge a3h1ptdm), rosters, standings |
 | 2023-24 | matches, rosters, standings | matches (winner+MVP), rosters, derived standings | rosters, points standings | matches (Challonge ezesportstetrio), rosters, standings |
 | 2024-25 | matches A/B (winner+MVP), standings+points — **no rosters** | — | — (see open items) | matches (Challonge 5w6o4ch2), rosters, standings |
-| 2025-26 | matches A/B (scores via bold-winner), rosters — ongoing | — | — | matches (Challonge vtcrm8qc, bdywy3mg, rt1myii0), rosters, standings |
+| 2025-26 | matches A/B (scores via bold-winner), rosters — ongoing. A-team playoffs are a manual supplement (`manual/valorant-2025-26-a-playoffs.json`), not on the regular-season sheet and not loaded | — | — | matches (Challonge vtcrm8qc, bdywy3mg, rt1myii0), rosters, standings |
 
 TETR.IO match results and tournament brackets were reconstructed from historical Challonge tournaments
 and registration archives across all four active seasons into `bronze_data/tetrio_<season>_*/`.
@@ -97,6 +97,14 @@ own row, because the public pages route on a single year.
 Importing only ever **adds rows and fills blank bios**. It never overwrites a
 bio, never touches `member_id`, never resurrects a soft-deleted row, and never
 deletes. Re-run it after every edit to the sheet; a second run is a no-op.
+
+## Manual supplements
+
+`manual/valorant-2025-26-a-playoffs.json` is the 2025-26 Valorant A-team
+playoff bracket transcribed from Discord. `normalize_gold.py` appends it
+after the sheet matches and marks every row `counts_for_standings=false`.
+Rebuilding gold does not write the database. See
+[spec-033](../spec/spec-033-valorant-2025-26-a-playoffs.md).
 
 ## Open items (data chasing)
 
