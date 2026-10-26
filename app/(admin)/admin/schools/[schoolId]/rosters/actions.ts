@@ -7,7 +7,7 @@ import { and, count, eq, or, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { dbErrorChain, sanitizeDbError } from '@/app/lib/text-utils';
 import {
-  memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool, siblingEnrollment, teamInSchool,
+  lockRosterMember, memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool, siblingEnrollment, teamInSchool,
 } from '@/app/lib/db/roster-scope';
 import { notifyRosterMembershipChanged } from '@/app/lib/onboarding/roster-membership-events';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
@@ -273,7 +273,10 @@ export async function createPlayer(schoolId: string, formData: FormData) {
       if (memberId && !(await memberInSchool(memberId, schoolId, tx))) return 'not-found' as const;
 
       // One tier per game: a member already on a sibling roster is moved, not added a second time.
+      // The lock serializes concurrent adds/moves of this member within the team, so two requests
+      // cannot both pass the check.
       if (memberId) {
+        await lockRosterMember(tx, roster.teamId, memberId);
         const sibling = await siblingEnrollment(roster.teamId, memberId, rosterId, tx);
         if (sibling) {
           const name = await memberDisplayName(memberId, tx);
@@ -351,7 +354,7 @@ export async function updatePlayer(schoolId: string, playerId: string, formData:
         .update(schema.members)
         .set({ firstName, lastName, discord: discord || null, graduationYear: gradYear })
         .where(eq(schema.members.id, player.memberId));
-      return 'ok' as const;
+      return { memberId: player.memberId };
     });
     if (outcome === 'not-found') return playerFail(NOT_FOUND.error);
 
@@ -359,6 +362,8 @@ export async function updatePlayer(schoolId: string, playerId: string, formData:
     updateTag('players');
     updateTag('rosters');
     refreshSchoolRosters(schoolId);
+    // A role change (captain, coach, sub) can change what the member should be granted elsewhere.
+    await notifyMembershipChanged([outcome.memberId]);
     return { success: true as const };
   } catch (error: unknown) {
     console.error(error);
@@ -405,17 +410,25 @@ export async function moveRosterMember(schoolId: string, playerId: string, toRos
       if (from.teamId !== to.teamId) {
         return { error: 'Players can only be moved between rosters of the same team (same school, game and season).' };
       }
+      // Serialize with concurrent adds/moves of this member within the team.
+      await lockRosterMember(tx, from.teamId, player.memberId);
       if (await memberOnRoster(player.memberId, to.id, tx)) {
         const name = await memberDisplayName(player.memberId, tx);
         return { error: `${name} is already on ${to.name}.` };
       }
 
       const wasCaptain = player.isCaptain || player.role === 'captain';
-      await tx
+      // Guarded by the roster we read the player on: if someone else moved or removed the row in
+      // the meantime nothing matches and we say so instead of overwriting their change.
+      const updated = await tx
         .update(schema.players)
         // players_captain_role_check ties role='captain' to is_captain, so demote both together.
         .set({ rosterId: to.id, role: wasCaptain ? 'player' : player.role, isCaptain: false, updatedAt: new Date() })
-        .where(eq(schema.players.id, playerId));
+        .where(and(eq(schema.players.id, playerId), eq(schema.players.rosterId, from.id)))
+        .returning({ id: schema.players.id });
+      if (updated.length === 0) {
+        return { error: 'This player was just moved or removed by someone else. Refresh the page and try again.' };
+      }
       return { memberId: player.memberId, fromName: from.name, toName: to.name, wasCaptain };
     });
     if ('error' in outcome) return { success: false as const, error: outcome.error };

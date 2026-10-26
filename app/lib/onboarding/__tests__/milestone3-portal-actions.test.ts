@@ -117,6 +117,7 @@ const mocks = vi.hoisted(() => {
       let currentTable: any = null;
       const joins: Array<{ table: any; on: any }> = [];
       let whereClause: any = null;
+      let ordered = false;
 
       const builder = {
         from: vi.fn((tbl: any) => {
@@ -135,7 +136,10 @@ const mocks = vi.hoisted(() => {
           whereClause = clause;
           return builder;
         }),
-        orderBy: vi.fn(() => builder),
+        orderBy: vi.fn(() => {
+          ordered = true;
+          return builder;
+        }),
         limit: vi.fn(() => builder),
         then: (resolve: (val: any) => void) => {
           resolve(executeSelect());
@@ -203,7 +207,11 @@ const mocks = vi.hoisted(() => {
               };
             });
           }
-          return store.filter((r) => conds.every((c) => matchesRow(r, c)));
+          const rows = store.filter((r) => conds.every((c) => matchesRow(r, c)));
+          // orderBy(createdAt, id): oldest first, id as the tie-break.
+          return ordered
+            ? [...rows].sort((x, y) => (x.createdAt?.getTime?.() ?? 0) - (y.createdAt?.getTime?.() ?? 0) || String(x.id).localeCompare(String(y.id)))
+            : rows;
         }
 
         // 4. Players join Members, Rosters, Teams, Games
@@ -328,6 +336,8 @@ const mocks = vi.hoisted(() => {
       };
     }),
 
+    // The advisory lock (pg_advisory_xact_lock) is the only raw SQL the actions run.
+    execute: vi.fn(async (_query: unknown) => []),
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => {
       return cb(mockDb);
     }),
@@ -724,7 +734,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         rosterId: 'roster-varsity-val',
       });
 
-      expect(result.success).toBe(true);
+      if (!result.success) throw new Error(result.error);
       expect(result.status).toBe('accepted');
 
       const invite = mocks.state.playerInvitesStore.find((i) => i.id === inviteId);
@@ -751,7 +761,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         rejectionReason: 'Invalid school attendance record',
       });
 
-      expect(result.success).toBe(true);
+      if (!result.success) throw new Error(result.error);
       expect(result.status).toBe('rejected');
       expect(result.rejectionReason).toBe('Invalid school attendance record');
 
@@ -1117,7 +1127,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         role: 'player',
       });
 
-      expect(result.success).toBe(true);
+      if (!result.success) throw new Error(result.error);
       expect(result.player.memberId).toBe(memberId);
       expect(result.player.playerName).toBe('Justin Wong');
       expect(result.player.ign).toBe('JWong#NA1');
@@ -1140,7 +1150,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         role: 'captain',
       });
 
-      expect(result.success).toBe(true);
+      if (!result.success) throw new Error(result.error);
       expect(result.player.role).toBe('captain');
       expect(result.player.isCaptain).toBe(true);
 
@@ -2123,9 +2133,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
 
     it('refuses a move to a roster on a different team (another game) and changes nothing', async () => {
       const before = snapshot();
-      await expect(
-        movePlayerToRoster({ fromRosterId: varsity, toRosterId: lolVarsity, playerId: 'pl-sub' })
-      ).rejects.toThrow(/same team/);
+      const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: lolVarsity, playerId: 'pl-sub' });
+      expect(res).toMatchObject({ success: false, error: expect.stringMatching(/same team/) });
       expect(snapshot()).toBe(before);
       expect(mocks.mockNotify).not.toHaveBeenCalled();
     });
@@ -2133,17 +2142,15 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     it('refuses a move when the member is already on the target roster', async () => {
       mocks.state.playersStore.push({ id: 'pl-sub-jv', rosterId: jv, memberId: 'm-sub', role: 'player', isCaptain: false, ign: 'x' });
       const before = snapshot();
-      await expect(
-        movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })
-      ).rejects.toThrow(/Su B is already on JV/);
+      const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' });
+      expect(res).toEqual({ success: false, error: 'Su B is already on JV.' });
       expect(snapshot()).toBe(before);
       expect(mocks.mockNotify).not.toHaveBeenCalled();
     });
 
     it('refuses a player who is not on the source roster', async () => {
-      await expect(
-        movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-jvcap' })
-      ).rejects.toThrow(/not on Varsity/);
+      const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-jvcap' });
+      expect(res).toEqual({ success: false, error: 'That player is not on Varsity.' });
     });
 
     it('refuses a manager of a different school (either roster) with no write', async () => {
@@ -2173,16 +2180,17 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('refuses to move onto the same roster', async () => {
-      await expect(
-        movePlayerToRoster({ fromRosterId: varsity, toRosterId: varsity, playerId: 'pl-sub' })
-      ).rejects.toThrow(/different roster/);
+      const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: varsity, playerId: 'pl-sub' });
+      expect(res).toMatchObject({ success: false, error: expect.stringMatching(/different roster/) });
     });
 
     it('enrollPlayerToRoster rejects a member who is already on a sibling roster', async () => {
       const before = snapshot();
-      await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).rejects.toThrow(
-        'Su B is already on Varsity. Use Move to put them on JV.'
-      );
+      // Returned, not thrown: Next.js hides thrown server-action messages in production.
+      await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).resolves.toEqual({
+        success: false,
+        error: 'Su B is already on Varsity. Use Move to put them on JV.',
+      });
       expect(snapshot()).toBe(before);
       expect(mocks.mockNotify).not.toHaveBeenCalled();
     });
@@ -2197,6 +2205,154 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       const res = await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-sub', role: 'player' });
       expect(res.success).toBe(true);
       expect(mocks.state.playersStore.find((p) => p.id === 'pl-sub')?.role).toBe('player');
+    });
+
+    describe('concurrency: advisory lock and guarded update', () => {
+      // Call order of the transaction, the advisory lock and the first query after it began.
+      const order = (fn: { mock: { invocationCallOrder: number[] } }) => fn.mock.invocationCallOrder[0];
+      const firstSelectAfter = (n: number) => mocks.mockDb.select.mock.invocationCallOrder.find((o: number) => o > n);
+
+      const expectLockedBeforeFirstQuery = (key: string) => {
+        const lock = order(mocks.mockDb.execute);
+        expect(lock, 'no advisory lock was taken').toBeDefined();
+        expect(JSON.stringify(mocks.mockDb.execute.mock.calls[0][0])).toContain('pg_advisory_xact_lock');
+        expect(JSON.stringify(mocks.mockDb.execute.mock.calls[0][0])).toContain(key);
+        const txStart = order(mocks.mockDb.transaction);
+        expect(lock).toBeGreaterThan(txStart);
+        expect(firstSelectAfter(txStart)).toBeGreaterThan(lock);
+      };
+
+      beforeEach(() => {
+        mocks.mockDb.execute.mockClear();
+        mocks.mockDb.select.mockClear();
+        mocks.mockDb.transaction.mockClear();
+      });
+
+      it('enroll takes the (team, member) lock before the sibling check reads anything', async () => {
+        await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' });
+        expectLockedBeforeFirstQuery(`roster-member:${val}:m-new`);
+      });
+
+      it('move takes the (team, member) lock before the in-transaction reads', async () => {
+        await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' });
+        expectLockedBeforeFirstQuery(`roster-member:${val}:m-sub`);
+      });
+
+      it('a row moved by someone else between the read and the update is not overwritten', async () => {
+        // Simulate the concurrent move: the row changes rosters right before our UPDATE runs.
+        mocks.mockDb.transaction.mockImplementationOnce(async (cb: (tx: any) => Promise<any>) =>
+          cb({
+            ...mocks.mockDb,
+            update: (tbl: unknown) => {
+              mocks.state.playersStore.find((p) => p.id === 'pl-sub').rosterId = 'roster-elsewhere';
+              return mocks.mockDb.update(tbl);
+            },
+          })
+        );
+
+        const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' });
+
+        expect(res).toMatchObject({ success: false, error: expect.stringMatching(/just moved or removed/) });
+        expect(mocks.state.playersStore.find((p) => p.id === 'pl-sub')?.rosterId).toBe('roster-elsewhere');
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+        expect(mocks.mockUpdateCacheTags).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('approving an invite (reviewPlayerInvite)', () => {
+      const inviteId = 'inv-approve';
+      const seedInvite = (extra: Record<string, unknown> = {}) => {
+        mocks.state.playerInvitesStore = [
+          {
+            id: inviteId,
+            schoolId,
+            gameId: valGameId,
+            memberId: 'm-sub',
+            status: 'submitted',
+            intendedFirstName: 'Su',
+            intendedLastName: 'B',
+            submissionDraft: { ign: 'Su#1' },
+            ...extra,
+          },
+        ];
+      };
+
+      it('refuses a student already on a sibling roster: returned, invite stays pending, nothing written, no notify', async () => {
+        seedInvite();
+        const before = snapshot();
+        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv });
+
+        expect(res).toEqual({ success: false, error: 'Su B is already on Varsity. Use Move to put them on JV.' });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+        expect(snapshot()).toBe(before);
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+        expect(mocks.mockUpdateCacheTags).not.toHaveBeenCalled();
+      });
+
+      it('takes the lock before the sibling check', async () => {
+        seedInvite();
+        mocks.mockDb.execute.mockClear();
+        mocks.mockDb.select.mockClear();
+        mocks.mockDb.transaction.mockClear();
+        await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv });
+        const lock = mocks.mockDb.execute.mock.invocationCallOrder[0];
+        const txStart = mocks.mockDb.transaction.mock.invocationCallOrder[0];
+        expect(lock).toBeGreaterThan(txStart);
+        expect(mocks.mockDb.select.mock.invocationCallOrder.find((o: number) => o > txStart)).toBeGreaterThan(lock);
+      });
+
+      it('accepts and enrolls a student who is not on a sibling roster, then notifies once after commit', async () => {
+        seedInvite({ memberId: 'm-new' });
+        const orderLog: string[] = [];
+        mocks.mockDb.transaction.mockImplementationOnce(async (cb: (tx: any) => Promise<any>) => {
+          const out = await cb(mocks.mockDb);
+          orderLog.push('commit');
+          return out;
+        });
+        mocks.mockNotify.mockImplementation(async () => {
+          orderLog.push('notify');
+        });
+
+        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv });
+
+        expect(res).toMatchObject({ success: true, status: 'accepted', targetRosterId: jv });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('accepted');
+        expect(mocks.state.playersStore.find((p) => p.memberId === 'm-new')?.rosterId).toBe(jv);
+        expect(memberIdsNotified()).toEqual([['m-new']]);
+        expect(orderLog).toEqual(['commit', 'notify']);
+      });
+
+      it('a throwing notify does not fail the approval', async () => {
+        seedInvite({ memberId: 'm-new' });
+        mocks.mockNotify.mockRejectedValue(new Error('discord down'));
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        await expect(reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv })).resolves.toMatchObject({ success: true });
+        spy.mockRestore();
+      });
+
+      it('the default roster is the oldest one, not whichever row the database returns first', async () => {
+        // Varsity is stored first but JV is older: the default target must follow created_at.
+        mocks.state.rostersStore.find((r) => r.id === varsity).createdAt = new Date('2026-09-02');
+        mocks.state.rostersStore.find((r) => r.id === jv).createdAt = new Date('2026-09-01');
+        seedInvite({ memberId: 'm-new' });
+
+        const res = await reviewPlayerInvite({ inviteId, action: 'approve' });
+
+        expect(res).toMatchObject({ success: true, targetRosterId: jv });
+      });
+
+      it('rejecting an invite never notifies', async () => {
+        seedInvite();
+        await reviewPlayerInvite({ inviteId, action: 'reject' });
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('role changes notify the seam', () => {
+      it('updateRosterPlayerRole notifies the member whose role changed', async () => {
+        await updateRosterPlayerRole({ rosterId: varsity, playerId: 'pl-sub', role: 'player' });
+        expect(memberIdsNotified()).toEqual([['m-sub']]);
+      });
     });
 
     describe('roster membership notifications (post-commit seam)', () => {
@@ -2247,7 +2403,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       });
 
       it('a failed enroll (sibling rule) does not notify', async () => {
-        await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).rejects.toThrow();
+        await expect(enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' })).resolves.toMatchObject({ success: false });
         expect(mocks.mockNotify).not.toHaveBeenCalled();
       });
     });

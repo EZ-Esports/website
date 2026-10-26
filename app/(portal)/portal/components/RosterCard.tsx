@@ -8,8 +8,8 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlineXCircle,
   HiOutlineTrash,
-  HiOutlineArrowUturnRight,
 } from 'react-icons/hi2';
+import { MovePlayerControl } from './MovePlayerControl';
 import type {
   SchoolRosterDetails,
   RosterEligibilityResult,
@@ -172,43 +172,23 @@ export function RosterCard({
                   </td>
                   <td className="py-2.5 text-right">
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
-                    {onMovePlayer && siblingRosters.length === 1 && (
+                      {onMovePlayer && (
+                        <MovePlayerControl
+                          playerName={p.playerName}
+                          rosterName={roster.name}
+                          siblings={siblingRosters}
+                          isDisabled={locked || movingPlayerId === p.id}
+                          onMove={(toRosterId) => onMovePlayer(roster.id, p.id, toRosterId)}
+                        />
+                      )}
                       <Button
-                        onPress={() => onMovePlayer(roster.id, p.id, siblingRosters[0].id)}
-                        isDisabled={locked || movingPlayerId === p.id}
-                        aria-label={`Move ${p.playerName} from ${roster.name} to ${siblingRosters[0].name}`}
-                        className="min-h-[44px] sm:min-h-0 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                        onPress={() => onRemovePlayer(roster.id, p.id)}
+                        isDisabled={locked}
+                        aria-label={`Remove ${p.playerName} from ${roster.name}`}
+                        className="p-2.5 -m-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <HiOutlineArrowUturnRight className="w-3.5 h-3.5 text-sky-400 shrink-0" aria-hidden="true" />
-                        <span>Move to {siblingRosters[0].name}</span>
+                        <HiOutlineTrash className="w-3.5 h-3.5" />
                       </Button>
-                    )}
-                    {onMovePlayer && siblingRosters.length > 1 && (
-                      <select
-                        value=""
-                        disabled={locked || movingPlayerId === p.id}
-                        aria-label={`Move ${p.playerName} from ${roster.name} to another roster`}
-                        onChange={(e) => {
-                          if (e.target.value) onMovePlayer(roster.id, p.id, e.target.value);
-                        }}
-                        className="min-h-[44px] sm:min-h-0 px-2 py-1 text-[11px] font-semibold rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-                      >
-                        <option value="">Move to…</option>
-                        {siblingRosters.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <Button
-                      onPress={() => onRemovePlayer(roster.id, p.id)}
-                      isDisabled={locked}
-                      aria-label={`Remove ${p.playerName} from ${roster.name}`}
-                      className="p-2.5 -m-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <HiOutlineTrash className="w-3.5 h-3.5" />
-                    </Button>
                     </div>
                   </td>
                 </tr>

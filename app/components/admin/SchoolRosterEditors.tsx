@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useTransition, type FormEvent, type ReactNode } from 'react';
+import { Button, Menu, MenuItem, MenuTrigger, Popover } from 'react-aria-components';
 import { FiCornerUpRight, FiPlus } from 'react-icons/fi';
 import {
   createPlayer,
@@ -356,12 +357,14 @@ export interface SiblingRoster {
 
 /**
  * Moves a player to the team's other roster(s). One sibling is a plain "Move to JV" button; more
- * than one (a team can have extra rosters) is a labelled select. Staff are not blocked by the
- * season roster lock, so this is never disabled for that reason.
+ * than one (a team can have extra rosters) is a React Aria menu of the roster names. Staff are not
+ * blocked by the season roster lock, so this is never disabled for that reason. The accessible
+ * name starts with the visible text (label in name), then says whose row it is.
  */
-function MovePlayerControl({ player, siblings }: { player: RosterViewPlayer; siblings: SiblingRoster[] }) {
+function MovePlayerControl({ player, rosterName, siblings }: { player: RosterViewPlayer; rosterName: string; siblings: SiblingRoster[] }) {
   const { schoolId, run, pending } = useEdit();
   if (siblings.length === 0) return null;
+  const context = `${player.name} (currently ${rosterName})`;
   const move = (target: SiblingRoster) =>
     run(
       () => moveRosterMember(schoolId, player.id, target.id),
@@ -374,7 +377,7 @@ function MovePlayerControl({ player, siblings }: { player: RosterViewPlayer; sib
         type="button"
         className={ghostBtnSm}
         disabled={pending}
-        aria-label={`Move ${player.name} to ${target.name}`}
+        aria-label={`Move to ${target.name}: ${context}`}
         onClick={() => move(target)}
       >
         <FiCornerUpRight aria-hidden /> Move to {target.name}
@@ -382,23 +385,32 @@ function MovePlayerControl({ player, siblings }: { player: RosterViewPlayer; sib
     );
   }
   return (
-    <select
-      className={cx(selectClass, 'w-auto')}
-      aria-label={`Move ${player.name} to another roster`}
-      disabled={pending}
-      value=""
-      onChange={(e) => {
-        const target = siblings.find((s) => s.id === e.target.value);
-        if (target) move(target);
-      }}
-    >
-      <option value="">Move to…</option>
-      {siblings.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.name}
-        </option>
-      ))}
-    </select>
+    <MenuTrigger>
+      <Button isDisabled={pending} aria-label={`Move to…: ${context}`} className={ghostBtnSm}>
+        <FiCornerUpRight aria-hidden /> Move to…
+      </Button>
+      <Popover className="admin-popover w-44" placement="bottom end">
+        <Menu
+          aria-label={`Move ${context} to`}
+          onAction={(key) => {
+            const target = siblings.find((x) => x.id === String(key));
+            if (target) move(target);
+          }}
+          className="rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none"
+        >
+          {siblings.map((x) => (
+            <MenuItem
+              key={x.id}
+              id={x.id}
+              textValue={x.name}
+              className="flex min-h-11 w-full cursor-pointer items-center rounded-lg px-3 py-2 text-left text-sm text-foreground-secondary outline-none transition-colors data-[focused]:bg-surface data-[focused]:text-foreground sm:min-h-0"
+            >
+              {x.name}
+            </MenuItem>
+          ))}
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   );
 }
 
@@ -416,7 +428,7 @@ export function PlayerRowActions({
   const { schoolId, notify } = useEdit();
   return (
     <div className="flex shrink-0 items-center gap-1.5">
-      <MovePlayerControl player={player} siblings={siblings} />
+      <MovePlayerControl player={player} rosterName={rosterName} siblings={siblings} />
       <RowIconButton kind="edit" label={`Edit player ${player.name}`} onClick={onEdit} />
       <ConfirmDeleteButton
         label={`Remove player ${player.name}`}

@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from './index';
 import * as schema from './schema';
 
@@ -116,4 +116,15 @@ export async function memberDisplayName(memberId: string, executor: DbOrTx = db)
     .where(eq(schema.members.id, memberId))
     .limit(1);
   return row ? `${row.firstName} ${row.lastName}` : 'That member';
+}
+
+/**
+ * Serializes writes that could put one member on two rosters of the same team. Take it first in
+ * every transaction that enrolls, approves or moves a member, before the sibling check: the
+ * one-tier rule is enforced in code, not by a constraint, so without a lock two concurrent
+ * enrolls could each see "no sibling" and both insert. Transaction-scoped (released at commit),
+ * which also works through Supabase's transaction pooler; same pattern as the gallery lock.
+ */
+export async function lockRosterMember(tx: TransactionExecutor, teamId: string, memberId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`roster-member:${teamId}:${memberId}`}))`);
 }

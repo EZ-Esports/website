@@ -149,9 +149,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ---
 
-## Roster move (spec-033)
+## Roster move (spec-034)
 
-- **One-tier rule is app-level only.** No database constraint; concurrent enrolls could double-enroll a member, and rows that violated the rule before this change remain. A cleanup query (members with players rows on two rosters of one team) has not been run against production.
-- **Manager error text in production is unverified.** The new manager actions throw like their neighbours; whether Next.js masks thrown server-action messages in production (hiding "already on Varsity") has not been checked. If it does, all manager rejections (lock, view-only, enroll) need a returned-result style.
-- **Not seen in a browser.** The Move control and its toast were verified by unit and render tests only.
-- **Seam has no consumer.** `notifyRosterMembershipChanged` is a no-op until the Discord role feature lands.
+- **One-tier rule is app-level only.** An advisory lock plus a check inside the transaction, no database constraint. Seed scripts and hand-run SQL bypass it, and rows that violated the rule before this change remain. A cleanup query (members with `players` rows on two rosters of one team) has not been run against production.
+- **Thrown manager errors are masked in production (confirmed).** Next.js omits the message of an error thrown from a server action, so the move, enroll and invite-approval rejections are now returned results. The neighbouring manager actions (`removePlayerFromRoster`, `updateRosterPlayerRole`, `emergencySwapSub`, `deleteSchoolRoster`, `createSchoolRoster`) and the authorization / lock / view-only guards still throw, and the client shows `err.message` with `alert`; if a message there matters, convert it the same way.
+- **Not seen in a browser.** The Move control and its notice were verified by unit and render tests only.
+- **Seam has no consumer, and does not see everything.** `notifyRosterMembershipChanged` is a no-op until the Discord role feature lands. Game and season deletes (database cascade), the seed/ingest scripts and manager `deleteSchoolRoster` never call it, so the consumer needs a periodic reconcile.

@@ -100,6 +100,8 @@ export default function SchoolPortalClient({
   const [selectedRosterMap, setSelectedRosterMap] = useState<Record<string, string>>({});
   const [selectedRoleMap, setSelectedRoleMap] = useState<Record<string, 'player' | 'sub' | 'captain'>>({});
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
+  // Outcome of the last roster Move, announced politely by the Rosters section.
+  const [rosterNotice, setRosterNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   // The player row whose move is in flight; its Move control is disabled so it cannot be double-fired.
   const [movingPlayerId, setMovingPlayerId] = useState<string | null>(null);
 
@@ -172,6 +174,12 @@ export default function SchoolPortalClient({
         rosterId: chosenRosterId || undefined,
         role: chosenRole,
       });
+
+      if (!result.success) {
+        // The invite stays pending (for example the student is already on a sibling roster).
+        setApprovalFeedback(result.error);
+        return;
+      }
 
       if (result.success) {
         setSubmissions((prev) => prev.filter((s) => s.id !== inviteId));
@@ -337,6 +345,8 @@ export default function SchoolPortalClient({
           );
 
           setActiveEnrollRoster(null);
+        } else {
+          setEnrollError(result.error);
         }
       } catch (err: any) {
         setEnrollError(err.message || 'Failed to enroll player to roster');
@@ -369,8 +379,13 @@ export default function SchoolPortalClient({
 
   const handleMovePlayer = async (fromRosterId: string, playerId: string, toRosterId: string) => {
     setMovingPlayerId(playerId);
+    setRosterNotice(null);
     try {
       const moved = await movePlayerToRoster({ fromRosterId, playerId, toRosterId });
+      if (!moved.success) {
+        setRosterNotice({ kind: 'error', text: moved.error });
+        return;
+      }
       setRosters((prev) => {
         const source = prev.find((r) => r.id === fromRosterId);
         const player = source?.players.find((p) => p.id === playerId);
@@ -397,14 +412,14 @@ export default function SchoolPortalClient({
               }
         )
       );
-      setApprovalFeedback(
-        `${moved.playerName} moved from ${moved.fromRosterName} to ${moved.toRosterName}.${
+      setRosterNotice({
+        kind: 'success',
+        text: `${moved.playerName} moved from ${moved.fromRosterName} to ${moved.toRosterName}.${
           moved.wasCaptain ? ` They were captain, so choose a new captain for ${moved.fromRosterName}.` : ''
-        }`
-      );
-      setTimeout(() => setApprovalFeedback(null), 6000);
+        }`,
+      });
     } catch (err: any) {
-      alert(`Failed to move player: ${err.message}`);
+      setRosterNotice({ kind: 'error', text: `Failed to move player: ${err.message}` });
     } finally {
       setMovingPlayerId(null);
     }
@@ -666,6 +681,7 @@ export default function SchoolPortalClient({
         onRemovePlayer={handleRemovePlayer}
         onMovePlayer={handleMovePlayer}
         movingPlayerId={movingPlayerId}
+        notice={rosterNotice}
         onDeleteRoster={handleDeleteRoster}
       />
 

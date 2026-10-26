@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { Permissions } from '@/app/lib/roles';
 import * as schema from '@/app/lib/db/schema';
 
@@ -11,7 +12,14 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(async (_p: bigint): Promise<unknown> => ({})),
   updateTag: vi.fn(),
   revalidatePath: vi.fn(),
-  writes: [] as Array<{ op: string; table?: unknown; values?: unknown }>,
+  writes: [] as Array<{ op: string; table?: unknown; values?: unknown; where?: unknown }>,
+  /** Order in which the advisory lock and the sibling check ran. */
+  order: [] as string[],
+  /** Rows an UPDATE ... RETURNING reports; [] simulates a concurrent move/removal. */
+  updateReturning: [{ id: 'player-ok' }] as Array<{ id: string }>,
+  lockRosterMember: vi.fn(async (_tx: unknown, _team: string, _member: string) => {
+    mocks.order.push('lock');
+  }),
   /** Makes the matching write throw, to prove the surrounding transaction rolls back. */
   failWrite: null as null | ((w: { op: string; table?: unknown }) => Error | null),
   rolledBack: 0,
@@ -31,10 +39,16 @@ const mocks = vi.hoisted(() => ({
   memberInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown) => id === 'member-ok'),
   /** Sibling roster the member is already on, per test; null = on none. */
   sibling: null as null | { playerId: string; rosterId: string; rosterName: string },
-  siblingEnrollment: vi.fn(async (_t: string, _m: string, _r: string, _tx?: unknown) => mocks.sibling),
+  siblingEnrollment: vi.fn(async (_t: string, _m: string, _r: string, _tx?: unknown) => {
+    mocks.order.push('sibling');
+    return mocks.sibling;
+  }),
   /** Members already on the TARGET roster of a move. */
   onTarget: false,
-  memberOnRoster: vi.fn(async (_m: string, _r: string, _tx?: unknown) => mocks.onTarget),
+  memberOnRoster: vi.fn(async (_m: string, _r: string, _tx?: unknown) => {
+    mocks.order.push('onTarget');
+    return mocks.onTarget;
+  }),
   memberDisplayName: vi.fn(async (_m: string, _tx?: unknown) => 'Ada Lovelace'),
   /** Rows the deleteRoster pre-read of the roster's players returns. */
   rosterPlayers: [] as Array<{ memberId: string }>,
@@ -49,16 +63,17 @@ vi.mock('@/app/lib/db/roster-scope', () => ({
   playerInSchool: mocks.playerInSchool,
   memberInSchool: mocks.memberInSchool,
   siblingEnrollment: mocks.siblingEnrollment,
+  lockRosterMember: mocks.lockRosterMember,
   memberOnRoster: mocks.memberOnRoster,
   memberDisplayName: mocks.memberDisplayName,
 }));
 vi.mock('@/app/lib/onboarding/roster-membership-events', () => ({ notifyRosterMembershipChanged: mocks.notify }));
 vi.mock('@/app/lib/db', () => {
-  type Sink = Array<{ op: string; table?: unknown; values?: unknown }>;
+  type Sink = Array<{ op: string; table?: unknown; values?: unknown; where?: unknown }>;
   // `sink` is mocks.writes for the shared connection, or the transaction's staging list, which is
   // only copied into mocks.writes when the transaction callback resolves (commit) and dropped when
   // it throws (rollback).
-  const record = (sink: Sink, w: { op: string; table?: unknown; values?: unknown }) => {
+  const record = (sink: Sink, w: { op: string; table?: unknown; values?: unknown; where?: unknown }) => {
     const err = mocks.failWrite?.(w);
     if (err) throw err;
     sink.push(w);
@@ -70,8 +85,14 @@ vi.mock('@/app/lib/db', () => {
         return { returning: async () => [{ id: 'new-id' }], then: (r: (v: unknown) => void) => r(undefined) };
       },
       set: (values: unknown) => {
-        record(sink, { op, table, values });
-        return { where: async () => undefined };
+        const write: { op: string; table?: unknown; values?: unknown; where?: unknown } = { op, table, values };
+        record(sink, write);
+        return {
+          where: (clause: unknown) => {
+            write.where = clause;
+            return Object.assign(Promise.resolve(undefined), { returning: async () => mocks.updateReturning });
+          },
+        };
       },
       where: async () => {
         record(sink, { op, table });
@@ -445,6 +466,8 @@ describe('staff roster moves and the sibling-roster rule', () => {
     mocks.onTarget = false;
     mocks.rosterPlayers = [];
     mocks.matchCount = 0;
+    mocks.order.length = 0;
+    mocks.updateReturning = [{ id: 'player-ok' }];
     mocks.requirePermission.mockImplementation(async () => ({}));
     mocks.notify.mockImplementation(async () => {});
   });
@@ -516,6 +539,48 @@ describe('staff roster moves and the sibling-roster rule', () => {
     const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-jv', firstName: 'A', lastName: 'B', role: 'player' }));
     expect(res).toEqual({ success: true });
     expect(mocks.siblingEnrollment).not.toHaveBeenCalled();
+  });
+
+  describe('concurrency: advisory lock and guarded update', () => {
+    it('createPlayer takes the (team, member) lock before the sibling check', async () => {
+      await createPlayer(SCHOOL, form({ rosterId: 'roster-jv', memberId: 'member-ok', role: 'player' }));
+      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), 'team-ok', 'member-ok');
+      expect(mocks.order).toEqual(['lock', 'sibling']);
+    });
+
+    it('moveRosterMember takes the (team, member) lock before checking the target roster', async () => {
+      await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), 'team-ok', 'member-ok');
+      expect(mocks.order).toEqual(['lock', 'onTarget']);
+    });
+
+    it('the UPDATE is restricted to the roster the player was read on, and zero rows is a known rejection', async () => {
+      mocks.updateReturning = [];
+      const res = await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
+      expect(res).toEqual({
+        success: false,
+        error: 'This player was just moved or removed by someone else. Refresh the page and try again.',
+      });
+      // The condition names both the row and its source roster, so a concurrent move matches nothing.
+      const update = playerWrites()[0];
+      const { sql, params } = new PgDialect().sqlToQuery(update.where as never);
+      expect(sql).toMatch(/"id" = \$1/);
+      expect(sql).toMatch(/"roster_id" = \$2/);
+      expect(params).toEqual(['player-ok', 'roster-ok']);
+      expect(mocks.notify).not.toHaveBeenCalled();
+      expect(mocks.updateTag).not.toHaveBeenCalled();
+    });
+  });
+
+  it('updatePlayer (a role change) notifies the member', async () => {
+    const res = await updatePlayer(SCHOOL, 'player-ok', form({ role: 'captain', firstName: 'A', lastName: 'B' }));
+    expect(res).toEqual({ success: true });
+    expect(mocks.notify).toHaveBeenCalledWith(['member-ok']);
+  });
+
+  it('updatePlayer does not notify when the player is outside the school', async () => {
+    await updatePlayer(SCHOOL, 'player-elsewhere', form({ role: 'captain', firstName: 'A', lastName: 'B' }));
+    expect(mocks.notify).not.toHaveBeenCalled();
   });
 
   describe('post-commit notifications', () => {
