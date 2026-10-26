@@ -174,6 +174,28 @@ export async function upsertMemberRecord(
   return newMember.id;
 }
 
+/**
+ * Member id that already owns this Discord account, if any. One Discord account maps to one
+ * member; the unique (provider, provider_user_id) index backs this, but checking first lets the
+ * wizard show a readable error instead of a constraint violation.
+ */
+export async function findDiscordIdentityOwner(
+  tx: OnboardingTx,
+  discordUserId: string
+): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ memberId: schema.playerIdentities.memberId })
+    .from(schema.playerIdentities)
+    .where(
+      and(
+        eq(schema.playerIdentities.provider, 'discord'),
+        eq(schema.playerIdentities.providerUserId, discordUserId)
+      )
+    )
+    .limit(1);
+  return row?.memberId;
+}
+
 /** Upserts the Riot and Discord identities for a member. */
 export async function upsertPlayerIdentities(
   tx: OnboardingTx,

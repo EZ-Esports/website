@@ -18,13 +18,17 @@ import {
   type WizardFormData,
 } from '../types';
 
-export function useWizardDraft(token: string, inviteData: InviteData) {
+export function useWizardDraft(
+  token: string,
+  inviteData: InviteData,
+  options: { initialError?: string | null; discordVerified?: boolean } = {}
+) {
   const initialDraft = inviteData.submissionDraft || {};
   const isManager = inviteData.role === 'manager';
 
   const [saveDraftPending, setSaveDraftPending] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(options.initialError ?? null);
 
   // Step 1: Account Information
   const [legalFirstName, setLegalFirstName] = useState(
@@ -151,9 +155,12 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       password: isManager ? password : undefined,
       graduationYear,
       academicYear: isManager ? academicYear : undefined,
-      discordUsername,
-      discordJoinedConfirmed,
-      discordConnected: Boolean(discordUsername && discordJoinedConfirmed),
+      // Players never persist a typed handle: their Discord identity is the signed OAuth result.
+      discordUsername: isManager ? discordUsername : '',
+      discordJoinedConfirmed: isManager ? discordJoinedConfirmed : false,
+      discordConnected: isManager
+        ? Boolean(discordUsername && discordJoinedConfirmed)
+        : Boolean(options.discordVerified),
       riotId,
       ignConfirmed,
       birthDate,
@@ -231,6 +238,13 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
 
   function validateStep2(): boolean {
     setErrorMessage(null);
+    if (!isManager) {
+      if (!options.discordVerified) {
+        setErrorMessage('Please connect your Discord account to continue.');
+        return false;
+      }
+      return true;
+    }
     if (!discordUsername.trim()) {
       setErrorMessage('Please enter your Discord handle or username.');
       return false;

@@ -241,6 +241,22 @@ vi.mock('@/app/lib/db', () => ({
   db: mocks.mockDb,
 }));
 
+// Discord identity normally comes from the signed OAuth cookie (needs a request context).
+// Default: every invite token has a verified Discord account; `override` replaces it per test.
+const discordSession = vi.hoisted(() => ({ override: undefined as any }));
+vi.mock('@/app/lib/onboarding/discord-session', () => ({
+  readVerifiedDiscord: async (token: string) => {
+    if (discordSession.override !== undefined) return discordSession.override;
+    const { createHash } = await import('node:crypto');
+    return {
+      discordUserId: '123456789012345678',
+      discordUsername: 'alexchen',
+      inGuild: true,
+      inviteHash: createHash('sha256').update(token.trim()).digest('hex'),
+    };
+  },
+}));
+
 vi.mock('@/app/lib/cache', () => ({
   CACHE_TAGS: {
     ROSTERS: 'rosters',
@@ -269,6 +285,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    discordSession.override = undefined;
 
     mocks.state.schoolsStore = [
       {
@@ -532,9 +549,9 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2026,
       riotId: 'Demon1#LFT1',
-      discordUsername: 'alexchen',
-      discordUserId: 'discord-snowflake-12345',
-      inGuild: true,
+      discordUsername: 'client-typed-handle',
+      discordUserId: '999999999999999999',
+      inGuild: false,
       birthDate: '2008-05-14',
       gender: 'Male',
       race: ['Asian'],
@@ -590,7 +607,8 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         (i) => i.memberId === result.memberId && i.provider === 'discord'
       );
       expect(discordIdentity).toBeDefined();
-      expect(discordIdentity.providerUserId).toBe('discord-snowflake-12345');
+      // Identity comes from the verified OAuth cookie; client-supplied values are ignored.
+      expect(discordIdentity.providerUserId).toBe('123456789012345678');
       expect(discordIdentity.providerUsername).toBe('alexchen');
       expect(discordIdentity.inGuild).toBe(true);
 
@@ -797,6 +815,82 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         const invite = mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1');
         expect(invite.submissionDraft).toEqual({ legalFirstName: 'Alex' });
       });
+    });
+  });
+
+  describe('4b. Verified Discord requirement (players)', () => {
+    const submission: PlayerOnboardingSubmission = {
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.chen@nycstudents.net',
+      graduationYear: 2027,
+      riotId: 'Demon1#LFT1',
+      discordUsername: 'typed-by-client',
+      discordUserId: '555555555555555555',
+      inGuild: true,
+      birthDate: '2008-05-14',
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    };
+    const hashOf = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
+
+    it('rejects a player submission when no verified Discord cookie is present', async () => {
+      discordSession.override = null;
+      await expect(submitPlayerOnboarding({ token: rawToken, submission })).rejects.toThrow(
+        'Discord account is not connected'
+      );
+      expect(mocks.state.membersStore.find((m) => m.email === submission.email)).toBeUndefined();
+      expect(mocks.state.playerIdentitiesStore.filter((i) => i.provider === 'discord')).toHaveLength(0);
+    });
+
+    it('rejects a verification that was issued for a different invite', async () => {
+      discordSession.override = {
+        discordUserId: '123456789012345678',
+        discordUsername: 'alexchen',
+        inGuild: true,
+        inviteHash: hashOf('some_other_invite_token'),
+      };
+      await expect(submitPlayerOnboarding({ token: rawToken, submission })).rejects.toThrow(
+        'Discord account is not connected'
+      );
+    });
+
+    it('rejects when the verified account is not confirmed to be in the server', async () => {
+      discordSession.override = {
+        discordUserId: '123456789012345678',
+        discordUsername: 'alexchen',
+        inGuild: false,
+        inviteHash: hashOf(rawToken),
+      };
+      await expect(submitPlayerOnboarding({ token: rawToken, submission })).rejects.toThrow(
+        'could not confirm you are in the EZ Esports Discord server'
+      );
+    });
+
+    it('ignores client-supplied Discord id, handle and inGuild', async () => {
+      const result = await submitPlayerOnboarding({ token: rawToken, submission });
+      const identity = mocks.state.playerIdentitiesStore.find(
+        (i) => i.memberId === result.memberId && i.provider === 'discord'
+      );
+      expect(identity.providerUserId).toBe('123456789012345678');
+      expect(identity.providerUsername).toBe('alexchen');
+      expect(identity.inGuild).toBe(true);
+      expect(mocks.state.membersStore.find((m) => m.id === result.memberId).discord).toBe('alexchen');
+    });
+
+    it('rejects a Discord account already linked to a different member', async () => {
+      mocks.state.membersStore.push({ id: 'other-member', email: 'someone.else@nycstudents.net' });
+      mocks.state.playerIdentitiesStore.push({
+        id: 'ident-other',
+        memberId: 'other-member',
+        provider: 'discord',
+        providerUserId: '123456789012345678',
+        providerUsername: 'someone',
+        inGuild: true,
+      });
+      await expect(submitPlayerOnboarding({ token: rawToken, submission })).rejects.toThrow(
+        'already linked to another EZ Esports player'
+      );
     });
   });
 

@@ -8,6 +8,8 @@ import {
   FiArrowLeft,
 } from 'react-icons/fi';
 import { validateInviteToken } from '@/app/lib/onboarding/wizard-actions';
+import { readVerifiedDiscord } from '@/app/lib/onboarding/discord-session';
+import { DISCORD_FAILURE_MESSAGES, type DiscordFailureCode } from '@/app/lib/onboarding/adapters/discord-rest';
 import PlayerOnboardingWizard from './PlayerOnboardingWizard';
 
 interface JoinPageProps {
@@ -17,6 +19,8 @@ interface JoinPageProps {
   }>;
   searchParams: Promise<{
     token?: string;
+    discord?: string;
+    discord_error?: string;
   }>;
 }
 
@@ -190,9 +194,25 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
     );
   }
 
+  // Only players verify Discord; the identity shown comes from the signed cookie.
+  const verified = validation.isManager ? null : await readVerifiedDiscord(token);
+  const errorCode = searchParams.discord_error as DiscordFailureCode | undefined;
+  const discordError =
+    !validation.isManager && errorCode
+      ? (Object.prototype.hasOwnProperty.call(DISCORD_FAILURE_MESSAGES, errorCode)
+          ? DISCORD_FAILURE_MESSAGES[errorCode]
+          : DISCORD_FAILURE_MESSAGES.unknown)
+      : null;
+
   return (
     <main className="min-h-[80vh] py-6">
-      <PlayerOnboardingWizard token={token} inviteData={validation} />
+      <PlayerOnboardingWizard
+        token={token}
+        inviteData={validation}
+        discord={verified ? { username: verified.discordUsername, inGuild: verified.inGuild } : null}
+        discordError={discordError}
+        resumeAtDiscord={!validation.isManager && Boolean(searchParams.discord || errorCode)}
+      />
     </main>
   );
 }

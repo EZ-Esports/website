@@ -9,6 +9,7 @@ import {
 import type { ConsentSubmission } from './consent';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
+import { readVerifiedDiscord } from './discord-session';
 
 export interface ValidateInviteTokenParams {
   schoolSlug?: string;
@@ -78,8 +79,11 @@ export interface PlayerOnboardingSubmission {
   academicYear?: string;
   password?: string;
   riotId: string;
-  discordUsername: string;
+  /** Managers only (legacy self-reported). Ignored for players: their Discord identity comes from OAuth. */
+  discordUsername?: string;
+  /** Managers only. Ignored for players. */
   discordUserId?: string;
+  /** Ignored: guild membership is established server-side. */
   inGuild?: boolean;
   birthDate: string | Date;
   gender?: string;
@@ -321,5 +325,7 @@ export async function saveOnboardingDraft(
 export async function submitPlayerOnboarding(
   params: SubmitPlayerOnboardingParams
 ): Promise<SubmitPlayerOnboardingResult> {
-  return processOnboardingSubmission(params);
+  // Discord identity comes from the signed OAuth cookie, never from the (client-controlled) submission.
+  const verifiedDiscord = await readVerifiedDiscord(params.token);
+  return processOnboardingSubmission({ ...params, verifiedDiscord });
 }

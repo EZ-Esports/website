@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {
+  findDiscordIdentityOwner,
   findInviteForSubmission,
   findStaffUserIdByEmail,
   insertOnboardingConsent,
@@ -21,6 +22,7 @@ import {
   type NormalizedConsent,
 } from '../consent';
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
+import type { VerifiedDiscord } from '../discord-verification';
 import type {
   PlayerOnboardingSubmission,
   SubmitPlayerOnboardingParams,
@@ -39,8 +41,6 @@ export function validateSubmissionInputs(
   legalLastName: string;
   gradYear: number;
   birthDateObj: Date;
-  discordUsername: string;
-  discordUserId: string;
   consent: NormalizedConsent;
 } {
   const email = (submission.email || '').trim().toLowerCase();
@@ -75,22 +75,61 @@ export function validateSubmissionInputs(
     fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
   });
 
-  const discordUsername = (submission.discordUsername || '').trim();
-  if (!discordUsername) {
-    throw new Error('Discord username or handle is required.');
-  }
-
-  const discordUserId = submission.discordUserId?.trim() || discordUsername;
-
   return {
     email,
     legalFirstName,
     legalLastName,
     gradYear,
     birthDateObj,
-    discordUsername,
-    discordUserId,
     consent,
+  };
+}
+
+export interface ResolvedDiscordIdentity {
+  discordUserId: string;
+  discordUsername: string;
+  inGuild: boolean;
+}
+
+/**
+ * Decides which Discord identity is persisted. Players must have completed Discord OAuth: the
+ * identity comes only from the signed server-side verification, and anything the client sent
+ * (handle, id, inGuild) is ignored. Managers keep the legacy self-reported handle because the
+ * Discord verification gate is player-only.
+ */
+export function resolveDiscordIdentity(params: {
+  isManager: boolean;
+  submission: PlayerOnboardingSubmission;
+  verifiedDiscord: VerifiedDiscord | null | undefined;
+}): ResolvedDiscordIdentity {
+  const { isManager, submission, verifiedDiscord } = params;
+
+  if (!isManager) {
+    if (!verifiedDiscord) {
+      throw new Error(
+        'Your Discord account is not connected. Go back to the Discord step and press "Connect Discord".'
+      );
+    }
+    if (!verifiedDiscord.inGuild) {
+      throw new Error(
+        'We could not confirm you are in the EZ Esports Discord server. Go back to the Discord step and connect again.'
+      );
+    }
+    return {
+      discordUserId: verifiedDiscord.discordUserId,
+      discordUsername: verifiedDiscord.discordUsername,
+      inGuild: true,
+    };
+  }
+
+  const discordUsername = (submission.discordUsername || '').trim();
+  if (!discordUsername) {
+    throw new Error('Discord username or handle is required.');
+  }
+  return {
+    discordUserId: submission.discordUserId?.trim() || discordUsername,
+    discordUsername,
+    inGuild: true,
   };
 }
 
@@ -205,9 +244,12 @@ export async function provisionManagerAccount(
  * Executes the complete wizard onboarding submission pipeline.
  */
 export async function processOnboardingSubmission(
-  params: SubmitPlayerOnboardingParams
+  params: SubmitPlayerOnboardingParams & {
+    /** Read from the signed cookie by the server action; never from the client payload. */
+    verifiedDiscord?: VerifiedDiscord | null;
+  }
 ): Promise<SubmitPlayerOnboardingResult> {
-  const { token, submission, options } = params;
+  const { token, submission, options, verifiedDiscord } = params;
 
   if (!token?.trim()) {
     throw new Error('Invite token is required.');
@@ -232,6 +274,12 @@ export async function processOnboardingSubmission(
 
   // Step 1: Validate inputs
   const validated = validateSubmissionInputs(submission);
+  const discord = resolveDiscordIdentity({
+    isManager,
+    submission,
+    verifiedDiscord:
+      verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
+  });
 
   // Step 2: Resolve external Riot identity
   const effectiveGameSlug = gameSlug || 'valorant';
@@ -247,17 +295,23 @@ export async function processOnboardingSubmission(
       email: validated.email,
       legalFirstName: validated.legalFirstName,
       legalLastName: validated.legalLastName,
-      discordUsername: validated.discordUsername,
+      discordUsername: discord.discordUsername,
       gradYear: validated.gradYear,
       schoolId: invite.schoolId,
     });
 
-    // 3b. Identities (Riot + Discord)
+    // 3b. Identities (Riot + Discord). One Discord account may belong to only one member.
+    const discordOwner = await findDiscordIdentityOwner(tx, discord.discordUserId);
+    if (discordOwner && discordOwner !== createdOrUpdatedMemberId) {
+      throw new Error(
+        'This Discord account is already linked to another EZ Esports player. Connect a different Discord account or contact your school manager.'
+      );
+    }
     await upsertPlayerIdentities(tx, createdOrUpdatedMemberId, {
       riotIdentifier: resolvedRiot.rawIdentifier,
-      discordUserId: validated.discordUserId,
-      discordUsername: validated.discordUsername,
-      inGuild: true,
+      discordUserId: discord.discordUserId,
+      discordUsername: discord.discordUsername,
+      inGuild: discord.inGuild,
     });
 
     // 3c. Demographics Vault (FERPA / NY § 2-D)

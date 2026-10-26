@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fi';
 import {
   submitPlayerOnboarding,
+  saveOnboardingDraft,
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
 import type { InviteData } from './types';
@@ -25,20 +26,39 @@ import { ConsentStep } from './components/steps/ConsentStep';
 
 export type { InviteData };
 
+/** Server-verified Discord identity (from the signed OAuth cookie), never typed by the student. */
+export interface VerifiedDiscordView {
+  username: string;
+  inGuild: boolean;
+}
+
 interface PlayerOnboardingWizardProps {
   token: string;
   inviteData: InviteData;
+  discord?: VerifiedDiscordView | null;
+  /** Readable message from a failed Discord callback. */
+  discordError?: string | null;
+  /** True when returning from the Discord callback, so the wizard resumes at the Discord step. */
+  resumeAtDiscord?: boolean;
 }
 
 export default function PlayerOnboardingWizard({
   token,
   inviteData,
+  discord = null,
+  discordError = null,
+  resumeAtDiscord = false,
 }: PlayerOnboardingWizardProps) {
-  const [step, setStep] = useState<number>(1);
+  const [step, setStep] = useState<number>(resumeAtDiscord ? 2 : 1);
   const [isPending, startTransition] = useTransition();
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
-  const draft = useWizardDraft(token, inviteData);
+  const discordVerified = Boolean(discord?.inGuild);
+  const draft = useWizardDraft(token, inviteData, {
+    initialError: discordError,
+    discordVerified,
+  });
+  const [discordConnecting, setDiscordConnecting] = useState(false);
   const { isManager } = draft;
 
   function handleNext() {
@@ -51,6 +71,26 @@ export default function PlayerOnboardingWizard({
     } else if (step === 4 && draft.validateStep4()) {
       setStep(5);
     }
+  }
+
+  /**
+   * Saves progress first (the OAuth round trip is a full page navigation), then hands off to the
+   * server route that signs state and redirects to Discord.
+   */
+  async function handleConnectDiscord() {
+    setDiscordConnecting(true);
+    draft.setErrorMessage(null);
+    try {
+      await saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() });
+    } catch {
+      // Losing the draft is not worth blocking the connection; the student can re-enter steps.
+    }
+    const qs = new URLSearchParams({
+      token,
+      school: inviteData.schoolSlug,
+      game: inviteData.gameSlug,
+    });
+    window.location.assign(`/api/discord/start?${qs.toString()}`);
   }
 
   function handleBack() {
@@ -75,8 +115,8 @@ export default function PlayerOnboardingWizard({
           graduationYear: draft.graduationYear,
           academicYear: isManager ? draft.academicYear : undefined,
           riotId: draft.riotId.trim(),
-          discordUsername: draft.discordUsername.trim(),
-          inGuild: true,
+          // Managers keep the self-reported handle; for players the server uses the OAuth cookie.
+          discordUsername: isManager ? draft.discordUsername.trim() : undefined,
           birthDate: draft.birthDate,
           gender: draft.gender || undefined,
           race: draft.selectedRaces.length > 0 ? draft.selectedRaces : undefined,
@@ -119,7 +159,7 @@ export default function PlayerOnboardingWizard({
         legalFirstName={draft.legalFirstName}
         legalLastName={draft.legalLastName}
         email={draft.email}
-        discordUsername={draft.discordUsername}
+        discordUsername={isManager ? draft.discordUsername : (discord?.username ?? '')}
         inviteData={inviteData}
       />
     );
@@ -213,6 +253,10 @@ export default function PlayerOnboardingWizard({
 
         {step === 2 && (
           <DiscordStep
+            isManager={isManager}
+            verified={discord}
+            connecting={discordConnecting}
+            onConnect={handleConnectDiscord}
             discordUsername={draft.discordUsername}
             setDiscordUsername={draft.setDiscordUsername}
             discordJoinedConfirmed={draft.discordJoinedConfirmed}
