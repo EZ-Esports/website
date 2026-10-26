@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = 'September 2026';
+  const lastUpdated = 'October 2026';
 
   return (
     <main>
@@ -44,6 +44,13 @@ export default function PrivacyPage() {
                 <strong className="text-foreground">Contact and identification information:</strong> name,
                 school name, email address, phone number, Discord username, and role (e.g., student,
                 coach, administrator) submitted through application or contact forms.
+              </li>
+              <li>
+                <strong className="text-foreground">Discord sign-in:</strong> when a student player
+                connects Discord during onboarding, we use Discord sign-in to read your Discord user ID
+                and username and to add you to the official EZ Esports Discord server on your behalf.
+                We do not read your messages or other servers, and we do not store the access token
+                Discord gives us.
               </li>
               <li>
                 <strong className="text-foreground">Staff application materials:</strong> if you apply

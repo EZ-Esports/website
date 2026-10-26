@@ -9,6 +9,8 @@ import {
 import type { ConsentSubmission } from './consent';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
+import { OnboardingRejection, type OnboardingRejectionCode } from './rejection';
+import { readVerifiedDiscord } from './discord-session';
 
 export interface ValidateInviteTokenParams {
   schoolSlug?: string;
@@ -78,8 +80,11 @@ export interface PlayerOnboardingSubmission {
   academicYear?: string;
   password?: string;
   riotId: string;
-  discordUsername: string;
+  /** Managers only (legacy self-reported). Ignored for players: their Discord identity comes from OAuth. */
+  discordUsername?: string;
+  /** Managers only. Ignored for players. */
   discordUserId?: string;
+  /** Ignored: guild membership is established server-side. */
   inGuild?: boolean;
   birthDate: string | Date;
   gender?: string;
@@ -115,12 +120,23 @@ export interface SubmitPlayerOnboardingParams {
 }
 
 export interface SubmitPlayerOnboardingResult {
-  success: boolean;
+  success: true;
   inviteId: string;
   memberId: string;
   status: 'submitted' | 'accepted';
   role?: 'player' | 'manager';
 }
+
+/** Expected rejection returned (not thrown) so its message survives production error masking. */
+export interface SubmitPlayerOnboardingFailure {
+  success: false;
+  code: OnboardingRejectionCode;
+  error: string;
+}
+
+export type SubmitPlayerOnboardingOutcome =
+  | SubmitPlayerOnboardingResult
+  | SubmitPlayerOnboardingFailure;
 
 const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
   'gender',
@@ -320,6 +336,15 @@ export async function saveOnboardingDraft(
  */
 export async function submitPlayerOnboarding(
   params: SubmitPlayerOnboardingParams
-): Promise<SubmitPlayerOnboardingResult> {
-  return processOnboardingSubmission(params);
+): Promise<SubmitPlayerOnboardingOutcome> {
+  // Discord identity comes from the signed OAuth cookie, never from the (client-controlled) submission.
+  const verifiedDiscord = await readVerifiedDiscord(params.token);
+  try {
+    return await processOnboardingSubmission({ ...params, verifiedDiscord });
+  } catch (err) {
+    if (err instanceof OnboardingRejection) {
+      return { success: false, code: err.code, error: err.message };
+    }
+    throw err;
+  }
 }

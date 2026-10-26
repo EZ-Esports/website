@@ -1,10 +1,15 @@
 'use client';
 
-import { FiCheck, FiExternalLink } from 'react-icons/fi';
+import { FiCheck, FiClock, FiExternalLink } from 'react-icons/fi';
 import { SiDiscord } from 'react-icons/si';
 import { RequiredMark } from '../RequiredMark';
 
 interface DiscordStepProps {
+  isManager: boolean;
+  /** Server-verified identity from Discord OAuth (players). */
+  verified: { username: string; inGuild: boolean } | null;
+  connecting: boolean;
+  onConnect: () => void;
   discordUsername: string;
   setDiscordUsername: (val: string) => void;
   discordJoinedConfirmed: boolean;
@@ -12,6 +17,10 @@ interface DiscordStepProps {
 }
 
 export function DiscordStep({
+  isManager,
+  verified,
+  connecting,
+  onConnect,
   discordUsername,
   setDiscordUsername,
   discordJoinedConfirmed,
@@ -51,6 +60,8 @@ export function DiscordStep({
           </div>
         </div>
 
+        {isManager ? (
+          <>
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
             Your Discord Handle / Username<RequiredMark />
@@ -94,6 +105,52 @@ export function DiscordStep({
               Linked: <strong>{discordUsername}</strong> will be registered on the EZ Esports Discord roster
             </span>
           </div>
+        )}
+          </>
+        ) : (
+          <>
+        {verified?.inGuild ? (
+          <div className="flex items-start gap-3 p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10">
+            <FiCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="text-xs sm:text-sm text-foreground">
+              <p>
+                Connected as <strong>@{verified.username}</strong>, in the EZ Esports server.
+              </p>
+              <button
+                type="button"
+                onClick={onConnect}
+                disabled={connecting}
+                className="mt-1 text-xs text-accent underline disabled:opacity-50"
+              >
+                Use a different Discord account
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-foreground-muted leading-relaxed">
+              Sign in with Discord and we will add you to the official server automatically. We only
+              read your Discord username and ID; we never see your password or messages.
+            </p>
+            <button
+              type="button"
+              onClick={onConnect}
+              disabled={connecting}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2.5 rounded-lg bg-[#5865F2] text-white text-sm font-semibold hover:bg-[#4752c4] transition-colors disabled:opacity-60"
+            >
+              {connecting ? (
+                <>
+                  <FiClock className="w-4 h-4 animate-spin" /> Opening Discord...
+                </>
+              ) : (
+                <>
+                  <SiDiscord className="w-4 h-4" /> Connect Discord
+                </>
+              )}
+            </button>
+          </div>
+        )}
+          </>
         )}
       </div>
     </div>

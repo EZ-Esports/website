@@ -359,6 +359,22 @@ const mocks = vi.hoisted(() => {
 });
 
 // Mock modules
+// Discord identity normally comes from the signed OAuth cookie (needs a request context).
+// Default: every invite token has a verified Discord account; `override` replaces it per test.
+const discordSession = vi.hoisted(() => ({ override: undefined as any }));
+vi.mock('@/app/lib/onboarding/discord-session', () => ({
+  readVerifiedDiscord: async (token: string) => {
+    if (discordSession.override !== undefined) return discordSession.override;
+    const { createHash } = await import('node:crypto');
+    return {
+      discordUserId: '123456789012345678',
+      discordUsername: 'alexchen',
+      inGuild: true,
+      inviteHash: createHash('sha256').update(token.trim()).digest('hex'),
+    };
+  },
+}));
+
 vi.mock('@/app/lib/auth', () => ({
   requirePermission: mocks.mockRequirePermission,
 }));
@@ -429,6 +445,13 @@ import {
   getSchoolManagerContext,
   assertManagerForSchool,
 } from '@/app/lib/onboarding/manager-auth';
+
+/** Success-path wrapper: expected rejections come back as `{success:false}`; surface them as errors here. */
+async function submitOk(params: Parameters<typeof submitPlayerOnboarding>[0]) {
+  const result = await submitPlayerOnboarding(params);
+  if (!result.success) throw new Error(result.error);
+  return result;
+}
 
 describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
   const staffSuperAdmin = {
@@ -587,7 +610,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       }
 
       // Step 3: Manager completes onboarding wizard with portal password
-      const subRes = await submitPlayerOnboarding({
+      const subRes = await submitOk({
         token,
         submission: {
           legalFirstName: 'Alex',
@@ -713,7 +736,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       }
 
       // Step 4: Player submits onboarding
-      const submitPlayerRes = await submitPlayerOnboarding({
+      const submitPlayerRes = await submitOk({
         token: playerToken,
         submission: {
           legalFirstName: 'David',
