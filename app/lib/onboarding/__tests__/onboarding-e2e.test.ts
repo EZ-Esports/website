@@ -446,6 +446,13 @@ import {
   assertManagerForSchool,
 } from '@/app/lib/onboarding/manager-auth';
 
+/** Success-path wrapper: expected rejections come back as `{success:false}`; surface them as errors here. */
+async function submitOk(params: Parameters<typeof submitPlayerOnboarding>[0]) {
+  const result = await submitPlayerOnboarding(params);
+  if (!result.success) throw new Error(result.error);
+  return result;
+}
+
 describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
   const staffSuperAdmin = {
     id: 'super-admin-uuid',
@@ -603,7 +610,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       }
 
       // Step 3: Manager completes onboarding wizard with portal password
-      const subRes = await submitPlayerOnboarding({
+      const subRes = await submitOk({
         token,
         submission: {
           legalFirstName: 'Alex',
@@ -729,7 +736,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       }
 
       // Step 4: Player submits onboarding
-      const submitPlayerRes = await submitPlayerOnboarding({
+      const submitPlayerRes = await submitOk({
         token: playerToken,
         submission: {
           legalFirstName: 'David',

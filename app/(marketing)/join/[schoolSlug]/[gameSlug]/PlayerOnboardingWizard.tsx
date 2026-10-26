@@ -45,7 +45,7 @@ interface PlayerOnboardingWizardProps {
 export default function PlayerOnboardingWizard({
   token,
   inviteData,
-  discord = null,
+  discord: discordProp = null,
   discordError = null,
   resumeAtDiscord = false,
 }: PlayerOnboardingWizardProps) {
@@ -53,6 +53,8 @@ export default function PlayerOnboardingWizard({
   const [isPending, startTransition] = useTransition();
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
+  // Starts from the server-read cookie; cleared locally when the server later rejects it (e.g. it expired).
+  const [discord, setDiscord] = useState<VerifiedDiscordView | null>(discordProp);
   const discordVerified = Boolean(discord?.inGuild);
   const draft = useWizardDraft(token, inviteData, {
     initialError: discordError,
@@ -141,9 +143,14 @@ export default function PlayerOnboardingWizard({
           submission,
         });
 
-        if (result.success) {
-          setIsSubmitted(true);
+        if (!result.success) {
+          // Expected Discord rejections: send the student back to reconnect rather than showing a dead end.
+          setDiscord(null);
+          setStep(2);
+          draft.setErrorMessage(result.error);
+          return;
         }
+        setIsSubmitted(true);
       } catch (err: any) {
         draft.setErrorMessage(
           err.message || 'An error occurred while submitting your onboarding form.'

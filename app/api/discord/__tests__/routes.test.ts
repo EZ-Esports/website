@@ -92,6 +92,15 @@ describe('GET /api/discord/start', () => {
     expect(header).toMatch(/Path=\/api\/discord/i);
   });
 
+  it('clears any earlier verification cookie when a new connection attempt starts', async () => {
+    const { res } = await begin();
+    const cleared = res.headers.getSetCookie().find((c) => c.startsWith(`${DISCORD_RESULT_COOKIE}=`));
+    expect(cleared).toBeDefined();
+    expect(cleared).toMatch(/Path=\/join/i);
+    expect(cleared).toMatch(/Max-Age=0/i);
+    expect(cookieValue(res, DISCORD_RESULT_COOKIE)).toBeUndefined();
+  });
+
   it('does not start OAuth for an invalid invite or a manager invite', async () => {
     validateInviteToken.mockResolvedValueOnce({ valid: false, status: 'expired', message: 'x' });
     let { res } = await begin();

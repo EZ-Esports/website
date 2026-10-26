@@ -22,6 +22,7 @@ import {
   type NormalizedConsent,
 } from '../consent';
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
+import { OnboardingRejection, isDiscordIdentityUniqueViolation } from '../rejection';
 import type { VerifiedDiscord } from '../discord-verification';
 import type {
   PlayerOnboardingSubmission,
@@ -85,6 +86,9 @@ export function validateSubmissionInputs(
   };
 }
 
+const DISCORD_ALREADY_LINKED_MESSAGE =
+  'This Discord account is already linked to another EZ Esports player. Please reconnect with a different Discord account, or contact your school manager.';
+
 export interface ResolvedDiscordIdentity {
   discordUserId: string;
   discordUsername: string;
@@ -106,13 +110,15 @@ export function resolveDiscordIdentity(params: {
 
   if (!isManager) {
     if (!verifiedDiscord) {
-      throw new Error(
-        'Your Discord account is not connected. Go back to the Discord step and press "Connect Discord".'
+      throw new OnboardingRejection(
+        'discord_required',
+        'Your Discord connection is missing or has expired. Please reconnect your Discord account.'
       );
     }
     if (!verifiedDiscord.inGuild) {
-      throw new Error(
-        'We could not confirm you are in the EZ Esports Discord server. Go back to the Discord step and connect again.'
+      throw new OnboardingRejection(
+        'discord_not_in_guild',
+        'We could not confirm you are in the EZ Esports Discord server. Please reconnect your Discord account.'
       );
     }
     return {
@@ -289,66 +295,72 @@ export async function processOnboardingSubmission(
   let createdOrUpdatedMemberId = '';
 
   // Step 3: Atomic database transaction
-  await runOnboardingTransaction(async (tx) => {
-    // 3a. Member
-    createdOrUpdatedMemberId = await upsertMemberRecord(tx, {
-      email: validated.email,
-      legalFirstName: validated.legalFirstName,
-      legalLastName: validated.legalLastName,
-      discordUsername: discord.discordUsername,
-      gradYear: validated.gradYear,
-      schoolId: invite.schoolId,
-    });
-
-    // 3b. Identities (Riot + Discord). One Discord account may belong to only one member.
-    const discordOwner = await findDiscordIdentityOwner(tx, discord.discordUserId);
-    if (discordOwner && discordOwner !== createdOrUpdatedMemberId) {
-      throw new Error(
-        'This Discord account is already linked to another EZ Esports player. Connect a different Discord account or contact your school manager.'
-      );
-    }
-    await upsertPlayerIdentities(tx, createdOrUpdatedMemberId, {
-      riotIdentifier: resolvedRiot.rawIdentifier,
-      discordUserId: discord.discordUserId,
-      discordUsername: discord.discordUsername,
-      inGuild: discord.inGuild,
-    });
-
-    // 3c. Demographics Vault (FERPA / NY § 2-D)
-    await upsertDemographicsVault(tx, createdOrUpdatedMemberId, {
-      legalFirstName: validated.legalFirstName,
-      legalLastName: validated.legalLastName,
-      birthDateObj: validated.birthDateObj,
-      submission,
-    });
-
-    // 3d. Consent record (ToS acknowledgment + guardian authorization for under-18s).
-    // signedAt is stamped here on the server, never accepted from the client.
-    await insertOnboardingConsent(tx, {
-      memberId: createdOrUpdatedMemberId,
-      schoolId: invite.schoolId,
-      inviteKind: isManager ? 'manager' : 'player',
-      inviteId: invite.id,
-      ...validated.consent,
-      signedAt: new Date(),
-    });
-
-    // 3e. Role-specific finalization
-    if (isManager) {
-      await provisionManagerAccount(tx, {
+  try {
+    await runOnboardingTransaction(async (tx) => {
+      // 3a. Member
+      createdOrUpdatedMemberId = await upsertMemberRecord(tx, {
         email: validated.email,
-        memberId: createdOrUpdatedMemberId,
+        legalFirstName: validated.legalFirstName,
+        legalLastName: validated.legalLastName,
+        discordUsername: discord.discordUsername,
+        gradYear: validated.gradYear,
         schoolId: invite.schoolId,
-        password: submission.password,
-        academicYear: submission.academicYear,
-        submissionDraft: invite.submissionDraft as Record<string, any> | null,
       });
 
-      await markManagerInviteAccepted(tx, invite.id, createdOrUpdatedMemberId);
-    } else {
-      await markPlayerInviteSubmitted(tx, invite.id, createdOrUpdatedMemberId);
+      // 3b. Identities (Riot + Discord). One Discord account may belong to only one member.
+      const discordOwner = await findDiscordIdentityOwner(tx, discord.discordUserId);
+      if (discordOwner && discordOwner !== createdOrUpdatedMemberId) {
+        throw new OnboardingRejection('discord_already_linked', DISCORD_ALREADY_LINKED_MESSAGE);
+      }
+      await upsertPlayerIdentities(tx, createdOrUpdatedMemberId, {
+        riotIdentifier: resolvedRiot.rawIdentifier,
+        discordUserId: discord.discordUserId,
+        discordUsername: discord.discordUsername,
+        inGuild: discord.inGuild,
+      });
+
+      // 3c. Demographics Vault (FERPA / NY § 2-D)
+      await upsertDemographicsVault(tx, createdOrUpdatedMemberId, {
+        legalFirstName: validated.legalFirstName,
+        legalLastName: validated.legalLastName,
+        birthDateObj: validated.birthDateObj,
+        submission,
+      });
+
+      // 3d. Consent record (ToS acknowledgment + guardian authorization for under-18s).
+      // signedAt is stamped here on the server, never accepted from the client.
+      await insertOnboardingConsent(tx, {
+        memberId: createdOrUpdatedMemberId,
+        schoolId: invite.schoolId,
+        inviteKind: isManager ? 'manager' : 'player',
+        inviteId: invite.id,
+        ...validated.consent,
+        signedAt: new Date(),
+      });
+
+      // 3e. Role-specific finalization
+      if (isManager) {
+        await provisionManagerAccount(tx, {
+          email: validated.email,
+          memberId: createdOrUpdatedMemberId,
+          schoolId: invite.schoolId,
+          password: submission.password,
+          academicYear: submission.academicYear,
+          submissionDraft: invite.submissionDraft as Record<string, any> | null,
+        });
+
+        await markManagerInviteAccepted(tx, invite.id, createdOrUpdatedMemberId);
+      } else {
+        await markPlayerInviteSubmitted(tx, invite.id, createdOrUpdatedMemberId);
+      }
+    });
+  } catch (err) {
+    // Two submissions racing for the same Discord id: the unique index decides. Never reveal the owner.
+    if (isDiscordIdentityUniqueViolation(err)) {
+      throw new OnboardingRejection('discord_already_linked', DISCORD_ALREADY_LINKED_MESSAGE);
     }
-  });
+    throw err;
+  }
 
   // Step 4: Invalidate cache tags
   if (isManager) {

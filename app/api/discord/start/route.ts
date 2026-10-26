@@ -6,6 +6,8 @@ import {
   DISCORD_FLOW_COOKIE,
   DISCORD_FLOW_COOKIE_PATH,
   DISCORD_FLOW_TTL_SECONDS,
+  DISCORD_RESULT_COOKIE,
+  DISCORD_RESULT_COOKIE_PATH,
   newNonce,
   signFlowCookie,
   signState,
@@ -74,6 +76,15 @@ export async function GET(request: NextRequest) {
     sameSite: 'lax',
     path: DISCORD_FLOW_COOKIE_PATH,
     maxAge: DISCORD_FLOW_TTL_SECONDS,
+  });
+  // Reconnecting starts from scratch: drop any earlier verification so a failed attempt cannot leave
+  // the old "connected" banner next to the error.
+  response.cookies.set(DISCORD_RESULT_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: DISCORD_RESULT_COOKIE_PATH,
+    maxAge: 0,
   });
   response.headers.set('Cache-Control', 'no-store');
   return response;
