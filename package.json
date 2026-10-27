@@ -21,6 +21,7 @@
     "db:ingest:leadership": "npx tsx --env-file-if-exists=.env db/seed-leadership.ts",
     "db:backfill:leadership": "npx tsx --env-file-if-exists=.env db/backfill-leadership.ts",
     "db:backfill:gallery-thumbnails": "npx tsx --conditions=react-server --env-file-if-exists=.env db/backfill-gallery-thumbnails.ts",
+    "db:purge:onboarding-test-data": "npx tsx --conditions=react-server --env-file-if-exists=.env db/purge-onboarding-test-data.ts",
     "db:backup:clean": "npx tsx db/backup-clean.ts",
     "db:storage:clean": "npx tsx --env-file-if-exists=.env db/storage-clean.ts",
     "prepare": "node scripts/prepare-hooks.mjs || true"
