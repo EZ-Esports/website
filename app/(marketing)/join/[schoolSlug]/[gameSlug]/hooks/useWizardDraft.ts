@@ -52,18 +52,6 @@ export function useWizardDraft(
       : DEFAULT_MANAGER_SEASON
   );
 
-  // Step 2: Discord Connection
-  const [discordUsername, setDiscordUsername] = useState(
-    initialDraft.discordUsername || ''
-  );
-  const [discordJoinedConfirmed, setDiscordJoinedConfirmed] = useState<boolean>(
-    Boolean(
-      initialDraft.discordJoinedConfirmed ??
-        initialDraft.discordConnected ??
-        (initialDraft.discordUsername ? true : false)
-    )
-  );
-
   // Step 3: Riot Games Identity
   const [riotId, setRiotId] = useState(initialDraft.riotId || '');
   const [ignConfirmed, setIgnConfirmed] = useState<boolean>(
@@ -155,12 +143,6 @@ export function useWizardDraft(
       password: isManager ? password : undefined,
       graduationYear,
       academicYear: isManager ? academicYear : undefined,
-      // Players never persist a typed handle: their Discord identity is the signed OAuth result.
-      discordUsername: isManager ? discordUsername : '',
-      discordJoinedConfirmed: isManager ? discordJoinedConfirmed : false,
-      discordConnected: isManager
-        ? Boolean(discordUsername && discordJoinedConfirmed)
-        : Boolean(options.discordVerified),
       riotId,
       ignConfirmed,
       birthDate,
@@ -238,21 +220,9 @@ export function useWizardDraft(
 
   function validateStep2(): boolean {
     setErrorMessage(null);
-    if (!isManager) {
-      if (!options.discordVerified) {
-        setErrorMessage('Please connect your Discord account to continue.');
-        return false;
-      }
-      return true;
-    }
-    if (!discordUsername.trim()) {
-      setErrorMessage('Please enter your Discord handle or username.');
-      return false;
-    }
-    if (!discordJoinedConfirmed) {
-      setErrorMessage(
-        'Please confirm that you have joined the official EZ Esports Discord server.'
-      );
+    // The verified state is read from the signed cookie on the server; the client only mirrors it.
+    if (!options.discordVerified) {
+      setErrorMessage('Please connect your Discord account to continue.');
       return false;
     }
     return true;
@@ -330,10 +300,6 @@ export function useWizardDraft(
     setGraduationYear,
     academicYear,
     setAcademicYear,
-    discordUsername,
-    setDiscordUsername,
-    discordJoinedConfirmed,
-    setDiscordJoinedConfirmed,
     riotId,
     setRiotId,
     ignConfirmed,

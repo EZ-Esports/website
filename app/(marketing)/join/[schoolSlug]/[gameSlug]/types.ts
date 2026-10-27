@@ -13,6 +13,11 @@ export interface InviteData {
   expiresAt: Date;
 }
 
+/** Wizard step that fixes a rejection returned by the server: the password lives on step 1, Discord on step 2. */
+export function stepForRejection(code: string): 1 | 2 {
+  return code === 'manager_password_required' ? 1 : 2;
+}
+
 export interface WizardFormData {
   legalFirstName: string;
   legalLastName: string;
@@ -21,9 +26,6 @@ export interface WizardFormData {
   graduationYear: number;
   /** Manager only: season the manager is applying for, e.g. "2026-27". */
   academicYear?: string;
-  discordUsername: string;
-  discordJoinedConfirmed: boolean;
-  discordConnected: boolean;
   riotId: string;
   ignConfirmed: boolean;
   birthDate: string;

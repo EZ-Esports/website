@@ -302,7 +302,7 @@ export async function upsertStudentDemographics(
 
 /** Auth user id of the staff member with this email (case-insensitive), if any. */
 export async function findStaffUserIdByEmail(
-  tx: OnboardingTx,
+  tx: OnboardingTx | typeof db,
   email: string
 ): Promise<string | undefined> {
   const [staff] = await tx

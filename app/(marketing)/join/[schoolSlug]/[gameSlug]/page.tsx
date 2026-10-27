@@ -194,11 +194,11 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
     );
   }
 
-  // Only players verify Discord; the identity shown comes from the signed cookie.
-  const verified = validation.isManager ? null : await readVerifiedDiscord(token);
+  // The identity shown comes from the signed cookie, never from client state.
+  const verified = await readVerifiedDiscord(token);
   const errorCode = searchParams.discord_error as DiscordFailureCode | undefined;
   const discordError =
-    !validation.isManager && errorCode
+    errorCode
       ? (Object.prototype.hasOwnProperty.call(DISCORD_FAILURE_MESSAGES, errorCode)
           ? DISCORD_FAILURE_MESSAGES[errorCode]
           : DISCORD_FAILURE_MESSAGES.unknown)
@@ -211,7 +211,7 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
         inviteData={validation}
         discord={verified ? { username: verified.discordUsername, inGuild: verified.inGuild } : null}
         discordError={discordError}
-        resumeAtDiscord={!validation.isManager && Boolean(searchParams.discord || errorCode)}
+        resumeAtDiscord={Boolean(searchParams.discord || errorCode)}
       />
     </main>
   );
