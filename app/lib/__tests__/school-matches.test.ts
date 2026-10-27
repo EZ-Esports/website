@@ -18,6 +18,7 @@ function row(over: Partial<SchoolMatchRow> = {}): SchoolMatchRow {
     seasonName: '2026-27',
     gameId: 'game-1',
     gameName: 'Valorant',
+    gameSlug: 'valorant',
     scheduledAt: new Date('2026-10-30T23:00:00.000Z'),
     status: 'scheduled',
     homeScore: 2,
@@ -171,6 +172,8 @@ const mocks = vi.hoisted(() => ({
   getOutcomesPublicSeasonIds: vi.fn(),
   getLatestRescheduleRequests: vi.fn(),
   getRescheduledFrom: vi.fn(),
+  getGameCounts: vi.fn(),
+  getPendingSubmissions: vi.fn(),
 }));
 
 vi.mock('@/app/lib/db', () => ({ db: {} }));
@@ -189,6 +192,10 @@ vi.mock('@/app/lib/db/reschedules', () => ({
   getLatestRescheduleRequests: mocks.getLatestRescheduleRequests,
   getRescheduledFrom: mocks.getRescheduledFrom,
 }));
+vi.mock('@/app/lib/db/match-results', () => ({
+  getGameCounts: mocks.getGameCounts,
+  getPendingSubmissions: mocks.getPendingSubmissions,
+}));
 vi.mock('@/app/lib/db/standings', () => ({
   getOutcomesPublicSeasonIds: mocks.getOutcomesPublicSeasonIds,
 }));
@@ -200,6 +207,8 @@ describe('getSchoolMatches', () => {
     mocks.getOutcomesPublicSeasonIds.mockResolvedValue(new Set<string>());
     mocks.getLatestRescheduleRequests.mockResolvedValue(new Map());
     mocks.getRescheduledFrom.mockResolvedValue(new Map());
+    mocks.getGameCounts.mockResolvedValue(new Map());
+    mocks.getPendingSubmissions.mockResolvedValue(new Map());
   });
 
   async function load(schoolId: string, gameId?: string) {
@@ -266,11 +275,28 @@ describe('getSchoolMatches', () => {
     expect(items.find((i) => i.id === 'plain')!.rescheduledFrom).toBeNull();
   });
 
+  it('carries the stored game count and a pending fetched result onto each match', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'played' }), row({ id: 'waiting' }), row({ id: 'plain' })]);
+    mocks.getGameCounts.mockResolvedValue(new Map([['played', 2]]));
+    mocks.getPendingSubmissions.mockResolvedValue(
+      new Map([['waiting', { id: 's', matchId: 'waiting', matchIds: ['a', 'b'], retryAfter: null, message: 'busy' }]])
+    );
+
+    const items = await load('stuy');
+
+    expect(items.find((i) => i.id === 'played')!.gameCount).toBe(2);
+    expect(items.find((i) => i.id === 'waiting')!.pendingResult).toEqual({ retryAfter: null, message: 'busy', gameCount: 2 });
+    expect(items.find((i) => i.id === 'plain')).toMatchObject({ gameCount: 0, pendingResult: null });
+  });
+
   it('still returns the schedule when the reschedule lookups fail', async () => {
     mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1' }]);
     mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'm' })]);
     mocks.getLatestRescheduleRequests.mockRejectedValue(new Error('relation does not exist'));
     mocks.getRescheduledFrom.mockRejectedValue(new Error('relation does not exist'));
+    mocks.getGameCounts.mockRejectedValue(new Error('relation does not exist'));
+    mocks.getPendingSubmissions.mockRejectedValue(new Error('relation does not exist'));
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const items = await load('stuy');
@@ -278,7 +304,8 @@ describe('getSchoolMatches', () => {
     expect(items).toHaveLength(1);
     expect(items[0].reschedule).toBeNull();
     expect(items[0].rescheduledFrom).toBeNull();
-    expect(log).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledTimes(4);
+    expect(items[0]).toMatchObject({ gameCount: 0, pendingResult: null });
     log.mockRestore();
   });
 

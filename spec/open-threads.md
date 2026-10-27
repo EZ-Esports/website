@@ -103,7 +103,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#243](https://github.com/EZ-Esports/website/issues/243): school roster locking on the manager side.
 - [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
 - [#247](https://github.com/EZ-Esports/website/issues/247): Riot Sign-On (OAuth) and consent for student onboarding. On hold until Riot approves the production key.
-- [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
+- [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key. The interim path is [#290](https://github.com/EZ-Esports/website/issues/290) ([spec-038](spec-038-match-results-from-game-data.md)): HenrikDev (unofficial) behind `MatchDataPort`; #247 and #248 are unchanged and remain open.
 - [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and server join are built for players ([spec-033](spec-033-discord-oauth-onboarding.md), PR #281) and for school managers ([spec-035](spec-035-manager-discord-oauth.md), required for everyone, all self-reported Discord code removed). Still open: role assignment (`syncMemberRoles` is a stub), live guild re-check at roster time, the owner-run purge of pre-OAuth test data (rows with unverified Discord ids), and Discord app/bot setup plus env vars on staging and production.
 - [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
 
@@ -174,3 +174,11 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **`alert()` and `prompt()` remain.** `SchoolPortalClient` still uses `alert()` for remove-player and role-change failures (and other portal and admin forms may); they share the same auto-dismiss problem as `confirm()`. The lint rule bans only `confirm`. Convert them to the roster notice or an `AdminNotice` and widen the rule.
 - **Component test setup is new.** jsdom, Testing Library and jest-dom are dev dependencies, enabled per file with `// @vitest-environment jsdom`; the older render tests still use `renderToStaticMarkup` in node.
 - **Dialog error vs toast on League Setup.** A failed game or season delete now shows its error in the dialog rather than a toast; revisit if staff expect the toast.
+
+## Match results from game data (spec-038, #290)
+
+- **Migration 0054 is written but not applied to production.** Until the owner runs `npm run db:migrate` (named host, fresh backup), Submit result will fail on a missing table; the portal list degrades quietly. Set `VALORANTAPI` in Vercel as well as the local `.env`.
+- **The Henrik response shape is unverified against a live payload.** The schema follows the published v4 docs; a real match should be fetched once and compared. MVP is derived (top score on winners / losers), not an API field; confirm against tracker.gg.
+- **Matching is by Riot `Name#Tag`**, not PUUID; renamed accounts or a roster without Riot IDs will be refused ("do not match either roster"). Consider storing PUUIDs.
+- **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
+- **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.

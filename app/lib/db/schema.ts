@@ -309,6 +309,109 @@ export const matchRescheduleOptions = pgTable('match_reschedule_options', {
   check('match_reschedule_options_proposed_by_check', sql`${t.proposedBy} in ('requester', 'opponent')`),
 ]).enableRLS();
 
+// --- MATCH RESULTS FROM THE GAME'S OWN DATA (spec-038) ---
+
+// One finished Valorant game as the data provider reported it. A finished game never changes, so
+// a row is fetched once and reused: `riot_match_id` is unique and it is the cache key. The raw
+// provider payload is deliberately not kept (it names every participant, rounds, kills and
+// locations); only the fields the scoreboard and series scoring use are stored.
+export const valorantGames = pgTable('valorant_games', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  riotMatchId: text('riot_match_id').notNull(),
+  mapId: text('map_id').notNull(),
+  mapName: text('map_name').notNull(),
+  startedAt: timestamp('started_at').notNull(),
+  gameLengthMs: integer('game_length_ms').notNull(),
+  queueId: text('queue_id').notNull(),
+  gameVersion: text('game_version'),
+  redRounds: integer('red_rounds').notNull(),
+  blueRounds: integer('blue_rounds').notNull(),
+  winningSide: text('winning_side').notNull(), // 'Red' | 'Blue'
+  fetchedAt: timestamp('fetched_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('valorant_games_riot_match_id_idx').on(t.riotMatchId),
+  check('valorant_games_winning_side_check', sql`${t.winningSide} in ('Red', 'Blue')`),
+]).enableRLS();
+
+// One player's line in a stored game.
+export const valorantGamePlayers = pgTable('valorant_game_players', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  gameId: uuid('game_id')
+    .references(() => valorantGames.id, { onDelete: 'cascade' })
+    .notNull(),
+  puuid: text('puuid').notNull(),
+  name: text('name').notNull(),
+  tag: text('tag').notNull(),
+  side: text('side').notNull(), // 'Red' | 'Blue'
+  agent: text('agent').notNull(),
+  tier: text('tier'),
+  score: integer('score').notNull(),
+  kills: integer('kills').notNull(),
+  deaths: integer('deaths').notNull(),
+  assists: integer('assists').notNull(),
+  headshots: integer('headshots').notNull(),
+  bodyshots: integer('bodyshots').notNull(),
+  legshots: integer('legshots').notNull(),
+  damageDealt: integer('damage_dealt').notNull(),
+  damageReceived: integer('damage_received').notNull(),
+  // Derived by us (the provider has no MVP field): see NormalizedPlayer in match-results/types.ts.
+  isMatchMvp: boolean('is_match_mvp').default(false).notNull(),
+  isTeamMvp: boolean('is_team_mvp').default(false).notNull(),
+}, (t) => [
+  index('valorant_game_players_game_id_idx').on(t.gameId),
+  uniqueIndex('valorant_game_players_game_puuid_idx').on(t.gameId, t.puuid),
+  check('valorant_game_players_side_check', sql`${t.side} in ('Red', 'Blue')`),
+]).enableRLS();
+
+// A stored game attached to a league match as one game of its best-of-3. `game_id` is unique so a
+// game can count for only one series; (match_id, game_number) is unique so a series has one game 1,
+// one game 2, one game 3.
+export const matchGames = pgTable('match_games', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  gameId: uuid('game_id')
+    .references(() => valorantGames.id, { onDelete: 'restrict' })
+    .notNull(),
+  gameNumber: integer('game_number').notNull(),
+  // Which in-game side (Red/Blue) the match's home roster played in this game.
+  homeSide: text('home_side').notNull(),
+  homeRounds: integer('home_rounds').notNull(),
+  awayRounds: integer('away_rounds').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('match_games_game_id_idx').on(t.gameId),
+  uniqueIndex('match_games_match_game_number_idx').on(t.matchId, t.gameNumber),
+  check('match_games_home_side_check', sql`${t.homeSide} in ('Red', 'Blue')`),
+  check('match_games_game_number_check', sql`${t.gameNumber} between 1 and 3`),
+]).enableRLS();
+
+// A manager's submitted match IDs that could not be resolved yet because the data service was
+// rate-limited or down. It keeps the IDs so "Check again" does not need them re-pasted, and holds
+// the earliest sensible retry. At most one is open per match.
+export const matchResultSubmissions = pgTable('match_result_submissions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  submittedByUserId: uuid('submitted_by_user_id').notNull(), // Supabase auth.users.id
+  submittedBySchoolId: uuid('submitted_by_school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
+    .notNull(),
+  riotMatchIds: text('riot_match_ids').array().notNull(),
+  status: text('status').default('pending').notNull(), // 'pending' | 'completed' | 'cancelled'
+  retryAfter: timestamp('retry_after'),
+  lastError: text('last_error'),
+  ...auditColumns,
+}, (t) => [
+  index('match_result_submissions_match_id_idx').on(t.matchId),
+  uniqueIndex('match_result_submissions_one_pending_per_match_idx')
+    .on(t.matchId)
+    .where(sql`status = 'pending'`),
+  check('match_result_submissions_status_check', sql`${t.status} in ('pending', 'completed', 'cancelled')`),
+]).enableRLS();
+
 // --- TOURNAMENTS ---
 
 export const tournamentFormatEnum = pgEnum('tournament_format', [
