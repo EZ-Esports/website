@@ -13,13 +13,15 @@ import { input } from '@/app/components/admin/styles';
 import type { GameItem, ManagerInviteItem } from './types';
 import { adminButton, inputSm, label as labelClass, primaryBtn, primaryBtnSm } from '../styles';
 import { RequiredMark } from '../AdminUI';
+import ConfirmActionDialog from '../ConfirmActionDialog';
+import { useConfirmAction } from '../useConfirmAction';
 
 interface ProvisionInviteTabProps {
   schoolId: string;
   games: GameItem[];
   invites: ManagerInviteItem[];
   isRevokingId: string | null;
-  onRevokeInvite: (id: string, name: string) => Promise<any>;
+  onRevokeInvite: (id: string) => Promise<{ success: boolean; error?: string }>;
   onRefresh: () => Promise<void>;
   onError: (msg: string | null) => void;
   onSuccess: (msg: string | null) => void;
@@ -46,6 +48,11 @@ export function ProvisionInviteTab({
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [now] = useState(() => Date.now());
   const [isSubmitting, startSubmitting] = useTransition();
+  const revocation = useConfirmAction<{ id: string; name: string }>(async ({ id }) => {
+    const res = await onRevokeInvite(id);
+    if (!res?.success && res?.error) onError(res.error);
+    return res;
+  }, 'Failed to revoke invite.');
 
   const handleToggleGame = (slug: string) => {
     setSelectedGames((prev) =>
@@ -346,15 +353,12 @@ export function ProvisionInviteTab({
                     {inv.status === 'pending' && !isExpired && (
                       <button
                         type="button"
-                        onClick={async () => {
-                          const res = await onRevokeInvite(
-                            inv.id,
-                            `${inv.intendedFirstName} ${inv.intendedLastName}`
-                          );
-                          if (!res?.success && res?.error) {
-                            onError(res.error);
-                          }
-                        }}
+                        onClick={() =>
+                          revocation.request({
+                            id: inv.id,
+                            name: `${inv.intendedFirstName} ${inv.intendedLastName}`,
+                          })
+                        }
                         disabled={isRevokingId === inv.id}
                         className={adminButton('ghost', 'sm') + ' text-red-300 hover:text-red-200 hover:bg-red-950/40'}
                       >
@@ -368,6 +372,15 @@ export function ProvisionInviteTab({
           </div>
         )}
       </div>
+
+      <ConfirmActionDialog
+        {...revocation.dialogProps}
+        tone="danger"
+        title="Revoke invite?"
+        message={`Are you sure you want to revoke the invite for ${revocation.target?.name ?? ''}?`}
+        confirmLabel="Revoke invite"
+        pendingLabel="Revoking…"
+      />
     </div>
   );
 }

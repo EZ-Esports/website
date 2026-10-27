@@ -1,6 +1,8 @@
 'use client';
 
 import { FiStar, FiTrash2 } from 'react-icons/fi';
+import ConfirmActionDialog from '../ConfirmActionDialog';
+import { useConfirmAction } from '../useConfirmAction';
 import type { ManagerItem } from './types';
 import { chip, deleteIconBtn } from '../styles';
 
@@ -9,7 +11,7 @@ interface ActiveManagersTabProps {
   managers: ManagerItem[];
   loading: boolean;
   isRemovingId: string | null;
-  onRemoveManager: (id: string, name: string) => Promise<any>;
+  onRemoveManager: (id: string) => Promise<{ success: boolean; error?: string }>;
   onError: (msg: string | null) => void;
 }
 
@@ -20,6 +22,12 @@ export function ActiveManagersTab({
   onRemoveManager,
   onError,
 }: ActiveManagersTabProps) {
+  const removal = useConfirmAction<{ id: string; name: string }>(async ({ id }) => {
+    const res = await onRemoveManager(id);
+    if (!res?.success && res?.error) onError(res.error);
+    return res;
+  }, 'Failed to remove manager.');
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -93,12 +101,7 @@ export function ActiveManagersTab({
 
                 <button
                   type="button"
-                  onClick={async () => {
-                    const res = await onRemoveManager(m.id, displayName || displayEmail);
-                    if (!res?.success && res?.error) {
-                      onError(res.error);
-                    }
-                  }}
+                  onClick={() => removal.request({ id: m.id, name: displayName || displayEmail })}
                   disabled={isRemovingId === m.id}
                   className={deleteIconBtn}
                   title="Remove manager access"
@@ -111,6 +114,15 @@ export function ActiveManagersTab({
           })}
         </div>
       )}
+
+      <ConfirmActionDialog
+        {...removal.dialogProps}
+        tone="danger"
+        title="Remove manager access?"
+        message={`Are you sure you want to remove manager access for ${removal.target?.name ?? ''}?`}
+        confirmLabel="Remove access"
+        pendingLabel="Removing…"
+      />
     </div>
   );
 }
