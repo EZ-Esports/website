@@ -5,7 +5,7 @@
 - **Status:** Implemented on branch `fix/replace-native-confirm` (not merged at the time of writing). No migration, no schema change.
 - **PR / Commit:** pending
 - **Date:** 2026-10-27
-- **Scope:** the eight native `confirm()` call sites, an extended `ConfirmActionDialog`, a new `useConfirmAction` hook, an ESLint rule and a vitest backstop. (035 and 036 are reserved by unmerged PRs #283 and #284.)
+- **Scope:** the eight native `confirm()` call sites, an extended `ConfirmActionDialog`, a new `useConfirmAction` hook, an ESLint rule and a vitest backstop. (035 is the merged managers Discord OAuth spec; 036 is reserved by the open purge-script PR #284.)
 
 ## Context & Motivation
 
