@@ -19,10 +19,32 @@ export interface GuildJoinResult {
   alreadyMember: boolean;
 }
 
+export interface RoleSyncInput {
+  /** Every role id this sync is allowed to touch. Roles outside this set are never added or removed. */
+  managed: string[];
+  /** The managed roles the member should hold afterwards. Ids not in `managed` are ignored. */
+  desired: string[];
+}
+
+export interface RoleSyncOutcome {
+  /** False when the user is not in the guild; nothing was changed. */
+  inGuild: boolean;
+  added: string[];
+  removed: string[];
+}
+
 export interface CommunityPlatformPort {
   addMemberToGuild(discordUserId: string, accessToken: string): Promise<GuildJoinResult>;
   isMemberInGuild(discordUserId: string): Promise<boolean>;
-  syncMemberRoles(discordUserId: string, roleIds: string[]): Promise<void>;
+  /** The member's current role ids, or null when they are not in the guild. */
+  getMemberRoles(discordUserId: string): Promise<string[] | null>;
+  addMemberRole(discordUserId: string, roleId: string): Promise<void>;
+  removeMemberRole(discordUserId: string, roleId: string): Promise<void>;
+  /**
+   * Makes the member's MANAGED roles equal `desired` by adding and removing individual roles.
+   * Every other role the member holds is left alone.
+   */
+  syncManagedRoles(discordUserId: string, input: RoleSyncInput): Promise<RoleSyncOutcome>;
 }
 
 export interface ManagerAuthUserResult {

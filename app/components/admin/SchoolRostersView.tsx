@@ -27,6 +27,7 @@ import {
   RosterEditProvider,
   useRosterEditRunner,
 } from '@/app/components/admin/SchoolRosterEditors';
+import ResyncDiscordRoles from '@/app/components/admin/ResyncDiscordRoles';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { chip, chipDot, focusRing, segmentedGroup, segmentedItem, selectClass } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
@@ -111,6 +112,7 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
     <div className="space-y-5">
       <AdminToast toast={toast} onDismiss={() => setToast(null)} />
       <RegisterTeamPanel />
+      <ResyncDiscordRoles schoolId={schoolId} schoolName={schoolName} />
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <div>
           <label htmlFor="roster-game-filter" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">

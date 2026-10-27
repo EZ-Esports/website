@@ -111,10 +111,6 @@ describe('DiscordRestAdapter other methods', () => {
     expect(await adapterWith(vi.fn(async () => json(200, {}))).adapter.isMemberInGuild(UID)).toBe(true);
     expect(await adapterWith(vi.fn(async () => json(404, { code: 10007 }))).adapter.isMemberInGuild(UID)).toBe(false);
   });
-
-  it('syncMemberRoles is explicitly not implemented', async () => {
-    await expect(adapterWith(vi.fn()).adapter.syncMemberRoles(UID, ['r'])).rejects.toThrow('not implemented');
-  });
 });
 
 describe('OAuth helpers', () => {

@@ -1,4 +1,9 @@
-import type { CommunityPlatformPort, GuildJoinResult } from '../core/ports/external-ports';
+import type {
+  CommunityPlatformPort,
+  GuildJoinResult,
+  RoleSyncInput,
+  RoleSyncOutcome,
+} from '../core/ports/external-ports';
 
 /**
  * Stateless Discord REST client for the onboarding wizard. Plain `fetch` against API v10:
@@ -27,6 +32,8 @@ export type DiscordFailureCode =
   | 'server_cap'
   | 'banned'
   | 'bot_misconfigured'
+  | 'role_not_found'
+  | 'member_not_found'
   | 'rate_limited'
   | 'outage'
   | 'unknown';
@@ -55,6 +62,9 @@ export const DISCORD_FAILURE_MESSAGES: Record<DiscordFailureCode, string> = {
   banned: 'This Discord account cannot join the EZ Esports server. Please contact your school manager.',
   bot_misconfigured:
     'We could not add you to the EZ Esports Discord server because of a problem on our side. Please tell your school manager or an EZ Esports staff member.',
+  role_not_found:
+    'A Discord tier role in DISCORD_TIER_ROLES does not exist in the server. Check the role ids.',
+  member_not_found: 'That Discord user is not in the EZ Esports server.',
   rate_limited: 'Discord is busy right now. Please wait a minute and press "Connect Discord" again.',
   outage: 'Discord is not responding right now. Please try again in a few minutes.',
   unknown: 'Something went wrong while connecting Discord. Please try again.',
@@ -267,7 +277,119 @@ export class DiscordRestAdapter implements CommunityPlatformPort {
     throw discordFailure('unknown');
   }
 
-  async syncMemberRoles(_discordUserId: string, _roleIds: string[]): Promise<void> {
-    throw new Error('DiscordRestAdapter.syncMemberRoles is not implemented: role assignment is out of scope for Discord OAuth onboarding.');
+  async getMemberRoles(discordUserId: string): Promise<string[] | null> {
+    if (!isDiscordSnowflake(discordUserId)) throw discordFailure('unknown');
+    const res = await this.botRequest(`/guilds/${this.guildId}/members/${discordUserId}`, { method: 'GET' });
+    if (res.status === 200) {
+      const body = (await res.json().catch(() => null)) as { roles?: unknown } | null;
+      if (!body || !Array.isArray(body.roles)) throw discordFailure('unknown');
+      return body.roles.filter(isDiscordSnowflake);
+    }
+    if (res.status === 404) {
+      const apiCode = await apiCodeOf(res);
+      // 10004 is "Unknown Guild": a wrong DISCORD_GUILD_ID, not a user who is absent.
+      if (apiCode === 10004) throw discordFailure('bot_misconfigured');
+      return null;
+    }
+    this.throwForStatus(res.status);
   }
+
+  async addMemberRole(discordUserId: string, roleId: string): Promise<void> {
+    await this.changeRole('PUT', discordUserId, roleId);
+  }
+
+  async removeMemberRole(discordUserId: string, roleId: string): Promise<void> {
+    await this.changeRole('DELETE', discordUserId, roleId);
+  }
+
+  /**
+   * Adds or removes ONE role through the per-role endpoints. The PATCH-members `roles` array
+   * overwrites everything the member has and would erase roles staff assigned by hand, so this
+   * adapter never uses it.
+   */
+  private async changeRole(method: 'PUT' | 'DELETE', discordUserId: string, roleId: string): Promise<void> {
+    if (!isDiscordSnowflake(discordUserId) || !isDiscordSnowflake(roleId)) throw discordFailure('unknown');
+    const res = await this.botRequest(`/guilds/${this.guildId}/members/${discordUserId}/roles/${roleId}`, {
+      method,
+      headers: { 'X-Audit-Log-Reason': ROLE_SYNC_AUDIT_REASON },
+    });
+    if (res.status === 204 || res.status === 200) return;
+    if (res.status === 404) {
+      const apiCode = await apiCodeOf(res);
+      if (apiCode === 10007 || apiCode === 10013) throw discordFailure('member_not_found');
+      throw discordFailure('role_not_found');
+    }
+    this.throwForStatus(res.status);
+  }
+
+  async syncManagedRoles(discordUserId: string, input: RoleSyncInput): Promise<RoleSyncOutcome> {
+    const { toAdd, toRemove, current } = await this.planManagedRoles(discordUserId, input);
+    if (current === null) return { inGuild: false, added: [], removed: [] };
+
+    const added: string[] = [];
+    const removed: string[] = [];
+    try {
+      // Add before remove so a move between tiers never leaves the member with neither role.
+      for (const id of toAdd) {
+        await this.addMemberRole(discordUserId, id);
+        added.push(id);
+      }
+      for (const id of toRemove) {
+        await this.removeMemberRole(discordUserId, id);
+        removed.push(id);
+      }
+    } catch (error) {
+      // They left the server between the read and the write: nothing left to sync.
+      if (error instanceof DiscordError && error.code === 'member_not_found') {
+        return { inGuild: false, added: [], removed: [] };
+      }
+      throw error;
+    }
+    return { inGuild: true, added, removed };
+  }
+
+  /** Reads the member's roles and works out what a sync would change, without changing anything. */
+  async planManagedRoles(
+    discordUserId: string,
+    input: RoleSyncInput
+  ): Promise<{ current: string[] | null; toAdd: string[]; toRemove: string[] }> {
+    const current = await this.getMemberRoles(discordUserId);
+    if (current === null) return { current: null, toAdd: [], toRemove: [] };
+    return { current, ...planRoleChanges(current, input) };
+  }
+
+  private throwForStatus(status: number): never {
+    if (status >= 500) throw discordFailure('outage');
+    if (status === 401 || status === 403) {
+      // The bot lacks Manage Roles, or its highest role sits below the tier role it must assign.
+      console.error(`Discord role request rejected (HTTP ${status}); the bot needs Manage Roles and a role above the tier roles.`);
+      throw discordFailure('bot_misconfigured');
+    }
+    throw discordFailure('unknown');
+  }
+}
+
+/** Shown in the server's audit log next to every role change the sync makes. ASCII only: it travels in an HTTP header. */
+export const ROLE_SYNC_AUDIT_REASON = 'EZ Esports roster sync';
+
+/**
+ * The only place the add/remove sets are decided. A role is touched only if it is in `managed`:
+ * `desired` is clipped to it, and only managed roles the member currently holds can be removed.
+ */
+export function planRoleChanges(
+  current: string[],
+  input: RoleSyncInput
+): { toAdd: string[]; toRemove: string[] } {
+  const managed = new Set(input.managed.filter(isDiscordSnowflake));
+  const desired = new Set(input.desired.filter((id) => managed.has(id)));
+  const held = new Set(current);
+  return {
+    toAdd: [...desired].filter((id) => !held.has(id)),
+    toRemove: [...held].filter((id) => managed.has(id) && !desired.has(id)),
+  };
+}
+
+async function apiCodeOf(res: Response): Promise<number | undefined> {
+  const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+  return typeof body?.code === 'number' ? body.code : undefined;
 }

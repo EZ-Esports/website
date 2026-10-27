@@ -104,7 +104,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
 - [#247](https://github.com/EZ-Esports/website/issues/247): Riot Sign-On (OAuth) and consent for student onboarding. On hold until Riot approves the production key.
 - [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
-- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and server join are built for players ([spec-033](spec-033-discord-oauth-onboarding.md), PR #281) and for school managers ([spec-035](spec-035-manager-discord-oauth.md), required for everyone, all self-reported Discord code removed). Still open: role assignment (`syncMemberRoles` is a stub), live guild re-check at roster time, the owner-run purge of pre-OAuth test data (rows with unverified Discord ids), and Discord app/bot setup plus env vars on staging and production.
+- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and server join are built for players ([spec-033](spec-033-discord-oauth-onboarding.md), PR #281) and for school managers ([spec-035](spec-035-manager-discord-oauth.md), required for everyone, all self-reported Discord code removed). Tier-role assignment is built ([spec-038](spec-038-discord-role-sync.md), `syncMemberRoles` stub replaced). Still open: school roles, live guild re-check at roster time, the owner-run purge of pre-OAuth test data (rows with unverified Discord ids), and Discord app/bot setup plus env vars on staging and production.
 - [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
 
 ## Onboarding draft and season defaults (spec-017)
@@ -154,7 +154,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **One-tier rule is app-level only.** An advisory lock plus a check inside the transaction, no database constraint. Seed scripts and hand-run SQL bypass it, and rows that violated the rule before this change remain. A cleanup query (members with `players` rows on two rosters of one team) has not been run against production.
 - **Thrown manager errors are masked in production (confirmed).** Next.js omits the message of an error thrown from a server action, so the move, enroll and invite-approval rejections are now returned results. The neighbouring manager actions (`removePlayerFromRoster`, `updateRosterPlayerRole`, `emergencySwapSub`, `deleteSchoolRoster`, `createSchoolRoster`) and the authorization / lock / view-only guards still throw, and the client shows `err.message` with `alert`; if a message there matters, convert it the same way.
 - **Not seen in a browser.** The Move control and its notice were verified by unit and render tests only.
-- **Seam has no consumer, and does not see everything.** `notifyRosterMembershipChanged` is a no-op until the Discord role feature lands. Game and season deletes (database cascade), the seed/ingest scripts and manager `deleteSchoolRoster` never call it, so the consumer needs a periodic reconcile.
+- **Seam does not see everything.** `notifyRosterMembershipChanged` now drives the Discord tier-role sync ([spec-038](spec-038-discord-role-sync.md)). Game and season deletes (database cascade), the seed/ingest scripts and manager `deleteSchoolRoster` never call it, so the consumer needs a periodic reconcile.
 - **Roster size limits are app-level and not retroactive.** No database constraint (seeds and hand-run SQL bypass them), and rosters already above 7 players or 2 subs are left alone. A query listing them has not been run against production. Staff are held to the caps with no override; if the owner wants one it should be an explicit, audited action. Games with a different roster shape (for example tournament-model games) share the same constants; confirm with the owner.
 - **Captain rule is ambiguous.** "One captain per team" is enforced per roster today (database index); the owner has not confirmed whether it should also span Varsity and JV. Captain behaviour was deliberately not changed with the caps.
 
@@ -167,6 +167,18 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - The run is recorded here and in the timeline. Consider removing the script (`db/purge-onboarding-test-data.ts`, its tests and the PGlite devDependency) now that it has served its purpose; it stays only if a future purge is likely.
 
 ---
+
+## Discord tier-role sync (spec-038)
+
+- **Never run against real Discord.** All tests use fakes and mocked `fetch`. Try it on a throwaway server first (`docs/dev/DISCORD.md`); confirm the bot role order, the 403 mapping and the audit-log reason there.
+- **Backfill not run.** `npm run db:sync:discord-roles` is written; the owner decides when to run the dry run and `--execute` against production (it reads `.env`).
+- **School roles** are out of scope and still manual.
+- **Live guild re-check** at roster time (`isMemberInGuild`) is still not wired into enroll.
+- **Season rollover.** When the active season flips, nobody's roster in the new season exists yet and past-season rosters stop counting; nothing triggers a sync-all. Run the staff resync per school (or the script) after a rollover, or add a season-switch hook.
+- **Mapping lives in an env var.** Adding a game means editing `DISCORD_TIER_ROLES` in Vercel and redeploying; a DB-backed mapping editable in League Setup is the alternative.
+- **Failures are not visible after the fact.** Live-sync failures only reach the server log (masked id + code); there is no per-member status page. Students who are not in the server are skipped until their next roster change or a resync.
+- **Coaches get no tier role** (player, sub and captain do); confirm with the owner.
+- **Resync runs inline.** A very large school may approach the server action time limit; it processes students sequentially at about 150 ms pacing.
 
 ## In-app confirm dialogs (spec-037)
 
