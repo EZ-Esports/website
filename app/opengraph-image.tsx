@@ -24,6 +24,8 @@ export default function OpengraphImage() {
           backgroundColor: '#1c1c1c',
         }}
       >
+        {/* next/image is a client component and cannot render inside ImageResponse (satori); a plain img is required here. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={logoSrc}
           width={747}
