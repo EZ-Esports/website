@@ -21,6 +21,15 @@ interface SchoolRostersPageProps {
  * denied before any roster query runs, so edit controls never render for them.
  * The game / division filters come from the URL and are validated here.
  */
+/**
+ * Server actions inherit the page's time limit. The whole-school "Resync Discord roles" walks the
+ * school's students one at a time (a database read and a paced Discord call each), so it needs more
+ * than the platform default. 60 seconds is the highest value every Vercel plan accepts; it covers
+ * roughly 100-150 connected students, beyond which the resync stops partway and can simply be run
+ * again (it is idempotent).
+ */
+export const maxDuration = 60;
+
 export default async function SchoolRostersPage({ params, searchParams }: SchoolRostersPageProps) {
   if (!(await getStaffWithPermission(ADMIN_ROSTER_VIEW_PERMISSION))) return <PermissionDenied />;
 

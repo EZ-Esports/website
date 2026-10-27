@@ -97,6 +97,14 @@ describe('addMemberRole / removeMemberRole', () => {
     expect(await codeOf(setup(() => res(404, { code: 10011 })).adapter.addMemberRole(UID, R1))).toBe('role_not_found');
     expect(await codeOf(setup(() => res(404, { code: 10007 })).adapter.addMemberRole(UID, R1))).toBe('member_not_found');
   });
+  it('attributes a 404 by Discord error code: 10004 is a misconfiguration, anything else is unknown', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await codeOf(setup(() => res(404, { code: 10004 })).adapter.addMemberRole(UID, R1))).toBe('bot_misconfigured');
+    expect(await codeOf(setup(() => res(404, { code: 99999 })).adapter.addMemberRole(UID, R1))).toBe('unknown');
+    expect(await codeOf(setup(() => res(404, {})).adapter.removeMemberRole(UID, R1))).toBe('unknown');
+    // A proxy or CDN error page is not JSON; it must not be blamed on the role configuration.
+    expect(await codeOf(setup(() => new Response('<html>Not Found</html>', { status: 404 })).adapter.addMemberRole(UID, R1))).toBe('unknown');
+  });
   it('rejects invalid ids without calling Discord', async () => {
     const { adapter, fetchImpl } = setup(() => res(204));
     expect(await codeOf(adapter.addMemberRole(UID, 'nope'))).toBe('unknown');

@@ -52,6 +52,50 @@ describe('ResyncDiscordRoles', () => {
   });
 });
 
+describe('guards', () => {
+  it('shows a blocked report as an alert with the fix, not as a success summary', async () => {
+    resync.mockResolvedValue({ success: true, report: { ...base, status: 'blocked', blockedReason: 'role_not_below_bot' } });
+    const user = userEvent.setup();
+    render(<ResyncDiscordRoles schoolId="s1" schoolName="Lincoln High" />);
+    await user.click(screen.getByRole('button', { name: /resync discord roles/i }));
+    await user.click(await screen.findByRole('button', { name: 'Resync roles' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('no Discord roles were changed');
+    expect(alert).toHaveTextContent('drag the bot');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('asks a second time, with the numbers, before removing every tier role, and only then forces it', async () => {
+    resync
+      .mockResolvedValueOnce({ success: false, error: 'x', stripAll: { withDiscord: 4, members: 6 } })
+      .mockResolvedValueOnce({ success: true, report: { ...base, synced: 4 } });
+    const user = userEvent.setup();
+    render(<ResyncDiscordRoles schoolId="s1" schoolName="Lincoln High" />);
+    await user.click(screen.getByRole('button', { name: /resync discord roles/i }));
+    await user.click(await screen.findByRole('button', { name: 'Resync roles' }));
+
+    const warning = await screen.findByRole('alertdialog', { name: 'Remove tier roles from everyone?' });
+    expect(warning).toHaveTextContent('4 students with Discord connected');
+    expect(resync).toHaveBeenCalledTimes(1);
+    expect(resync).toHaveBeenLastCalledWith('s1');
+
+    await user.click(screen.getByRole('button', { name: 'Remove their tier roles' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('4 updated');
+    expect(resync).toHaveBeenLastCalledWith('s1', undefined, { allowStripAll: true });
+  });
+
+  it('cancelling the warning removes nothing', async () => {
+    resync.mockResolvedValueOnce({ success: false, error: 'x', stripAll: { withDiscord: 2, members: 2 } });
+    const user = userEvent.setup();
+    render(<ResyncDiscordRoles schoolId="s1" schoolName="Lincoln High" />);
+    await user.click(screen.getByRole('button', { name: /resync discord roles/i }));
+    await user.click(await screen.findByRole('button', { name: 'Resync roles' }));
+    await screen.findByRole('alertdialog', { name: 'Remove tier roles from everyone?' });
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(resync).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('summarizeReport', () => {
   it('omits zero optional counts', () => {
     expect(summarizeReport({ ...base, synced: 1, unchanged: 2 })).toBe('Discord roles resynced: 1 updated, 2 already correct.');

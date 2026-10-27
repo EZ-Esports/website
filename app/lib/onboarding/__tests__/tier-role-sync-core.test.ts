@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DiscordError, discordFailure, planRoleChanges } from '../adapters/discord-rest';
 import type { RoleSyncInput, RoleSyncOutcome } from '../core/ports/external-ports';
-import { runTierRoleSync, type TierSyncDeps } from '../tier-role-sync-core';
+import { previewTierSync, runTierRoleSync, type TierSyncDeps } from '../tier-role-sync-core';
 import type { RosterMembershipFact, TierRoleMap } from '../tier-roles';
 
 const VAL_V = '111111111111111111';
@@ -15,6 +15,8 @@ const fact = (rosterName: string, over: Partial<RosterMembershipFact> = {}): Ros
   gameSlug: 'valorant', rosterName, seasonIsActive: true, playerRole: 'player', ...over,
 });
 
+const OK = { checkTierRolesAssignable: async () => ({ ok: true as const }) };
+
 /** A fake guild that applies the real planning rules and counts concurrency. */
 function fakeGuild(initial: Record<string, string[] | null>) {
   const state = new Map(Object.entries(initial));
@@ -22,6 +24,7 @@ function fakeGuild(initial: Record<string, string[] | null>) {
   let inFlight = 0;
   let maxInFlight = 0;
   const adapter = {
+    ...OK,
     async syncManagedRoles(discordUserId: string, input: RoleSyncInput): Promise<RoleSyncOutcome> {
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
@@ -107,8 +110,9 @@ describe('runTierRoleSync', () => {
   it('isolates failures per member and reports only masked ids and codes', async () => {
     const g = fakeGuild({ [D(1)]: [], [D(3)]: [] });
     const failing = {
+      ...OK,
       async syncManagedRoles(id: string, input: RoleSyncInput) {
-        if (id === D(2)) throw discordFailure('bot_misconfigured');
+        if (id === D(2)) throw discordFailure('outage');
         return g.adapter.syncManagedRoles(id, input);
       },
     };
@@ -126,7 +130,7 @@ describe('runTierRoleSync', () => {
       )
     );
     expect(report).toMatchObject({ synced: 2, failed: 1 });
-    expect(report.failures).toEqual([{ member: '00000002...', reason: 'bot_misconfigured' }]);
+    expect(report.failures).toEqual([{ member: '00000002...', memberId: M2, reason: 'outage' }]);
     expect(g.state.get(D(3))).toEqual([VAL_J]);
     const text = lines.join('\n');
     expect(text).toContain('00000002...');
@@ -199,8 +203,38 @@ describe('runTierRoleSync', () => {
     expect(sleep).toHaveBeenCalledWith(50);
   });
 
+  it('does not pause for members without a Discord account (no Discord call, no pacing)', async () => {
+    const g = fakeGuild({ [D(3)]: [] });
+    const sleep = vi.fn(async () => {});
+    await runTierRoleSync(
+      [M1, M2, M3],
+      deps({ [M1]: { discord: null, memberships: [] }, [M2]: { discord: null, memberships: [] }, [M3]: { discord: D(3), memberships: [fact('Varsity')] } }, g.adapter, { paceMs: 50, sleep })
+    );
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('is blocked without touching any member when the preflight fails', async () => {
+    const loadDiscordUserId = vi.fn(async () => D(1));
+    const adapter = { checkTierRolesAssignable: async () => ({ ok: false as const, reason: 'missing_manage_roles' as const }), syncManagedRoles: vi.fn() };
+    const report = await runTierRoleSync([M1], deps({}, adapter, { loadDiscordUserId }));
+    expect(report).toMatchObject({ status: 'blocked', blockedReason: 'missing_manage_roles' });
+    expect(adapter.syncManagedRoles).not.toHaveBeenCalled();
+    expect(loadDiscordUserId).not.toHaveBeenCalled();
+  });
+
+  it('stops after a bot_misconfigured failure and reports the rest as not attempted', async () => {
+    const adapter = { ...OK, syncManagedRoles: vi.fn(async () => { throw discordFailure('bot_misconfigured'); }) };
+    const report = await runTierRoleSync(
+      [M1, M2],
+      deps(Object.fromEntries([M1, M2].map((m, i) => [m, { discord: D(i + 1), memberships: [fact('Varsity')] }])), adapter)
+    );
+    expect(adapter.syncManagedRoles).toHaveBeenCalledTimes(1);
+    expect(report.failures.map((f) => f.reason)).toEqual(['bot_misconfigured', 'not_attempted_after_config_error']);
+  });
+
   it('stops hammering Discord after a rate limit and reports the rest as not attempted', async () => {
     const adapter = {
+      ...OK,
       syncManagedRoles: vi.fn(async () => {
         throw new DiscordError('rate_limited', 'x', 2);
       }),
@@ -218,8 +252,33 @@ describe('runTierRoleSync', () => {
   });
 
   it('only ever passes the managed set to the adapter', async () => {
-    const adapter = { syncManagedRoles: vi.fn(async () => ({ inGuild: true, added: [], removed: [] })) };
+    const adapter = { ...OK, syncManagedRoles: vi.fn(async () => ({ inGuild: true, added: [], removed: [] })) };
     await runTierRoleSync([M1], deps({ [M1]: { discord: D(1), memberships: [fact('Varsity')] } }, adapter));
     expect(adapter.syncManagedRoles).toHaveBeenCalledWith(D(1), { managed: MANAGED, desired: [VAL_V] });
+  });
+});
+
+describe('previewTierSync', () => {
+  const run = (members: Record<string, { discord: string | null; memberships: RosterMembershipFact[] }>) =>
+    previewTierSync(Object.keys(members), {
+      roles: ROLES,
+      loadDiscordUserId: async (id) => members[id].discord,
+      loadMemberships: async (id) => members[id].memberships,
+    });
+
+  it('flags a school where nobody connected would hold a tier role (an empty new season)', async () => {
+    const p = await run({
+      [M1]: { discord: D(1), memberships: [fact('Varsity', { seasonIsActive: false })] },
+      [M2]: { discord: D(2), memberships: [] },
+      [M3]: { discord: null, memberships: [fact('Varsity')] },
+    });
+    expect(p).toEqual({ members: 3, withDiscord: 2, withTierRoles: 0, stripAll: true });
+  });
+  it('does not flag when at least one connected member keeps a tier role', async () => {
+    const p = await run({ [M1]: { discord: D(1), memberships: [fact('JV')] }, [M2]: { discord: D(2), memberships: [] } });
+    expect(p).toMatchObject({ withDiscord: 2, withTierRoles: 1, stripAll: false });
+  });
+  it('does not flag a school with nobody connected (nothing to strip)', async () => {
+    expect((await run({ [M1]: { discord: null, memberships: [] } })).stripAll).toBe(false);
   });
 });

@@ -3,6 +3,8 @@ import type {
   GuildJoinResult,
   RoleSyncInput,
   RoleSyncOutcome,
+  TierPreflightReason,
+  TierPreflightResult,
 } from '../core/ports/external-ports';
 
 /**
@@ -196,6 +198,26 @@ export interface DiscordRestAdapterOptions {
   fetchImpl?: FetchLike;
   /** Injectable so tests do not really sleep. */
   sleep?: (ms: number) => Promise<void>;
+  /** Injectable clock for the preflight cache. */
+  now?: () => number;
+}
+
+const ADMINISTRATOR = BigInt(0x8);
+const MANAGE_ROLES = BigInt(0x10000000);
+
+/** A passing preflight is trusted for this long; a failing one is re-checked sooner so a fix shows quickly. */
+export const PREFLIGHT_SUCCESS_TTL_MS = 5 * 60_000;
+export const PREFLIGHT_FAILURE_TTL_MS = 60_000;
+
+const preflightCache = new Map<string, { result: TierPreflightResult; expiresAt: number }>();
+
+/** Forgets cached preflight results for a guild (all guilds when omitted). */
+export function invalidateTierPreflightCache(guildId?: string): void {
+  if (guildId === undefined) {
+    preflightCache.clear();
+    return;
+  }
+  for (const key of [...preflightCache.keys()]) if (key.startsWith(`${guildId}|`)) preflightCache.delete(key);
 }
 
 export class DiscordRestAdapter implements CommunityPlatformPort {
@@ -203,12 +225,81 @@ export class DiscordRestAdapter implements CommunityPlatformPort {
   private readonly guildId: string;
   private readonly fetchImpl: FetchLike;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly now: () => number;
 
   constructor(options: DiscordRestAdapterOptions) {
     this.botToken = options.botToken;
     this.guildId = options.guildId;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.sleep = options.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.now = options.now ?? Date.now;
+  }
+
+  async checkTierRolesAssignable(managedRoleIds: string[]): Promise<TierPreflightResult> {
+    const key = `${this.guildId}|${[...managedRoleIds].sort().join(',')}`;
+    const hit = preflightCache.get(key);
+    if (hit && hit.expiresAt > this.now()) return hit.result;
+
+    let result: TierPreflightResult;
+    try {
+      result = await this.runPreflight(managedRoleIds);
+    } catch {
+      // Network, 5xx, 429, 401/403 or an unreadable answer: we cannot prove the roles are
+      // assignable, so assign nothing.
+      result = { ok: false, reason: 'preflight_failed' };
+    }
+    preflightCache.set(key, {
+      result,
+      expiresAt: this.now() + (result.ok ? PREFLIGHT_SUCCESS_TTL_MS : PREFLIGHT_FAILURE_TTL_MS),
+    });
+    return result;
+  }
+
+  private async runPreflight(managedRoleIds: string[]): Promise<TierPreflightResult> {
+    const fail = (reason: TierPreflightReason): TierPreflightResult => ({ ok: false, reason });
+    if (managedRoleIds.length === 0 || !managedRoleIds.every(isDiscordSnowflake)) return fail('role_missing');
+
+    const me = await this.botRequest('/users/@me', { method: 'GET' });
+    const meBody = me.status === 200 ? ((await me.json().catch(() => null)) as { id?: unknown } | null) : null;
+    if (!meBody || !isDiscordSnowflake(meBody.id)) return fail('preflight_failed');
+    const botId = meBody.id;
+
+    const rolesRes = await this.botRequest(`/guilds/${this.guildId}/roles`, { method: 'GET' });
+    const rolesBody = rolesRes.status === 200 ? ((await rolesRes.json().catch(() => null)) as unknown) : null;
+    if (!Array.isArray(rolesBody)) return fail('preflight_failed');
+    const guildRoles = new Map<string, { position: number; permissions: bigint; managed: boolean }>();
+    for (const r of rolesBody as Array<Record<string, unknown>>) {
+      if (!isDiscordSnowflake(r.id) || typeof r.position !== 'number' || typeof r.permissions !== 'string') {
+        return fail('preflight_failed');
+      }
+      guildRoles.set(r.id, { position: r.position, permissions: BigInt(r.permissions), managed: r.managed === true });
+    }
+
+    const memberRes = await this.botRequest(`/guilds/${this.guildId}/members/${botId}`, { method: 'GET' });
+    const memberBody = memberRes.status === 200 ? ((await memberRes.json().catch(() => null)) as { roles?: unknown } | null) : null;
+    if (!memberBody || !Array.isArray(memberBody.roles)) return fail('preflight_failed');
+    const botRoleIds = memberBody.roles.filter(isDiscordSnowflake);
+
+    // @everyone shares the guild's id and applies to every member.
+    let permissions = guildRoles.get(this.guildId)?.permissions ?? BigInt(0);
+    let highest = 0;
+    for (const id of botRoleIds) {
+      const role = guildRoles.get(id);
+      if (!role) continue;
+      permissions |= role.permissions;
+      highest = Math.max(highest, role.position);
+    }
+    if ((permissions & ADMINISTRATOR) === BigInt(0) && (permissions & MANAGE_ROLES) === BigInt(0)) {
+      return fail('missing_manage_roles');
+    }
+
+    for (const id of managedRoleIds) {
+      const role = guildRoles.get(id);
+      if (!role) return fail('role_missing');
+      if (role.managed) return fail('role_is_managed');
+      if (role.position >= highest) return fail('role_not_below_bot');
+    }
+    return { ok: true };
   }
 
   static fromEnv(env: NodeJS.ProcessEnv = process.env): DiscordRestAdapter {
@@ -315,9 +406,13 @@ export class DiscordRestAdapter implements CommunityPlatformPort {
     });
     if (res.status === 204 || res.status === 200) return;
     if (res.status === 404) {
+      // Attribute by Discord's own error code. Anything unrecognised (including a body that is not
+      // JSON, such as a proxy page) is "unknown" rather than blamed on the role configuration.
       const apiCode = await apiCodeOf(res);
       if (apiCode === 10007 || apiCode === 10013) throw discordFailure('member_not_found');
-      throw discordFailure('role_not_found');
+      if (apiCode === 10011) throw discordFailure('role_not_found');
+      if (apiCode === 10004) throw discordFailure('bot_misconfigured');
+      throw discordFailure('unknown');
     }
     this.throwForStatus(res.status);
   }
@@ -362,6 +457,8 @@ export class DiscordRestAdapter implements CommunityPlatformPort {
     if (status >= 500) throw discordFailure('outage');
     if (status === 401 || status === 403) {
       // The bot lacks Manage Roles, or its highest role sits below the tier role it must assign.
+      // Whatever the preflight cached about this guild is now known to be wrong.
+      invalidateTierPreflightCache(this.guildId);
       console.error(`Discord role request rejected (HTTP ${status}); the bot needs Manage Roles and a role above the tier roles.`);
       throw discordFailure('bot_misconfigured');
     }

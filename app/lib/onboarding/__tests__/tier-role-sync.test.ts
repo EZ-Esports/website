@@ -3,12 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // The DB module is mocked so importing the service never builds a real client.
 vi.mock('@/app/lib/db', () => ({ db: {} }));
 
-const adapterCalls = vi.hoisted(() => ({ ctor: 0, sync: 0 }));
+const adapterCalls = vi.hoisted(() => ({ ctor: 0, sync: 0, blocked: false }));
 vi.mock('../adapters/discord-rest', async (orig) => {
   const actual = await orig<typeof import('../adapters/discord-rest')>();
   class FakeAdapter {
     constructor() {
       adapterCalls.ctor++;
+    }
+    async checkTierRolesAssignable() {
+      return adapterCalls.blocked ? { ok: false, reason: 'role_not_below_bot' } : { ok: true };
     }
     async syncManagedRoles() {
       adapterCalls.sync++;
@@ -29,6 +32,7 @@ beforeEach(() => {
   for (const k of ENV_KEYS) delete process.env[k];
   adapterCalls.ctor = 0;
   adapterCalls.sync = 0;
+  adapterCalls.blocked = false;
   resetTierRoleConfigLog();
   vi.spyOn(console, 'info').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -47,7 +51,7 @@ describe('syncTierRolesForMembers entry point', () => {
     process.env.DISCORD_GUILD_ID = 'g';
     const report = await syncTierRolesForMembers(['m1']);
     expect(report).toMatchObject({ status: 'disabled', disabledReason: 'config_unset' });
-    expect(adapterCalls).toEqual({ ctor: 0, sync: 0 });
+    expect(adapterCalls).toMatchObject({ ctor: 0, sync: 0 });
   });
 
   it('is disabled (not a crash) for a malformed config, and says so in the log', async () => {
@@ -56,7 +60,7 @@ describe('syncTierRolesForMembers entry point', () => {
     process.env.DISCORD_GUILD_ID = 'g';
     const report = await syncTierRolesForMembers(['m1']);
     expect(report).toMatchObject({ status: 'disabled', disabledReason: 'config_invalid' });
-    expect(adapterCalls).toEqual({ ctor: 0, sync: 0 });
+    expect(adapterCalls).toMatchObject({ ctor: 0, sync: 0 });
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('DISABLED'));
   });
 
@@ -72,6 +76,16 @@ describe('syncTierRolesForMembers entry point', () => {
     process.env.DISCORD_BOT_TOKEN = 't';
     process.env.DISCORD_GUILD_ID = 'g';
     expect(await syncTierRolesForMembers([])).toMatchObject({ status: 'ok', synced: 0, failed: 0 });
+    expect(adapterCalls.sync).toBe(0);
+  });
+
+  it('a blocked preflight surfaces as a blocked report and no member work happens', async () => {
+    process.env.DISCORD_TIER_ROLES = JSON.stringify({ valorant: { varsity: '111111111111111111' } });
+    process.env.DISCORD_BOT_TOKEN = 't';
+    process.env.DISCORD_GUILD_ID = 'g';
+    adapterCalls.blocked = true;
+    const report = await syncTierRolesForMembers(['00000001-0000-0000-0000-000000000000']);
+    expect(report).toMatchObject({ status: 'blocked', blockedReason: 'role_not_below_bot', failed: 0 });
     expect(adapterCalls.sync).toBe(0);
   });
 

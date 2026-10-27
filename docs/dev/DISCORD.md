@@ -45,9 +45,29 @@ The value is validated: every id must be a 17-20 digit string, tier keys are `va
 
 Students must have connected Discord in onboarding (the sync reads `player_identities`) and be in the server. A student who is not in the server is skipped and counted; they get the roles the next time their roster changes or a resync runs.
 
+### Fail closed: the preflight
+
+The repo contains no role ids; they exist only in the `DISCORD_TIER_ROLES` environment variable. Before any role is added or removed, in every path (a roster change, the staff button, the script), the bot is checked once and the result cached in memory (5 minutes when it passes, 1 minute when it fails; a 401/403 from a role call drops the cache). **If the bot cannot be shown able to assign every configured role, no role is assigned to anyone**, and the run reports `blocked` with one of these reasons (logged once per reason, never with ids or tokens):
+
+| Reason | Meaning | Fix |
+| --- | --- | --- |
+| `missing_manage_roles` | The bot holds neither Administrator nor Manage Roles | Grant the bot **Manage Roles** (Server Settings -> Roles -> the bot's role -> Permissions) |
+| `role_not_below_bot` | A tier role is at or above the bot's highest role | Server Settings -> Roles: drag the bot's role **above all** tier roles. One role above the bot blocks everything, even the roles that are fine |
+| `role_missing` | An id in `DISCORD_TIER_ROLES` is not a role in this server | Re-copy the ids with Developer Mode, check you are in the right server and `DISCORD_GUILD_ID` |
+| `role_is_managed` | A configured role belongs to an integration or bot, which cannot be assigned | Use ordinary roles you created |
+| `preflight_failed` | Discord could not be checked (network, 5xx, rate limit, rejected bot token) | Nothing was changed. Retry in a minute; if it persists check `DISCORD_BOT_TOKEN` |
+
+If the bot is fine at the preflight but a role call is rejected mid-run (a 403, or a role deleted since), the run stops there: the remaining students are reported as not attempted rather than retried one by one. A move is done add-first, so a failure part way leaves the student with the old role, never with neither; fix the cause and run any sync again, it converges.
+
 ### Staff resync
 
-Admin -> Schools -> a school -> Rosters has **Resync Discord roles** (needs the Manage Rosters permission). It re-derives every member of that school and reports how many were updated, already correct, not in the server, without Discord, or failed (failures show a masked member id and a reason such as "The bot lacks Manage Roles, or its role is below the tier roles").
+Admin -> Schools -> a school -> Rosters has **Resync Discord roles** (needs the Manage Rosters permission). It re-derives every member of that school and reports how many were updated, already correct, not in the server, without Discord, or failed (failures show the member's initials plus the first 8 characters of their id, and a reason such as "The bot lacks Manage Roles, or its role is below the tier roles"). A blocked run is shown as a red notice with the reason above.
+
+**Season rollover guard.** After a new season is activated, before it has rosters, nobody is on a Varsity or JV roster of an active season, so a resync would take the tier roles from everyone. When the school has connected students but none of them would keep a tier role, the button asks a second time, with the number of students, in a red dialog ("Remove tier roles from everyone?"). Continue only if that is intended; otherwise roster the new season first.
+
+**Concurrent changes.** Each student's rosters are read immediately before their roles are written, but two overlapping syncs for one student can still finish out of order (the last writer wins, with whatever it read). The repair is always the same and safe: run **Resync Discord roles** again for that school (or the script); it is idempotent and converges on the current rosters.
+
+The page allows the resync up to 60 seconds (`maxDuration`, the highest value every Vercel plan accepts, a conservative choice), which covers roughly 100-150 connected students at the built-in pacing. A larger school stops partway; run it again.
 
 ### Backfill script
 
@@ -57,7 +77,10 @@ Admin -> Schools -> a school -> Rosters has **Resync Discord roles** (needs the 
 npm run db:sync:discord-roles                         # dry run: reads the DB and current Discord roles, prints the diff
 npm run db:sync:discord-roles -- --no-discord-read    # dry run without Discord: just the desired roles
 npm run db:sync:discord-roles -- --execute            # applies the diff
+npm run db:sync:discord-roles -- --execute --allow-strip-all   # only if removing every tier role is intended
 ```
+
+The dry run first runs the same preflight and prints `BLOCKED (reason)` with the fix (exit code 2); `--execute` refuses to start when blocked. If every connected student would lose their tier roles (no tier roster in an active season, for example a new season with no rosters yet) it prints a `WARNING` with the number, and `--execute` refuses unless you also pass `--allow-strip-all`. Before writing each student, `--execute` re-reads that student's rosters (one query) and uses what is true then, so a roster change made while you were typing the confirmation is not undone; students whose plan changed are listed and counted. A 403 or rate limit stops the run.
 
 `--execute` needs the remote-host gate (`SEED_ALLOW_REMOTE=<exact hostname>` when `DATABASE_URL` is not loopback), then asks you to type a phrase naming the host and the counts. Output is masked (initials, truncated ids). Database queries run one at a time (the production pooler hangs on pipelined queries) and Discord calls are paced with 429 handling. Exit code 2 means it finished but some students failed. The script reads `.env`, which points at production here: confirm before running it.
 

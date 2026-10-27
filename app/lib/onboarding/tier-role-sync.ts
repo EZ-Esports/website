@@ -7,7 +7,9 @@ import type { CommunityPlatformPort } from './core/ports/external-ports';
 import {
   disabledReport,
   emptyReport,
+  previewTierSync,
   runTierRoleSync,
+  type TierSyncPreview,
   type TierSyncReport,
 } from './tier-role-sync-core';
 import { getTierRoleConfig, type RosterMembershipFact } from './tier-roles';
@@ -35,7 +37,7 @@ function adapterFromEnv(env: NodeJS.ProcessEnv = process.env): CommunityPlatform
 }
 
 /** The member's Discord snowflake. `player_identities` is not unique per member, so the freshest valid one wins. */
-async function loadDiscordUserId(memberId: string): Promise<string | null> {
+export async function loadDiscordUserId(memberId: string): Promise<string | null> {
   const rows = await db
     .select({ providerUserId: schema.playerIdentities.providerUserId })
     .from(schema.playerIdentities)
@@ -45,7 +47,7 @@ async function loadDiscordUserId(memberId: string): Promise<string | null> {
 }
 
 /** Every roster the member is on, across all games and seasons; the reconciler filters to active seasons. */
-async function loadMemberships(memberId: string): Promise<RosterMembershipFact[]> {
+export async function loadMemberships(memberId: string): Promise<RosterMembershipFact[]> {
   return db
     .select({
       gameSlug: schema.games.slug,
@@ -88,4 +90,14 @@ export async function syncTierRolesForMembers(memberIds: string[]): Promise<Tier
     console.error('Discord tier role sync failed:', error instanceof Error ? error.name : 'unknown error');
     return { ...emptyReport(), failed: memberIds.length };
   }
+}
+
+/**
+ * Database-only preview of a sync (see `previewTierSync`). `null` when the sync is not configured,
+ * in which case there is nothing to warn about.
+ */
+export async function previewTierRolesForMembers(memberIds: string[]): Promise<TierSyncPreview | null> {
+  const config = getTierRoleConfig();
+  if (config.status !== 'enabled') return null;
+  return previewTierSync(memberIds, { roles: config.roles, loadDiscordUserId, loadMemberships });
 }

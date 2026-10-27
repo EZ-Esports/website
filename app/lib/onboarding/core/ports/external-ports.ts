@@ -33,7 +33,27 @@ export interface RoleSyncOutcome {
   removed: string[];
 }
 
+/**
+ * Why the bot cannot be trusted to assign the tier roles. The sync fails closed: any reason other
+ * than `ok` means no role is added or removed anywhere in that run.
+ */
+export type TierPreflightReason =
+  | 'missing_manage_roles'
+  | 'role_not_below_bot'
+  | 'role_missing'
+  | 'role_is_managed'
+  | 'preflight_failed';
+
+export type TierPreflightResult = { ok: true } | { ok: false; reason: TierPreflightReason };
+
 export interface CommunityPlatformPort {
+  /**
+   * Verifies, without changing anything, that the bot can assign EVERY one of `managedRoleIds`:
+   * it holds Administrator or Manage Roles, each role exists in the guild, none is an integration
+   * (`managed`) role, and each sits strictly below the bot's highest role. Never throws; a check
+   * that cannot complete reports `preflight_failed`.
+   */
+  checkTierRolesAssignable(managedRoleIds: string[]): Promise<TierPreflightResult>;
   addMemberToGuild(discordUserId: string, accessToken: string): Promise<GuildJoinResult>;
   isMemberInGuild(discordUserId: string): Promise<boolean>;
   /** The member's current role ids, or null when they are not in the guild. */

@@ -40,6 +40,26 @@ The ambiguous `syncMemberRoles(id, roleIds)` stub on `CommunityPlatformPort` is 
 - `planRoleChanges(current, {managed, desired})` is the single place that decides the diff: `desired` is clipped to `managed`, and only managed roles currently held can be removed. Adds happen before removes so a move never leaves the member with neither role.
 - Errors reuse the existing handling: a short `Retry-After` (<= 3 s) is waited once, then `rate_limited` is surfaced; 401/403 -> `bot_misconfigured` (missing Manage Roles, or the bot's role is below the tier role); 404 on a role endpoint -> `role_not_found` (code 10011, a config error) or `member_not_found` (10007/10013, the user left; `syncManagedRoles` treats this as not in guild); 404 with code 10004 on the member read is an unknown guild, reported as `bot_misconfigured`, not as an absent user.
 
+## Fail closed: preflight (added after review, owner requirement)
+
+The owner has not supplied role ids and the code holds none; it reads only `DISCORD_TIER_ROLES`. The principle: **if the bot cannot assign the roles, assign no roles at all.**
+
+- `checkTierRolesAssignable(managedRoleIds)` on the port/adapter: `GET /users/@me` (bot id), `GET /guilds/{g}/roles`, `GET /guilds/{g}/members/{botId}`. Bot permissions are `@everyone` (role id == guild id) OR every bot role. Requires Administrator (0x8) or Manage Roles (0x10000000); every configured role must exist, not be `managed` (integration), and sit strictly below the bot's highest role position. Reasons: `missing_manage_roles | role_not_below_bot | role_missing | role_is_managed | preflight_failed`. Any failure to complete the check (network, 5xx, 429, 401/403, unreadable body) is `preflight_failed`: it never throws and never passes.
+- `runTierRoleSync` calls it once per run before touching any member. A failure returns a `blocked` report (`blockedReason`) with zero reads of members and zero writes, logged once per reason (no ids or tokens). The hook, the staff action and the backfill all go through it; the script's `--execute` refuses, its dry run prints `BLOCKED`.
+- Cached in process (module-level, keyed by guild and configured role set): 5 minutes for a pass, 60 seconds for a failure; any 401/403 from a role call invalidates the guild's entries.
+- A failure that would repeat for every member (`bot_misconfigured`, `role_not_found`, `rate_limited`) aborts the rest of the run; remaining members are reported as not attempted (`not_attempted_after_config_error` / `not_attempted_after_rate_limit`).
+- Order is add before remove, so a partial failure leaves the old role in place; the next sync converges (tested with a fake guild).
+
+## Other review fixes
+
+- **Stale backfill plan.** `--execute` re-reads each student's rosters (one query) just before writing and uses the fresh result; changed plans are logged and counted.
+- **Overlapping syncs.** Memberships are read immediately before each member's Discord write; two runs for one member can still finish out of order (last writer wins). Repair: run the resync again (idempotent). Tests show both the "later recompute wins" and the "stale run finishes last" cases.
+- **Season rollover guard.** A school-wide resync (and the script) that would leave NO connected student holding a tier role (`stripAll`, from a database-only preview) is refused until confirmed a second time: the server action returns `stripAll` numbers, the UI shows a red second dialog, and the script needs `--allow-strip-all`. Single-member resyncs are not guarded. The preview cannot know who currently holds a role in Discord (no Discord read), so the warning says tier roles "would be removed", not how many.
+- **`maxDuration = 60`** exported from the school rosters page (server actions inherit the page's limit; 60 s is the highest every Vercel plan accepts, chosen conservatively); members with no Discord identity no longer cost a pacing pause.
+- **404 attribution** on role calls follows Discord's code: 10011 `role_not_found`, 10004 `bot_misconfigured`, 10007/10013 `member_not_found` (user left), anything else (including a non-JSON body) `unknown`.
+- **Staff failure rows** show the member's initials plus uuid prefix (`A. L. (5d1f3c3e...)`), resolved server-side; full ids never reach the client.
+- **PGlite rehearsal** (`db/__tests__/discord-role-sql-pglite.test.ts`) runs the real Drizzle queries (`loadMemberships`, `loadDiscordUserId`) and the script's raw SQL against the migrations, and proves they agree.
+
 ## Sync service
 
 - `tier-role-sync-core.ts`: `runTierRoleSync(memberIds, deps)` with everything injected. Per member, strictly sequential: read the Discord identity (skip if none or not a snowflake), read memberships, compute desired, call `syncManagedRoles`. Failures are isolated per member and logged as a Discord failure code or the error class name only (a database error message can embed query parameters), with a masked id (`first 8 chars...`). Never throws. After a `rate_limited` failure the remaining members are reported as not attempted instead of hammering Discord. Idempotent: a second run with nothing changed makes no write.

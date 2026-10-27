@@ -170,6 +170,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Discord tier-role sync (spec-038)
 
+- **Role ids not supplied.** The owner has not given real role ids; `DISCORD_TIER_ROLES` stays unset until they do, which keeps the whole feature off. When set, the preflight (spec-038) blocks every assignment unless the bot is above all tier roles and has Manage Roles; the blocked reasons are in `docs/dev/DISCORD.md`.
+- **Out-of-order overlapping syncs** can still leave a stale result until the next sync; repair is another resync. A per-member lock or a version check would remove it.
+- **Strip-all guard is database-only.** It cannot say how many students actually hold a role in Discord today. It only protects the "nobody keeps a tier role" case, not a partial rollover where some students are rostered and others not yet.
+- **Resync time limit.** `maxDuration = 60` on the rosters page; a school above roughly 150 connected students stops partway and needs a second click.
 - **Never run against real Discord.** All tests use fakes and mocked `fetch`. Try it on a throwaway server first (`docs/dev/DISCORD.md`); confirm the bot role order, the 403 mapping and the audit-log reason there.
 - **Backfill not run.** `npm run db:sync:discord-roles` is written; the owner decides when to run the dry run and `--execute` against production (it reads `.env`).
 - **School roles** are out of scope and still manual.
