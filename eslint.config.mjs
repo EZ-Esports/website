@@ -23,6 +23,24 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
     }
   },
+  // Native confirm() is silently dismissed by embedded browsers and webviews, so the
+  // button looks dead, and it cannot be styled or made accessible. Use
+  // ConfirmActionDialog (app/components/admin) with useConfirmAction instead.
+  {
+    files: ["app/**/*.{ts,tsx}"],
+    ignores: ["**/__tests__/**", "**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-globals": ["error", {
+        name: "confirm",
+        message: "Native confirm() is not allowed. Use ConfirmActionDialog with useConfirmAction."
+      }],
+      "no-restricted-properties": ["error", ...["window", "globalThis", "self"].map((object) => ({
+        object,
+        property: "confirm",
+        message: "Native confirm() is not allowed. Use ConfirmActionDialog with useConfirmAction."
+      }))]
+    }
+  },
   // --- Module boundary rules ------------------------------------------------
   // The (admin) and (marketing) route groups are the two halves of the system.
   // Importing across this boundary couples layout, auth concerns, and server

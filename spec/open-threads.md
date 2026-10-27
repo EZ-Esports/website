@@ -157,3 +157,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Seam has no consumer, and does not see everything.** `notifyRosterMembershipChanged` is a no-op until the Discord role feature lands. Game and season deletes (database cascade), the seed/ingest scripts and manager `deleteSchoolRoster` never call it, so the consumer needs a periodic reconcile.
 - **Roster size limits are app-level and not retroactive.** No database constraint (seeds and hand-run SQL bypass them), and rosters already above 7 players or 2 subs are left alone. A query listing them has not been run against production. Staff are held to the caps with no override; if the owner wants one it should be an explicit, audited action. Games with a different roster shape (for example tournament-model games) share the same constants; confirm with the owner.
 - **Captain rule is ambiguous.** "One captain per team" is enforced per roster today (database index); the owner has not confirmed whether it should also span Varsity and JV. Captain behaviour was deliberately not changed with the caps.
+
+## In-app confirm dialogs (spec-037)
+
+- **Not seen in a browser.** The dialogs were verified in jsdom only. Check the portal's dark dialog, 44px targets at phone width and the exit animation in a real browser before merge.
+- **`alert()` and `prompt()` remain.** `SchoolPortalClient` still uses `alert()` for remove-player and role-change failures (and other portal and admin forms may); they share the same auto-dismiss problem as `confirm()`. The lint rule bans only `confirm`. Convert them to the roster notice or an `AdminNotice` and widen the rule.
+- **Component test setup is new.** jsdom, Testing Library and jest-dom are dev dependencies, enabled per file with `// @vitest-environment jsdom`; the older render tests still use `renderToStaticMarkup` in node.
+- **Dialog error vs toast on League Setup.** A failed game or season delete now shows its error in the dialog rather than a toast; revisit if staff expect the toast.
