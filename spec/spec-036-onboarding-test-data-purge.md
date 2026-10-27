@@ -2,8 +2,8 @@
 
 - **Spec ID:** spec-036
 - **Title:** Guarded one-off script that deletes non-staff onboarding records and manager Auth logins
-- **Status:** Implemented on branch `chore/purge-onboarding-test-data` (not merged). Not run against any database. No migration.
-- **PR / Commit:** pending
+- **Status:** Implemented and merged (PRs #284 and #287). Run against production on 2026-10-27 (database only; no login accounts were deleted). No migration.
+- **PR / Commit:** #284 (script), #287 (pooler hang fix)
 - **Date:** 2026-10-26
 - **Scope:** `db/purge-onboarding-test-data.ts`, npm script `db:purge:onboarding-test-data`, `db/__tests__/purge-onboarding-test-data.test.ts`, `docs/dev/PURGE-ONBOARDING-TEST-DATA.md`.
 
@@ -61,3 +61,12 @@ See the final report of the implementing session and the dry run: whether all te
 The first dry run against production hung with no output and ~0 CPU. Cause: the snapshot read ~20 tables with `Promise.all` over a single `max: 1` connection, which postgres.js pipelines, and the Supabase transaction pooler (port 6543) never answers a pipelined batch (a single query takes ~200 ms, four at once never return). The in-memory PGlite rehearsal cannot reproduce a pooler, so it passed. Fix: `loadSnapshotFrom` runs its queries strictly one at a time, the script logs `Reading the database (read-only)...` before it starts, and `db/__tests__/purge-snapshot-sequential.test.ts` fails if two queries are ever in flight at once. No data was at risk (the run was read-only).
 
 Also seen: the Auth/staff email cross-check calls the Supabase Auth admin API over HTTPS; on a network that cannot reach it the lookups time out (10 s each), the dry run prints the SKIPPED warning, and `--execute` refuses unless `--skip-auth-staff-crosscheck` is passed. Run from a network that can reach Supabase.
+
+## Run record (2026-10-27)
+
+Run by the owner from `main` with `--execute` (database only), after a dry run they reviewed. The staff email cross-check ran (no skip warning), using `NODE_OPTIONS=--tls-max-v1.2` because Node 24's TLS 1.3 handshake to `*.supabase.co` hangs on the owner's network.
+
+- **Deleted 36 database rows** in one committed transaction after a 472 KB scoped `pg_dump` backup (`db/backups/`, file name `gold-seed-<timestamp>.sql`): 6 members (all at the test school "Monsters High School"), 12 player identities, 6 student demographics, 3 roster rows (all on the active season), 8 player invites, 1 manager invite. Match reschedule rows, consents and manager assignments: 0.
+- **Protected 7 people** (staff-linked or ambiguous name matches), kept archive members 0, past-season roster history 0. **0 Supabase Auth users were deleted**: the only two manager rows belonged to staff, so no `--delete-auth-users` run was needed.
+- A verification dry run afterwards showed 0 left to delete. Two tables (`student_demographics`: 7, `school_managers`: 2) had also lost the protected people's own rows; the owner confirmed they deleted those by hand on purpose, so nothing needed restoring. The script's accounting (36 rows) matched exactly.
+- Remaining manual step: refresh the Vercel Data Cache tags (`members`, `players`, `rosters`, `teams`, `schools`, `matches`, `people`, `leadership`) by saving any admin row with its existing values.
