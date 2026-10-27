@@ -26,6 +26,9 @@ import { ConsentStep } from './components/steps/ConsentStep';
 
 export type { InviteData };
 
+export const MANAGER_PASSWORD_REENTRY_NOTE =
+  'Please re-enter your password. It is not kept while you connect Discord.';
+
 /** Server-verified Discord identity (from the signed OAuth cookie), never typed by the student. */
 export interface VerifiedDiscordView {
   username: string;
@@ -49,7 +52,10 @@ export default function PlayerOnboardingWizard({
   discordError = null,
   resumeAtDiscord = false,
 }: PlayerOnboardingWizardProps) {
-  const [step, setStep] = useState<number>(resumeAtDiscord ? 2 : 1);
+  const isManagerInvite = inviteData.role === 'manager';
+  // The password is deliberately not kept in the saved draft, so a manager coming back from Discord
+  // starts again at step 1 to re-enter it; a player resumes straight at the Discord step.
+  const [step, setStep] = useState<number>(resumeAtDiscord && !isManagerInvite ? 2 : 1);
   const [isPending, startTransition] = useTransition();
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
@@ -57,7 +63,10 @@ export default function PlayerOnboardingWizard({
   const [discord, setDiscord] = useState<VerifiedDiscordView | null>(discordProp);
   const discordVerified = Boolean(discord?.inGuild);
   const draft = useWizardDraft(token, inviteData, {
-    initialError: discordError,
+    initialError:
+      resumeAtDiscord && isManagerInvite
+        ? [discordError, MANAGER_PASSWORD_REENTRY_NOTE].filter(Boolean).join(' ')
+        : discordError,
     discordVerified,
   });
   const [discordConnecting, setDiscordConnecting] = useState(false);
@@ -106,6 +115,11 @@ export default function PlayerOnboardingWizard({
     if (!draft.validateStep5()) {
       return;
     }
+    // A lost or short password would otherwise only fail on the server; send the manager back to fix it.
+    if (isManager && !draft.validateStep1()) {
+      setStep(1);
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -142,9 +156,13 @@ export default function PlayerOnboardingWizard({
         });
 
         if (!result.success) {
-          // Expected Discord rejections: send the invitee back to reconnect rather than showing a dead end.
-          setDiscord(null);
-          setStep(2);
+          // Expected rejections: send the invitee to the step that fixes them rather than a dead end.
+          if (result.code === 'manager_password_required') {
+            setStep(1);
+          } else {
+            setDiscord(null);
+            setStep(2);
+          }
           draft.setErrorMessage(result.error);
           return;
         }

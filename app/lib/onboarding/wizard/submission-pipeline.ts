@@ -13,6 +13,7 @@ import {
   upsertStudentDemographics,
   type OnboardingTx,
 } from '@/app/lib/db/onboarding';
+import { db } from '@/app/lib/db';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
@@ -84,6 +85,31 @@ export function validateSubmissionInputs(
     birthDateObj,
     consent,
   };
+}
+
+export const MANAGER_PASSWORD_MIN_LENGTH = 8;
+
+const MANAGER_PASSWORD_MESSAGE =
+  'Please re-enter a password of at least 8 characters for the School Manager Portal. It is not kept while you connect Discord.';
+
+function hasUsablePassword(password: string | undefined): password is string {
+  return typeof password === 'string' && password.length >= MANAGER_PASSWORD_MIN_LENGTH;
+}
+
+/**
+ * Existing Supabase Auth user for this email, if the service client is configured and finds one.
+ * Such a manager keeps their current credentials, so no new password is needed.
+ */
+async function findExistingAuthUserId(email: string): Promise<string | null> {
+  if (!process.env.SUPABASE_SECRET_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
+  try {
+    const { createServiceClient } = await import('@/app/lib/supabase/service');
+    const { data: list } = await createServiceClient().auth.admin.listUsers();
+    return list?.users?.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
+  } catch (err) {
+    console.warn('Could not look up existing Supabase Auth user for manager:', err);
+    return null;
+  }
 }
 
 const DISCORD_ALREADY_LINKED_MESSAGE =
@@ -178,27 +204,32 @@ export async function provisionManagerAccount(
   if (staffUserId) {
     resolvedUserId = staffUserId;
   } else {
-    try {
-      if (process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        const { createServiceClient } = await import('@/app/lib/supabase/service');
-        const supabase = createServiceClient();
-        const { data: created, error: createError } = await supabase.auth.admin.createUser({
-          email,
-          password: password || crypto.randomBytes(16).toString('hex'),
-          email_confirm: true,
-        });
-        if (created?.user) {
-          resolvedUserId = created.user.id;
-        } else if (createError) {
-          const { data: list } = await supabase.auth.admin.listUsers();
-          const existingAuthUser = list?.users?.find((u) => u.email?.toLowerCase() === email);
-          if (existingAuthUser) {
-            resolvedUserId = existingAuthUser.id;
+    // A manager who already has an auth account keeps it. Only a brand-new account needs the password
+    // the manager chose; there is deliberately no generated fallback, because a random password would
+    // lock the manager out of the portal they just signed up for.
+    resolvedUserId = await findExistingAuthUserId(email);
+    if (!resolvedUserId) {
+      if (!hasUsablePassword(password)) {
+        throw new OnboardingRejection('manager_password_required', MANAGER_PASSWORD_MESSAGE);
+      }
+      try {
+        if (process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+          const { createServiceClient } = await import('@/app/lib/supabase/service');
+          const supabase = createServiceClient();
+          const { data: created, error: createError } = await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+          });
+          if (created?.user) {
+            resolvedUserId = created.user.id;
+          } else if (createError) {
+            resolvedUserId = await findExistingAuthUserId(email);
           }
         }
+      } catch (authErr) {
+        console.warn('Could not provision Supabase Auth user for manager:', authErr);
       }
-    } catch (authErr) {
-      console.warn('Could not provision Supabase Auth user for manager:', authErr);
     }
   }
 
@@ -269,6 +300,17 @@ export async function processOnboardingSubmission(
     verifiedDiscord:
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
   });
+
+  // A new manager account needs the password they chose. Checked before anything is written or any
+  // auth user is created; staff and existing auth users keep their current credentials.
+  if (isManager && !hasUsablePassword(submission.password)) {
+    const hasAccount =
+      Boolean(await findStaffUserIdByEmail(db, validated.email)) ||
+      Boolean(await findExistingAuthUserId(validated.email));
+    if (!hasAccount) {
+      throw new OnboardingRejection('manager_password_required', MANAGER_PASSWORD_MESSAGE);
+    }
+  }
 
   // Step 2: Resolve external Riot identity
   const effectiveGameSlug = gameSlug || 'valorant';

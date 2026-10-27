@@ -109,7 +109,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Onboarding draft and season defaults (spec-017)
 
-- `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
+- (fixed in [spec-035](spec-035-manager-discord-oauth.md)) `saveOnboardingDraft` used to replace the invite's whole `submission_draft`, dropping the admin-seeded `managedGames` and `isPrimaryContact`. For manager invites the server now keeps the existing values of those two keys over anything the browser sends, and fills `academicYear` from the seed only when the wizard sent none.
 - (Resolved in spec-019: the hard-coded `'2025-2026'` default is gone; manager seasons are `YYYY-YY` and default to `DEFAULT_MANAGER_SEASON`.) Bump or derive it from today's date in a separate change.
 - The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.
 

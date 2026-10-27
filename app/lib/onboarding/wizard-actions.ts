@@ -173,6 +173,29 @@ function sanitizeDraftData(
 }
 
 /**
+ * Draft keys seeded by staff when they create a manager invite. They scope what the manager may do
+ * (`managedGames`, `isPrimaryContact`), so the browser can never set them through a draft save and an
+ * existing value always survives a save. `academicYear` is seeded by staff but the manager also picks
+ * it in step 1, so it is only filled in from the seed when the wizard sent none.
+ */
+const STAFF_OWNED_DRAFT_KEYS = ['managedGames', 'isPrimaryContact'] as const;
+
+function mergeStaffOwnedDraftKeys(
+  existing: Record<string, any> | null,
+  incoming: Record<string, any> | null
+): Record<string, any> | null {
+  const merged: Record<string, any> = { ...(incoming ?? {}) };
+  for (const key of STAFF_OWNED_DRAFT_KEYS) {
+    if (existing && Object.prototype.hasOwnProperty.call(existing, key)) merged[key] = existing[key];
+    else delete merged[key];
+  }
+  if (merged.academicYear == null && existing?.academicYear != null) {
+    merged.academicYear = existing.academicYear;
+  }
+  return merged;
+}
+
+/**
  * Validates a player invite token against school and game parameters.
  * Computes the SHA-256 hash of the token and checks status and expiration.
  */
@@ -323,7 +346,14 @@ export async function saveOnboardingDraft(
     throw new Error('Cannot save draft: invite link has expired');
   }
 
-  await updateInviteDraft(found.kind, invite.id, sanitizeDraftData(draftData));
+  const sanitized = sanitizeDraftData(draftData);
+  await updateInviteDraft(
+    found.kind,
+    invite.id,
+    found.kind === 'manager'
+      ? mergeStaffOwnedDraftKeys(invite.submissionDraft as Record<string, any> | null, sanitized)
+      : sanitized
+  );
 
   return {
     success: true,
