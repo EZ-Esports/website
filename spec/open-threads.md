@@ -162,9 +162,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Onboarding test data purge (spec-036)
 
-- **The owner must run it; CI never does.** `npm run db:purge:onboarding-test-data` was written and unit-tested against fakes only. It has not been run against any database, so the dry run on production is the first real check of the assumptions listed in [spec-036](spec-036-onboarding-test-data-purge.md). Follow `docs/dev/PURGE-ONBOARDING-TEST-DATA.md`.
+- **Run on 2026-10-27 (database only).** The owner ran `npm run db:purge:onboarding-test-data -- --execute` after reviewing the dry run; 36 rows deleted, 0 Auth users (see the run record in [spec-036](spec-036-onboarding-test-data-purge.md)). CI never runs it. Follow `docs/dev/PURGE-ONBOARDING-TEST-DATA.md` if it is ever needed again, and set `NODE_OPTIONS=--tls-max-v1.2` on a network where Node 24's TLS 1.3 handshake to supabase.co hangs.
 - **Refresh the Data Cache afterwards** (tags `members`, `players`, `rosters`, `teams`, `schools`, `matches`, `people`, `leadership`): a script cannot call `updateTag`.
-- Once the purge has run, record the date and counts here and in the timeline, and consider removing the script.
+- The run is recorded here and in the timeline. Consider removing the script (`db/purge-onboarding-test-data.ts`, its tests and the PGlite devDependency) now that it has served its purpose; it stays only if a future purge is likely.
 
 ---
 
