@@ -14,7 +14,7 @@ import {
   saveOnboardingDraft,
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
-import type { InviteData } from './types';
+import { stepForRejection, type InviteData } from './types';
 import { useWizardDraft } from './hooks/useWizardDraft';
 import { WizardProgressStepper } from './components/WizardProgressStepper';
 import { SuccessStep } from './components/SuccessStep';
@@ -25,6 +25,9 @@ import { DemographicsStep } from './components/steps/DemographicsStep';
 import { ConsentStep } from './components/steps/ConsentStep';
 
 export type { InviteData };
+
+export const MANAGER_PASSWORD_REENTRY_NOTE =
+  'Please re-enter your password. It is not kept while you connect Discord.';
 
 /** Server-verified Discord identity (from the signed OAuth cookie), never typed by the student. */
 export interface VerifiedDiscordView {
@@ -49,7 +52,10 @@ export default function PlayerOnboardingWizard({
   discordError = null,
   resumeAtDiscord = false,
 }: PlayerOnboardingWizardProps) {
-  const [step, setStep] = useState<number>(resumeAtDiscord ? 2 : 1);
+  const isManagerInvite = inviteData.role === 'manager';
+  // The password is deliberately not kept in the saved draft, so a manager coming back from Discord
+  // starts again at step 1 to re-enter it; a player resumes straight at the Discord step.
+  const [step, setStep] = useState<number>(resumeAtDiscord && !isManagerInvite ? 2 : 1);
   const [isPending, startTransition] = useTransition();
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
@@ -57,7 +63,10 @@ export default function PlayerOnboardingWizard({
   const [discord, setDiscord] = useState<VerifiedDiscordView | null>(discordProp);
   const discordVerified = Boolean(discord?.inGuild);
   const draft = useWizardDraft(token, inviteData, {
-    initialError: discordError,
+    initialError:
+      resumeAtDiscord && isManagerInvite
+        ? [discordError, MANAGER_PASSWORD_REENTRY_NOTE].filter(Boolean).join(' ')
+        : discordError,
     discordVerified,
   });
   const [discordConnecting, setDiscordConnecting] = useState(false);
@@ -106,6 +115,11 @@ export default function PlayerOnboardingWizard({
     if (!draft.validateStep5()) {
       return;
     }
+    // A lost or short password would otherwise only fail on the server; send the manager back to fix it.
+    if (isManager && !draft.validateStep1()) {
+      setStep(1);
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -117,8 +131,6 @@ export default function PlayerOnboardingWizard({
           graduationYear: draft.graduationYear,
           academicYear: isManager ? draft.academicYear : undefined,
           riotId: draft.riotId.trim(),
-          // Managers keep the self-reported handle; for players the server uses the OAuth cookie.
-          discordUsername: isManager ? draft.discordUsername.trim() : undefined,
           birthDate: draft.birthDate,
           gender: draft.gender || undefined,
           race: draft.selectedRaces.length > 0 ? draft.selectedRaces : undefined,
@@ -144,9 +156,10 @@ export default function PlayerOnboardingWizard({
         });
 
         if (!result.success) {
-          // Expected Discord rejections: send the student back to reconnect rather than showing a dead end.
-          setDiscord(null);
-          setStep(2);
+          // Expected rejections: send the invitee to the step that fixes them rather than a dead end.
+          const target = stepForRejection(result.code);
+          if (target === 2) setDiscord(null);
+          setStep(target);
           draft.setErrorMessage(result.error);
           return;
         }
@@ -166,7 +179,7 @@ export default function PlayerOnboardingWizard({
         legalFirstName={draft.legalFirstName}
         legalLastName={draft.legalLastName}
         email={draft.email}
-        discordUsername={isManager ? draft.discordUsername : (discord?.username ?? '')}
+        discordUsername={discord?.username ?? ''}
         inviteData={inviteData}
       />
     );
@@ -260,14 +273,9 @@ export default function PlayerOnboardingWizard({
 
         {step === 2 && (
           <DiscordStep
-            isManager={isManager}
             verified={discord}
             connecting={discordConnecting}
             onConnect={handleConnectDiscord}
-            discordUsername={draft.discordUsername}
-            setDiscordUsername={draft.setDiscordUsername}
-            discordJoinedConfirmed={draft.discordJoinedConfirmed}
-            setDiscordJoinedConfirmed={draft.setDiscordJoinedConfirmed}
           />
         )}
 

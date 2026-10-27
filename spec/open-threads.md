@@ -104,12 +104,12 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
 - [#247](https://github.com/EZ-Esports/website/issues/247): Riot Sign-On (OAuth) and consent for student onboarding. On hold until Riot approves the production key.
 - [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
-- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and server join in the player wizard are built ([spec-033](spec-033-discord-oauth-onboarding.md), pending merge). Still open: role assignment (`syncMemberRoles` is a stub), live guild re-check at roster time, backfill of existing students whose Discord is self-reported, manager verification, and Discord app/bot setup plus env vars on staging and production.
+- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and server join are built for players ([spec-033](spec-033-discord-oauth-onboarding.md), PR #281) and for school managers ([spec-035](spec-035-manager-discord-oauth.md), required for everyone, all self-reported Discord code removed). Still open: role assignment (`syncMemberRoles` is a stub), live guild re-check at roster time, the owner-run purge of pre-OAuth test data (rows with unverified Discord ids), and Discord app/bot setup plus env vars on staging and production.
 - [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
 
 ## Onboarding draft and season defaults (spec-017)
 
-- `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
+- (fixed in [spec-035](spec-035-manager-discord-oauth.md)) `saveOnboardingDraft` used to replace the invite's whole `submission_draft`, dropping the admin-seeded `managedGames` and `isPrimaryContact`. For manager invites the server now keeps the existing values of those two keys over anything the browser sends, and fills `academicYear` from the seed only when the wizard sent none.
 - (Resolved in spec-019: the hard-coded `'2025-2026'` default is gone; manager seasons are `YYYY-YY` and default to `DEFAULT_MANAGER_SEASON`.) Bump or derive it from today's date in a separate change.
 - The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.
 

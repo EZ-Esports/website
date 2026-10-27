@@ -621,8 +621,6 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           password: 'SecretManagerPassword123!',
           graduationYear: 2026,
           riotId: 'DemonAlex#NA1',
-          discordUsername: 'DemonAlex#1234',
-          inGuild: true,
           birthDate: new Date('1990-05-15'),
           codeOfConductAccepted: true,
           consent: { tosAcknowledged: true },
@@ -655,7 +653,9 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
         (i) => i.memberId === createdMember?.id && i.provider === 'discord'
       );
       expect(discordId).toBeDefined();
-      expect(discordId?.providerUsername).toBe('DemonAlex#1234');
+      // The verified OAuth username, never a typed handle.
+      expect(discordId?.providerUsername).toBe('alexchen');
+      expect(discordId?.inGuild).toBe(true);
 
       const riotId = mocks.state.playerIdentitiesStore.find(
         (i) => i.memberId === createdMember?.id && i.provider === 'riot'
@@ -746,8 +746,6 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           email: 'david.kim@nycstudents.net',
           graduationYear: 2026,
           riotId: 'DavidK#NA1',
-          discordUsername: 'DavidK#9999',
-          inGuild: true,
           birthDate: new Date('2008-03-21'),
           codeOfConductAccepted: true,
           consent: { tosAcknowledged: true },

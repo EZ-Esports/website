@@ -101,14 +101,30 @@ describe('GET /api/discord/start', () => {
     expect(cookieValue(res, DISCORD_RESULT_COOKIE)).toBeUndefined();
   });
 
-  it('does not start OAuth for an invalid invite or a manager invite', async () => {
+  it('does not start OAuth for an invalid invite', async () => {
     validateInviteToken.mockResolvedValueOnce({ valid: false, status: 'expired', message: 'x' });
-    let { res } = await begin();
+    const { res, flow } = await begin();
     expect(new URL(res.headers.get('location')!).pathname).toBe('/join/stuyvesant/valorant');
+    expect(flow).toBeUndefined();
+  });
 
-    validateInviteToken.mockResolvedValueOnce({ valid: true, isManager: true });
-    ({ res } = await begin());
-    expect(new URL(res.headers.get('location')!).hostname).toBe('localhost');
+  it('starts OAuth for a school manager invite (game slug "manager") and returns to the manager join URL', async () => {
+    validateInviteToken.mockResolvedValue({ valid: true, isManager: true });
+    const req = new NextRequest(`${ORIGIN}/api/discord/start?token=${TOKEN}&school=stuyvesant-high-school&game=manager`);
+    const res = await start(req);
+    const location = new URL(res.headers.get('location')!);
+    expect(location.origin + location.pathname).toBe('https://discord.com/oauth2/authorize');
+    expect(location.toString()).not.toContain(TOKEN);
+    const flow = cookieValue(res, DISCORD_FLOW_COOKIE)!;
+    expect(flow).toBeTruthy();
+
+    stubDiscordFetch(okDiscord(201));
+    const cb = await callback(callbackReq({ code: 'abc', state: location.searchParams.get('state')! }, flow));
+    const loc = new URL(cb.headers.get('location')!);
+    expect(loc.pathname).toBe('/join/stuyvesant-high-school/manager');
+    expect(loc.searchParams.get('discord')).toBe('connected');
+    const result = verifyResultCookie(cookieValue(cb, DISCORD_RESULT_COOKIE), TOKEN_HASH);
+    expect(result).toMatchObject({ discordUserId: UID, inGuild: true });
   });
 
   it('returns the wizard with bot_misconfigured when env is missing', async () => {
