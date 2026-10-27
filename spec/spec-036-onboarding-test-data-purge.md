@@ -55,3 +55,9 @@ A script cannot call `updateTag`. It prints the tags to refresh (`members`, `pla
 ## Unverified without the live database
 
 See the final report of the implementing session and the dry run: whether all test members lack `member_key`; whether `staff_audit_logs.user_id` includes manager ids; whether any staff application email is a student's; row counts per table.
+
+## First real dry run: pooler hang (fixed)
+
+The first dry run against production hung with no output and ~0 CPU. Cause: the snapshot read ~20 tables with `Promise.all` over a single `max: 1` connection, which postgres.js pipelines, and the Supabase transaction pooler (port 6543) never answers a pipelined batch (a single query takes ~200 ms, four at once never return). The in-memory PGlite rehearsal cannot reproduce a pooler, so it passed. Fix: `loadSnapshotFrom` runs its queries strictly one at a time, the script logs `Reading the database (read-only)...` before it starts, and `db/__tests__/purge-snapshot-sequential.test.ts` fails if two queries are ever in flight at once. No data was at risk (the run was read-only).
+
+Also seen: the Auth/staff email cross-check calls the Supabase Auth admin API over HTTPS; on a network that cannot reach it the lookups time out (10 s each), the dry run prints the SKIPPED warning, and `--execute` refuses unless `--skip-auth-staff-crosscheck` is passed. Run from a network that can reach Supabase.

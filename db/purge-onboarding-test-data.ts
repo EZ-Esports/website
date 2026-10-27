@@ -753,6 +753,7 @@ export async function runPurge(opts: PurgeOptions, deps: PurgeDeps): Promise<Pur
     }
   }
 
+  log('Reading the database (read-only)...');
   const snapshot = await deps.loadSnapshot();
   const haveCreds = Boolean(deps.auth && deps.auth.hasCredentials());
 
@@ -955,9 +956,17 @@ export interface SqlLike {
 const str = (v: unknown) => (v == null ? null : String(v));
 
 export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
-  const q = async (text: string): Promise<Row[]> => (await sql.unsafe(text)) as unknown as Row[];
+  // Each query is a thunk and they run strictly one at a time. Firing them together over this single
+  // connection (postgres.js pipelines them) hangs forever behind the Supabase transaction pooler
+  // (port 6543): single queries answer in milliseconds, four at once never come back.
+  const q = (text: string) => async (): Promise<Row[]> => (await sql.unsafe(text)) as unknown as Row[];
+  const runOneAtATime = async (thunks: Array<() => Promise<Row[]>>): Promise<Row[][]> => {
+    const out: Row[][] = [];
+    for (const run of thunks) out.push(await run());
+    return out;
+  };
   const [members, players, rosters, teams, seasons, identities, demos, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead] =
-    await Promise.all([
+    await runOneAtATime([
       q('select m.id, m.first_name, m.last_name, m.email, m.member_key, coalesce(s.name, \'\') as school_name from members m left join schools s on s.id = m.school_id'),
       q('select id, member_id, roster_id from players'),
       q('select id, team_id from rosters'),
