@@ -24,7 +24,7 @@ The owner states all onboarding data in the database is test data. It must go, w
 | `members` | school (restrict) | delete if onboarding footprint, no `member_key`, not protected |
 | `staff_members`, `people`, `leadership` | member (set null) | keep; their members are protected |
 | `user_roles`, `staff_*`, `roles` | staff | keep, and feed the protected set |
-| `match_reschedule_requests` | `requested_by_user_id` (no FK) | keep (matches data) |
+| `match_reschedule_requests`, `match_reschedule_options` | `requested_by_user_id` (no FK to Auth); options cascade from requests | delete those requested by deleted managers; `matches` is never changed or reverted |
 | schools, games, seasons, teams, rosters, matches, standings, sponsors, news, gallery, applications | | keep |
 
 No table has an FK to `school_managers`, `player_invites` or `manager_invites`; a test fails if a new FK to `members` appears.
@@ -38,6 +38,12 @@ No table has an FK to `school_managers`, `player_invites` or `manager_invites`; 
 
 ## Decisions beyond the brief
 
+- A member is deleted only when every `players` row is on the active season of its game; any past or undeterminable season keeps the member and roster rows (onboarding records still purged). The `member_key` schema comment alone is not trusted.
+- The typed phrase is `purge <host> <dbRows> <playersRows> <authUsers>`; Auth deletion is irreversible and outside the backup. A database-only run saves the Auth ids (after commit) for a separate `--delete-auth-users --auth-user-ids-file` run.
+- The Auth cross-check (live Auth emails of staff, role holders and kept managers protect matching members) is required for `--execute` unless `--skip-auth-staff-crosscheck`.
+- Inside the transaction, counts of staff, roles, leadership, people, schools, teams, rosters, matches and players are compared before and after.
+- The dry run lists every member and Auth candidate that would be deleted, masked, and saves the list to `db/backups/`.
+- The SQL is rehearsed against an in-memory PGlite built from `db/migrations/*.sql` (`db/__tests__/purge-onboarding-pglite.test.ts`).
 - Members with a gold-archive `member_key` keep their row and roster history (onboarding upserts by email, so an alumnus may have been onboarded); only their onboarding records are deleted.
 - Same-name-as-staff and a draft mentioning a staff email count as ambiguous and protect.
 - Staff-linked `leadership`/`people` members are protected as staff.
