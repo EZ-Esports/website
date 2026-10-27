@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS "match_games" (
 	"home_side" text NOT NULL,
 	"home_rounds" integer NOT NULL,
 	"away_rounds" integer NOT NULL,
+	"non_roster_players" text[] DEFAULT '{}'::text[] NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "match_games_home_side_check" CHECK ("match_games"."home_side" in ('Red', 'Blue')),
 	CONSTRAINT "match_games_game_number_check" CHECK ("match_games"."game_number" between 1 and 3)

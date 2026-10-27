@@ -47,6 +47,11 @@ export interface NormalizedGame {
   blueRounds: number;
   /** Null for a drawn game, which a best-of-3 cannot score. */
   winningSide: TeamSide | null;
+  /**
+   * The declared winner did not win more rounds: a surrender or forfeit ended the game early.
+   * Such a game is refused rather than scored from a partial round count.
+   */
+  endedEarly: boolean;
   players: NormalizedPlayer[];
 }
 

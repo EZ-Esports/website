@@ -280,13 +280,13 @@ describe('getSchoolMatches', () => {
     mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'played' }), row({ id: 'waiting' }), row({ id: 'plain' })]);
     mocks.getGameCounts.mockResolvedValue(new Map([['played', 2]]));
     mocks.getPendingSubmissions.mockResolvedValue(
-      new Map([['waiting', { id: 's', matchId: 'waiting', matchIds: ['a', 'b'], retryAfter: null, message: 'busy' }]])
+      new Map([['waiting', { id: 's', matchId: 'waiting', matchIds: ['a', 'b'], storedCount: 1, retryAfter: null, message: 'busy' }]])
     );
 
     const items = await load('stuy');
 
     expect(items.find((i) => i.id === 'played')!.gameCount).toBe(2);
-    expect(items.find((i) => i.id === 'waiting')!.pendingResult).toEqual({ retryAfter: null, message: 'busy', gameCount: 2 });
+    expect(items.find((i) => i.id === 'waiting')!.pendingResult).toEqual({ retryAfter: null, message: 'busy', gameCount: 1 });
     expect(items.find((i) => i.id === 'plain')).toMatchObject({ gameCount: 0, pendingResult: null });
   });
 

@@ -1,25 +1,40 @@
 /**
- * Pure rules for turning fetched games into a best-of-3 series result: which roster played which
- * side of each game, whether the participants really are the two rostered squads, and the series
- * score. No I/O, so every refusal is unit-tested against fixtures.
+ * Pure rules for turning fetched games into a best-of-3 series result: which school played which
+ * side of each game, whether the participants really are the two schools, and the series score.
+ * No I/O, so every refusal is unit-tested against fixtures.
  */
 import type { NormalizedGame, TeamSide } from './types';
 
 /** Wins that decide a best-of-3. */
 export const WINS_TO_TAKE_SERIES = 2;
-/** A side is attributed to a roster only when at least this many of its players are on it. */
-export const MIN_ROSTERED_PER_SIDE = 3;
+/**
+ * A side belongs to a school when at least this many of its players are on that school's roster.
+ * Rosters are locked and include subs, so one rostered player is enough to place a side; the rest
+ * of the side may be anyone and is reported, not refused.
+ */
+export const MIN_ROSTERED_PER_SIDE = 1;
 /** The only queue a league match may be played in. */
 export const CUSTOM_QUEUE_ID = 'custom';
 
 export type RosterSlot = 'home' | 'away';
 
-/** Lower-cased `name#tag`, whitespace collapsed: the key used to match a Riot account to a roster. */
-export function riotIdKey(name: string, tag: string): string {
-  return `${name}#${tag}`.trim().replace(/\s+/g, ' ').toLowerCase();
+/**
+ * Normalizes a full `Name#Tag` for comparison: Unicode NFKC (so look-alike forms of the same
+ * characters compare equal), whitespace collapsed, spaces around the `#` removed, lower-cased.
+ */
+export function normalizeRiotId(raw: string): string {
+  const text = raw.normalize('NFKC').trim().replace(/\s+/g, ' ');
+  const hash = text.lastIndexOf('#');
+  if (hash === -1) return text.toLowerCase();
+  return `${text.slice(0, hash).trim()}#${text.slice(hash + 1).trim()}`.toLowerCase();
 }
 
-/** The Riot IDs on each side's roster (already normalized with `riotIdKey`). */
+/** The key used to match a Riot account to a roster. */
+export function riotIdKey(name: string, tag: string): string {
+  return normalizeRiotId(`${name}#${tag}`);
+}
+
+/** The Riot IDs of every enrolled player (subs included, coaches excluded) of each school's roster. */
 export interface RosterRiotIds {
   home: ReadonlySet<string>;
   away: ReadonlySet<string>;
@@ -28,7 +43,7 @@ export interface RosterRiotIds {
 export interface GameAttribution {
   /** Which roster played Red and which played Blue. */
   rosterBySide: Record<TeamSide, RosterSlot>;
-  /** Players (`Name#Tag`) who are on neither roster: stand-ins to flag, not a reason to refuse. */
+  /** Players (`Name#Tag`) on a side who are not on that side's school roster: warnings for staff. */
   unrostered: string[];
 }
 
@@ -37,9 +52,11 @@ export type AttributionResult =
   | { ok: false; error: string };
 
 /**
- * Decides which roster played each side of one game. A side belongs to a roster when at least
- * `MIN_ROSTERED_PER_SIDE` of its players are on it and it beats the other roster's count, and the
- * two sides must resolve to different rosters. Subs and one stand-in are tolerated.
+ * Decides which school played each side of one game. Both rosters are checked against both sides;
+ * a side belongs to the school with more of its players on the roster (at least
+ * `MIN_ROSTERED_PER_SIDE`; a tie is ambiguous and refused), and the two sides must belong to
+ * different schools. Sides may swap between games. Players who are not on their side's roster are
+ * allowed (a roster member may be a sub) but are returned for the manager and staff to see.
  */
 export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): AttributionResult {
   if (game.queueId !== CUSTOM_QUEUE_ID) {
@@ -51,28 +68,46 @@ export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): Att
   if (!game.winningSide) {
     return { ok: false, error: 'This match has no winner (it was drawn or abandoned).' };
   }
+  if (game.endedEarly) {
+    return {
+      ok: false,
+      error:
+        'This game ended early (a surrender or forfeit), so it cannot be scored from its rounds. Ask EZ Esports staff to enter the result.',
+    };
+  }
 
   const rosterBySide = {} as Record<TeamSide, RosterSlot>;
-  const unrostered: string[] = [];
   for (const side of ['Red', 'Blue'] as const) {
-    const players = game.players.filter((p) => p.side === side);
-    const keys = players.map((p) => riotIdKey(p.name, p.tag));
+    const keys = game.players.filter((p) => p.side === side).map((p) => riotIdKey(p.name, p.tag));
     const home = keys.filter((k) => rosters.home.has(k)).length;
     const away = keys.filter((k) => rosters.away.has(k)).length;
-    const best = Math.max(home, away);
-    if (best < MIN_ROSTERED_PER_SIDE || home === away) {
+    if (Math.max(home, away) < MIN_ROSTERED_PER_SIDE) {
       return {
         ok: false,
-        error: `The ${side} team's players do not match either roster (${best} of ${players.length} found). Check the Riot IDs on both rosters.`,
+        error: `No one on the ${side} team is on either school's roster. Check the Riot IDs on both rosters.`,
+      };
+    }
+    if (home === away) {
+      return {
+        ok: false,
+        error: `The ${side} team has as many players from one school's roster as the other's, so it cannot be placed. Check the Riot IDs on both rosters.`,
       };
     }
     rosterBySide[side] = home > away ? 'home' : 'away';
-    players.forEach((p, i) => {
-      if (!rosters.home.has(keys[i]) && !rosters.away.has(keys[i])) unrostered.push(`${p.name}#${p.tag}`);
-    });
   }
   if (rosterBySide.Red === rosterBySide.Blue) {
-    return { ok: false, error: 'Both teams in this game match the same roster. It is not a game between these two teams.' };
+    return {
+      ok: false,
+      error: 'Both teams in this game match the same school. It is not a game between these two schools.',
+    };
+  }
+
+  const unrostered: string[] = [];
+  for (const side of ['Red', 'Blue'] as const) {
+    const roster = rosters[rosterBySide[side]];
+    for (const p of game.players) {
+      if (p.side === side && !roster.has(riotIdKey(p.name, p.tag))) unrostered.push(`${p.name}#${p.tag}`);
+    }
   }
   return { ok: true, attribution: { rosterBySide, unrostered } };
 }
@@ -86,6 +121,7 @@ export interface ScoredGame {
   homeRounds: number;
   awayRounds: number;
   winner: RosterSlot;
+  /** Players not on their side's roster in this game; shown as a warning and kept for staff. */
   unrostered: string[];
 }
 

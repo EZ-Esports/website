@@ -42,9 +42,9 @@ describe('normalizeHenrikMatch', () => {
     expect(() => normalizeHenrikMatch({})).toThrow();
   });
 
-  it('rejects a winner that disagrees with the round counts', () => {
-    expect(() =>
-      normalizeHenrikMatch(henrikPayload({ matchId: uuid(1), winner: 'Red', redRounds: 5, blueRounds: 13 }))
-    ).toThrow();
+  it('flags a surrender or forfeit (winner without more rounds) instead of failing the payload', () => {
+    const game = normalizeHenrikMatch(henrikPayload({ matchId: uuid(1), winner: 'Red', redRounds: 5, blueRounds: 13 }));
+    expect(game.endedEarly).toBe(true);
+    expect(normalizeHenrikMatch(henrikPayload({ matchId: uuid(2), winner: 'Red' })).endedEarly).toBe(false);
   });
 });

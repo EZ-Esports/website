@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, DialogTrigger, Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { Dialog, Heading, Modal, Overlay } from '@/app/components/ui/overlay';
 import { formatNY } from '@/app/lib/dates';
 import { parseMatchReferences } from '@/app/lib/match-results/parse-match-ref';
@@ -49,7 +51,7 @@ function ErrorList({ message, errors }: { message: string | null; errors: string
 }
 
 /** Runs a result action, refreshes the portal on success and keeps the message and per-game problems. */
-function useResultAction(onSuccess?: () => void) {
+function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -70,7 +72,7 @@ function useResultAction(onSuccess?: () => void) {
           if (result.pending) router.refresh();
           return;
         }
-        onSuccess?.();
+        onSuccess?.(result);
         router.refresh();
       } catch {
         setMessage('Something went wrong. Please try again.');
@@ -80,12 +82,21 @@ function useResultAction(onSuccess?: () => void) {
   return { pending, message, errors, reset, run, setMessage, setErrors };
 }
 
-function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: string }) {
+function SubmitDialog({
+  match,
+  schoolId,
+  onSubmitted,
+}: {
+  match: SchoolMatchItem;
+  schoolId: string;
+  onSubmitted: (result: MatchResultActionResult) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const { pending, message, errors, reset, run, setMessage, setErrors } = useResultAction(() => {
+  const { pending, message, errors, reset, run, setMessage, setErrors } = useResultAction((result) => {
     setOpen(false);
     setInput('');
+    onSubmitted(result);
   });
 
   const submit = (e: React.FormEvent) => {
@@ -152,33 +163,54 @@ function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: s
 
 function PendingNotice({ match, schoolId, viewOnly }: { match: SchoolMatchItem; schoolId: string; viewOnly: boolean }) {
   const pendingResult = match.pendingResult!;
+  const router = useRouter();
   const { pending, message, errors, run } = useResultAction();
+  // Discarding drops the saved IDs, so it asks first (in-app dialog, never a native confirm).
+  const discard = useConfirmAction<null>(async () => {
+    const result = await cancelPendingResult({ matchId: match.id, schoolId });
+    if (result.success) router.refresh();
+    return result;
+  }, 'Could not discard the saved match IDs.');
+  const guarded = (action: () => void) => () => {
+    if (!pending) action();
+  };
   return (
     <div className="space-y-2 max-w-[14rem]">
-      <p className="text-[11px] leading-snug text-amber-300">
-        Waiting on the match data service. {pendingResult.gameCount} games saved.
-      </p>
-      <ErrorList message={message} errors={errors} />
+      <div role="status" aria-live="polite" className="space-y-2">
+        <p className="text-[11px] leading-snug text-amber-300">
+          Waiting on the match data service. {pendingResult.gameCount} of the submitted games saved so far.
+        </p>
+        <ErrorList message={message} errors={errors} />
+      </div>
       {!viewOnly && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={pending}
-            onClick={() => run(() => retryMatchResult({ matchId: match.id, schoolId }))}
-            className={`${PRIMARY_BUTTON} disabled:opacity-50`}
+            aria-disabled={pending}
+            onClick={guarded(() => run(() => retryMatchResult({ matchId: match.id, schoolId })))}
+            className={`${PRIMARY_BUTTON} aria-disabled:opacity-50 aria-disabled:cursor-not-allowed`}
           >
             {pending ? 'Checking…' : 'Check again'}
           </button>
           <button
             type="button"
-            disabled={pending}
-            onClick={() => run(() => cancelPendingResult({ matchId: match.id, schoolId }))}
-            className={`${QUIET_BUTTON} disabled:opacity-50`}
+            aria-disabled={pending}
+            onClick={guarded(() => discard.request(null))}
+            className={`${QUIET_BUTTON} aria-disabled:opacity-50 aria-disabled:cursor-not-allowed`}
           >
             Discard
           </button>
         </div>
       )}
+      <ConfirmActionDialog
+        {...discard.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Discard saved match IDs?"
+        message={`The ${match.pendingResult?.gameCount ?? 0} saved games stay stored, but you will need to paste the match IDs again to submit a result.`}
+        confirmLabel="Discard"
+        pendingLabel="Discarding…"
+      />
     </div>
   );
 }
@@ -255,6 +287,11 @@ function Scoreboard({ scoreboard }: { scoreboard: MatchScoreboard }) {
               {g.mapName} · {g.teams[0].rounds}–{g.teams[1].rounds} · {g.rounds} rounds ·{' '}
               {formatNY(new Date(g.startedAt), 'date-short')}
             </p>
+            {g.nonRosterPlayers.length > 0 && (
+              <p className="text-[11px] text-amber-300">
+                Not on a roster: {g.nonRosterPlayers.join(', ')}
+              </p>
+            )}
             <TeamTable team={g.teams[0]} />
             <TeamTable team={g.teams[1]} />
           </TabPanel>
@@ -319,16 +356,37 @@ interface ResultCellProps {
   viewOnly: boolean;
 }
 
-/** The result actions for one match: submit, check again, or open the scoreboard. */
+/**
+ * The result actions for one match: submit, check again, or open the scoreboard. The outcome of a
+ * just-saved submission is kept here (this component stays mounted while the row re-renders from
+ * Submit to Scoreboard), so the manager sees the score and any non-roster warnings.
+ */
 export function ResultActions({ match, schoolId, viewOnly }: ResultCellProps) {
+  const [outcome, setOutcome] = useState<MatchResultActionResult | null>(null);
+  const notice = outcome && (
+    <div role="status" aria-live="polite" className="mb-2 max-w-[16rem] space-y-1 rounded-lg border border-emerald-800/40 bg-emerald-950/30 p-2 text-[11px] text-emerald-300">
+      <p>Result saved: {outcome.summary}.</p>
+      {outcome.warnings?.map((w) => (
+        <p key={w} className="text-amber-300">{w}</p>
+      ))}
+      <button type="button" onClick={() => setOutcome(null)} className="underline cursor-pointer min-h-[44px] sm:min-h-0">
+        Dismiss
+      </button>
+    </div>
+  );
+  let control: React.ReactNode = null;
   if (match.gameCount > 0) {
-    return <ScoreboardDialog match={match} schoolId={schoolId} />;
+    control = <ScoreboardDialog match={match} schoolId={schoolId} />;
+  } else if (match.pendingResult) {
+    control = <PendingNotice match={match} schoolId={schoolId} viewOnly={viewOnly} />;
+  } else if (!viewOnly && canSubmitGameResult(match)) {
+    control = <SubmitDialog match={match} schoolId={schoolId} onSubmitted={setOutcome} />;
   }
-  if (match.pendingResult) {
-    return <PendingNotice match={match} schoolId={schoolId} viewOnly={viewOnly} />;
-  }
-  if (!viewOnly && canSubmitGameResult(match)) {
-    return <SubmitDialog match={match} schoolId={schoolId} />;
-  }
-  return null;
+  if (!control && !notice) return null;
+  return (
+    <>
+      {notice}
+      {control}
+    </>
+  );
 }

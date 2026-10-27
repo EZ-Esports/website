@@ -985,7 +985,7 @@ export async function getSchoolMatches(
     return toSchoolMatchItem(row, schoolId, requests.get(row.id) ?? null, movedFrom.get(row.id) ?? null, {
       gameCount: gameCounts.get(row.id) ?? 0,
       pending: pending
-        ? { retryAfter: pending.retryAfter, message: pending.message, gameCount: pending.matchIds.length }
+        ? { retryAfter: pending.retryAfter, message: pending.message, gameCount: pending.storedCount }
         : null,
     });
   });

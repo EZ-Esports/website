@@ -40,6 +40,12 @@ describe('HenrikMatchAdapter (fake fetch, never the live API)', () => {
     expect(await adapterWith(new Error('boom')).adapter.fetchMatch(uuid(1))).toMatchObject({ kind: 'unavailable' });
   });
 
+  it('treats 408 as unavailable and other 4xx as a refused request, not an outage', async () => {
+    expect(await adapterWith(new Response('x', { status: 408 })).adapter.fetchMatch(uuid(1))).toMatchObject({ kind: 'unavailable' });
+    expect(await adapterWith(new Response('x', { status: 400 })).adapter.fetchMatch(uuid(1))).toMatchObject({ kind: 'invalid_response' });
+    expect(await adapterWith(new Response('x', { status: 422 })).adapter.fetchMatch(uuid(1))).toMatchObject({ kind: 'invalid_response' });
+  });
+
   it('maps 401 and a missing key to misconfigured, without calling out when keyless', async () => {
     expect(await adapterWith(new Response('x', { status: 401 })).adapter.fetchMatch(uuid(1))).toMatchObject({ kind: 'misconfigured' });
     const fetchImpl = vi.fn();

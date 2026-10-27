@@ -8,6 +8,7 @@ import * as schema from '@/app/lib/db/schema';
 import {
   cancelPendingSubmission,
   gameRepository,
+  isUniqueViolation,
   getMatchRosterRiotIds,
   getMatchScoreboard,
   getPendingSubmissionForMatch,
@@ -34,6 +35,8 @@ export interface MatchResultActionResult {
   pending?: boolean;
   /** Set on success: the series as home-away maps won, from the submitting school's side. */
   summary?: string;
+  /** Set on success: players who are not on their school's roster (allowed, but worth a look). */
+  warnings?: string[];
 }
 
 class ActionError extends Error {}
@@ -157,14 +160,19 @@ async function submit(
 
   if (outcome.status === 'pending') {
     const seconds = outcome.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS;
-    await upsertPendingSubmission({
-      matchId: match.id,
-      userId,
-      schoolId,
-      riotMatchIds: matchIds,
-      retryAfter: new Date(Date.now() + seconds * 1000),
-      message: outcome.message,
-    });
+    try {
+      await upsertPendingSubmission({
+        matchId: match.id,
+        userId,
+        schoolId,
+        riotMatchIds: matchIds,
+        retryAfter: new Date(Date.now() + seconds * 1000),
+        message: outcome.message,
+      });
+    } catch (error) {
+      console.error('Failed to save pending match result', error);
+      return { success: false, error: 'The match data service is busy and your IDs could not be saved. Try again shortly.' };
+    }
     revalidatePath('/portal');
     return {
       success: false,
@@ -177,6 +185,10 @@ async function submit(
   try {
     saved = await saveSeriesResult({ matchId: match.id, series: outcome.series });
   } catch (error) {
+    if (isUniqueViolation(error)) {
+      // The unique index on a game's id: another match claimed one of these games first.
+      return { success: false, error: 'One of these games is already counted for another match.' };
+    }
     console.error('Failed to save series result', error);
     return { success: false, error: 'Could not save the result. Please try again.' };
   }
@@ -186,7 +198,12 @@ async function submit(
   const own = schoolId === match.homeSchoolId ? 'home' : 'away';
   const mine = own === 'home' ? outcome.series.homeWins : outcome.series.awayWins;
   const theirs = own === 'home' ? outcome.series.awayWins : outcome.series.homeWins;
-  return { success: true, summary: `${mine}-${theirs}` };
+  const warnings = outcome.series.games.flatMap((g) =>
+    g.unrostered.length > 0
+      ? [`Game ${g.gameNumber}: ${g.unrostered.join(', ')} ${g.unrostered.length === 1 ? 'is' : 'are'} not on a roster. This was accepted and recorded for staff.`]
+      : []
+  );
+  return { success: true, summary: `${mine}-${theirs}`, ...(warnings.length > 0 ? { warnings } : {}) };
 }
 
 export interface SubmitMatchResultParams {

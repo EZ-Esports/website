@@ -379,6 +379,9 @@ export const matchGames = pgTable('match_games', {
   homeSide: text('home_side').notNull(),
   homeRounds: integer('home_rounds').notNull(),
   awayRounds: integer('away_rounds').notNull(),
+  // Riot IDs (`Name#Tag`) who played for a school but are not on its roster. Allowed (a roster
+  // member may be a sub) but recorded so staff can review stand-ins.
+  nonRosterPlayers: text('non_roster_players').array().default(sql`'{}'::text[]`).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   uniqueIndex('match_games_game_id_idx').on(t.gameId),

@@ -101,6 +101,17 @@ describe('resolveSeries', () => {
     expect(s.repo.store).toHaveBeenCalledTimes(2);
   });
 
+  it('does not persist a game between strangers or a non-custom game', async () => {
+    const strangers = normalizeHenrikMatch(
+      henrikPayload({ matchId: uuid(1), players: [...playersFor(['X1', 'X2', 'X3', 'X4', 'X5'], 'Red'), ...playersFor(['Y1', 'Y2', 'Y3', 'Y4', 'Y5'], 'Blue')] })
+    );
+    const ranked = normalizeHenrikMatch(henrikPayload({ matchId: uuid(2), queue: 'competitive', players: [...playersFor(RED_PLAYERS, 'Red'), ...playersFor(BLUE_PLAYERS, 'Blue')] }));
+    const s = setup({ fetch: (id) => ({ ok: true, game: id === uuid(1) ? strangers : ranked }) });
+    const out = await run(s, [uuid(1), uuid(2)]);
+    expect(out.status).toBe('invalid');
+    expect(s.repo.store).not.toHaveBeenCalled();
+  });
+
   it('does not store an unfinished game', async () => {
     const live = normalizeHenrikMatch(henrikPayload({ matchId: uuid(1), completed: false }));
     const s = setup({ fetch: () => ({ ok: true, game: live }) });

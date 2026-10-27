@@ -85,10 +85,11 @@ export function normalizeHenrikMatch(body: unknown): NormalizedGame {
     roundsBySide[side] = team.rounds.won;
     if (team.won) winningSide = side;
   }
-  // Henrik marks `won` on a drawn game for neither team; trust the round counts only to confirm.
-  if (winningSide && roundsBySide[winningSide] <= roundsBySide[winningSide === 'Red' ? 'Blue' : 'Red']) {
-    throw new Error('Winner disagrees with round counts.');
-  }
+  // A team can be declared the winner with fewer (or equal) rounds when the other side
+  // surrendered or forfeited. That is a real, finished game, not a malformed payload, so it is
+  // flagged here and refused with a clear message at scoring time.
+  const endedEarly =
+    winningSide !== null && roundsBySide[winningSide] <= roundsBySide[winningSide === 'Red' ? 'Blue' : 'Red'];
 
   const startedAt = new Date(data.metadata.started_at);
   if (Number.isNaN(startedAt.getTime())) throw new Error('Invalid start time.');
@@ -137,6 +138,7 @@ export function normalizeHenrikMatch(body: unknown): NormalizedGame {
     redRounds: roundsBySide.Red,
     blueRounds: roundsBySide.Blue,
     winningSide,
+    endedEarly,
     players,
   };
 }

@@ -25,6 +25,7 @@ vi.mock('@/app/lib/onboarding/manager-auth', () => ({ assertManagerForSchoolGame
 vi.mock('@/app/lib/db/match-results', () => ({
   cancelPendingSubmission: vi.fn(),
   gameRepository: {},
+  isUniqueViolation: (e: unknown) => (e as { code?: string })?.code === '23505',
   getMatchRosterRiotIds: mocks.getMatchRosterRiotIds,
   getMatchScoreboard: vi.fn(),
   getPendingSubmissionForMatch: mocks.getPendingSubmissionForMatch,
@@ -102,6 +103,31 @@ describe('submitMatchResult', () => {
     expect(mocks.updateTag).toHaveBeenCalledWith('matches');
     expect(mocks.updateTag).toHaveBeenCalledWith('rosters');
     expect(mocks.updateTag).toHaveBeenCalledWith('teams');
+  });
+
+  it('reports players who are not on a roster as warnings on a successful save', async () => {
+    mocks.resolveSeries.mockResolvedValue({
+      status: 'ok',
+      series: { homeWins: 2, awayWins: 0, winner: 'home', games: [{ gameNumber: 1, unrostered: ['Pug#NA1'] }, { gameNumber: 2, unrostered: [] }] },
+      games: [],
+    });
+    mocks.saveSeriesResult.mockResolvedValue(true);
+    const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual(['Game 1: Pug#NA1 is not on a roster. This was accepted and recorded for staff.']);
+  });
+
+  it('says a game is already counted when the unique index fires, and when the match was completed meanwhile', async () => {
+    mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
+    mocks.saveSeriesResult.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: '23505' }));
+    expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).error).toBe(
+      'One of these games is already counted for another match.'
+    );
+    mocks.saveSeriesResult.mockResolvedValueOnce(false);
+    expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).error).toBe(
+      'This match can no longer take a result.'
+    );
+    expect(mocks.updateTag).not.toHaveBeenCalled();
   });
 
   it('returns the per-game errors when validation fails and writes nothing', async () => {

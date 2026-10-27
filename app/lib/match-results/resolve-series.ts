@@ -3,7 +3,7 @@
  * the port, and score the series. The repository is injected so the "never request a game twice",
  * duplicate-match and error-path rules are unit-tested without a database or the network.
  */
-import { scoreSeries, type RosterRiotIds, type SeriesResult } from './series';
+import { attributeGame, scoreSeries, type RosterRiotIds, type SeriesResult } from './series';
 import type { MatchDataPort, NormalizedGame } from './types';
 
 export interface GameRepository {
@@ -55,8 +55,10 @@ export async function resolveSeries(params: {
     if (games.has(id)) continue;
     const result = await port.fetchMatch(id);
     if (result.ok) {
-      // Stored immediately, before validation, so a rejected series never costs a second request.
-      if (result.game.isCompleted && result.game.winningSide) await repo.store(result.game);
+      // Stored before the series is scored, so a series refused for its score (a 1-1 split) never
+      // costs a second request. Only a game that is between these two schools is kept: a rejected
+      // game (not custom, ended early, strangers) must not leave other people's data in the cache.
+      if (attributeGame(result.game, rosters).ok) await repo.store(result.game);
       games.set(id, result.game);
       continue;
     }

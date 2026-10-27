@@ -93,8 +93,13 @@ export class HenrikMatchAdapter implements MatchDataPort {
     if (response.status === 401 || response.status === 403) {
       return fail('misconfigured', 'Automatic match lookup is not set up. Ask an EZ Esports admin.');
     }
-    if (!response.ok) {
+    if (response.status === 408 || response.status >= 500) {
       return fail('unavailable', 'The match data service is having problems. Try again shortly.');
+    }
+    if (!response.ok) {
+      // Any other 4xx means the request itself was refused (for example a malformed id): retrying
+      // the same input cannot help, so it must not park the submission as pending.
+      return fail('invalid_response', 'The match data service did not accept this match ID.');
     }
 
     try {

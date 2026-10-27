@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeHenrikMatch } from '../henrik-schema';
-import { riotIdKey, scoreSeries, type RosterRiotIds } from '../series';
+import { normalizeRiotId, riotIdKey, scoreSeries, type RosterRiotIds } from '../series';
 import type { NormalizedGame } from '../types';
 import { BLUE_PLAYERS, henrikPayload, playersFor, RED_PLAYERS, uuid } from './fixtures';
 
@@ -70,6 +70,54 @@ describe('scoreSeries', () => {
     expect(scoreSeries([draw, game(2, { homeWins: true })], rosters).ok).toBe(false);
   });
 
+  it('places a side from a single rostered player and reports everyone else on it', () => {
+    const oneEach = normalizeHenrikMatch(
+      henrikPayload({
+        matchId: uuid(1),
+        startedAt: '2026-10-20T20:00:00.000Z',
+        players: [
+          ...playersFor(['RedOne', 'Pug1', 'Pug2', 'Pug3', 'Pug4'], 'Red'),
+          ...playersFor(['BlueOne', 'Pug5', 'Pug6', 'Pug7', 'Pug8'], 'Blue'),
+        ],
+      })
+    );
+    const out = scoreSeries([oneEach, game(2, { homeWins: true })], rosters);
+    expect(out.ok && out.series.games[0].unrostered).toHaveLength(8);
+  });
+
+  it('refuses a game that ended by surrender or forfeit with a clear message', () => {
+    const surrender = normalizeHenrikMatch(
+      henrikPayload({
+        matchId: uuid(1),
+        winner: 'Red',
+        redRounds: 4,
+        blueRounds: 8,
+        players: [...playersFor(RED_PLAYERS, 'Red'), ...playersFor(BLUE_PLAYERS, 'Blue')],
+      })
+    );
+    const out = scoreSeries([surrender, game(2, { homeWins: true })], rosters);
+    expect(!out.ok && out.errors[0]).toContain('ended early');
+  });
+
+  it('refuses a side that splits evenly between the two rosters', () => {
+    const tie = normalizeHenrikMatch(
+      henrikPayload({
+        matchId: uuid(1),
+        players: [...playersFor(['RedOne', 'BlueOne', 'Pug1'], 'Red'), ...playersFor(['BlueTwo', 'BlueThree'], 'Blue')],
+      })
+    );
+    const out = scoreSeries([tie, game(2, { homeWins: true })], rosters);
+    expect(!out.ok && out.errors[0]).toContain('cannot be placed');
+  });
+
+  it('refuses a game where a side is on neither roster', () => {
+    const oneSided = normalizeHenrikMatch(
+      henrikPayload({ matchId: uuid(1), players: [...playersFor(RED_PLAYERS, 'Red'), ...playersFor(['P1', 'P2', 'P3', 'P4', 'P5'], 'Blue')] })
+    );
+    const out = scoreSeries([oneSided, game(2, { homeWins: true })], rosters);
+    expect(!out.ok && out.errors[0]).toContain('No one on the Blue team');
+  });
+
   it('refuses games whose players are not on the two rosters', () => {
     const strangers = normalizeHenrikMatch(
       henrikPayload({
@@ -78,7 +126,7 @@ describe('scoreSeries', () => {
       })
     );
     const out = scoreSeries([strangers, game(2, { homeWins: true })], rosters);
-    expect(!out.ok && out.errors[0]).toContain("Red team's players do not match either roster");
+    expect(!out.ok && out.errors[0]).toContain('No one on the Red team');
   });
 
   it('refuses a game where both teams are the same roster', () => {
@@ -101,6 +149,11 @@ describe('scoreSeries', () => {
     );
     const out = scoreSeries([standIn, game(2, { homeWins: true })], rosters);
     expect(out.ok && out.series.games[0].unrostered).toEqual(['Visitor#NA1']);
+  });
+
+  it('normalizes Unicode forms, spacing around # and case when matching Riot IDs', () => {
+    expect(riotIdKey('Ｒed One', ' NA1')).toBe(riotIdKey('red one ', 'na1'));
+    expect(normalizeRiotId('Name #  TAG')).toBe('name#tag');
   });
 
   it('matches Riot IDs case-insensitively', () => {

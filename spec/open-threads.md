@@ -179,6 +179,8 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 - **Migration 0054 is written but not applied to production.** Until the owner runs `npm run db:migrate` (named host, fresh backup), Submit result will fail on a missing table; the portal list degrades quietly. Set `VALORANTAPI` in Vercel as well as the local `.env`.
 - **The Henrik response shape is unverified against a live payload.** The schema follows the published v4 docs; a real match should be fetched once and compared. MVP is derived (top score on winners / losers), not an API field; confirm against tracker.gg.
+- **Roster rule is deliberately loose** (at least one rostered player per side, subs count, extra players only warned and recorded in `match_games.non_roster_players`). Rosters are assumed locked after finalization; submission does not itself check the season lock. A game rejected by the per-game checks is not cached, so resubmitting it requests it again.
+- **Undecided, intentionally not built:** a date window for when a game was played (scrims / old games can currently be attached to a match) and a throttle on submissions per manager or match. Ask the user before adding either.
 - **Matching is by Riot `Name#Tag`**, not PUUID; renamed accounts or a roster without Riot IDs will be refused ("do not match either roster"). Consider storing PUUIDs.
 - **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
 - **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.

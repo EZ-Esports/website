@@ -1,8 +1,9 @@
 import 'server-only';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { db } from './index';
+import { dbErrorChain } from '../text-utils';
 import * as schema from './schema';
-import type { RosterRiotIds, SeriesResult } from '../match-results/series';
+import { normalizeRiotId, type RosterRiotIds, type SeriesResult } from '../match-results/series';
 import type { GameRepository } from '../match-results/resolve-series';
 import type { NormalizedGame, NormalizedPlayer, TeamSide } from '../match-results/types';
 
@@ -29,7 +30,7 @@ async function rosterRiotIds(rosterId: string): Promise<Set<string>> {
     if (row.role === 'coach') continue; // coaches do not play
     for (const raw of [row.ign, row.riotId]) {
       const value = raw?.trim();
-      if (value && value.includes('#')) keys.add(value.replace(/\s+/g, ' ').toLowerCase());
+      if (value && value.includes('#')) keys.add(normalizeRiotId(value));
     }
   }
   return keys;
@@ -78,8 +79,14 @@ function toNormalizedGame(game: GameRow, players: PlayerRow[]): NormalizedGame {
     redRounds: game.redRounds,
     blueRounds: game.blueRounds,
     winningSide: game.winningSide as TeamSide,
+    endedEarly: false, // such games are refused before they are stored
     players: players.map(toNormalizedPlayer),
   };
+}
+
+/** Postgres unique_violation, which drizzle may wrap so the code sits on `.cause`. */
+export function isUniqueViolation(error: unknown): boolean {
+  return dbErrorChain(error).some((e) => (e as { code?: unknown })?.code === '23505');
 }
 
 export const gameRepository: GameRepository = {
@@ -185,6 +192,9 @@ export async function saveSeriesResult(params: {
       .where(eq(schema.matches.id, matchId))
       .for('update');
     if (!current || current.status === 'cancelled' || current.status === 'forfeit') return false;
+    // The caller checked this before fetching; re-check under the lock so two submissions (or a
+    // staff score entry) racing each other cannot overwrite a result that landed in between.
+    if (current.status === 'completed' || current.homeScore !== null) return false;
 
     const stored = await tx
       .select({ id: schema.valorantGames.id, riotMatchId: schema.valorantGames.riotMatchId })
@@ -204,6 +214,7 @@ export async function saveSeriesResult(params: {
         homeSide: g.homeSide,
         homeRounds: g.homeRounds,
         awayRounds: g.awayRounds,
+        nonRosterPlayers: g.unrostered,
       }))
     );
     await tx
@@ -236,6 +247,8 @@ export interface PendingSubmissionItem {
   id: string;
   matchId: string;
   matchIds: string[];
+  /** How many of the submitted games are already stored (fetched), not how many were pasted. */
+  storedCount: number;
   /** ISO time before which a retry is pointless, when the service gave one. */
   retryAfter: string | null;
   message: string | null;
@@ -253,11 +266,23 @@ export async function getPendingSubmissions(matchIds: string[]): Promise<Map<str
         eq(schema.matchResultSubmissions.status, 'pending')
       )
     );
+  const allIds = [...new Set(rows.flatMap((r) => r.riotMatchIds))];
+  const storedIds = new Set(
+    allIds.length === 0
+      ? []
+      : (
+          await db
+            .select({ riotMatchId: schema.valorantGames.riotMatchId })
+            .from(schema.valorantGames)
+            .where(inArray(schema.valorantGames.riotMatchId, allIds))
+        ).map((g) => g.riotMatchId)
+  );
   for (const row of rows) {
     result.set(row.matchId, {
       id: row.id,
       matchId: row.matchId,
       matchIds: row.riotMatchIds,
+      storedCount: row.riotMatchIds.filter((id) => storedIds.has(id)).length,
       retryAfter: row.retryAfter ? row.retryAfter.toISOString() : null,
       message: row.lastError,
     });
@@ -292,7 +317,22 @@ export async function upsertPendingSubmission(params: {
     )
     .returning({ id: schema.matchResultSubmissions.id });
   if (updated.length > 0) return;
-  await db.insert(schema.matchResultSubmissions).values({ matchId: params.matchId, ...values });
+  try {
+    await db.insert(schema.matchResultSubmissions).values({ matchId: params.matchId, ...values });
+  } catch (error) {
+    // Another submission for this match created the single open row between our update and
+    // insert; refresh that row instead of failing.
+    if (!isUniqueViolation(error)) throw error;
+    await db
+      .update(schema.matchResultSubmissions)
+      .set(values)
+      .where(
+        and(
+          eq(schema.matchResultSubmissions.matchId, params.matchId),
+          eq(schema.matchResultSubmissions.status, 'pending')
+        )
+      );
+  }
 }
 
 export async function cancelPendingSubmission(matchId: string): Promise<void> {
@@ -343,6 +383,8 @@ export interface ScoreboardGame {
   mapName: string;
   startedAt: string;
   rounds: number;
+  /** Riot IDs who played for a school without being on its roster. */
+  nonRosterPlayers: string[];
   teams: [ScoreboardTeam, ScoreboardTeam];
 }
 
@@ -376,6 +418,7 @@ export async function getMatchScoreboard(
       homeSide: schema.matchGames.homeSide,
       homeRounds: schema.matchGames.homeRounds,
       awayRounds: schema.matchGames.awayRounds,
+      nonRosterPlayers: schema.matchGames.nonRosterPlayers,
       gameId: schema.valorantGames.id,
       mapName: schema.valorantGames.mapName,
       startedAt: schema.valorantGames.startedAt,
@@ -418,6 +461,7 @@ export async function getMatchScoreboard(
       mapName: link.mapName,
       startedAt: link.startedAt.toISOString(),
       rounds,
+      nonRosterPlayers: link.nonRosterPlayers,
       teams: [
         { slot: 'home', side: homeSide, schoolName: names.homeSchoolName, rounds: link.homeRounds, won: homeWon, players: forSide(homeSide) },
         { slot: 'away', side: awaySide, schoolName: names.awaySchoolName, rounds: link.awayRounds, won: !homeWon, players: forSide(awaySide) },
