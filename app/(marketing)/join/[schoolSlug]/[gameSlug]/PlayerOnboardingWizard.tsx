@@ -14,7 +14,7 @@ import {
   saveOnboardingDraft,
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
-import type { InviteData } from './types';
+import { stepForRejection, type InviteData } from './types';
 import { useWizardDraft } from './hooks/useWizardDraft';
 import { WizardProgressStepper } from './components/WizardProgressStepper';
 import { SuccessStep } from './components/SuccessStep';
@@ -157,12 +157,9 @@ export default function PlayerOnboardingWizard({
 
         if (!result.success) {
           // Expected rejections: send the invitee to the step that fixes them rather than a dead end.
-          if (result.code === 'manager_password_required') {
-            setStep(1);
-          } else {
-            setDiscord(null);
-            setStep(2);
-          }
+          const target = stepForRejection(result.code);
+          if (target === 2) setDiscord(null);
+          setStep(target);
           draft.setErrorMessage(result.error);
           return;
         }

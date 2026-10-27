@@ -8,7 +8,7 @@ vi.mock('@/app/lib/onboarding/wizard-actions', () => ({
 }));
 
 import PlayerOnboardingWizard, { MANAGER_PASSWORD_REENTRY_NOTE } from '../PlayerOnboardingWizard';
-import type { InviteData } from '../types';
+import { stepForRejection, type InviteData } from '../types';
 
 const invite = (role: 'player' | 'manager'): InviteData => ({
   inviteId: 'i1',
@@ -53,5 +53,14 @@ describe('PlayerOnboardingWizard resume after Discord', () => {
     const html = render('manager', false);
     expect(html).toContain('Step 1 of 5');
     expect(html).not.toContain(MANAGER_PASSWORD_REENTRY_NOTE);
+  });
+});
+
+describe('stepForRejection', () => {
+  it('sends a missing manager password to step 1 and Discord problems to step 2', () => {
+    expect(stepForRejection('manager_password_required')).toBe(1);
+    for (const code of ['discord_required', 'discord_not_in_guild', 'discord_already_linked']) {
+      expect(stepForRejection(code)).toBe(2);
+    }
   });
 });

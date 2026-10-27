@@ -1395,6 +1395,19 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         }
       );
 
+      it('provisionManagerAccount itself refuses to create an account without a password (no generated fallback)', async () => {
+        const { provisionManagerAccount } = await import('@/app/lib/onboarding/wizard/submission-pipeline');
+        await expect(
+          provisionManagerAccount(mocks.mockDb as any, {
+            email: 'smiller@stuy.edu',
+            memberId: 'm1',
+            schoolId,
+            submissionDraft: null,
+          })
+        ).rejects.toMatchObject({ code: 'manager_password_required' });
+        expect(authMock.createUser).not.toHaveBeenCalled();
+      });
+
       it('creates the auth user with the password the manager chose', async () => {
         await submitOk({ token: managerToken, submission: sub('chosenPassword1') });
         expect(authMock.createUser).toHaveBeenCalledWith(

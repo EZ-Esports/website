@@ -41,4 +41,12 @@ describe('DiscordStep', () => {
     );
     expect(connected).toMatch(/min-h-\[44px\][^>]*>Use a different Discord account/);
   });
+
+  it('keeps the reconnect link focusable (aria-disabled, not disabled) while connecting', () => {
+    const html = renderToStaticMarkup(
+      <DiscordStep verified={{ username: 'a', inGuild: true }} connecting={true} onConnect={noop} />
+    );
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).not.toContain('disabled=""');
+  });
 });
