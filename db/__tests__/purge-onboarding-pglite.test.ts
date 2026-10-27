@@ -209,11 +209,10 @@ describe('PGlite rehearsal of the purge SQL', () => {
     await db.close();
   });
 
-  it('the migrations load faithfully: only role/auth/policy statements may be skipped', () => {
-    const fatal = migrationReport.skipped.filter(
-      (s) => !/POLICY|FUNCTION|GRANT|REVOKE|DO \$\$|^--/i.test(s.statement)
-    );
-    expect(fatal).toEqual([]);
+  it('the migrations load faithfully: every statement applies, none is skipped', () => {
+    // With the stand-in roles and auth schema every migration statement applies today. A skip would
+    // mean the rehearsal no longer mirrors production DDL, so fail instead of tolerating a pattern.
+    expect(migrationReport.skipped).toEqual([]);
   });
 
   it('sets up the FK behaviour the plan depends on', async () => {
