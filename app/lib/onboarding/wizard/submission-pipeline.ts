@@ -13,6 +13,7 @@ import {
   upsertStudentDemographics,
   type OnboardingTx,
 } from '@/app/lib/db/onboarding';
+import { db } from '@/app/lib/db';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
@@ -86,8 +87,33 @@ export function validateSubmissionInputs(
   };
 }
 
+export const MANAGER_PASSWORD_MIN_LENGTH = 8;
+
+const MANAGER_PASSWORD_MESSAGE =
+  'Please re-enter a password of at least 8 characters for the School Manager Portal. It is not kept while you connect Discord.';
+
+function hasUsablePassword(password: string | undefined): password is string {
+  return typeof password === 'string' && password.length >= MANAGER_PASSWORD_MIN_LENGTH;
+}
+
+/**
+ * Existing Supabase Auth user for this email, if the service client is configured and finds one.
+ * Such a manager keeps their current credentials, so no new password is needed.
+ */
+async function findExistingAuthUserId(email: string): Promise<string | null> {
+  if (!process.env.SUPABASE_SECRET_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
+  try {
+    const { createServiceClient } = await import('@/app/lib/supabase/service');
+    const { data: list } = await createServiceClient().auth.admin.listUsers();
+    return list?.users?.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
+  } catch (err) {
+    console.warn('Could not look up existing Supabase Auth user for manager:', err);
+    return null;
+  }
+}
+
 const DISCORD_ALREADY_LINKED_MESSAGE =
-  'This Discord account is already linked to another EZ Esports player. Please reconnect with a different Discord account, or contact your school manager.';
+  'This Discord account is already linked to another EZ Esports member. Please reconnect with a different Discord account, or contact EZ Esports if you think this is a mistake.';
 
 export interface ResolvedDiscordIdentity {
   discordUserId: string;
@@ -96,45 +122,30 @@ export interface ResolvedDiscordIdentity {
 }
 
 /**
- * Decides which Discord identity is persisted. Players must have completed Discord OAuth: the
- * identity comes only from the signed server-side verification, and anything the client sent
- * (handle, id, inGuild) is ignored. Managers keep the legacy self-reported handle because the
- * Discord verification gate is player-only.
+ * Decides which Discord identity is persisted. Everyone (players and school managers) must have
+ * completed Discord OAuth: the identity comes only from the signed server-side verification, bound
+ * to this invite. The submission payload carries no Discord fields, so the browser cannot assert one.
  */
 export function resolveDiscordIdentity(params: {
-  isManager: boolean;
-  submission: PlayerOnboardingSubmission;
   verifiedDiscord: VerifiedDiscord | null | undefined;
 }): ResolvedDiscordIdentity {
-  const { isManager, submission, verifiedDiscord } = params;
+  const { verifiedDiscord } = params;
 
-  if (!isManager) {
-    if (!verifiedDiscord) {
-      throw new OnboardingRejection(
-        'discord_required',
-        'Your Discord connection is missing or has expired. Please reconnect your Discord account.'
-      );
-    }
-    if (!verifiedDiscord.inGuild) {
-      throw new OnboardingRejection(
-        'discord_not_in_guild',
-        'We could not confirm you are in the EZ Esports Discord server. Please reconnect your Discord account.'
-      );
-    }
-    return {
-      discordUserId: verifiedDiscord.discordUserId,
-      discordUsername: verifiedDiscord.discordUsername,
-      inGuild: true,
-    };
+  if (!verifiedDiscord) {
+    throw new OnboardingRejection(
+      'discord_required',
+      'Your Discord connection is missing or has expired. Please reconnect your Discord account.'
+    );
   }
-
-  const discordUsername = (submission.discordUsername || '').trim();
-  if (!discordUsername) {
-    throw new Error('Discord username or handle is required.');
+  if (!verifiedDiscord.inGuild) {
+    throw new OnboardingRejection(
+      'discord_not_in_guild',
+      'We could not confirm you are in the EZ Esports Discord server. Please reconnect your Discord account.'
+    );
   }
   return {
-    discordUserId: submission.discordUserId?.trim() || discordUsername,
-    discordUsername,
+    discordUserId: verifiedDiscord.discordUserId,
+    discordUsername: verifiedDiscord.discordUsername,
     inGuild: true,
   };
 }
@@ -193,27 +204,32 @@ export async function provisionManagerAccount(
   if (staffUserId) {
     resolvedUserId = staffUserId;
   } else {
-    try {
-      if (process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        const { createServiceClient } = await import('@/app/lib/supabase/service');
-        const supabase = createServiceClient();
-        const { data: created, error: createError } = await supabase.auth.admin.createUser({
-          email,
-          password: password || crypto.randomBytes(16).toString('hex'),
-          email_confirm: true,
-        });
-        if (created?.user) {
-          resolvedUserId = created.user.id;
-        } else if (createError) {
-          const { data: list } = await supabase.auth.admin.listUsers();
-          const existingAuthUser = list?.users?.find((u) => u.email?.toLowerCase() === email);
-          if (existingAuthUser) {
-            resolvedUserId = existingAuthUser.id;
+    // A manager who already has an auth account keeps it. Only a brand-new account needs the password
+    // the manager chose; there is deliberately no generated fallback, because a random password would
+    // lock the manager out of the portal they just signed up for.
+    resolvedUserId = await findExistingAuthUserId(email);
+    if (!resolvedUserId) {
+      if (!hasUsablePassword(password)) {
+        throw new OnboardingRejection('manager_password_required', MANAGER_PASSWORD_MESSAGE);
+      }
+      try {
+        if (process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+          const { createServiceClient } = await import('@/app/lib/supabase/service');
+          const supabase = createServiceClient();
+          const { data: created, error: createError } = await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+          });
+          if (created?.user) {
+            resolvedUserId = created.user.id;
+          } else if (createError) {
+            resolvedUserId = await findExistingAuthUserId(email);
           }
         }
+      } catch (authErr) {
+        console.warn('Could not provision Supabase Auth user for manager:', authErr);
       }
-    } catch (authErr) {
-      console.warn('Could not provision Supabase Auth user for manager:', authErr);
     }
   }
 
@@ -281,11 +297,20 @@ export async function processOnboardingSubmission(
   // Step 1: Validate inputs
   const validated = validateSubmissionInputs(submission);
   const discord = resolveDiscordIdentity({
-    isManager,
-    submission,
     verifiedDiscord:
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
   });
+
+  // A new manager account needs the password they chose. Checked before anything is written or any
+  // auth user is created; staff and existing auth users keep their current credentials.
+  if (isManager && !hasUsablePassword(submission.password)) {
+    const hasAccount =
+      Boolean(await findStaffUserIdByEmail(db, validated.email)) ||
+      Boolean(await findExistingAuthUserId(validated.email));
+    if (!hasAccount) {
+      throw new OnboardingRejection('manager_password_required', MANAGER_PASSWORD_MESSAGE);
+    }
+  }
 
   // Step 2: Resolve external Riot identity
   const effectiveGameSlug = gameSlug || 'valorant';

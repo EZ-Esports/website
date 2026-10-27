@@ -46,8 +46,8 @@ export default function PrivacyPage() {
                 coach, administrator) submitted through application or contact forms.
               </li>
               <li>
-                <strong className="text-foreground">Discord sign-in:</strong> when a student player
-                connects Discord during onboarding, we use Discord sign-in to read your Discord user ID
+                <strong className="text-foreground">Discord sign-in:</strong> when a student player or
+                school manager connects Discord during onboarding, we use Discord sign-in to read your Discord user ID
                 and username and to add you to the official EZ Esports Discord server on your behalf.
                 We do not read your messages or other servers, and we do not store the access token
                 Discord gives us.

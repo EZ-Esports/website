@@ -5,7 +5,8 @@
 export type OnboardingRejectionCode =
   | 'discord_required'
   | 'discord_not_in_guild'
-  | 'discord_already_linked';
+  | 'discord_already_linked'
+  | 'manager_password_required';
 
 export class OnboardingRejection extends Error {
   readonly code: OnboardingRejectionCode;

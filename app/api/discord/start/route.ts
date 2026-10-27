@@ -16,7 +16,7 @@ import { rateLimit, getClientIp } from '@/app/lib/rate-limit';
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,80}$/i;
 
-/** Where the student lands after OAuth: the wizard, which resumes at the Discord step. */
+/** Where the invitee lands after OAuth: the wizard, which resumes at the Discord step. */
 function wizardUrl(origin: string, school: string, game: string, token: string, extra: Record<string, string>) {
   const url = new URL(`/join/${encodeURIComponent(school)}/${encodeURIComponent(game)}`, origin);
   url.searchParams.set('token', token);
@@ -25,7 +25,7 @@ function wizardUrl(origin: string, school: string, game: string, token: string, 
 }
 
 /**
- * Begins Discord OAuth for a player invite. The raw invite token is kept only in a signed httpOnly
+ * Begins Discord OAuth for a player or school manager invite. The raw invite token is kept only in a signed httpOnly
  * cookie; the `state` sent through Discord carries just the invite hash and a nonce.
  */
 export async function GET(request: NextRequest) {
@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
 
   const validation = await validateInviteToken({ schoolSlug: school, gameSlug: game, token });
   // Invalid, expired or already used invites are explained by the join page itself.
-  // Managers keep the existing onboarding path; Discord verification is player-only.
-  if (!validation.valid || validation.isManager) {
+  // Players and school managers share this flow; a manager invite's join URL uses the `manager` game slug.
+  if (!validation.valid) {
     return NextResponse.redirect(wizardUrl(origin, school, game, token, {}), 302);
   }
 
