@@ -6,6 +6,9 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    // Source-scanning guards walk all of app/, and the PGlite and jsdom suites load the runner; on a
+    // 2-core CI runner running Node 20 the 5s default is too tight and makes them flaky.
+    testTimeout: 15_000,
     include: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
     exclude: [
       ...configDefaults.exclude,

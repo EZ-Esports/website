@@ -1,6 +1,6 @@
 # spec-035: Discord OAuth for school managers, legacy self-reported Discord removed
 
-- **Status:** Implemented, unmerged (branch `feat/manager-discord-oauth`)
+- **Status:** Implemented and merged in PR #283 (issue #249, managers)
 - **Date:** 2026-10-26
 - **Builds on:** [spec-033](spec-033-discord-oauth-onboarding.md) (player flow, PR #281), issue #249
 - **Schema:** none. No migration.

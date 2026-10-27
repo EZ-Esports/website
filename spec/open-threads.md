@@ -158,6 +158,16 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Roster size limits are app-level and not retroactive.** No database constraint (seeds and hand-run SQL bypass them), and rosters already above 7 players or 2 subs are left alone. A query listing them has not been run against production. Staff are held to the caps with no override; if the owner wants one it should be an explicit, audited action. Games with a different roster shape (for example tournament-model games) share the same constants; confirm with the owner.
 - **Captain rule is ambiguous.** "One captain per team" is enforced per roster today (database index); the owner has not confirmed whether it should also span Varsity and JV. Captain behaviour was deliberately not changed with the caps.
 
+---
+
+## Onboarding test data purge (spec-036)
+
+- **The owner must run it; CI never does.** `npm run db:purge:onboarding-test-data` was written and unit-tested against fakes only. It has not been run against any database, so the dry run on production is the first real check of the assumptions listed in [spec-036](spec-036-onboarding-test-data-purge.md). Follow `docs/dev/PURGE-ONBOARDING-TEST-DATA.md`.
+- **Refresh the Data Cache afterwards** (tags `members`, `players`, `rosters`, `teams`, `schools`, `matches`, `people`, `leadership`): a script cannot call `updateTag`.
+- Once the purge has run, record the date and counts here and in the timeline, and consider removing the script.
+
+---
+
 ## In-app confirm dialogs (spec-037)
 
 - **Not seen in a browser.** The dialogs were verified in jsdom only. Check the portal's dark dialog, 44px targets at phone width and the exit animation in a real browser before merge.
