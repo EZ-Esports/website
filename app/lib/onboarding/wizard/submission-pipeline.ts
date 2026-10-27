@@ -87,7 +87,7 @@ export function validateSubmissionInputs(
 }
 
 const DISCORD_ALREADY_LINKED_MESSAGE =
-  'This Discord account is already linked to another EZ Esports player. Please reconnect with a different Discord account, or contact your school manager.';
+  'This Discord account is already linked to another EZ Esports member. Please reconnect with a different Discord account, or contact EZ Esports if you think this is a mistake.';
 
 export interface ResolvedDiscordIdentity {
   discordUserId: string;
@@ -96,45 +96,30 @@ export interface ResolvedDiscordIdentity {
 }
 
 /**
- * Decides which Discord identity is persisted. Players must have completed Discord OAuth: the
- * identity comes only from the signed server-side verification, and anything the client sent
- * (handle, id, inGuild) is ignored. Managers keep the legacy self-reported handle because the
- * Discord verification gate is player-only.
+ * Decides which Discord identity is persisted. Everyone (players and school managers) must have
+ * completed Discord OAuth: the identity comes only from the signed server-side verification, bound
+ * to this invite. The submission payload carries no Discord fields, so the browser cannot assert one.
  */
 export function resolveDiscordIdentity(params: {
-  isManager: boolean;
-  submission: PlayerOnboardingSubmission;
   verifiedDiscord: VerifiedDiscord | null | undefined;
 }): ResolvedDiscordIdentity {
-  const { isManager, submission, verifiedDiscord } = params;
+  const { verifiedDiscord } = params;
 
-  if (!isManager) {
-    if (!verifiedDiscord) {
-      throw new OnboardingRejection(
-        'discord_required',
-        'Your Discord connection is missing or has expired. Please reconnect your Discord account.'
-      );
-    }
-    if (!verifiedDiscord.inGuild) {
-      throw new OnboardingRejection(
-        'discord_not_in_guild',
-        'We could not confirm you are in the EZ Esports Discord server. Please reconnect your Discord account.'
-      );
-    }
-    return {
-      discordUserId: verifiedDiscord.discordUserId,
-      discordUsername: verifiedDiscord.discordUsername,
-      inGuild: true,
-    };
+  if (!verifiedDiscord) {
+    throw new OnboardingRejection(
+      'discord_required',
+      'Your Discord connection is missing or has expired. Please reconnect your Discord account.'
+    );
   }
-
-  const discordUsername = (submission.discordUsername || '').trim();
-  if (!discordUsername) {
-    throw new Error('Discord username or handle is required.');
+  if (!verifiedDiscord.inGuild) {
+    throw new OnboardingRejection(
+      'discord_not_in_guild',
+      'We could not confirm you are in the EZ Esports Discord server. Please reconnect your Discord account.'
+    );
   }
   return {
-    discordUserId: submission.discordUserId?.trim() || discordUsername,
-    discordUsername,
+    discordUserId: verifiedDiscord.discordUserId,
+    discordUsername: verifiedDiscord.discordUsername,
     inGuild: true,
   };
 }
@@ -281,8 +266,6 @@ export async function processOnboardingSubmission(
   // Step 1: Validate inputs
   const validated = validateSubmissionInputs(submission);
   const discord = resolveDiscordIdentity({
-    isManager,
-    submission,
     verifiedDiscord:
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
   });

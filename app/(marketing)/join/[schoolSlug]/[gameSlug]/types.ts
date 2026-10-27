@@ -21,9 +21,6 @@ export interface WizardFormData {
   graduationYear: number;
   /** Manager only: season the manager is applying for, e.g. "2026-27". */
   academicYear?: string;
-  discordUsername: string;
-  discordJoinedConfirmed: boolean;
-  discordConnected: boolean;
   riotId: string;
   ignConfirmed: boolean;
   birthDate: string;

@@ -524,8 +524,49 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       expect(valResult.valid).toBe(true);
       if (valResult.valid) {
-        expect(valResult.submissionDraft).toEqual(draftData);
+        // Legacy self-reported Discord keys are dropped, never read back or trusted.
+        const { discordUsername: _legacy, ...expected } = draftData;
+        expect(valResult.submissionDraft).toEqual(expected);
+        expect(valResult.submissionDraft).not.toHaveProperty('discordUsername');
       }
+    });
+
+    it('drops every legacy Discord key from a draft on save', async () => {
+      await saveOnboardingDraft({
+        token: rawToken,
+        draftData: {
+          legalFirstName: 'Alexander',
+          discordUsername: 'typed',
+          discordUserId: '999',
+          inGuild: true,
+          discordJoinedConfirmed: true,
+          discordConnected: true,
+        },
+      });
+      const valResult = await validateInviteToken({
+        schoolSlug: 'stuyvesant',
+        gameSlug: 'valorant',
+        token: rawToken,
+      });
+      expect(valResult.valid).toBe(true);
+      if (valResult.valid) expect(valResult.submissionDraft).toEqual({ legalFirstName: 'Alexander' });
+    });
+
+    it('does not crash on, or trust, legacy Discord keys already stored in an existing draft', async () => {
+      const row = mocks.state.playerInvitesStore.find((i) => i.tokenHash === tokenHash);
+      row.submissionDraft = {
+        legalFirstName: 'Alexander',
+        discordUsername: 'old-handle',
+        discordJoinedConfirmed: true,
+        discordConnected: true,
+      };
+      const valResult = await validateInviteToken({
+        schoolSlug: 'stuyvesant',
+        gameSlug: 'valorant',
+        token: rawToken,
+      });
+      expect(valResult.valid).toBe(true);
+      if (valResult.valid) expect(valResult.submissionDraft).toEqual({ legalFirstName: 'Alexander' });
     });
 
     it('fails to save draft if token does not match an invite', async () => {
@@ -556,9 +597,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2026,
       riotId: 'Demon1#LFT1',
-      discordUsername: 'client-typed-handle',
-      discordUserId: '999999999999999999',
-      inGuild: false,
       birthDate: '2008-05-14',
       gender: 'Male',
       race: ['Asian'],
@@ -832,9 +870,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2027,
       riotId: 'Demon1#LFT1',
-      discordUsername: 'typed-by-client',
-      discordUserId: '555555555555555555',
-      inGuild: true,
       birthDate: '2008-05-14',
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
@@ -1063,9 +1098,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         password: 'securePassword123!',
         graduationYear: 2026,
         riotId: 'CoachSam#NA1',
-        discordUsername: 'coach_sam',
-        discordUserId: 'discord-sam-999',
-        inGuild: true,
         birthDate: '1988-08-20',
         gender: 'Male',
         codeOfConductAccepted: true,
@@ -1117,9 +1149,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
           graduationYear: 2028,
           academicYear: '2026-27',
           riotId: 'CoachSam#NA1',
-          discordUsername: 'coach_sam',
-          discordUserId: 'discord-sam-999',
-          inGuild: true,
           birthDate: '1988-08-20',
           codeOfConductAccepted: true,
           consent: { tosAcknowledged: true },
@@ -1145,8 +1174,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
             graduationYear: 2028,
             academicYear: '2026-2029',
             riotId: 'CoachSam#NA1',
-            discordUsername: 'coach_sam',
-            inGuild: true,
             birthDate: '1988-08-20',
             codeOfConductAccepted: true,
             consent: { tosAcknowledged: true },
@@ -1167,8 +1194,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
             graduationYear: 2028,
             academicYear: '2026-2027',
             riotId: 'CoachSam#NA1',
-            discordUsername: 'coach_sam',
-            inGuild: true,
             birthDate: '1988-08-20',
             codeOfConductAccepted: true,
             consent: { tosAcknowledged: true },
@@ -1191,8 +1216,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         email: 'smiller@stuy.edu',
         graduationYear: 2026,
         riotId: 'CoachSam#NA1',
-        discordUsername: 'coach_sam',
-        inGuild: true,
         birthDate: '1988-08-20',
         codeOfConductAccepted: true,
         consent: { tosAcknowledged: true },
@@ -1208,6 +1231,85 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       );
       expect(managerRow).toBeDefined();
       expect(managerRow.userId).toBe(existingStaffUserId);
+    });
+
+    describe('verified Discord requirement (managers use the same OAuth gate as players)', () => {
+      const managerSub = (): PlayerOnboardingSubmission => ({
+        legalFirstName: 'Samuel',
+        legalLastName: 'Miller',
+        email: 'smiller@stuy.edu',
+        password: 'securePassword123!',
+        graduationYear: 2027,
+        riotId: 'CoachSam#NA1',
+        birthDate: '1988-08-20',
+        codeOfConductAccepted: true,
+        consent: { tosAcknowledged: true },
+      });
+
+      it('stores the verified Discord identity from the cookie on the manager member', async () => {
+        const result = await submitOk({ token: managerToken, submission: managerSub() });
+        const identity = mocks.state.playerIdentitiesStore.find(
+          (i) => i.memberId === result.memberId && i.provider === 'discord'
+        );
+        expect(identity).toMatchObject({
+          providerUserId: '123456789012345678',
+          providerUsername: 'alexchen',
+          inGuild: true,
+        });
+        expect(mocks.state.membersStore.find((m) => m.id === result.memberId).discord).toBe('alexchen');
+      });
+
+      it('rejects a manager without a verified Discord cookie and creates nothing', async () => {
+        discordSession.override = null;
+        const result = await submitPlayerOnboarding({ token: managerToken, submission: managerSub() });
+        expect(result).toMatchObject({ success: false, code: 'discord_required' });
+        expect(mocks.state.membersStore.find((m) => m.email === 'smiller@stuy.edu')).toBeUndefined();
+        expect(mocks.state.schoolManagersStore).toHaveLength(0);
+        expect(mocks.state.managerInvitesStore.find((i) => i.id === 'manager-invite-1').status).toBe('pending');
+      });
+
+      it('rejects a manager whose verification was issued for a different invite', async () => {
+        discordSession.override = {
+          discordUserId: '123456789012345678',
+          discordUsername: 'alexchen',
+          inGuild: true,
+          inviteHash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+        };
+        await expect(
+          submitPlayerOnboarding({ token: managerToken, submission: managerSub() })
+        ).resolves.toMatchObject({ success: false, code: 'discord_required' });
+        expect(mocks.state.schoolManagersStore).toHaveLength(0);
+      });
+
+      it('rejects a manager who is not confirmed in the server', async () => {
+        discordSession.override = {
+          discordUserId: '123456789012345678',
+          discordUsername: 'alexchen',
+          inGuild: false,
+          inviteHash: managerTokenHash,
+        };
+        await expect(
+          submitPlayerOnboarding({ token: managerToken, submission: managerSub() })
+        ).resolves.toMatchObject({ success: false, code: 'discord_not_in_guild' });
+      });
+
+      it('rejects a Discord account already linked to another member, with wording that fits a manager', async () => {
+        mocks.state.membersStore.push({ id: 'other-member', email: 'someone.else@nycstudents.net' });
+        mocks.state.playerIdentitiesStore.push({
+          id: 'ident-other',
+          memberId: 'other-member',
+          provider: 'discord',
+          providerUserId: '123456789012345678',
+          providerUsername: 'someone',
+          inGuild: true,
+        });
+        const result = await submitPlayerOnboarding({ token: managerToken, submission: managerSub() });
+        expect(result).toMatchObject({ success: false, code: 'discord_already_linked' });
+        const message = result.success === false ? result.error : '';
+        expect(message).not.toMatch(/player/i);
+        expect(message).toMatch(/different Discord account/i);
+        expect(mocks.state.schoolManagersStore).toHaveLength(0);
+      });
     });
   });
 });

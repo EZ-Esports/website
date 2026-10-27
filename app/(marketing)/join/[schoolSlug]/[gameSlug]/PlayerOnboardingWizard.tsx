@@ -117,8 +117,6 @@ export default function PlayerOnboardingWizard({
           graduationYear: draft.graduationYear,
           academicYear: isManager ? draft.academicYear : undefined,
           riotId: draft.riotId.trim(),
-          // Managers keep the self-reported handle; for players the server uses the OAuth cookie.
-          discordUsername: isManager ? draft.discordUsername.trim() : undefined,
           birthDate: draft.birthDate,
           gender: draft.gender || undefined,
           race: draft.selectedRaces.length > 0 ? draft.selectedRaces : undefined,
@@ -144,7 +142,7 @@ export default function PlayerOnboardingWizard({
         });
 
         if (!result.success) {
-          // Expected Discord rejections: send the student back to reconnect rather than showing a dead end.
+          // Expected Discord rejections: send the invitee back to reconnect rather than showing a dead end.
           setDiscord(null);
           setStep(2);
           draft.setErrorMessage(result.error);
@@ -166,7 +164,7 @@ export default function PlayerOnboardingWizard({
         legalFirstName={draft.legalFirstName}
         legalLastName={draft.legalLastName}
         email={draft.email}
-        discordUsername={isManager ? draft.discordUsername : (discord?.username ?? '')}
+        discordUsername={discord?.username ?? ''}
         inviteData={inviteData}
       />
     );
@@ -260,14 +258,9 @@ export default function PlayerOnboardingWizard({
 
         {step === 2 && (
           <DiscordStep
-            isManager={isManager}
             verified={discord}
             connecting={discordConnecting}
             onConnect={handleConnectDiscord}
-            discordUsername={draft.discordUsername}
-            setDiscordUsername={draft.setDiscordUsername}
-            discordJoinedConfirmed={draft.discordJoinedConfirmed}
-            setDiscordJoinedConfirmed={draft.setDiscordJoinedConfirmed}
           />
         )}
 

@@ -80,12 +80,6 @@ export interface PlayerOnboardingSubmission {
   academicYear?: string;
   password?: string;
   riotId: string;
-  /** Managers only (legacy self-reported). Ignored for players: their Discord identity comes from OAuth. */
-  discordUsername?: string;
-  /** Managers only. Ignored for players. */
-  discordUserId?: string;
-  /** Ignored: guild membership is established server-side. */
-  inGuild?: boolean;
   birthDate: string | Date;
   gender?: string;
   race?: string[];
@@ -152,6 +146,13 @@ const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
   'password',
   // Guardian PII and signature are collected at final submit only, never persisted in the draft.
   'consent',
+  // Discord identity comes only from the signed OAuth cookie. Drafts saved before OAuth existed may
+  // still carry a typed handle or "joined" flag; they are dropped, never read back or trusted.
+  'discordUsername',
+  'discordUserId',
+  'inGuild',
+  'discordJoinedConfirmed',
+  'discordConnected',
 ]);
 
 /**
