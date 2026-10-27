@@ -46,10 +46,8 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     }
   }, [isOpen, loadData]);
 
-  const handleRemoveManager = async (managerId: string, managerName: string) => {
-    if (!confirm(`Are you sure you want to remove manager access for ${managerName}?`)) {
-      return { success: false };
-    }
+  // Callers confirm first (ConfirmActionDialog); these run the action unconditionally.
+  const handleRemoveManager = async (managerId: string) => {
     setIsRemovingId(managerId);
     try {
       const res = await removeSchoolManager({ managerId });
@@ -65,10 +63,7 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     }
   };
 
-  const handleRevokeInvite = async (inviteId: string, name: string) => {
-    if (!confirm(`Are you sure you want to revoke the invite for ${name}?`)) {
-      return { success: false };
-    }
+  const handleRevokeInvite = async (inviteId: string) => {
     setIsRevokingId(inviteId);
     try {
       const res = await revokeManagerInvite(inviteId);

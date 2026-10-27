@@ -165,3 +165,12 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **The owner must run it; CI never does.** `npm run db:purge:onboarding-test-data` was written and unit-tested against fakes only. It has not been run against any database, so the dry run on production is the first real check of the assumptions listed in [spec-036](spec-036-onboarding-test-data-purge.md). Follow `docs/dev/PURGE-ONBOARDING-TEST-DATA.md`.
 - **Refresh the Data Cache afterwards** (tags `members`, `players`, `rosters`, `teams`, `schools`, `matches`, `people`, `leadership`): a script cannot call `updateTag`.
 - Once the purge has run, record the date and counts here and in the timeline, and consider removing the script.
+
+---
+
+## In-app confirm dialogs (spec-037)
+
+- **Not seen in a browser.** The dialogs were verified in jsdom only. Check the portal's dark dialog, 44px targets at phone width and the exit animation in a real browser before merge.
+- **`alert()` and `prompt()` remain.** `SchoolPortalClient` still uses `alert()` for remove-player and role-change failures (and other portal and admin forms may); they share the same auto-dismiss problem as `confirm()`. The lint rule bans only `confirm`. Convert them to the roster notice or an `AdminNotice` and widen the rule.
+- **Component test setup is new.** jsdom, Testing Library and jest-dom are dev dependencies, enabled per file with `// @vitest-environment jsdom`; the older render tests still use `renderToStaticMarkup` in node.
+- **Dialog error vs toast on League Setup.** A failed game or season delete now shows its error in the dialog rather than a toast; revisit if staff expect the toast.

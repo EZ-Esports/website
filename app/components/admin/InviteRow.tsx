@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState } from 'react';
 import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-components';
 import { revokeInvite } from '@/app/(admin)/admin/team/actions';
 import { parseHexColor } from '@/app/lib/roles';
 import { cx } from '@/app/lib/cx';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { HiOutlineTrash, HiOutlineEllipsisVertical } from 'react-icons/hi2';
 
 interface InviteRowProps {
@@ -25,29 +27,24 @@ interface InviteRowProps {
 }
 
 export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps) {
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   // Controlled so a cancelled confirm keeps the menu open (RAC otherwise closes
   // the menu unconditionally after onAction runs).
   const [actionsOpen, setActionsOpen] = useState(false);
 
+  const revocation = useConfirmAction<string>(async (inviteId) => {
+    const result = await revokeInvite(inviteId);
+    if (result.success) setRemoved(true);
+    return result;
+  }, 'Could not cancel invite.');
+  const isPending = revocation.dialogProps.isPending;
+
   if (removed) return null;
 
   function handleRevoke() {
-    if (!window.confirm(`Cancel the pending invite for ${invite.email}? The link will stop working.`)) {
-      return;
-    }
     setActionsOpen(false);
-    setError(null);
-    startTransition(async () => {
-      const result = await revokeInvite(invite.id);
-      if (!result.success) {
-        setError(result.error ?? 'Could not cancel invite.');
-        return;
-      }
-      setRemoved(true);
-    });
+    revocation.request(invite.id);
   }
 
   // Derive initials and colors
@@ -99,7 +96,6 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
               })}`
             )}
           </span>
-          {error && <p role="alert" aria-live="polite" className="admin-fade-in mt-1 text-xs font-medium text-danger-on-tint">{error}</p>}
         </div>
       </div>
 
@@ -133,6 +129,7 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
         ) : (
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
+              ref={menuButtonRef}
               className={({ isFocusVisible }) =>
                 cx(
                   'inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground-secondary hover:text-foreground hover:bg-surface-raised data-[pressed]:bg-surface-raised transition-colors duration-150 cursor-pointer outline-none',
@@ -162,6 +159,16 @@ export default function InviteRow({ invite, expired, canRevoke }: InviteRowProps
           </MenuTrigger>
         )}
       </div>
+
+      <ConfirmActionDialog
+        {...revocation.dialogProps}
+        tone="danger"
+        restoreFocusRef={menuButtonRef}
+        title="Cancel invite?"
+        message={`Cancel the pending invite for ${invite.email}? The link will stop working.`}
+        confirmLabel="Cancel invite"
+        pendingLabel="Cancelling…"
+      />
     </li>
   );
 }

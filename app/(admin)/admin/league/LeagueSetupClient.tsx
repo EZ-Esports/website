@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FiEye, FiEyeOff, FiList, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineCalendarDays, HiOutlinePuzzlePiece } from 'react-icons/hi2';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { cancelBtn, chip, chipButton, deleteIconBtn, input, listStack, primaryBtn, saveBtn } from '@/app/components/admin/styles';
 import { AdminCount, AdminEmptyState, AdminField, AdminFilterTabs, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
@@ -126,10 +127,17 @@ export default function LeagueSetupClient({
     });
   };
 
-  const confirmDelete = (message: string, action: () => Promise<ActionResult>, successMsg: string) => {
-    if (!window.confirm(message)) return;
-    runAction(action, successMsg);
-  };
+  // A delete only runs from the confirm dialog. A failure stays in the dialog (the
+  // toast sits behind its backdrop) so it can be read, retried or cancelled.
+  const deletion = useConfirmAction<{ title: string; message: string; action: () => Promise<ActionResult>; successMsg: string }>(
+    async ({ action, successMsg }) => {
+      const res = await action();
+      if (res?.success) showToast(successMsg, 'success');
+      return res ?? { success: false, error: 'Something went wrong.' };
+    },
+  );
+  const confirmDelete = (title: string, message: string, action: () => Promise<ActionResult>, successMsg: string) =>
+    deletion.request({ title, message, action, successMsg });
 
   return (
     <div className="space-y-6">
@@ -175,6 +183,7 @@ export default function LeagueSetupClient({
                 onUpdate={(fd) => runAction(() => updateGame(g.id, fd), 'Game updated.')}
                 onDelete={() =>
                   confirmDelete(
+                    'Delete game?',
                     `Delete "${g.displayName}"? This will also delete all linked seasons (cascade). This is permanent.`,
                     () => deleteGame(g.id),
                     'Game deleted.',
@@ -300,6 +309,7 @@ export default function LeagueSetupClient({
                       }}
                       onDelete={() =>
                         confirmDelete(
+                          'Delete season?',
                           `Delete season "${s.name}"? Seasons with existing matches cannot be deleted until those matches are removed or reassigned. This is permanent.`,
                           () => deleteSeason(s.id),
                           'Season deleted.',
@@ -313,6 +323,15 @@ export default function LeagueSetupClient({
           </>
         )}
       </AdminSection>
+
+      <ConfirmActionDialog
+        {...deletion.dialogProps}
+        tone="danger"
+        title={deletion.target?.title ?? ''}
+        message={deletion.target?.message ?? ''}
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+      />
 
       <ConfirmActionDialog
         isOpen={outcomesTarget !== null}

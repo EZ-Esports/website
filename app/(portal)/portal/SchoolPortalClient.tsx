@@ -19,6 +19,8 @@ import {
   type RosterEligibilityResult,
 } from '@/app/lib/onboarding/portal-actions';
 import type { SchoolMatchItem } from '@/app/lib/school-matches';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { PortalHeader } from './components/PortalHeader';
 import { GameTabs, type GameItem } from './components/GameTabs';
 import { GenerateInviteCard } from './components/GenerateInviteCard';
@@ -456,14 +458,23 @@ export default function SchoolPortalClient({
     });
   };
 
-  const handleDeleteRoster = async (rosterId: string) => {
-    if (!confirm('Are you sure you want to delete this empty roster?')) return;
+  // Deleting only runs from the confirm dialog. A failure stays in the dialog and is
+  // also mirrored to the roster notice so it survives a cancel.
+  const rosterDeletion = useConfirmAction<string>(async (rosterId) => {
     try {
       await deleteSchoolRoster(rosterId);
-      setRosters((prev) => prev.filter((r) => r.id !== rosterId));
     } catch (err: any) {
-      alert(err.message || 'Failed to delete roster');
+      const text = err?.message || 'Failed to delete roster';
+      setRosterNotice({ kind: 'error', text });
+      return { success: false, error: text };
     }
+    setRosters((prev) => prev.filter((r) => r.id !== rosterId));
+    return { success: true };
+  }, 'Failed to delete roster');
+
+  const handleDeleteRoster = (rosterId: string) => {
+    setRosterNotice(null);
+    rosterDeletion.request(rosterId);
   };
 
   const handleUpdateRole = async (
@@ -704,6 +715,16 @@ export default function SchoolPortalClient({
       <InvitesHistoryTable
         invites={filteredInvites}
         onCopyLink={handleCopyLink}
+      />
+
+      <ConfirmActionDialog
+        {...rosterDeletion.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Delete roster?"
+        message="Are you sure you want to delete this empty roster?"
+        confirmLabel="Delete roster"
+        pendingLabel="Deleting…"
       />
 
       {/* Emergency Sub Swap Modal */}
