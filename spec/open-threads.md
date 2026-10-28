@@ -207,3 +207,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Kept members keep their spent invite.** There is no UI for staff to purge a kept student on request.
 - **`onboarding_content_flags` is covered** (added after #304 merged): counted in the helper's `deleteMember`, named in the confirmation copy, and in the mocked and PGlite tests. The spec-036 purge script still relies on the member FK cascade for it (see the comment on `DELETE_ORDER`).
 - `manager_invites` and `school_managers` have no email column, so the case-insensitive email match applies only to `staff_members` and `people`; managers are matched by member link, and manager invites also by intended name at the member's school.
+
+## Generate season follow-ups (spec-043)
+
+- Generation is refused for any season that already has a match, so the JV schedule cannot be added after Varsity without removing matches. Consider scoping the check to the chosen division.
+- The lock, bulk inserts and UI have not been exercised against a real database or in a browser.
+- Week 1 date and the fixed 7 PM ET slot are the only schedule inputs; holidays and per-week skips are not modelled.
+- `createMatch`/`deleteMatch` do not lock the season row, so a hand-scheduled match racing Generate's commit can slip in between its check and insert (spec-043). Left as is; revisit if it ever happens.

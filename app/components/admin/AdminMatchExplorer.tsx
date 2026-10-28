@@ -7,12 +7,14 @@ import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actio
 import { HiOutlineCalendarDays, HiOutlineEllipsisVertical, HiOutlineNoSymbol, HiOutlineTrash, HiPlus } from 'react-icons/hi2';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import ScheduleMatchDialog from '@/app/components/admin/ScheduleMatchDialog';
+import GenerateSeasonDialog, { type GenerateSchoolOption } from '@/app/components/admin/GenerateSeasonDialog';
 import {
   chip,
   ghostBtnSm,
   input,
   primaryBtn,
   primaryBtnSm,
+  secondaryBtn,
   secondaryBtnSm,
   selectClass,
   type ChipTone,
@@ -100,6 +102,8 @@ interface AdminMatchExplorerProps {
   back?: { href: string; label: string };
   /** Active seasons, rosters and teams for the schedule dialog. */
   scheduleForm: ScheduleFormData;
+  /** Active schools offered by Generate season. */
+  generateSchools: GenerateSchoolOption[];
   /** Extra sections between the header and the filters (the reschedule queue). */
   children?: React.ReactNode;
 }
@@ -148,6 +152,7 @@ export default function AdminMatchExplorer({
   serverNow,
   back,
   scheduleForm,
+  generateSchools,
   children,
 }: AdminMatchExplorerProps) {
   const searchParams = useSearchParams();
@@ -181,6 +186,7 @@ export default function AdminMatchExplorer({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [restoreFocusId, setRestoreFocusId] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<MatchPageItemDto | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -437,10 +443,16 @@ export default function AdminMatchExplorer({
         back={back}
         description="Enter results for matches that have been played, and schedule what is next."
         actions={
-          <button type="button" onClick={() => setScheduleOpen(true)} className={cx(primaryBtn, 'max-sm:h-11')}>
-            <HiPlus aria-hidden className="h-4 w-4" />
-            Schedule match
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setGenerateOpen(true)} className={cx(secondaryBtn, 'max-sm:h-11')}>
+              <HiOutlineCalendarDays aria-hidden className="h-4 w-4" />
+              Generate season
+            </button>
+            <button type="button" onClick={() => setScheduleOpen(true)} className={cx(primaryBtn, 'max-sm:h-11')}>
+              <HiPlus aria-hidden className="h-4 w-4" />
+              Schedule match
+            </button>
+          </div>
         }
       />
 
@@ -452,6 +464,18 @@ export default function AdminMatchExplorer({
           reload();
         }}
         {...scheduleForm}
+      />
+
+      <GenerateSeasonDialog
+        isOpen={generateOpen}
+        onOpenChange={setGenerateOpen}
+        games={games}
+        seasons={seasons}
+        schools={generateSchools}
+        onGenerated={(message) => {
+          setToast({ message, type: 'success' });
+          reload();
+        }}
       />
 
       {children}
