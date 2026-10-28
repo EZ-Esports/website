@@ -201,10 +201,32 @@ export function isDerivedStandings(rows: { notes: string | null }[]): boolean {
   return rows.length > 0 && rows.every((row) => isReconstructed(row.notes));
 }
 
-/** Keyset cursor: the sort key of the last row already delivered. */
+/**
+ * Keyset cursor: the sort key of the last row already delivered.
+ *
+ * The list is ordered by (scheduledAt, home school name, canonical division, id). A generated
+ * week gives every match of both divisions one identical kickoff, and the row id is a random
+ * uuid, so ordering ties by id alone scatters them arbitrarily. School name then division keeps
+ * a school's Varsity and JV matches next to each other and makes the order stable and readable;
+ * id remains the final tiebreak so the key is unique.
+ */
 export interface MatchCursor {
   scheduledAt: string; // ISO timestamp
+  /** Home school name of the last row. */
+  home: string;
+  /** Canonical division of the last row. */
+  division: string;
   id: string;
+}
+
+/** The cursor that resumes after `row` (mirrors the SQL keyset in `buildMatchesPageQuery`). */
+export function cursorFor(row: { scheduledAt: Date | string; homeTeam: string; division: string; id: string }): MatchCursor {
+  return {
+    scheduledAt: new Date(row.scheduledAt).toISOString(),
+    home: row.homeTeam,
+    division: row.division,
+    id: row.id,
+  };
 }
 
 /**

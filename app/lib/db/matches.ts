@@ -23,6 +23,7 @@ import {
 import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
   COMBINED_DIVISION,
+  cursorFor,
   FINISHED_MATCH_STATUSES,
   canonicalDivision,
   clampPageLimit,
@@ -117,7 +118,7 @@ function facetConditions(params: MatchesPageParams): SQL[] {
 
 /**
  * Keyset-paginated match list with division + school names joined in.
- * Sorted by (scheduledAt, id); `cursor` is the sort key of the last row of
+ * Sorted by (scheduledAt, home school name, canonical division, id); `cursor` is the sort key of the last row of
  * the previous page. Fetches one extra row to detect whether more remain.
  * Uncached: filter permutations are unbounded and admin edits must be fresh.
  */
@@ -131,19 +132,18 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     if (tabCondition) conditions.push(tabCondition);
   }
   if (params.cursor) {
-    const ts = new Date(params.cursor.scheduledAt);
-    const { id } = params.cursor;
-    conditions.push(
-      (sort === 'desc'
-        ? or(
-            lt(schema.matches.scheduledAt, ts),
-            and(eq(schema.matches.scheduledAt, ts), lt(schema.matches.id, id))
-          )
-        : or(
-            gt(schema.matches.scheduledAt, ts),
-            and(eq(schema.matches.scheduledAt, ts), gt(schema.matches.id, id))
-          ))!
+    // Lexicographic keyset over the same four columns as the ORDER BY below, all in one direction.
+    const cmp = sort === 'desc' ? lt : gt;
+    const keys = [
+      { col: sql`${schema.matches.scheduledAt}`, value: new Date(params.cursor.scheduledAt) as unknown },
+      { col: sql`${homeSchool.name}`, value: params.cursor.home as unknown },
+      { col: sql`${canonicalDivisionSql(homeRoster.division)}`, value: params.cursor.division as unknown },
+      { col: sql`${schema.matches.id}`, value: params.cursor.id as unknown },
+    ];
+    const branches = keys.map((k, i) =>
+      and(...keys.slice(0, i).map((e) => eq(e.col, e.value)), cmp(k.col, k.value))!
     );
+    conditions.push(or(...branches)!);
   }
 
   const direction = sort === 'desc' ? desc : asc;
@@ -170,7 +170,12 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(direction(schema.matches.scheduledAt), direction(schema.matches.id))
+    .orderBy(
+      direction(schema.matches.scheduledAt),
+      direction(homeSchool.name),
+      direction(canonicalDivisionSql(homeRoster.division)),
+      direction(schema.matches.id)
+    )
     .limit(limit + 1);
 }
 
@@ -184,7 +189,7 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
     items,
     nextCursor:
       rows.length > limit && last
-        ? { scheduledAt: last.scheduledAt.toISOString(), id: last.id }
+        ? cursorFor(last)
         : null,
   };
 }
@@ -270,7 +275,12 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
     .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(and(...conditions))
-    .orderBy(asc(schema.matches.scheduledAt), asc(schema.matches.id));
+    .orderBy(
+      asc(schema.matches.scheduledAt),
+      asc(homeSchool.name),
+      asc(canonicalDivisionSql(homeRoster.division)),
+      asc(schema.matches.id)
+    );
 }
 
 /**
@@ -338,7 +348,12 @@ export async function getSchoolMatchRows(params: {
     .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(and(...conditions))
-    .orderBy(asc(schema.matches.scheduledAt), asc(schema.matches.id));
+    .orderBy(
+      asc(schema.matches.scheduledAt),
+      asc(homeSchool.name),
+      asc(canonicalDivisionSql(homeRoster.division)),
+      asc(schema.matches.id)
+    );
 }
 
 /** Count of all scheduled matches (for dashboard). */
