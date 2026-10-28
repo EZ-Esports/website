@@ -233,6 +233,107 @@ export async function getSchoolInvites(
   return invites;
 }
 
+/** Invites are limited to the pending state: later states carry a review trail or a student record. */
+const INVITE_NOT_PENDING_ERROR = 'Only pending invites can be changed. This invite has already been submitted or reviewed.';
+
+/**
+ * Loads an invite and authorizes the caller as a manager of its school and game (mutation guard:
+ * refuses an inactive season, spec-028). The invite's own school and game are authoritative, never
+ * values supplied by the client, so an id from another school is refused as Forbidden.
+ */
+async function authorizeInviteMutation(inviteId: string) {
+  if (!inviteId) throw new Error('inviteId is required');
+  const [invite] = await db
+    .select({
+      id: schema.playerInvites.id,
+      schoolId: schema.playerInvites.schoolId,
+      gameId: schema.playerInvites.gameId,
+      status: schema.playerInvites.status,
+    })
+    .from(schema.playerInvites)
+    .where(eq(schema.playerInvites.id, inviteId))
+    .limit(1);
+  if (!invite) throw new Error('Invite not found');
+  await assertManagerForSchool(invite.schoolId, invite.gameId);
+  if (invite.status !== 'pending') throw new Error(INVITE_NOT_PENDING_ERROR);
+  return invite;
+}
+
+export interface RegeneratePlayerInviteLinkResult {
+  inviteId: string;
+  inviteUrl: string;
+  expiresAt: Date;
+}
+
+/**
+ * Issues a fresh link for a pending invite. Only the token hash is stored, so the original link
+ * cannot be recovered; instead the old token is replaced (and so stops working) and the new one is
+ * returned once for the caller to copy. The update is conditional on the invite still being
+ * pending, so a concurrent submission cannot be clobbered. Invites are read uncached, so no cache
+ * tag is involved.
+ */
+export async function regeneratePlayerInviteLink(
+  inviteId: string
+): Promise<RegeneratePlayerInviteLinkResult> {
+  const invite = await authorizeInviteMutation(inviteId);
+
+  const { token, tokenHash } = await generateInviteToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const [updated] = await db
+    .update(schema.playerInvites)
+    .set({ tokenHash, expiresAt })
+    .where(
+      and(
+        eq(schema.playerInvites.id, invite.id),
+        eq(schema.playerInvites.schoolId, invite.schoolId),
+        eq(schema.playerInvites.status, 'pending')
+      )
+    )
+    .returning({ id: schema.playerInvites.id });
+  if (!updated) throw new Error(INVITE_NOT_PENDING_ERROR);
+
+  const [school] = await db
+    .select({ slug: schema.schools.slug })
+    .from(schema.schools)
+    .where(eq(schema.schools.id, invite.schoolId))
+    .limit(1);
+  const [game] = await db
+    .select({ slug: schema.games.slug })
+    .from(schema.games)
+    .where(eq(schema.games.id, invite.gameId))
+    .limit(1);
+
+  return {
+    inviteId: invite.id,
+    inviteUrl: `/join/${school?.slug ?? invite.schoolId}/${game?.slug ?? invite.gameId}?token=${token}`,
+    expiresAt,
+  };
+}
+
+/**
+ * Deletes a pending invite, which invalidates its link. Submitted, accepted and rejected invites
+ * are kept: they are the audit trail of a student's onboarding. Conditional on the pending status
+ * so a submission that lands first wins.
+ */
+export async function deletePlayerInvite(inviteId: string): Promise<{ success: true; inviteId: string }> {
+  const invite = await authorizeInviteMutation(inviteId);
+
+  const deleted = await db
+    .delete(schema.playerInvites)
+    .where(
+      and(
+        eq(schema.playerInvites.id, invite.id),
+        eq(schema.playerInvites.schoolId, invite.schoolId),
+        eq(schema.playerInvites.status, 'pending')
+      )
+    )
+    .returning({ id: schema.playerInvites.id });
+  if (deleted.length === 0) throw new Error(INVITE_NOT_PENDING_ERROR);
+
+  return { success: true, inviteId: invite.id };
+}
+
 export interface PendingSubmission {
   id: string;
   schoolId: string;

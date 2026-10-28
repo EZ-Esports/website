@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useEffect, useState, useTransition } from 'react';
 import type { SchoolManagerContext, ManagedSchoolInfo } from '@/app/lib/onboarding/manager-auth';
 import {
   reviewPlayerInvite,
@@ -11,6 +11,8 @@ import {
   updateRosterPlayerRole,
   createSchoolRoster,
   deleteSchoolRoster,
+  regeneratePlayerInviteLink,
+  deletePlayerInvite,
   type SchoolInviteItem,
   type PendingSubmission,
   type SchoolRosterDetails,
@@ -142,13 +144,48 @@ export default function SchoolPortalClient({
     selectedGame === 'all' ? matches : matches.filter((m) => m.gameId === selectedGame);
 
   // --- Handlers ---
-  const handleCopyLink = async (url: string) => {
+  // The invite whose fresh link was just copied, and the link itself when the clipboard refused it.
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [manualLink, setManualLink] = useState<{ inviteId: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!copiedInviteId) return;
+    const timer = setTimeout(() => setCopiedInviteId(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copiedInviteId]);
+
+  // Only the token hash is stored, so "copy" issues a new link (the old one stops working) and
+  // copies it straight away. It runs from the confirm dialog because it invalidates the old link.
+  const inviteLinkCopy = useConfirmAction<SchoolInviteItem>(async (invite) => {
+    let result;
+    try {
+      result = await regeneratePlayerInviteLink(invite.id);
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to create a new link' };
+    }
+    const url = window.location.origin + result.inviteUrl;
+    setInvites((prev) =>
+      prev.map((inv) => (inv.id === invite.id ? { ...inv, expiresAt: result.expiresAt } : inv))
+    );
     try {
       await navigator.clipboard.writeText(url);
+      setManualLink(null);
+      setCopiedInviteId(invite.id);
     } catch {
-      // Clipboard write failed gracefully
+      setManualLink({ inviteId: invite.id, url });
     }
-  };
+    return { success: true };
+  }, 'Failed to create a new link');
+
+  const inviteDeletion = useConfirmAction<SchoolInviteItem>(async (invite) => {
+    try {
+      await deletePlayerInvite(invite.id);
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to delete invite' };
+    }
+    setInvites((prev) => prev.filter((inv) => inv.id !== invite.id));
+    setManualLink((prev) => (prev?.inviteId === invite.id ? null : prev));
+    return { success: true };
+  }, 'Failed to delete invite');
 
   const handleApprove = async (inviteId: string) => {
     setApprovingId(inviteId);
@@ -667,7 +704,34 @@ export default function SchoolPortalClient({
       {/* Invites Sent Table */}
       <InvitesHistoryTable
         invites={filteredInvites}
-        onCopyLink={handleCopyLink}
+        onCopyLink={(inv) => {
+          setManualLink(null);
+          inviteLinkCopy.request(inv);
+        }}
+        onDelete={inviteDeletion.request}
+        viewOnlyGameIds={viewOnlyGameIds}
+        copiedId={copiedInviteId}
+        manualLink={manualLink}
+      />
+
+      <ConfirmActionDialog
+        {...inviteLinkCopy.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Copy a new invite link?"
+        message={`This replaces the current link for ${inviteLinkCopy.target?.intendedFirstName ?? 'this student'} ${inviteLinkCopy.target?.intendedLastName ?? ''}. The old link will stop working and the new link is copied to your clipboard.`}
+        confirmLabel="Copy new link"
+        pendingLabel="Creating…"
+      />
+
+      <ConfirmActionDialog
+        {...inviteDeletion.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Delete invite?"
+        message={`Delete the invite for ${inviteDeletion.target?.intendedFirstName ?? 'this student'} ${inviteDeletion.target?.intendedLastName ?? ''}? Its link will stop working. This action cannot be undone.`}
+        confirmLabel="Delete invite"
+        pendingLabel="Deleting…"
       />
 
       <ConfirmActionDialog

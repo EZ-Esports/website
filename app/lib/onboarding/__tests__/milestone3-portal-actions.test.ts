@@ -325,14 +325,17 @@ const mocks = vi.hoisted(() => {
       return {
         where: vi.fn((clause: any) => {
           const conds = extractConditions(clause);
+          const removed: any[] = [];
           if (store) {
             for (let i = store.length - 1; i >= 0; i--) {
               if (conds.every((c) => matchesRow(store[i], c))) {
+                removed.push(store[i]);
                 store.splice(i, 1);
               }
             }
           }
           return {
+            returning: vi.fn(() => Promise.resolve(removed)),
             then: (resolve: (v: any) => void) => resolve([]),
           };
         }),
@@ -413,6 +416,8 @@ import {
   generateInviteToken,
   createPlayerInvite,
   getSchoolInvites,
+  regeneratePlayerInviteLink,
+  deletePlayerInvite,
   getPendingSubmissions,
   reviewPlayerInvite,
   getRosterEligibility,
@@ -563,6 +568,78 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(schoolInvites[0].intendedFirstName).toBe('Jordan');
       expect(schoolInvites[0].schoolSlug).toBe('stuyvesant');
       expect(schoolInvites[0].gameName).toBe('Valorant');
+    });
+  });
+
+  describe('1b. Invite regenerate-link and delete', () => {
+    const makeInvite = async (gameId = valGameId) =>
+      createPlayerInvite({ schoolId, gameId, intendedFirstName: 'Jordan', intendedLastName: 'Lee' });
+
+    it('regenerate replaces the stored hash so the old token stops working and the new link validates', async () => {
+      const created = await makeInvite();
+      const result = await regeneratePlayerInviteLink(created.inviteId);
+
+      expect(result.inviteUrl).toMatch(/^\/join\/stuyvesant\/valorant\?token=[0-9a-f]{64}$/);
+      const newToken = result.inviteUrl.split('token=')[1];
+      const stored = mocks.state.playerInvitesStore.find((i) => i.id === created.inviteId);
+      expect(stored.tokenHash).toBe(crypto.createHash('sha256').update(newToken).digest('hex'));
+      expect(stored.tokenHash).not.toBe(crypto.createHash('sha256').update(created.token).digest('hex'));
+      expect(stored.status).toBe('pending');
+    });
+
+    it('delete removes a pending invite', async () => {
+      const created = await makeInvite();
+      await deletePlayerInvite(created.inviteId);
+      expect(mocks.state.playerInvitesStore.find((i) => i.id === created.inviteId)).toBeUndefined();
+    });
+
+    it.each(['submitted', 'accepted', 'rejected'])('refuses to delete or regenerate a %s invite', async (status) => {
+      const created = await makeInvite();
+      const row = mocks.state.playerInvitesStore.find((i) => i.id === created.inviteId);
+      row.status = status;
+      const hashBefore = row.tokenHash;
+
+      await expect(deletePlayerInvite(created.inviteId)).rejects.toThrow(/Only pending invites/);
+      await expect(regeneratePlayerInviteLink(created.inviteId)).rejects.toThrow(/Only pending invites/);
+      expect(mocks.state.playerInvitesStore.find((i) => i.id === created.inviteId)?.tokenHash).toBe(hashBefore);
+    });
+
+    it('refuses an invite belonging to another school and leaves it untouched', async () => {
+      mocks.state.playerInvitesStore.push({
+        id: 'foreign-invite',
+        schoolId: otherSchoolId,
+        gameId: valGameId,
+        tokenHash: 'h',
+        status: 'pending',
+        intendedFirstName: 'A',
+        intendedLastName: 'B',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      await expect(deletePlayerInvite('foreign-invite')).rejects.toThrow(/Forbidden/);
+      await expect(regeneratePlayerInviteLink('foreign-invite')).rejects.toThrow(/Forbidden/);
+      expect(mocks.state.playerInvitesStore.some((i) => i.id === 'foreign-invite')).toBe(true);
+      expect(mocks.state.playerInvitesStore.find((i) => i.id === 'foreign-invite').tokenHash).toBe('h');
+    });
+
+    it('refuses an invite for a game outside the manager scope', async () => {
+      mocks.state.playerInvitesStore.push({
+        id: 'lol-invite',
+        schoolId,
+        gameId: lolGameId,
+        tokenHash: 'h2',
+        status: 'pending',
+        intendedFirstName: 'A',
+        intendedLastName: 'B',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      await expect(deletePlayerInvite('lol-invite')).rejects.toThrow(/Forbidden/);
+    });
+
+    it('refuses an unauthenticated caller and an unknown invite', async () => {
+      const created = await makeInvite();
+      await expect(deletePlayerInvite('missing')).rejects.toThrow('Invite not found');
+      mocks.setClaims(null);
+      await expect(regeneratePlayerInviteLink(created.inviteId)).rejects.toThrow('Unauthorized');
     });
   });
 
