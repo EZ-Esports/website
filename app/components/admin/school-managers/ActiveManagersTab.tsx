@@ -119,7 +119,7 @@ export function ActiveManagersTab({
         {...removal.dialogProps}
         tone="danger"
         title="Remove manager access?"
-        message={`Are you sure you want to remove manager access for ${removal.target?.name ?? ''}?`}
+        message={`Remove manager access for ${removal.target?.name ?? ''}? They will no longer be able to use the school portal. Their student record and roster spots are not deleted.`}
         confirmLabel="Remove access"
         pendingLabel="Removing…"
       />

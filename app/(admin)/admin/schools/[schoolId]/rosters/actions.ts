@@ -14,6 +14,9 @@ import { occupancyOf, rosterCapacityError } from '@/app/lib/onboarding/roster-li
 import { notifyRosterMembershipChanged } from '@/app/lib/onboarding/roster-membership-events';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
 import { toHubDivision, type CanonicalDivision } from '@/app/lib/db/match-page';
+import {
+  cleanupOrphanMember, removalCacheTags, removalNotice, removePlayerFromRosterTx,
+} from '@/app/lib/db/roster-removal';
 
 /**
  * Staff roster editing, scoped to one school (Schools & Rosters ->
@@ -204,16 +207,26 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
       .where(eq(schema.players.rosterId, rosterId));
 
     // The NOT EXISTS guard closes the window where a match is created after the count above.
-    await db.delete(schema.rosters).where(
-      and(
-        eq(schema.rosters.id, rosterId),
-        sql`not exists (select 1 from ${schema.matches} where ${schema.matches.homeRosterId} = ${rosterId} or ${schema.matches.awayRosterId} = ${rosterId})`,
-      ),
-    );
+    // The roster has no matches, so a member left on no roster at all has no history to protect and
+    // gets the same orphan cleanup as a single removal; members still elsewhere are untouched.
+    const memberIds = [...new Set(affected.map((p) => p.memberId))];
+    await db.transaction(async (tx) => {
+      const removed = await tx.delete(schema.rosters).where(
+        and(
+          eq(schema.rosters.id, rosterId),
+          sql`not exists (select 1 from ${schema.matches} where ${schema.matches.homeRosterId} = ${rosterId} or ${schema.matches.awayRosterId} = ${rosterId})`,
+        ),
+      ).returning({ id: schema.rosters.id });
+      if (removed.length === 0) return;
+      for (const memberId of memberIds) {
+        await cleanupOrphanMember(tx, { memberId, rosterId });
+      }
+    });
     updateTag('rosters');
     updateTag('players');
     updateTag('teams');
     updateTag('matches');
+    updateTag('members');
     refreshSchoolRosters(schoolId);
     revalidatePath('/');
     await notifyMembershipChanged(affected.map((p) => p.memberId).filter(Boolean));
@@ -406,12 +419,17 @@ export async function deleteRosterMember(schoolId: string, playerId: string) {
   try {
     const player = await playerInSchool(playerId, schoolId);
     if (!player) return NOT_FOUND;
-    await db.delete(schema.players).where(eq(schema.players.id, playerId));
-    updateTag('players');
-    updateTag('rosters');
+    // One transaction: the roster spot and, when nothing else needs it, the student's own record.
+    const removal = await db.transaction((tx) =>
+      removePlayerFromRosterTx(tx, { playerId, rosterId: player.rosterId }));
+    for (const tag of removalCacheTags(removal)) updateTag(tag);
     refreshSchoolRosters(schoolId);
     await notifyMembershipChanged([player.memberId]);
-    return { success: true };
+    return {
+      success: true,
+      studentRecord: removal.removed ? removal.studentRecord : ('unchanged' as const),
+      message: removalNotice(removal),
+    };
   } catch (error: unknown) {
     console.error(error);
     return { success: false, error: sanitizeDbError(error) };

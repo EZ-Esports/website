@@ -116,5 +116,7 @@ Dedicated portal for vetted school managers and staff administrators ([spec-011]
 5. **Sep 2026** — Legal and security catch up to a site that already collected applications: `/rules`, `/terms`, footer IP disclaimers, headers and a nonce CSP, login rate limiting, markdown XSS hardening, youtube-nocookie.
 6. **Sep–Oct 2026** — Tournament-model games get brackets (spec-010); Player Onboarding & School Manager Portal (`/portal`, `/join/[schoolSlug]/[gameSlug]`, `spec-011`). Replaces external Google Forms with authenticated single-use invite workflows, Discord/Riot identity capture (self-reported; real verification is tracked in #247 and #249), FERPA-compliant demographic isolation (`Permissions.VIEW_STUDENT_DEMOGRAPHICS`), and live roster eligibility gates. The staff portal gets the Control Panel sidebar and UI overhaul (spec-012/013), then gallery thumbnails (spec-014) and the manager tour (spec-015/016).
 
+Roster removal (spec-040): staff (Schools & Rosters trash icon) and school managers (portal roster card, now with a confirmation) delete a player's roster spot, and the student's onboarding record too unless they are on another roster, staff, a manager, in the archive or have match history; the toast/notice says which happened.
+
 [`docs/QUICKSTART.md`](../docs/QUICKSTART.md) covers local setup and where things live; this file is the route and surface map.
 

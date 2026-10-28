@@ -30,6 +30,7 @@ import {
   selectClass,
 } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
+import { rosterRemovalConfirmMessage } from '@/app/lib/roster-removal-copy';
 import { MAX_ROSTER_PLAYERS, moveBlockedReason, moveMenuItems } from '@/app/lib/onboarding/roster-limits';
 
 type Result = { success: boolean; error?: string; [key: string]: unknown };
@@ -225,7 +226,7 @@ export function DeleteRosterButton({ roster }: { roster: RosterViewRoster }) {
   return (
     <ConfirmDeleteButton
       label={`Delete roster ${roster.name}`}
-      message={`Permanently delete roster "${roster.name}"? This removes ${roster.players.length === 1 ? 'its 1 player' : `its ${roster.players.length} players`} from the roster and cannot be undone. A roster that has matches cannot be deleted.`}
+      message={`Permanently delete roster "${roster.name}"? This removes ${roster.players.length === 1 ? 'its 1 player' : `its ${roster.players.length} players`} from the roster. Any of them who is on no other roster has their student record (profile, onboarding answers, consent form, linked accounts, used invite) deleted too, unless they are staff, a school manager or have match history. This cannot be undone. A roster that has matches cannot be deleted.`}
       action={async () => {
         const res = await deleteRoster(schoolId, roster.id);
         if (res.success) notify('Roster deleted.');
@@ -444,10 +445,10 @@ export function PlayerRowActions({
       <RowIconButton kind="edit" label={`Edit player ${player.name}`} onClick={onEdit} />
       <ConfirmDeleteButton
         label={`Remove player ${player.name}`}
-        message={`Remove ${player.name} from ${rosterName}? They stay in the school's member list.`}
+        message={rosterRemovalConfirmMessage(player.name, rosterName)}
         action={async () => {
           const res = await deleteRosterMember(schoolId, player.id);
-          if (res.success) notify('Player removed.');
+          if (res.success) notify(('message' in res && res.message) || 'Player removed.');
           return res;
         }}
       />

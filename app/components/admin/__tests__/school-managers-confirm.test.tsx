@@ -76,7 +76,7 @@ describe('ActiveManagersTab: remove manager', () => {
     const { onRemoveManager } = setup();
     await user.click(screen.getByRole('button', { name: 'Remove manager Ada Lovelace' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Are you sure you want to remove manager access for Ada Lovelace?');
+    expect(dialog).toHaveTextContent('Remove manager access for Ada Lovelace? They will no longer be able to use the school portal. Their student record and roster spots are not deleted.');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(onRemoveManager).not.toHaveBeenCalled();

@@ -184,3 +184,11 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
 - **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.
 - **`match_result_attempts` grows by one row per fresh submission or Check again.** Rows older than one hour are deleted opportunistically inside `reserveSubmissionAttempt`, so the table stays small; staff admins are throttled the same as managers (no exemption). A pending submission whose retry is refused as invalid is cancelled, not left waiting.
+
+## Roster removal cleanup (spec-040, unmerged)
+
+- **Not verified on a real Postgres.** The helper's SQL (`SELECT ... FOR UPDATE`, nested savepoints, `position(... in lower(...))`) is covered only by mocked-transaction tests. Rehearse it on PGlite (the spec-036 pattern) or a local Postgres before relying on it in production. Nothing ran against a database.
+- **Implicit removals not covered.** Deleting a game or season cascades teams, rosters and players without the app reading them, so their members are not cleaned and `notifyRosterMembershipChanged` is not called; deleting a school is a soft delete and leaves members. Orphans left by those paths (and any created before spec-040) can be swept by the spec-036 purge script; a generic sweep job was not built. The spec-034 move keeps the `players` row, so it needs no cleanup. Staff roster delete does run the cleanup (it is already refused when the roster has matches).
+- **History detection is heuristic.** Nothing references `players.id`, so "has match history" is inferred from the removed roster's scored/live/completed matches, stored games, and name / in-game name / Riot id matches in standings, MVP text and Valorant scoreboards. A member or PUUID link on `valorant_game_players` would make it exact (see spec-038's PUUID note). Loose name matches keep more records than strictly needed; they never delete one that should stay.
+- **Kept members keep their spent invite.** There is no UI for staff to purge a kept student on request.
+- The request mentioned "onboarding content flags"; no such table exists in this repo, so none are cleaned.
