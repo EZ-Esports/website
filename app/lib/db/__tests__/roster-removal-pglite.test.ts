@@ -41,7 +41,8 @@ beforeAll(async () => {
   const otherTeam = await id(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school2, game, season]);
   const other = await id(`insert into rosters (team_id, name, division) values ($1, 'Other', 'A') returning id`, [otherTeam]);
   world = { school, game, season, team, varsity, jv, other };
-});
+  // Replaying every migration takes ~10s alone and longer beside the rest of the suite (pre-push).
+}, 60_000);
 afterAll(async () => {
   await client.close();
 });
