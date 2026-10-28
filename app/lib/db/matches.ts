@@ -135,7 +135,7 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     // Lexicographic keyset over the same four columns as the ORDER BY below, all in one direction.
     const cmp = sort === 'desc' ? lt : gt;
     const keys = [
-      { col: sql`${schema.matches.scheduledAt}`, value: new Date(params.cursor.scheduledAt) as unknown },
+      { col: sql`${schema.matches.scheduledAt}`, value: new Date(params.cursor.scheduledAt).toISOString() as unknown },
       { col: sql`${homeSchool.name}`, value: params.cursor.home as unknown },
       { col: sql`${canonicalDivisionSql(homeRoster.division)}`, value: params.cursor.division as unknown },
       { col: sql`${schema.matches.id}`, value: params.cursor.id as unknown },

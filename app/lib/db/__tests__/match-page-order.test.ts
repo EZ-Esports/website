@@ -39,7 +39,9 @@ describe('staff match list ordering', () => {
     expect(asc.params.filter((p) => p === 'Bronx Science')).toHaveLength(3);
     expect(asc.params.filter((p) => p === cursor.id)).toHaveLength(1);
     for (const v of ['Bronx Science', 'JV', cursor.id]) expect(asc.params).toContain(v);
-    expect(asc.params.some((p) => p instanceof Date || p === cursor.scheduledAt || String(p).startsWith('2026-11-02'))).toBe(true);
+    // Raw Dates inside sql`` fragments skip the column encoder and the driver rejects them (Load more 500).
+    expect(asc.params.some((p) => p instanceof Date)).toBe(false);
+    expect(asc.params.filter((p) => p === '2026-11-02T00:00:00.000Z').length).toBeGreaterThan(0);
   });
 
   it('cursorFor carries every key of the row, so the next page resumes exactly after it', () => {
