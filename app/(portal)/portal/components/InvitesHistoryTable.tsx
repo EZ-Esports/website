@@ -20,10 +20,11 @@ export function InvitesHistoryTable({
         <span className="text-xs text-zinc-500">{invites.length} Total Invites</span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
+      {/* Capped height so a long list scrolls inside the table instead of stretching the page. */}
+      <div className="max-h-96 overflow-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
         <table className="w-full min-w-[36rem] text-left text-xs">
-          <thead>
-            <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950/60">
+          <thead className="sticky top-0 z-10">
+            <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950">
               <th className="py-3 px-4 font-semibold">Intended Student</th>
               <th className="py-3 px-4 font-semibold">Game</th>
               <th className="py-3 px-4 font-semibold">Status</th>

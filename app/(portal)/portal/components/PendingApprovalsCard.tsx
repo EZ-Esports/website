@@ -70,7 +70,8 @@ export function PendingApprovalsCard({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        // Capped height so a long queue scrolls in place instead of stretching the page.
+        <div className="max-h-[32rem] space-y-2.5 overflow-y-auto pr-1">
           {submissions.map((sub) => {
             const gameRosters = rosters.filter((r) => r.gameId === sub.gameId);
             const isApproving = approvingId === sub.id;
@@ -81,7 +82,7 @@ export function PendingApprovalsCard({
             return (
               <div
                 key={sub.id}
-                className="p-4 sm:p-5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-colors space-y-3.5"
+                className="p-3 sm:p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-colors space-y-2.5"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800/60">
                   <div>
@@ -103,13 +104,13 @@ export function PendingApprovalsCard({
 
                 {/* Verified Details Badges (Zero-PII: IGN + Discord only) */}
                 <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 text-xs">
-                  <div className="min-w-0 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
-                    <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">
+                  <div className="min-w-0 px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                    <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block">
                       In-Game ID (Riot)
                     </span>
                     <span className="font-mono font-semibold text-zinc-200 break-all">{sub.ign}</span>
                   </div>
-                  <div className="min-w-0 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                  <div className="min-w-0 px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-800/80">
                     <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">
                       Discord Handle
                     </span>
