@@ -317,6 +317,7 @@ export async function getSchoolMatchRows(params: {
       seasonName: schema.seasons.name,
       gameId: schema.games.id,
       gameName: schema.games.displayName,
+      gameSlug: schema.games.slug,
       scheduledAt: schema.matches.scheduledAt,
       status: schema.matches.status,
       homeScore: schema.matches.homeScore,

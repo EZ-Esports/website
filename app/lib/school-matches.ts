@@ -14,6 +14,7 @@ export interface SchoolMatchRow {
   seasonName: string;
   gameId: string;
   gameName: string;
+  gameSlug: string;
   scheduledAt: Date;
   status: MatchStatus;
   homeScore: number | null;
@@ -30,6 +31,8 @@ export interface SchoolMatchItem {
   id: string;
   gameId: string;
   gameName: string;
+  /** Results can be fetched from the game's own data only for some games (see `canSubmitGameResult`). */
+  gameSlug: string;
   seasonName: string;
   /** Display label (`Junior Varsity`, not `JV`). */
   division: string;
@@ -46,6 +49,22 @@ export interface SchoolMatchItem {
   reschedule: RescheduleRequestItem | null;
   /** The time staff moved this match from (ISO), when an approved request ever moved it. */
   rescheduledFrom: string | null;
+  /** Games attached from the game's own data (spec-038); 0 for a manually reported match. */
+  gameCount: number;
+  /** Match IDs saved while the data service was busy, waiting for "Check again"; else null. */
+  pendingResult: PendingResultItem | null;
+}
+
+export interface PendingResultItem {
+  /** ISO time before which a retry is pointless; null when the service gave none. */
+  retryAfter: string | null;
+  message: string | null;
+  gameCount: number;
+}
+
+export interface ResultInfo {
+  gameCount: number;
+  pending: PendingResultItem | null;
 }
 
 /**
@@ -56,13 +75,15 @@ export function toSchoolMatchItem(
   row: SchoolMatchRow,
   schoolId: string,
   reschedule: RescheduleRequestItem | null = null,
-  rescheduledFrom: string | null = null
+  rescheduledFrom: string | null = null,
+  result: ResultInfo = { gameCount: 0, pending: null }
 ): SchoolMatchItem {
   const isHome = row.homeSchoolId === schoolId;
   return {
     id: row.id,
     gameId: row.gameId,
     gameName: row.gameName,
+    gameSlug: row.gameSlug,
     seasonName: row.seasonName,
     division: divisionLabel(row.division),
     scheduledAt: row.scheduledAt.toISOString(),
@@ -74,6 +95,8 @@ export function toSchoolMatchItem(
     sameSchool: row.homeSchoolId === row.awaySchoolId,
     reschedule,
     rescheduledFrom,
+    gameCount: result.gameCount,
+    pendingResult: result.pending,
   };
 }
 
@@ -91,6 +114,25 @@ export function canRequestReschedule(
     new Date(item.scheduledAt).getTime() > now.getTime() &&
     !item.sameSchool &&
     !(item.reschedule && isOpenStatus(item.reschedule.status))
+  );
+}
+
+/** Games whose results can be fetched from the game's own data. */
+export const FETCHABLE_RESULT_GAME_SLUGS: readonly string[] = ['valorant'];
+
+/**
+ * Whether the portal offers "Submit result" on this match: a fetchable game and a live or
+ * scheduled match with no recorded result. Season view-only state is the caller's to apply (it is
+ * per game); the server re-checks everything regardless.
+ */
+export function canSubmitGameResult(
+  item: Pick<SchoolMatchItem, 'gameSlug' | 'status' | 'ownScore' | 'gameCount'>
+): boolean {
+  return (
+    FETCHABLE_RESULT_GAME_SLUGS.includes(item.gameSlug) &&
+    (item.status === 'scheduled' || item.status === 'live') &&
+    item.ownScore === null &&
+    item.gameCount === 0
   );
 }
 

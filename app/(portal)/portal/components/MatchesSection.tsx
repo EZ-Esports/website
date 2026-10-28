@@ -11,6 +11,7 @@ import {
   type SchoolMatchItem,
 } from '@/app/lib/school-matches';
 import { RescheduleCell } from './RescheduleControls';
+import { ResultActions } from './MatchResultControls';
 
 interface MatchesSectionProps {
   matches: SchoolMatchItem[];
@@ -74,7 +75,7 @@ function MatchTable({
   const columns = 4 + (showGame ? 1 : 0) + (showResult ? 1 : 0) + (showReschedule ? 1 : 0);
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
-      <table className={`w-full text-left text-xs ${showReschedule ? 'min-w-[44rem]' : 'min-w-[34rem]'}`}>
+      <table className={`w-full text-left text-xs ${showReschedule ? 'min-w-[44rem]' : 'min-w-[38rem]'}`}>
         <thead>
           <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950/60">
             <th className="py-3 px-4 font-semibold">When</th>
@@ -126,7 +127,16 @@ function MatchTable({
                     <StatusChip label={schoolMatchStatusLabel(match, now)} />
                   </td>
                   {showResult && (
-                    <td className="py-3 px-4 text-zinc-300 whitespace-nowrap">{result ?? '—'}</td>
+                    <td className="py-3 px-4 align-top text-zinc-300">
+                      <div className="whitespace-nowrap">{result ?? '—'}</div>
+                      <div className="mt-2">
+                        <ResultActions
+                          match={match}
+                          schoolId={schoolId}
+                          viewOnly={viewOnlyGameIds.includes(match.gameId)}
+                        />
+                      </div>
+                    </td>
                   )}
                   {showReschedule && (
                     <td className="py-3 px-4 align-top">
