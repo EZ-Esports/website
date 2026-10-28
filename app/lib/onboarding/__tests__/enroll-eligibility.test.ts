@@ -1,25 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { hasUnacceptedApplication, type EnrollmentInvite } from '../enroll-eligibility';
+import {
+  hasAcceptedApplicationForSeason,
+  notOnboardedForSeasonError,
+  type EnrollmentInvite,
+} from '../enroll-eligibility';
 
 const inv = (status: string, seasonId: string | null = 's1', gameId: string | null = 'g1'): EnrollmentInvite => ({ gameId, seasonId, status });
+const ok = (invites: EnrollmentInvite[]) => hasAcceptedApplicationForSeason(invites, 'g1', 's1');
 
-describe('hasUnacceptedApplication', () => {
-  it('blocks submitted, pending and rejected; ignores expired', () => {
-    for (const st of ['submitted', 'pending', 'rejected']) expect(hasUnacceptedApplication([inv(st)], 'g1', 's1')).toBe(true);
-    expect(hasUnacceptedApplication([inv('expired')], 'g1', 's1')).toBe(false);
+describe('hasAcceptedApplicationForSeason', () => {
+  it('needs an accepted application for the game and season', () => {
+    expect(ok([inv('accepted')])).toBe(true);
+    expect(ok([inv('rejected'), inv('accepted')])).toBe(true);
   });
-  it('does not block with no applications or an accepted one', () => {
-    expect(hasUnacceptedApplication([], 'g1', 's1')).toBe(false);
-    expect(hasUnacceptedApplication([inv('accepted')], 'g1', 's1')).toBe(false);
+  it('is false with no application, or anything that is not accepted', () => {
+    expect(ok([])).toBe(false);
+    for (const st of ['submitted', 'pending', 'rejected', 'expired']) expect(ok([inv(st)])).toBe(false);
   });
-  it('accepted for the roster season wins over a rejected one for the same season', () => {
-    expect(hasUnacceptedApplication([inv('rejected', 's1'), inv('accepted', 's1')], 'g1', 's1')).toBe(false);
+  it('is false for an accepted application of another season, no season, or another game', () => {
+    expect(ok([inv('accepted', 's0')])).toBe(false);
+    expect(ok([inv('accepted', null)])).toBe(false);
+    expect(ok([inv('accepted', 's1', 'g2')])).toBe(false);
   });
-  it('only the roster season can block: other-season and seasonless rows are ignored', () => {
-    expect(hasUnacceptedApplication([inv('rejected', 's0'), inv('submitted', null), inv('accepted', 's0')], 'g1', 's1')).toBe(false);
-    expect(hasUnacceptedApplication([inv('rejected', 's1'), inv('accepted', 's0')], 'g1', 's1')).toBe(true);
-  });
-  it('ignores other games', () => {
-    expect(hasUnacceptedApplication([inv('rejected', 's1', 'g2')], 'g1', 's1')).toBe(false);
+  it('names the season in the refusal', () => {
+    expect(notOnboardedForSeasonError('Ada L', '2026-27')).toBe('Ada L has not been onboarded for 2026-27. Send them an invite and approve it first.');
   });
 });

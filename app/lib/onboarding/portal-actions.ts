@@ -15,7 +15,7 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { isEligibleForSeason, notEligibleForSeasonError } from '@/app/lib/season-name';
-import { applicationNotAcceptedError, hasUnacceptedApplication, type EnrollmentInvite } from './enroll-eligibility';
+import { hasAcceptedApplicationForSeason, notOnboardedForSeasonError, type EnrollmentInvite } from './enroll-eligibility';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } from './invite-expiry';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
@@ -432,6 +432,8 @@ export interface PendingSubmission {
   gameId: string | null;
   gameName: string;
   gameSlug: string;
+  /** The season the application was issued for (null for legacy rows). */
+  seasonId: string | null;
   intendedFirstName: string;
   intendedLastName: string;
   playerName: string;
@@ -473,6 +475,7 @@ export async function getPendingSubmissions(
       intendedFirstName: schema.playerInvites.intendedFirstName,
       intendedLastName: schema.playerInvites.intendedLastName,
       memberId: schema.playerInvites.memberId,
+      seasonId: schema.playerInvites.seasonId,
       submissionDraft: schema.playerInvites.submissionDraft,
       submittedAt: schema.playerInvites.submittedAt,
       status: schema.playerInvites.status,
@@ -547,6 +550,7 @@ export async function getPendingSubmissions(
       gameId: invite.gameId,
       gameName: invite.gameName,
       gameSlug: invite.gameSlug,
+      seasonId: invite.seasonId,
       intendedFirstName: invite.intendedFirstName,
       intendedLastName: invite.intendedLastName,
       playerName: `${invite.intendedFirstName} ${invite.intendedLastName}`,
@@ -1289,10 +1293,11 @@ export interface SchoolPoolPlayer {
   riotVerified: boolean;
   graduationYear: number | null;
   /**
-   * The student's applications (game, season, status only: no PII) so the Enroll dialog can hide
-   * students whose application is not accepted. Always empty for a staff admin, who is exempt.
+   * The student's applications (game, season, status only: no PII) so the Enroll dialog offers
+   * only students with an accepted application for the roster's season. Null for a staff admin,
+   * who is exempt from that rule.
    */
-  invites: EnrollmentInvite[];
+  invites: EnrollmentInvite[] | null;
   enrolledRosters: Array<{
     rosterId: string;
     rosterName: string;
@@ -1417,7 +1422,7 @@ export async function getSchoolPlayerPool(
         ? invites
             .filter((inv) => inv.memberId === m.id)
             .map((inv) => ({ id: inv.id, gameId: inv.gameId, seasonId: inv.seasonId, status: inv.status }))
-        : [],
+        : null,
       enrolledRosters: memberRosters,
     };
   });
@@ -1470,8 +1475,9 @@ export async function enrollPlayerToRoster(
     throw new Error('Member does not belong to the school managing this roster');
   }
 
-  // Application state: a manager cannot enroll a student whose application is unreviewed,
-  // rejected or not accepted for this season (staff admins may override).
+  // Onboarding: a manager can enroll only a student with an accepted application for this
+  // game and season, so past-season, archive-imported and staff-created students must be
+  // onboarded again (staff admins may override).
   if (!managerContext.isStaffAdmin) {
     const applications = await db
       .select({
@@ -1487,8 +1493,13 @@ export async function enrollPlayerToRoster(
           eq(schema.playerInvites.gameId, team.gameId)
         )
       );
-    if (hasUnacceptedApplication(applications, team.gameId, team.seasonId)) {
-      return reject(applicationNotAcceptedError(`${member.firstName} ${member.lastName}`));
+    if (!hasAcceptedApplicationForSeason(applications, team.gameId, team.seasonId)) {
+      return reject(
+        notOnboardedForSeasonError(
+          `${member.firstName} ${member.lastName}`,
+          await seasonNameOf(team.seasonId, null)
+        )
+      );
     }
   }
 

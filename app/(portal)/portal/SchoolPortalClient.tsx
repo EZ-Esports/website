@@ -238,7 +238,7 @@ export default function SchoolPortalClient({
           if (prev.some((p) => p.memberId === sub.memberId)) {
             // Mark this application accepted so the Enroll dialog now offers the student.
             return prev.map((p) =>
-              p.memberId === sub.memberId
+              p.memberId === sub.memberId && p.invites
                 ? { ...p, invites: p.invites.map((i) => (i.id === inviteId ? { ...i, status: 'accepted' } : i)) }
                 : p
             );
@@ -253,7 +253,7 @@ export default function SchoolPortalClient({
             inGuild: true,
             riotVerified: true,
             graduationYear: null,
-            invites: [],
+            invites: [{ id: inviteId, gameId: sub.gameId, seasonId: sub.seasonId, status: 'accepted' }],
             enrolledRosters: [],
           };
           return [accepted, ...prev];
