@@ -3,7 +3,6 @@
 import { Button } from 'react-aria-components';
 import {
   HiOutlineUserPlus,
-  HiOutlineArrowsRightLeft,
   HiOutlineCheckCircle,
   HiOutlineExclamationTriangle,
   HiOutlineXCircle,
@@ -23,7 +22,6 @@ interface RosterCardProps {
   gateResult?: RosterEligibilityResult;
   isEvaluating: boolean;
   onOpenEnrollModal: (roster: SchoolRosterDetails) => void;
-  onOpenSwapModal: (roster: SchoolRosterDetails) => void;
   onCheckRosterGate: (rosterId: string) => void;
   onUpdateRole: (
     rosterId: string,
@@ -45,7 +43,6 @@ export function RosterCard({
   gateResult,
   isEvaluating,
   onOpenEnrollModal,
-  onOpenSwapModal,
   onCheckRosterGate,
   onUpdateRole,
   onRemovePlayer,
@@ -84,14 +81,6 @@ export function RosterCard({
           >
             <HiOutlineUserPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>{isFull ? `Roster full (${playerCount}/${MAX_ROSTER_PLAYERS})` : 'Enroll Player'}</span>
-          </Button>
-          <Button
-            onPress={() => onOpenSwapModal(roster)}
-            isDisabled={locked}
-            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <HiOutlineArrowsRightLeft className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Emergency Sub</span>
           </Button>
           <Button
             onPress={() => onCheckRosterGate(roster.id)}

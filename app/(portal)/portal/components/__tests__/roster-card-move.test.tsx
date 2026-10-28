@@ -35,7 +35,6 @@ const render = (props: Partial<React.ComponentProps<typeof RosterCard>>) =>
       roster={roster}
       isEvaluating={false}
       onOpenEnrollModal={vi.fn()}
-      onOpenSwapModal={vi.fn()}
       onCheckRosterGate={vi.fn()}
       onUpdateRole={vi.fn()}
       onRemovePlayer={vi.fn()}
@@ -106,7 +105,6 @@ describe('RostersSection: Move feedback region', () => {
         evaluatingRosterId={null}
         onOpenCreateRosterModal={vi.fn()}
         onOpenEnrollModal={vi.fn()}
-        onOpenSwapModal={vi.fn()}
         onCheckRosterGate={vi.fn()}
         onUpdateRole={vi.fn()}
         onRemovePlayer={vi.fn()}

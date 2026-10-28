@@ -86,7 +86,7 @@ export const TOUR_SECTIONS: TourSection[] = [
         id: 'rosters',
         anchor: 'rosters',
         title: 'Your team rosters',
-        body: 'Each roster card lists its players. Add players, change roles, or make an emergency substitution, then press Check Eligibility to see if the roster is ready for tournament registration.',
+        body: 'Each roster card lists its players. Add players, change roles, then press Check Eligibility to see if the roster is ready for tournament registration.',
       },
       {
         id: 'create-roster',

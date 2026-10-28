@@ -183,8 +183,9 @@ When registering for an upcoming tournament season (e.g. *Fall 2026 Valorant Cha
      ⚠️ *"Cannot submit roster: Tyler Vance is not in the Discord server. Have them rejoin via discord.gg/ezesports."*
 3. Once all gates pass, Manager clicks **"Confirm Registration"**. Roster moves to `SUBMITTED`.
 
-### Flow 6: Match-Day Emergency Substitutions
-- If Starter #3's computer crashes 15 minutes before match start, the Manager or Team Captain can open the match fixture in `/portal` and click **"Emergency Sub"**.
+### Flow 6: Match-Day Emergency Substitutions (portal entry point removed)
+- Removed from the portal in the "remove Emergency Sub button" change (follow-up to #298): the **"Emergency Sub"** button and its swap modal are gone from roster cards. `emergencySwapSub` remains in the backend and is refused for managers during a season roster lock ([spec-020](spec-020-season-roster-lock.md)), but no portal UI reaches it.
+- The original intent, kept for reference: if Starter #3's computer crashes 15 minutes before match start, the Manager or Team Captain would swap them from the roster in `/portal`.
 - Manager swaps Starter #3 for any **pre-registered, approved Substitute** on the roster.
 - The platform atomically updates the match lineup and automatically broadcasts the change to the match ops room on Discord. Zero admin delays; zero unverified ringers.
 

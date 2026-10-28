@@ -5,7 +5,6 @@ import type { SchoolManagerContext, ManagedSchoolInfo } from '@/app/lib/onboardi
 import {
   reviewPlayerInvite,
   getRosterEligibility,
-  emergencySwapSub,
   enrollPlayerToRoster,
   removePlayerFromRoster,
   movePlayerToRoster,
@@ -28,7 +27,6 @@ import { PendingApprovalsCard } from './components/PendingApprovalsCard';
 import { RostersSection } from './components/RostersSection';
 import { InvitesHistoryTable } from './components/InvitesHistoryTable';
 import { MatchesSection } from './components/MatchesSection';
-import { EmergencySwapModal } from './components/EmergencySwapModal';
 import { EnrollPlayerModal } from './components/EnrollPlayerModal';
 import { CreateRosterModal } from './components/CreateRosterModal';
 import PortalTour from './tour/PortalTour';
@@ -112,13 +110,6 @@ export default function SchoolPortalClient({
     Record<string, RosterEligibilityResult>
   >({});
   const [evaluatingRosterId, setEvaluatingRosterId] = useState<string | null>(null);
-
-  // --- Emergency Sub Modal State ---
-  const [activeSwapRoster, setActiveSwapRoster] = useState<SchoolRosterDetails | null>(null);
-  const [outPlayerId, setOutPlayerId] = useState<string>('');
-  const [inPlayerId, setInPlayerId] = useState<string>('');
-  const [swapError, setSwapError] = useState<string | null>(null);
-  const [isSwapping, startSwapping] = useTransition();
 
   // --- Enroll Player Modal State ---
   const [activeEnrollRoster, setActiveEnrollRoster] = useState<SchoolRosterDetails | null>(null);
@@ -552,69 +543,6 @@ export default function SchoolPortalClient({
     }
   };
 
-  const handleOpenSwapModal = (roster: SchoolRosterDetails) => {
-    setActiveSwapRoster(roster);
-    const starters = roster.players.filter(
-      (p) => p.role === 'player' || p.role === 'captain' || p.isCaptain
-    );
-    const subs = roster.players.filter((p) => p.role === 'sub');
-    setOutPlayerId(starters[0]?.id || '');
-    setInPlayerId(subs[0]?.id || '');
-    setSwapError(null);
-  };
-
-  const handleConfirmSwap = () => {
-    if (!activeSwapRoster || !outPlayerId || !inPlayerId) {
-      setSwapError('Please select both a starter and a substitute.');
-      return;
-    }
-
-    setSwapError(null);
-    startSwapping(async () => {
-      try {
-        const result = await emergencySwapSub({
-          rosterId: activeSwapRoster.id,
-          outPlayerId,
-          inPlayerId,
-        });
-
-        if (result.success) {
-          setRosters((prev) =>
-            prev.map((r) => {
-              if (r.id !== activeSwapRoster.id) return r;
-              const outP = r.players.find((p) => p.id === outPlayerId);
-              const inP = r.players.find((p) => p.id === inPlayerId);
-              if (!outP || !inP) return r;
-
-              const prevOutRole = outP.role;
-              const prevOutCaptain = outP.isCaptain;
-
-              const updatedPlayers = r.players.map((p) => {
-                if (p.id === outPlayerId) {
-                  return { ...p, role: 'sub', isCaptain: false };
-                }
-                if (p.id === inPlayerId) {
-                  return {
-                    ...p,
-                    role: prevOutRole === 'captain' ? 'captain' : 'player',
-                    isCaptain: prevOutCaptain,
-                  };
-                }
-                return p;
-              });
-
-              return { ...r, players: updatedPlayers };
-            })
-          );
-
-          setActiveSwapRoster(null);
-        }
-      } catch (err: any) {
-        setSwapError(err.message || 'Substitution swap failed');
-      }
-    });
-  };
-
   return (
     <div className="space-y-8">
       {/* Top Banner & Title */}
@@ -692,7 +620,6 @@ export default function SchoolPortalClient({
           setCreateRosterError(null);
         }}
         onOpenEnrollModal={handleOpenEnrollModal}
-        onOpenSwapModal={handleOpenSwapModal}
         onCheckRosterGate={handleCheckRosterGate}
         onUpdateRole={handleUpdateRole}
         onRemovePlayer={handleRemovePlayer}
@@ -725,19 +652,6 @@ export default function SchoolPortalClient({
         message="Are you sure you want to delete this empty roster?"
         confirmLabel="Delete roster"
         pendingLabel="Deleting…"
-      />
-
-      {/* Emergency Sub Swap Modal */}
-      <EmergencySwapModal
-        roster={activeSwapRoster}
-        outPlayerId={outPlayerId}
-        setOutPlayerId={setOutPlayerId}
-        inPlayerId={inPlayerId}
-        setInPlayerId={setInPlayerId}
-        swapError={swapError}
-        isSwapping={isSwapping}
-        onConfirmSwap={handleConfirmSwap}
-        onClose={() => setActiveSwapRoster(null)}
       />
 
       {/* Enroll Player to Roster Modal */}

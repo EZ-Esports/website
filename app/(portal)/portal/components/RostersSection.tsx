@@ -25,7 +25,6 @@ interface RostersSectionProps {
   evaluatingRosterId: string | null;
   onOpenCreateRosterModal: () => void;
   onOpenEnrollModal: (roster: SchoolRosterDetails) => void;
-  onOpenSwapModal: (roster: SchoolRosterDetails) => void;
   onCheckRosterGate: (rosterId: string) => void;
   onUpdateRole: (
     rosterId: string,
@@ -52,7 +51,6 @@ export function RostersSection({
   evaluatingRosterId,
   onOpenCreateRosterModal,
   onOpenEnrollModal,
-  onOpenSwapModal,
   onCheckRosterGate,
   onUpdateRole,
   onRemovePlayer,
@@ -157,7 +155,6 @@ export function RostersSection({
               gateResult={eligibilityResults[roster.id]}
               isEvaluating={evaluatingRosterId === roster.id}
               onOpenEnrollModal={onOpenEnrollModal}
-              onOpenSwapModal={onOpenSwapModal}
               onCheckRosterGate={onCheckRosterGate}
               onUpdateRole={onUpdateRole}
               onRemovePlayer={onRemovePlayer}
