@@ -41,7 +41,9 @@ beforeAll(async () => {
   const otherTeam = await id(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school2, game, season]);
   const other = await id(`insert into rosters (team_id, name, division) values ($1, 'Other', 'A') returning id`, [otherTeam]);
   world = { school, game, season, team, varsity, jv, other };
-});
+  // Booting PGlite and applying every migration takes ~15s when the full parallel suite is
+  // loading the machine, so the default 10s hook timeout is too tight.
+}, 120_000);
 afterAll(async () => {
   await client.close();
 });
