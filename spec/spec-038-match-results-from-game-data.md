@@ -2,7 +2,7 @@
 
 - **Spec ID:** spec-038
 - **Title:** Fetch best-of-3 results and per-player stats from submitted Valorant match IDs
-- **Status:** Implemented in the PR for [#290](https://github.com/EZ-Esports/website/issues/290); migration `0054` written, **not yet applied to production**
+- **Status:** Shipped in PR #297 (issue [#290](https://github.com/EZ-Esports/website/issues/290)); migration `0054` applied to production 28 Oct 2026 (after a scoped pg_dump backup). Not yet verified against a real Henrik response; `VALORANTAPI` must be set in Vercel
 - **Date:** 2026-10-27
 - **Scope:** `app/lib/match-results/` (port, adapter, schema, scoring), `app/lib/db/match-results.ts`, `app/lib/onboarding/match-result-actions.ts`, the portal `MatchesSection` / `MatchResultControls`, migration `0054_match_games_from_game_data.sql`.
 - **Relationship to other work:** the interim path while the official-Riot work is on hold. [#248](https://github.com/EZ-Esports/website/issues/248) (Riot match ingestion) and [#247](https://github.com/EZ-Esports/website/issues/247) (Riot Sign-On) stay open and untouched; this is built behind a port so Riot's official API can replace it by writing one adapter.
