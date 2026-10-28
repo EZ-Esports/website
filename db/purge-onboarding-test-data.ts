@@ -38,7 +38,11 @@ import { assertSeedTargetAllowed, seedTargetHost } from './seed-target';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Tables this script deletes from, in the order it deletes (children first). */
+/**
+ * Tables this script deletes from, in the order it deletes (children first).
+ * `onboarding_content_flags` (staff review records for overridden content warnings) is not listed:
+ * its member FK is ON DELETE CASCADE, so deleting a member removes it, and it may not exist yet.
+ */
 export const DELETE_ORDER = [
   'match_reschedule_options',
   'match_reschedule_requests',

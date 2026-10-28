@@ -27,6 +27,7 @@ import {
   RosterEditProvider,
   useRosterEditRunner,
 } from '@/app/components/admin/SchoolRosterEditors';
+import ContentFlagBadge from '@/app/components/admin/ContentFlagBadge';
 import RowIconButton from '@/app/components/admin/RowIconButton';
 import { chip, chipDot, focusRing, segmentedGroup, segmentedItem, selectClass } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
@@ -416,6 +417,7 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                       .filter(Boolean)
                       .join(' · ') || 'No further details'}
                   </p>
+                  {p.contentFlags?.map((flag) => <ContentFlagBadge key={flag.id} flag={flag} who={p.name} />)}
                 </>
               )}
             </li>

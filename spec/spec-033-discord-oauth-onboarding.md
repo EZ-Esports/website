@@ -42,3 +42,5 @@ The `proxy.ts` CSP has `form-action 'self'`; the flow uses a script-initiated to
 ## Not done (out of scope)
 
 Role assignment (`syncMemberRoles` throws "not implemented"), a live re-check of guild membership at roster time, backfill of existing students whose Discord is self-reported, Discord setup on staging/production, and Riot Sign-On (#247). A server-side nonce store (consume-once) would harden the callback against replay. Unexpected thrown errors are still masked by Next in production builds.
+
+> **Update (28 Oct 2026):** the wizard now starts this flow in a second tab so it keeps its state; see [spec-041](spec-041-discord-oauth-second-tab.md). The same-tab redirect described above remains the fallback when a pop-up is blocked.

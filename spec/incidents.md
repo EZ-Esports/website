@@ -206,6 +206,12 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 21. Code deployed before its migration (pattern; spec-040, Oct 2026)
+
+Migration 0052 (consents) was merged and deployed before it was applied, and onboarding submissions failed on the missing table for the gap. Spec-040 adds `onboarding_content_flags` (0055) on the same risk, so no hard dependency on it: guarded reads and writes (`isMissingContentFlagsError`, savepoint inside the onboarding transaction, separate roster query) make onboarding and the staff pages work with or without the migration, with a warning in the logs. **Do not repeat.** A feature that adds a table or column must not make an existing, previously working path depend on it; tests must cover the missing-relation path.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

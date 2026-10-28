@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { saveOnboardingDraft } from '@/app/lib/onboarding/wizard-actions';
 import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/riot-manual';
 import {
@@ -11,9 +11,18 @@ import {
   type ConsentSubmission,
 } from '@/app/lib/onboarding/consent';
 import {
+  CONTENT_FIELDS,
+  CONTENT_FLAGGED_MESSAGE,
+  collectContentValues,
+  findFlaggedFields,
+  parseSavedOverrides,
+  type ContentFieldKey,
+} from '@/app/lib/onboarding/content-check';
+import {
   DEFAULT_MANAGER_SEASON,
   GRADUATION_YEAR_OPTIONS,
   MANAGER_SEASON_OPTIONS,
+  type ContentFlagControls,
   type InviteData,
   type WizardFormData,
 } from '../types';
@@ -21,7 +30,12 @@ import {
 export function useWizardDraft(
   token: string,
   inviteData: InviteData,
-  options: { initialError?: string | null; discordVerified?: boolean } = {}
+  options: {
+    initialError?: string | null;
+    discordVerified?: boolean;
+    /** Verified Discord username, screened like the typed fields. */
+    discordUsername?: string | null;
+  } = {}
 ) {
   const initialDraft = inviteData.submissionDraft || {};
   const isManager = inviteData.role === 'manager';
@@ -135,6 +149,67 @@ export function useWizardDraft(
     };
   }
 
+  // Offensive-content screen. An override is remembered together with the exact value it was given
+  // for, so editing a flagged field afterwards asks again instead of carrying the override over.
+  // The map is saved in the draft so it survives the Discord round trip; restored entries only count
+  // while the field still holds that exact value.
+  const [overrides, setOverrides] = useState<Partial<Record<ContentFieldKey, string>>>(() =>
+    parseSavedOverrides(initialDraft.contentOverrides)
+  );
+  // Guardian fields are hidden for adults, so stale text in them must not block anyone.
+  const consentForCheck = isMinor
+    ? buildConsent()
+    : { ...buildConsent(), guardianFullName: '', guardianRelationship: '', guardianSignature: '' };
+  const contentValues = collectContentValues(
+    {
+      legalFirstName,
+      legalLastName,
+      riotId,
+      countryOfBirth,
+      primaryLanguageAtHome,
+      surveyDetails: { feedback },
+      consent: consentForCheck,
+    },
+    options.discordUsername
+  );
+  const contentKey = JSON.stringify(contentValues);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- contentKey is the serialized contentValues
+  const flaggedFields = useMemo(() => findFlaggedFields(contentValues), [contentKey]);
+
+  const contentFlags: ContentFlagControls = {
+    state(field) {
+      const hit = flaggedFields.find((f) => f.field === field);
+      return { flagged: Boolean(hit), overridden: Boolean(hit && overrides[field] === hit.value) };
+    },
+    setOverride(field, checked) {
+      const hit = flaggedFields.find((f) => f.field === field);
+      setOverrides((prev) => {
+        const next = { ...prev };
+        if (checked && hit) next[field] = hit.value;
+        else delete next[field];
+        return next;
+      });
+    },
+  };
+
+  /** Flagged fields on `step` that the person has not confirmed. */
+  function unresolvedFlags(step: number): ContentFieldKey[] {
+    return flaggedFields
+      .filter((f) => CONTENT_FIELDS[f.field].step === step && overrides[f.field] !== f.value)
+      .map((f) => f.field);
+  }
+
+  /** Fields to send as `contentOverrides`: flagged now and confirmed for exactly this value. */
+  function contentOverrideKeys(): ContentFieldKey[] {
+    return flaggedFields.filter((f) => overrides[f.field] === f.value).map((f) => f.field);
+  }
+
+  function blockedByContent(step: number): boolean {
+    if (unresolvedFlags(step).length === 0) return false;
+    setErrorMessage(CONTENT_FLAGGED_MESSAGE);
+    return true;
+  }
+
   function buildCurrentPayload(): WizardFormData {
     return {
       legalFirstName,
@@ -161,6 +236,7 @@ export function useWizardDraft(
         feedback,
       },
       codeOfConductAccepted,
+      contentOverrides: overrides,
     };
   }
 
@@ -193,6 +269,10 @@ export function useWizardDraft(
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email.trim() && !email.includes('@')) {
+      setErrorMessage('Your email address must include an @ symbol.');
+      return false;
+    }
     if (!email.trim() || !emailRegex.test(email.trim())) {
       setErrorMessage(
         isManager
@@ -215,6 +295,7 @@ export function useWizardDraft(
       setErrorMessage('Please select the season you are applying for.');
       return false;
     }
+    if (blockedByContent(1)) return false;
     return true;
   }
 
@@ -225,6 +306,7 @@ export function useWizardDraft(
       setErrorMessage('Please connect your Discord account to continue.');
       return false;
     }
+    if (blockedByContent(2)) return false;
     return true;
   }
 
@@ -246,6 +328,7 @@ export function useWizardDraft(
       );
       return false;
     }
+    if (blockedByContent(3)) return false;
     return true;
   }
 
@@ -265,6 +348,7 @@ export function useWizardDraft(
       );
       return false;
     }
+    if (blockedByContent(4)) return false;
     return true;
   }
 
@@ -283,6 +367,7 @@ export function useWizardDraft(
       setErrorMessage(err.message);
       return false;
     }
+    if (blockedByContent(5)) return false;
     return true;
   }
 
@@ -356,6 +441,10 @@ export function useWizardDraft(
     isRiotIdValid,
     trackerUrl,
     isManager,
+
+    // Offensive-content screen
+    contentFlags,
+    contentOverrideKeys,
 
     // Actions
     buildCurrentPayload,

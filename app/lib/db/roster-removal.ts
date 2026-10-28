@@ -54,6 +54,7 @@ export interface DeletedCounts {
   consents: number;
   demographics: number;
   identities: number;
+  contentFlags: number;
   invites: number;
 }
 
@@ -311,12 +312,14 @@ async function deleteMember(tx: DbOrTx, memberId: string): Promise<DeletedCounts
     .where(eq(schema.studentDemographics.memberId, memberId)).returning({ id: schema.studentDemographics.id }));
   const identities = await deleteCount(tx, 'player_identities', (t) => t.delete(schema.playerIdentities)
     .where(eq(schema.playerIdentities.memberId, memberId)).returning({ id: schema.playerIdentities.id }));
+  const contentFlags = await deleteCount(tx, 'onboarding_content_flags', (t) => t.delete(schema.onboardingContentFlags)
+    .where(eq(schema.onboardingContentFlags.memberId, memberId)).returning({ id: schema.onboardingContentFlags.id }));
   const invites = await deleteCount(tx, 'player_invites', (t) => t.delete(schema.playerInvites)
     .where(eq(schema.playerInvites.memberId, memberId)).returning({ id: schema.playerInvites.id }));
   const gone = await tx.delete(schema.members).where(eq(schema.members.id, memberId))
     .returning({ id: schema.members.id });
   if (gone.length !== 1) throw new Error('member delete affected an unexpected number of rows');
-  return { consents, demographics, identities, invites };
+  return { consents, demographics, identities, contentFlags, invites };
 }
 
 type CleanupOutcome =

@@ -101,13 +101,14 @@ describe('removePlayerFromRosterTx: orphan', () => {
       removed: true,
       memberId: 'm1',
       studentRecord: 'deleted',
-      deleted: { consents: 2, demographics: 1, identities: 1, invites: 1 },
+      deleted: { consents: 2, demographics: 1, identities: 1, contentFlags: 1, invites: 1 },
     });
     expect(deletes()).toEqual([
       'delete players',
       'delete onboarding_consents',
       'delete student_demographics',
       'delete player_identities',
+      'delete onboarding_content_flags',
       'delete player_invites',
       'delete members',
     ]);
@@ -307,7 +308,7 @@ describe('invite handling', () => {
 describe('outcome wording and cache tags', () => {
   const deleted: RosterRemovalResult = {
     removed: true, memberId: 'm1', studentRecord: 'deleted',
-    deleted: { consents: 1, demographics: 1, identities: 1, invites: 1 },
+    deleted: { consents: 1, demographics: 1, identities: 1, contentFlags: 1, invites: 1 },
   };
   const kept: RosterRemovalResult = { removed: true, memberId: 'm1', studentRecord: 'kept', keptReason: 'match_history' };
 

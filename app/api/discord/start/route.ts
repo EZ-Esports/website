@@ -33,21 +33,25 @@ export async function GET(request: NextRequest) {
   const token = (searchParams.get('token') || '').trim();
   const school = searchParams.get('school') || '';
   const game = searchParams.get('game') || '';
+  // Opened from a second tab: the callback then returns that tab to a "close this tab" page.
+  const popup = searchParams.get('popup') === '1';
 
   if (!token || !SLUG_REGEX.test(school) || !SLUG_REGEX.test(game)) {
     return NextResponse.json({ error: 'Missing or invalid invite parameters.' }, { status: 400 });
   }
 
+  const popupParam: Record<string, string> = popup ? { popup: '1' } : {};
+
   const rl = rateLimit(`discord-start:${getClientIp(request)}`, 20, 10 * 60_000);
   if (!rl.allowed) {
-    return NextResponse.redirect(wizardUrl(origin, school, game, token, { discord_error: 'rate_limited' }), 302);
+    return NextResponse.redirect(wizardUrl(origin, school, game, token, { discord_error: 'rate_limited', ...popupParam }), 302);
   }
 
   const validation = await validateInviteToken({ schoolSlug: school, gameSlug: game, token });
   // Invalid, expired or already used invites are explained by the join page itself.
   // Players and school managers share this flow; a manager invite's join URL uses the `manager` game slug.
   if (!validation.valid) {
-    return NextResponse.redirect(wizardUrl(origin, school, game, token, {}), 302);
+    return NextResponse.redirect(wizardUrl(origin, school, game, token, { ...popupParam }), 302);
   }
 
   let config;
@@ -55,7 +59,7 @@ export async function GET(request: NextRequest) {
     config = getDiscordConfig();
   } catch (err) {
     const code = err instanceof DiscordError ? err.code : 'unknown';
-    return NextResponse.redirect(wizardUrl(origin, school, game, token, { discord_error: code }), 302);
+    return NextResponse.redirect(wizardUrl(origin, school, game, token, { discord_error: code, ...popupParam }), 302);
   }
 
   const inviteHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -70,7 +74,7 @@ export async function GET(request: NextRequest) {
     }),
     302
   );
-  response.cookies.set(DISCORD_FLOW_COOKIE, signFlowCookie({ nonce, inviteHash, token, school, game }), {
+  response.cookies.set(DISCORD_FLOW_COOKIE, signFlowCookie({ nonce, inviteHash, token, school, game, popup }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

@@ -10,7 +10,7 @@ export function rosterRemovalConfirmMessage(playerName: string, rosterName: stri
   return (
     `Remove ${playerName} from ${rosterName}? This permanently deletes their roster spot. ` +
     `If they are not on any other roster and have no match history, their student record is deleted too: ` +
-    `their profile, onboarding answers, demographic answers, signed consent form, linked Discord and Riot accounts and their used invite. ` +
+    `their profile, onboarding answers, demographic answers, signed consent form, any content-warning overrides, linked Discord and Riot accounts and their used invite. ` +
     `They would have to be invited and onboarded again. ` +
     `Their student record is kept if they are on another roster, a staff member, a school manager, ` +
     `have a leadership or people profile, are in the league archive, or have match history. ` +

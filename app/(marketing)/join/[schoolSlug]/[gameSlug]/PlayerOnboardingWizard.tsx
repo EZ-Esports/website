@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import {
   FiAlertTriangle,
   FiSave,
@@ -12,8 +12,10 @@ import {
 import {
   submitPlayerOnboarding,
   saveOnboardingDraft,
+  getVerifiedDiscordForInvite,
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
+import { listenDiscordResult } from '@/app/lib/onboarding/discord-channel';
 import { stepForRejection, type InviteData } from './types';
 import { useWizardDraft } from './hooks/useWizardDraft';
 import { WizardProgressStepper } from './components/WizardProgressStepper';
@@ -68,6 +70,7 @@ export default function PlayerOnboardingWizard({
         ? [discordError, MANAGER_PASSWORD_REENTRY_NOTE].filter(Boolean).join(' ')
         : discordError,
     discordVerified,
+    discordUsername: discord?.username ?? null,
   });
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const { isManager } = draft;
@@ -84,24 +87,164 @@ export default function PlayerOnboardingWizard({
     }
   }
 
+  // The in-flight Discord tab: `stopWaitingRef` ends the wait (listeners, timers); the popup ref lets
+  // Cancel close the tab we opened. Both are cleaned up on unmount.
+  const stopWaitingRef = useRef<(() => void) | null>(null);
+  const popupRef = useRef<Window | null>(null);
+  // Mirrors state so click handlers and timers see the latest values without stale closures.
+  const connectingRef = useRef(false);
+  const discordRef = useRef<VerifiedDiscordView | null>(discordProp);
+  useEffect(() => {
+    discordRef.current = discord;
+  }, [discord]);
+  useEffect(() => () => stopWaitingRef.current?.(), []);
+
   /**
-   * Saves progress first (the OAuth round trip is a full page navigation), then hands off to the
-   * server route that signs state and redirects to Discord.
+   * What the signed cookie says right now. `undefined` means the check itself failed (network),
+   * which callers treat as "unknown", never as "not connected". The cross-tab message is never the identity.
    */
-  async function handleConnectDiscord() {
-    setDiscordConnecting(true);
-    draft.setErrorMessage(null);
+  const fetchVerifiedDiscord = useCallback(async (): Promise<VerifiedDiscordView | null | undefined> => {
     try {
-      await saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() });
+      return await getVerifiedDiscordForInvite(token);
     } catch {
-      // Losing the draft is not worth blocking the connection; the student can re-enter steps.
+      return undefined;
     }
+  }, [token]);
+
+  /** Old behaviour: save the draft, then leave for Discord in this tab (the page unloads). */
+  function connectInThisTab(qs: URLSearchParams) {
+    void (async () => {
+      try {
+        await saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() });
+      } catch {
+        // Losing the draft is not worth blocking the connection; the student can re-enter steps.
+      }
+      window.location.assign(`/api/discord/start?${qs.toString()}`);
+    })();
+  }
+
+  function cancelDiscordWait() {
+    try {
+      popupRef.current?.close();
+    } catch {
+      // The tab may already be gone.
+    }
+    stopWaitingRef.current?.();
+  }
+
+  /**
+   * Opens Discord sign-in in a second tab so this tab keeps its step, fields, password and
+   * overrides. `window.open` has to run synchronously inside the click for pop-up blockers; the
+   * draft save is fired without waiting. A blocked tab (null, or already closed) falls back to the
+   * same-tab redirect.
+   *
+   * The tab is opened without `noopener` on purpose: the wizard needs the returned handle to detect a
+   * blocked pop-up and to poll `closed` when the person abandons the tab. The only page that could
+   * reach `window.opener` is Discord's own sign-in (and our callback page), both trusted origins, and
+   * nothing sensitive is reachable through it.
+   */
+  function handleConnectDiscord() {
+    if (connectingRef.current) return;
+    draft.setErrorMessage(null);
     const qs = new URLSearchParams({
       token,
       school: inviteData.schoolSlug,
       game: inviteData.gameSlug,
     });
-    window.location.assign(`/api/discord/start?${qs.toString()}`);
+    const popup = window.open(`/api/discord/start?${qs.toString()}&popup=1`, '_blank');
+
+    connectingRef.current = true;
+    setDiscordConnecting(true);
+    if (!popup || popup.closed) {
+      connectInThisTab(qs);
+      return;
+    }
+    popupRef.current = popup;
+    saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() }).catch(() => {});
+
+    stopWaitingRef.current?.();
+    const identityAtStart = discordRef.current;
+    let finished = false;
+    let refreshing = false;
+    const intervals: number[] = [];
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      connectingRef.current = false;
+      popupRef.current = null;
+      stopWaitingRef.current = null;
+      stopListening();
+      intervals.forEach((t) => window.clearInterval(t));
+      window.clearTimeout(capTimer);
+      window.clearTimeout(blockedTimer);
+      window.removeEventListener('focus', onFocus);
+      setDiscordConnecting(false);
+    };
+
+    // Some blockers hand back a window that is closed a moment later.
+    const blockedTimer = window.setTimeout(() => {
+      if (!finished && popup.closed) {
+        finish();
+        connectingRef.current = true;
+        setDiscordConnecting(true);
+        connectInThisTab(qs);
+      }
+    }, 0);
+
+    // The other tab finished and said so. Authoritative: re-read the server and show whatever it says.
+    const onWake = async (message: { status: 'connected' | 'error'; error?: string }) => {
+      if (finished) return;
+      finish();
+      const verified = await fetchVerifiedDiscord();
+      if (verified !== undefined) setDiscord(verified);
+      if (message.status === 'error' || !verified?.inGuild) {
+        draft.setErrorMessage(message.error ?? 'We could not confirm your Discord connection. Please try again.');
+      }
+    };
+    const stopListening = listenDiscordResult(inviteData.inviteId, onWake);
+
+    // Safety net when no message arrives (storage blocked, message lost). One check at a time. While
+    // the tab is still open, only a *different* identity than the one shown at the start counts: the
+    // old cookie is expected until the new sign-in finishes, and must neither end the wait nor blank
+    // the identity on screen. Once the tab has closed, the server's answer is final.
+    const recheck = async (popupClosed: boolean) => {
+      if (finished || refreshing) return;
+      refreshing = true;
+      try {
+        const verified = await fetchVerifiedDiscord();
+        if (finished) return;
+        if (popupClosed) {
+          finish();
+          if (verified !== undefined) setDiscord(verified);
+          if (!verified?.inGuild) draft.setErrorMessage('Discord was not connected. Please try again.');
+          return;
+        }
+        const changed =
+          verified &&
+          (!identityAtStart ||
+            verified.username !== identityAtStart.username ||
+            verified.inGuild !== identityAtStart.inGuild);
+        if (changed) {
+          finish();
+          setDiscord(verified);
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+    const onFocus = () => void recheck(Boolean(popup.closed));
+    window.addEventListener('focus', onFocus);
+    // Fast poll for "the tab was closed"; slow poll for a result whose message was lost.
+    intervals.push(
+      window.setInterval(() => {
+        if (popup.closed) void recheck(true);
+      }, 800)
+    );
+    intervals.push(window.setInterval(() => void recheck(Boolean(popup.closed)), 5000));
+    // Give up after ten minutes (the flow cookie lasts far less).
+    const capTimer = window.setTimeout(finish, 10 * 60_000);
+    stopWaitingRef.current = finish;
   }
 
   function handleBack() {
@@ -148,6 +291,7 @@ export default function PlayerOnboardingWizard({
           },
           codeOfConductAccepted: draft.codeOfConductAccepted,
           consent: draft.buildConsent(),
+          contentOverrides: draft.contentOverrideKeys(),
         };
 
         const result = await submitPlayerOnboarding({
@@ -157,8 +301,10 @@ export default function PlayerOnboardingWizard({
 
         if (!result.success) {
           // Expected rejections: send the invitee to the step that fixes them rather than a dead end.
-          const target = stepForRejection(result.code);
-          if (target === 2) setDiscord(null);
+          const target = stepForRejection(result.code, result.fields);
+          // Only a Discord rejection means the connection itself is bad; a flagged Discord username
+          // keeps its connection so the person can override or switch accounts.
+          if (target === 2 && result.code !== 'content_flagged') setDiscord(null);
           setStep(target);
           draft.setErrorMessage(result.error);
           return;
@@ -255,6 +401,7 @@ export default function PlayerOnboardingWizard({
       <div className="bg-surface-elevated border border-border rounded-2xl p-6 sm:p-8 shadow-sm">
         {step === 1 && (
           <AccountInfoStep
+            contentFlags={draft.contentFlags}
             legalFirstName={draft.legalFirstName}
             setLegalFirstName={draft.setLegalFirstName}
             legalLastName={draft.legalLastName}
@@ -273,14 +420,17 @@ export default function PlayerOnboardingWizard({
 
         {step === 2 && (
           <DiscordStep
+            contentFlags={draft.contentFlags}
             verified={discord}
             connecting={discordConnecting}
             onConnect={handleConnectDiscord}
+            onCancel={cancelDiscordWait}
           />
         )}
 
         {step === 3 && (
           <GameIdentityStep
+            contentFlags={draft.contentFlags}
             riotId={draft.riotId}
             setRiotId={draft.setRiotId}
             ignConfirmed={draft.ignConfirmed}
@@ -294,6 +444,7 @@ export default function PlayerOnboardingWizard({
 
         {step === 4 && (
           <DemographicsStep
+            contentFlags={draft.contentFlags}
             birthDate={draft.birthDate}
             setBirthDate={draft.setBirthDate}
             gender={draft.gender}
@@ -327,6 +478,7 @@ export default function PlayerOnboardingWizard({
 
         {step === 5 && (
           <ConsentStep
+            contentFlags={draft.contentFlags}
             age={draft.age}
             isMinor={draft.isMinor}
             tosAcknowledged={draft.tosAcknowledged}

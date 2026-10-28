@@ -14,6 +14,14 @@ import {
   type OnboardingTx,
 } from '@/app/lib/db/onboarding';
 import { db } from '@/app/lib/db';
+import { insertContentFlag } from '@/app/lib/db/content-flags';
+import {
+  CONTENT_FLAGGED_MESSAGE,
+  FIELD_TOO_LONG_MESSAGE,
+  collectContentValues,
+  evaluateContent,
+  findTooLongFields,
+} from '../content-check';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
@@ -301,6 +309,27 @@ export async function processOnboardingSubmission(
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
   });
 
+  // Offensive-content screen. The server recomputes what is flagged from the submitted values and
+  // honors an override only for a field that is flagged, so the browser cannot skip the check.
+  // Nothing has been written yet, so a block here leaves no trace.
+  const contentValues = collectContentValues(
+    // The normalized consent, not the raw one: an adult's leftover guardian fields are dropped there.
+    { ...submission, consent: validated.consent },
+    discord.discordUsername
+  );
+  const tooLong = findTooLongFields(contentValues);
+  if (tooLong.length > 0) {
+    throw new OnboardingRejection('field_too_long', FIELD_TOO_LONG_MESSAGE, tooLong);
+  }
+  const contentCheck = evaluateContent(contentValues, submission.contentOverrides);
+  if (contentCheck.blocked.length > 0) {
+    throw new OnboardingRejection(
+      'content_flagged',
+      CONTENT_FLAGGED_MESSAGE,
+      contentCheck.blocked.map((f) => f.field)
+    );
+  }
+
   // A new manager account needs the password they chose. Checked before anything is written or any
   // auth user is created; staff and existing auth users keep their current credentials.
   if (isManager && !hasUsablePassword(submission.password)) {
@@ -363,7 +392,19 @@ export async function processOnboardingSubmission(
         signedAt: new Date(),
       });
 
-      // 3e. Role-specific finalization
+      // 3e. Staff review record for any warning the person overrode. A missing table (migration not
+      // applied yet) skips only this record; it never fails the onboarding.
+      if (contentCheck.overridden.length > 0) {
+        await insertContentFlag(tx, {
+          memberId: createdOrUpdatedMemberId,
+          schoolId: invite.schoolId,
+          inviteKind: isManager ? 'manager' : 'player',
+          inviteId: invite.id,
+          fields: contentCheck.overridden,
+        });
+      }
+
+      // 3f. Role-specific finalization
       if (isManager) {
         await provisionManagerAccount(tx, {
           email: validated.email,

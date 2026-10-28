@@ -6,6 +6,8 @@ import {
   GRADUATION_YEAR_OPTIONS,
   MANAGER_SEASON_OPTIONS,
 } from '../../types';
+import { ContentFlagNotice, contentFieldProps } from '../ContentFlagNotice';
+import type { ContentFlagControls } from '../../types';
 
 interface AccountInfoStepProps {
   legalFirstName: string;
@@ -21,6 +23,8 @@ interface AccountInfoStepProps {
   academicYear?: string;
   setAcademicYear?: (val: string) => void;
   isManager: boolean;
+  /** Offensive-content warnings and overrides for this step's fields. */
+  contentFlags?: ContentFlagControls;
 }
 
 export function AccountInfoStep({
@@ -37,6 +41,7 @@ export function AccountInfoStep({
   academicYear,
   setAcademicYear,
   isManager,
+  contentFlags,
 }: AccountInfoStepProps) {
   return (
     <div className="space-y-6">
@@ -59,6 +64,7 @@ export function AccountInfoStep({
           </label>
           <input
             id="account-legal-first-name"
+            {...contentFieldProps('legalFirstName', contentFlags)}
             type="text"
             value={legalFirstName}
             onChange={(e) => setLegalFirstName(e.target.value)}
@@ -66,6 +72,7 @@ export function AccountInfoStep({
             placeholder="e.g. Alex"
             required
           />
+          <ContentFlagNotice field="legalFirstName" controls={contentFlags} />
         </div>
 
         <div>
@@ -77,6 +84,7 @@ export function AccountInfoStep({
           </label>
           <input
             id="account-legal-last-name"
+            {...contentFieldProps('legalLastName', contentFlags)}
             type="text"
             value={legalLastName}
             onChange={(e) => setLegalLastName(e.target.value)}
@@ -84,6 +92,7 @@ export function AccountInfoStep({
             placeholder="e.g. Chen"
             required
           />
+          <ContentFlagNotice field="legalLastName" controls={contentFlags} />
         </div>
       </div>
 

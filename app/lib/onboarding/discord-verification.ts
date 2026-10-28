@@ -53,6 +53,11 @@ export interface DiscordFlowPayload {
   tok: string;
   school: string;
   game: string;
+  /**
+   * True when the flow was started from a second tab, so the callback sends that tab to the
+   * "you can close this tab" page. Absent on cookies issued before this existed, which behave as before.
+   */
+  popup?: boolean;
   exp: number;
 }
 
@@ -127,7 +132,7 @@ export function verifyState(value: string | undefined | null, now = nowSec()) {
 }
 
 export function signFlowCookie(
-  input: { nonce: string; inviteHash: string; token: string; school: string; game: string },
+  input: { nonce: string; inviteHash: string; token: string; school: string; game: string; popup?: boolean },
   now = nowSec()
 ): string {
   return sign({
@@ -137,6 +142,7 @@ export function signFlowCookie(
     tok: input.token,
     school: input.school,
     game: input.game,
+    ...(input.popup ? { popup: true } : {}),
     exp: now + DISCORD_FLOW_TTL_SECONDS,
   });
 }

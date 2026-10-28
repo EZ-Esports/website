@@ -9,12 +9,15 @@ import {
   revokeManagerInvite,
   type RegisteredManagerAccount,
 } from '@/app/(admin)/admin/schools/manager-actions';
+import { getManagerContentFlags } from '@/app/(admin)/admin/schools/content-flag-actions';
+import type { ContentFlagView } from '@/app/lib/db/content-flags';
 import type { ManagerItem, ManagerInviteItem } from './types';
 
 export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
   const [managers, setManagers] = useState<ManagerItem[]>([]);
   const [invites, setInvites] = useState<ManagerInviteItem[]>([]);
   const [registeredManagers, setRegisteredManagers] = useState<RegisteredManagerAccount[]>([]);
+  const [contentFlags, setContentFlags] = useState<Record<string, ContentFlagView[]>>({});
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isRemovingId, setIsRemovingId] = useState<string | null>(null);
@@ -33,6 +36,13 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
       setManagers(mgrs);
       setInvites(invs);
       setRegisteredManagers(regMgrs);
+      // Badges are optional extras: a failure here must never hide the managers themselves.
+      try {
+        const memberIds = mgrs.map((m: ManagerItem) => m.memberId).filter((id: string | null | undefined): id is string => Boolean(id));
+        setContentFlags(memberIds.length > 0 ? await getManagerContentFlags(memberIds) : {});
+      } catch {
+        setContentFlags({});
+      }
     } catch (err: any) {
       setFetchError(err.message || 'Failed to load school manager records.');
     } finally {
@@ -81,6 +91,7 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
 
   return {
     managers,
+    contentFlags,
     invites,
     registeredManagers,
     loading,
