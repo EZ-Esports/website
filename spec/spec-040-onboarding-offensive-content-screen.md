@@ -2,7 +2,7 @@
 
 - **Spec ID:** spec-040
 - **Title:** Profanity and slur screening of onboarding fields, a per-field "this is my real information" override, and a staff review badge
-- **Status:** Implemented on branch `worktree-agent-ab37714a4c6e7940c`; not pushed, no PR yet. **Migration `0055` is not applied to production.**
+- **Status:** Merged (PR #304). **Migration `0055` was applied to production on 2026-10-28** (dry run in a rolled-back transaction first, then `npm run db:migrate` with its scoped backup).
 - **Date:** 2026-10-28
 - **Context:** Issue #291 (rules and acknowledgement copy). Builds on [spec-011](spec-011-player-onboarding-and-manager-portal.md), [spec-029](spec-029-onboarding-consent-form.md), [spec-033](spec-033-discord-oauth-onboarding.md) and [spec-035](spec-035-manager-discord-oauth.md).
 
@@ -66,6 +66,6 @@ Production may run this code before 0055 is applied. Every statement that touche
 
 ## Follow-ups
 
-- Apply migration 0055 (owner, with the usual scoped backup).
+- ~~Apply migration 0055~~ Done 2026-10-28.
 - Decide whether to add a roster "flagged only" filter or a cross-school review queue.
 - Extend screening to staff-typed invite names and portal free text if wanted.
