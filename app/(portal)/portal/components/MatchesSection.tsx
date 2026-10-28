@@ -254,7 +254,16 @@ export function MatchesSection({
             Upcoming ({upcoming.length})
           </Tab>
           <Tab id="needs-results" className={TAB_CLASS}>
-            Needs result ({needsResults.length})
+            Needs result
+            <span
+              className={`ml-2 inline-flex min-w-[1.5rem] justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                needsResults.length > 0
+                  ? 'bg-amber-400/15 text-amber-300 border border-amber-400/50'
+                  : 'text-zinc-500'
+              }`}
+            >
+              {needsResults.length}
+            </span>
           </Tab>
           <Tab id="past" className={TAB_CLASS}>
             Past ({past.length})

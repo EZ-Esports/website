@@ -73,7 +73,8 @@ export function RostersSection({
     group.rosters.push(roster);
     seasons.set(roster.seasonId, group);
   }
-  const seasonGroups = [...seasons.entries()];
+  // Season names are "YYYY-YY", so sorting them descending puts the most recent season first.
+  const seasonGroups = [...seasons.entries()].sort(([, a], [, b]) => b.name.localeCompare(a.name));
   return (
     <div data-tour="rosters" className="min-w-0 space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
