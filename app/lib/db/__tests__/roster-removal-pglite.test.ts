@@ -12,6 +12,10 @@ import * as schema from '../schema';
 import { removePlayerFromRosterTx, cleanupOrphanMember, type RosterRemovalResult } from '../roster-removal';
 import { applyMigrations } from '../../../../db/__tests__/helpers/pglite-migrations';
 
+// Every PGlite here replays all migrations (the suite's own plus the one in 'failure isolation'), which
+// outlasts the 15s default per-test timeout when the full suite runs in parallel under the pre-push hook.
+vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
+
 let client: PGlite;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 let world: { school: string; game: string; season: string; team: string; varsity: string; jv: string; other: string };
@@ -41,7 +45,9 @@ beforeAll(async () => {
   const otherTeam = await id(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school2, game, season]);
   const other = await id(`insert into rosters (team_id, name, division) values ($1, 'Other', 'A') returning id`, [otherTeam]);
   world = { school, game, season, team, varsity, jv, other };
-});
+  // Replaying every migration in PGlite takes well over the 10s default hook timeout when the full suite runs
+  // in parallel (the pre-push hook), so give setup room.
+}, 90_000);
 afterAll(async () => {
   await client.close();
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { RequiredMark } from '../RequiredMark';
 import {
   DEFAULT_MANAGER_SEASON,
@@ -22,6 +23,14 @@ interface AccountInfoStepProps {
   setGraduationYear: (val: number) => void;
   academicYear?: string;
   setAcademicYear?: (val: string) => void;
+  /** Manager only: "I also play in this league" and the games they play. */
+  alsoPlays?: boolean;
+  setAlsoPlays?: (val: boolean) => void;
+  playableGames?: Array<{ id: string; displayName: string }>;
+  playGameIds?: string[];
+  /** Increments each time the person tries to continue with no game chosen. */
+  playGamesErrorTick?: number;
+  setPlayGameIds?: (val: string[]) => void;
   isManager: boolean;
   /** Offensive-content warnings and overrides for this step's fields. */
   contentFlags?: ContentFlagControls;
@@ -40,9 +49,22 @@ export function AccountInfoStep({
   setGraduationYear,
   academicYear,
   setAcademicYear,
+  alsoPlays = false,
+  setAlsoPlays,
+  playableGames = [],
+  playGameIds = [],
+  playGamesErrorTick = 0,
+  setPlayGameIds,
   isManager,
   contentFlags,
 }: AccountInfoStepProps) {
+  const firstGameRef = useRef<HTMLInputElement>(null);
+  const gamesInvalid = playGamesErrorTick > 0 && alsoPlays && playGameIds.length === 0;
+  // Each failed attempt moves focus to the first game so keyboard and screen reader users land on the problem.
+  useEffect(() => {
+    if (playGamesErrorTick > 0) firstGameRef.current?.focus();
+  }, [playGamesErrorTick]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -198,6 +220,72 @@ export function AccountInfoStep({
             The season you are applying to manage your school&apos;s teams for.
           </p>
         </div>
+      )}
+
+      {isManager && setAlsoPlays && setPlayGameIds && (
+        <fieldset className="space-y-3 rounded-xl border border-border bg-surface p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+            Will you also be playing?
+          </legend>
+          <label className="flex min-h-[44px] items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={alsoPlays}
+              onChange={(e) => setAlsoPlays(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-border text-accent focus:ring-accent accent-accent"
+            />
+            <span className="text-sm text-foreground">
+              I also play in this league
+              <span className="block text-xs text-foreground-muted mt-0.5">
+                You will be registered as a player in this same sign-up, with the same Discord account and
+                details. Your player application goes to the normal review queue.
+              </span>
+            </span>
+          </label>
+
+          {alsoPlays && (
+            <div
+              role="group"
+              aria-label="Games you play"
+              aria-describedby={gamesInvalid ? 'play-games-error' : undefined}
+              className="space-y-1 pl-7"
+            >
+              <p className="text-xs font-semibold text-foreground-muted">
+                Which games do you play?<RequiredMark />
+              </p>
+              {playableGames.length === 0 && (
+                <p className="text-xs text-foreground-muted">
+                  No games are available for your invite yet. Untick the box above or contact EZ Esports.
+                </p>
+              )}
+              {playableGames.map((game, index) => (
+                <label key={game.id} className="flex min-h-[44px] items-center gap-3 cursor-pointer">
+                  <input
+                    ref={index === 0 ? firstGameRef : undefined}
+                    aria-invalid={gamesInvalid || undefined}
+                    aria-describedby={gamesInvalid ? 'play-games-error' : undefined}
+                    type="checkbox"
+                    checked={playGameIds.includes(game.id)}
+                    onChange={(e) =>
+                      setPlayGameIds(
+                        e.target.checked
+                          ? [...playGameIds, game.id]
+                          : playGameIds.filter((id) => id !== game.id)
+                      )
+                    }
+                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent accent-accent"
+                  />
+                  <span className="text-sm text-foreground">{game.displayName}</span>
+                </label>
+              ))}
+              {gamesInvalid && (
+                <p id="play-games-error" role="alert" className="text-xs text-rose-300">
+                  Choose at least one game you will play.
+                </p>
+              )}
+            </div>
+          )}
+        </fieldset>
       )}
     </div>
   );

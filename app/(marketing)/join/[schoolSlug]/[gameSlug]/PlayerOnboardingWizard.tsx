@@ -60,6 +60,11 @@ export default function PlayerOnboardingWizard({
   const [step, setStep] = useState<number>(resumeAtDiscord && !isManagerInvite ? 2 : 1);
   const [isPending, startTransition] = useTransition();
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  // What the server reports about the player applications filed for a manager who also plays.
+  const [applications, setApplications] = useState<{ created: number; existing: number }>({
+    created: 0,
+    existing: 0,
+  });
 
   // Starts from the server-read cookie; cleared locally when the server later rejects it (e.g. it expired).
   const [discord, setDiscord] = useState<VerifiedDiscordView | null>(discordProp);
@@ -273,6 +278,8 @@ export default function PlayerOnboardingWizard({
           password: isManager ? draft.password : undefined,
           graduationYear: draft.graduationYear,
           academicYear: isManager ? draft.academicYear : undefined,
+          alsoPlays: isManager ? draft.alsoPlays : undefined,
+          playGameIds: isManager && draft.alsoPlays ? draft.playGameIds : undefined,
           riotId: draft.riotId.trim(),
           birthDate: draft.birthDate,
           gender: draft.gender || undefined,
@@ -307,8 +314,13 @@ export default function PlayerOnboardingWizard({
           if (target === 2 && result.code !== 'content_flagged') setDiscord(null);
           setStep(target);
           draft.setErrorMessage(result.error);
+          if (result.code === 'play_games_required') draft.flagPlayGamesError();
           return;
         }
+        setApplications({
+          created: result.playerApplicationsCreated ?? 0,
+          existing: result.playerApplicationsExisting ?? 0,
+        });
         setIsSubmitted(true);
       } catch (err: any) {
         draft.setErrorMessage(
@@ -322,6 +334,9 @@ export default function PlayerOnboardingWizard({
     return (
       <SuccessStep
         isManager={isManager}
+        alsoPlays={isManager && draft.alsoPlays}
+        applicationsCreated={applications.created}
+        applicationsExisting={applications.existing}
         legalFirstName={draft.legalFirstName}
         legalLastName={draft.legalLastName}
         email={draft.email}
@@ -414,6 +429,12 @@ export default function PlayerOnboardingWizard({
             setGraduationYear={draft.setGraduationYear}
             academicYear={draft.academicYear}
             setAcademicYear={draft.setAcademicYear}
+            alsoPlays={draft.alsoPlays}
+            setAlsoPlays={draft.setAlsoPlays}
+            playableGames={inviteData.playableGames}
+            playGameIds={draft.playGameIds}
+            playGamesErrorTick={draft.playGamesErrorTick}
+            setPlayGameIds={draft.setPlayGameIds}
             isManager={isManager}
           />
         )}
@@ -437,7 +458,7 @@ export default function PlayerOnboardingWizard({
             setIgnConfirmed={draft.setIgnConfirmed}
             isRiotIdValid={draft.isRiotIdValid}
             trackerUrl={draft.trackerUrl}
-            isManager={isManager}
+            isManager={isManager && !draft.alsoPlays}
             gameName={inviteData.gameName}
           />
         )}

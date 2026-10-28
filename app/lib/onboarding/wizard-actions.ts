@@ -4,9 +4,12 @@ import crypto from 'node:crypto';
 import {
   findInviteByTokenHash,
   findInviteForValidation,
+  listOnboardingGames,
   updateInviteDraft,
+  type OnboardingGameOption,
 } from '@/app/lib/db/onboarding';
 import type { ConsentSubmission } from './consent';
+import { filterGamesByManaged, sanitizeGameIds } from './play-games';
 import { parseSavedOverrides } from './content-check';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
@@ -36,6 +39,8 @@ export type ValidateInviteTokenResult =
       gameSlug: string;
       submissionDraft: Record<string, any> | null;
       expiresAt: Date;
+      /** Manager invites only: games the manager can say they also play. */
+      playableGames?: OnboardingGameOption[];
     }
   | {
       valid: false;
@@ -80,6 +85,12 @@ export interface PlayerOnboardingSubmission {
   /** Manager only: season applied for, e.g. "2026-27". */
   academicYear?: string;
   password?: string;
+  /**
+   * Manager only: the manager will also play. The server then also records them as a player of
+   * `playGameIds` on the same member. Ignored on player invites; absent means "no".
+   */
+  alsoPlays?: boolean;
+  playGameIds?: string[];
   riotId: string;
   birthDate: string | Date;
   gender?: string;
@@ -125,6 +136,12 @@ export interface SubmitPlayerOnboardingResult {
   memberId: string;
   status: 'submitted' | 'accepted';
   role?: 'player' | 'manager';
+  /**
+   * Manager who also plays: how many chosen games got a new player application, and how many the
+   * member already had a live one for, so the success page never claims a duplicate.
+   */
+  playerApplicationsCreated?: number;
+  playerApplicationsExisting?: number;
 }
 
 /** Expected rejection returned (not thrown) so its message survives production error masking. */
@@ -176,6 +193,10 @@ function sanitizeDraftData(
     if (key === 'contentOverrides') {
       // Only known fields with bounded string values are kept; never trusted as an override at submit.
       sanitized[key] = parseSavedOverrides(value);
+    } else if (key === 'alsoPlays') {
+      sanitized[key] = value === true;
+    } else if (key === 'playGameIds') {
+      sanitized[key] = sanitizeGameIds(value);
     } else if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
       sanitized[key] = value;
     }
@@ -318,6 +339,14 @@ export async function validateInviteToken(
       gameSlug: resolvedGameSlug,
       submissionDraft: sanitizeDraftData(invite.submissionDraft as Record<string, any> | null),
       expiresAt: invite.expiresAt,
+      ...(isManager
+        ? {
+            playableGames: filterGamesByManaged(
+              await listOnboardingGames(),
+              (invite.submissionDraft as Record<string, any> | null)?.managedGames
+            ),
+          }
+        : {}),
     };
   }
 
@@ -358,6 +387,11 @@ export async function saveOnboardingDraft(
   }
 
   const sanitized = sanitizeDraftData(draftData);
+  // "Also plays" only exists on manager invites; a player draft never carries it.
+  if (sanitized && found.kind !== 'manager') {
+    delete sanitized.alsoPlays;
+    delete sanitized.playGameIds;
+  }
   await updateInviteDraft(
     found.kind,
     invite.id,

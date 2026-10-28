@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 /** Transaction handle passed to the onboarding write steps. */
 export type OnboardingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -403,4 +403,75 @@ export async function insertOnboardingConsent(
   values: typeof schema.onboardingConsents.$inferInsert
 ): Promise<void> {
   await tx.insert(schema.onboardingConsents).values(values);
+}
+
+export interface OnboardingGameOption {
+  id: string;
+  slug: string;
+  displayName: string;
+}
+
+/**
+ * Games a school manager can say they also play, in display-name order. Only games with at least one
+ * season are offered: rosters, and so player applications, only exist for those.
+ */
+export async function listOnboardingGames(): Promise<OnboardingGameOption[]> {
+  return db
+    .select({
+      id: schema.games.id,
+      slug: schema.games.slug,
+      displayName: schema.games.displayName,
+    })
+    .from(schema.games)
+    .where(sql`exists (select 1 from seasons where seasons.game_id = ${schema.games.id})`)
+    .orderBy(asc(schema.games.displayName));
+}
+
+/**
+ * Records that a member plays a game at a school as a `submitted` `player_invites` row, exactly what
+ * a player's own wizard submission leaves behind. It therefore waits in the manager review queue and
+ * goes through `reviewPlayerInvite` (season scope, roster lock, one tier per game, roster limits) like
+ * any other student. A member who already has a live (not rejected or expired) row for that school
+ * and game is left alone, so re-onboarding never duplicates it. Returns true when a row was created.
+ */
+export async function ensurePlayerSubmission(
+  tx: OnboardingTx,
+  params: {
+    memberId: string;
+    schoolId: string;
+    gameId: string;
+    invitedByUserId: string;
+    intendedFirstName: string;
+    intendedLastName: string;
+    tokenHash: string;
+  }
+): Promise<boolean> {
+  const existing = await tx
+    .select({ id: schema.playerInvites.id, status: schema.playerInvites.status })
+    .from(schema.playerInvites)
+    .where(
+      and(
+        eq(schema.playerInvites.memberId, params.memberId),
+        eq(schema.playerInvites.schoolId, params.schoolId),
+        eq(schema.playerInvites.gameId, params.gameId)
+      )
+    )
+    .limit(1);
+  if (existing.some((row) => row.status !== 'rejected' && row.status !== 'expired')) return false;
+
+  const now = new Date();
+  await tx.insert(schema.playerInvites).values({
+    schoolId: params.schoolId,
+    gameId: params.gameId,
+    tokenHash: params.tokenHash,
+    intendedFirstName: params.intendedFirstName,
+    intendedLastName: params.intendedLastName,
+    invitedByUserId: params.invitedByUserId,
+    status: 'submitted',
+    expiresAt: now,
+    submittedAt: now,
+    memberId: params.memberId,
+    submissionDraft: { source: 'manager_also_plays' },
+  });
+  return true;
 }
