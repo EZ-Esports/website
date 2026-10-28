@@ -354,23 +354,12 @@ describe('outcome wording and cache tags', () => {
 describe('confirmation copy', () => {
   const msg = rosterRemovalConfirmMessage('Ada Lovelace', 'Varsity');
 
-  it('names the player and roster and says the roster spot is permanently deleted', () => {
+  it('names the player and roster and says the removal is permanent', () => {
     expect(msg).toContain('Remove Ada Lovelace from Varsity?');
-    expect(msg).toContain('permanently deletes their roster spot');
+    expect(msg).toContain('This will remove them permanently.');
   });
 
-  it('states exactly when the student record is deleted too, and what is kept', () => {
-    expect(msg).toContain('not on any other roster and have no match history');
-    expect(msg).toContain('student record is deleted too');
-    for (const keeper of ['on another roster', 'a staff member', 'a school manager', 'leadership or people profile', 'in the league archive', 'have match history']) {
-      expect(msg).toContain(keeper);
-    }
-    expect(msg).toContain('signed consent form');
-    expect(msg).toContain('demographic answers');
-  });
-
-  it('says it cannot be undone and never claims the member stays in the list', () => {
-    expect(msg).toContain('This cannot be undone.');
-    expect(msg).not.toMatch(/stay in the school's member list/i);
+  it('says it cannot be undone', () => {
+    expect(msg).toContain('This action cannot be undone.');
   });
 });

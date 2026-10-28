@@ -688,7 +688,7 @@ export default function SchoolPortalClient({
         appearance="portal"
         tone="danger"
         title="Delete roster?"
-        message="Are you sure you want to delete this empty roster?"
+        message="Delete this roster? This will remove it permanently. This action cannot be undone."
         confirmLabel="Delete roster"
         pendingLabel="Deleting…"
       />
