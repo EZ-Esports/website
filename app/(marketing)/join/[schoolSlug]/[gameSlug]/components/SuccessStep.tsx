@@ -6,6 +6,8 @@ import type { InviteData } from '../types';
 
 interface SuccessStepProps {
   isManager?: boolean;
+  /** Manager who also plays: a player application was submitted in the same sign-up. */
+  alsoPlays?: boolean;
   legalFirstName: string;
   legalLastName: string;
   email: string;
@@ -15,6 +17,7 @@ interface SuccessStepProps {
 
 export function SuccessStep({
   isManager,
+  alsoPlays,
   legalFirstName,
   legalLastName,
   email,
@@ -69,6 +72,17 @@ export function SuccessStep({
                   Generate player invite links for students at {inviteData.schoolName} and approve student submissions for tournament rosters.
                 </span>
               </li>
+              {alsoPlays && (
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                    ✓
+                  </span>
+                  <span>
+                    <strong className="text-foreground">Player Application Submitted:</strong>{' '}
+                    Your own player application is in the review queue in the portal. Approve it to place yourself on a roster.
+                  </span>
+                </li>
+              )}
             </ul>
           </div>
 

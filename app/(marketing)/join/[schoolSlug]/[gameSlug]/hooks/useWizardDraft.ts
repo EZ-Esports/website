@@ -66,6 +66,15 @@ export function useWizardDraft(
       : DEFAULT_MANAGER_SEASON
   );
 
+  // Manager only: "I also play in this league". The games are validated against the games table on submit.
+  const [alsoPlays, setAlsoPlays] = useState<boolean>(isManager && initialDraft.alsoPlays === true);
+  const [playGameIds, setPlayGameIds] = useState<string[]>(() => {
+    const known = new Set((inviteData.playableGames ?? []).map((g) => g.id));
+    return Array.isArray(initialDraft.playGameIds)
+      ? initialDraft.playGameIds.filter((id: unknown): id is string => typeof id === 'string' && known.has(id))
+      : [];
+  });
+
   // Step 3: Riot Games Identity
   const [riotId, setRiotId] = useState(initialDraft.riotId || '');
   const [ignConfirmed, setIgnConfirmed] = useState<boolean>(
@@ -218,6 +227,8 @@ export function useWizardDraft(
       password: isManager ? password : undefined,
       graduationYear,
       academicYear: isManager ? academicYear : undefined,
+      alsoPlays: isManager ? alsoPlays : undefined,
+      playGameIds: isManager && alsoPlays ? playGameIds : undefined,
       riotId,
       ignConfirmed,
       birthDate,
@@ -293,6 +304,10 @@ export function useWizardDraft(
     }
     if (isManager && !(MANAGER_SEASON_OPTIONS as readonly string[]).includes(academicYear)) {
       setErrorMessage('Please select the season you are applying for.');
+      return false;
+    }
+    if (isManager && alsoPlays && playGameIds.length === 0) {
+      setErrorMessage('Please choose at least one game you will play.');
       return false;
     }
     if (blockedByContent(1)) return false;
@@ -385,6 +400,10 @@ export function useWizardDraft(
     setGraduationYear,
     academicYear,
     setAcademicYear,
+    alsoPlays,
+    setAlsoPlays,
+    playGameIds,
+    setPlayGameIds,
     riotId,
     setRiotId,
     ignConfirmed,

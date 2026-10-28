@@ -22,6 +22,12 @@ interface AccountInfoStepProps {
   setGraduationYear: (val: number) => void;
   academicYear?: string;
   setAcademicYear?: (val: string) => void;
+  /** Manager only: "I also play in this league" and the games they play. */
+  alsoPlays?: boolean;
+  setAlsoPlays?: (val: boolean) => void;
+  playableGames?: Array<{ id: string; displayName: string }>;
+  playGameIds?: string[];
+  setPlayGameIds?: (val: string[]) => void;
   isManager: boolean;
   /** Offensive-content warnings and overrides for this step's fields. */
   contentFlags?: ContentFlagControls;
@@ -40,6 +46,11 @@ export function AccountInfoStep({
   setGraduationYear,
   academicYear,
   setAcademicYear,
+  alsoPlays = false,
+  setAlsoPlays,
+  playableGames = [],
+  playGameIds = [],
+  setPlayGameIds,
   isManager,
   contentFlags,
 }: AccountInfoStepProps) {
@@ -198,6 +209,54 @@ export function AccountInfoStep({
             The season you are applying to manage your school&apos;s teams for.
           </p>
         </div>
+      )}
+
+      {isManager && setAlsoPlays && setPlayGameIds && (
+        <fieldset className="space-y-3 rounded-xl border border-border bg-surface p-4">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+            Will you also be playing?
+          </legend>
+          <label className="flex min-h-[44px] items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={alsoPlays}
+              onChange={(e) => setAlsoPlays(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-border text-accent focus:ring-accent accent-accent"
+            />
+            <span className="text-sm text-foreground">
+              I also play in this league
+              <span className="block text-xs text-foreground-muted mt-0.5">
+                You will be registered as a player in this same sign-up, with the same Discord account and
+                details. Your player application goes to the normal review queue.
+              </span>
+            </span>
+          </label>
+
+          {alsoPlays && (
+            <div role="group" aria-label="Games you play" className="space-y-1 pl-7">
+              <p className="text-xs font-semibold text-foreground-muted">
+                Which games do you play?<RequiredMark />
+              </p>
+              {playableGames.map((game) => (
+                <label key={game.id} className="flex min-h-[44px] items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={playGameIds.includes(game.id)}
+                    onChange={(e) =>
+                      setPlayGameIds(
+                        e.target.checked
+                          ? [...playGameIds, game.id]
+                          : playGameIds.filter((id) => id !== game.id)
+                      )
+                    }
+                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent accent-accent"
+                  />
+                  <span className="text-sm text-foreground">{game.displayName}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </fieldset>
       )}
     </div>
   );

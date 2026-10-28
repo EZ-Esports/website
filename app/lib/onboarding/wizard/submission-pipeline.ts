@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import {
+  ensurePlayerSubmission,
   findDiscordIdentityOwner,
+  findExistingGames,
   findInviteForSubmission,
   findStaffUserIdByEmail,
   insertOnboardingConsent,
@@ -33,6 +35,7 @@ import {
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
 import { OnboardingRejection, isDiscordIdentityUniqueViolation } from '../rejection';
 import type { VerifiedDiscord } from '../discord-verification';
+import { sanitizeGameIds } from '../play-games';
 import type {
   PlayerOnboardingSubmission,
   SubmitPlayerOnboardingParams,
@@ -341,8 +344,22 @@ export async function processOnboardingSubmission(
     }
   }
 
+  // A manager who also plays names the games they play. Resolved against the games table before
+  // anything is written, so an unknown or browser-invented id can never create a record.
+  let playGames: Array<{ id: string; slug: string; displayName: string }> = [];
+  if (isManager && submission.alsoPlays === true) {
+    const requested = sanitizeGameIds(submission.playGameIds);
+    playGames = await findExistingGames(db, requested);
+    if (requested.length === 0 || playGames.length !== requested.length) {
+      throw new OnboardingRejection(
+        'play_games_required',
+        'Please choose at least one game you will play.'
+      );
+    }
+  }
+
   // Step 2: Resolve external Riot identity
-  const effectiveGameSlug = gameSlug || 'valorant';
+  const effectiveGameSlug = gameSlug || playGames[0]?.slug || 'valorant';
   const riotAdapter = options?.riotAdapter ?? new ManualRiotIdAdapter({ isVerified: true });
   const resolvedRiot = await riotAdapter.resolveIdentity(effectiveGameSlug, submission.riotId);
 
@@ -414,6 +431,20 @@ export async function processOnboardingSubmission(
           academicYear: submission.academicYear,
           submissionDraft: invite.submissionDraft as Record<string, any> | null,
         });
+
+        // 3g. Manager who also plays: the SAME member (matched by email above, one Discord identity)
+        // also gets a submitted player application per chosen game (reviewed like any student's), so they never need a second invite.
+        for (const game of playGames) {
+          await ensurePlayerSubmission(tx, {
+            memberId: createdOrUpdatedMemberId,
+            schoolId: invite.schoolId,
+            gameId: game.id,
+            invitedByUserId: invite.invitedByUserId,
+            intendedFirstName: validated.legalFirstName,
+            intendedLastName: validated.legalLastName,
+            tokenHash: crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex'),
+          });
+        }
 
         await markManagerInviteAccepted(tx, invite.id, createdOrUpdatedMemberId);
       } else {

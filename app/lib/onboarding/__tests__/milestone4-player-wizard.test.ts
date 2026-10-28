@@ -1257,6 +1257,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(managerRow.userId).toBe(existingStaffUserId);
     });
 
+    // __INSERT_ALSO_PLAYS__
     describe('verified Discord requirement (managers use the same OAuth gate as players)', () => {
       beforeEach(() => {
         stubSupabaseEnv();

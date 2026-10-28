@@ -159,6 +159,8 @@ The student opens the link. The wizard renders 4 streamlined steps:
   - **Tech & Gaming Survey**: Home internet reliability, average ping, gaming hours per week, peripherals, career interests, feedback.
 * **Submission**: Moves invite status to `submitted`. System saves draft if closed midway, allowing resumption using the same token until final submission.
 
+> **Update (28 Oct 2026, [spec-042](spec-042-manager-also-plays.md), issue #296):** a School Manager who also plays ticks "I also play in this league" in the manager wizard and picks their games. The same submission creates the manager role and a `submitted` player application on the same member (one Discord identity), which then appears in Flow 4 below and follows the same season-scope and roster-lock rules as any student.
+
 ### Flow 4: Manager Approve / Reject Queue
 1. In `/portal`, the student appears in the **Approve / Reject Queue** under that game.
 2. Manager sees: *Alex Chen | IGN: Demon1#LFT1 | Discord: @comaticx | Grade: 11th*.

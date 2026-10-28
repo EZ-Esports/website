@@ -198,3 +198,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Unverified in real conditions:** real Discord OAuth, real browsers' pop-up blockers (Safari/iOS in particular), in-app webviews and embedded browsers (may not support `window.open` or `BroadcastChannel`; they rely on the same-tab fallback, the focus/5 s cookie re-check and the closed-tab poll), and real two-tab messaging. Tests are jsdom and mocks only; the UI was not checked in a browser.
 - `window.close()` from the finished tab only works for tabs the wizard opened; otherwise the person closes it from the on-screen instruction.
 - A callback with an expired or missing flow cookie shows a plain error page in the second tab and sends no message; the wizard tab recovers through Cancel, closing the tab, or the ten-minute cap.
+
+## Managers who also play (spec-042, #296)
+
+- Not verified in a browser or with real Discord/Supabase; component and pipeline tests only.
+- Members are matched by email only. A person who uses a different email on a second invite but the same Discord account is still refused with `discord_already_linked`; matching by Discord was deliberately not added.
+- `upsertMemberRecord` overwrites `members.school_id`, so a person who uses an invite from a second school is moved to it (existing behaviour, now reachable for managers who play).
+- The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).

@@ -273,6 +273,8 @@ export default function PlayerOnboardingWizard({
           password: isManager ? draft.password : undefined,
           graduationYear: draft.graduationYear,
           academicYear: isManager ? draft.academicYear : undefined,
+          alsoPlays: isManager ? draft.alsoPlays : undefined,
+          playGameIds: isManager && draft.alsoPlays ? draft.playGameIds : undefined,
           riotId: draft.riotId.trim(),
           birthDate: draft.birthDate,
           gender: draft.gender || undefined,
@@ -322,6 +324,7 @@ export default function PlayerOnboardingWizard({
     return (
       <SuccessStep
         isManager={isManager}
+        alsoPlays={isManager && draft.alsoPlays}
         legalFirstName={draft.legalFirstName}
         legalLastName={draft.legalLastName}
         email={draft.email}
@@ -414,6 +417,11 @@ export default function PlayerOnboardingWizard({
             setGraduationYear={draft.setGraduationYear}
             academicYear={draft.academicYear}
             setAcademicYear={draft.setAcademicYear}
+            alsoPlays={draft.alsoPlays}
+            setAlsoPlays={draft.setAlsoPlays}
+            playableGames={inviteData.playableGames}
+            playGameIds={draft.playGameIds}
+            setPlayGameIds={draft.setPlayGameIds}
             isManager={isManager}
           />
         )}
@@ -437,7 +445,7 @@ export default function PlayerOnboardingWizard({
             setIgnConfirmed={draft.setIgnConfirmed}
             isRiotIdValid={draft.isRiotIdValid}
             trackerUrl={draft.trackerUrl}
-            isManager={isManager}
+            isManager={isManager && !draft.alsoPlays}
             gameName={inviteData.gameName}
           />
         )}
