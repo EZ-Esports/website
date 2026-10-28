@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Button } from 'react-aria-components';
 import { HiOutlineClipboardDocument, HiOutlineTrash } from 'react-icons/hi2';
 import type { SchoolInviteItem } from '@/app/lib/onboarding/portal-actions';
@@ -15,6 +16,8 @@ interface InvitesHistoryTableProps {
   copiedId?: string | null;
   /** Shown when the clipboard refused the write, so the manager can copy the link by hand. */
   manualLink?: { inviteId: string; url: string } | null;
+  /** Polite live-region text for the outcome of a copy ("Link copied", "Copy failed..."). */
+  announcement?: string;
 }
 
 export function InvitesHistoryTable({
@@ -24,9 +27,21 @@ export function InvitesHistoryTable({
   viewOnlyGameIds = [],
   copiedId = null,
   manualLink = null,
+  announcement = '',
 }: InvitesHistoryTableProps) {
+  // The fallback field takes focus as it appears so a keyboard or screen-reader user lands on the
+  // link they now have to copy by hand.
+  const manualInputRef = useRef<HTMLInputElement>(null);
+  const manualUrl = manualLink?.url;
+  useEffect(() => {
+    if (manualUrl) manualInputRef.current?.focus();
+  }, [manualUrl]);
+
   return (
     <div data-tour="invite-history" className="space-y-4 pt-4 border-t border-zinc-800">
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2 className="text-lg font-bold text-white">Issued Player Invitations</h2>
         <span className="text-xs text-zinc-500">{invites.length} Total Invites</span>
@@ -108,12 +123,14 @@ export function InvitesHistoryTable({
                         </Button>
                       </div>
                     ) : (
-                      <span className="text-zinc-600" aria-label="No actions available">
-                        &mdash;
+                      <span className="text-zinc-600">
+                        <span aria-hidden="true">&mdash;</span>
+                        <span className="sr-only">No actions available</span>
                       </span>
                     )}
                     {manualLink?.inviteId === inv.id && (
                       <input
+                        ref={manualInputRef}
                         readOnly
                         value={manualLink.url}
                         aria-label="New invite link, copy manually"

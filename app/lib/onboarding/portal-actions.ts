@@ -15,6 +15,7 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
+import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } from './invite-expiry';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
@@ -122,11 +123,15 @@ export async function createPlayerInvite(
     throw new Error('Student first and last names are required');
   }
 
+  if (expiresInDays !== undefined && !isInviteExpiryDays(expiresInDays)) {
+    throw new Error(`Invite duration must be one of ${INVITE_EXPIRY_DAYS.join(', ')} days`);
+  }
+
   // Mutation: refused on an inactive (view-only) season by default (spec-028).
   const context = await assertManagerForSchool(schoolId, gameId);
 
   const { token, tokenHash } = await generateInviteToken();
-  const days = expiresInDays && expiresInDays > 0 ? expiresInDays : 7;
+  const days = expiresInDays ?? DEFAULT_INVITE_EXPIRY_DAYS;
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
   const [inserted] = await db
@@ -237,12 +242,27 @@ export async function getSchoolInvites(
 const INVITE_NOT_PENDING_ERROR = 'Only pending invites can be changed. This invite has already been submitted or reviewed.';
 
 /**
+ * An expected refusal, returned (not thrown) because Next redacts thrown messages in production.
+ * `status` is the invite's current state when it still exists and `null` when it is gone, so the
+ * portal can correct its stale row.
+ */
+export interface InviteActionRejection {
+  success: false;
+  error: string;
+  status: string | null;
+}
+
+function inviteRejection(error: string, status: string | null): InviteActionRejection {
+  return { success: false, error, status };
+}
+
+/**
  * Loads an invite and authorizes the caller as a manager of its school and game (mutation guard:
  * refuses an inactive season, spec-028). The invite's own school and game are authoritative, never
  * values supplied by the client, so an id from another school is refused as Forbidden.
  */
 async function authorizeInviteMutation(inviteId: string) {
-  if (!inviteId) throw new Error('inviteId is required');
+  if (!inviteId) return inviteRejection('inviteId is required', null);
   const [invite] = await db
     .select({
       id: schema.playerInvites.id,
@@ -253,13 +273,33 @@ async function authorizeInviteMutation(inviteId: string) {
     .from(schema.playerInvites)
     .where(eq(schema.playerInvites.id, inviteId))
     .limit(1);
-  if (!invite) throw new Error('Invite not found');
-  await assertManagerForSchool(invite.schoolId, invite.gameId);
-  if (invite.status !== 'pending') throw new Error(INVITE_NOT_PENDING_ERROR);
+  if (!invite) return inviteRejection('Invite not found. It may have been deleted already.', null);
+  try {
+    await assertManagerForSchool(invite.schoolId, invite.gameId);
+  } catch (err) {
+    // Authorization refusals are expected outcomes; the status is withheld from a caller who may
+    // not act on this invite at all.
+    return inviteRejection(err instanceof Error ? err.message : 'Not authorized', 'forbidden');
+  }
+  if (invite.status !== 'pending') return inviteRejection(INVITE_NOT_PENDING_ERROR, invite.status);
   return invite;
 }
 
-export interface RegeneratePlayerInviteLinkResult {
+/** Re-reads the status after a conditional write matched nothing (a concurrent change won). */
+async function rejectLostRace(inviteId: string): Promise<InviteActionRejection> {
+  const [current] = await db
+    .select({ status: schema.playerInvites.status })
+    .from(schema.playerInvites)
+    .where(eq(schema.playerInvites.id, inviteId))
+    .limit(1);
+  return inviteRejection(
+    current ? INVITE_NOT_PENDING_ERROR : 'Invite not found. It may have been deleted already.',
+    current?.status ?? null
+  );
+}
+
+export interface RegeneratePlayerInviteLinkSuccess {
+  success: true;
   inviteId: string;
   inviteUrl: string;
   expiresAt: Date;
@@ -268,17 +308,19 @@ export interface RegeneratePlayerInviteLinkResult {
 /**
  * Issues a fresh link for a pending invite. Only the token hash is stored, so the original link
  * cannot be recovered; instead the old token is replaced (and so stops working) and the new one is
- * returned once for the caller to copy. The update is conditional on the invite still being
- * pending, so a concurrent submission cannot be clobbered. Invites are read uncached, so no cache
- * tag is involved.
+ * returned once for the caller to copy. The new link lives the maximum allowed time
+ * (DEFAULT_INVITE_EXPIRY_DAYS), which also renews an invite whose time had run out. The update is
+ * conditional on the invite still being pending, so a concurrent submission cannot be clobbered.
+ * Invites are read uncached, so no cache tag is involved.
  */
 export async function regeneratePlayerInviteLink(
   inviteId: string
-): Promise<RegeneratePlayerInviteLinkResult> {
+): Promise<RegeneratePlayerInviteLinkSuccess | InviteActionRejection> {
   const invite = await authorizeInviteMutation(inviteId);
+  if ('success' in invite) return invite;
 
   const { token, tokenHash } = await generateInviteToken();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + DEFAULT_INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
   const [updated] = await db
     .update(schema.playerInvites)
@@ -291,7 +333,7 @@ export async function regeneratePlayerInviteLink(
       )
     )
     .returning({ id: schema.playerInvites.id });
-  if (!updated) throw new Error(INVITE_NOT_PENDING_ERROR);
+  if (!updated) return rejectLostRace(invite.id);
 
   const [school] = await db
     .select({ slug: schema.schools.slug })
@@ -305,6 +347,7 @@ export async function regeneratePlayerInviteLink(
     .limit(1);
 
   return {
+    success: true,
     inviteId: invite.id,
     inviteUrl: `/join/${school?.slug ?? invite.schoolId}/${game?.slug ?? invite.gameId}?token=${token}`,
     expiresAt,
@@ -316,8 +359,11 @@ export async function regeneratePlayerInviteLink(
  * are kept: they are the audit trail of a student's onboarding. Conditional on the pending status
  * so a submission that lands first wins.
  */
-export async function deletePlayerInvite(inviteId: string): Promise<{ success: true; inviteId: string }> {
+export async function deletePlayerInvite(
+  inviteId: string
+): Promise<{ success: true; inviteId: string } | InviteActionRejection> {
   const invite = await authorizeInviteMutation(inviteId);
+  if ('success' in invite) return invite;
 
   const deleted = await db
     .delete(schema.playerInvites)
@@ -329,7 +375,7 @@ export async function deletePlayerInvite(inviteId: string): Promise<{ success: t
       )
     )
     .returning({ id: schema.playerInvites.id });
-  if (deleted.length === 0) throw new Error(INVITE_NOT_PENDING_ERROR);
+  if (deleted.length === 0) return rejectLostRace(invite.id);
 
   return { success: true, inviteId: invite.id };
 }
