@@ -417,7 +417,7 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                       .filter(Boolean)
                       .join(' · ') || 'No further details'}
                   </p>
-                  {p.contentFlag && <ContentFlagBadge flag={p.contentFlag} who={p.name} />}
+                  {p.contentFlags?.map((flag) => <ContentFlagBadge key={flag.id} flag={flag} who={p.name} />)}
                 </>
               )}
             </li>

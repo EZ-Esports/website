@@ -1078,7 +1078,7 @@ export const onboardingContentFlags = pgTable('onboarding_content_flags', {
   // Stamped by the server at submission.
   createdAt: timestamp('created_at').defaultNow().notNull(),
   reviewedAt: timestamp('reviewed_at'),
-  // Staff user id of whoever marked it reviewed.
+  // Email (falling back to the user id) of the staff member who marked it reviewed.
   reviewedBy: text('reviewed_by'),
 }, (t) => [
   uniqueIndex('onboarding_content_flags_invite_idx').on(t.inviteKind, t.inviteId),

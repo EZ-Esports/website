@@ -12,7 +12,7 @@ import { chip, deleteIconBtn } from '../styles';
 interface ActiveManagersTabProps {
   managers: ManagerItem[];
   /** Onboarding content-flag overrides by member id; empty when none or not migrated yet. */
-  contentFlags?: Record<string, ContentFlagView>;
+  contentFlags?: Record<string, ContentFlagView[]>;
   loading: boolean;
   isRemovingId: string | null;
   onRemoveManager: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -102,9 +102,10 @@ export function ActiveManagersTab({
                       ))
                     )}
                   </div>
-                  {m.memberId && contentFlags[m.memberId] && (
-                    <ContentFlagBadge flag={contentFlags[m.memberId]} who={displayName || displayEmail} />
-                  )}
+                  {m.memberId &&
+                    (contentFlags[m.memberId] ?? []).map((flag) => (
+                      <ContentFlagBadge key={flag.id} flag={flag} who={displayName || displayEmail} />
+                    ))}
                 </div>
 
                 <button

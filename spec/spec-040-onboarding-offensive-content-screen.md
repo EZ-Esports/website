@@ -10,7 +10,7 @@
 
 1. **Detector** (`app/lib/profanity/`): dependency-free `checkProfanity(text)` returning `{ flagged, matches: [{ term, language }] }`. Word lists are data in `terms.ts` (English, Spanish, French, German, Portuguese, Italian, Dutch, romanized Russian, Chinese pinyin, Japanese romaji, Korean romanization, Arabic and Hindi transliterations, plus a few native-script terms for Russian Cyrillic, Chinese, Japanese, Korean, Arabic, Hindi); the rules are in `detect.ts`.
 2. **Screen** (`app/lib/onboarding/content-check.ts`): which fields are screened, the server and client share it.
-3. **Wizard**: every screened field shows an inline warning and a checkbox, "This is actually my real information", under the field; Continue is blocked until the value changes or the box is ticked.
+3. **Wizard**: every screened field shows an inline warning and a checkbox, "This is actually my real information", under the field; Continue is blocked until the value changes or the box is ticked. The notice sits in an always-mounted `role="status"` polite live region and uses the shared tokens (`danger`/`danger-on-tint`, `warning`) that carry AA contrast in both the dark and `.theme-light` palettes.
 4. **Server**: the submission pipeline recomputes what is flagged and rejects with `content_flagged` (and the field keys) unless each flagged field is in `contentOverrides`. Overrides are persisted to `onboarding_content_flags`.
 5. **Staff**: a "Flagged info - overridden" badge on the player's row in the Schools & Rosters view and on managers in the School Managers dialog, with the fields, the values, the matched terms and a "Mark reviewed" button; a header chip on the roster page counts unreviewed ones.
 6. **Rules and acknowledgement**: rules page 3.4 "Names, Usernames & Submitted Information" (`#submitted-information`); the Step 4 Code of Conduct checkbox now names the prohibition and links Rule 3.4.
@@ -33,7 +33,9 @@ The Discord username is not a field the person types: it comes from Discord via 
 
 - Per field, per value. The client keeps `field -> value-at-the-time`; editing the value (even to another flagged one) clears the override. The submission sends `contentOverrides: string[]` of field keys.
 - The server never trusts the client's idea of what is flagged: it recomputes, honors an override only for a field that is currently flagged, ignores unknown keys, and rejects the rest. A rejection returns `{ success: false, code: 'content_flagged', error, fields }`; the wizard jumps to the earliest step holding a flagged field (`stepForRejection(code, fields)`), and a flagged Discord username does not clear the Discord connection. The check runs before any write.
-- Drafts do not store overrides (they live in wizard memory only).
+- **Drafts store the overrides map** (`contentOverrides: { field: value }`), so an override survives the Discord OAuth round trip (the Discord username override in particular). On restore the map is parsed defensively (`parseSavedOverrides`: known fields, bounded strings; the server also parses it when saving a draft) and an entry counts only while the field still holds exactly that value. The submit-time `contentOverrides` list is still re-validated by the server and a draft is never trusted as an override. (Guardian fields are not restored from drafts, so their overrides are simply asked for again.)
+- **Length limits, server-side:** each screened field has a maximum (`CONTENT_FIELDS[...].max`: names 100, Riot ID 60, country/language/relationship 100, participant/guardian name/signature 200, staff note 1000). A longer value is rejected before any write with `field_too_long` and the field keys (the wizard jumps to that step). The scan itself examines at most 1000 characters (`MAX_CHECK_LENGTH`) and `findFlaggedFields` truncates to the field maximum, so a huge paste cannot make it slow.
+- **Performance:** runs of one repeated character are cut to three in a single pass before matching, and input is bounded, so 100k-character hostile inputs (`aaaa...`, `s$s$...`, `f f f ...`, `a-a-...-k`) finish well under a second (tests assert < 1 s).
 
 ## Data (migration 0055)
 
@@ -52,7 +54,8 @@ Production may run this code before 0055 is applied. Every statement that touche
 
 ## Staff visibility
 
-- Players: `getSchoolRosterBlocks` attaches `contentFlag` to each `RosterViewPlayer`; `RosterCard` shows `ContentFlagBadge` (a `<details>` with the person's name, when, which invite kind, each field and value, the matched terms and languages, and "Mark reviewed"). Reviewed flags show a neutral chip with who and when. The roster page header shows "N players have flagged information to review".
+- A person can carry more than one record (for example a player and a manager invite), so `getContentFlagsByMember` returns every record per member, newest first; each gets its own badge and "Mark reviewed", and the header count covers anyone with any unreviewed record.
+- Players: `getSchoolRosterBlocks` attaches `contentFlags` to each `RosterViewPlayer`; `RosterCard` shows `ContentFlagBadge` (a `<details>` with the person's name, when, which invite kind, each field and value, the matched terms and languages, and "Mark reviewed"). Reviewed flags show a neutral chip with who and when. The roster page header shows "N players have flagged information to review".
 - Managers: `ActiveManagersTab` shows the same badge (flags fetched by `getManagerContentFlags`).
 - Permission: `reviewContentFlag` and `getManagerContentFlags` require MANAGE_ROSTERS or MANAGE_SCHOOLS (same as the pages that show them).
 - There is no filter control (only the badge and header count) and no cross-school queue.

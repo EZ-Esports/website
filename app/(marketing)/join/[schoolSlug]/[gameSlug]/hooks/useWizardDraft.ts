@@ -15,6 +15,7 @@ import {
   CONTENT_FLAGGED_MESSAGE,
   collectContentValues,
   findFlaggedFields,
+  parseSavedOverrides,
   type ContentFieldKey,
 } from '@/app/lib/onboarding/content-check';
 import {
@@ -150,7 +151,11 @@ export function useWizardDraft(
 
   // Offensive-content screen. An override is remembered together with the exact value it was given
   // for, so editing a flagged field afterwards asks again instead of carrying the override over.
-  const [overrides, setOverrides] = useState<Partial<Record<ContentFieldKey, string>>>({});
+  // The map is saved in the draft so it survives the Discord round trip; restored entries only count
+  // while the field still holds that exact value.
+  const [overrides, setOverrides] = useState<Partial<Record<ContentFieldKey, string>>>(() =>
+    parseSavedOverrides(initialDraft.contentOverrides)
+  );
   // Guardian fields are hidden for adults, so stale text in them must not block anyone.
   const consentForCheck = isMinor
     ? buildConsent()
@@ -231,6 +236,7 @@ export function useWizardDraft(
         feedback,
       },
       codeOfConductAccepted,
+      contentOverrides: overrides,
     };
   }
 

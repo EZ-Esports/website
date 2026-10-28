@@ -9,17 +9,17 @@ import { checkProfanity, type ProfanityMatch } from '@/app/lib/profanity/detect'
  * a field here, but it is shown to opponents and staff, so it follows the same override path.
  */
 export const CONTENT_FIELDS = {
-  legalFirstName: { label: 'legal first name', step: 1 },
-  legalLastName: { label: 'legal last name', step: 1 },
-  discordUsername: { label: 'Discord username', step: 2 },
-  riotId: { label: 'Riot ID', step: 3 },
-  countryOfBirth: { label: 'country of birth', step: 4 },
-  primaryLanguageAtHome: { label: 'primary language at home', step: 4 },
-  feedback: { label: 'notes for staff', step: 4 },
-  participantLegalName: { label: 'participant legal name', step: 5 },
-  guardianFullName: { label: 'guardian full name', step: 5 },
-  guardianRelationship: { label: 'guardian relationship', step: 5 },
-  guardianSignature: { label: 'signature', step: 5 },
+  legalFirstName: { label: 'legal first name', step: 1, max: 100 },
+  legalLastName: { label: 'legal last name', step: 1, max: 100 },
+  discordUsername: { label: 'Discord username', step: 2, max: 100 },
+  riotId: { label: 'Riot ID', step: 3, max: 60 },
+  countryOfBirth: { label: 'country of birth', step: 4, max: 100 },
+  primaryLanguageAtHome: { label: 'primary language at home', step: 4, max: 100 },
+  feedback: { label: 'notes for staff', step: 4, max: 1000 },
+  participantLegalName: { label: 'participant legal name', step: 5, max: 200 },
+  guardianFullName: { label: 'guardian full name', step: 5, max: 200 },
+  guardianRelationship: { label: 'guardian relationship', step: 5, max: 100 },
+  guardianSignature: { label: 'signature', step: 5, max: 200 },
 } as const;
 
 export type ContentFieldKey = keyof typeof CONTENT_FIELDS;
@@ -28,6 +28,22 @@ export const CONTENT_FIELD_KEYS = Object.keys(CONTENT_FIELDS) as ContentFieldKey
 
 export function isContentFieldKey(value: unknown): value is ContentFieldKey {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(CONTENT_FIELDS, value);
+}
+
+/**
+ * Reads a saved `field -> value` overrides map (from a draft) back into a safe shape: known fields
+ * only, string values within the field's length limit. It is only ever a convenience; an override
+ * counts again only while the field still holds exactly that value, and the server re-checks at submit.
+ */
+export function parseSavedOverrides(raw: unknown): Partial<Record<ContentFieldKey, string>> {
+  const out: Partial<Record<ContentFieldKey, string>> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (isContentFieldKey(key) && typeof value === 'string' && value.length <= CONTENT_FIELDS[key].max) {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 export type ContentFieldValues = Partial<Record<ContentFieldKey, string | null | undefined>>;
@@ -43,13 +59,25 @@ export interface FlaggedField {
 export const CONTENT_FLAGGED_MESSAGE =
   'Some of the information you entered looks like it may contain offensive language. Offensive names and usernames are not allowed. Fix the highlighted field, or if it is genuinely your information, tick "This is actually my real information". Staff will review it.';
 
+export const FIELD_TOO_LONG_MESSAGE =
+  'One of the fields you entered is too long. Please shorten the highlighted field and try again.';
+
+/** Screened fields whose trimmed value exceeds the field's maximum length. */
+export function findTooLongFields(values: ContentFieldValues): ContentFieldKey[] {
+  return CONTENT_FIELD_KEYS.filter((field) => {
+    const raw = values[field];
+    return typeof raw === 'string' && raw.trim().length > CONTENT_FIELDS[field].max;
+  });
+}
+
 /** Returns the screened fields whose value trips the profanity check, in a stable order. */
 export function findFlaggedFields(values: ContentFieldValues): FlaggedField[] {
   const flagged: FlaggedField[] = [];
   for (const field of CONTENT_FIELD_KEYS) {
     const raw = values[field];
     if (typeof raw !== 'string') continue;
-    const value = raw.trim();
+    // Bounded so a huge paste cannot make the scan slow; longer values are rejected separately.
+    const value = raw.trim().slice(0, CONTENT_FIELDS[field].max);
     if (!value) continue;
     const result = checkProfanity(value);
     if (result.flagged) {

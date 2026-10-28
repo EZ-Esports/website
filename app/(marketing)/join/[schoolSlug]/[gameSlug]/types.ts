@@ -20,7 +20,7 @@ export interface InviteData {
  * on step 2, and a flagged field on whichever step holds it.
  */
 export function stepForRejection(code: string, fields: readonly string[] = []): 1 | 2 | 3 | 4 | 5 {
-  if (code === 'content_flagged') return stepForContentFields(fields);
+  if (code === 'content_flagged' || code === 'field_too_long') return stepForContentFields(fields);
   return code === 'manager_password_required' ? 1 : 2;
 }
 
@@ -56,6 +56,8 @@ export interface WizardFormData {
     feedback: string;
   };
   codeOfConductAccepted: boolean;
+  /** Offensive-content overrides (field -> the value they were confirmed for); re-validated on restore and on the server. */
+  contentOverrides?: Partial<Record<ContentFieldKey, string>>;
 }
 
 /** Anticipated graduation years offered to everyone (students and managers), with grade for 2026-2027. */

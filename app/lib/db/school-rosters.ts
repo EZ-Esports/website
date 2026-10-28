@@ -83,7 +83,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
       discord: p.discord,
       graduationYear: p.graduationYear,
       role: p.role,
-      contentFlag: contentFlags.get(p.memberId),
+      contentFlags: contentFlags.get(p.memberId),
     });
     playersByRoster.set(p.rosterId, list);
   }
@@ -106,7 +106,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
  * Override records for the badge. Read apart from the roster queries and never allowed to fail the
  * page: if the table is not migrated yet, or the read errors, the rosters render without badges.
  */
-async function loadContentFlags(memberIds: string[]): Promise<Map<string, ContentFlagView>> {
+async function loadContentFlags(memberIds: string[]): Promise<Map<string, ContentFlagView[]>> {
   try {
     return await getContentFlagsByMember([...new Set(memberIds)]);
   } catch (error) {

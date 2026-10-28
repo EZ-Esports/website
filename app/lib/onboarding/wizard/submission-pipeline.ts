@@ -17,8 +17,10 @@ import { db } from '@/app/lib/db';
 import { insertContentFlag } from '@/app/lib/db/content-flags';
 import {
   CONTENT_FLAGGED_MESSAGE,
+  FIELD_TOO_LONG_MESSAGE,
   collectContentValues,
   evaluateContent,
+  findTooLongFields,
 } from '../content-check';
 import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
@@ -310,11 +312,16 @@ export async function processOnboardingSubmission(
   // Offensive-content screen. The server recomputes what is flagged from the submitted values and
   // honors an override only for a field that is flagged, so the browser cannot skip the check.
   // Nothing has been written yet, so a block here leaves no trace.
-  const contentCheck = evaluateContent(
+  const contentValues = collectContentValues(
     // The normalized consent, not the raw one: an adult's leftover guardian fields are dropped there.
-    collectContentValues({ ...submission, consent: validated.consent }, discord.discordUsername),
-    submission.contentOverrides
+    { ...submission, consent: validated.consent },
+    discord.discordUsername
   );
+  const tooLong = findTooLongFields(contentValues);
+  if (tooLong.length > 0) {
+    throw new OnboardingRejection('field_too_long', FIELD_TOO_LONG_MESSAGE, tooLong);
+  }
+  const contentCheck = evaluateContent(contentValues, submission.contentOverrides);
   if (contentCheck.blocked.length > 0) {
     throw new OnboardingRejection(
       'content_flagged',

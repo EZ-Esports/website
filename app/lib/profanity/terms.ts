@@ -32,7 +32,7 @@ export const TERM_LISTS: Record<string, TermList> = {
       'cocksuck', 'cockhead', 'pussy', 'bastard', 'bollock', 'wanker', 'whore', 'slutty', 'douchebag',
       'jerkoff', 'jackoff', 'cumshot', 'cumslut', 'blowjob', 'handjob', 'dildo', 'orgasm', 'jizz',
       'faggot', 'nigger', 'nigga', 'niglet', 'wetback', 'towelhead', 'raghead', 'sandnigger',
-      'retarded', 'vagina', 'pedophile', 'paedophile', 'hitler',
+      'retarded', 'vagina', 'pornhub', 'jewboy', 'sieg heil', 'azzhole', 'nigguh', 'niggah', 'pedophile', 'paedophile', 'hitler',
     ],
     word: [
       'ass', 'arse', 'dick', 'dicks', 'cock', 'cocks', 'cunt', 'cunts', 'cunty', 'twat', 'twats',
@@ -43,7 +43,8 @@ export const TERM_LISTS: Record<string, TermList> = {
       'kike', 'kikes', 'paki', 'honky', 'beaner', 'negro', 'nazi', 'nazis', 'pedo', 'pedos', 'kys', 'thot',
       'mofo', 'fck', 'fuk', 'fuq', 'fuc', 'shyt', 'sheit', 'shiz', 'bich', 'btch',
       'ass hole', 'jack ass', 'dumb ass', 'smart ass', 'fat ass', 'dick head', 'cock sucker', 'mother fucker',
-      'kill yourself',
+      'kill yourself', 'sht', 'dck', 'dik', 'fcuk', 'phuk', 'kunt', 'azz', 'nigg', 'hentai', 'boner', 'bellend', 'kkk',
+      'white power',
     ],
   },
   spanish: {

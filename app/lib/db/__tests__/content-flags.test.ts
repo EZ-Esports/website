@@ -113,17 +113,18 @@ describe('getContentFlagsByMember', () => {
     expect(dbMock.select).not.toHaveBeenCalled();
   });
 
-  it('maps rows by member, preferring an unreviewed record over a newer reviewed one', async () => {
+  it('keeps every record per member, newest first, so a player and a manager flag both show', async () => {
     selecting(
       Promise.resolve([
         row({ id: 'new-reviewed', reviewedAt: new Date('2026-10-29T00:00:00Z'), reviewedBy: 'staff@x.org' }),
-        row({ id: 'old-open', createdAt: new Date('2026-10-01T00:00:00Z') }),
+        row({ id: 'old-open', inviteKind: 'manager', createdAt: new Date('2026-10-01T00:00:00Z') }),
         row({ id: 'other', memberId: 'm2' }),
       ])
     );
     const map = await getContentFlagsByMember(['m1', 'm2']);
-    expect(map.get('m1')?.id).toBe('old-open');
-    expect(map.get('m2')?.createdAt).toBe('2026-10-28T12:00:00.000Z');
+    expect(map.get('m1')?.map((f) => f.id)).toEqual(['new-reviewed', 'old-open']);
+    expect(map.get('m1')?.map((f) => f.inviteKind)).toEqual(['player', 'manager']);
+    expect(map.get('m2')?.[0].createdAt).toBe('2026-10-28T12:00:00.000Z');
   });
 
   it('returns nothing, and does not throw, when the table is missing', async () => {

@@ -33,19 +33,21 @@ export interface ProfanityResult {
 /** Characters a letter may be disguised as. Letters not listed match only themselves. */
 const LOOKALIKES: Record<string, string> = {
   a: 'a4@',
-  c: 'c©¢',
+  c: 'c©¢(',
   e: 'e3€',
+  g: 'g9q',
   i: 'i1!|',
   l: 'l1|',
   o: 'o0',
   s: 's5$',
   t: 't7+',
-  u: 'uv',
+  u: 'uv@',
 };
 
 /** Symbols that stay inside a word instead of acting as separators, because they stand in for letters. */
-const WORD_SYMBOLS = '@$!*|+©¢€';
-const KEEP = `\\p{L}\\p{N}${WORD_SYMBOLS.replace(/[$|+*]/g, '\\$&')}`;
+const WORD_SYMBOLS = '@$!*|+©¢€(';
+const ESCAPED_SYMBOLS = WORD_SYMBOLS.replace(/[$|+*(]/g, '\\$&');
+const KEEP = `\\p{L}\\p{N}${ESCAPED_SYMBOLS}`;
 
 const INVISIBLE = /[­​-‏‪-‮⁠﻿]/g;
 
@@ -80,7 +82,7 @@ function mapScript(chunk: string): string {
 }
 
 // A run of three or more single characters split by separators ("f u c k", "f.u.c.k", "s_h_i_t") is one word.
-const UNIT = `[a-z0-9${WORD_SYMBOLS.replace(/[$|+*]/g, '\\$&')}]`;
+const UNIT = `[a-z0-9${ESCAPED_SYMBOLS}]`;
 const SPLIT_LETTERS = new RegExp(
   `(?<!${UNIT})${UNIT}(?:[\\s._\\-]+${UNIT}(?!${UNIT})){2,}`,
   'gu'
@@ -93,12 +95,24 @@ interface PreparedText {
   squashed: string;
 }
 
+/**
+ * Longest text examined. Callers cap every field well below this (see content-check.ts), so nothing
+ * a form accepts is skipped; the cap exists so a hostile 100k-character paste cannot make the
+ * pattern scan slow. Longer input is checked up to this length only.
+ */
+export const MAX_CHECK_LENGTH = 1000;
+
+/** Runs of one character longer than three are cut to three in one linear pass ("fuuuuuuck" -> "fuuuck"). */
+const LONG_RUN = /(.)\1{3,}/gsu;
+
 export function prepareText(raw: string): PreparedText {
   const folded = foldAccents(raw.replace(INVISIBLE, ''))
     .split(/(\s+)/)
     .map(mapScript)
     .join('');
-  const joined = folded.replace(SPLIT_LETTERS, (m) => m.replace(/[\s._\-]+/g, ''));
+  const joined = folded
+    .replace(SPLIT_LETTERS, (m) => m.replace(/[\s._\-]+/g, ''))
+    .replace(LONG_RUN, '$1$1$1');
   const strip = new RegExp(`[^${KEEP}]+`, 'gu');
   const spaced = joined.replace(strip, ' ').trim();
   const squashed = joined
@@ -183,7 +197,8 @@ function looksLikeText(matched: string): boolean {
 export function checkProfanity(text: string | null | undefined): ProfanityResult {
   if (!text || !text.trim()) return { flagged: false, matches: [] };
 
-  const prepared = prepareText(text);
+  const bounded = text.length > MAX_CHECK_LENGTH ? text.slice(0, MAX_CHECK_LENGTH) : text;
+  const prepared = prepareText(bounded);
   const spaced = prepared.spaced.replace(INNOCENT, ' ');
   const squashed = prepared.squashed.replace(INNOCENT, ' ');
 
@@ -214,7 +229,7 @@ export function checkProfanity(text: string | null | undefined): ProfanityResult
     }
   }
 
-  const nativeText = text.normalize('NFC').toLowerCase();
+  const nativeText = bounded.normalize('NFC').toLowerCase();
   for (const n of NATIVE_TERMS) {
     if (nativeText.includes(n.term)) add(n.term, n.language);
   }

@@ -7,6 +7,7 @@ import {
   updateInviteDraft,
 } from '@/app/lib/db/onboarding';
 import type { ConsentSubmission } from './consent';
+import { parseSavedOverrides } from './content-check';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
 import { OnboardingRejection, type OnboardingRejectionCode } from './rejection';
@@ -172,7 +173,10 @@ function sanitizeDraftData(
   if (!draft || typeof draft !== 'object') return null;
   const sanitized: Record<string, any> = {};
   for (const [key, value] of Object.entries(draft)) {
-    if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
+    if (key === 'contentOverrides') {
+      // Only known fields with bounded string values are kept; never trusted as an override at submit.
+      sanitized[key] = parseSavedOverrides(value);
+    } else if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
       sanitized[key] = value;
     }
   }

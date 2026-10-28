@@ -99,6 +99,43 @@ describe('useWizardDraft content screen', () => {
     expect(result.current.contentFlags.state('legalFirstName').flagged).toBe(false);
   });
 
+  it('saves overrides in the draft and restores them only for the value they were given for', () => {
+    const first = setup();
+    act(() => first.result.current.setLegalFirstName('Fuckface'));
+    act(() => first.result.current.contentFlags.setOverride('legalFirstName', true));
+    const saved = first.result.current.buildCurrentPayload();
+    expect(saved.contentOverrides).toEqual({ legalFirstName: 'Fuckface' });
+
+    // Returning from Discord with the same draft: still overridden.
+    const restored = renderHook(() =>
+      useWizardDraft('t', { ...invite(), submissionDraft: JSON.parse(JSON.stringify(saved)) }, {})
+    );
+    expect(restored.result.current.contentFlags.state('legalFirstName')).toEqual({ flagged: true, overridden: true });
+    expect(restored.result.current.contentOverrideKeys()).toEqual(['legalFirstName']);
+
+    // A draft whose name changed since (or hand-edited junk) does not carry the override over.
+    const stale = renderHook(() =>
+      useWizardDraft(
+        't',
+        {
+          ...invite(),
+          submissionDraft: { legalFirstName: 'Shithead', contentOverrides: { legalFirstName: 'Fuckface', bogus: 'x', riotId: 5 } },
+        },
+        {}
+      )
+    );
+    expect(stale.result.current.contentFlags.state('legalFirstName')).toEqual({ flagged: true, overridden: false });
+    expect(stale.result.current.contentOverrideKeys()).toEqual([]);
+  });
+
+  it('restores a Discord username override after the OAuth round trip', () => {
+    const draft = { contentOverrides: { discordUsername: 'xX_fuckboy_Xx' } };
+    const { result } = renderHook(() =>
+      useWizardDraft('t', { ...invite(), submissionDraft: draft }, { discordVerified: true, discordUsername: 'xX_fuckboy_Xx' })
+    );
+    expect(result.current.contentFlags.state('discordUsername')).toEqual({ flagged: true, overridden: true });
+  });
+
   it('screens the Riot ID on step 3 and the free text on step 4', () => {
     const { result } = setup();
     act(() => {

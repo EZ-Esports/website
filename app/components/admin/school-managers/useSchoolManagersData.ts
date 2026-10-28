@@ -17,7 +17,7 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
   const [managers, setManagers] = useState<ManagerItem[]>([]);
   const [invites, setInvites] = useState<ManagerInviteItem[]>([]);
   const [registeredManagers, setRegisteredManagers] = useState<RegisteredManagerAccount[]>([]);
-  const [contentFlags, setContentFlags] = useState<Record<string, ContentFlagView>>({});
+  const [contentFlags, setContentFlags] = useState<Record<string, ContentFlagView[]>>({});
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isRemovingId, setIsRemovingId] = useState<string | null>(null);

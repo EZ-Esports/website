@@ -1518,6 +1518,18 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1').status).toBe('pending');
     });
 
+    it('rejects an oversized free-text value outright, quickly, and writes nothing', async () => {
+      const start = performance.now();
+      const result = await submitRaw({
+        ...baseSubmission(),
+        surveyDetails: { feedback: 'a'.repeat(100_000) },
+        legalLastName: 'f '.repeat(50_000),
+      });
+      expect(performance.now() - start).toBeLessThan(1000);
+      expect(result).toMatchObject({ success: false, code: 'field_too_long', fields: ['legalLastName', 'feedback'] });
+      expect(mocks.state.membersStore).toHaveLength(0);
+    });
+
     it('lists every flagged field, across the free-text fields', async () => {
       const result = await submitRaw({
         ...baseSubmission(),

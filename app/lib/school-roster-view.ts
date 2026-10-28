@@ -19,8 +19,8 @@ export interface RosterViewPlayer {
   discord: string | null;
   graduationYear: number | null;
   role: 'captain' | 'player' | 'coach' | 'sub';
-  /** Onboarding offensive-content override awaiting (or past) staff review; absent when none or when its table is not migrated yet. */
-  contentFlag?: ContentFlagView;
+  /** Every onboarding offensive-content override for this person (a player and a manager record can both exist), newest first; absent when none or when its table is not migrated yet. */
+  contentFlags?: ContentFlagView[];
 }
 
 export interface RosterViewRoster {
@@ -84,7 +84,7 @@ export function countUnreviewedContentFlags(blocks: SeasonBlock[]): number {
   for (const block of blocks) {
     for (const roster of block.rosters) {
       for (const p of roster.players) {
-        if (p.contentFlag && !p.contentFlag.reviewedAt) seen.add(p.memberId);
+        if (p.contentFlags?.some((f) => !f.reviewedAt)) seen.add(p.memberId);
       }
     }
   }

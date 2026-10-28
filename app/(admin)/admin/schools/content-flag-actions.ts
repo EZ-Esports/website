@@ -20,8 +20,8 @@ async function requireFlagReviewer() {
   );
 }
 
-/** Override records for these members (school managers), keyed by member id. */
-export async function getManagerContentFlags(memberIds: string[]): Promise<Record<string, ContentFlagView>> {
+/** Every override record for these members (school managers), newest first, keyed by member id. */
+export async function getManagerContentFlags(memberIds: string[]): Promise<Record<string, ContentFlagView[]>> {
   if (!(await requireFlagReviewer())) return {};
   const ids = (Array.isArray(memberIds) ? memberIds : []).filter((id) => typeof id === 'string' && UUID.test(id));
   try {

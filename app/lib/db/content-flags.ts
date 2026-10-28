@@ -103,11 +103,11 @@ function toView(row: typeof schema.onboardingContentFlags.$inferSelect): Content
 }
 
 /**
- * Override records for these members, newest first per member. Always a separate query from the
+ * Every override record for these members, newest first per member. Always a separate query from the
  * roster read, so a missing table leaves the roster intact and only drops the badge.
  */
-export async function getContentFlagsByMember(memberIds: string[]): Promise<Map<string, ContentFlagView>> {
-  const out = new Map<string, ContentFlagView>();
+export async function getContentFlagsByMember(memberIds: string[]): Promise<Map<string, ContentFlagView[]>> {
+  const out = new Map<string, ContentFlagView[]>();
   if (memberIds.length === 0) return out;
   try {
     const rows = await db
@@ -115,10 +115,12 @@ export async function getContentFlagsByMember(memberIds: string[]): Promise<Map<
       .from(schema.onboardingContentFlags)
       .where(inArray(schema.onboardingContentFlags.memberId, memberIds))
       .orderBy(desc(schema.onboardingContentFlags.createdAt));
+    // Rows are newest first and every one is kept: the same person can carry a player and a manager
+    // record, and each needs its own review.
     for (const row of rows) {
-      // Rows are newest first; keep the newest unreviewed one if any, else the newest.
-      const existing = out.get(row.memberId);
-      if (!existing || (existing.reviewedAt && !row.reviewedAt)) out.set(row.memberId, toView(row));
+      const list = out.get(row.memberId) ?? [];
+      list.push(toView(row));
+      out.set(row.memberId, list);
     }
   } catch (err) {
     if (!isMissingContentFlagsError(err)) throw err;

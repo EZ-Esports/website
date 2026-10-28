@@ -171,7 +171,7 @@ export function ConsentStep({
                 </label>
                 <input
                   id="consent-guardian-name"
-                {...contentFieldProps('guardianFullName', contentFlags)}
+                  {...contentFieldProps('guardianFullName', contentFlags)}
                   type="text"
                   autoComplete="off"
                   value={guardianFullName}
@@ -179,7 +179,7 @@ export function ConsentStep({
                   className={inputClass}
                   required
                 />
-              <ContentFlagNotice field="guardianFullName" controls={contentFlags} />
+                <ContentFlagNotice field="guardianFullName" controls={contentFlags} />
               </div>
               <div>
                 <label htmlFor="consent-guardian-relationship" className={labelClass}>
@@ -188,7 +188,7 @@ export function ConsentStep({
                 </label>
                 <input
                   id="consent-guardian-relationship"
-                {...contentFieldProps('guardianRelationship', contentFlags)}
+                  {...contentFieldProps('guardianRelationship', contentFlags)}
                   type="text"
                   autoComplete="off"
                   value={guardianRelationship}
@@ -196,7 +196,7 @@ export function ConsentStep({
                   className={inputClass}
                   required
                 />
-              <ContentFlagNotice field="guardianRelationship" controls={contentFlags} />
+                <ContentFlagNotice field="guardianRelationship" controls={contentFlags} />
               </div>
             </div>
             <div>
@@ -235,7 +235,7 @@ export function ConsentStep({
                 </label>
                 <input
                   id="consent-guardian-signature"
-                {...contentFieldProps('guardianSignature', contentFlags)}
+                  {...contentFieldProps('guardianSignature', contentFlags)}
                   type="text"
                   autoComplete="off"
                   value={guardianSignature}
@@ -243,7 +243,7 @@ export function ConsentStep({
                   className={inputClass}
                   required
                 />
-              <ContentFlagNotice field="guardianSignature" controls={contentFlags} />
+                <ContentFlagNotice field="guardianSignature" controls={contentFlags} />
               </div>
               <div>
                 <label htmlFor="consent-date" className={labelClass}>

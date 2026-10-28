@@ -4,6 +4,8 @@ import {
   collectContentValues,
   evaluateContent,
   findFlaggedFields,
+  findTooLongFields,
+  parseSavedOverrides,
   stepForContentFields,
 } from '../content-check';
 import { stepForRejection } from '@/app/(marketing)/join/[schoolSlug]/[gameSlug]/types';
@@ -25,6 +27,23 @@ describe('findFlaggedFields', () => {
   it('keeps fields in a stable order regardless of input order', () => {
     const flagged = findFlaggedFields({ feedback: 'shit', legalFirstName: 'bitch' });
     expect(flagged.map((f) => f.field)).toEqual(['legalFirstName', 'feedback']);
+  });
+});
+
+describe('length limits', () => {
+  it('flags values over a field limit and does not scan more than the limit', () => {
+    const huge = 'a'.repeat(100_000);
+    expect(findTooLongFields({ legalFirstName: huge, riotId: 'ok#NA1' })).toEqual(['legalFirstName']);
+    expect(findTooLongFields({ feedback: 'x'.repeat(1000) })).toEqual([]);
+    const start = performance.now();
+    findFlaggedFields({ legalFirstName: huge, feedback: 's$'.repeat(50_000), riotId: 'f '.repeat(50_000) });
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  it('parses saved overrides defensively', () => {
+    expect(parseSavedOverrides({ riotId: 'x', bogus: 'y', feedback: 7, legalFirstName: 'a'.repeat(500) })).toEqual({ riotId: 'x' });
+    expect(parseSavedOverrides(null)).toEqual({});
+    expect(parseSavedOverrides(['riotId'])).toEqual({});
   });
 });
 
@@ -93,6 +112,7 @@ describe('step mapping', () => {
 
   it('sends a content_flagged rejection to that step and leaves the other codes alone', () => {
     expect(stepForRejection('content_flagged', ['countryOfBirth'])).toBe(4);
+    expect(stepForRejection('field_too_long', ['feedback'])).toBe(4);
     expect(stepForRejection('manager_password_required')).toBe(1);
     expect(stepForRejection('discord_required')).toBe(2);
   });

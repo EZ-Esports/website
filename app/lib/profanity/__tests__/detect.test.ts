@@ -62,6 +62,47 @@ describe('profanity detection: evasion', () => {
   });
 });
 
+describe('profanity detection: misses found in review', () => {
+  it.each([
+    'sht', 'dck', 'dik', 'fcuk', 'phuk', 'kunt', 'f@ck', 'fu(k', 'azzhole', 'ni99er', 'nigguh', 'niqqa', 'nigg',
+    'pornhub', 'hentai', 'boner', 'bellend', 'jewboy', 'kkk', 'sieg heil', 'white power', 'Sieg Heil!', 'xX_kkk_Xx',
+  ])('flags %s', (word) => {
+    expect(flagged(word)).toBe(true);
+  });
+
+  it('keeps the short ones whole-word so ordinary words stay clear', () => {
+    for (const ok of ['Class', 'Grass', 'Bass', 'Pass', 'Mass', 'Glass', 'Brass', 'Shtetl', 'Dickson', 'Hancock', 'Cockburn',
+      'Assad', 'Essex', 'Scunthorpe', 'Kuntz', 'Diklan', 'Boneri', 'Whitepowell', 'Niggli', 'Skkkip']) {
+      expect(flagged(ok), ok).toBe(false);
+    }
+  });
+});
+
+describe('profanity detection: performance on hostile input', () => {
+  const inputs: Record<string, string> = {
+    'a x100k': 'a'.repeat(100_000),
+    's x100k': 's'.repeat(100_000),
+    'ss!': 's'.repeat(99_999) + '!',
+    's$ pairs': 's$'.repeat(50_000),
+    'f spaced': 'f '.repeat(50_000),
+    'a-...k': 'a-'.repeat(49_999) + 'k',
+    'a-z spaced letters': 'a b '.repeat(25_000),
+    'fu x100k': 'fu'.repeat(50_000),
+    'dots': '.'.repeat(100_000),
+    'mixed leet': '5$@4!1'.repeat(16_000),
+  };
+
+  it.each(Object.entries(inputs))('finishes quickly on %s', (_name, text) => {
+    const start = performance.now();
+    checkProfanity(text);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  it('still catches profanity at the start of an oversized value', () => {
+    expect(flagged('fuck' + 'x'.repeat(100_000))).toBe(true);
+  });
+});
+
 describe('profanity detection: other languages', () => {
   it.each([
     ['mierda', 'spanish'],
