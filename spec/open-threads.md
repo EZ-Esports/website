@@ -199,7 +199,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - `window.close()` from the finished tab only works for tabs the wizard opened; otherwise the person closes it from the on-screen instruction.
 - A callback with an expired or missing flow cookie shows a plain error page in the second tab and sends no message; the wizard tab recovers through Cancel, closing the tab, or the ten-minute cap.
 
-## Roster removal cleanup (spec-042, unmerged)
+## Roster removal cleanup (spec-042, merged in PR #305)
 
 - **Rehearsed on PGlite only.** The helper's SQL is exercised in memory (`roster-removal-pglite.test.ts`), including the FK-restrict race and a dropped optional table. `FOR UPDATE` and nested savepoints through the Supabase transaction pooler (port 6543) are not verified; nothing ran against any real database.
 - **Implicit removals not covered.** Deleting a game or season cascades teams, rosters and players without the app reading them, so their members are not cleaned and `notifyRosterMembershipChanged` is not called; deleting a school is a soft delete and leaves members. Orphans left by those paths (and any created before spec-042) can be swept by the spec-036 purge script; a generic sweep job was not built. The spec-034 move keeps the `players` row, so it needs no cleanup. Staff roster delete does run the cleanup (it is already refused when the roster has matches).
