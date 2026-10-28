@@ -157,6 +157,11 @@ describe('canRequestReschedule', () => {
     expect(canRequestReschedule({ ...base, reschedule: request('declined_requester') }, NOW)).toBe(true);
     expect(canRequestReschedule({ ...base, reschedule: request('cancelled') }, NOW)).toBe(true);
   });
+
+  it('refuses a match that an approved request has already moved, whichever school asked', () => {
+    expect(canRequestReschedule({ ...base, reschedule: request('approved'), rescheduledFrom: at(24 * 4).toISOString() }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, rescheduledFrom: at(24 * 4).toISOString() }, NOW)).toBe(false);
+  });
 });
 
 describe('per-season reschedule allowance', () => {

@@ -105,13 +105,14 @@ export function toSchoolMatchItem(
 
 /**
  * Whether the portal offers "Request reschedule" on this match: it must still be scheduled and
- * not started, be between two different schools, have no open request, and the school must not
- * have used its reschedule allowance for the season. Season view-only
- * state is the caller's to apply (it is per game); the server re-checks everything regardless.
+ * not started, be between two different schools, have no open request, the match must not
+ * already have been moved by an approved request, and the school must not have used its
+ * reschedule allowance for the season. Season view-only state is the caller's to apply (it is
+ * per game); the server re-checks everything regardless.
  */
 export function canRequestReschedule(
   item: Pick<SchoolMatchItem, 'status' | 'scheduledAt' | 'sameSchool' | 'reschedule'> &
-    Partial<Pick<SchoolMatchItem, 'rescheduleAllowanceUsed'>>,
+    Partial<Pick<SchoolMatchItem, 'rescheduleAllowanceUsed' | 'rescheduledFrom'>>,
   now: Date
 ): boolean {
   return (
@@ -119,6 +120,7 @@ export function canRequestReschedule(
     new Date(item.scheduledAt).getTime() > now.getTime() &&
     !item.sameSchool &&
     !(item.reschedule && isOpenStatus(item.reschedule.status)) &&
+    !item.rescheduledFrom &&
     !item.rescheduleAllowanceUsed
   );
 }
