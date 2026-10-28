@@ -94,3 +94,24 @@ export function parseScoreInput(raw: string): number | null {
   if (trimmed === '') return null;
   return /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : Number.NaN;
 }
+
+/**
+ * For a day's already-ordered rows: where each division block starts and how many of its rows are
+ * loaded. Empty when the day holds one division, so a single-division day gets no sub-labels.
+ * A block may continue on the next page; the count is of the rows loaded so far.
+ */
+export function divisionBlockStarts<T extends { id: string; division: string }>(
+  items: T[]
+): Map<string, { division: string; count: number }> {
+  const starts = new Map<string, { division: string; count: number }>();
+  if (new Set(items.map((i) => i.division)).size < 2) return starts;
+  let current: { division: string; count: number } | null = null;
+  for (const item of items) {
+    if (!current || current.division !== item.division) {
+      current = { division: item.division, count: 0 };
+      starts.set(item.id, current);
+    }
+    current.count++;
+  }
+  return starts;
+}

@@ -201,14 +201,18 @@ export function isDerivedStandings(rows: { notes: string | null }[]): boolean {
   return rows.length > 0 && rows.every((row) => isReconstructed(row.notes));
 }
 
+/** Order of the division blocks under a date: Varsity, then JV, then All. */
+export const DIVISION_RANK: Record<CanonicalDivision, number> = { Varsity: 0, JV: 1, All: 2 };
+
 /**
  * Keyset cursor: the sort key of the last row already delivered.
  *
- * The list is ordered by (scheduledAt, home school name, canonical division, id). A generated
- * week gives every match of both divisions one identical kickoff, and the row id is a random
- * uuid, so ordering ties by id alone scatters them arbitrarily. School name then division keeps
- * a school's Varsity and JV matches next to each other and makes the order stable and readable;
- * id remains the final tiebreak so the key is unique.
+ * The list is ordered by (Eastern calendar day, division rank, scheduledAt, home school name, id).
+ * Each date therefore shows one contiguous Varsity block then one JV block, whatever the kickoff
+ * times (rank sorts before time on purpose: JV 6 PM, Varsity 7 PM, JV 8 PM must not interleave).
+ * The day and rank are derived from `scheduledAt` and `division` here and in SQL, so the cursor
+ * stays four plain values. Values are strings only; a Date inside a raw sql fragment bypasses
+ * the column encoder and breaks the query.
  */
 export interface MatchCursor {
   scheduledAt: string; // ISO timestamp
@@ -227,6 +231,17 @@ export function cursorFor(row: { scheduledAt: Date | string; homeTeam: string; d
     division: row.division,
     id: row.id,
   };
+}
+
+/** The ordered key of a row or cursor: day (ET), division rank, instant, home school, id. */
+export function matchOrderKey(row: {
+  scheduledAt: Date | string;
+  division: string;
+  home: string;
+  id: string;
+}): [string, number, string, string, string] {
+  const at = new Date(row.scheduledAt);
+  return [formatNY(at, 'ymd'), DIVISION_RANK[canonicalDivision(row.division)], at.toISOString(), row.home, row.id];
 }
 
 /**

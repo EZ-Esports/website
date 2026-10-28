@@ -24,6 +24,7 @@ import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
   COMBINED_DIVISION,
   cursorFor,
+  matchOrderKey,
   FINISHED_MATCH_STATUSES,
   canonicalDivision,
   clampPageLimit,
@@ -92,6 +93,28 @@ export function matchTabCondition(tab: MatchTab, now: Date): SQL | undefined {
   }
 }
 
+/** Eastern calendar day of the kickoff as YYYY-MM-DD; `scheduled_at` stores a UTC instant. */
+const matchDayEtSql = () =>
+  sql`to_char((${schema.matches.scheduledAt} at time zone 'UTC') at time zone 'America/New_York', 'YYYY-MM-DD')`;
+
+/** Varsity 0, JV 1, All 2 (see DIVISION_RANK). */
+const divisionRankSql = () =>
+  sql`(case ${canonicalDivisionSql(homeRoster.division)} when 'Varsity' then 0 when 'JV' then 1 else 2 end)`;
+
+/**
+ * The staff/public list order: date, then one block per division, then time, home school, id.
+ * Used with one direction for every key so a reversed list is the exact mirror image.
+ */
+function matchListOrder(direction: typeof asc | typeof desc) {
+  return [
+    direction(matchDayEtSql()),
+    direction(divisionRankSql()),
+    direction(schema.matches.scheduledAt),
+    direction(homeSchool.name),
+    direction(schema.matches.id),
+  ];
+}
+
 /** Every facet except the tab, sort and cursor: shared by the page query and the tab counts. */
 function facetConditions(params: MatchesPageParams): SQL[] {
   const conditions: SQL[] = [];
@@ -118,7 +141,7 @@ function facetConditions(params: MatchesPageParams): SQL[] {
 
 /**
  * Keyset-paginated match list with division + school names joined in.
- * Sorted by (scheduledAt, home school name, canonical division, id); `cursor` is the sort key of the last row of
+ * Sorted by (Eastern day, division rank, scheduledAt, home school name, id); `cursor` is the sort key of the last row of
  * the previous page. Fetches one extra row to detect whether more remain.
  * Uncached: filter permutations are unbounded and admin edits must be fresh.
  */
@@ -132,13 +155,20 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     if (tabCondition) conditions.push(tabCondition);
   }
   if (params.cursor) {
-    // Lexicographic keyset over the same four columns as the ORDER BY below, all in one direction.
+    // Lexicographic keyset over the same five keys as the ORDER BY below, all in one direction.
     const cmp = sort === 'desc' ? lt : gt;
+    const [day, rank, at, home, id] = matchOrderKey({
+      scheduledAt: params.cursor.scheduledAt,
+      division: params.cursor.division,
+      home: params.cursor.home,
+      id: params.cursor.id,
+    });
     const keys = [
-      { col: sql`${schema.matches.scheduledAt}`, value: new Date(params.cursor.scheduledAt).toISOString() as unknown },
-      { col: sql`${homeSchool.name}`, value: params.cursor.home as unknown },
-      { col: sql`${canonicalDivisionSql(homeRoster.division)}`, value: params.cursor.division as unknown },
-      { col: sql`${schema.matches.id}`, value: params.cursor.id as unknown },
+      { col: matchDayEtSql(), value: day as unknown },
+      { col: divisionRankSql(), value: rank as unknown },
+      { col: sql`${schema.matches.scheduledAt}`, value: at as unknown },
+      { col: sql`${homeSchool.name}`, value: home as unknown },
+      { col: sql`${schema.matches.id}`, value: id as unknown },
     ];
     const branches = keys.map((k, i) =>
       and(...keys.slice(0, i).map((e) => eq(e.col, e.value)), cmp(k.col, k.value))!
@@ -170,12 +200,7 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(
-      direction(schema.matches.scheduledAt),
-      direction(homeSchool.name),
-      direction(canonicalDivisionSql(homeRoster.division)),
-      direction(schema.matches.id)
-    )
+    .orderBy(...matchListOrder(direction))
     .limit(limit + 1);
 }
 
@@ -275,12 +300,7 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
     .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(and(...conditions))
-    .orderBy(
-      asc(schema.matches.scheduledAt),
-      asc(homeSchool.name),
-      asc(canonicalDivisionSql(homeRoster.division)),
-      asc(schema.matches.id)
-    );
+    .orderBy(...matchListOrder(asc));
 }
 
 /**
@@ -348,12 +368,7 @@ export async function getSchoolMatchRows(params: {
     .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
     .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
     .where(and(...conditions))
-    .orderBy(
-      asc(schema.matches.scheduledAt),
-      asc(homeSchool.name),
-      asc(canonicalDivisionSql(homeRoster.division)),
-      asc(schema.matches.id)
-    );
+    .orderBy(...matchListOrder(asc));
 }
 
 /** Count of all scheduled matches (for dashboard). */

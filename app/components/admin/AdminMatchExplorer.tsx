@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Button, Menu, MenuItem, MenuTrigger, Popover, Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
 import { HiOutlineCalendarDays, HiOutlineEllipsisVertical, HiOutlineNoSymbol, HiOutlineTrash, HiPlus } from 'react-icons/hi2';
@@ -34,6 +34,7 @@ import { fetchStaffMatchesPage, fetchStaffMatchTabCounts } from '@/app/lib/match
 import {
   MATCH_TABS,
   MATCH_TAB_LABELS,
+  divisionLabel,
   effectiveSort,
   needsResult,
   type MatchCursor,
@@ -44,7 +45,7 @@ import {
   type MatchTabCounts,
 } from '@/app/lib/db/match-page';
 import { formatNY } from '@/app/lib/dates';
-import { applySavedMatch, groupMatchesByDay, parseScoreInput } from '@/app/lib/admin-match-list';
+import { applySavedMatch, divisionBlockStarts, groupMatchesByDay, parseScoreInput } from '@/app/lib/admin-match-list';
 import {
   DEFAULT_MATCH_FACETS,
   hasActiveMoreFilters,
@@ -621,7 +622,9 @@ export default function AdminMatchExplorer({
             ) : (
               // Dimmed (not hidden) while a filter change loads, so the layout never jumps.
               <div className={cx('space-y-6 transition-opacity duration-200 motion-reduce:transition-none', (isLoading || isStale) && 'opacity-60')}>
-                {groups.map((group) => (
+                {groups.map((group) => {
+                  const blockStarts = divisionBlockStarts(group.items);
+                  return (
                   <section key={group.key} aria-labelledby={`day-${group.key}`}>
                     <h2 id={`day-${group.key}`} className="mb-2 flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-foreground-secondary">
                       {group.heading}
@@ -631,6 +634,7 @@ export default function AdminMatchExplorer({
                     </h2>
                     <ul className="divide-y divide-line/50 overflow-hidden rounded-2xl bg-admin-panel">
                       {group.items.map((match) => {
+                        const blockStart = blockStarts.get(match.id);
                         const season = seasonMap.get(match.seasonId);
                         const game = season ? gameMap.get(season.gameId) : undefined;
                         const overdue = needsResult(match, now);
@@ -642,7 +646,13 @@ export default function AdminMatchExplorer({
                         const saving = savingId === match.id;
                         const defaultStatus: MatchStatus = overdue ? 'completed' : match.status;
                         return (
-                          <li key={match.id} className={editing ? 'bg-surface-raised/40' : undefined}>
+                          <Fragment key={match.id}>
+                          {blockStart && (
+                            <li className="bg-surface-sunken/60 px-4 py-1.5 text-xs font-medium text-foreground-secondary">
+                              {divisionLabel(blockStart.division)} · {blockStart.count} {blockStart.count === 1 ? 'match' : 'matches'}
+                            </li>
+                          )}
+                          <li className={editing ? 'bg-surface-raised/40' : undefined}>
                             <div className="grid grid-cols-2 items-center gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_auto_auto]">
                               <span className="text-sm font-medium tabular-nums text-foreground-secondary max-sm:order-1">
                                 {formatNY(new Date(match.scheduledAt), 'time-bare')}
@@ -794,11 +804,13 @@ export default function AdminMatchExplorer({
                               </form>
                             )}
                           </li>
+                          </Fragment>
                         );
                       })}
                     </ul>
                   </section>
-                ))}
+                  );
+                })}
               </div>
             )}
 
