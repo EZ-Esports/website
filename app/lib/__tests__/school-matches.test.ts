@@ -172,6 +172,7 @@ const mocks = vi.hoisted(() => ({
   getOutcomesPublicSeasonIds: vi.fn(),
   getLatestRescheduleRequests: vi.fn(),
   getRescheduledFrom: vi.fn(),
+  getSeasonsWithRescheduleAllowanceUsed: vi.fn(),
   getGameCounts: vi.fn(),
   getPendingSubmissions: vi.fn(),
 }));
@@ -191,6 +192,7 @@ vi.mock('@/app/lib/db/matches', () => ({ getSchoolMatchRows: mocks.getSchoolMatc
 vi.mock('@/app/lib/db/reschedules', () => ({
   getLatestRescheduleRequests: mocks.getLatestRescheduleRequests,
   getRescheduledFrom: mocks.getRescheduledFrom,
+  getSeasonsWithRescheduleAllowanceUsed: mocks.getSeasonsWithRescheduleAllowanceUsed,
 }));
 vi.mock('@/app/lib/db/match-results', () => ({
   getGameCounts: mocks.getGameCounts,
@@ -207,6 +209,7 @@ describe('getSchoolMatches', () => {
     mocks.getOutcomesPublicSeasonIds.mockResolvedValue(new Set<string>());
     mocks.getLatestRescheduleRequests.mockResolvedValue(new Map());
     mocks.getRescheduledFrom.mockResolvedValue(new Map());
+    mocks.getSeasonsWithRescheduleAllowanceUsed.mockResolvedValue(new Set());
     mocks.getGameCounts.mockResolvedValue(new Map());
     mocks.getPendingSubmissions.mockResolvedValue(new Map());
   });

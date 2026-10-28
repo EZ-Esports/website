@@ -41,7 +41,7 @@ Rules page 4.3 sets the league's rescheduling rules (72 hours, two proposed time
 ## Known limits (accepted for now)
 
 - A user who manages both schools of a match could request and accept alone; staff approval is the backstop (and a reason to think twice before dropping that step).
-- After `approved`, either school may immediately request a new move of the same match; nothing limits repeat requests.
+- After `approved`, either school may immediately request a new move of the same match. Each school is limited to one request per season across all its matches ([spec-039](spec-039-one-reschedule-per-season.md)), but nothing stops a second move by the other school.
 - The approval guard compares `scheduled_at` for equality; a match time stored with sub-millisecond precision (only possible from raw SQL) would always read as "changed".
 - Staff admins viewing a school's portal see the request buttons; the server refuses them.
 - A second request on a match that already has an open one returns the generic "Could not send the request" message instead of the friendly one ([#277](https://github.com/EZ-Esports/website/issues/277)); no data is affected, and the portal hides the button while a request is open.

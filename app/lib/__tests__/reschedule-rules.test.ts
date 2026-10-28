@@ -4,8 +4,11 @@ import {
   canCancelRequest,
   canOpponentRespond,
   canRequesterRespond,
+  MAX_RESCHEDULE_REQUESTS_PER_SEASON,
   canStaffDecide,
+  hasUsedRescheduleAllowance,
   isLateRequest,
+  rescheduleAllowanceMessage,
   isOpenStatus,
   rescheduleStatusLabel,
   validateProposedTimes,
@@ -153,5 +156,25 @@ describe('canRequestReschedule', () => {
     expect(canRequestReschedule({ ...base, reschedule: request('declined_staff') }, NOW)).toBe(true);
     expect(canRequestReschedule({ ...base, reschedule: request('declined_requester') }, NOW)).toBe(true);
     expect(canRequestReschedule({ ...base, reschedule: request('cancelled') }, NOW)).toBe(true);
+  });
+});
+
+describe('per-season reschedule allowance', () => {
+  it('allows one request per school per season', () => {
+    expect(MAX_RESCHEDULE_REQUESTS_PER_SEASON).toBe(1);
+    expect(hasUsedRescheduleAllowance(0)).toBe(false);
+    expect(hasUsedRescheduleAllowance(MAX_RESCHEDULE_REQUESTS_PER_SEASON - 1)).toBe(false);
+    expect(hasUsedRescheduleAllowance(MAX_RESCHEDULE_REQUESTS_PER_SEASON)).toBe(true);
+    expect(hasUsedRescheduleAllowance(2)).toBe(true);
+  });
+
+  it('explains the limit in plain words', () => {
+    expect(rescheduleAllowanceMessage()).toBe('Your school has already used its one reschedule for this season.');
+  });
+
+  it('hides the request button for a school that has used its allowance', () => {
+    const scheduled = { status: 'scheduled' as const, scheduledAt: at(24 * 5).toISOString(), sameSchool: false, reschedule: null };
+    expect(canRequestReschedule({ ...scheduled, rescheduleAllowanceUsed: true }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...scheduled, rescheduleAllowanceUsed: false }, NOW)).toBe(true);
   });
 });

@@ -18,6 +18,13 @@ export const MAX_PROPOSED_TIMES = 5;
 export const MAX_REASON_LENGTH = 500;
 export const MAX_STAFF_NOTE_LENGTH = 500;
 
+/**
+ * How many reschedule requests a school may make per season, across all of its matches. Counts
+ * the school's own requests that were not cancelled (open, approved and declined ones all count);
+ * the opponent's answers and staff edits do not. Enforced server-side in `requestReschedule`.
+ */
+export const MAX_RESCHEDULE_REQUESTS_PER_SEASON = 1;
+
 export const RESCHEDULE_STATUSES = [
   'pending_opponent',
   // The opponent answered with times of their own; the requester now picks one or declines.
@@ -44,6 +51,18 @@ export const OPEN_RESCHEDULE_STATUSES: readonly RescheduleStatus[] = [
 
 export function isOpenStatus(status: RescheduleStatus): boolean {
   return OPEN_RESCHEDULE_STATUSES.includes(status);
+}
+
+/** True once a school's requests this season (see `MAX_RESCHEDULE_REQUESTS_PER_SEASON`) reach the limit. */
+export function hasUsedRescheduleAllowance(requestsThisSeason: number): boolean {
+  return requestsThisSeason >= MAX_RESCHEDULE_REQUESTS_PER_SEASON;
+}
+
+/** The refusal shown when a school has used its allowance for the season. */
+export function rescheduleAllowanceMessage(): string {
+  return MAX_RESCHEDULE_REQUESTS_PER_SEASON === 1
+    ? 'Your school has already used its one reschedule for this season.'
+    : `Your school has already used its ${MAX_RESCHEDULE_REQUESTS_PER_SEASON} reschedules for this season.`;
 }
 
 /** True when `now` is closer than 72 hours to the match's current start (equal is on time). */

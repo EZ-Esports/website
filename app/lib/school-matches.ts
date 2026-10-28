@@ -49,6 +49,8 @@ export interface SchoolMatchItem {
   reschedule: RescheduleRequestItem | null;
   /** The time staff moved this match from (ISO), when an approved request ever moved it. */
   rescheduledFrom: string | null;
+  /** The school has used its reschedule allowance for this match's season (see `MAX_RESCHEDULE_REQUESTS_PER_SEASON`). */
+  rescheduleAllowanceUsed?: boolean;
   /** Games attached from the game's own data (spec-038); 0 for a manually reported match. */
   gameCount: number;
   /** Match IDs saved while the data service was busy, waiting for "Check again"; else null. */
@@ -95,6 +97,7 @@ export function toSchoolMatchItem(
     sameSchool: row.homeSchoolId === row.awaySchoolId,
     reschedule,
     rescheduledFrom,
+    rescheduleAllowanceUsed: false,
     gameCount: result.gameCount,
     pendingResult: result.pending,
   };
@@ -102,18 +105,21 @@ export function toSchoolMatchItem(
 
 /**
  * Whether the portal offers "Request reschedule" on this match: it must still be scheduled and
- * not started, be between two different schools, and have no open request. Season view-only
+ * not started, be between two different schools, have no open request, and the school must not
+ * have used its reschedule allowance for the season. Season view-only
  * state is the caller's to apply (it is per game); the server re-checks everything regardless.
  */
 export function canRequestReschedule(
-  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt' | 'sameSchool' | 'reschedule'>,
+  item: Pick<SchoolMatchItem, 'status' | 'scheduledAt' | 'sameSchool' | 'reschedule'> &
+    Partial<Pick<SchoolMatchItem, 'rescheduleAllowanceUsed'>>,
   now: Date
 ): boolean {
   return (
     item.status === 'scheduled' &&
     new Date(item.scheduledAt).getTime() > now.getTime() &&
     !item.sameSchool &&
-    !(item.reschedule && isOpenStatus(item.reschedule.status))
+    !(item.reschedule && isOpenStatus(item.reschedule.status)) &&
+    !item.rescheduleAllowanceUsed
   );
 }
 
