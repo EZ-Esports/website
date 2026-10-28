@@ -120,7 +120,7 @@ async function resolveManagerScope(
 }
 
 /**
- * Restricts invite queries to the manager's own season of each game (spec-046): an invite is
+ * Restricts invite queries to the manager's own season of each game (spec-047): an invite is
  * visible only when its `season_id` is the manager's resolved season for its game. Legacy invites
  * with no season never match, so they stay hidden from managers. Staff admins (scopes === null)
  * get no condition.
@@ -239,7 +239,7 @@ export async function getSchoolInvites(
   if (gameId) {
     whereConditions.push(eq(schema.playerInvites.gameId, gameId));
   }
-  // A manager sees only invites of their own season of each game (spec-046); staff see all.
+  // A manager sees only invites of their own season of each game (spec-047); staff see all.
   const seasonCondition = inviteSeasonCondition(scopes);
   if (seasonCondition) whereConditions.push(seasonCondition);
 
@@ -573,7 +573,7 @@ export type ReviewPlayerInviteResult = ReviewPlayerInviteSuccess | RosterActionR
  * applies the roster lock, size caps, one-tier-per-game and season-eligibility rules.
  * Reject sets status 'rejected' with a reason.
  *
- * A manager may review only invites of their own season (spec-046) and, being a mutation, not on an
+ * A manager may review only invites of their own season (spec-047) and, being a mutation, not on an
  * inactive season (spec-028). Staff admins may review any invite. Because nothing is put on a
  * roster, the season roster lock does not apply to reviewing.
  */
@@ -604,7 +604,7 @@ export async function reviewPlayerInvite(
     throw new Error('Forbidden: This invite is not tied to a game in your season');
   }
 
-  // A manager reviews only invites of their own season (spec-046); a legacy invite with no season
+  // A manager reviews only invites of their own season (spec-047); a legacy invite with no season
   // never matches. Staff admins review any invite.
   if (!reviewContext.isStaffAdmin && (!managerSeason || invite.seasonId !== managerSeason.id)) {
     throw new Error('Forbidden: This invite belongs to a different season than your manager affiliation and cannot be reviewed from the portal');

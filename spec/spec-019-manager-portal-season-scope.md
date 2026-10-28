@@ -1,6 +1,6 @@
 # spec-019 — Manager portal season scope and `YYYY-YY` season names
 
-**Update (28 Oct 2026): the invite-season gap described below was closed by [spec-046](spec-046-invite-season-scope-and-enrollment-eligibility.md).** **Status:** Season rule superseded by [spec-026](spec-026-manager-season-by-name.md) (22 Oct 2026). Originally: In Review (branch `fix/manager-portal-season-scope`, PR TBD). **Date:** 17 Oct 2026. **Issue:** #230. **Scope:** `app/lib/season-name.ts`, `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, League Setup, join wizard, admin manager tabs, portal page. No migration.
+**Update (28 Oct 2026): the invite-season gap described below was closed by [spec-047](spec-047-invite-season-scope-and-enrollment-eligibility.md).** **Status:** Season rule superseded by [spec-026](spec-026-manager-season-by-name.md) (22 Oct 2026). Originally: In Review (branch `fix/manager-portal-season-scope`, PR TBD). **Date:** 17 Oct 2026. **Issue:** #230. **Scope:** `app/lib/season-name.ts`, `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, League Setup, join wizard, admin manager tabs, portal page. No migration.
 
 ## Context & motivation
 

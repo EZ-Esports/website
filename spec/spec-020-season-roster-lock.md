@@ -28,7 +28,7 @@ Staff need to freeze a game's rosters mid-season (for example once the bracket o
 | `removePlayerFromRoster` | refused |
 | `updateRosterPlayerRole` | refused |
 | `emergencySwapSub` | refused (decided: no emergency exception) |
-| `reviewPlayerInvite` approve (explicit `rosterId` or default roster; superseded by spec-046: approve no longer rosters, so it is allowed while locked and enrolment is what is refused) | refused before the invite changes state |
+| `reviewPlayerInvite` approve (explicit `rosterId` or default roster; superseded by spec-047: approve no longer rosters, so it is allowed while locked and enrolment is what is refused) | refused before the invite changes state |
 | `reviewPlayerInvite` reject | allowed |
 | `getSchoolRosters`, `getRosterEligibility`, `getSchoolPlayerPool`, invites reads | allowed |
 

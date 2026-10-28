@@ -1,6 +1,6 @@
 /**
  * Whether a student has been onboarded for a season, which is what lets a school manager put them
- * on that season's rosters (spec-046). Pure and client-safe so the Enroll dialog and the server
+ * on that season's rosters (spec-047). Pure and client-safe so the Enroll dialog and the server
  * action share one rule.
  *
  * A student is enrollable on a roster of game G, season S only with an ACCEPTED application for G

@@ -945,7 +945,7 @@ export const playerInvites = pgTable('player_invites', {
   schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
   gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }).notNull(),
   // The season the invite was issued for. Null only for legacy rows whose season could not be
-  // derived; managers never see or review those (spec-046). Set null if the season is deleted.
+  // derived; managers never see or review those (spec-047). Set null if the season is deleted.
   seasonId: uuid('season_id').references(() => seasons.id, { onDelete: 'set null' }),
   tokenHash: text('token_hash').notNull().unique(), // SHA-256
   intendedFirstName: text('intended_first_name').notNull(),

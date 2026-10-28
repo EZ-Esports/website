@@ -115,7 +115,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## Manager portal season scope (spec-019)
 
-- **Invite scoping: resolved by [spec-046](spec-046-invite-season-scope-and-enrollment-eligibility.md) (#253).** `player_invites.season_id` exists; managers see and review only invites of their season. Still to do: apply migration `0056` to production (backup and owner go-ahead first, before the code deploys). Legacy invites the backfill could not place stay NULL and are hidden from managers.
+- **Invite scoping: resolved by [spec-047](spec-047-invite-season-scope-and-enrollment-eligibility.md) (#253).** `player_invites.season_id` exists; managers see and review only invites of their season. Still to do: apply migration `0056` to production (backup and owner go-ahead first, before the code deploys). Legacy invites the backfill could not place stay NULL and are hidden from managers.
 - **#233 interplay.** Managers can still hold role-less `staff_members` rows (legacy, or granted deliberately). The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way. New manager logins no longer create such rows (spec-023).
 - Renaming a season in League Setup silently re-maps or orphans managers whose `academic_year` matches the old or new name (spec-026 open item): there is no cross-check or warning.
 - [#266](https://github.com/EZ-Esports/website/issues/266): approving a player invite with an explicit `rosterId` checks the roster's school but not that the roster's game matches the invite's game. It stays inside the manager's school, and the roster's own season and lock are enforced. Tracked separately for the player-invites PR.
@@ -214,3 +214,8 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Members are matched by email only. A person who uses a different email on a second invite but the same Discord account is still refused with `discord_already_linked`; matching by Discord was deliberately not added.
 - `upsertMemberRecord` overwrites `members.school_id`, so a person who uses an invite from a second school is moved to it (existing behaviour, now reachable for managers who play).
 - The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).
+## Generate season follow-ups (spec-046)
+
+- The lock, bulk inserts and UI have not been exercised against a real database or in a browser.
+- Week 1 date and the fixed 7 PM ET slot are the only schedule inputs; holidays and per-week skips are not modelled.
+- `createMatch`/`deleteMatch` do not lock the season row, so a hand-scheduled match racing Generate's commit can slip in between its check and insert (spec-046). Left as is; revisit if it ever happens.

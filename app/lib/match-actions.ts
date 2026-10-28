@@ -57,6 +57,9 @@ function toParams(request: MatchPageRequest) {
   const cursor =
     request.cursor &&
     UUID_RE.test(request.cursor.id) &&
+    typeof request.cursor.home === 'string' &&
+    request.cursor.home.length <= 300 &&
+    (DIVISIONS as readonly string[]).includes(request.cursor.division) &&
     !Number.isNaN(new Date(request.cursor.scheduledAt).getTime())
       ? request.cursor
       : null;

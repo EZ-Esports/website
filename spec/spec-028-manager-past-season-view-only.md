@@ -1,6 +1,6 @@
 # spec-028 — Inactive seasons are view-only for school managers
 
-**Update (28 Oct 2026): the invite-season gap described below was closed by [spec-046](spec-046-invite-season-scope-and-enrollment-eligibility.md).** **Status:** Implemented on branch `feat/schools-roster-view`, PR #267. **Date:** 22 Oct 2026. **Scope:** `app/lib/season-name.ts` (error text), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, `app/(portal)/portal` (page, header chip, banner and disabled controls). No migration. **Builds on** [spec-026](spec-026-manager-season-by-name.md) (season by name) and [spec-020](spec-020-season-roster-lock.md) (lock). The file name keeps "past" so existing links work; the rule was simplified from "past vs upcoming" to "inactive" the same day, before merge.
+**Update (28 Oct 2026): the invite-season gap described below was closed by [spec-047](spec-047-invite-season-scope-and-enrollment-eligibility.md).** **Status:** Implemented on branch `feat/schools-roster-view`, PR #267. **Date:** 22 Oct 2026. **Scope:** `app/lib/season-name.ts` (error text), `app/lib/onboarding/manager-auth.ts`, `portal-actions.ts`, `app/(portal)/portal` (page, header chip, banner and disabled controls). No migration. **Builds on** [spec-026](spec-026-manager-season-by-name.md) (season by name) and [spec-020](spec-020-season-roster-lock.md) (lock). The file name keeps "past" so existing links work; the rule was simplified from "past vs upcoming" to "inactive" the same day, before merge.
 
 ## Why
 

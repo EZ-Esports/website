@@ -1227,7 +1227,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
 
   /**
    * Gives every member in the store an accepted application for the Valorant game and its active
-   * 2026-27 season, which is what a manager needs before enrolling them (spec-046). Tests of the
+   * 2026-27 season, which is what a manager needs before enrolling them (spec-047). Tests of the
    * rule itself seed applications explicitly instead.
    */
   const acceptAllMembers = (seasonId = 'season-val-now') => {
@@ -2189,7 +2189,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect((await getSchoolRosters(schoolId, valGameId)).length).toBe(2);
       await expect(getRosterEligibility({ rosterId: 'r-past' })).resolves.toBeDefined();
       await expect(getSchoolPlayerPool(schoolId)).resolves.toBeDefined();
-      // Only the invite of the manager's own (inactive) season is listed (spec-046).
+      // Only the invite of the manager's own (inactive) season is listed (spec-047).
       expect((await getSchoolInvites(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-past']);
       expect((await getPendingSubmissions(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-past']);
 
@@ -2846,7 +2846,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
     });
   });
-  describe('13. Invite season scope and roster enrollment eligibility (spec-046)', () => {
+  describe('13. Invite season scope and roster enrollment eligibility (spec-047)', () => {
     const mkInvite = (id: string, seasonId: string | null, extra: Record<string, unknown> = {}) => ({
       id, schoolId, gameId: valGameId, seasonId, memberId: 'm-kid', intendedFirstName: 'Kid', intendedLastName: 'One',
       status: 'submitted', tokenHash: `h-${id}`, expiresAt: new Date('2027-01-01'), submittedAt: new Date(), createdAt: new Date(),
