@@ -13,9 +13,33 @@ export interface InviteData {
   expiresAt: Date;
 }
 
-/** Wizard step that fixes a rejection returned by the server: the password lives on step 1, Discord on step 2. */
-export function stepForRejection(code: string): 1 | 2 {
-  return code === 'manager_password_required' ? 1 : 2;
+export type WizardStep = 1 | 2 | 3 | 4 | 5;
+
+/** Step that holds each free-text field the server can reject as offensive. */
+const STEP_FOR_OFFENSIVE_FIELD: Readonly<Record<string, WizardStep>> = {
+  legalFirstName: 1,
+  legalLastName: 1,
+  riotId: 3,
+  countryOfBirth: 4,
+  primaryLanguageAtHome: 4,
+  feedback: 4,
+  participantLegalName: 5,
+  guardianFullName: 5,
+  guardianRelationship: 5,
+  guardianSignature: 5,
+};
+
+/**
+ * Wizard step that fixes a rejection returned by the server. The password lives on step 1, Discord on
+ * step 2, the Code of Conduct box on step 4, the Terms of Service box on step 5, and offensive content
+ * goes to the step holding the offending field.
+ */
+export function stepForRejection(code: string, field?: string): WizardStep {
+  if (code === 'manager_password_required') return 1;
+  if (code === 'offensive_content') return STEP_FOR_OFFENSIVE_FIELD[field ?? ''] ?? 1;
+  if (code === 'code_of_conduct_required') return 4;
+  if (code === 'terms_required') return 5;
+  return 2;
 }
 
 export interface WizardFormData {

@@ -6,15 +6,21 @@ export type OnboardingRejectionCode =
   | 'discord_required'
   | 'discord_not_in_guild'
   | 'discord_already_linked'
-  | 'manager_password_required';
+  | 'manager_password_required'
+  | 'offensive_content'
+  | 'code_of_conduct_required'
+  | 'terms_required';
 
 export class OnboardingRejection extends Error {
   readonly code: OnboardingRejectionCode;
+  /** Form field the student must fix (e.g. "riotId"), so the wizard can send them to its step. */
+  readonly field?: string;
 
-  constructor(code: OnboardingRejectionCode, message: string) {
+  constructor(code: OnboardingRejectionCode, message: string, options?: { field?: string }) {
     super(message);
     this.name = 'OnboardingRejection';
     this.code = code;
+    this.field = options?.field;
   }
 }
 

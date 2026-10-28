@@ -7,6 +7,19 @@
 import { GAMES, canonicalGameSlug } from '@/app/lib/constants';
 import { toHubDivision, type CanonicalDivision, type HubDivision } from '@/app/lib/db/match-page';
 
+/** A flagged onboarding field the member confirmed as real (spec-040). Shown only to MANAGE_ROSTERS staff. */
+export interface RosterViewContentOverride {
+  id: string;
+  /** OffensiveFieldKey, e.g. 'legalFirstName'. */
+  field: string;
+  /** What the student typed, kept so staff can judge it. Never logged. */
+  submittedValue: string;
+  createdAt: Date;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  reviewNote: string | null;
+}
+
 export interface RosterViewPlayer {
   id: string;
   memberId: string;
@@ -18,6 +31,8 @@ export interface RosterViewPlayer {
   discord: string | null;
   graduationYear: number | null;
   role: 'captain' | 'player' | 'coach' | 'sub';
+  /** Content overrides recorded for this member at onboarding; empty when none. */
+  contentOverrides?: RosterViewContentOverride[];
 }
 
 export interface RosterViewRoster {

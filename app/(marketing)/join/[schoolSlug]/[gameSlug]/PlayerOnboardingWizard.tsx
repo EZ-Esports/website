@@ -23,6 +23,7 @@ import { DiscordStep } from './components/steps/DiscordStep';
 import { GameIdentityStep } from './components/steps/GameIdentityStep';
 import { DemographicsStep } from './components/steps/DemographicsStep';
 import { ConsentStep } from './components/steps/ConsentStep';
+import { OffensiveFieldOverrideProvider } from './components/OffensiveField';
 
 export type { InviteData };
 
@@ -105,7 +106,7 @@ export default function PlayerOnboardingWizard({
   }
 
   function handleBack() {
-    draft.setErrorMessage(null);
+    draft.clearErrors();
     if (step > 1) {
       setStep((prev) => prev - 1);
     }
@@ -148,6 +149,8 @@ export default function PlayerOnboardingWizard({
           },
           codeOfConductAccepted: draft.codeOfConductAccepted,
           consent: draft.buildConsent(),
+          // Flagged fields the student confirmed as their real information. The server re-checks each one.
+          contentOverrides: draft.confirmedContentOverrides(),
         };
 
         const result = await submitPlayerOnboarding({
@@ -157,10 +160,11 @@ export default function PlayerOnboardingWizard({
 
         if (!result.success) {
           // Expected rejections: send the invitee to the step that fixes them rather than a dead end.
-          const target = stepForRejection(result.code);
-          if (target === 2) setDiscord(null);
+          const target = stepForRejection(result.code, result.field);
+          if (result.code.startsWith('discord_')) setDiscord(null);
           setStep(target);
           draft.setErrorMessage(result.error);
+          draft.setInvalidField(result.code === 'offensive_content' ? (result.field ?? null) : null);
           return;
         }
         setIsSubmitted(true);
@@ -252,6 +256,7 @@ export default function PlayerOnboardingWizard({
       )}
 
       {/* Form Wizard Container */}
+      <OffensiveFieldOverrideProvider value={draft.offensiveOverrides}>
       <div className="bg-surface-elevated border border-border rounded-2xl p-6 sm:p-8 shadow-sm">
         {step === 1 && (
           <AccountInfoStep
@@ -268,6 +273,7 @@ export default function PlayerOnboardingWizard({
             academicYear={draft.academicYear}
             setAcademicYear={draft.setAcademicYear}
             isManager={isManager}
+            invalidField={draft.invalidField}
           />
         )}
 
@@ -289,6 +295,7 @@ export default function PlayerOnboardingWizard({
             trackerUrl={draft.trackerUrl}
             isManager={isManager}
             gameName={inviteData.gameName}
+            invalidField={draft.invalidField}
           />
         )}
 
@@ -320,6 +327,7 @@ export default function PlayerOnboardingWizard({
             setCareerInterests={draft.setCareerInterests}
             feedback={draft.feedback}
             setFeedback={draft.setFeedback}
+            invalidField={draft.invalidField}
             codeOfConductAccepted={draft.codeOfConductAccepted}
             setCodeOfConductAccepted={draft.setCodeOfConductAccepted}
           />
@@ -341,6 +349,7 @@ export default function PlayerOnboardingWizard({
             setGuardianEmail={draft.setGuardianEmail}
             guardianSignature={draft.guardianSignature}
             setGuardianSignature={draft.setGuardianSignature}
+            invalidField={draft.invalidField}
           />
         )}
 
@@ -389,6 +398,7 @@ export default function PlayerOnboardingWizard({
           </div>
         </div>
       </div>
+      </OffensiveFieldOverrideProvider>
     </div>
   );
 }

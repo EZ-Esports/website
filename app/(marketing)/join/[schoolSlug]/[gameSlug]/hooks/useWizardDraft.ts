@@ -11,12 +11,23 @@ import {
   type ConsentSubmission,
 } from '@/app/lib/onboarding/consent';
 import {
+  OFFENSIVE_FIELD_SPECS,
+  findFlaggedFields,
+  type OffensiveFieldKey,
+} from '@/app/lib/onboarding/offensive-fields';
+import type { OffensiveFieldOverrideState } from '../components/OffensiveField';
+import {
   DEFAULT_MANAGER_SEASON,
   GRADUATION_YEAR_OPTIONS,
   MANAGER_SEASON_OPTIONS,
   type InviteData,
   type WizardFormData,
 } from '../types';
+
+/** Shown when a typed field contains offensive language. Names the field, never the word. */
+function offensiveMessage(label: string): string {
+  return `Please remove offensive language from ${label}. Offensive names and submitted information are not allowed.`;
+}
 
 export function useWizardDraft(
   token: string,
@@ -29,6 +40,22 @@ export function useWizardDraft(
   const [saveDraftPending, setSaveDraftPending] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(options.initialError ?? null);
+  // The typed field that holds offensive language, so its input can be highlighted. Null otherwise.
+  const [invalidField, setInvalidField] = useState<string | null>(null);
+  // Fields the student ticked as real information, mapped to the value they ticked against. A tick only
+  // counts while the field still holds that value, so editing a confirmed field requires confirming it again.
+  const [confirmedValues, setConfirmedValues] = useState<Partial<Record<OffensiveFieldKey, string>>>({});
+
+  function clearErrors() {
+    setErrorMessage(null);
+    setInvalidField(null);
+  }
+
+  function flagOffensive(field: OffensiveFieldKey) {
+    const label = OFFENSIVE_FIELD_SPECS.find((spec) => spec.key === field)?.label ?? 'this field';
+    setErrorMessage(offensiveMessage(label));
+    setInvalidField(field);
+  }
 
   // Step 1: Account Information
   const [legalFirstName, setLegalFirstName] = useState(
@@ -119,6 +146,44 @@ export function useWizardDraft(
   // Prefilled from the Step 1 legal name until the signer edits it.
   const participantLegalName =
     participantNameEdit ?? `${legalFirstName.trim()} ${legalLastName.trim()}`.trim();
+
+  // Screened fields that currently hold offensive language, and the confirmation logic built on them.
+  const fieldValues: Partial<Record<OffensiveFieldKey, string>> = {
+    legalFirstName,
+    legalLastName,
+    riotId,
+    countryOfBirth,
+    primaryLanguageAtHome,
+    feedback,
+    participantLegalName,
+    guardianFullName,
+    guardianRelationship,
+    guardianSignature,
+  };
+  const flaggedFields = findFlaggedFields(fieldValues, isMinor);
+  function isConfirmed(field: OffensiveFieldKey): boolean {
+    return confirmedValues[field] !== undefined && confirmedValues[field] === fieldValues[field];
+  }
+  function isUnconfirmedFlag(field: OffensiveFieldKey): boolean {
+    return flaggedFields.includes(field) && !isConfirmed(field);
+  }
+  function setConfirmed(field: OffensiveFieldKey, ticked: boolean) {
+    setConfirmedValues((prev) => {
+      const next = { ...prev };
+      if (ticked) next[field] = fieldValues[field] ?? '';
+      else delete next[field];
+      return next;
+    });
+  }
+  const offensiveOverrides: OffensiveFieldOverrideState = {
+    flagged: flaggedFields,
+    isConfirmed: (field) => isConfirmed(field as OffensiveFieldKey),
+    setConfirmed: (field, ticked) => setConfirmed(field as OffensiveFieldKey, ticked),
+  };
+  /** Flagged fields the student has confirmed, sent with the submission for staff review. */
+  function confirmedContentOverrides(): OffensiveFieldKey[] {
+    return flaggedFields.filter(isConfirmed);
+  }
   const isRiotIdValid = RIOT_ID_REGEX.test(riotId.trim());
   const trackerUrl = isRiotIdValid
     ? deriveTrackerUrl(inviteData.gameSlug, riotId.trim())
@@ -183,13 +248,21 @@ export function useWizardDraft(
   }
 
   function validateStep1(): boolean {
-    setErrorMessage(null);
+    clearErrors();
     if (!legalFirstName.trim()) {
       setErrorMessage('Please enter your legal first name.');
       return false;
     }
     if (!legalLastName.trim()) {
       setErrorMessage('Please enter your legal last name.');
+      return false;
+    }
+    if (isUnconfirmedFlag('legalFirstName')) {
+      flagOffensive('legalFirstName');
+      return false;
+    }
+    if (isUnconfirmedFlag('legalLastName')) {
+      flagOffensive('legalLastName');
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -219,7 +292,7 @@ export function useWizardDraft(
   }
 
   function validateStep2(): boolean {
-    setErrorMessage(null);
+    clearErrors();
     // The verified state is read from the signed cookie on the server; the client only mirrors it.
     if (!options.discordVerified) {
       setErrorMessage('Please connect your Discord account to continue.');
@@ -229,7 +302,7 @@ export function useWizardDraft(
   }
 
   function validateStep3(): boolean {
-    setErrorMessage(null);
+    clearErrors();
     if (!riotId.trim()) {
       setErrorMessage('Please enter your Riot ID.');
       return false;
@@ -238,6 +311,10 @@ export function useWizardDraft(
       setErrorMessage(
         'Invalid Riot ID format. Expected Name#Tag (e.g., Demon1#NA1), where name is 3-16 characters and tag is 3-5 alphanumeric characters.'
       );
+      return false;
+    }
+    if (isUnconfirmedFlag('riotId')) {
+      flagOffensive('riotId');
       return false;
     }
     if (!ignConfirmed) {
@@ -250,13 +327,25 @@ export function useWizardDraft(
   }
 
   function validateStep4(): boolean {
-    setErrorMessage(null);
+    clearErrors();
     if (!birthDate) {
       setErrorMessage('Please provide your date of birth.');
       return false;
     }
     if (!isPlausibleBirthDate(new Date(birthDate))) {
       setErrorMessage('Please enter a valid date of birth (4-digit year).');
+      return false;
+    }
+    if (isUnconfirmedFlag('countryOfBirth')) {
+      flagOffensive('countryOfBirth');
+      return false;
+    }
+    if (isUnconfirmedFlag('primaryLanguageAtHome')) {
+      flagOffensive('primaryLanguageAtHome');
+      return false;
+    }
+    if (isUnconfirmedFlag('feedback')) {
+      flagOffensive('feedback');
       return false;
     }
     if (!codeOfConductAccepted) {
@@ -269,9 +358,26 @@ export function useWizardDraft(
   }
 
   function validateStep5(): boolean {
-    setErrorMessage(null);
+    clearErrors();
     if (age === null) {
       setErrorMessage('Please go back and provide your date of birth.');
+      return false;
+    }
+    if (isUnconfirmedFlag('participantLegalName')) {
+      flagOffensive('participantLegalName');
+      return false;
+    }
+    // Guardian fields are only shown to minors (see ConsentStep), so they are screened only for minors.
+    if (isUnconfirmedFlag('guardianFullName')) {
+      flagOffensive('guardianFullName');
+      return false;
+    }
+    if (isUnconfirmedFlag('guardianRelationship')) {
+      flagOffensive('guardianRelationship');
+      return false;
+    }
+    if (isUnconfirmedFlag('guardianSignature')) {
+      flagOffensive('guardianSignature');
       return false;
     }
     try {
@@ -353,6 +459,11 @@ export function useWizardDraft(
     saveStatus,
     errorMessage,
     setErrorMessage,
+    invalidField,
+    setInvalidField,
+    offensiveOverrides,
+    confirmedContentOverrides,
+    clearErrors,
     isRiotIdValid,
     trackerUrl,
     isManager,

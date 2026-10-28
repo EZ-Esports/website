@@ -5,6 +5,7 @@ import * as schema from './schema';
 import {
   buildSeasonBlocks,
   type RosterEditOptions,
+  type RosterViewContentOverride,
   type RosterViewPlayer,
   type RosterViewRoster,
   type SchoolRosterTeamInput,
@@ -67,6 +68,39 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
         .where(inArray(schema.players.rosterId, rosterRows.map((r) => r.id)))
     : [];
 
+  // Content overrides for the members on these rosters. Read only here, for the MANAGE_ROSTERS roster page.
+  const memberIds = [...new Set(playerRows.map((p) => p.memberId))];
+  const overrideRows = memberIds.length
+    ? await db
+        .select({
+          id: schema.onboardingContentOverrides.id,
+          memberId: schema.onboardingContentOverrides.memberId,
+          field: schema.onboardingContentOverrides.field,
+          submittedValue: schema.onboardingContentOverrides.submittedValue,
+          createdAt: schema.onboardingContentOverrides.createdAt,
+          reviewedAt: schema.onboardingContentOverrides.reviewedAt,
+          reviewedBy: schema.onboardingContentOverrides.reviewedBy,
+          reviewNote: schema.onboardingContentOverrides.reviewNote,
+        })
+        .from(schema.onboardingContentOverrides)
+        .where(inArray(schema.onboardingContentOverrides.memberId, memberIds))
+        .orderBy(asc(schema.onboardingContentOverrides.createdAt))
+    : [];
+  const overridesByMember = new Map<string, RosterViewContentOverride[]>();
+  for (const o of overrideRows) {
+    const list = overridesByMember.get(o.memberId) ?? [];
+    list.push({
+      id: o.id,
+      field: o.field,
+      submittedValue: o.submittedValue,
+      createdAt: o.createdAt,
+      reviewedAt: o.reviewedAt,
+      reviewedBy: o.reviewedBy,
+      reviewNote: o.reviewNote,
+    });
+    overridesByMember.set(o.memberId, list);
+  }
+
   const playersByRoster = new Map<string, RosterViewPlayer[]>();
   for (const p of playerRows) {
     const list = playersByRoster.get(p.rosterId) ?? [];
@@ -80,6 +114,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
       discord: p.discord,
       graduationYear: p.graduationYear,
       role: p.role,
+      contentOverrides: overridesByMember.get(p.memberId) ?? [],
     });
     playersByRoster.set(p.rosterId, list);
   }

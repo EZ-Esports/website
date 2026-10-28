@@ -1054,6 +1054,24 @@ export const onboardingConsents = pgTable('onboarding_consents', {
   ),
 ]).enableRLS();
 
+// A flagged onboarding field the student confirmed as their real information (spec-040). Written in the same
+// transaction as the member, so it never exists without one. `submittedValue` is what was typed, kept so staff
+// can judge it; it is shown only to staff with MANAGE_ROSTERS and is never logged.
+export const onboardingContentOverrides = pgTable('onboarding_content_overrides', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  // The OffensiveFieldKey that was flagged, e.g. 'legalFirstName' or 'riotId'.
+  field: text('field').notNull(),
+  submittedValue: text('submitted_value').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at'),
+  // Staff user id (Supabase auth user), set by the Mark reviewed action.
+  reviewedBy: text('reviewed_by'),
+  reviewNote: text('review_note'),
+}, (t) => [
+  index('onboarding_content_overrides_member_id_idx').on(t.memberId),
+]).enableRLS();
+
 export type SchoolManager = typeof schoolManagers.$inferSelect;
 export type NewSchoolManager = typeof schoolManagers.$inferInsert;
 export type PlayerInvite = typeof playerInvites.$inferSelect;

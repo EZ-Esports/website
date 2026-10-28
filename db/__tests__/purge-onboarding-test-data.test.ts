@@ -33,6 +33,7 @@ function snap(over: Partial<Snapshot> = {}): Snapshot {
     playerIdentities: [],
     studentDemographics: [],
     onboardingConsents: [],
+    onboardingContentOverrides: [],
     playerInvites: [],
     managerInvites: [],
     schoolManagers: [],
@@ -670,7 +671,7 @@ describe('schema audit', () => {
     // A new FK to members must be classified (delete, keep or protect) before this passes.
     expect(tablesReferencing('members')).toEqual(
       [
-        'leadership', 'manager_invites', 'onboarding_consents', 'people', 'player_identities',
+        'leadership', 'manager_invites', 'onboarding_consents', 'onboarding_content_overrides', 'people', 'player_identities',
         'player_invites', 'players', 'school_managers', 'staff_members', 'student_demographics',
       ].sort()
     );

@@ -100,6 +100,8 @@ export interface PlayerOnboardingSubmission {
   codeOfConductAccepted: boolean;
   /** Terms of Service acknowledgment and, for under-18s, the guardian authorization. Validated server-side. */
   consent: ConsentSubmission;
+  /** Flagged fields the student confirmed as their real information. Ignored unless the server also flags them. */
+  contentOverrides?: string[];
 }
 
 export interface SubmitPlayerOnboardingOptions {
@@ -126,6 +128,8 @@ export interface SubmitPlayerOnboardingFailure {
   success: false;
   code: OnboardingRejectionCode;
   error: string;
+  /** Field to fix, when the rejection is about one field (e.g. "riotId"). */
+  field?: string;
 }
 
 export type SubmitPlayerOnboardingOutcome =
@@ -374,7 +378,7 @@ export async function submitPlayerOnboarding(
     return await processOnboardingSubmission({ ...params, verifiedDiscord });
   } catch (err) {
     if (err instanceof OnboardingRejection) {
-      return { success: false, code: err.code, error: err.message };
+      return { success: false, code: err.code, error: err.message, field: err.field };
     }
     throw err;
   }

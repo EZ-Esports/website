@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 /** Transaction handle passed to the onboarding write steps. */
 export type OnboardingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -403,4 +403,34 @@ export async function insertOnboardingConsent(
   values: typeof schema.onboardingConsents.$inferInsert
 ): Promise<void> {
   await tx.insert(schema.onboardingConsents).values(values);
+}
+
+/**
+ * Replaces this member's unreviewed content overrides with the ones from the latest submission, inside the
+ * submission transaction. Rows staff have already reviewed are kept: they record a decision that was made.
+ */
+/** Longest typed value kept for staff review. Matches the "anything else" answer's limit. */
+const CONTENT_OVERRIDE_VALUE_MAX_LENGTH = 1000;
+
+export async function replaceUnreviewedContentOverrides(
+  tx: OnboardingTx,
+  memberId: string,
+  rows: Array<{ field: string; submittedValue: string }>
+): Promise<void> {
+  await tx
+    .delete(schema.onboardingContentOverrides)
+    .where(
+      and(
+        eq(schema.onboardingContentOverrides.memberId, memberId),
+        isNull(schema.onboardingContentOverrides.reviewedAt)
+      )
+    );
+  if (rows.length === 0) return;
+  await tx.insert(schema.onboardingContentOverrides).values(
+    rows.map((row) => ({
+      memberId,
+      field: row.field,
+      submittedValue: row.submittedValue.slice(0, CONTENT_OVERRIDE_VALUE_MAX_LENGTH),
+    }))
+  );
 }

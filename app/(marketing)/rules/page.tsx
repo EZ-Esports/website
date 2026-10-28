@@ -258,6 +258,16 @@ export default function RulesPage() {
                 occurring either on campus or within league competition.
               </p>
             </div>
+
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-foreground">3.4 Offensive Names &amp; Submitted Information</h3>
+              <p>
+                Usernames, in-game names, Riot IDs, and other information submitted during registration or onboarding must not contain
+                offensive language, including profanity and slurs in English and other common languages. The onboarding form checks for
+                common offensive terms and asks students to correct any it finds. That check is not complete, so submissions are also
+                reviewed by EZ Esports staff.
+              </p>
+            </div>
           </section>
 
           {/* Section 4: Match Operations & Scheduling */}

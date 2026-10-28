@@ -63,4 +63,32 @@ describe('stepForRejection', () => {
       expect(stepForRejection(code)).toBe(2);
     }
   });
+
+  it('routes offensive content to the step that holds the offending field', () => {
+    const cases: Array<[string, number]> = [
+      ['legalFirstName', 1],
+      ['legalLastName', 1],
+      ['riotId', 3],
+      ['countryOfBirth', 4],
+      ['primaryLanguageAtHome', 4],
+      ['feedback', 4],
+      ['participantLegalName', 5],
+      ['guardianFullName', 5],
+      ['guardianRelationship', 5],
+      ['guardianSignature', 5],
+    ];
+    for (const [field, step] of cases) {
+      expect(stepForRejection('offensive_content', field), field).toBe(step);
+    }
+  });
+
+  it('falls back to step 1 for offensive content with no or an unknown field', () => {
+    expect(stepForRejection('offensive_content')).toBe(1);
+    expect(stepForRejection('offensive_content', 'mystery')).toBe(1);
+  });
+
+  it('sends a missing Code of Conduct to step 4 and a missing Terms of Service to step 5', () => {
+    expect(stepForRejection('code_of_conduct_required')).toBe(4);
+    expect(stepForRejection('terms_required')).toBe(5);
+  });
 });

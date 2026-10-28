@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { FiShield } from 'react-icons/fi';
 import { CAREER_INTEREST_OPTIONS, RACE_ETHNICITY_OPTIONS } from '../../types';
 import { MIN_BIRTH_DATE } from '@/app/lib/onboarding/consent';
 import { RequiredMark } from '../RequiredMark';
+import { OffensiveFieldHint, fieldBorderClass } from '../OffensiveField';
 
 interface DemographicsStepProps {
   birthDate: string;
@@ -34,6 +36,8 @@ interface DemographicsStepProps {
   setFeedback: (val: string) => void;
   codeOfConductAccepted: boolean;
   setCodeOfConductAccepted: (val: boolean) => void;
+  /** Field flagged for offensive language by the last check, if any. */
+  invalidField?: string | null;
 }
 
 export function DemographicsStep({
@@ -65,6 +69,7 @@ export function DemographicsStep({
   setFeedback,
   codeOfConductAccepted,
   setCodeOfConductAccepted,
+  invalidField,
 }: DemographicsStepProps) {
   return (
     <div className="space-y-6">
@@ -192,8 +197,10 @@ export function DemographicsStep({
               value={countryOfBirth}
               onChange={(e) => setCountryOfBirth(e.target.value)}
               placeholder="e.g. United States, Dominican Republic"
-              className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className={`w-full px-3.5 py-2 rounded-lg bg-surface border text-foreground text-sm focus:outline-none focus:ring-2 ${fieldBorderClass(invalidField, 'countryOfBirth')}`}
+              aria-invalid={invalidField === 'countryOfBirth' || undefined}
             />
+            <OffensiveFieldHint invalidField={invalidField} field="countryOfBirth" />
           </div>
 
           <div>
@@ -209,8 +216,10 @@ export function DemographicsStep({
               value={primaryLanguageAtHome}
               onChange={(e) => setPrimaryLanguageAtHome(e.target.value)}
               placeholder="e.g. English, Spanish, Cantonese"
-              className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className={`w-full px-3.5 py-2 rounded-lg bg-surface border text-foreground text-sm focus:outline-none focus:ring-2 ${fieldBorderClass(invalidField, 'primaryLanguageAtHome')}`}
+              aria-invalid={invalidField === 'primaryLanguageAtHome' || undefined}
             />
+            <OffensiveFieldHint invalidField={invalidField} field="primaryLanguageAtHome" />
           </div>
         </div>
 
@@ -413,9 +422,11 @@ export function DemographicsStep({
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={2}
-            className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+            className={`w-full px-3.5 py-2 rounded-lg bg-surface border text-foreground text-xs focus:outline-none focus:ring-2 ${fieldBorderClass(invalidField, 'feedback')}`}
+            aria-invalid={invalidField === 'feedback' || undefined}
             placeholder="Schedule constraints, accommodations, questions..."
           />
+          <OffensiveFieldHint invalidField={invalidField} field="feedback" />
         </div>
       </div>
 
@@ -430,7 +441,16 @@ export function DemographicsStep({
             required
           />
           <span className="text-xs text-foreground leading-relaxed">
-            <strong>Code of Conduct & Rules Agreement<RequiredMark />:</strong> I have read and agree to abide by the EZ Esports Rulebook, Code of Conduct, and Tournament Regulations. I understand that unsportsmanlike behavior, toxicity, or ringing will result in immediate disqualification.
+            <strong>Code of Conduct & Rules Agreement<RequiredMark />:</strong> I have read and agree to abide by the EZ Esports{' '}
+            <Link
+              href="/rules"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline underline-offset-2 hover:no-underline"
+            >
+              Rulebook / Code of Conduct
+            </Link>{' '}
+            and Tournament Regulations. I understand that offensive usernames and offensive information submitted on this form are not allowed, and that unsportsmanlike behavior, toxicity, or ringing will result in immediate disqualification.
           </span>
         </label>
       </div>

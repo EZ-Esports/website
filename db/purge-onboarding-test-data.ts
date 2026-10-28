@@ -43,6 +43,7 @@ export const DELETE_ORDER = [
   'match_reschedule_options',
   'match_reschedule_requests',
   'onboarding_consents',
+  'onboarding_content_overrides',
   'student_demographics',
   'player_identities',
   'players',
@@ -77,6 +78,8 @@ export interface Snapshot {
   playerIdentities: { id: string; memberId: string; provider: string }[];
   studentDemographics: { id: string; memberId: string }[];
   onboardingConsents: { id: string; memberId: string; inviteId: string }[];
+  /** Flagged-field overrides from onboarding (spec-040). Deleted with their member, like consents. */
+  onboardingContentOverrides: { id: string; memberId: string }[];
   /** `draftText` is the submission draft serialised to text, or null. Searched for staff emails. */
   playerInvites: { id: string; memberId: string | null; draftText: string | null }[];
   managerInvites: { id: string; memberId: string | null; draftText: string | null }[];
@@ -321,6 +324,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
   for (const x of s.managerInvites) if (x.memberId) linked.add(x.memberId);
   for (const x of s.schoolManagers) if (x.memberId) linked.add(x.memberId);
   for (const x of s.onboardingConsents) linked.add(x.memberId);
+  for (const x of s.onboardingContentOverrides) linked.add(x.memberId);
   for (const x of s.studentDemographics) linked.add(x.memberId);
   for (const x of s.playerIdentities) linked.add(x.memberId);
 
@@ -400,6 +404,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
     match_reschedule_options: s.rescheduleOptions.filter((o) => deletedRequestIds.has(o.requestId)).map((o) => o.id),
     match_reschedule_requests: [...deletedRequestIds],
     onboarding_consents: s.onboardingConsents.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
+    onboarding_content_overrides: s.onboardingContentOverrides.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
     student_demographics: s.studentDemographics.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
     player_identities: s.playerIdentities.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
     players: s.players.filter((r) => deleteMemberSet.has(r.memberId)).map((r) => r.id),
@@ -415,6 +420,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
     match_reschedule_options: s.rescheduleOptions.length,
     match_reschedule_requests: s.rescheduleRequests.length,
     onboarding_consents: s.onboardingConsents.length,
+    onboarding_content_overrides: s.onboardingContentOverrides.length,
     student_demographics: s.studentDemographics.length,
     player_identities: s.playerIdentities.length,
     players: s.players.length,
@@ -428,6 +434,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
     match_reschedule_options: s.rescheduleOptions.filter((o) => keptRequestIds.has(o.requestId)).length,
     match_reschedule_requests: keptRequestIds.size,
     onboarding_consents: s.onboardingConsents.filter((r) => inScopeProtectedMembers(r.memberId)).length,
+    onboarding_content_overrides: s.onboardingContentOverrides.filter((r) => inScopeProtectedMembers(r.memberId)).length,
     student_demographics: s.studentDemographics.filter((r) => inScopeProtectedMembers(r.memberId)).length,
     player_identities: s.playerIdentities.filter((r) => inScopeProtectedMembers(r.memberId)).length,
     players: s.players.filter((r) => inScopeProtectedMembers(r.memberId)).length,
@@ -965,7 +972,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
     for (const run of thunks) out.push(await run());
     return out;
   };
-  const [members, players, rosters, teams, seasons, identities, demos, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead] =
+  const [members, players, rosters, teams, seasons, identities, demos, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead, contentOverrides] =
     await runOneAtATime([
       q('select m.id, m.first_name, m.last_name, m.email, m.member_key, coalesce(s.name, \'\') as school_name from members m left join schools s on s.id = m.school_id'),
       q('select id, member_id, roster_id from players'),
@@ -992,6 +999,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
       ),
       q('select full_name, user_id, member_id, email from people'),
       q('select member_id from leadership'),
+      q('select id, member_id from onboarding_content_overrides'),
     ]);
   return {
     members: members.map((r) => ({ id: String(r.id), firstName: String(r.first_name), lastName: String(r.last_name), email: str(r.email), memberKey: str(r.member_key), schoolName: String(r.school_name) })),
@@ -1002,6 +1010,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
     playerIdentities: identities.map((r) => ({ id: String(r.id), memberId: String(r.member_id), provider: String(r.provider) })),
     studentDemographics: demos.map((r) => ({ id: String(r.id), memberId: String(r.member_id) })),
     onboardingConsents: consents.map((r) => ({ id: String(r.id), memberId: String(r.member_id), inviteId: String(r.invite_id) })),
+    onboardingContentOverrides: contentOverrides.map((r) => ({ id: String(r.id), memberId: String(r.member_id) })),
     playerInvites: pInv.map((r) => ({ id: String(r.id), memberId: str(r.member_id), draftText: str(r.draft) })),
     managerInvites: mInv.map((r) => ({ id: String(r.id), memberId: str(r.member_id), draftText: str(r.draft) })),
     schoolManagers: mgrs.map((r) => ({ id: String(r.id), userId: String(r.user_id), memberId: str(r.member_id) })),

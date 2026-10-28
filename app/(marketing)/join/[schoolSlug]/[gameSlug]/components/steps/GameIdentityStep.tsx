@@ -2,6 +2,7 @@
 
 import { FiCheck, FiExternalLink } from 'react-icons/fi';
 import { RequiredMark } from '../RequiredMark';
+import { OffensiveFieldHint } from '../OffensiveField';
 
 interface GameIdentityStepProps {
   riotId: string;
@@ -12,6 +13,8 @@ interface GameIdentityStepProps {
   trackerUrl: string | null;
   isManager: boolean;
   gameName: string;
+  /** Field flagged for offensive language by the last check, if any. */
+  invalidField?: string | null;
 }
 
 export function GameIdentityStep({
@@ -23,6 +26,7 @@ export function GameIdentityStep({
   trackerUrl,
   isManager,
   gameName,
+  invalidField,
 }: GameIdentityStepProps) {
   return (
     <div className="space-y-6">
@@ -46,15 +50,20 @@ export function GameIdentityStep({
           value={riotId}
           onChange={(e) => setRiotId(e.target.value)}
           className={`w-full px-3.5 py-2.5 rounded-lg bg-surface border text-foreground text-sm focus:outline-none focus:ring-2 ${
-            riotId
-              ? isRiotIdValid
-                ? 'border-emerald-500/50 focus:ring-emerald-500'
-                : 'border-rose-500/50 focus:ring-rose-500'
-              : 'border-border focus:ring-accent'
+            invalidField === 'riotId'
+              ? 'border-danger focus:ring-danger'
+              : riotId
+                ? isRiotIdValid
+                  ? 'border-emerald-500/50 focus:ring-emerald-500'
+                  : 'border-rose-500/50 focus:ring-rose-500'
+                : 'border-border focus:ring-accent'
           }`}
+          aria-invalid={invalidField === 'riotId' || undefined}
+          aria-describedby={invalidField === 'riotId' ? 'riotId-offensive-hint' : undefined}
           placeholder="e.g. Demon1#LFT1 or Faker#T1"
           required
         />
+        <OffensiveFieldHint invalidField={invalidField} field="riotId" />
 
         <div className="mt-2 text-xs">
           {riotId && isRiotIdValid ? (

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {
+  replaceUnreviewedContentOverrides,
   findDiscordIdentityOwner,
   findInviteForSubmission,
   findStaffUserIdByEmail,
@@ -18,18 +19,87 @@ import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
   calculateAge,
+  isMinorAge,
   isPlausibleBirthDate,
   validateConsent,
   type NormalizedConsent,
 } from '../consent';
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
 import { OnboardingRejection, isDiscordIdentityUniqueViolation } from '../rejection';
+import { findFlaggedFields, specsFor, type OffensiveFieldKey } from '../offensive-fields';
 import type { VerifiedDiscord } from '../discord-verification';
 import type {
   PlayerOnboardingSubmission,
   SubmitPlayerOnboardingParams,
   SubmitPlayerOnboardingResult,
 } from '../wizard-actions';
+
+/**
+ * Student-typed free text screened for offensive language (students and managers alike). `field` is the
+ * name the wizard routes on; `label` is the only thing shown to the student, never the offending word.
+ */
+/** Raw submitted value for each screened field. Guardian values are read only for minors. */
+function submittedFieldValues(
+  submission: PlayerOnboardingSubmission,
+  isMinor: boolean
+): Partial<Record<OffensiveFieldKey, unknown>> {
+  const values: Partial<Record<OffensiveFieldKey, unknown>> = {
+    legalFirstName: submission.legalFirstName,
+    legalLastName: submission.legalLastName,
+    riotId: submission.riotId,
+    countryOfBirth: submission.countryOfBirth,
+    primaryLanguageAtHome: submission.primaryLanguageAtHome,
+    feedback: submission.surveyDetails?.feedback,
+    participantLegalName: submission.consent?.participantLegalName,
+  };
+  if (isMinor) {
+    values.guardianFullName = submission.consent?.guardianFullName;
+    values.guardianRelationship = submission.consent?.guardianRelationship;
+    values.guardianSignature = submission.consent?.guardianSignature;
+  }
+  return values;
+}
+
+/**
+ * Screens the applicable fields and returns those holding offensive language, in form order, with their
+ * trimmed text. Non-string values can only come from a tampered client, not from a student fixing the form,
+ * so they throw a plain (masked) error rather than a student-fixable rejection.
+ */
+function screenOffensiveFields(
+  submission: PlayerOnboardingSubmission,
+  isMinor: boolean
+): Array<{ key: OffensiveFieldKey; label: string; text: string }> {
+  const values = submittedFieldValues(submission, isMinor);
+  const flagged: Array<{ key: OffensiveFieldKey; label: string; text: string }> = [];
+  for (const spec of specsFor(isMinor)) {
+    const raw = values[spec.key];
+    if (raw !== undefined && raw !== null && typeof raw !== 'string') {
+      throw new Error('Invalid onboarding submission.');
+    }
+  }
+  for (const key of findFlaggedFields(values, isMinor)) {
+    const spec = specsFor(isMinor).find((s) => s.key === key);
+    const text = String(values[key] ?? '').trim();
+    if (spec) flagged.push({ key, label: spec.label, text });
+  }
+  return flagged;
+}
+
+/**
+ * Content overrides the student ticked for fields that are actually flagged. Keys that are not flagged are
+ * dropped here, so a client cannot record an override for a clean field.
+ */
+function acceptedContentOverrides(
+  flagged: Array<{ key: OffensiveFieldKey; text: string }>,
+  requested: unknown
+): Array<{ field: OffensiveFieldKey; submittedValue: string }> {
+  const ticked = new Set(
+    Array.isArray(requested) ? requested.filter((k): k is string => typeof k === 'string') : []
+  );
+  return flagged
+    .filter((f) => ticked.has(f.key))
+    .map((f) => ({ field: f.key, submittedValue: f.text }));
+}
 
 /**
  * Validates player/manager onboarding submission inputs before database persistence.
@@ -44,6 +114,8 @@ export function validateSubmissionInputs(
   gradYear: number;
   birthDateObj: Date;
   consent: NormalizedConsent;
+  /** Flagged fields the student confirmed as their real information. Recorded for staff review. */
+  contentOverrides: Array<{ field: OffensiveFieldKey; submittedValue: string }>;
 } {
   const email = (submission.email || '').trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -56,13 +128,36 @@ export function validateSubmissionInputs(
     throw new Error('Legal first and last names are required.');
   }
 
+  // Offensive content is a student-fixable rejection, so it is returned as a coded result, not a thrown
+  // Error: production builds mask thrown messages. Runs for players and managers, since both paths call this.
+  // Same age rule as validateConsent, so the guardian fields are screened exactly when the form shows them.
+  const screenedBirthDate = new Date(submission.birthDate);
+  const isMinor =
+    isPlausibleBirthDate(screenedBirthDate, now) && isMinorAge(calculateAge(screenedBirthDate, now));
+  // A flagged field passes only when the student ticked its confirmation; every other flagged field is
+  // rejected as before. Accepted overrides are returned so they can be recorded for staff with the member.
+  const flagged = screenOffensiveFields(submission, isMinor);
+  const contentOverrides = acceptedContentOverrides(flagged, submission.contentOverrides);
+  const confirmed = new Set<string>(contentOverrides.map((o) => o.field));
+  const unconfirmed = flagged.find((f) => !confirmed.has(f.key));
+  if (unconfirmed) {
+    throw new OnboardingRejection(
+      'offensive_content',
+      `Please remove offensive language from ${unconfirmed.label}. Offensive names and submitted information are not allowed.`,
+      { field: unconfirmed.key }
+    );
+  }
+
   const gradYear = Number(submission.graduationYear);
   if (!Number.isInteger(gradYear) || gradYear < 2020 || gradYear > 2040) {
     throw new Error('A valid graduation year (e.g. 2026) is required.');
   }
 
   if (!submission.codeOfConductAccepted) {
-    throw new Error('You must accept the EZ Esports code of conduct and rules to complete onboarding.');
+    throw new OnboardingRejection(
+      'code_of_conduct_required',
+      'You must accept the EZ Esports code of conduct and rules to complete onboarding.'
+    );
   }
 
   const birthDateObj = new Date(submission.birthDate);
@@ -72,6 +167,12 @@ export function validateSubmissionInputs(
 
   // Consent is enforced here, server-side, so it cannot be skipped by calling the action directly.
   // Age comes from the stored date of birth, never from a client-supplied age.
+  if (!submission.consent || submission.consent.tosAcknowledged !== true) {
+    throw new OnboardingRejection(
+      'terms_required',
+      'You must acknowledge the EZ Esports Terms of Service to complete onboarding.'
+    );
+  }
   const consent = validateConsent(submission.consent, {
     age: calculateAge(birthDateObj, now),
     fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
@@ -84,6 +185,7 @@ export function validateSubmissionInputs(
     gradYear,
     birthDateObj,
     consent,
+    contentOverrides,
   };
 }
 
@@ -331,6 +433,10 @@ export async function processOnboardingSubmission(
         gradYear: validated.gradYear,
         schoolId: invite.schoolId,
       });
+
+      // 3a-ii. Content overrides: flagged fields the student confirmed. Written in this transaction, so they
+      // exist only alongside the member they belong to.
+      await replaceUnreviewedContentOverrides(tx, createdOrUpdatedMemberId, validated.contentOverrides);
 
       // 3b. Identities (Riot + Discord). One Discord account may belong to only one member.
       const discordOwner = await findDiscordIdentityOwner(tx, discord.discordUserId);

@@ -224,6 +224,12 @@ const mocks = vi.hoisted(() => {
       };
     }),
 
+    // Unreviewed content overrides are cleared on every submission (spec-040). This suite does not exercise
+    // overrides, so the delete is a no-op here.
+    delete: vi.fn(() => ({
+      where: vi.fn(() => ({ then: (resolve: (v: any) => void) => resolve([]) })),
+    })),
+
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => {
       return cb(mockDb);
     }),

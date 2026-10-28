@@ -6,6 +6,7 @@ import {
   formatConsentIntro,
 } from '@/app/lib/onboarding/consent';
 import { RequiredMark } from '../RequiredMark';
+import { OffensiveFieldHint, fieldBorderClass } from '../OffensiveField';
 
 interface ConsentStepProps {
   /** Age computed from the date of birth entered in Step 4; null if none was entered. */
@@ -23,10 +24,13 @@ interface ConsentStepProps {
   setGuardianEmail: (val: string) => void;
   guardianSignature: string;
   setGuardianSignature: (val: string) => void;
+  /** Field flagged for offensive language by the last check, if any. */
+  invalidField?: string | null;
 }
 
-const inputClass =
-  'w-full min-h-[44px] px-3.5 py-2.5 rounded-lg bg-surface-raised border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent';
+const inputBaseClass =
+  'w-full min-h-[44px] px-3.5 py-2.5 rounded-lg bg-surface-raised border text-foreground text-sm focus:outline-none focus:ring-2';
+const inputClass = `${inputBaseClass} border-border focus:ring-accent`;
 const labelClass = 'block text-xs font-semibold text-foreground-secondary mb-1.5';
 const sectionHeadingClass = 'text-sm font-bold text-foreground';
 
@@ -55,6 +59,7 @@ export function ConsentStep({
   setGuardianEmail,
   guardianSignature,
   setGuardianSignature,
+  invalidField,
 }: ConsentStepProps) {
   const termsLink = (
     <a
@@ -126,9 +131,11 @@ export function ConsentStep({
                 autoComplete="off"
                 value={participantLegalName}
                 onChange={(e) => setParticipantLegalName(e.target.value)}
-                className={inputClass}
+                className={`${inputBaseClass} ${fieldBorderClass(invalidField, 'participantLegalName')}`}
+                aria-invalid={invalidField === 'participantLegalName' || undefined}
                 required
               />
+              <OffensiveFieldHint invalidField={invalidField} field="participantLegalName" />
             </div>
           </section>
 
@@ -168,9 +175,11 @@ export function ConsentStep({
                   autoComplete="off"
                   value={guardianFullName}
                   onChange={(e) => setGuardianFullName(e.target.value)}
-                  className={inputClass}
+                  className={`${inputBaseClass} ${fieldBorderClass(invalidField, 'guardianFullName')}`}
+                  aria-invalid={invalidField === 'guardianFullName' || undefined}
                   required
                 />
+                <OffensiveFieldHint invalidField={invalidField} field="guardianFullName" />
               </div>
               <div>
                 <label htmlFor="consent-guardian-relationship" className={labelClass}>
@@ -183,9 +192,11 @@ export function ConsentStep({
                   autoComplete="off"
                   value={guardianRelationship}
                   onChange={(e) => setGuardianRelationship(e.target.value)}
-                  className={inputClass}
+                  className={`${inputBaseClass} ${fieldBorderClass(invalidField, 'guardianRelationship')}`}
+                  aria-invalid={invalidField === 'guardianRelationship' || undefined}
                   required
                 />
+                <OffensiveFieldHint invalidField={invalidField} field="guardianRelationship" />
               </div>
             </div>
             <div>
@@ -228,9 +239,11 @@ export function ConsentStep({
                   autoComplete="off"
                   value={guardianSignature}
                   onChange={(e) => setGuardianSignature(e.target.value)}
-                  className={inputClass}
+                  className={`${inputBaseClass} ${fieldBorderClass(invalidField, 'guardianSignature')}`}
+                  aria-invalid={invalidField === 'guardianSignature' || undefined}
                   required
                 />
+                <OffensiveFieldHint invalidField={invalidField} field="guardianSignature" />
               </div>
               <div>
                 <label htmlFor="consent-date" className={labelClass}>

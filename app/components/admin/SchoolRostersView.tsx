@@ -21,6 +21,7 @@ import {
   AddRosterControl,
   DeleteRosterButton,
   PlayerEditForm,
+  ContentOverrideNotice,
   PlayerRowActions,
   RegisterTeamPanel,
   RosterEditForm,
@@ -416,6 +417,7 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                       .filter(Boolean)
                       .join(' · ') || 'No further details'}
                   </p>
+                  <ContentOverrideNotice player={p} />
                 </>
               )}
             </li>

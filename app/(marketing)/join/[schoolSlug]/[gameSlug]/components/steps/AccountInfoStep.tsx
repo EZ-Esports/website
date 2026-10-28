@@ -1,6 +1,7 @@
 'use client';
 
 import { RequiredMark } from '../RequiredMark';
+import { OffensiveFieldHint, fieldBorderClass } from '../OffensiveField';
 import {
   DEFAULT_MANAGER_SEASON,
   GRADUATION_YEAR_OPTIONS,
@@ -21,6 +22,8 @@ interface AccountInfoStepProps {
   academicYear?: string;
   setAcademicYear?: (val: string) => void;
   isManager: boolean;
+  /** Field flagged for offensive language by the last check, if any. */
+  invalidField?: string | null;
 }
 
 export function AccountInfoStep({
@@ -37,6 +40,7 @@ export function AccountInfoStep({
   academicYear,
   setAcademicYear,
   isManager,
+  invalidField,
 }: AccountInfoStepProps) {
   return (
     <div className="space-y-6">
@@ -62,10 +66,13 @@ export function AccountInfoStep({
             type="text"
             value={legalFirstName}
             onChange={(e) => setLegalFirstName(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className={`w-full px-3.5 py-2.5 rounded-lg bg-surface border text-foreground text-sm focus:outline-none focus:ring-2 ${fieldBorderClass(invalidField, 'legalFirstName')}`}
+            aria-invalid={invalidField === 'legalFirstName' || undefined}
+            aria-describedby={invalidField === 'legalFirstName' ? 'legalFirstName-offensive-hint' : undefined}
             placeholder="e.g. Alex"
             required
           />
+          <OffensiveFieldHint invalidField={invalidField} field="legalFirstName" />
         </div>
 
         <div>
@@ -80,10 +87,13 @@ export function AccountInfoStep({
             type="text"
             value={legalLastName}
             onChange={(e) => setLegalLastName(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className={`w-full px-3.5 py-2.5 rounded-lg bg-surface border text-foreground text-sm focus:outline-none focus:ring-2 ${fieldBorderClass(invalidField, 'legalLastName')}`}
+            aria-invalid={invalidField === 'legalLastName' || undefined}
+            aria-describedby={invalidField === 'legalLastName' ? 'legalLastName-offensive-hint' : undefined}
             placeholder="e.g. Chen"
             required
           />
+          <OffensiveFieldHint invalidField={invalidField} field="legalLastName" />
         </div>
       </div>
 

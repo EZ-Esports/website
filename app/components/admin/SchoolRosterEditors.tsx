@@ -13,8 +13,16 @@ import {
   updatePlayer,
   updateRoster,
 } from '@/app/(admin)/admin/schools/[schoolId]/rosters/actions';
+import { markContentOverrideReviewed } from '@/app/(admin)/admin/schools/[schoolId]/rosters/override-actions';
 import { toHubDivision } from '@/app/lib/db/match-page';
-import type { RosterEditOptions, RosterViewPlayer, RosterViewRoster, SeasonBlock } from '@/app/lib/school-roster-view';
+import type {
+  RosterEditOptions,
+  RosterViewContentOverride,
+  RosterViewPlayer,
+  RosterViewRoster,
+  SeasonBlock,
+} from '@/app/lib/school-roster-view';
+import { OFFENSIVE_FIELD_STAFF_LABELS } from '@/app/lib/onboarding/offensive-fields';
 import { AdminField, PendingLabel } from '@/app/components/admin/AdminUI';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
@@ -460,5 +468,87 @@ export function AddPlayerButton({ open, onClick, full = false, playerCount = 0 }
     <button type="button" className={primaryBtnSm} aria-expanded={open} disabled={full} onClick={onClick}>
       <FiPlus aria-hidden /> {full ? `Roster full (${playerCount}/${MAX_ROSTER_PLAYERS})` : 'Add player'}
     </button>
+  );
+}
+
+/** Calendar date in UTC, so the server and client render the same text. */
+function shortDate(d: Date): string {
+  return new Date(d).toISOString().slice(0, 10);
+}
+
+/**
+ * Onboarding content overrides for one player (spec-040): a flagged field the student confirmed as their real
+ * information. The submitted value is shown here only; this page is MANAGE_ROSTERS-only and nothing logs it.
+ */
+export function ContentOverrideNotice({ player }: { player: RosterViewPlayer }) {
+  const overrides = player.contentOverrides ?? [];
+  if (overrides.length === 0) return null;
+  return (
+    <ul className="mt-1.5 space-y-1.5">
+      {overrides.map((o) => (
+        <ContentOverrideRow key={o.id} override={o} />
+      ))}
+    </ul>
+  );
+}
+
+function ContentOverrideRow({ override }: { override: RosterViewContentOverride }) {
+  const { schoolId, pending, run } = useEdit();
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const fieldLabel = OFFENSIVE_FIELD_STAFF_LABELS[override.field as keyof typeof OFFENSIVE_FIELD_STAFF_LABELS] ?? override.field;
+  const reviewed = override.reviewedAt !== null;
+
+  return (
+    <li className="rounded-lg border border-warning/40 bg-warning/5 px-2.5 py-2 text-xs text-foreground">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-semibold">Confirmed flagged text: {fieldLabel}</span>
+        <span className="text-foreground-secondary">submitted {shortDate(override.createdAt)}</span>
+        <span className={reviewed ? 'text-foreground-secondary' : 'font-semibold text-warning'}>
+          {reviewed ? `Reviewed ${shortDate(override.reviewedAt as Date)}` : 'Not reviewed'}
+        </span>
+      </div>
+      <p className="mt-1 break-words font-mono text-foreground">&quot;{override.submittedValue}&quot;</p>
+      {reviewed && override.reviewNote && (
+        <p className="mt-1 break-words text-foreground-secondary">Note: {override.reviewNote}</p>
+      )}
+      {!reviewed &&
+        (noteOpen ? (
+          <form
+            className="mt-2 flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(
+                () => markContentOverrideReviewed(schoolId, override.id, note),
+                'Marked reviewed.',
+                () => {
+                  setNoteOpen(false);
+                  setNote('');
+                },
+              );
+            }}
+          >
+            <input
+              type="text"
+              aria-label="Review note (optional)"
+              value={note}
+              maxLength={500}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Review note (optional)"
+              className={cx(input, 'min-w-0 flex-1')}
+            />
+            <button type="submit" className={primaryBtnSm} disabled={pending}>
+              <PendingLabel pending={pending} label="Save review" pendingLabel="Saving..." />
+            </button>
+            <button type="button" className={ghostBtnSm} onClick={() => setNoteOpen(false)} disabled={pending}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button type="button" className={cx(secondaryBtnSm, 'mt-2')} onClick={() => setNoteOpen(true)}>
+            Mark reviewed
+          </button>
+        ))}
+    </li>
   );
 }

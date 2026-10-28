@@ -241,6 +241,10 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
 
+    // Unreviewed content overrides are cleared on every submission (spec-040); this flow does not exercise them.
+    delete: vi.fn(() => ({
+      where: vi.fn(() => ({ then: (resolve: (v: any) => void) => resolve([]) })),
+    })),
     insert: vi.fn((tbl: any) => {
       let insertVals: any = null;
       const builder = {
