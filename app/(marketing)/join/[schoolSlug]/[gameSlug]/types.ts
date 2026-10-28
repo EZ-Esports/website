@@ -13,6 +13,8 @@ export interface InviteData {
   gameSlug: string;
   submissionDraft: Record<string, any> | null;
   expiresAt: Date;
+  /** Manager invites only: games a manager can say they also play. */
+  playableGames?: Array<{ id: string; slug: string; displayName: string }>;
 }
 
 /**
@@ -21,7 +23,7 @@ export interface InviteData {
  */
 export function stepForRejection(code: string, fields: readonly string[] = []): 1 | 2 | 3 | 4 | 5 {
   if (code === 'content_flagged' || code === 'field_too_long') return stepForContentFields(fields);
-  return code === 'manager_password_required' ? 1 : 2;
+  return code === 'manager_password_required' || code === 'play_games_required' ? 1 : 2;
 }
 
 /** What a step needs to warn about, and let the person override, one offensive-content flag. */
@@ -38,6 +40,9 @@ export interface WizardFormData {
   graduationYear: number;
   /** Manager only: season the manager is applying for, e.g. "2026-27". */
   academicYear?: string;
+  /** Manager only: null until answered. */
+  alsoPlays?: boolean | null;
+  playGameIds?: string[];
   riotId: string;
   ignConfirmed: boolean;
   birthDate: string;

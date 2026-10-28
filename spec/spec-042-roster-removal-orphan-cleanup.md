@@ -2,7 +2,7 @@
 
 - **Spec ID:** spec-042
 - **Title:** Removing a player from a roster also deletes the student's onboarding record when nothing else needs it
-- **Status:** Implemented on branch `fix/roster-removal-orphan-cleanup` (PR #305, not merged at the time of writing). No migration, no schema change. (Numbered 042 because 040 and 041 are taken by PR #304 and the Discord second-tab work; #304 is merged and its conflicts with this branch are resolved.)
+- **Status:** Merged via PR #305 (branch `fix/roster-removal-orphan-cleanup`), 2026-10-28. No migration, no schema change. (Numbered 042 because 040 and 041 are taken by PR #304 and the Discord second-tab work; #304 is merged and its conflicts with this branch are resolved.)
 - **PR / Commit:** PR #305
 - **Date:** 2026-10-28
 - **Scope:** `app/lib/db/roster-removal.ts` (one shared helper), staff `deleteRosterMember` and `deleteRoster`, manager `removePlayerFromRoster`, the confirmation wording (`app/lib/roster-removal-copy.ts`), the manager portal's new remove confirmation, and a small wording audit of other delete buttons.

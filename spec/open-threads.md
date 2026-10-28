@@ -199,7 +199,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - `window.close()` from the finished tab only works for tabs the wizard opened; otherwise the person closes it from the on-screen instruction.
 - A callback with an expired or missing flow cookie shows a plain error page in the second tab and sends no message; the wizard tab recovers through Cancel, closing the tab, or the ten-minute cap.
 
-## Roster removal cleanup (spec-042, unmerged)
+## Roster removal cleanup (spec-042, merged in PR #305)
 
 - **Rehearsed on PGlite only.** The helper's SQL is exercised in memory (`roster-removal-pglite.test.ts`), including the FK-restrict race and a dropped optional table. `FOR UPDATE` and nested savepoints through the Supabase transaction pooler (port 6543) are not verified; nothing ran against any real database.
 - **Implicit removals not covered.** Deleting a game or season cascades teams, rosters and players without the app reading them, so their members are not cleaned and `notifyRosterMembershipChanged` is not called; deleting a school is a soft delete and leaves members. Orphans left by those paths (and any created before spec-042) can be swept by the spec-036 purge script; a generic sweep job was not built. The spec-034 move keeps the `players` row, so it needs no cleanup. Staff roster delete does run the cleanup (it is already refused when the roster has matches).
@@ -207,3 +207,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Kept members keep their spent invite.** There is no UI for staff to purge a kept student on request.
 - **`onboarding_content_flags` is covered** (added after #304 merged): counted in the helper's `deleteMember`, named in the confirmation copy, and in the mocked and PGlite tests. The spec-036 purge script still relies on the member FK cascade for it (see the comment on `DELETE_ORDER`).
 - `manager_invites` and `school_managers` have no email column, so the case-insensitive email match applies only to `staff_members` and `people`; managers are matched by member link, and manager invites also by intended name at the member's school.
+
+## Managers who also play (spec-043, #296, merged in PR #308)
+
+- Not verified in a browser or with real Discord/Supabase; component and pipeline tests only.
+- Members are matched by email only. A person who uses a different email on a second invite but the same Discord account is still refused with `discord_already_linked`; matching by Discord was deliberately not added.
+- `upsertMemberRecord` overwrites `members.school_id`, so a person who uses an invite from a second school is moved to it (existing behaviour, now reachable for managers who play).
+- The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).

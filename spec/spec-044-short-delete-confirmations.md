@@ -1,8 +1,8 @@
-# spec-043: Short, uniform wording for roster delete confirmations
+# spec-044: Short, uniform wording for roster delete confirmations
 
-- **Spec ID:** spec-043
+- **Spec ID:** spec-044
 - **Title:** Roster removal and roster delete dialogs only say "permanently" and "cannot be undone"
-- **Status:** Implemented on branch `claude/roster-remove-confirm-79876c`. Copy only: no behaviour, schema or migration change.
+- **Status:** Implemented on PR #310, branch `claude/roster-remove-confirm-79876c`. Copy only: no behaviour, schema or migration change.
 - **Date:** 2026-10-28
 - **Scope:** `app/lib/roster-removal-copy.ts`, `SchoolPortalClient.tsx` (empty-roster delete), `SchoolRosterEditors.tsx` (staff delete roster) and their tests.
 
