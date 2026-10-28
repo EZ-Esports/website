@@ -15,18 +15,14 @@ interface ArchiveMatchListProps {
   sort: 'asc' | 'desc';
   initialItems: MatchPageItemDto[];
   initialCursor: MatchCursor | null;
-  /** Season outcomes are unpublished; rows arrive without scores and read as plain "Completed". */
+  /** Season outcomes are unpublished; rows arrive without scores and every match reads as "0 - 0". */
   outcomesHidden?: boolean;
 }
 
 function StatusBadge({ match, outcomesHidden }: { match: MatchPageItemDto; outcomesHidden: boolean }) {
-  // The server already turned a hidden season's forfeits into plain completed matches.
-  if (outcomesHidden && match.status === 'completed') {
-    return (
-      <Badge variant="neutral" size="sm">
-        Completed
-      </Badge>
-    );
+  // Hidden outcomes read "0 - 0" for every match, whatever its status.
+  if (outcomesHidden) {
+    return <Badge>0 - 0</Badge>;
   }
   if (match.status === 'forfeit') {
     return (

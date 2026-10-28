@@ -13,7 +13,7 @@ interface CalendarScheduleProps {
   matches: ScheduleCalendarItem[];
   gameSlug: string;
   division: string;
-  /** Season outcomes are unpublished; matches arrive without scores and read as plain "Completed". */
+  /** Season outcomes are unpublished; matches arrive without scores and every match reads as "0 - 0". */
   outcomesHidden?: boolean;
 }
 
@@ -391,7 +391,10 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
                     </div>
 
                     <div className="text-right shrink-0">
-                      {isCompleted ? (
+                      {/* Hidden outcomes read "0 - 0" for every match, whatever its status. */}
+                      {outcomesHidden ? (
+                        <Badge>0 - 0</Badge>
+                      ) : isCompleted ? (
                         <div className="flex flex-col items-end gap-1">
                           {/* Unrecorded results render a neutral label, not an empty pill. */}
                           {match.forfeit ? (
@@ -401,7 +404,7 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
                           ) : match.result ? (
                             <Badge>{match.result}</Badge>
                           ) : (
-                            <Badge variant="neutral" size="sm">{outcomesHidden ? 'Completed' : 'Final'}</Badge>
+                            <Badge variant="neutral" size="sm">Final</Badge>
                           )}
                           {!match.forfeit && match.homeScore !== null && match.awayScore !== null && (
                             <span className="text-xs text-foreground-secondary font-bold">
@@ -476,7 +479,13 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
 
                   {/* VS / Score Hub */}
                   <div className="flex flex-col items-center justify-center shrink-0 min-w-[70px] z-10">
-                    {selectedMatch.status === 'Completed' && selectedMatch.homeScore !== null && selectedMatch.awayScore !== null ? (
+                    {outcomesHidden ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
+                        <span className="text-foreground-muted font-extrabold text-sm">-</span>
+                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
+                      </div>
+                    ) : selectedMatch.status === 'Completed' && selectedMatch.homeScore !== null && selectedMatch.awayScore !== null ? (
                       <div className="flex items-center gap-2">
                         <span className={`text-2xl md:text-3xl font-black ${selectedMatch.homeScore > selectedMatch.awayScore ? 'text-accent' : 'text-foreground-secondary'}`}>
                           {selectedMatch.homeScore}

@@ -457,12 +457,10 @@ export default async function GameHubView({ params, division }: GameHubViewProps
               <Table>
                 <thead className="border-b border-line">
                   <tr>
-                    {outcomesPublic && <Th>Rank</Th>}
+                    <Th>Rank</Th>
                     <Th>Team</Th>
-                    {outcomesPublic && <Th className="whitespace-nowrap">W&ndash;L</Th>}
-                    {outcomesPublic && (
-                      <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
-                    )}
+                    <Th className="whitespace-nowrap">W&ndash;L</Th>
+                    <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
                     {/* Form needs ~150px (five chips plus the cell's px-6) beyond
                         the four columns already here, and the tile is half of a
                         four-column grid (486px at `lg`), of which five `px-6`
@@ -488,6 +486,10 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                       {/* The leader carries the game's accent, the one place
                           the table earns colour. Hidden outcomes have no
                           leader: the list is alphabetical. */}
+                      {/* Hidden outcomes: rank reads 0, never a redacted blank. */}
+                      {!outcomesPublic && (
+                        <Td className="font-bold whitespace-nowrap border-l-2 border-l-transparent">0</Td>
+                      )}
                       {outcomesPublic && entry.rank !== null && (
                         <Td
                           className={cx(
@@ -506,9 +508,16 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                           the squad that tells a combined table's two Brooklyn
                           Technical rows apart. */}
                       <Td className="font-bold text-foreground">{entry.teamLabel}</Td>
+                      {/* Hidden outcomes: every record reads 0-0, never a redacted blank. */}
+                      {!outcomesPublic && <Td className="font-medium whitespace-nowrap">0-0</Td>}
                       {outcomesPublic && entry.wins !== null && entry.losses !== null && (
                         <Td className="font-medium whitespace-nowrap">
                           {entry.wins}&ndash;{entry.losses}
+                        </Td>
+                      )}
+                      {!outcomesPublic && (
+                        <Td className="hidden sm:table-cell font-bold text-foreground text-right whitespace-nowrap">
+                          0%
                         </Td>
                       )}
                       {outcomesPublic && entry.winPct !== null && (
