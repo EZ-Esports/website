@@ -66,14 +66,20 @@ export function RostersSection({
   const createLocked =
     (anyLocked || anyViewOnly) &&
     allGameIds.every((id) => lockedGameIds.includes(id) || viewOnlyGameIds.includes(id));
+  // One titled section per season, in the order the rosters arrive, so a staff view stays readable.
+  const seasons = new Map<string, { name: string; rosters: SchoolRosterDetails[] }>();
+  for (const roster of rosters) {
+    const group = seasons.get(roster.seasonId) ?? { name: roster.seasonName, rosters: [] };
+    group.rosters.push(roster);
+    seasons.set(roster.seasonId, group);
+  }
+  const seasonGroups = [...seasons.entries()];
   return (
     <div data-tour="rosters" className="min-w-0 space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-xl font-bold text-white tracking-tight">Team Rosters & Eligibility Gates</h2>
-          <p className="text-xs sm:text-sm text-zinc-400">
-            Live 5-point verification for tournament registration (Roster size, Captain, Riot ID, Discord link, and In-Guild status).
-          </p>
+          <p className="text-xs sm:text-sm text-zinc-400">Check each roster before tournament registration.</p>
         </div>
         <Button
           data-tour="create-roster"
@@ -146,32 +152,37 @@ export function RostersSection({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {rosters.map((roster) => (
-            <RosterCard
-              key={roster.id}
-              roster={roster}
-              locked={lockedGameIds.includes(roster.gameId) || viewOnlyGameIds.includes(roster.gameId)}
-              gateResult={eligibilityResults[roster.id]}
-              isEvaluating={evaluatingRosterId === roster.id}
-              onOpenEnrollModal={onOpenEnrollModal}
-              onCheckRosterGate={onCheckRosterGate}
-              onUpdateRole={onUpdateRole}
-              onRemovePlayer={onRemovePlayer}
-              onMovePlayer={onMovePlayer}
-              movingPlayerId={movingPlayerId}
-              siblingRosters={rosters
-                .filter((r) => r.teamId === roster.teamId && r.id !== roster.id)
-                .map((r) => ({
-                  id: r.id,
-                  name: r.name,
-                  playerCount: r.players.length,
-                  subCount: r.players.filter((p) => p.role === 'sub').length,
-                }))}
-              onDeleteRoster={onDeleteRoster}
-            />
-          ))}
-        </div>
+        seasonGroups.map(([seasonId, group]) => (
+          <section key={seasonId} aria-label={`${group.name} season rosters`} className="space-y-4">
+            <h3 className="text-base font-bold text-white">{group.name} Season</h3>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {group.rosters.map((roster) => (
+                <RosterCard
+                  key={roster.id}
+                  roster={roster}
+                  locked={lockedGameIds.includes(roster.gameId) || viewOnlyGameIds.includes(roster.gameId)}
+                  gateResult={eligibilityResults[roster.id]}
+                  isEvaluating={evaluatingRosterId === roster.id}
+                  onOpenEnrollModal={onOpenEnrollModal}
+                  onCheckRosterGate={onCheckRosterGate}
+                  onUpdateRole={onUpdateRole}
+                  onRemovePlayer={onRemovePlayer}
+                  onMovePlayer={onMovePlayer}
+                  movingPlayerId={movingPlayerId}
+                  siblingRosters={rosters
+                    .filter((r) => r.teamId === roster.teamId && r.id !== roster.id)
+                    .map((r) => ({
+                      id: r.id,
+                      name: r.name,
+                      playerCount: r.players.length,
+                      subCount: r.players.filter((p) => p.role === 'sub').length,
+                    }))}
+                  onDeleteRoster={onDeleteRoster}
+                />
+              ))}
+            </div>
+          </section>
+        ))
       )}
     </div>
   );
