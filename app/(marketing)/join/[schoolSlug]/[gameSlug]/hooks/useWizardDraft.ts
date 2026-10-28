@@ -75,6 +75,10 @@ export function useWizardDraft(
       : [];
   });
 
+  // Bumped on every failed attempt to leave step 1 without a game, so the group flags itself and takes focus again.
+  const [playGamesErrorTick, setPlayGamesErrorTick] = useState(0);
+  const flagPlayGamesError = () => setPlayGamesErrorTick((n) => n + 1);
+
   // Step 3: Riot Games Identity
   const [riotId, setRiotId] = useState(initialDraft.riotId || '');
   const [ignConfirmed, setIgnConfirmed] = useState<boolean>(
@@ -308,6 +312,7 @@ export function useWizardDraft(
     }
     if (isManager && alsoPlays && playGameIds.length === 0) {
       setErrorMessage('Please choose at least one game you will play.');
+      flagPlayGamesError();
       return false;
     }
     if (blockedByContent(1)) return false;
@@ -404,6 +409,8 @@ export function useWizardDraft(
     setAlsoPlays,
     playGameIds,
     setPlayGameIds,
+    playGamesErrorTick,
+    flagPlayGamesError,
     riotId,
     setRiotId,
     ignConfirmed,

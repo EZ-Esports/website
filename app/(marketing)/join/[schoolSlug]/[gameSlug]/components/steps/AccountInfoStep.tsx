@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { RequiredMark } from '../RequiredMark';
 import {
   DEFAULT_MANAGER_SEASON,
@@ -27,6 +28,8 @@ interface AccountInfoStepProps {
   setAlsoPlays?: (val: boolean) => void;
   playableGames?: Array<{ id: string; displayName: string }>;
   playGameIds?: string[];
+  /** Increments each time the person tries to continue with no game chosen. */
+  playGamesErrorTick?: number;
   setPlayGameIds?: (val: string[]) => void;
   isManager: boolean;
   /** Offensive-content warnings and overrides for this step's fields. */
@@ -50,10 +53,18 @@ export function AccountInfoStep({
   setAlsoPlays,
   playableGames = [],
   playGameIds = [],
+  playGamesErrorTick = 0,
   setPlayGameIds,
   isManager,
   contentFlags,
 }: AccountInfoStepProps) {
+  const firstGameRef = useRef<HTMLInputElement>(null);
+  const gamesInvalid = playGamesErrorTick > 0 && alsoPlays && playGameIds.length === 0;
+  // Each failed attempt moves focus to the first game so keyboard and screen reader users land on the problem.
+  useEffect(() => {
+    if (playGamesErrorTick > 0) firstGameRef.current?.focus();
+  }, [playGamesErrorTick]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -233,13 +244,26 @@ export function AccountInfoStep({
           </label>
 
           {alsoPlays && (
-            <div role="group" aria-label="Games you play" className="space-y-1 pl-7">
+            <div
+              role="group"
+              aria-label="Games you play"
+              aria-describedby={gamesInvalid ? 'play-games-error' : undefined}
+              className="space-y-1 pl-7"
+            >
               <p className="text-xs font-semibold text-foreground-muted">
                 Which games do you play?<RequiredMark />
               </p>
-              {playableGames.map((game) => (
+              {playableGames.length === 0 && (
+                <p className="text-xs text-foreground-muted">
+                  No games are available for your invite yet. Untick the box above or contact EZ Esports.
+                </p>
+              )}
+              {playableGames.map((game, index) => (
                 <label key={game.id} className="flex min-h-[44px] items-center gap-3 cursor-pointer">
                   <input
+                    ref={index === 0 ? firstGameRef : undefined}
+                    aria-invalid={gamesInvalid || undefined}
+                    aria-describedby={gamesInvalid ? 'play-games-error' : undefined}
                     type="checkbox"
                     checked={playGameIds.includes(game.id)}
                     onChange={(e) =>
@@ -254,6 +278,11 @@ export function AccountInfoStep({
                   <span className="text-sm text-foreground">{game.displayName}</span>
                 </label>
               ))}
+              {gamesInvalid && (
+                <p id="play-games-error" role="alert" className="text-xs text-rose-300">
+                  Choose at least one game you will play.
+                </p>
+              )}
             </div>
           )}
         </fieldset>

@@ -81,7 +81,7 @@ describe('manager "I also play in this league"', () => {
     fillStepOne();
     fireEvent.click(screen.getByRole('checkbox', { name: /i also play in this league/i }));
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
-    expect(screen.getByText(/choose at least one game you will play/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/choose at least one game you will play/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: /Step 1/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'VALORANT' }));
@@ -109,6 +109,43 @@ describe('manager "I also play in this league"', () => {
     await waitFor(() => expect(mocks.saveOnboardingDraft).toHaveBeenCalled());
     const sent = mocks.saveOnboardingDraft.mock.calls[0][0].draftData;
     expect(sent).toMatchObject({ alsoPlays: true, playGameIds: ['g-val'] });
+  });
+
+  it('flags the games, links the error and moves focus to the first game when none is chosen', () => {
+    render(<PlayerOnboardingWizard token="tok" inviteData={managerInvite()} />);
+    fillStepOne();
+    fireEvent.click(screen.getByRole('checkbox', { name: /i also play in this league/i }));
+    expect(screen.getByRole('checkbox', { name: 'VALORANT' })).not.toHaveAttribute('aria-invalid');
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+
+    const first = screen.getByRole('checkbox', { name: 'VALORANT' });
+    expect(first).toHaveAttribute('aria-invalid', 'true');
+    expect(first).toHaveAttribute('aria-describedby', 'play-games-error');
+    expect(document.getElementById('play-games-error')).toHaveTextContent(/at least one game/i);
+    expect(first).toHaveFocus();
+
+    // Choosing a game clears the flag.
+    fireEvent.click(first);
+    expect(first).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('shows an honest success message depending on whether a new application was filed', async () => {
+    const { default: SuccessStep } = { default: (await import('../components/SuccessStep')).SuccessStep };
+    const common = {
+      isManager: true,
+      alsoPlays: true,
+      legalFirstName: 'Sam',
+      legalLastName: 'Miller',
+      email: 'sam@school.edu',
+      discordUsername: 'sam',
+      inviteData: managerInvite(),
+    };
+    const { unmount } = render(<SuccessStep {...common} applicationsCreated={1} applicationsExisting={0} />);
+    expect(screen.getByText(/player application submitted/i)).toBeInTheDocument();
+    unmount();
+    render(<SuccessStep {...common} applicationsCreated={0} applicationsExisting={1} />);
+    expect(screen.getByText(/already on file/i)).toBeInTheDocument();
+    expect(screen.queryByText(/player application submitted/i)).toBeNull();
   });
 
   it('maps a play_games_required rejection back to step 1', () => {

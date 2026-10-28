@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 /** Transaction handle passed to the onboarding write steps. */
 export type OnboardingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -411,7 +411,10 @@ export interface OnboardingGameOption {
   displayName: string;
 }
 
-/** Games a school manager can say they also play, in display-name order. */
+/**
+ * Games a school manager can say they also play, in display-name order. Only games with at least one
+ * season are offered: rosters, and so player applications, only exist for those.
+ */
 export async function listOnboardingGames(): Promise<OnboardingGameOption[]> {
   return db
     .select({
@@ -420,23 +423,8 @@ export async function listOnboardingGames(): Promise<OnboardingGameOption[]> {
       displayName: schema.games.displayName,
     })
     .from(schema.games)
+    .where(sql`exists (select 1 from seasons where seasons.game_id = ${schema.games.id})`)
     .orderBy(asc(schema.games.displayName));
-}
-
-/** The subset of `gameIds` that exist, so a browser-sent id can never create a row for an unknown game. */
-export async function findExistingGames(
-  tx: OnboardingTx | typeof db,
-  gameIds: string[]
-): Promise<OnboardingGameOption[]> {
-  if (gameIds.length === 0) return [];
-  return tx
-    .select({
-      id: schema.games.id,
-      slug: schema.games.slug,
-      displayName: schema.games.displayName,
-    })
-    .from(schema.games)
-    .where(inArray(schema.games.id, gameIds));
 }
 
 /**
