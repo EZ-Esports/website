@@ -34,15 +34,14 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 describe('staff: removing a player from a roster', () => {
-  it('the confirmation says what is deleted, when the student record goes too, and that it cannot be undone', async () => {
+  it('the confirmation names the player and roster and says it is permanent and cannot be undone', async () => {
     const user = userEvent.setup();
     renderRow();
     await user.click(screen.getByRole('button', { name: 'Remove player Ana Lee' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent('Remove Ana Lee from Varsity?');
-    expect(dialog).toHaveTextContent('permanently deletes their roster spot');
-    expect(dialog).toHaveTextContent('not on any other roster and have no match history');
-    expect(dialog).toHaveTextContent('This cannot be undone.');
+    expect(dialog).toHaveTextContent('This will remove them permanently.');
+    expect(dialog).toHaveTextContent('This action cannot be undone.');
     expect(dialog).not.toHaveTextContent(/stay in the school's member list/i);
   });
 
@@ -73,7 +72,7 @@ describe('staff: removing a player from a roster', () => {
 });
 
 describe('staff: deleting a roster', () => {
-  it('says the student records of players on no other roster are deleted too', async () => {
+  it('says roster deletion is permanent and cannot be undone', async () => {
     const user = userEvent.setup();
     render(
       <RosterEditProvider
@@ -84,8 +83,8 @@ describe('staff: deleting a roster', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Delete roster JV' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('its 2 players');
-    expect(dialog).toHaveTextContent('on no other roster has their student record');
-    expect(dialog).toHaveTextContent('This cannot be undone.');
+    expect(dialog).toHaveTextContent('Delete roster "JV"?');
+    expect(dialog).toHaveTextContent('This will remove it permanently.');
+    expect(dialog).toHaveTextContent('This action cannot be undone.');
   });
 });
