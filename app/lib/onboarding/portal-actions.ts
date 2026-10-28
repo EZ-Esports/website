@@ -412,6 +412,8 @@ export async function getPendingSubmissions(
   });
 }
 
+const NOT_REVIEWABLE_MESSAGE = 'This application was already reviewed or has not been submitted yet. Refresh the page.';
+
 export interface ReviewPlayerInviteParams {
   inviteId: string;
   action: 'approve' | 'reject';
@@ -471,11 +473,21 @@ export async function reviewPlayerInvite(
     throw new Error('Forbidden: This invite belongs to a different season than your manager affiliation and cannot be reviewed from the portal');
   }
 
+  // Only a submitted application can be reviewed, and exactly once: the status is part of the
+  // UPDATE's WHERE, so two clicks (or two managers) cannot both succeed or flip a decided invite.
+  const onlySubmitted = and(
+    eq(schema.playerInvites.id, inviteId),
+    eq(schema.playerInvites.status, 'submitted')
+  );
+
   if (action === 'approve') {
-    await db
+    if (!invite.memberId) return reject(NOT_REVIEWABLE_MESSAGE);
+    const updated = await db
       .update(schema.playerInvites)
       .set({ status: 'accepted', reviewedAt: new Date() })
-      .where(eq(schema.playerInvites.id, inviteId));
+      .where(onlySubmitted)
+      .returning({ id: schema.playerInvites.id });
+    if (updated.length === 0) return reject(NOT_REVIEWABLE_MESSAGE);
 
     updateCacheTags(CACHE_TAGS.PLAYERS);
     return { success: true, status: 'accepted', inviteId };
@@ -483,14 +495,16 @@ export async function reviewPlayerInvite(
 
   if (action === 'reject') {
     const reason = rejectionReason?.trim() || 'Application declined by school manager';
-    await db
+    const updated = await db
       .update(schema.playerInvites)
       .set({
         status: 'rejected',
         rejectionReason: reason,
         reviewedAt: new Date(),
       })
-      .where(eq(schema.playerInvites.id, inviteId));
+      .where(onlySubmitted)
+      .returning({ id: schema.playerInvites.id });
+    if (updated.length === 0) return reject(NOT_REVIEWABLE_MESSAGE);
 
     return {
       success: true,

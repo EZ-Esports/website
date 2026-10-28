@@ -2763,6 +2763,34 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         expect(mocks.state.playersStore.find((p) => p.memberId === 'm-kid')?.rosterId).toBe('r-now');
       });
 
+      it('reviews a submitted invite exactly once: a second approve or a later reject is refused and changes nothing', async () => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-now', 'season-val-now')];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'approve' })).resolves.toMatchObject({ success: true });
+        const accepted = { ...mocks.state.playerInvitesStore[0] };
+
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'approve' })).resolves.toMatchObject({
+          success: false,
+          error: expect.stringMatching(/already reviewed or has not been submitted/),
+        });
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'reject' })).resolves.toMatchObject({ success: false });
+        expect(mocks.state.playerInvitesStore[0]).toEqual(accepted);
+      });
+
+      it.each(['approve', 'reject'] as const)('refuses to %s an invite that has not been submitted (pending)', async (action) => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-pending', 'season-val-now', { status: 'pending', memberId: null })];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-pending', action })).resolves.toMatchObject({
+          success: false,
+          error: expect.stringMatching(/not been submitted/),
+        });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('pending');
+      });
+
+      it('refuses to approve a submitted invite that has no student record', async () => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-nomember', 'season-val-now', { memberId: null })];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-nomember', action: 'approve' })).resolves.toMatchObject({ success: false });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+      });
+
       it.each(['approve', 'reject'] as const)('refuses a past-season invite (%s) and leaves it untouched', async (action) => {
         mocks.state.playerInvitesStore = [mkInvite('inv-past', 'season-val-past')];
         await expect(reviewPlayerInvite({ inviteId: 'inv-past', action })).rejects.toThrow(/different season/);

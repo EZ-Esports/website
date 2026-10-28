@@ -42,4 +42,3 @@ export function resolveManagerSeason<S extends { name: string }>(
   }
   return best;
 }
-
