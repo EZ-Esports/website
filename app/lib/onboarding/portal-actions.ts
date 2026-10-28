@@ -18,6 +18,7 @@ import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
+import { removalCacheTags, removalNotice, removePlayerFromRosterTx } from '@/app/lib/db/roster-removal';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
 import {
@@ -1612,12 +1613,23 @@ export interface RemovePlayerFromRosterParams {
   playerId: string;
 }
 
+export interface RemovePlayerFromRosterResult {
+  success: boolean;
+  playerId: string;
+  /** 'deleted': the student's onboarding record went too; 'kept': it stays (see message); 'unchanged': the row was already gone. */
+  studentRecord: 'deleted' | 'kept' | 'unchanged';
+  /** One sentence for the roster notice. */
+  message: string;
+}
+
 /**
- * Removes a player from a roster.
+ * Removes a player from a roster. In the same transaction the student's own record and onboarding
+ * leftovers are deleted when nothing else needs them (no other roster, not staff or a manager, no
+ * match history); otherwise the record is kept and `message` says why. See roster-removal.ts.
  */
 export async function removePlayerFromRoster(
   params: RemovePlayerFromRosterParams
-): Promise<{ success: boolean; playerId: string }> {
+): Promise<RemovePlayerFromRosterResult> {
   const { rosterId, playerId } = params;
 
   if (!rosterId || !playerId) {
@@ -1626,25 +1638,17 @@ export async function removePlayerFromRoster(
 
   await assertManagerForRoster(rosterId);
 
-  const [existing] = await db
-    .select({ memberId: schema.players.memberId })
-    .from(schema.players)
-    .where(and(eq(schema.players.id, playerId), eq(schema.players.rosterId, rosterId)))
-    .limit(1);
+  const removal = await db.transaction((tx) => removePlayerFromRosterTx(tx, { playerId, rosterId }));
 
-  await db
-    .delete(schema.players)
-    .where(
-      and(
-        eq(schema.players.id, playerId),
-        eq(schema.players.rosterId, rosterId)
-      )
-    );
+  updateCacheTags(...removalCacheTags(removal), CACHE_TAGS.TEAMS);
+  if (removal.removed) await notifyMembershipChanged([removal.memberId]);
 
-  updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
-  if (existing) await notifyMembershipChanged([existing.memberId]);
-
-  return { success: true, playerId };
+  return {
+    success: true,
+    playerId,
+    studentRecord: removal.removed ? removal.studentRecord : 'unchanged',
+    message: removalNotice(removal),
+  };
 }
 
 export interface MovePlayerToRosterParams {

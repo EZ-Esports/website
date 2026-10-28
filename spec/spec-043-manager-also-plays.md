@@ -1,8 +1,8 @@
-# spec-042: Managers Who Also Play
+# spec-043: Managers Who Also Play
 
-- **Spec ID:** spec-042
+- **Spec ID:** spec-043
 - **Title:** "I also play in this league" in the manager onboarding wizard
-- **Status:** Implemented on branch `worktree-agent-a26eb6f37f4e3b2bb`; not pushed. **No migration.**
+- **Status:** Implemented on PR #308 (`feat/manager-also-plays`); not pushed. **No migration.**
 - **Date:** 2026-10-28
 - **Issue:** #296
 - **Builds on:** [spec-011](spec-011-player-onboarding-and-manager-portal.md), [spec-018](spec-018-manager-invites-table.md), [spec-029](spec-029-onboarding-consent-form.md), [spec-033](spec-033-discord-oauth-onboarding.md), [spec-035](spec-035-manager-discord-oauth.md), [spec-040](spec-040-onboarding-offensive-content-screen.md), [spec-041](spec-041-discord-oauth-second-tab.md)

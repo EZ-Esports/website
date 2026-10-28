@@ -43,7 +43,7 @@ describe('LeagueSetupClient: delete game', () => {
     await user.click(screen.getByRole('button', { name: 'Delete game Valorant' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent(
-      'Delete "Valorant"? This will also delete all linked seasons (cascade). This is permanent.',
+      'Permanently delete "Valorant"? This also deletes all of its seasons and, with them, every team, roster spot and standing in those seasons. A game with any matches cannot be deleted until those matches are removed. Students and schools are not deleted. This cannot be undone.',
     );
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
@@ -88,7 +88,7 @@ describe('LeagueSetupClient: delete season (dynamic message)', () => {
     await user.click(screen.getByRole('button', { name: 'Delete season Fall 2026' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent(
-      'Delete season "Fall 2026"? Seasons with existing matches cannot be deleted until those matches are removed or reassigned. This is permanent.',
+      'Permanently delete season "Fall 2026"? This also deletes its teams, rosters and standings. A season with matches cannot be deleted until those matches are removed. Students are not deleted. This cannot be undone.',
     );
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());

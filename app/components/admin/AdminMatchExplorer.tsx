@@ -814,7 +814,7 @@ export default function AdminMatchExplorer({
         }}
         message={
           deleteTarget
-            ? `Permanently delete this match (${deleteTarget.homeTeam} vs ${deleteTarget.awayTeam})? This cannot be undone.`
+            ? `Permanently delete this match (${deleteTarget.homeTeam} vs ${deleteTarget.awayTeam})? This also deletes its result, game data and reschedule requests. This cannot be undone.`
             : ''
         }
         label={deleteTarget ? `Delete match ${deleteTarget.homeTeam} vs ${deleteTarget.awayTeam}` : 'Delete match'}
