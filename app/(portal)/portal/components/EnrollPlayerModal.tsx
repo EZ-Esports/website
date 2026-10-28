@@ -174,7 +174,7 @@ export function EnrollPlayerModal({
 
             {hiddenCount > 0 && (
               <p className="text-xs text-zinc-500 mt-1">
-                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: their class year is before the {roster.seasonName} season, or their application has not been accepted yet. Approve pending applications first; if a class year is wrong, ask a league admin to correct it.
+                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: their class year is before the {roster.seasonName} season, or their application for this season has not been accepted yet. Approve pending applications first; if a class year is wrong, ask a league admin to correct it.
               </p>
             )}
 

@@ -12,8 +12,11 @@ describe('hasUnacceptedApplication', () => {
     expect(hasUnacceptedApplication([], 'g1', 's1')).toBe(false);
     expect(hasUnacceptedApplication([inv('accepted')], 'g1', 's1')).toBe(false);
   });
-  it('accepted for the roster season wins; accepted for another season does not', () => {
-    expect(hasUnacceptedApplication([inv('rejected', 's0'), inv('accepted', 's1')], 'g1', 's1')).toBe(false);
+  it('accepted for the roster season wins over a rejected one for the same season', () => {
+    expect(hasUnacceptedApplication([inv('rejected', 's1'), inv('accepted', 's1')], 'g1', 's1')).toBe(false);
+  });
+  it('only the roster season can block: other-season and seasonless rows are ignored', () => {
+    expect(hasUnacceptedApplication([inv('rejected', 's0'), inv('submitted', null), inv('accepted', 's0')], 'g1', 's1')).toBe(false);
     expect(hasUnacceptedApplication([inv('rejected', 's1'), inv('accepted', 's0')], 'g1', 's1')).toBe(true);
   });
   it('ignores other games', () => {

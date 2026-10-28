@@ -2994,11 +2994,17 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         await expect(enroll()).resolves.toMatchObject({ success: true });
       });
 
-      it('an unreviewed past-season or seasonless application still blocks, and an accepted one from another season does not rescue it', async () => {
-        seed(mkInvite('past', 'season-val-past', { status: 'submitted' }));
-        await expect(enroll()).resolves.toMatchObject({ success: false });
-        seed(mkInvite('none', null, { status: 'submitted' }));
-        await expect(enroll()).resolves.toMatchObject({ success: false });
+      it('only the roster season counts: stale old-season or seasonless rows never block a returning player', async () => {
+        seed(
+          mkInvite('past-rej', 'season-val-past', { status: 'rejected' }),
+          mkInvite('past-sub', 'season-val-past', { status: 'submitted' }),
+          mkInvite('none-sub', null, { status: 'submitted' }),
+          mkInvite('past-acc', 'season-val-past', { status: 'accepted' })
+        );
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('a rejected application for this season blocks even beside an accepted one from another season', async () => {
         seed(mkInvite('past-acc', 'season-val-past', { status: 'accepted' }), mkInvite('now-rej', 'season-val-now', { status: 'rejected' }));
         await expect(enroll()).resolves.toMatchObject({ success: false });
       });
