@@ -13,7 +13,7 @@ interface CalendarScheduleProps {
   matches: ScheduleCalendarItem[];
   gameSlug: string;
   division: string;
-  /** Season outcomes are unpublished; matches arrive without scores and read as plain "Completed". */
+  /** Season outcomes are unpublished; matches arrive without scores and completed matches read as "0 - 0". */
   outcomesHidden?: boolean;
 }
 
@@ -398,10 +398,12 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
                             <Badge variant="warning">
                               Forfeit{match.homeScore !== null && match.awayScore !== null ? ` ${match.homeScore}-${match.awayScore}` : ''}
                             </Badge>
+                          ) : outcomesHidden ? (
+                            <Badge>0 - 0</Badge>
                           ) : match.result ? (
                             <Badge>{match.result}</Badge>
                           ) : (
-                            <Badge variant="neutral" size="sm">{outcomesHidden ? 'Completed' : 'Final'}</Badge>
+                            <Badge variant="neutral" size="sm">Final</Badge>
                           )}
                           {!match.forfeit && match.homeScore !== null && match.awayScore !== null && (
                             <span className="text-xs text-foreground-secondary font-bold">
@@ -485,6 +487,12 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
                         <span className={`text-2xl md:text-3xl font-black ${selectedMatch.awayScore > selectedMatch.homeScore ? 'text-accent' : 'text-foreground-secondary'}`}>
                           {selectedMatch.awayScore}
                         </span>
+                      </div>
+                    ) : selectedMatch.status === 'Completed' && outcomesHidden ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
+                        <span className="text-foreground-muted font-extrabold text-sm">-</span>
+                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
                       </div>
                     ) : selectedMatch.status === 'Live' ? (
                       <span className="px-2.5 py-1 rounded bg-success/10 border border-success/20 text-success font-extrabold text-xs uppercase animate-pulse">
