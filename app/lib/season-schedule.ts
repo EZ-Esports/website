@@ -1,5 +1,5 @@
 /**
- * Regular-season schedule generation (spec-045). Pure and deterministic: no DB, no Next, no clock,
+ * Regular-season schedule generation (spec-046). Pure and deterministic: no DB, no Next, no clock,
  * so the preview a staff member confirms and the commit that writes it are computed by the same
  * function from the same inputs and can be compared by fingerprint.
  *

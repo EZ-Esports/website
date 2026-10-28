@@ -134,7 +134,7 @@ To guarantee that the platform launches without friction and without waiting mon
 2. Clicks **"Create Player Invite"**.
 3. Inputs:
    - **Intended Student First & Last Name** (e.g. "Alex Chen").
-   - **Link Expiration**: Dropdown with options for 3, 7 (default), or 14 days.
+   - **Link Expiration**: Dropdown with options for 3, 5, or 7 (default) days; 14 was removed by [spec-045](spec-045-invite-copy-regenerate-and-delete.md).
 4. System creates a `player_invites` record and outputs:  
    `https://ezesports.org/join/stuyvesant/valorant?token=tok_8f92ab`
 5. The portal shows the invite under **Invites Sent** (`Alex Chen | Pending | Expires in 7 days`).

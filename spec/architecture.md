@@ -116,7 +116,7 @@ Ports and adapters again: `app/lib/match-results/types.ts` defines `MatchDataPor
 
 `PlayerOnboardingWizard` opens `/api/discord/start?...&popup=1` in a second tab so it never unmounts (a manager's password and the content-screen overrides stay in memory). `popup` rides in the signed flow cookie and the callback redirect; the join page renders `DiscordPopupDone` for `popup=1`. That tab broadcasts `{ inviteId, status, error? }` through `app/lib/onboarding/discord-channel.ts` (BroadcastChannel, `storage`-event fallback; both guarded). The message is a wake-up only: the wizard then calls the server action `getVerifiedDiscordForInvite(token)` (`wizard-actions.ts`, reads the signed result cookie through `readVerifiedDiscord`, returns `{ username, inGuild } | null`), so identity still comes only from the signed httpOnly cookie. Fallbacks: blocked/closed pop-up falls back to the same-tab redirect; focus and a 5 s poll re-check the cookie; a closed tab ends the wait; Cancel and a ten-minute cap end it. See [spec-041](spec-041-discord-oauth-second-tab.md).
 
-## Season generation: pure scheduler, preview/commit with a lock (spec-045)
+## Season generation: pure scheduler, preview/commit with a lock (spec-046)
 
 `app/lib/season-schedule.ts` (circle-method rounds, 7-regular for even n >= 8, kickoffs at 7 PM ET via `parseEastern`) and `season-generation.ts` (what to create) are pure. `generate-season-actions.ts` previews without writing; commit runs in one transaction that locks the season row, rechecks "no matches yet", and verifies the preview fingerprint. Matches reference rosters, so generation also creates the missing team and division roster. Tags updated: `matches`, `rosters`, `teams`.
 

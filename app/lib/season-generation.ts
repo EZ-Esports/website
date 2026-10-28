@@ -1,5 +1,5 @@
 /**
- * Pure planning for "Generate season" (spec-045): given the chosen schools and what the season
+ * Pure planning for "Generate season" (spec-046): given the chosen schools and what the season
  * already has, decides which teams and rosters must be created and which matches to write.
  * The server action loads the facts, calls this, and either returns the plan (preview) or
  * writes it (commit). Keeping the decision here makes idempotency testable without a database.
