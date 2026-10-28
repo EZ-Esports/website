@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
     const url = new URL(`/join/${encodeURIComponent(flow.school)}/${encodeURIComponent(flow.game)}`, origin);
     url.searchParams.set('token', flow.tok);
     for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
+    // Every outcome of a second-tab flow lands on the "close this tab" page, not the wizard.
+    if (flow.popup === true) url.searchParams.set('popup', '1');
     const res = NextResponse.redirect(url, 302);
     res.headers.set('Cache-Control', 'no-store');
     // The flow cookie is single-use: any outcome consumes it, which also blocks state replay.

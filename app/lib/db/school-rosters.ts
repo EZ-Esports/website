@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from './index';
 import * as schema from './schema';
+import { getContentFlagsByMember, type ContentFlagView } from './content-flags';
 import {
   buildSeasonBlocks,
   type RosterEditOptions,
@@ -67,6 +68,8 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
         .where(inArray(schema.players.rosterId, rosterRows.map((r) => r.id)))
     : [];
 
+  const contentFlags = await loadContentFlags(playerRows.map((p) => p.memberId));
+
   const playersByRoster = new Map<string, RosterViewPlayer[]>();
   for (const p of playerRows) {
     const list = playersByRoster.get(p.rosterId) ?? [];
@@ -80,6 +83,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
       discord: p.discord,
       graduationYear: p.graduationYear,
       role: p.role,
+      contentFlags: contentFlags.get(p.memberId),
     });
     playersByRoster.set(p.rosterId, list);
   }
@@ -96,6 +100,19 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
     rosters: rostersByTeam.get(t.teamId) ?? [],
   }));
   return buildSeasonBlocks(input);
+}
+
+/**
+ * Override records for the badge. Read apart from the roster queries and never allowed to fail the
+ * page: if the table is not migrated yet, or the read errors, the rosters render without badges.
+ */
+async function loadContentFlags(memberIds: string[]): Promise<Map<string, ContentFlagView[]>> {
+  try {
+    return await getContentFlagsByMember([...new Set(memberIds)]);
+  } catch (error) {
+    console.error('Could not load onboarding content flags for the roster view:', error);
+    return new Map();
+  }
 }
 
 /** School name for the page header; null when the id matches no live school. */

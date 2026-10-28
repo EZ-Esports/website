@@ -184,3 +184,17 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
 - **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.
 - **`match_result_attempts` grows by one row per fresh submission or Check again.** Rows older than one hour are deleted opportunistically inside `reserveSubmissionAttempt`, so the table stays small; staff admins are throttled the same as managers (no exemption). A pending submission whose retry is refused as invalid is cancelled, not left waiting.
+
+## Onboarding offensive-content screen (spec-040)
+
+- **Migration `0055_onboarding_content_flags` is NOT applied to production.** The code is written to work without it (overrides are simply not recorded and no badges show; the server still blocks unoverridden flagged fields). Apply with `npm run db:migrate` only after the owner confirms, with the usual `SEED_ALLOW_REMOTE` and a fresh scoped backup (`PG_DUMP` may need to point at a PostgreSQL 18 `pg_dump`). Until then overrides made by real people are not retained for staff; check the Vercel logs for "apply migration 0055" warnings to know how many were skipped.
+- **Not verified:** the SQL in 0055 was never run against a Postgres; savepoint behaviour is only covered through the query-builder stand-in; no browser check of the wizard warning, the roster badge or the managers dialog (desktop and phone width).
+- **Detector limits:** word lists are reasonable coverage, not an audit by native speakers; expect false positives to report (add to `INNOCENT_WORDS` or move the term to `word`) and misses. No profanity check on staff-typed invite names, portal free text, or emails.
+- **No roster filter / cross-school queue** for flagged info; only the per-row badge, the roster header count and the managers dialog badge. The review action records the reviewer's email but there is no un-review.
+- **`drizzle-kit generate` is still blocked** by the duplicate snapshot parent (above), so 0055 is hand-written like 0043-0054.
+
+## Discord second tab (spec-041)
+
+- **Unverified in real conditions:** real Discord OAuth, real browsers' pop-up blockers (Safari/iOS in particular), in-app webviews and embedded browsers (may not support `window.open` or `BroadcastChannel`; they rely on the same-tab fallback, the focus/5 s cookie re-check and the closed-tab poll), and real two-tab messaging. Tests are jsdom and mocks only; the UI was not checked in a browser.
+- `window.close()` from the finished tab only works for tabs the wizard opened; otherwise the person closes it from the on-screen instruction.
+- A callback with an expired or missing flow cookie shows a plain error page in the second tab and sends no message; the wizard tab recovers through Cancel, closing the tab, or the ten-minute cap.

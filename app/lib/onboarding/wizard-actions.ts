@@ -7,6 +7,7 @@ import {
   updateInviteDraft,
 } from '@/app/lib/db/onboarding';
 import type { ConsentSubmission } from './consent';
+import { parseSavedOverrides } from './content-check';
 import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
 import { OnboardingRejection, type OnboardingRejectionCode } from './rejection';
@@ -98,6 +99,11 @@ export interface PlayerOnboardingSubmission {
     [key: string]: any;
   };
   codeOfConductAccepted: boolean;
+  /**
+   * Fields the person confirmed are genuinely their information after being warned that they look
+   * offensive (see content-check.ts). Only honored for fields the server itself flags.
+   */
+  contentOverrides?: string[];
   /** Terms of Service acknowledgment and, for under-18s, the guardian authorization. Validated server-side. */
   consent: ConsentSubmission;
 }
@@ -126,6 +132,8 @@ export interface SubmitPlayerOnboardingFailure {
   success: false;
   code: OnboardingRejectionCode;
   error: string;
+  /** Flagged field keys when `code` is `content_flagged`. */
+  fields?: string[];
 }
 
 export type SubmitPlayerOnboardingOutcome =
@@ -165,7 +173,10 @@ function sanitizeDraftData(
   if (!draft || typeof draft !== 'object') return null;
   const sanitized: Record<string, any> = {};
   for (const [key, value] of Object.entries(draft)) {
-    if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
+    if (key === 'contentOverrides') {
+      // Only known fields with bounded string values are kept; never trusted as an override at submit.
+      sanitized[key] = parseSavedOverrides(value);
+    } else if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
       sanitized[key] = value;
     }
   }
@@ -362,6 +373,18 @@ export async function saveOnboardingDraft(
 }
 
 /**
+ * Server Action: the Discord identity currently verified for this invite, read from the signed
+ * httpOnly cookie. The wizard calls it after the second tab finishes OAuth; nothing the browser
+ * sends (including the cross-tab message) is ever used as the identity.
+ */
+export async function getVerifiedDiscordForInvite(
+  token: string
+): Promise<{ username: string; inGuild: boolean } | null> {
+  const verified = await readVerifiedDiscord(token);
+  return verified ? { username: verified.discordUsername, inGuild: verified.inGuild } : null;
+}
+
+/**
  * Server Action: Validates and atomically processes a player onboarding submission.
  * Delegates execution to the modular submission pipeline.
  */
@@ -374,7 +397,7 @@ export async function submitPlayerOnboarding(
     return await processOnboardingSubmission({ ...params, verifiedDiscord });
   } catch (err) {
     if (err instanceof OnboardingRejection) {
-      return { success: false, code: err.code, error: err.message };
+      return { success: false, code: err.code, error: err.message, ...(err.fields ? { fields: err.fields } : {}) };
     }
     throw err;
   }

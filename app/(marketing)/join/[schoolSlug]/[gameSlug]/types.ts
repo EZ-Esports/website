@@ -1,3 +1,5 @@
+import { stepForContentFields, type ContentFieldKey } from '@/app/lib/onboarding/content-check';
+
 export interface InviteData {
   inviteId: string;
   role?: 'player' | 'manager';
@@ -13,9 +15,19 @@ export interface InviteData {
   expiresAt: Date;
 }
 
-/** Wizard step that fixes a rejection returned by the server: the password lives on step 1, Discord on step 2. */
-export function stepForRejection(code: string): 1 | 2 {
+/**
+ * Wizard step that fixes a rejection returned by the server: the password lives on step 1, Discord
+ * on step 2, and a flagged field on whichever step holds it.
+ */
+export function stepForRejection(code: string, fields: readonly string[] = []): 1 | 2 | 3 | 4 | 5 {
+  if (code === 'content_flagged' || code === 'field_too_long') return stepForContentFields(fields);
   return code === 'manager_password_required' ? 1 : 2;
+}
+
+/** What a step needs to warn about, and let the person override, one offensive-content flag. */
+export interface ContentFlagControls {
+  state(field: ContentFieldKey): { flagged: boolean; overridden: boolean };
+  setOverride(field: ContentFieldKey, checked: boolean): void;
 }
 
 export interface WizardFormData {
@@ -44,6 +56,8 @@ export interface WizardFormData {
     feedback: string;
   };
   codeOfConductAccepted: boolean;
+  /** Offensive-content overrides (field -> the value they were confirmed for); re-validated on restore and on the server. */
+  contentOverrides?: Partial<Record<ContentFieldKey, string>>;
 }
 
 /** Anticipated graduation years offered to everyone (students and managers), with grade for 2026-2027. */

@@ -5,6 +5,7 @@
  * testable; `app/lib/db/school-rosters.ts` does the SQL and delegates here.
  */
 import { GAMES, canonicalGameSlug } from '@/app/lib/constants';
+import type { ContentFlagView } from '@/app/lib/db/content-flags';
 import { toHubDivision, type CanonicalDivision, type HubDivision } from '@/app/lib/db/match-page';
 
 export interface RosterViewPlayer {
@@ -18,6 +19,8 @@ export interface RosterViewPlayer {
   discord: string | null;
   graduationYear: number | null;
   role: 'captain' | 'player' | 'coach' | 'sub';
+  /** Every onboarding offensive-content override for this person (a player and a manager record can both exist), newest first; absent when none or when its table is not migrated yet. */
+  contentFlags?: ContentFlagView[];
 }
 
 export interface RosterViewRoster {
@@ -73,6 +76,19 @@ export interface SeasonBlock {
   columns: DivisionColumn[];
   /** Every roster, used by the tournament layout. */
   rosters: RosterViewRoster[];
+}
+
+/** Players with an onboarding content-flag override that staff have not marked reviewed, counted once per player. */
+export function countUnreviewedContentFlags(blocks: SeasonBlock[]): number {
+  const seen = new Set<string>();
+  for (const block of blocks) {
+    for (const roster of block.rosters) {
+      for (const p of roster.players) {
+        if (p.contentFlags?.some((f) => !f.reviewedAt)) seen.add(p.memberId);
+      }
+    }
+  }
+  return seen.size;
 }
 
 /** First calendar year of a `YYYY-YY` season name; null for anything else. */

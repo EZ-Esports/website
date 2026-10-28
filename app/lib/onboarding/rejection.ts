@@ -6,15 +6,20 @@ export type OnboardingRejectionCode =
   | 'discord_required'
   | 'discord_not_in_guild'
   | 'discord_already_linked'
-  | 'manager_password_required';
+  | 'manager_password_required'
+  | 'content_flagged'
+  | 'field_too_long';
 
 export class OnboardingRejection extends Error {
   readonly code: OnboardingRejectionCode;
+  /** Field keys the rejection is about (content_flagged), so the wizard can open the right step. */
+  readonly fields?: string[];
 
-  constructor(code: OnboardingRejectionCode, message: string) {
+  constructor(code: OnboardingRejectionCode, message: string, fields?: string[]) {
     super(message);
     this.name = 'OnboardingRejection';
     this.code = code;
+    this.fields = fields;
   }
 }
 
