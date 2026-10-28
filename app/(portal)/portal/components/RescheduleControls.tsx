@@ -14,7 +14,6 @@ import {
   canRequesterRespond,
   isLateRequest,
   isOpenStatus,
-  rescheduleAllowanceMessage,
   rescheduleStatusLabel,
   validateProposedTimes,
   type RescheduleOptionItem,
@@ -63,6 +62,8 @@ function resolvedLabel(request: RescheduleRequestItem, match: SchoolMatchItem, i
       return iAmRequester ? 'You declined' : `Declined by ${request.requestedBySchoolName}`;
     case 'declined_staff':
       return 'Declined by EZ Esports staff';
+    case 'approved':
+      return 'Match rescheduled';
     default:
       return rescheduleStatusLabel(request.status);
   }
@@ -549,9 +550,6 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
       )}
       {!viewOnly && canRequestReschedule(match, now) && (
         <RequestDialog match={match} schoolId={schoolId} now={now} />
-      )}
-      {!viewOnly && match.rescheduleAllowanceUsed && canRequestReschedule({ ...match, rescheduleAllowanceUsed: false }, now) && (
-        <div className="text-zinc-500">{rescheduleAllowanceMessage()}</div>
       )}
     </div>
   );

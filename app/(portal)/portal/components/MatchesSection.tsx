@@ -158,6 +158,30 @@ function MatchTable({
   );
 }
 
+/** One line per season: whether this school has used its single reschedule for it. */
+function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) {
+  const seasons = new Map<string, { name: string; used: boolean }>();
+  for (const match of matches) {
+    const key = `${match.gameId}|${match.seasonName}`;
+    const entry = seasons.get(key) ?? { name: match.seasonName, used: false };
+    if (match.rescheduleAllowanceUsed) entry.used = true;
+    seasons.set(key, entry);
+  }
+  if (seasons.size === 0) return null;
+  return (
+    <div className="space-y-1 text-xs text-zinc-400">
+      {[...seasons.entries()].map(([key, season]) => (
+        <p key={key}>
+          {season.name}:{' '}
+          {season.used
+            ? 'your school has used its one reschedule for this season'
+            : 'your school has one reschedule for this season, not yet used'}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function MatchesSection({
   matches,
   schoolId,
@@ -201,6 +225,8 @@ export function MatchesSection({
           ))}
         </div>
       )}
+
+      <RescheduleAllowanceNotice matches={matches} />
 
       <Tabs>
         <TabList
