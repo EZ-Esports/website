@@ -66,6 +66,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('@/app/lib/db', () => ({ db: mocks.db }));
 vi.mock('../manager-auth', () => ({ assertManagerForSchoolGame: mocks.assertManagerForSchoolGame }));
 
+import { MAX_RESCHEDULE_REQUESTS_PER_SEASON } from '@/app/lib/reschedule-rules';
 import {
   cancelReschedule,
   counterReschedule,
@@ -185,20 +186,26 @@ describe('requestReschedule', () => {
     expect((await requestReschedule(params)).error).toMatch(/not started/);
   });
 
-  it('enforces two proposed times at least an hour apart', async () => {
+  it('enforces two proposed times, all at 7:00 PM ET, and no duplicates', async () => {
     mocks.queue.push([match()]);
     expect((await requestReschedule({ ...params, proposedTimes: [PROPOSALS[0]] })).error).toMatch(/at least 2/);
     mocks.queue.push([match()]);
-    const tooClose = await requestReschedule({
+    const notSevenPm = await requestReschedule({
       ...params,
-      proposedTimes: ['2026-11-12T19:00', '2026-11-12T19:30'],
+      proposedTimes: ['2026-11-12T19:00', '2026-11-13T18:30'],
     });
-    expect(tooClose.error).toMatch(/one hour apart/);
+    expect(notSevenPm.error).toMatch(/7:00 PM ET/);
+    mocks.queue.push([match()]);
+    const duplicate = await requestReschedule({
+      ...params,
+      proposedTimes: ['2026-11-12T19:00', '2026-11-12T19:00'],
+    });
+    expect(duplicate.error).toMatch(/one hour apart/);
     expect(mocks.inserted).toEqual([]);
   });
 
   it('stores the request and its options, as on time when 72+ hours ahead', async () => {
-    mocks.queue.push([match()], [{ id: 'req-1' }], []);
+    mocks.queue.push([match()], [], [{ used: 0 }], [{ id: 'req-1' }], []);
     expect(await requestReschedule(params)).toEqual({ success: true });
     const [[requestRow], options] = mocks.inserted as [Record<string, unknown>[], Record<string, unknown>[]];
     expect(requestRow).toMatchObject({
@@ -215,13 +222,32 @@ describe('requestReschedule', () => {
   });
 
   it('flags a request under 72 hours as late', async () => {
-    mocks.queue.push([match({ scheduledAt: new Date(NOW.getTime() + 48 * HOUR) })], [{ id: 'req-1' }], []);
+    mocks.queue.push([match({ scheduledAt: new Date(NOW.getTime() + 48 * HOUR) })], [], [{ used: 0 }], [{ id: 'req-1' }], []);
     await requestReschedule({ ...params, proposedTimes: ['2026-10-28T19:00', '2026-10-29T19:00'] });
     expect(mocks.inserted[0][0]).toMatchObject({ isLate: true });
   });
 
+  it('refuses a second request from the school in the same season, and writes nothing', async () => {
+    mocks.queue.push([match()], [], [{ used: MAX_RESCHEDULE_REQUESTS_PER_SEASON }]);
+    const result = await requestReschedule(params);
+    expect(result).toEqual({
+      success: false,
+      error: 'Your school has already used its one reschedule for this season.',
+    });
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it('counts the school’s own non-cancelled requests in this season, locking the school row first', async () => {
+    mocks.queue.push([match()], [], [{ used: 0 }], [{ id: 'req-1' }], []);
+    await requestReschedule(params);
+    // Reads in order: the match, the school row lock, then the per-season count.
+    const [, lockWhere, countWhere] = mocks.wheres as unknown[];
+    expect(mocks.paramValues(lockWhere)).toEqual(['school-a']);
+    expect(mocks.paramValues(countWhere)).toEqual(expect.arrayContaining(['school-a', 'season-1', 'cancelled']));
+  });
+
   it('reports an already-open request instead of failing', async () => {
-    mocks.queue.push([match()], Object.assign(new Error('duplicate key'), { code: '23505' }));
+    mocks.queue.push([match()], [], [{ used: 0 }], Object.assign(new Error('duplicate key'), { code: '23505' }));
     const result = await requestReschedule(params);
     expect(result).toEqual({ success: false, error: 'This match already has an open reschedule request.' });
   });
@@ -313,8 +339,11 @@ describe('counterReschedule', () => {
     mocks.queue.push([request()], [match()]);
     expect((await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00'] })).error).toMatch(/at least 2/);
     mocks.queue.push([request()], [match()]);
-    const tooClose = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-14T19:30'] });
-    expect(tooClose.error).toMatch(/one hour apart/);
+    const duplicate = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-14T19:00'] });
+    expect(duplicate.error).toMatch(/one hour apart/);
+    mocks.queue.push([request()], [match()]);
+    const notSevenPm = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-15T20:00'] });
+    expect(notSevenPm.error).toMatch(/7:00 PM ET/);
   });
 
   it('tells the opponent to accept a time the requester already offered', async () => {

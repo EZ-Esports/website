@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { formatNY } from '@/app/lib/dates';
+import { matchTabOf } from '@/app/lib/db/match-page';
 import {
   divisionOptions,
   filterByDivision,
@@ -158,6 +159,42 @@ function MatchTable({
   );
 }
 
+/** A callout per season showing how many reschedules this school has left (each school gets one). */
+function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) {
+  const seasons = new Map<string, { name: string; used: boolean }>();
+  for (const match of matches) {
+    const key = `${match.gameId}|${match.seasonName}`;
+    const entry = seasons.get(key) ?? { name: match.seasonName, used: false };
+    if (match.rescheduleAllowanceUsed) entry.used = true;
+    seasons.set(key, entry);
+  }
+  if (seasons.size === 0) return null;
+  return (
+    <div className="space-y-2">
+      {[...seasons.entries()].map(([key, season]) => (
+        <div
+          key={key}
+          role="status"
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm ${
+            season.used
+              ? 'border-amber-700/60 bg-amber-950/30 text-amber-200'
+              : 'border-emerald-700/60 bg-emerald-950/30 text-emerald-200'
+          }`}
+        >
+          <span className="font-semibold">
+            {season.name}: Reschedules remaining {season.used ? '0' : '1'} of 1
+          </span>
+          <span className="text-xs opacity-80">
+            {season.used
+              ? 'Your school has used its one reschedule for this season.'
+              : 'Your school can request one reschedule for this season.'}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function MatchesSection({
   matches,
   schoolId,
@@ -170,7 +207,11 @@ export function MatchesSection({
   const divisions = divisionOptions(matches);
   // The pick survives a game change only while that division still exists in the list.
   const division = pickedDivision !== null && divisions.includes(pickedDivision) ? pickedDivision : null;
-  const { upcoming, past } = splitSchoolMatches(filterByDivision(matches, division), now);
+  const split = splitSchoolMatches(filterByDivision(matches, division), now);
+  const upcoming = split.upcoming;
+  // Overdue matches with no result yet get their own tab; Past keeps only the rest.
+  const needsResults = split.past.filter((m) => matchTabOf(m, now) === 'needs-results');
+  const past = split.past.filter((m) => matchTabOf(m, now) !== 'needs-results');
   // Only a staff admin's list can span seasons; a manager works in one season per game.
   const showSeason = new Set(matches.map((m) => `${m.gameId}|${m.seasonName}`)).size >
     new Set(matches.map((m) => m.gameId)).size;
@@ -202,6 +243,8 @@ export function MatchesSection({
         </div>
       )}
 
+      <RescheduleAllowanceNotice matches={matches} />
+
       <Tabs>
         <TabList
           aria-label="Matches"
@@ -210,10 +253,35 @@ export function MatchesSection({
           <Tab id="upcoming" className={TAB_CLASS}>
             Upcoming ({upcoming.length})
           </Tab>
+          <Tab id="needs-results" className={TAB_CLASS}>
+            Needs result
+            <span
+              className={`ml-2 inline-flex min-w-[1.5rem] justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                needsResults.length > 0
+                  ? 'bg-amber-400/15 text-amber-300 border border-amber-400/50'
+                  : 'text-zinc-500'
+              }`}
+            >
+              {needsResults.length}
+            </span>
+          </Tab>
           <Tab id="past" className={TAB_CLASS}>
             Past ({past.length})
           </Tab>
         </TabList>
+        <TabPanel id="needs-results" className={PANEL_CLASS}>
+          <MatchTable
+            matches={needsResults}
+            now={now}
+            showGame={showGame}
+            showSeason={showSeason}
+            showResult
+            showReschedule={false}
+            schoolId={schoolId}
+            viewOnlyGameIds={viewOnlyGameIds}
+            emptyText="No matches are waiting for a result."
+          />
+        </TabPanel>
         <TabPanel id="upcoming" className={PANEL_CLASS}>
           <MatchTable
             matches={upcoming}

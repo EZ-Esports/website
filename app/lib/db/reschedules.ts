@@ -1,12 +1,13 @@
 import 'server-only';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from './index';
 import * as schema from './schema';
-import type {
-  RescheduleRequestItem,
-  RescheduleStatus,
-  StaffRescheduleItem,
+import {
+  hasUsedRescheduleAllowance,
+  type RescheduleRequestItem,
+  type RescheduleStatus,
+  type StaffRescheduleItem,
 } from '../reschedule-rules';
 
 const homeRoster = alias(schema.rosters, 'home_roster');
@@ -158,4 +159,37 @@ export async function getStaffRescheduleQueue(): Promise<StaffRescheduleItem[]> 
     newScheduledAt: row.newScheduledAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+/**
+ * The seasons (of those given) in which a school has used up its reschedule allowance: its
+ * requests in that season, cancelled ones excluded, reach `MAX_RESCHEDULE_REQUESTS_PER_SEASON`.
+ * Same counting rule as the request action, which re-checks it under a lock before writing.
+ */
+export async function getSeasonsWithRescheduleAllowanceUsed(
+  schoolId: string,
+  seasonIds: string[]
+): Promise<Set<string>> {
+  const used = new Set<string>();
+  if (seasonIds.length === 0) return used;
+
+  const rows = await db
+    .select({
+      seasonId: schema.matches.seasonId,
+      requests: sql<number>`count(*)::int`,
+    })
+    .from(schema.matchRescheduleRequests)
+    .innerJoin(schema.matches, eq(schema.matchRescheduleRequests.matchId, schema.matches.id))
+    .where(
+      and(
+        eq(schema.matchRescheduleRequests.requestedBySchoolId, schoolId),
+        inArray(schema.matches.seasonId, seasonIds),
+        ne(schema.matchRescheduleRequests.status, 'cancelled')
+      )
+    )
+    .groupBy(schema.matches.seasonId);
+  for (const row of rows) {
+    if (hasUsedRescheduleAllowance(Number(row.requests))) used.add(row.seasonId);
+  }
+  return used;
 }

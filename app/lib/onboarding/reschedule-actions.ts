@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
@@ -8,6 +8,8 @@ import { parseEastern } from '@/app/lib/dates';
 import {
   MAX_REASON_LENGTH,
   canCancelRequest,
+  hasUsedRescheduleAllowance,
+  rescheduleAllowanceMessage,
   canOpponentRespond,
   canRequesterRespond,
   isLateRequest,
@@ -136,6 +138,27 @@ async function requestRescheduleImpl(
 
   try {
     await db.transaction(async (tx) => {
+      // Race-safe per-season limit: the school's row is locked until this transaction commits, so a
+      // second request from the same school waits here and then counts the first one. The count
+      // runs after the lock, so under READ COMMITTED it sees the first request's insert.
+      await tx
+        .select({ id: schema.schools.id })
+        .from(schema.schools)
+        .where(eq(schema.schools.id, params.schoolId))
+        .for('update');
+      const [used] = await tx
+        .select({ used: sql<number>`count(*)::int` })
+        .from(schema.matchRescheduleRequests)
+        .innerJoin(schema.matches, eq(schema.matchRescheduleRequests.matchId, schema.matches.id))
+        .where(
+          and(
+            eq(schema.matchRescheduleRequests.requestedBySchoolId, params.schoolId),
+            eq(schema.matches.seasonId, match.seasonId),
+            ne(schema.matchRescheduleRequests.status, 'cancelled')
+          )
+        );
+      if (hasUsedRescheduleAllowance(Number(used.used))) throw new ActionError(rescheduleAllowanceMessage());
+
       const [request] = await tx
         .insert(schema.matchRescheduleRequests)
         .values({
@@ -152,6 +175,7 @@ async function requestRescheduleImpl(
         .values(times.map((proposedAt) => ({ requestId: request.id, proposedAt })));
     });
   } catch (error) {
+    if (error instanceof ActionError) throw error;
     if (isUniqueViolation(error)) {
       return { success: false, error: 'This match already has an open reschedule request.' };
     }

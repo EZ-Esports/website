@@ -20,7 +20,11 @@ import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
-import { getLatestRescheduleRequests, getRescheduledFrom } from '@/app/lib/db/reschedules';
+import {
+  getLatestRescheduleRequests,
+  getRescheduledFrom,
+  getSeasonsWithRescheduleAllowanceUsed,
+} from '@/app/lib/db/reschedules';
 import { getGameCounts, getPendingSubmissions as getPendingMatchResults, type PendingSubmissionItem } from '@/app/lib/db/match-results';
 import type { RescheduleRequestItem } from '@/app/lib/reschedule-rules';
 import { redactHiddenMatches } from '@/app/lib/season-outcomes';
@@ -962,7 +966,7 @@ export async function getSchoolMatches(
     : rows;
   // Fail soft: the schedule must still show if the reschedule lookups fail.
   const ids = visible.map((row) => row.id);
-  const [requests, movedFrom, gameCounts, pendingResults] = await Promise.all([
+  const [requests, movedFrom, allowanceUsed, gameCounts, pendingResults] = await Promise.all([
     getLatestRescheduleRequests(ids).catch((error) => {
       console.error('Failed to load reschedule requests', error);
       return new Map<string, RescheduleRequestItem>();
@@ -971,6 +975,12 @@ export async function getSchoolMatches(
       console.error('Failed to load rescheduled matches', error);
       return new Map<string, string>();
     }),
+    getSeasonsWithRescheduleAllowanceUsed(schoolId, [...new Set(visible.map((row) => row.seasonId))]).catch(
+      (error) => {
+        console.error('Failed to load reschedule allowances', error);
+        return new Set<string>();
+      }
+    ),
     getGameCounts(ids).catch((error) => {
       console.error('Failed to load match game counts', error);
       return new Map<string, number>();
@@ -982,12 +992,13 @@ export async function getSchoolMatches(
   ]);
   return visible.map((row) => {
     const pending = pendingResults.get(row.id);
-    return toSchoolMatchItem(row, schoolId, requests.get(row.id) ?? null, movedFrom.get(row.id) ?? null, {
+    const item = toSchoolMatchItem(row, schoolId, requests.get(row.id) ?? null, movedFrom.get(row.id) ?? null, {
       gameCount: gameCounts.get(row.id) ?? 0,
       pending: pending
         ? { retryAfter: pending.retryAfter, message: pending.message, gameCount: pending.storedCount }
         : null,
     });
+    return { ...item, rescheduleAllowanceUsed: allowanceUsed.has(row.seasonId) };
   });
 }
 

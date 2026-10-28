@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Button } from 'react-aria-components';
-import { HiOutlineClipboardDocument } from 'react-icons/hi2';
+import { HiOutlineCheck, HiOutlineClipboardDocument } from 'react-icons/hi2';
 import type { SchoolInviteItem } from '@/app/lib/onboarding/portal-actions';
 
 interface InvitesHistoryTableProps {
@@ -13,6 +14,14 @@ export function InvitesHistoryTable({
   invites,
   onCopyLink,
 }: InvitesHistoryTableProps) {
+  // The invite whose link was just copied; the button confirms it for a moment.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!copiedId) return;
+    const timer = setTimeout(() => setCopiedId(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copiedId]);
+
   return (
     <div data-tour="invite-history" className="space-y-4 pt-4 border-t border-zinc-800">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -20,16 +29,17 @@ export function InvitesHistoryTable({
         <span className="text-xs text-zinc-500">{invites.length} Total Invites</span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
+      {/* Capped height so a long list scrolls inside the table instead of stretching the page. */}
+      <div className="max-h-96 overflow-auto rounded-xl border border-zinc-800 bg-zinc-900/60">
         <table className="w-full min-w-[36rem] text-left text-xs">
-          <thead>
-            <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950/60">
+          <thead className="sticky top-0 z-10">
+            <tr className="text-zinc-500 border-b border-zinc-800 bg-zinc-950">
               <th className="py-3 px-4 font-semibold">Intended Student</th>
               <th className="py-3 px-4 font-semibold">Game</th>
               <th className="py-3 px-4 font-semibold">Status</th>
               <th className="py-3 px-4 font-semibold">Created</th>
               <th className="py-3 px-4 font-semibold">Expires</th>
-              <th className="py-3 px-4 font-semibold text-right">Actions</th>
+              <th className="py-3 px-4 font-semibold text-right">Invite</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/40">
@@ -76,11 +86,23 @@ export function InvitesHistoryTable({
                       onPress={() => {
                         const url = `${window.location.origin}/join/${inv.schoolSlug}/${inv.gameSlug}`;
                         onCopyLink(url);
+                        setCopiedId(inv.id);
                       }}
-                      aria-label="Copy Base Join URL"
-                      className="p-2.5 -m-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                      aria-label={copiedId === inv.id ? 'Join URL copied' : 'Copy Base Join URL'}
+                      className={`inline-flex items-center gap-1.5 p-2.5 -m-1 rounded transition-colors cursor-pointer ${
+                        copiedId === inv.id
+                          ? 'text-emerald-400 bg-emerald-400/10'
+                          : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                      }`}
                     >
-                      <HiOutlineClipboardDocument className="w-4 h-4" />
+                      {copiedId === inv.id ? (
+                        <>
+                          <HiOutlineCheck className="w-4 h-4" aria-hidden="true" />
+                          <span className="font-semibold">Copied</span>
+                        </>
+                      ) : (
+                        <HiOutlineClipboardDocument className="w-4 h-4" aria-hidden="true" />
+                      )}
                     </Button>
                   </td>
                 </tr>
