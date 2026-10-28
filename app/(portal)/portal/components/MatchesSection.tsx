@@ -158,7 +158,7 @@ function MatchTable({
   );
 }
 
-/** One line per season: whether this school has used its single reschedule for it. */
+/** A callout per season showing how many reschedules this school has left (each school gets one). */
 function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) {
   const seasons = new Map<string, { name: string; used: boolean }>();
   for (const match of matches) {
@@ -169,14 +169,26 @@ function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) 
   }
   if (seasons.size === 0) return null;
   return (
-    <div className="space-y-1 text-xs text-zinc-400">
+    <div className="space-y-2">
       {[...seasons.entries()].map(([key, season]) => (
-        <p key={key}>
-          {season.name}:{' '}
-          {season.used
-            ? 'your school has used its one reschedule for this season'
-            : 'your school has one reschedule for this season, not yet used'}
-        </p>
+        <div
+          key={key}
+          role="status"
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm ${
+            season.used
+              ? 'border-amber-700/60 bg-amber-950/30 text-amber-200'
+              : 'border-emerald-700/60 bg-emerald-950/30 text-emerald-200'
+          }`}
+        >
+          <span className="font-semibold">
+            {season.name}: Reschedules remaining {season.used ? '0' : '1'} of 1
+          </span>
+          <span className="text-xs opacity-80">
+            {season.used
+              ? 'Your school has used its one reschedule for this season.'
+              : 'Your school can request one reschedule for this season.'}
+          </span>
+        </div>
       ))}
     </div>
   );
