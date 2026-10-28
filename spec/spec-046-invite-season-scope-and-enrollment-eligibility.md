@@ -1,6 +1,6 @@
-# spec-045: Player invites carry a season; roster enrollment is season-scoped
+# spec-046: Player invites carry a season; roster enrollment is season-scoped
 
-- **Spec ID:** spec-045
+- **Spec ID:** spec-046
 - **Title:** `player_invites.season_id`, season-scoped invite lists and review, and one season-eligibility rule for portal enrollment
 - **Status:** Implemented on branch `feat/253-invite-season-scope`, PR TBD. Issue #253. Migration `0056` is written but NOT applied to production (needs the owner's go-ahead and a backup, and must be applied before the code deploys: every `db.select().from(schema.playerInvites)` selects the new column).
 - **Date:** 2026-10-28
@@ -42,7 +42,7 @@ Staff `createPlayer` (admin roster editor) enforces rule 4 too (there is no staf
 
 ## Approval only accepts; enrolment is a separate step
 
-- `reviewPlayerInvite` approve no longer takes a `rosterId` or role and never chooses, defaults or writes a roster; it sets the invite to `accepted` (and reject sets `rejected`). The result carries no `enrolledPlayer` / `targetRosterId`. Manager guards are unchanged: school and game coverage, the inactive-season view-only refusal (spec-028) and the season-ownership refusal (`invite.season_id` must be the manager's resolved season, spec-045 Part 1). Staff admins may accept any invite. The old "choose a roster explicitly" staff refusals and the default-roster lookup are gone because nothing is rostered.
+- `reviewPlayerInvite` approve no longer takes a `rosterId` or role and never chooses, defaults or writes a roster; it sets the invite to `accepted` (and reject sets `rejected`). The result carries no `enrolledPlayer` / `targetRosterId`. Manager guards are unchanged: school and game coverage, the inactive-season view-only refusal (spec-028) and the season-ownership refusal (`invite.season_id` must be the manager's resolved season, spec-046 Part 1). Staff admins may accept any invite. The old "choose a roster explicitly" staff refusals and the default-roster lookup are gone because nothing is rostered.
 - **Lock:** accepting touches no roster, so the season roster lock (spec-020) no longer applies to approving; it still applies to every enrolment. This supersedes spec-020's "invite approval refused while locked" row. Reject was always allowed.
 - **Rostering an accepted student:** the manager uses Enroll on any roster of the game and season (Varsity or JV, or any extra roster). The Enroll pool (`getSchoolPlayerPool`) is every member of the school, so an accepted-but-unrostered student (empty `enrolledRosters`) is listed, minus students the class-year rule excludes for that roster's season. Enrolment goes through `enrollPlayerToRoster`: manager season access, active, unlocked, same school, size caps, captain rule, one tier per game, class-year eligibility.
 - **Portal UI:** the Pending Approvals card shows only Reject and Approve (no roster or role pickers); after approving it says to use Enroll on a roster. Tour copy updated.

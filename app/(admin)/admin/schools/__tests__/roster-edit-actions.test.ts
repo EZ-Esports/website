@@ -848,7 +848,7 @@ describe('stale /admin/roster revalidation', () => {
   });
 });
 
-describe('school roster edit actions: season eligibility (spec-045)', () => {
+describe('school roster edit actions: season eligibility (spec-046)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.writes.length = 0;

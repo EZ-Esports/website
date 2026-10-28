@@ -61,7 +61,7 @@ export function seasonEndYear(seasonName: string): number | null {
 }
 
 /**
- * Season-eligibility rule for putting a student on a roster (spec-045): a student whose class year
+ * Season-eligibility rule for putting a student on a roster (spec-046): a student whose class year
  * is before the year the season ends had already graduated when it began, so they cannot play in
  * it. A student with no recorded class year, or a season with a non-canonical name, is never
  * excluded: the rule only fires on data that proves ineligibility.

@@ -293,7 +293,7 @@ export async function createPlayer(schoolId: string, formData: FormData) {
       if (!roster) return 'not-found' as const;
       if (memberId && !(await memberInSchool(memberId, schoolId, tx))) return 'not-found' as const;
 
-      // Season scope (spec-045): a student who graduated before the roster's season cannot be
+      // Season scope (spec-046): a student who graduated before the roster's season cannot be
       // added to it. For a new member the class year typed in the form is the one that counts.
       const seasonName = await seasonNameForTeam(roster.teamId, tx);
       const classYear = memberId ? await memberGraduationYear(memberId, tx) : (gradYear as number | null);

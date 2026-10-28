@@ -42,7 +42,7 @@ describe('season name format (YYYY-YY)', () => {
   });
 });
 
-describe('season eligibility (spec-045)', () => {
+describe('season eligibility (spec-046)', () => {
   it('reads the end year from a canonical name only', () => {
     expect(seasonEndYear('2026-27')).toBe(2027);
     expect(seasonEndYear('2099-00')).toBe(2100);

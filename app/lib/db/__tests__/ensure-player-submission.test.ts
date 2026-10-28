@@ -51,7 +51,7 @@ const seasons = [
 ];
 const row = (academicYear: string, managedGames: string[] | null = null) => ({ academicYear, managedGames });
 
-describe('ensurePlayerSubmission season (spec-045)', () => {
+describe('ensurePlayerSubmission season (spec-046)', () => {
   it("uses the manager's own resolved season, even when it is not the active one", async () => {
     const { tx, inserted } = fakeTx({ seasons, invites: [], managerRows: [row('2027-28')] });
     expect(await ensurePlayerSubmission(tx, base)).toBe(true);

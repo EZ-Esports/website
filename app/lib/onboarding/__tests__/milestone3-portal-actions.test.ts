@@ -325,14 +325,17 @@ const mocks = vi.hoisted(() => {
       return {
         where: vi.fn((clause: any) => {
           const conds = extractConditions(clause);
+          const removed: any[] = [];
           if (store) {
             for (let i = store.length - 1; i >= 0; i--) {
               if (conds.every((c) => matchesRow(store[i], c))) {
+                removed.push(store[i]);
                 store.splice(i, 1);
               }
             }
           }
           return {
+            returning: vi.fn(() => Promise.resolve(removed)),
             then: (resolve: (v: any) => void) => resolve([]),
           };
         }),
@@ -413,6 +416,8 @@ import {
   generateInviteToken,
   createPlayerInvite,
   getSchoolInvites,
+  regeneratePlayerInviteLink,
+  deletePlayerInvite,
   getPendingSubmissions,
   reviewPlayerInvite,
   getRosterEligibility,
@@ -536,18 +541,31 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(Math.round(diffDays)).toBe(7);
     });
 
-    it('respects custom expiration period (e.g. 3 or 14 days)', async () => {
+    it.each([3, 5, 7])('respects the %i-day expiration option', async (days) => {
       const before = Date.now();
       const result = await createPlayerInvite({
         schoolId,
         gameId: valGameId,
         intendedFirstName: 'Sam',
         intendedLastName: 'Kim',
-        expiresInDays: 14,
+        expiresInDays: days,
       });
 
       const diffDays = (new Date(result.expiresAt).getTime() - before) / (24 * 60 * 60 * 1000);
-      expect(Math.round(diffDays)).toBe(14);
+      expect(Math.round(diffDays)).toBe(days);
+    });
+
+    it.each([0, 1, 4, 6, 8, 14, -3, 3.5, Number.NaN])('rejects the unsupported %s-day expiration instead of clamping', async (days) => {
+      await expect(
+        createPlayerInvite({
+          schoolId,
+          gameId: valGameId,
+          intendedFirstName: 'Sam',
+          intendedLastName: 'Kim',
+          expiresInDays: days,
+        })
+      ).rejects.toThrow(/must be one of 3, 5, 7/);
+      expect(mocks.state.playerInvitesStore).toHaveLength(0);
     });
 
     it('retrieves invites for the school matching the requested game', async () => {
@@ -563,6 +581,128 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(schoolInvites[0].intendedFirstName).toBe('Jordan');
       expect(schoolInvites[0].schoolSlug).toBe('stuyvesant');
       expect(schoolInvites[0].gameName).toBe('Valorant');
+    });
+  });
+
+  describe('1b. Invite regenerate-link and delete', () => {
+    const makeInvite = async (gameId = valGameId) =>
+      createPlayerInvite({ schoolId, gameId, intendedFirstName: 'Jordan', intendedLastName: 'Lee' });
+    const sha = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
+    const byId = (id: string) => mocks.state.playerInvitesStore.find((i) => i.id === id);
+
+    it('regenerate kills the old token and the new one resolves through the real lookup', async () => {
+      const created = await makeInvite();
+      const result = await regeneratePlayerInviteLink(created.inviteId);
+      if (!result.success) throw new Error('expected success');
+
+      expect(result.inviteUrl).toMatch(/^\/join\/stuyvesant\/valorant\?token=[0-9a-f]{64}$/);
+      const newToken = result.inviteUrl.split('token=')[1];
+      expect(byId(created.inviteId).tokenHash).toBe(sha(newToken));
+      expect(byId(created.inviteId).status).toBe('pending');
+
+      const { findInviteByTokenHash } = await import('@/app/lib/db/onboarding');
+      expect(await findInviteByTokenHash(sha(created.token))).toBeUndefined();
+      const found = await findInviteByTokenHash(sha(newToken));
+      expect(found?.kind).toBe('player');
+      expect(found?.invite.id).toBe(created.inviteId);
+    });
+
+    it('regenerate renews an expired-but-pending invite to 7 days', async () => {
+      const created = await makeInvite();
+      byId(created.inviteId).expiresAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const before = Date.now();
+      const result = await regeneratePlayerInviteLink(created.inviteId);
+      if (!result.success) throw new Error('expected success');
+      const days = (new Date(byId(created.inviteId).expiresAt).getTime() - before) / (24 * 60 * 60 * 1000);
+      expect(Math.round(days)).toBe(7);
+      expect(new Date(result.expiresAt).getTime()).toBe(new Date(byId(created.inviteId).expiresAt).getTime());
+    });
+
+    it('delete removes a pending invite and its token no longer resolves', async () => {
+      const created = await makeInvite();
+      expect(await deletePlayerInvite(created.inviteId)).toEqual({ success: true, inviteId: created.inviteId });
+      expect(byId(created.inviteId)).toBeUndefined();
+      const { findInviteByTokenHash } = await import('@/app/lib/db/onboarding');
+      expect(await findInviteByTokenHash(sha(created.token))).toBeUndefined();
+    });
+
+    it.each(['submitted', 'accepted', 'rejected'])('returns a rejection for a %s invite and changes nothing', async (status) => {
+      const created = await makeInvite();
+      byId(created.inviteId).status = status;
+      const hashBefore = byId(created.inviteId).tokenHash;
+
+      for (const result of [await deletePlayerInvite(created.inviteId), await regeneratePlayerInviteLink(created.inviteId)]) {
+        expect(result).toEqual({ success: false, error: expect.stringMatching(/Only pending invites/), status });
+      }
+      expect(byId(created.inviteId).tokenHash).toBe(hashBefore);
+    });
+
+    it('a status flip between the read and the write leaves the invite untouched and reports the new status', async () => {
+      for (const act of [deletePlayerInvite, regeneratePlayerInviteLink]) {
+        mocks.state.playerInvitesStore = [];
+        const created = await makeInvite();
+        const hashBefore = byId(created.inviteId).tokenHash;
+        const realUpdate = mocks.mockDb.update.getMockImplementation()!;
+        const realDelete = mocks.mockDb.delete.getMockImplementation()!;
+        // A manager's submission lands after the action's status read but before its write.
+        const flip = () => {
+          byId(created.inviteId).status = 'submitted';
+        };
+        // Only the write the action under test performs is intercepted; an unused one-shot would leak.
+        if (act === deletePlayerInvite) {
+          mocks.mockDb.delete.mockImplementationOnce((tbl: any) => (flip(), realDelete(tbl)));
+        } else {
+          mocks.mockDb.update.mockImplementationOnce((tbl: any) => (flip(), realUpdate(tbl)));
+        }
+
+        const result = await act(created.inviteId);
+        expect(result).toEqual({ success: false, error: expect.stringMatching(/Only pending invites/), status: 'submitted' });
+        expect(byId(created.inviteId)).toBeDefined();
+        expect(byId(created.inviteId).tokenHash).toBe(hashBefore);
+      }
+    });
+
+    it('refuses an invite belonging to another school and leaves it untouched', async () => {
+      mocks.state.playerInvitesStore.push({
+        id: 'foreign-invite',
+        schoolId: otherSchoolId,
+        gameId: valGameId,
+        tokenHash: 'h',
+        status: 'pending',
+        intendedFirstName: 'A',
+        intendedLastName: 'B',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      for (const result of [await deletePlayerInvite('foreign-invite'), await regeneratePlayerInviteLink('foreign-invite')]) {
+        expect(result).toMatchObject({ success: false, status: 'forbidden', error: expect.stringMatching(/Forbidden/) });
+      }
+      expect(byId('foreign-invite').tokenHash).toBe('h');
+    });
+
+    it('refuses an invite for a game outside the manager scope', async () => {
+      mocks.state.playerInvitesStore.push({
+        id: 'lol-invite',
+        schoolId,
+        gameId: lolGameId,
+        tokenHash: 'h2',
+        status: 'pending',
+        intendedFirstName: 'A',
+        intendedLastName: 'B',
+        expiresAt: new Date(Date.now() + 1000),
+      });
+      expect(await deletePlayerInvite('lol-invite')).toMatchObject({ success: false, status: 'forbidden' });
+      expect(byId('lol-invite')).toBeDefined();
+    });
+
+    it('refuses an unknown invite and an unauthenticated caller', async () => {
+      const created = await makeInvite();
+      expect(await deletePlayerInvite('missing')).toMatchObject({ success: false, status: null, error: expect.stringMatching(/not found/i) });
+      mocks.setClaims(null);
+      expect(await regeneratePlayerInviteLink(created.inviteId)).toMatchObject({
+        success: false,
+        status: 'forbidden',
+        error: expect.stringMatching(/Unauthorized/),
+      });
     });
   });
 
@@ -2025,7 +2165,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect((await getSchoolRosters(schoolId, valGameId)).length).toBe(2);
       await expect(getRosterEligibility({ rosterId: 'r-past' })).resolves.toBeDefined();
       await expect(getSchoolPlayerPool(schoolId)).resolves.toBeDefined();
-      // Only the invite of the manager's own (inactive) season is listed (spec-045).
+      // Only the invite of the manager's own (inactive) season is listed (spec-046).
       expect((await getSchoolInvites(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-past']);
       expect((await getPendingSubmissions(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-past']);
 
@@ -2675,7 +2815,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
     });
   });
-  describe('13. Invite season scope and roster enrollment eligibility (spec-045)', () => {
+  describe('13. Invite season scope and roster enrollment eligibility (spec-046)', () => {
     const mkInvite = (id: string, seasonId: string | null, extra: Record<string, unknown> = {}) => ({
       id, schoolId, gameId: valGameId, seasonId, memberId: 'm-kid', intendedFirstName: 'Kid', intendedLastName: 'One',
       status: 'submitted', tokenHash: `h-${id}`, expiresAt: new Date('2027-01-01'), submittedAt: new Date(), createdAt: new Date(),

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useEffect, useState, useTransition } from 'react';
 import type { SchoolManagerContext, ManagedSchoolInfo } from '@/app/lib/onboarding/manager-auth';
 import {
   reviewPlayerInvite,
@@ -11,6 +11,8 @@ import {
   updateRosterPlayerRole,
   createSchoolRoster,
   deleteSchoolRoster,
+  regeneratePlayerInviteLink,
+  deletePlayerInvite,
   type SchoolInviteItem,
   type PendingSubmission,
   type SchoolRosterDetails,
@@ -33,6 +35,10 @@ import { CreateRosterModal } from './components/CreateRosterModal';
 import PortalTour from './tour/PortalTour';
 
 export type { GameItem };
+
+function inviteStudentName(invite: SchoolInviteItem | null): string {
+  return invite ? `${invite.intendedFirstName} ${invite.intendedLastName}`.trim() : 'this student';
+}
 
 interface SchoolPortalClientProps {
   context: SchoolManagerContext;
@@ -140,13 +146,71 @@ export default function SchoolPortalClient({
     selectedGame === 'all' ? matches : matches.filter((m) => m.gameId === selectedGame);
 
   // --- Handlers ---
-  const handleCopyLink = async (url: string) => {
+  // The invite whose fresh link was just copied, and the link itself when the clipboard refused it.
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [manualLink, setManualLink] = useState<{ inviteId: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!copiedInviteId) return;
+    const timer = setTimeout(() => setCopiedInviteId(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copiedInviteId]);
+
+  // Only the token hash is stored, so "copy" issues a new link (the old one stops working) and
+  // copies it straight away. It runs from the confirm dialog because it invalidates the old link.
+  const [copyAnnouncement, setCopyAnnouncement] = useState('');
+
+  // A refusal carries the invite's current state: drop a row that is gone, correct a stale status.
+  const syncStaleInvite = (inviteId: string, status: string | null) => {
+    if (status === 'forbidden') return;
+    setInvites((prev) =>
+      status === null
+        ? prev.filter((inv) => inv.id !== inviteId)
+        : prev.map((inv) => (inv.id === inviteId ? { ...inv, status } : inv))
+    );
+  };
+
+  const inviteLinkCopy = useConfirmAction<SchoolInviteItem>(async (invite) => {
+    let result;
+    try {
+      result = await regeneratePlayerInviteLink(invite.id);
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to create a new link' };
+    }
+    if (!result.success) {
+      syncStaleInvite(invite.id, result.status);
+      return { success: false, error: result.error };
+    }
+    const url = window.location.origin + result.inviteUrl;
+    setInvites((prev) =>
+      prev.map((inv) => (inv.id === invite.id ? { ...inv, expiresAt: result.expiresAt } : inv))
+    );
     try {
       await navigator.clipboard.writeText(url);
+      setManualLink(null);
+      setCopiedInviteId(invite.id);
+      setCopyAnnouncement('Link copied');
     } catch {
-      // Clipboard write failed gracefully
+      setManualLink({ inviteId: invite.id, url });
+      setCopyAnnouncement('Copy failed, link shown below');
     }
-  };
+    return { success: true };
+  }, 'Failed to create a new link');
+
+  const inviteDeletion = useConfirmAction<SchoolInviteItem>(async (invite) => {
+    let result;
+    try {
+      result = await deletePlayerInvite(invite.id);
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to delete invite' };
+    }
+    if (!result.success) {
+      syncStaleInvite(invite.id, result.status);
+      return { success: false, error: result.error };
+    }
+    setInvites((prev) => prev.filter((inv) => inv.id !== invite.id));
+    setManualLink((prev) => (prev?.inviteId === invite.id ? null : prev));
+    return { success: true };
+  }, 'Failed to delete invite');
 
   // Approving only accepts the student; the manager then enrolls them onto any roster of the game
   // (Varsity or JV) from that roster's Enroll button, where the pool lists accepted students.
@@ -590,7 +654,36 @@ export default function SchoolPortalClient({
       {/* Invites Sent Table */}
       <InvitesHistoryTable
         invites={filteredInvites}
-        onCopyLink={handleCopyLink}
+        onCopyLink={(inv) => {
+          setManualLink(null);
+          setCopyAnnouncement('');
+          inviteLinkCopy.request(inv);
+        }}
+        onDelete={inviteDeletion.request}
+        viewOnlyGameIds={viewOnlyGameIds}
+        copiedId={copiedInviteId}
+        manualLink={manualLink}
+        announcement={copyAnnouncement}
+      />
+
+      <ConfirmActionDialog
+        {...inviteLinkCopy.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Copy a new invite link?"
+        message={`This replaces the current link for ${inviteStudentName(inviteLinkCopy.target)}. The old link will stop working and the new link is copied to your clipboard.`}
+        confirmLabel="Copy new link"
+        pendingLabel="Creating…"
+      />
+
+      <ConfirmActionDialog
+        {...inviteDeletion.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Delete invite?"
+        message={`Delete the invite for ${inviteStudentName(inviteDeletion.target)}? Its link will stop working. This action cannot be undone.`}
+        confirmLabel="Delete invite"
+        pendingLabel="Deleting…"
       />
 
       <ConfirmActionDialog

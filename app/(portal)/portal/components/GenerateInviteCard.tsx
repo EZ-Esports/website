@@ -13,6 +13,7 @@ import {
   createPlayerInvite,
   type SchoolInviteItem,
 } from '@/app/lib/onboarding/portal-actions';
+import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS } from '@/app/lib/onboarding/invite-expiry';
 import type { GameItem } from './GameTabs';
 
 interface GenerateInviteCardProps {
@@ -37,7 +38,7 @@ export function GenerateInviteCard({
 }: GenerateInviteCardProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [expiryDays, setExpiryDays] = useState(7);
+  const [expiryDays, setExpiryDays] = useState<number>(DEFAULT_INVITE_EXPIRY_DAYS);
   const [generatedInvite, setGeneratedInvite] = useState<{
     url: string;
     studentName: string;
@@ -197,9 +198,11 @@ export function GenerateInviteCard({
             onChange={(e) => setExpiryDays(Number(e.target.value))}
             className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
           >
-            <option value={3}>3 Days</option>
-            <option value={7}>7 Days (Standard)</option>
-            <option value={14}>14 Days</option>
+            {INVITE_EXPIRY_DAYS.map((days) => (
+              <option key={days} value={days}>
+                {days} Days{days === DEFAULT_INVITE_EXPIRY_DAYS ? ' (Standard)' : ''}
+              </option>
+            ))}
           </select>
         </div>
 
