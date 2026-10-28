@@ -74,8 +74,10 @@ export function RostersSection({
     (anyLocked || anyViewOnly) &&
     allGameIds.every((id) => lockedGameIds.includes(id) || viewOnlyGameIds.includes(id));
   // One titled section per season, in the order the rosters arrive, so a staff view stays readable.
+  // Within a season Varsity sits on the left and JV on the right.
+  const divisionRank = (division: string) => (division === 'JV' || division === 'Junior Varsity' ? 1 : 0);
   const seasons = new Map<string, { name: string; rosters: SchoolRosterDetails[] }>();
-  for (const roster of rosters) {
+  for (const roster of [...rosters].sort((a, b) => divisionRank(a.division) - divisionRank(b.division))) {
     const group = seasons.get(roster.seasonId) ?? { name: roster.seasonName, rosters: [] };
     group.rosters.push(roster);
     seasons.set(roster.seasonId, group);
