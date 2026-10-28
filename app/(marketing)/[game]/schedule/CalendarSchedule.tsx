@@ -13,7 +13,7 @@ interface CalendarScheduleProps {
   matches: ScheduleCalendarItem[];
   gameSlug: string;
   division: string;
-  /** Season outcomes are unpublished; matches arrive without scores and completed matches read as "0 - 0". */
+  /** Season outcomes are unpublished; matches arrive without scores and every match reads as "0 - 0". */
   outcomesHidden?: boolean;
 }
 
@@ -391,15 +391,16 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
                     </div>
 
                     <div className="text-right shrink-0">
-                      {isCompleted ? (
+                      {/* Hidden outcomes read "0 - 0" for every match, whatever its status. */}
+                      {outcomesHidden ? (
+                        <Badge>0 - 0</Badge>
+                      ) : isCompleted ? (
                         <div className="flex flex-col items-end gap-1">
                           {/* Unrecorded results render a neutral label, not an empty pill. */}
                           {match.forfeit ? (
                             <Badge variant="warning">
                               Forfeit{match.homeScore !== null && match.awayScore !== null ? ` ${match.homeScore}-${match.awayScore}` : ''}
                             </Badge>
-                          ) : outcomesHidden ? (
-                            <Badge>0 - 0</Badge>
                           ) : match.result ? (
                             <Badge>{match.result}</Badge>
                           ) : (
@@ -478,7 +479,13 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
 
                   {/* VS / Score Hub */}
                   <div className="flex flex-col items-center justify-center shrink-0 min-w-[70px] z-10">
-                    {selectedMatch.status === 'Completed' && selectedMatch.homeScore !== null && selectedMatch.awayScore !== null ? (
+                    {outcomesHidden ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
+                        <span className="text-foreground-muted font-extrabold text-sm">-</span>
+                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
+                      </div>
+                    ) : selectedMatch.status === 'Completed' && selectedMatch.homeScore !== null && selectedMatch.awayScore !== null ? (
                       <div className="flex items-center gap-2">
                         <span className={`text-2xl md:text-3xl font-black ${selectedMatch.homeScore > selectedMatch.awayScore ? 'text-accent' : 'text-foreground-secondary'}`}>
                           {selectedMatch.homeScore}
@@ -487,12 +494,6 @@ export default function CalendarSchedule({ matches, gameSlug, division, outcomes
                         <span className={`text-2xl md:text-3xl font-black ${selectedMatch.awayScore > selectedMatch.homeScore ? 'text-accent' : 'text-foreground-secondary'}`}>
                           {selectedMatch.awayScore}
                         </span>
-                      </div>
-                    ) : selectedMatch.status === 'Completed' && outcomesHidden ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
-                        <span className="text-foreground-muted font-extrabold text-sm">-</span>
-                        <span className="text-2xl md:text-3xl font-black text-foreground-secondary">0</span>
                       </div>
                     ) : selectedMatch.status === 'Live' ? (
                       <span className="px-2.5 py-1 rounded bg-success/10 border border-success/20 text-success font-extrabold text-xs uppercase animate-pulse">

@@ -69,12 +69,14 @@ function TeamStandingsTable({
    */
   if (!outcomesPublic) {
     // Rows arrive alphabetical and stat-free (see redactStandingRows); no rank
-    // or medal column, so nothing here implies an order of finish.
+    // or medal column, so nothing here implies an order of finish. The record
+    // reads 0-0 for every team rather than a number the redaction removed.
     return (
       <Table>
         <thead className="bg-surface-sunken/60 border-b border-line">
           <tr>
             <Th>Team</Th>
+            <Th>Record</Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -83,6 +85,7 @@ function TeamStandingsTable({
               <Td className="font-bold text-foreground">
                 {standingsTeamLabel(entry, standingsFormat)}
               </Td>
+              <Td className="font-medium">0-0</Td>
             </Tr>
           ))}
         </tbody>

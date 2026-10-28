@@ -459,7 +459,7 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                   <tr>
                     {outcomesPublic && <Th>Rank</Th>}
                     <Th>Team</Th>
-                    {outcomesPublic && <Th className="whitespace-nowrap">W&ndash;L</Th>}
+                    <Th className="whitespace-nowrap">W&ndash;L</Th>
                     {outcomesPublic && (
                       <Th align="right" className="hidden sm:table-cell whitespace-nowrap">Win %</Th>
                     )}
@@ -506,6 +506,8 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                           the squad that tells a combined table's two Brooklyn
                           Technical rows apart. */}
                       <Td className="font-bold text-foreground">{entry.teamLabel}</Td>
+                      {/* Hidden outcomes: every record reads 0-0, never a redacted blank. */}
+                      {!outcomesPublic && <Td className="font-medium whitespace-nowrap">0-0</Td>}
                       {outcomesPublic && entry.wins !== null && entry.losses !== null && (
                         <Td className="font-medium whitespace-nowrap">
                           {entry.wins}&ndash;{entry.losses}
