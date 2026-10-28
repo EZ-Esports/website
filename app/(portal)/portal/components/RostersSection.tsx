@@ -1,7 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from 'react-aria-components';
-import { HiOutlineEye, HiOutlineLockClosed, HiOutlinePlus } from 'react-icons/hi2';
+import {
+  HiOutlineChevronDown,
+  HiOutlineChevronUp,
+  HiOutlineEye,
+  HiOutlineLockClosed,
+  HiOutlinePlus,
+} from 'react-icons/hi2';
 import type {
   SchoolRosterDetails,
   RosterEligibilityResult,
@@ -75,6 +82,12 @@ export function RostersSection({
   }
   // Season names are "YYYY-YY", so sorting them descending puts the most recent season first.
   const seasonGroups = [...seasons.entries()].sort(([, a], [, b]) => b.name.localeCompare(a.name));
+  // Seasons the user has folded away; every season starts expanded.
+  const [collapsedSeasons, setCollapsedSeasons] = useState<string[]>([]);
+  const toggleSeason = (seasonId: string) =>
+    setCollapsedSeasons((prev) =>
+      prev.includes(seasonId) ? prev.filter((id) => id !== seasonId) : [...prev, seasonId]
+    );
   return (
     <div data-tour="rosters" className="min-w-0 space-y-5 pt-4 border-t border-zinc-800">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -153,10 +166,37 @@ export function RostersSection({
           </Button>
         </div>
       ) : (
-        seasonGroups.map(([seasonId, group]) => (
+        seasonGroups.map(([seasonId, group]) => {
+          const expanded = !collapsedSeasons.includes(seasonId);
+          const panelId = `season-rosters-${seasonId}`;
+          return (
           <section key={seasonId} aria-label={`${group.name} season rosters`} className="space-y-4">
-            <h3 className="text-base font-bold text-white">{group.name} Season</h3>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <h3>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={panelId}
+                onClick={() => toggleSeason(seasonId)}
+                className="flex w-full items-center justify-between gap-3 text-left cursor-pointer min-h-[44px] sm:min-h-0"
+              >
+                <span className="text-base font-bold text-white">
+                  {group.name} Season
+                  <span className="ml-2 text-xs font-normal text-zinc-500">
+                    {group.rosters.length} {group.rosters.length === 1 ? 'roster' : 'rosters'}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1 text-xs font-semibold text-zinc-300">
+                  {expanded ? 'Hide' : 'Show'}
+                  {expanded ? (
+                    <HiOutlineChevronUp className="w-4 h-4" aria-hidden="true" />
+                  ) : (
+                    <HiOutlineChevronDown className="w-4 h-4" aria-hidden="true" />
+                  )}
+                </span>
+              </button>
+            </h3>
+            {expanded && (
+            <div id={panelId} className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               {group.rosters.map((roster) => (
                 <RosterCard
                   key={roster.id}
@@ -182,8 +222,10 @@ export function RostersSection({
                 />
               ))}
             </div>
+            )}
           </section>
-        ))
+          );
+        })
       )}
     </div>
   );
