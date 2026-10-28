@@ -459,11 +459,7 @@ export async function processOnboardingSubmission(
             invitedByUserId: invite.invitedByUserId,
             intendedFirstName: validated.legalFirstName,
             intendedLastName: validated.legalLastName,
-            tokenHash: crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex'),
-            seasonName: resolveManagerAcademicYear(
-              submission.academicYear,
-              invite.submissionDraft as Record<string, any> | null
-            ),
+            tokenHash: crypto.createHash('sha256').update(crypto.randomBytes(32)).digest('hex'),
           });
           if (created) applicationsCreated += 1;
         }

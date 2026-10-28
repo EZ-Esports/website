@@ -98,8 +98,6 @@ export default function SchoolPortalClient({
   // --- Approvals Queue State ---
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [selectedRosterMap, setSelectedRosterMap] = useState<Record<string, string>>({});
-  const [selectedRoleMap, setSelectedRoleMap] = useState<Record<string, 'player' | 'sub' | 'captain'>>({});
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
   // Outcome of the last roster Move, announced politely by the Rosters section.
   const [rosterNotice, setRosterNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -150,119 +148,50 @@ export default function SchoolPortalClient({
     }
   };
 
+  // Approving only accepts the student; the manager then enrolls them onto any roster of the game
+  // (Varsity or JV) from that roster's Enroll button, where the pool lists accepted students.
   const handleApprove = async (inviteId: string) => {
     setApprovingId(inviteId);
     setApprovalFeedback(null);
     try {
       const sub = submissions.find((s) => s.id === inviteId);
-      const gameRosters = rosters.filter((r) => r.gameId === sub?.gameId);
-      const chosenRosterId =
-        selectedRosterMap[inviteId] !== undefined
-          ? selectedRosterMap[inviteId]
-          : (gameRosters[0]?.id || '');
-      const chosenRole = (selectedRoleMap[inviteId] as 'player' | 'sub' | 'captain') || 'player';
-
-      const result = await reviewPlayerInvite({
-        inviteId,
-        action: 'approve',
-        rosterId: chosenRosterId || undefined,
-        role: chosenRole,
-      });
+      const result = await reviewPlayerInvite({ inviteId, action: 'approve' });
 
       if (!result.success) {
-        // The invite stays pending (for example the student is already on a sibling roster).
         setApprovalFeedback(result.error);
         return;
       }
 
-      if (result.success) {
-        setSubmissions((prev) => prev.filter((s) => s.id !== inviteId));
-        setInvites((prev) =>
-          prev.map((inv) => (inv.id === inviteId ? { ...inv, status: 'accepted' } : inv))
-        );
+      setSubmissions((prev) => prev.filter((s) => s.id !== inviteId));
+      setInvites((prev) =>
+        prev.map((inv) => (inv.id === inviteId ? { ...inv, status: 'accepted' } : inv))
+      );
 
-        if (result.enrolledPlayer && result.targetRosterId) {
-          const enrolled = result.enrolledPlayer;
-          const targetId = result.targetRosterId;
-          setRosters((prev) =>
-            prev.map((r) => {
-              if (r.id !== targetId) return r;
-              const updatedPlayers = r.players.map((p) =>
-                enrolled.isCaptain && p.isCaptain ? { ...p, isCaptain: false, role: 'player' } : p
-              );
-              return {
-                ...r,
-                players: [
-                  ...updatedPlayers.filter(
-                    (p) => p.id !== enrolled.id && p.memberId !== enrolled.memberId
-                  ),
-                  enrolled,
-                ],
-              };
-            })
-          );
-        }
-
-        // Add to or update playerPool in client state
-        if (sub && sub.memberId) {
-          setPlayerPool((prev) => {
-            const existing = prev.find((p) => p.memberId === sub.memberId);
-            if (existing) {
-              if (result.targetRosterId) {
-                return prev.map((p) =>
-                  p.memberId === sub.memberId
-                    ? {
-                        ...p,
-                        enrolledRosters: [
-                          ...p.enrolledRosters.filter((er) => er.rosterId !== result.targetRosterId),
-                          {
-                            rosterId: result.targetRosterId!,
-                            rosterName: rosters.find((r) => r.id === result.targetRosterId)?.name || 'Roster',
-                            gameName: sub.gameName,
-                            role: chosenRole,
-                            isCaptain: chosenRole === 'captain',
-                          },
-                        ],
-                      }
-                    : p
-                );
-              }
-              return prev;
-            }
-            const newPoolPlayer: SchoolPoolPlayer = {
-              memberId: sub.memberId!,
-              firstName: sub.intendedFirstName,
-              lastName: sub.intendedLastName,
-              playerName: sub.playerName,
-              ign: sub.ign,
-              discordUsername: sub.discord,
-              inGuild: true,
-              riotVerified: true,
-              graduationYear: null,
-              enrolledRosters: result.targetRosterId
-                ? [
-                    {
-                      rosterId: result.targetRosterId,
-                      rosterName: rosters.find((r) => r.id === result.targetRosterId)?.name || 'Roster',
-                      gameName: sub.gameName,
-                      role: chosenRole,
-                      isCaptain: chosenRole === 'captain',
-                    },
-                  ]
-                : [],
-            };
-            return [newPoolPlayer, ...prev];
-          });
-        }
-
-        const enrolledRoster = result.targetRosterId ? rosters.find((r) => r.id === result.targetRosterId) : null;
-        setApprovalFeedback(
-          enrolledRoster
-            ? `Application approved! Player enrolled to ${enrolledRoster.name} (${enrolledRoster.gameName}) as ${chosenRole === 'captain' ? 'Captain' : chosenRole === 'sub' ? 'Substitute' : 'Starter'}.`
-            : 'Application approved! Player added to school pool.'
-        );
-        setTimeout(() => setApprovalFeedback(null), 5000);
+      // The student is already a member of the school; make sure they are in the client-side pool
+      // so the Enroll dialog offers them without a reload.
+      if (sub?.memberId) {
+        setPlayerPool((prev) => {
+          if (prev.some((p) => p.memberId === sub.memberId)) return prev;
+          const accepted: SchoolPoolPlayer = {
+            memberId: sub.memberId!,
+            firstName: sub.intendedFirstName,
+            lastName: sub.intendedLastName,
+            playerName: sub.playerName,
+            ign: sub.ign,
+            discordUsername: sub.discord,
+            inGuild: true,
+            riotVerified: true,
+            graduationYear: null,
+            enrolledRosters: [],
+          };
+          return [accepted, ...prev];
+        });
       }
+
+      setApprovalFeedback(
+        `${sub?.playerName ?? 'The student'} accepted. Use Enroll on a roster to put them on Varsity or JV.`
+      );
+      setTimeout(() => setApprovalFeedback(null), 5000);
     } catch (err: any) {
       setApprovalFeedback(`Approval failed: ${err.message}`);
     } finally {
@@ -614,15 +543,9 @@ export default function SchoolPortalClient({
         <div className="min-w-0 lg:col-span-7 space-y-4">
           <PendingApprovalsCard
             submissions={filteredSubmissions}
-            rosters={rosters}
             approvingId={approvingId}
             rejectingId={rejectingId}
             approvalFeedback={approvalFeedback}
-            selectedRosterMap={selectedRosterMap}
-            setSelectedRosterMap={setSelectedRosterMap}
-            selectedRoleMap={selectedRoleMap}
-            setSelectedRoleMap={setSelectedRoleMap}
-            lockedGameIds={lockedGameIds}
             viewOnlyGameIds={viewOnlyGameIds}
             onApprove={handleApprove}
             onReject={handleReject}

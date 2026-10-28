@@ -5,13 +5,9 @@ import * as schema from '@/app/lib/db/schema';
 import { Permissions, hasPermission, calculateEffectiveStaffAccess } from '@/app/lib/roles';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { inactiveSeasonViewOnlyError } from '@/app/lib/season-name';
+import { affiliationCoversGame, resolveManagerSeason, type ManagerAffiliation } from '@/app/lib/onboarding/manager-season';
 
-/** One `school_managers` row's grant at a school: a season (`YYYY-YY`) and the games it covers. */
-export interface ManagerAffiliation {
-  academicYear: string;
-  /** Game slugs/ids this row covers; null or empty means every game. */
-  managedGames: string[] | null;
-}
+export { resolveManagerSeason, type ManagerAffiliation };
 
 export interface ManagedSchoolInfo {
   schoolId: string;
@@ -327,38 +323,6 @@ export async function getActiveSeasonForGame(gameId: string): Promise<SeasonInfo
     .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
     .limit(1);
   return season ?? null;
-}
-
-function affiliationCoversGame(
-  affiliation: ManagerAffiliation,
-  game: { id: string; slug: string }
-): boolean {
-  const games = affiliation.managedGames;
-  if (!games || games.length === 0) return true;
-  return games.includes(game.slug) || games.includes(game.id);
-}
-
-/**
- * Pure season-resolution rule for the manager portal (spec-026). A manager's season for a game is
- * the game's season whose `name` equals the `academic_year` (`YYYY-YY`) of one of their rows that
- * covers the game. `seasons.is_active` plays no part. When several rows match several seasons,
- * the newest by name wins (`YYYY-YY` sorts lexicographically). Returns null when no season of the
- * game has a matching name. Change the multi-match policy here and nowhere else.
- */
-export function resolveManagerSeason<S extends { name: string }>(
-  affiliations: ManagerAffiliation[],
-  game: { id: string; slug: string },
-  gameSeasons: S[]
-): S | null {
-  const names = new Set(
-    affiliations.filter((a) => affiliationCoversGame(a, game)).map((a) => a.academicYear)
-  );
-  let best: S | null = null;
-  for (const season of gameSeasons) {
-    if (!names.has(season.name)) continue;
-    if (!best || season.name > best.name) best = season;
-  }
-  return best;
 }
 
 async function getSeasonsForGame(gameId: string): Promise<SeasonInfo[]> {

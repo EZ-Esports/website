@@ -56,6 +56,32 @@ describe('PlayerOnboardingWizard resume after Discord', () => {
   });
 });
 
+describe('PlayerOnboardingWizard prefills the name the manager typed on the invite', () => {
+  const step1 = (draft: InviteData['submissionDraft']) =>
+    renderToStaticMarkup(
+      <PlayerOnboardingWizard
+        token="t"
+        inviteData={{ ...invite('player'), submissionDraft: draft }}
+        discord={null}
+        resumeAtDiscord={false}
+      />
+    );
+
+  it('fills the legal first and last name inputs from the invite, with no extra notice', () => {
+    const html = step1(null);
+    expect(html).toMatch(/<input[^>]*value="Sam"/);
+    expect(html).toMatch(/<input[^>]*value="Miller"/);
+  });
+
+  it('keeps what the student already saved over the invite name (the fields stay editable)', () => {
+    const html = step1({ legalFirstName: 'Samuel', legalLastName: 'Miller-Jones' } as InviteData['submissionDraft']);
+    expect(html).toMatch(/<input[^>]*value="Samuel"/);
+    expect(html).toMatch(/<input[^>]*value="Miller-Jones"/);
+    expect(html).not.toMatch(/<input[^>]*value="Sam"/);
+    expect(html).not.toMatch(/<input[^>]*readOnly|<input[^>]*disabled[^>]*value="Samuel"/);
+  });
+});
+
 describe('stepForRejection', () => {
   it('sends a missing manager password to step 1 and Discord problems to step 2', () => {
     expect(stepForRejection('manager_password_required')).toBe(1);

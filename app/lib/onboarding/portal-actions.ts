@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, or, desc, asc, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, or, desc, inArray, type SQL } from 'drizzle-orm';
 import {
   assertManagerForSchool,
   assertManagerForSchoolGame,
@@ -415,8 +415,6 @@ export async function getPendingSubmissions(
 export interface ReviewPlayerInviteParams {
   inviteId: string;
   action: 'approve' | 'reject';
-  rosterId?: string;
-  role?: 'player' | 'sub' | 'captain';
   rejectionReason?: string;
 }
 
@@ -425,23 +423,25 @@ export interface ReviewPlayerInviteSuccess {
   status: 'accepted' | 'rejected';
   inviteId: string;
   rejectionReason?: string;
-  enrolledPlayer?: SchoolRosterPlayer;
-  targetRosterId?: string;
 }
 
-/** An approval can be refused (for example the student is already on a sibling roster); the invite then stays pending. */
 export type ReviewPlayerInviteResult = ReviewPlayerInviteSuccess | RosterActionRejection;
 
 /**
  * Reviews a submitted player application (approve or reject).
- * If approved: sets status to 'accepted' and assigns player to roster.
- * If rejected: sets status to 'rejected' with reason.
- * Revalidates ROSTERS, PLAYERS, TEAMS cache tags.
+ * Approve only ACCEPTS the student: it never picks or defaults a roster. An accepted student is
+ * then enrolled onto any roster of the game and season through `enrollPlayerToRoster`, which
+ * applies the roster lock, size caps, one-tier-per-game and season-eligibility rules.
+ * Reject sets status 'rejected' with a reason.
+ *
+ * A manager may review only invites of their own season (spec-045) and, being a mutation, not on an
+ * inactive season (spec-028). Staff admins may review any invite. Because nothing is put on a
+ * roster, the season roster lock does not apply to reviewing.
  */
 export async function reviewPlayerInvite(
   params: ReviewPlayerInviteParams
 ): Promise<ReviewPlayerInviteResult> {
-  const { inviteId, action, rosterId, role = 'player', rejectionReason } = params;
+  const { inviteId, action, rejectionReason } = params;
 
   if (!inviteId) {
     throw new Error('Invite ID is required');
@@ -460,10 +460,6 @@ export async function reviewPlayerInvite(
   const { context: reviewContext, season: managerSeason } = invite.gameId
     ? await assertManagerForSchoolGame(invite.schoolId, invite.gameId)
     : { context: await assertManagerForSchool(invite.schoolId), season: null };
-  // The season invite approval enrolls into: the manager's resolved season, or for a staff admin
-  // the game's active season (unchanged behavior).
-  const approvalSeason =
-    invite.gameId && !managerSeason ? await getActiveSeasonForGame(invite.gameId) : managerSeason;
   // Without a game there is no season to match, so only staff admins may review it.
   if (!invite.gameId && !reviewContext.isStaffAdmin) {
     throw new Error('Forbidden: This invite is not tied to a game in your season');
@@ -475,241 +471,14 @@ export async function reviewPlayerInvite(
     throw new Error('Forbidden: This invite belongs to a different season than your manager affiliation and cannot be reviewed from the portal');
   }
 
-  let explicitTarget: Awaited<ReturnType<typeof assertManagerForRoster>> | null = null;
-  if (rosterId) {
-    explicitTarget = await assertManagerForRoster(rosterId);
-    if (explicitTarget.team.schoolId !== invite.schoolId) {
-      throw new Error('Target roster does not belong to authorized school');
-    }
-    // The invite is for one game and season; it may only be rostered in that same game and
-    // season (a seasonless legacy invite, reviewable by staff only, has no season to compare).
-    if (explicitTarget.team.gameId !== invite.gameId) {
-      throw new Error('Target roster is for a different game than the invite');
-    }
-    if (invite.seasonId && explicitTarget.team.seasonId !== invite.seasonId) {
-      throw new Error('Target roster belongs to a different season than the invite');
-    }
-  }
-
-  // Approving an invite is the intake path onto a roster. While the season is locked it is
-  // refused outright (before the invite changes state) rather than accepting the player and
-  // silently skipping enrollment, which would strand an accepted-but-unrostered student.
-  // Rejecting stays allowed. An explicit rosterId is already covered by assertManagerForRoster.
-  if (action === 'approve' && invite.memberId && invite.gameId && !rosterId) {
-    assertSeasonRostersUnlocked(reviewContext, approvalSeason);
-  }
-
   if (action === 'approve') {
-    let enrolledPlayer: SchoolRosterPlayer | undefined = undefined;
-    let targetRosterId = rosterId;
-    let targetTeamId = explicitTarget?.team.id;
-    let targetRosterName = explicitTarget?.roster.name;
-    let targetSeasonId = explicitTarget?.team.seasonId;
+    await db
+      .update(schema.playerInvites)
+      .set({ status: 'accepted', reviewedAt: new Date() })
+      .where(eq(schema.playerInvites.id, inviteId));
 
-    if (invite.memberId && !targetRosterId && invite.gameId) {
-      // Find the school's team for the invite's own season; no other season's roster is ever the
-      // default target. A manager's invite season equals their resolved season (checked above).
-      // For staff it may differ from the active season, in which case the default is refused and
-      // an explicit roster must be chosen, so approving an old invite never lands in a new season.
-      if (!invite.seasonId) {
-        return reject('This invite has no season. Choose a roster explicitly to approve it.');
-      }
-      if (approvalSeason?.id !== invite.seasonId) {
-        return reject('This invite belongs to a different season than the one being managed. Choose a roster explicitly to approve it.');
-      }
-      const [team] = approvalSeason
-        ? await db
-            .select({ id: schema.teams.id })
-            .from(schema.teams)
-            .where(
-              and(
-                eq(schema.teams.schoolId, invite.schoolId),
-                eq(schema.teams.gameId, invite.gameId),
-                eq(schema.teams.seasonId, invite.seasonId)
-              )
-            )
-            .limit(1)
-        : [];
-
-      if (team) {
-        // Oldest roster first, id as the tie-break, so the default target never depends on
-        // the order Postgres happens to return rows in.
-        const [firstRoster] = await db
-          .select({ id: schema.rosters.id, name: schema.rosters.name })
-          .from(schema.rosters)
-          .where(eq(schema.rosters.teamId, team.id))
-          .orderBy(asc(schema.rosters.createdAt), asc(schema.rosters.id))
-          .limit(1);
-        targetRosterId = firstRoster?.id;
-        targetRosterName = firstRoster?.name;
-        targetTeamId = team.id;
-        targetSeasonId = invite.seasonId;
-      }
-    }
-
-    const enrolling = Boolean(invite.memberId && targetRosterId && targetTeamId);
-    const isCaptain = role === 'captain';
-
-    const [member] = invite.memberId
-      ? await db.select().from(schema.members).where(eq(schema.members.id, invite.memberId)).limit(1)
-      : [];
-    const [riotIdentity] = enrolling
-      ? await db
-          .select({ providerUserId: schema.playerIdentities.providerUserId })
-          .from(schema.playerIdentities)
-          .where(
-            and(
-              eq(schema.playerIdentities.memberId, invite.memberId!),
-              eq(schema.playerIdentities.provider, 'riot')
-            )
-          )
-          .limit(1)
-      : [];
-    const draft = invite.submissionDraft as Record<string, any> | null;
-    const ign = riotIdentity?.providerUserId ?? draft?.ign ?? null;
-    const playerName = member
-      ? `${member.firstName} ${member.lastName}`
-      : `${invite.intendedFirstName} ${invite.intendedLastName}`;
-
-    if (enrolling && member) {
-      const seasonName = await seasonNameOf(targetSeasonId!, approvalSeason);
-      const ineligible = seasonIneligibility(member, playerName, seasonName);
-      if (ineligible) return reject(ineligible);
-    }
-
-    // The invite is accepted and the student rostered in ONE transaction, so a refused
-    // enrollment leaves the invite pending instead of accepted-but-unrostered.
-    const outcome = await db.transaction(async (tx) => {
-      let playerId: string | undefined;
-
-      if (enrolling) {
-        // Serialize enrolls and moves of this member within the team so the sibling check
-        // below cannot race another write.
-        await lockRosterMember(tx, targetTeamId!, invite.memberId!);
-        await lockRoster(tx, targetRosterId!);
-
-        const [existingPlayer] = await tx
-          .select()
-          .from(schema.players)
-          .where(
-            and(
-              eq(schema.players.rosterId, targetRosterId!),
-              eq(schema.players.memberId, invite.memberId!)
-            )
-          )
-          .limit(1);
-
-        if (!existingPlayer) {
-          const sibling = await siblingEnrollment(targetTeamId!, invite.memberId!, targetRosterId!, tx);
-          if (sibling) {
-            return {
-              kind: 'conflict' as const,
-              message: siblingConflictMessage(playerName, sibling.rosterName, targetRosterName ?? 'this roster'),
-            };
-          }
-        }
-
-        const capacity = rosterCapacityError({
-          rosterName: targetRosterName ?? 'This roster',
-          occupancy: occupancyOf(await rosterPlayerRoles(tx, targetRosterId!), existingPlayer?.id),
-          role,
-          joining: !existingPlayer,
-        });
-        if (capacity) return { kind: 'conflict' as const, message: capacity };
-
-        await tx
-          .update(schema.playerInvites)
-          .set({ status: 'accepted', reviewedAt: new Date() })
-          .where(eq(schema.playerInvites.id, inviteId));
-
-        if (isCaptain) {
-          // Demote any existing captain on this roster
-          const otherCaptains = await tx
-            .select()
-            .from(schema.players)
-            .where(
-              and(
-                eq(schema.players.rosterId, targetRosterId!),
-                eq(schema.players.isCaptain, true)
-              )
-            );
-
-          for (const cap of otherCaptains) {
-            if (cap.memberId !== invite.memberId) {
-              await tx
-                .update(schema.players)
-                .set({ role: 'player', isCaptain: false, updatedAt: new Date() })
-                .where(eq(schema.players.id, cap.id));
-            }
-          }
-        }
-
-        if (!existingPlayer) {
-          const [inserted] = await tx
-            .insert(schema.players)
-            .values({
-              rosterId: targetRosterId!,
-              memberId: invite.memberId!,
-              role,
-              ign,
-              isCaptain,
-            })
-            .returning();
-          playerId = inserted.id;
-        } else {
-          playerId = existingPlayer.id;
-          await tx
-            .update(schema.players)
-            .set({
-              role,
-              isCaptain,
-              ign: ign ?? existingPlayer.ign,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.players.id, existingPlayer.id));
-        }
-      } else {
-        await tx
-          .update(schema.playerInvites)
-          .set({ status: 'accepted', reviewedAt: new Date() })
-          .where(eq(schema.playerInvites.id, inviteId));
-      }
-
-      return { kind: 'ok' as const, playerId };
-    });
-
-    if (outcome.kind === 'conflict') return reject(outcome.message);
-
-    if (enrolling && outcome.playerId) {
-      const identities = await db
-        .select()
-        .from(schema.playerIdentities)
-        .where(eq(schema.playerIdentities.memberId, invite.memberId!));
-
-      const discord = identities.find((i) => i.provider === 'discord');
-
-      enrolledPlayer = {
-        id: outcome.playerId,
-        memberId: invite.memberId!,
-        playerName,
-        ign: ign || 'Unlinked',
-        role,
-        isCaptain,
-        discordUsername: discord?.providerUsername || member?.discord || 'Unlinked',
-        inGuild: discord?.inGuild ?? false,
-        riotVerified: !!riotIdentity,
-      };
-    }
-
-    updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.PLAYERS, CACHE_TAGS.TEAMS);
-    if (enrolledPlayer) await notifyMembershipChanged([invite.memberId!]);
-    return {
-      success: true,
-      status: 'accepted',
-      inviteId,
-      enrolledPlayer,
-      targetRosterId: targetRosterId ?? undefined,
-    };
+    updateCacheTags(CACHE_TAGS.PLAYERS);
+    return { success: true, status: 'accepted', inviteId };
   }
 
   if (action === 'reject') {
