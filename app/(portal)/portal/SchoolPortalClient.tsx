@@ -237,11 +237,14 @@ export default function SchoolPortalClient({
         setPlayerPool((prev) => {
           if (prev.some((p) => p.memberId === sub.memberId)) {
             // Mark this application accepted so the Enroll dialog now offers the student.
-            return prev.map((p) =>
-              p.memberId === sub.memberId && p.invites
+            const accepted = { id: inviteId, gameId: sub.gameId, seasonId: sub.seasonId, status: 'accepted' };
+            return prev.map((p) => {
+              if (p.memberId !== sub.memberId || !p.invites) return p;
+              // Flip the known row, or add it when the pool was loaded before this application existed.
+              return p.invites.some((i) => i.id === inviteId)
                 ? { ...p, invites: p.invites.map((i) => (i.id === inviteId ? { ...i, status: 'accepted' } : i)) }
-                : p
-            );
+                : { ...p, invites: [...p.invites, accepted] };
+            });
           }
           const accepted: SchoolPoolPlayer = {
             memberId: sub.memberId!,
@@ -331,6 +334,8 @@ export default function SchoolPortalClient({
                     rosterId: activeEnrollRoster.id,
                     rosterName: activeEnrollRoster.name,
                     gameName: activeEnrollRoster.gameName,
+                    gameId: activeEnrollRoster.gameId,
+                    seasonId: activeEnrollRoster.seasonId,
                     role: enrollRole,
                     isCaptain: enrollRole === 'captain',
                   },

@@ -5,8 +5,6 @@ import {
   SEASON_NAME_OPTIONS,
   MANAGER_SEASON_OPTIONS,
   DEFAULT_MANAGER_SEASON,
-  seasonEndYear,
-  isEligibleForSeason,
 } from '@/app/lib/season-name';
 
 describe('season name format (YYYY-YY)', () => {
@@ -39,26 +37,5 @@ describe('season name format (YYYY-YY)', () => {
     expect(SEASON_NAME_OPTIONS).toContain('2026-27');
     expect(isValidSeasonName(DEFAULT_MANAGER_SEASON)).toBe(true);
     expect(MANAGER_SEASON_OPTIONS).toContain(DEFAULT_MANAGER_SEASON);
-  });
-});
-
-describe('season eligibility (spec-046)', () => {
-  it('reads the end year from a canonical name only', () => {
-    expect(seasonEndYear('2026-27')).toBe(2027);
-    expect(seasonEndYear('2099-00')).toBe(2100);
-    expect(seasonEndYear('Fall 2026')).toBeNull();
-  });
-
-  it('excludes a student who graduated before the season ends, keeps everyone else', () => {
-    expect(isEligibleForSeason(2026, '2026-27')).toBe(false);
-    expect(isEligibleForSeason(2027, '2026-27')).toBe(true);
-    expect(isEligibleForSeason(2030, '2026-27')).toBe(true);
-    expect(isEligibleForSeason(2026, '2025-26')).toBe(true);
-  });
-
-  it('never excludes on missing data', () => {
-    expect(isEligibleForSeason(null, '2026-27')).toBe(true);
-    expect(isEligibleForSeason(undefined, '2026-27')).toBe(true);
-    expect(isEligibleForSeason(2020, 'Fall 2026')).toBe(true);
   });
 });

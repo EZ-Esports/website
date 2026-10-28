@@ -34,7 +34,6 @@ export async function rosterInSchool(rosterId: string, schoolId: string, executo
       name: schema.rosters.name,
       division: schema.rosters.division,
       gameSlug: schema.games.slug,
-      seasonId: schema.teams.seasonId,
     })
     .from(schema.rosters)
     .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
@@ -110,27 +109,6 @@ export async function siblingEnrollment(
 }
 
 /** "First Last" for messages that name a member; falls back to a neutral phrase if the row is gone. */
-/** The `YYYY-YY` name of the season a team plays in, or null when it cannot be found. */
-export async function seasonNameForTeam(teamId: string, executor: DbOrTx = db): Promise<string | null> {
-  const [row] = await executor
-    .select({ name: schema.seasons.name })
-    .from(schema.teams)
-    .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
-  return row?.name ?? null;
-}
-
-/** A member's recorded class year (null when unknown or the member does not exist). */
-export async function memberGraduationYear(memberId: string, executor: DbOrTx = db): Promise<number | null> {
-  const [row] = await executor
-    .select({ graduationYear: schema.members.graduationYear })
-    .from(schema.members)
-    .where(eq(schema.members.id, memberId))
-    .limit(1);
-  return row?.graduationYear ?? null;
-}
-
 export async function memberDisplayName(memberId: string, executor: DbOrTx = db): Promise<string> {
   const [row] = await executor
     .select({ firstName: schema.members.firstName, lastName: schema.members.lastName })

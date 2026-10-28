@@ -7,7 +7,6 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2';
-import { isEligibleForSeason } from '@/app/lib/season-name';
 import { hasAcceptedApplicationForSeason } from '@/app/lib/onboarding/enroll-eligibility';
 import type {
   SchoolRosterDetails,
@@ -49,12 +48,15 @@ export function EnrollPlayerModal({
 }: EnrollPlayerModalProps) {
   if (!roster) return null;
 
-  // Only students who can play in this roster's season are offered; the server refuses the rest.
+  // A student already on a roster of this game and season is always listed (annotated below), as
+  // it is not a new enrollment. Everyone else is offered only when onboarded for this season
+  // (an accepted application; null = staff admin, exempt). The server refuses the rest.
+  const onRosterOfThisSeason = (p: SchoolPoolPlayer) =>
+    p.enrolledRosters.some((er) => er.gameId === roster.gameId && er.seasonId === roster.seasonId);
   const playerPool = schoolPool.filter(
     (p) =>
-      isEligibleForSeason(p.graduationYear, roster.seasonName) &&
-      // null = staff admin (exempt); a manager needs an accepted application for this season
-      (p.invites === null || hasAcceptedApplicationForSeason(p.invites, roster.gameId, roster.seasonId))
+      onRosterOfThisSeason(p) ||
+      p.invites === null || hasAcceptedApplicationForSeason(p.invites, roster.gameId, roster.seasonId)
   );
   const hiddenCount = schoolPool.length - playerPool.length;
 
@@ -151,9 +153,14 @@ export function EnrollPlayerModal({
                   const currentEnrollment = p.enrolledRosters.find(
                     (er) => er.rosterId === roster.id
                   );
-                  const otherEnrollment = p.enrolledRosters.find(
-                    (er) => er.rosterId !== roster.id
-                  );
+                  // A sibling roster of this game and season first, else any other roster.
+                  const otherEnrollment =
+                    p.enrolledRosters.find(
+                      (er) =>
+                        er.rosterId !== roster.id &&
+                        er.gameId === roster.gameId &&
+                        er.seasonId === roster.seasonId
+                    ) ?? p.enrolledRosters.find((er) => er.rosterId !== roster.id);
 
                   const labelSuffix = isOnThisRoster
                     ? ` (Already on this roster: ${currentEnrollment?.role || 'enrolled'})`
@@ -175,7 +182,7 @@ export function EnrollPlayerModal({
 
             {hiddenCount > 0 && (
               <p className="text-xs text-zinc-500 mt-1">
-                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: they have not been onboarded for {roster.seasonName} (send an invite and approve it first) or their class year is before that season. If a class year is wrong, ask a league admin to correct it.
+                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: they have not been onboarded for {roster.seasonName}. Send them an invite and approve it first.
               </p>
             )}
 

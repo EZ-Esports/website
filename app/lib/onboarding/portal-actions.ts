@@ -14,7 +14,6 @@ import {
   NO_ACTIVE_SEASON_ERROR,
   type AuthorizedGameScope,
 } from './manager-auth';
-import { isEligibleForSeason, notEligibleForSeasonError } from '@/app/lib/season-name';
 import { hasAcceptedApplicationForSeason, notOnboardedForSeasonError, type EnrollmentInvite } from './enroll-eligibility';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } from './invite-expiry';
@@ -78,20 +77,6 @@ async function seasonNameOf(seasonId: string, known: { id: string; name: string 
     .where(eq(schema.seasons.id, seasonId))
     .limit(1);
   return season?.name ?? null;
-}
-
-/**
- * Season-eligibility refusal for enrolling a member into a roster of the named season (spec-046),
- * or null when allowed. One rule for every portal enrollment path; see `isEligibleForSeason`.
- */
-function seasonIneligibility(
-  member: { graduationYear: number | null },
-  playerName: string,
-  seasonName: string | null
-): string | null {
-  if (!seasonName || member.graduationYear == null) return null;
-  if (isEligibleForSeason(member.graduationYear, seasonName)) return null;
-  return notEligibleForSeasonError(playerName, member.graduationYear, seasonName);
 }
 
 export interface CreatePlayerInviteParams {
@@ -1302,6 +1287,9 @@ export interface SchoolPoolPlayer {
     rosterId: string;
     rosterName: string;
     gameName: string;
+    /** With `seasonId`: lets the Enroll dialog tell a roster of the same game and season from others. */
+    gameId: string;
+    seasonId: string;
     role: string;
     isCaptain: boolean;
   }>;
@@ -1350,6 +1338,8 @@ export async function getSchoolPlayerPool(
       isCaptain: schema.players.isCaptain,
       rosterName: schema.rosters.name,
       gameName: schema.games.displayName,
+      gameId: schema.teams.gameId,
+      seasonId: schema.teams.seasonId,
     })
     .from(schema.players)
     .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
@@ -1404,6 +1394,8 @@ export async function getSchoolPlayerPool(
         rosterId: p.rosterId,
         rosterName: p.rosterName,
         gameName: p.gameName,
+        gameId: p.gameId,
+        seasonId: p.seasonId,
         role: p.role,
         isCaptain: p.isCaptain,
       }));
@@ -1475,10 +1467,18 @@ export async function enrollPlayerToRoster(
     throw new Error('Member does not belong to the school managing this roster');
   }
 
-  // Onboarding: a manager can enroll only a student with an accepted application for this
-  // game and season, so past-season, archive-imported and staff-created students must be
-  // onboarded again (staff admins may override).
-  if (!managerContext.isStaffAdmin) {
+  // Onboarding: a manager can put a student NEW to this game and season on a roster only with an
+  // accepted application for it, so past-season, archive-imported and staff-created students must
+  // be onboarded again (staff admins may override). A student already on a roster of this team
+  // (this one: a role edit; a sibling: the one-tier rule below says to Move) is not new and passes.
+  const [alreadyOnThisRoster] = await db
+    .select({ id: schema.players.id })
+    .from(schema.players)
+    .where(and(eq(schema.players.rosterId, rosterId), eq(schema.players.memberId, memberId)))
+    .limit(1);
+  const alreadyOnTeam =
+    Boolean(alreadyOnThisRoster) || Boolean(await siblingEnrollment(team.id, memberId, rosterId));
+  if (!managerContext.isStaffAdmin && !alreadyOnTeam) {
     const applications = await db
       .select({
         gameId: schema.playerInvites.gameId,
@@ -1502,14 +1502,6 @@ export async function enrollPlayerToRoster(
       );
     }
   }
-
-  // Season scope: the student must be eligible for the season this roster plays in.
-  const ineligible = seasonIneligibility(
-    member,
-    `${member.firstName} ${member.lastName}`,
-    await seasonNameOf(team.seasonId, null)
-  );
-  if (ineligible) return reject(ineligible);
 
   // 3. Resolve IGN from Riot identity or draft if not passed
   let ign = customIgn?.trim();
