@@ -244,6 +244,8 @@ const mocks = vi.hoisted(() => {
                 discord: member?.discord ?? '',
                 rosterName: roster?.name ?? '',
                 gameName: game?.displayName ?? '',
+                gameId: team?.gameId,
+                seasonId: team?.seasonId,
               };
             });
           }
@@ -385,6 +387,11 @@ vi.mock('@/app/lib/db/roster-removal', async (importOriginal) => ({
     const i = store.findIndex((p: any) => p.id === input.playerId && p.rosterId === input.rosterId);
     if (i < 0) return { removed: false };
     const [row] = store.splice(i, 1);
+    if (mocks.state.removalDeletesMember) {
+      // Like the real cleanup, a deleted student record takes the member and their invites with it.
+      mocks.state.membersStore = mocks.state.membersStore.filter((m: any) => m.id !== row.memberId);
+      mocks.state.playerInvitesStore = mocks.state.playerInvitesStore.filter((inv: any) => inv.memberId !== row.memberId);
+    }
     return mocks.state.removalDeletesMember
       ? { removed: true, memberId: row.memberId, studentRecord: 'deleted', deleted: { consents: 1, demographics: 1, identities: 1, invites: 1 } }
       : { removed: true, memberId: row.memberId, studentRecord: 'kept', keptReason: 'other_roster' };
@@ -822,6 +829,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         id: 'inv-alex-submitted',
         schoolId,
         gameId: valGameId,
+        seasonId: 'season-fall-26',
         intendedFirstName: 'Alex',
         intendedLastName: 'Chen',
         memberId,
@@ -877,6 +885,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         id: inviteId,
         schoolId,
         gameId: valGameId,
+        seasonId: 'season-fall-26',
         memberId,
         intendedFirstName: 'Tyler',
         intendedLastName: 'Vance',
@@ -886,12 +895,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       });
     });
 
-    it('approving an application sets status to accepted and inserts player into roster', async () => {
-      const result = await reviewPlayerInvite({
-        inviteId,
-        action: 'approve',
-        rosterId: 'roster-varsity-val',
-      });
+    it('approving an application only accepts the student: no roster is chosen or written', async () => {
+      const result = await reviewPlayerInvite({ inviteId, action: 'approve' });
 
       if (!result.success) throw new Error(result.error);
       expect(result.status).toBe('accepted');
@@ -899,8 +904,14 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       const invite = mocks.state.playerInvitesStore.find((i) => i.id === inviteId);
       expect(invite.status).toBe('accepted');
       expect(invite.reviewedAt).toBeInstanceOf(Date);
+      expect(mocks.state.playersStore.find((p) => p.memberId === memberId)).toBeUndefined();
+    });
 
-      // Verify player row created in DB
+    it('an accepted student can then be enrolled onto the roster the manager picks', async () => {
+      await reviewPlayerInvite({ inviteId, action: 'approve' });
+      const enrolled = await enrollPlayerToRoster({ rosterId: 'roster-varsity-val', memberId });
+      expect(enrolled).toMatchObject({ success: true });
+
       const playerRecord = mocks.state.playersStore.find(
         (p) => p.rosterId === 'roster-varsity-val' && p.memberId === memberId
       );
@@ -908,8 +919,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(playerRecord.role).toBe('player');
       expect(playerRecord.ign).toBe('Tyler#NA1');
       expect(playerRecord.isCaptain).toBe(false);
-
-      // Verify cache invalidation
       expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'teams');
     });
 
@@ -1216,6 +1225,21 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
   });
 
+  /**
+   * Gives every member in the store an accepted application for the Valorant game and its active
+   * 2026-27 season, which is what a manager needs before enrolling them (spec-047). Tests of the
+   * rule itself seed applications explicitly instead.
+   */
+  const acceptAllMembers = (seasonId = 'season-val-now') => {
+    for (const m of mocks.state.membersStore) {
+      if (mocks.state.playerInvitesStore.some((i) => i.id === `acc-${m.id}`)) continue;
+      mocks.state.playerInvitesStore.push({
+        id: `acc-${m.id}`, schoolId: m.schoolId, gameId: valGameId, seasonId, memberId: m.id,
+        intendedFirstName: 'A', intendedLastName: 'B', status: 'accepted', tokenHash: `acc-${m.id}`, expiresAt: new Date('2027-01-01'),
+      });
+    }
+  };
+
   describe('7. Direct Roster Enrollment & Player Pool Management', () => {
     const teamId = 'team-val-stuy';
     const rosterId = 'roster-val-varsity';
@@ -1260,7 +1284,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           firstName: 'Justin',
           lastName: 'Wong',
           discord: 'jwong#0001',
-          graduationYear: 2026,
+          graduationYear: 2027,
         },
         {
           id: 'member-cap',
@@ -1276,9 +1300,10 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           firstName: 'Bronx',
           lastName: 'Student',
           discord: 'bx#0001',
-          graduationYear: 2026,
+          graduationYear: 2027,
         },
       ];
+      acceptAllMembers('season-fall-26');
 
       mocks.state.playersStore = [
         {
@@ -1729,15 +1754,16 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(team?.seasonId).toBe('season-val-now');
     });
 
-    it('invite approval enrolls into the resolved (active) season default roster', async () => {
+    it('invite approval accepts the student without rostering them; they are then enrolled in the resolved (active) season', async () => {
       mocks.state.playersStore = [];
       mocks.state.membersStore.push({ id: 'm-inv', schoolId, firstName: 'In', lastName: 'Vite', discord: 'in#1', graduationYear: 2027 });
       mocks.state.playerInvitesStore = [
-        { id: 'inv-1', schoolId, gameId: valGameId, memberId: 'm-inv', intendedFirstName: 'In', intendedLastName: 'Vite', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
+        { id: 'inv-1', schoolId, gameId: valGameId, seasonId: 'season-val-now', memberId: 'm-inv', intendedFirstName: 'In', intendedLastName: 'Vite', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
       ];
-      await expect(reviewPlayerInvite({ inviteId: 'inv-1', action: 'approve' })).resolves.toMatchObject({ success: true });
-      const enrolled = mocks.state.playersStore.find((p) => p.memberId === 'm-inv');
-      expect(enrolled?.rosterId).toBe(rosterActive);
+      await expect(reviewPlayerInvite({ inviteId: 'inv-1', action: 'approve' })).resolves.toMatchObject({ success: true, status: 'accepted' });
+      expect(mocks.state.playersStore.find((p) => p.memberId === 'm-inv')).toBeUndefined();
+      await expect(enrollPlayerToRoster({ rosterId: rosterActive, memberId: 'm-inv' })).resolves.toMatchObject({ success: true });
+      expect(mocks.state.playersStore.find((p) => p.memberId === 'm-inv')?.rosterId).toBe(rosterActive);
     });
 
     it('a manager whose affiliation year matches no season of the game sees nothing and is refused', async () => {
@@ -1874,8 +1900,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       mocks.state.seasonsStore.find((s) => s.id === 'season-lol-now').name = '2027-28';
       const base = { schoolId, status: 'submitted', submissionDraft: {}, memberId: null, expiresAt: new Date(), createdAt: new Date(), submittedAt: new Date() };
       mocks.state.playerInvitesStore = [
-        { ...base, id: 'inv-val', gameId: valGameId, intendedFirstName: 'V', intendedLastName: 'Al' },
-        { ...base, id: 'inv-lol', gameId: lolGameId, intendedFirstName: 'L', intendedLastName: 'Ol' },
+        { ...base, id: 'inv-val', gameId: valGameId, seasonId: 'season-val-now', intendedFirstName: 'V', intendedLastName: 'Al' },
+        { ...base, id: 'inv-lol', gameId: lolGameId, seasonId: 'season-lol-now', intendedFirstName: 'L', intendedLastName: 'Ol' },
         { ...base, id: 'inv-null', gameId: null, intendedFirstName: 'N', intendedLastName: 'Ull' },
       ];
 
@@ -1952,6 +1978,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         { id: 'pl-lol', rosterId: lolRosterId, memberId: 'm-starter', role: 'player', isCaptain: false, ign: 'St#1' },
       ];
       mocks.state.playerInvitesStore = [];
+      acceptAllMembers();
     });
 
     const attempts: Array<[string, () => Promise<unknown>]> = [
@@ -2018,15 +2045,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(deleteSchoolRoster(emptyRosterId)).resolves.toMatchObject({ success: true });
     });
 
-    it('invite approval into a locked resolved season is refused', async () => {
-      lockSeason('season-val-now');
-      mocks.state.playerInvitesStore = [
-        { id: 'inv-lock2', schoolId, gameId: valGameId, memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
-      ];
-      await expect(reviewPlayerInvite({ inviteId: 'inv-lock2', action: 'approve' })).rejects.toThrow(LOCKED);
-      expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
-    });
-
     it('reads keep working while locked and report the lock per game scope', async () => {
       lockSeason('season-val-now');
       const rosters = await getSchoolRosters(schoolId);
@@ -2049,16 +2067,16 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     describe('invite approval', () => {
       beforeEach(() => {
         mocks.state.playerInvitesStore = [
-          { id: 'inv-lock', schoolId, gameId: valGameId, memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
+          { id: 'inv-lock', schoolId, gameId: valGameId, seasonId: 'season-val-now', memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid', status: 'submitted', tokenHash: 'h', expiresAt: new Date('2027-01-01') },
         ];
       });
 
-      it('refuses approval (explicit or default roster) while locked and leaves the invite untouched', async () => {
+      it('accepting a student is allowed while locked (it touches no roster), but enrolling them is still refused', async () => {
         lockSeason('season-val-now');
-        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve', rosterId })).rejects.toThrow(LOCKED);
-        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve' })).rejects.toThrow(LOCKED);
-        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve' })).resolves.toMatchObject({ success: true });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('accepted');
         expect(mocks.state.playersStore.some((p) => p.memberId === 'm-new')).toBe(false);
+        await expect(enrollPlayerToRoster({ rosterId, memberId: 'm-new' })).rejects.toThrow(LOCKED);
       });
 
       it('still allows rejecting while locked', async () => {
@@ -2066,10 +2084,11 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'reject' })).resolves.toMatchObject({ success: true });
       });
 
-      it('approves and enrolls once unlocked, and for a staff admin while locked', async () => {
+      it('a staff admin can enroll an accepted student while locked', async () => {
         lockSeason('season-val-now');
         makeAdmin();
-        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve', rosterId })).resolves.toMatchObject({ success: true });
+        await expect(reviewPlayerInvite({ inviteId: 'inv-lock', action: 'approve' })).resolves.toMatchObject({ success: true });
+        await expect(enrollPlayerToRoster({ rosterId, memberId: 'm-new' })).resolves.toMatchObject({ success: true });
         expect(mocks.state.playersStore.some((p) => p.memberId === 'm-new' && p.rosterId === rosterId)).toBe(true);
       });
     });
@@ -2107,7 +2126,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       ]);
     const seedInvites = () =>
       Object.keys(tags).map((t) => ({
-        id: `inv-${t}`, schoolId, gameId: valGameId, memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid',
+        id: `inv-${t}`, schoolId, gameId: valGameId, seasonId: tags[t as keyof typeof tags].season, memberId: 'm-new', intendedFirstName: 'New', intendedLastName: 'Kid',
         status: 'submitted', tokenHash: `h-${t}`, expiresAt: new Date('2027-01-01'),
       }));
 
@@ -2120,8 +2139,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       ['updateRosterPlayerRole', () => updateRosterPlayerRole({ rosterId: `r-${tag}`, playerId: `pl-${tag}-st`, role: 'sub' })],
       ['emergencySwapSub', () => emergencySwapSub({ rosterId: `r-${tag}`, outPlayerId: `pl-${tag}-st`, inPlayerId: `pl-${tag}-sub` })],
       ['createPlayerInvite', () => createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' })],
-      ['reviewPlayerInvite approve (default roster)', () => reviewPlayerInvite({ inviteId: `inv-${tag}`, action: 'approve' })],
-      ['reviewPlayerInvite approve (explicit roster)', () => reviewPlayerInvite({ inviteId: `inv-${tag}`, action: 'approve', rosterId: `r-${tag}` })],
+      ['reviewPlayerInvite approve', () => reviewPlayerInvite({ inviteId: `inv-${tag}`, action: 'approve' })],
       ['reviewPlayerInvite reject', () => reviewPlayerInvite({ inviteId: `inv-${tag}`, action: 'reject' })],
     ];
 
@@ -2171,8 +2189,9 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect((await getSchoolRosters(schoolId, valGameId)).length).toBe(2);
       await expect(getRosterEligibility({ rosterId: 'r-past' })).resolves.toBeDefined();
       await expect(getSchoolPlayerPool(schoolId)).resolves.toBeDefined();
-      expect((await getSchoolInvites(schoolId, valGameId)).length).toBe(3);
-      expect((await getPendingSubmissions(schoolId, valGameId)).length).toBe(3);
+      // Only the invite of the manager's own (inactive) season is listed (spec-047).
+      expect((await getSchoolInvites(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-past']);
+      expect((await getPendingSubmissions(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-past']);
 
       const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
       expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({
@@ -2306,6 +2325,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       ];
       mocks.state.playerIdentitiesStore = [];
       mocks.state.playerInvitesStore = [];
+      acceptAllMembers();
     });
 
     it('moves the existing row to the sibling roster, keeping its id, ign and bio', async () => {
@@ -2409,6 +2429,11 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('enrollPlayerToRoster still allows the same student on a different game (different team)', async () => {
+      // Onboarded for Valorant already; the other game needs its own accepted application.
+      mocks.state.playerInvitesStore.push({
+        id: 'acc-lol', schoolId, gameId: lolGameId, seasonId: 'season-lol-now', memberId: 'm-sub',
+        intendedFirstName: 'Su', intendedLastName: 'B', status: 'accepted', tokenHash: 'acc-lol', expiresAt: new Date('2027-01-01'),
+      });
       const res = await enrollPlayerToRoster({ rosterId: lolVarsity, memberId: 'm-sub' });
       expect(res.success).toBe(true);
       expect(mocks.state.playersStore.filter((p) => p.memberId === 'm-sub')).toHaveLength(2);
@@ -2480,6 +2505,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
             id: inviteId,
             schoolId,
             gameId: valGameId,
+            seasonId: 'season-val-now',
             memberId: 'm-sub',
             status: 'submitted',
             intendedFirstName: 'Su',
@@ -2490,68 +2516,41 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         ];
       };
 
-      it('refuses a student already on a sibling roster: returned, invite stays pending, nothing written, no notify', async () => {
-        seedInvite();
-        const before = snapshot();
-        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv });
-
-        expect(res).toEqual({ success: false, error: 'Su B is already on Varsity. Use Move to put them on JV.' });
-        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
-        expect(snapshot()).toBe(before);
-        expect(mocks.mockNotify).not.toHaveBeenCalled();
-        expect(mocks.mockUpdateCacheTags).not.toHaveBeenCalled();
-      });
-
-      it('takes the lock before the sibling check', async () => {
-        seedInvite();
-        mocks.mockDb.execute.mockClear();
-        mocks.mockDb.select.mockClear();
-        mocks.mockDb.transaction.mockClear();
-        await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv });
-        const lock = mocks.mockDb.execute.mock.invocationCallOrder[0];
-        const txStart = mocks.mockDb.transaction.mock.invocationCallOrder[0];
-        expect(lock).toBeGreaterThan(txStart);
-        expect(mocks.mockDb.select.mock.invocationCallOrder.find((o: number) => o > txStart)).toBeGreaterThan(lock);
-      });
-
-      it('accepts and enrolls a student who is not on a sibling roster, then notifies once after commit', async () => {
+      it('approving writes no roster row and notifies nobody (the roster seam only hears about enrollment)', async () => {
         seedInvite({ memberId: 'm-new' });
-        const orderLog: string[] = [];
-        mocks.mockDb.transaction.mockImplementationOnce(async (cb: (tx: any) => Promise<any>) => {
-          const out = await cb(mocks.mockDb);
-          orderLog.push('commit');
-          return out;
-        });
-        mocks.mockNotify.mockImplementation(async () => {
-          orderLog.push('notify');
-        });
-
-        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv });
-
-        expect(res).toMatchObject({ success: true, status: 'accepted', targetRosterId: jv });
-        expect(mocks.state.playerInvitesStore[0].status).toBe('accepted');
-        expect(mocks.state.playersStore.find((p) => p.memberId === 'm-new')?.rosterId).toBe(jv);
-        expect(memberIdsNotified()).toEqual([['m-new']]);
-        expect(orderLog).toEqual(['commit', 'notify']);
-      });
-
-      it('a throwing notify does not fail the approval', async () => {
-        seedInvite({ memberId: 'm-new' });
-        mocks.mockNotify.mockRejectedValue(new Error('discord down'));
-        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        await expect(reviewPlayerInvite({ inviteId, action: 'approve', rosterId: jv })).resolves.toMatchObject({ success: true });
-        spy.mockRestore();
-      });
-
-      it('the default roster is the oldest one, not whichever row the database returns first', async () => {
-        // Varsity is stored first but JV is older: the default target must follow created_at.
-        mocks.state.rostersStore.find((r) => r.id === varsity).createdAt = new Date('2026-09-02');
-        mocks.state.rostersStore.find((r) => r.id === jv).createdAt = new Date('2026-09-01');
-        seedInvite({ memberId: 'm-new' });
-
+        const before = JSON.stringify(mocks.state.playersStore);
         const res = await reviewPlayerInvite({ inviteId, action: 'approve' });
 
-        expect(res).toMatchObject({ success: true, targetRosterId: jv });
+        expect(res).toEqual({ success: true, status: 'accepted', inviteId });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('accepted');
+        expect(JSON.stringify(mocks.state.playersStore)).toBe(before);
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('an accepted student already on Varsity is refused for JV (one tier per game), nothing written', async () => {
+        seedInvite();
+        await reviewPlayerInvite({ inviteId, action: 'approve' });
+        const before = snapshot();
+        const res = await enrollPlayerToRoster({ rosterId: jv, memberId: 'm-sub' });
+
+        expect(res).toEqual({ success: false, error: 'Su B is already on Varsity. Use Move to put them on JV.' });
+        expect(snapshot()).toBe(before);
+        expect(mocks.mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('an accepted, unrostered student can be enrolled onto either Varsity or JV, notifying once after commit', async () => {
+        seedInvite({ memberId: 'm-new' });
+        await reviewPlayerInvite({ inviteId, action: 'approve' });
+
+        const res = await enrollPlayerToRoster({ rosterId: jv, memberId: 'm-new' });
+
+        expect(res).toMatchObject({ success: true });
+        expect(mocks.state.playersStore.find((p) => p.memberId === 'm-new')?.rosterId).toBe(jv);
+        expect(memberIdsNotified()).toEqual([['m-new']]);
+
+        // The same accepted student could equally have gone to Varsity.
+        mocks.state.playersStore = mocks.state.playersStore.filter((p) => p.memberId !== 'm-new');
+        await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' })).resolves.toMatchObject({ success: true });
       });
 
       it('rejecting an invite never notifies', async () => {
@@ -2671,13 +2670,15 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           id: inviteId,
           schoolId,
           gameId: valGameId,
+          seasonId: 'season-val-now',
           memberId: 'm-new',
-          status: 'submitted',
+          status: 'accepted',
           intendedFirstName: 'New',
           intendedLastName: 'Kid',
           submissionDraft: { ign: 'New#1' },
         },
       ];
+      acceptAllMembers();
     });
 
     describe('enrolling', () => {
@@ -2713,21 +2714,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' })).resolves.toMatchObject({ success: true });
       });
 
-      it('applies to invite approval: full roster', async () => {
-        fill(varsity, 7);
-        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity });
-        expect(res).toEqual({ success: false, error: 'Varsity is full (7 of 7 players).' });
-        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
-        expect(mocks.mockNotify).not.toHaveBeenCalled();
-      });
-
-      it('applies to invite approval: third substitute', async () => {
-        fill(varsity, 5, 2);
-        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity, role: 'sub' });
-        expect(res).toEqual({ success: false, error: 'Varsity already has 2 substitutes.' });
-        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
-      });
-
       it('takes the member lock, then the roster lock, before counting', async () => {
         fill(varsity, 3);
         mocks.mockDb.select.mockClear();
@@ -2745,28 +2731,11 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       });
     });
 
-    describe('approving: locks and self-exclusion', () => {
-      it('takes the member lock, then the roster lock, before counting', async () => {
-        fill(varsity, 2);
-        mocks.mockDb.select.mockClear();
-        mocks.mockDb.execute.mockClear();
-        await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity });
-        const locks = mocks.mockDb.execute.mock.calls.map((c: any[]) => JSON.stringify(c[0]));
-        expect(locks).toHaveLength(2);
-        expect(locks[0]).toContain(`roster-member:${val}:m-new`);
-        expect(locks[1]).toContain(`roster:${varsity}`);
-        const rosterLock = mocks.mockDb.execute.mock.invocationCallOrder[1];
-        const countCall = mocks.mockDb.select.mock.calls.findIndex(
-          (c: any[]) => c[0] && Object.keys(c[0]).sort().join() === 'id,role'
-        );
-        expect(countCall).toBeGreaterThanOrEqual(0);
-        expect(mocks.mockDb.select.mock.invocationCallOrder[countCall]).toBeGreaterThan(rosterLock);
-      });
-
-      it('a student already on the roster as one of its 2 subs can be re-approved as a sub (they are not counted twice)', async () => {
+    describe('self-exclusion', () => {
+      it('a student already on the roster as one of its 2 subs can be re-enrolled as a sub (they are not counted twice)', async () => {
         fill(varsity, 4, 1);
         mocks.state.playersStore.push({ id: 'pl-self', rosterId: varsity, memberId: 'm-new', role: 'sub', isCaptain: false, ign: 'x' });
-        const res = await reviewPlayerInvite({ inviteId, action: 'approve', rosterId: varsity, role: 'sub' });
+        const res = await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' });
         expect(res).toMatchObject({ success: true });
       });
     });
@@ -2875,6 +2844,280 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(emergencySwapSub({ rosterId: varsity, outPlayerId: 'pl-out', inPlayerId: 'pl-in' })).resolves.toMatchObject({ success: true });
       expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.role === 'sub')).toHaveLength(2);
       expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+    });
+  });
+  describe('13. Invite season scope and roster enrollment eligibility (spec-047)', () => {
+    const mkInvite = (id: string, seasonId: string | null, extra: Record<string, unknown> = {}) => ({
+      id, schoolId, gameId: valGameId, seasonId, memberId: 'm-kid', intendedFirstName: 'Kid', intendedLastName: 'One',
+      status: 'submitted', tokenHash: `h-${id}`, expiresAt: new Date('2027-01-01'), submittedAt: new Date(), createdAt: new Date(),
+      submissionDraft: {}, ...extra,
+    });
+    const makeAdmin = () => {
+      mocks.state.rolesStore.push({ id: 'role-admin', name: 'Admin', permissions: Permissions.ADMINISTRATOR, position: 5, isOwner: false });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
+    };
+
+    beforeEach(() => {
+      mocks.mockNotify.mockReset();
+      mocks.mockNotify.mockResolvedValue(undefined);
+      mocks.state.seasonsStore = [
+        { id: 'season-val-past', gameId: valGameId, name: '2025-26', isActive: false, rostersLockedAt: null },
+        { id: 'season-val-now', gameId: valGameId, name: '2026-27', isActive: true, rostersLockedAt: null },
+      ];
+      mocks.state.schoolManagersStore = [
+        { id: 'mgr-1', schoolId, userId: 'manager-user-1', managedGames: null, academicYear: '2026-27', isPrimaryContact: true, isActive: true },
+      ];
+      mocks.state.teamsStore = [
+        { id: 'team-now', schoolId, gameId: valGameId, seasonId: 'season-val-now' },
+        { id: 'team-past', schoolId, gameId: valGameId, seasonId: 'season-val-past' },
+      ];
+      mocks.state.rostersStore = [
+        { id: 'r-now', teamId: 'team-now', name: 'Varsity', division: 'A' },
+        { id: 'r-past', teamId: 'team-past', name: 'Varsity', division: 'A' },
+      ];
+      mocks.state.membersStore = [
+        { id: 'm-kid', schoolId, firstName: 'Kid', lastName: 'One', discord: 'k#1', graduationYear: 2027 },
+        { id: 'm-grad', schoolId, firstName: 'Old', lastName: 'Timer', discord: 'o#1', graduationYear: 2026 },
+        { id: 'm-nogy', schoolId, firstName: 'No', lastName: 'Year', discord: 'n#1', graduationYear: null },
+      ];
+      mocks.state.playersStore = [];
+      mocks.state.playerIdentitiesStore = [];
+      mocks.state.playerInvitesStore = [];
+    });
+
+    describe('invite creation', () => {
+      it('stamps a manager invite with their (active) season', async () => {
+        const result = await createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' });
+        expect(mocks.state.playerInvitesStore.find((i) => i.id === result.inviteId)?.seasonId).toBe('season-val-now');
+      });
+
+      it("stamps a staff admin invite with the game's active season, and refuses when none is active", async () => {
+        makeAdmin();
+        const result = await createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'A', intendedLastName: 'B' });
+        expect(mocks.state.playerInvitesStore.find((i) => i.id === result.inviteId)?.seasonId).toBe('season-val-now');
+
+        mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').isActive = false;
+        await expect(
+          createPlayerInvite({ schoolId, gameId: valGameId, intendedFirstName: 'C', intendedLastName: 'D' })
+        ).rejects.toThrow(/No active season/);
+      });
+    });
+
+    describe('lists', () => {
+      beforeEach(() => {
+        mocks.state.playerInvitesStore = [
+          mkInvite('inv-now', 'season-val-now'),
+          mkInvite('inv-past', 'season-val-past'),
+          mkInvite('inv-null', null),
+        ];
+      });
+
+      it('a manager sees only the invite whose season matches theirs (past-season and no-season hidden)', async () => {
+        expect((await getSchoolInvites(schoolId)).map((i) => i.id)).toEqual(['inv-now']);
+        expect((await getPendingSubmissions(schoolId)).map((i) => i.id)).toEqual(['inv-now']);
+        expect((await getSchoolInvites(schoolId, valGameId)).map((i) => i.id)).toEqual(['inv-now']);
+      });
+
+      it('a staff admin still sees every invite, including past-season and no-season ones', async () => {
+        makeAdmin();
+        expect((await getSchoolInvites(schoolId)).map((i) => i.id).sort()).toEqual(['inv-now', 'inv-null', 'inv-past']);
+        expect((await getPendingSubmissions(schoolId)).map((i) => i.id).sort()).toEqual(['inv-now', 'inv-null', 'inv-past']);
+      });
+    });
+
+    describe('reviewPlayerInvite', () => {
+      it('accepts a matching-season invite without touching any roster, then enrolls the student where the manager chooses', async () => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-now', 'season-val-now')];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'approve' })).resolves.toMatchObject({ success: true, status: 'accepted' });
+        expect(mocks.state.playersStore).toHaveLength(0);
+        await expect(enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-kid' })).resolves.toMatchObject({ success: true });
+        expect(mocks.state.playersStore.find((p) => p.memberId === 'm-kid')?.rosterId).toBe('r-now');
+      });
+
+      it('reviews a submitted invite exactly once: a second approve or a later reject is refused and changes nothing', async () => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-now', 'season-val-now')];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'approve' })).resolves.toMatchObject({ success: true });
+        const accepted = { ...mocks.state.playerInvitesStore[0] };
+
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'approve' })).resolves.toMatchObject({
+          success: false,
+          error: expect.stringMatching(/already reviewed or has not been submitted/),
+        });
+        await expect(reviewPlayerInvite({ inviteId: 'inv-now', action: 'reject' })).resolves.toMatchObject({ success: false });
+        expect(mocks.state.playerInvitesStore[0]).toEqual(accepted);
+      });
+
+      it.each(['approve', 'reject'] as const)('refuses to %s an invite that has not been submitted (pending)', async (action) => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-pending', 'season-val-now', { status: 'pending', memberId: null })];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-pending', action })).resolves.toMatchObject({
+          success: false,
+          error: expect.stringMatching(/not been submitted/),
+        });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('pending');
+      });
+
+      it('refuses to approve a submitted invite that has no student record', async () => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-nomember', 'season-val-now', { memberId: null })];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-nomember', action: 'approve' })).resolves.toMatchObject({ success: false });
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+      });
+
+      it.each(['approve', 'reject'] as const)('refuses a past-season invite (%s) and leaves it untouched', async (action) => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-past', 'season-val-past')];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-past', action })).rejects.toThrow(/different season/);
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+        expect(mocks.state.playersStore).toHaveLength(0);
+      });
+
+      it.each(['approve', 'reject'] as const)('refuses a legacy no-season invite (%s) for a manager', async (action) => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-null', null)];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-null', action })).rejects.toThrow(/different season/);
+        expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
+      });
+
+      it('lets a staff admin review a no-season or past-season invite', async () => {
+        makeAdmin();
+        mocks.state.playerInvitesStore = [mkInvite('inv-null', null), mkInvite('inv-past', 'season-val-past')];
+        await expect(reviewPlayerInvite({ inviteId: 'inv-null', action: 'reject' })).resolves.toMatchObject({ success: true });
+        await expect(reviewPlayerInvite({ inviteId: 'inv-past', action: 'reject' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('staff accept a past-season or seasonless invite too; no roster is involved, so nothing is defaulted into the active season', async () => {
+        makeAdmin();
+        mocks.state.playerInvitesStore = [mkInvite('inv-past', 'season-val-past'), mkInvite('inv-null', null)];
+        for (const id of ['inv-past', 'inv-null']) {
+          await expect(reviewPlayerInvite({ inviteId: id, action: 'approve' })).resolves.toMatchObject({ success: true, status: 'accepted' });
+        }
+        expect(mocks.state.playersStore).toHaveLength(0);
+      });
+    });
+
+    describe('enrolling needs an accepted application for the roster season (managers)', () => {
+      const NOT_ONBOARDED = /has not been onboarded for 2026-27\. Send them an invite and approve it first\./;
+      const seed = (...invites: ReturnType<typeof mkInvite>[]) => {
+        mocks.state.playerInvitesStore = invites;
+      };
+      const enroll = () => enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-kid' });
+      const pool = async () => (await getSchoolPlayerPool(schoolId)).find((p) => p.memberId === 'm-kid');
+
+      it('allows a student with an accepted application for this game and season', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'accepted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it.each(['submitted', 'pending', 'rejected', 'expired'])('refuses a student whose only application is %s, writing nothing', async (status) => {
+        seed(mkInvite('i1', 'season-val-now', { status }));
+        await expect(enroll()).resolves.toMatchObject({ success: false, error: expect.stringMatching(NOT_ONBOARDED) });
+        expect(mocks.state.playersStore).toHaveLength(0);
+      });
+
+      it('refuses a student with no application at all (archive-imported or staff-created)', async () => {
+        seed();
+        await expect(enroll()).resolves.toMatchObject({ success: false, error: expect.stringMatching(NOT_ONBOARDED) });
+        expect(mocks.state.playersStore).toHaveLength(0);
+      });
+
+      it('refuses a past-season student (accepted only for an earlier season) or a seasonless accepted row', async () => {
+        seed(mkInvite('past-acc', 'season-val-past', { status: 'accepted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+        seed(mkInvite('none-acc', null, { status: 'accepted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+      });
+
+      it('an accepted application for this season beats older rejected or unreviewed rows', async () => {
+        seed(
+          mkInvite('old-rej', 'season-val-past', { status: 'rejected' }),
+          mkInvite('old-sub', null, { status: 'submitted' }),
+          mkInvite('now-acc', 'season-val-now', { status: 'accepted' })
+        );
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('an accepted application for another game does not count', async () => {
+        seed(mkInvite('lol', 'season-val-now', { status: 'accepted', gameId: lolGameId }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+      });
+
+      it('approve then enroll works', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'submitted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+        await reviewPlayerInvite({ inviteId: 'i1', action: 'approve' });
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('removal that keeps the student record: they can be re-enrolled in the same season', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'accepted' }));
+        await enroll();
+        const playerId = mocks.state.playersStore.find((p) => p.memberId === 'm-kid')!.id;
+        await removePlayerFromRoster({ rosterId: 'r-now', playerId });
+        expect(mocks.state.playersStore).toHaveLength(0);
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('removal that deletes the student record (and their invites): they must be onboarded again', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'accepted' }));
+        await enroll();
+        const playerId = mocks.state.playersStore.find((p) => p.memberId === 'm-kid')!.id;
+        mocks.state.removalDeletesMember = true;
+        try {
+          const removed = await removePlayerFromRoster({ rosterId: 'r-now', playerId });
+          expect(removed.message).toContain('They will need a new invite to rejoin.');
+        } finally {
+          mocks.state.removalDeletesMember = false;
+        }
+        expect(mocks.state.playerInvitesStore).toHaveLength(0);
+        await expect(enroll()).rejects.toThrow(/not found/);
+      });
+
+      it('a student already on a roster is not "new": a role edit or a sibling Move hint is not masked by the onboarding rule', async () => {
+        seed(); // imported player: no application, but already on Varsity
+        mocks.state.playersStore.push({ id: 'pl-imp', rosterId: 'r-now', memberId: 'm-kid', role: 'player', isCaptain: false, ign: 'x' });
+        await expect(enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-kid', role: 'sub' })).resolves.toMatchObject({ success: true });
+        mocks.state.teamsStore.find((t) => t.id === 'team-now');
+        mocks.state.rostersStore.push({ id: 'r-jv', teamId: 'team-now', name: 'JV', division: 'B' });
+        await expect(enrollPlayerToRoster({ rosterId: 'r-jv', memberId: 'm-kid' })).resolves.toMatchObject({
+          success: false,
+          error: expect.stringMatching(/Use Move/),
+        });
+      });
+
+      it('a staff admin is exempt and sees no application filter (null) in the pool', async () => {
+        makeAdmin();
+        seed();
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+        expect((await pool())?.invites).toBeNull();
+      });
+
+      it('the pool exposes only id, game, season and status per application to a manager', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'submitted' }));
+        expect((await pool())?.invites).toEqual([{ id: 'i1', gameId: valGameId, seasonId: 'season-val-now', status: 'submitted' }]);
+      });
+    });
+
+    describe('player pool for the Enroll dialog', () => {
+      it('lists an accepted but unrostered student (no enrolled rosters) next to rostered ones', async () => {
+        mocks.state.playerInvitesStore = [mkInvite('inv-now', 'season-val-now')];
+        await reviewPlayerInvite({ inviteId: 'inv-now', action: 'approve' });
+        const pool = await getSchoolPlayerPool(schoolId);
+        const kid = pool.find((p) => p.memberId === 'm-kid');
+        expect(kid).toBeDefined();
+        expect(kid?.enrolledRosters).toEqual([]);
+        expect(kid?.graduationYear).toBe(2027);
+      });
+    });
+
+    describe('enrollPlayerToRoster', () => {
+      beforeEach(() => acceptAllMembers());
+
+      it('enrolls an onboarded student whatever their class year (the season comes from the invite only)', async () => {
+        await expect(enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-kid' })).resolves.toMatchObject({ success: true });
+        await expect(enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-nogy' })).resolves.toMatchObject({ success: true });
+        await expect(enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-grad' })).resolves.toMatchObject({ success: true });
+      });
+
+      it('still refuses a roster of a past season for a manager (view-only / different season)', async () => {
+        await expect(enrollPlayerToRoster({ rosterId: 'r-past', memberId: 'm-kid' })).rejects.toThrow(/different season/);
+      });
     });
   });
 });

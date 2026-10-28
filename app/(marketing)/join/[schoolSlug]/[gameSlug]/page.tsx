@@ -106,7 +106,7 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
                 <p className="text-sm text-foreground-muted leading-relaxed">
                   {validation.role === 'manager' || gameSlug === 'manager'
                     ? 'Your School Manager account has been activated. Please sign in to access your school portal.'
-                    : 'This invite link has already been used and approved by your team manager. You are already registered on the active roster.'}
+                    : 'This invite link has already been used and your team manager has accepted you. They will add you to a roster.'}
                 </p>
               </div>
 

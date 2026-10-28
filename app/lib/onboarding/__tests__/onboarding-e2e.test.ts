@@ -442,6 +442,7 @@ import {
   createPlayerInvite,
   getPendingSubmissions,
   reviewPlayerInvite,
+  enrollPlayerToRoster,
 } from '@/app/lib/onboarding/portal-actions';
 import {
   getSchoolManagerContext,
@@ -744,7 +745,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           legalFirstName: 'David',
           legalLastName: 'Kim',
           email: 'david.kim@nycstudents.net',
-          graduationYear: 2026,
+          graduationYear: 2027,
           riotId: 'DavidK#NA1',
           birthDate: new Date('2008-03-21'),
           codeOfConductAccepted: true,
@@ -765,18 +766,20 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       expect(targetSubmission?.intendedFirstName).toBe('David');
       expect(targetSubmission?.status).toBe('submitted');
 
-      // Step 6: Manager approves submission and assigns to Varsity Roster
+      // Step 6: Manager approves the submission (accepts the student; no roster is chosen)
       const approveRes = await reviewPlayerInvite({
         inviteId: playerInviteRes.inviteId!,
         action: 'approve',
-        rosterId: stuyRoster.id,
       });
 
       expect(approveRes.success).toBe(true);
-
-      // Step 7: Verify student is on the official roster in players table
       const studentMember = mocks.state.membersStore.find((m) => m.email === 'david.kim@nycstudents.net');
       expect(studentMember).toBeDefined();
+      expect(mocks.state.playersStore.some((p) => p.memberId === studentMember?.id)).toBe(false);
+
+      // Step 7: Manager enrolls the accepted student onto the Varsity roster
+      const enrollRes = await enrollPlayerToRoster({ rosterId: stuyRoster.id, memberId: studentMember!.id });
+      expect(enrollRes.success).toBe(true);
 
       const rosterPlayer = mocks.state.playersStore.find(
         (p) => p.rosterId === stuyRoster.id && p.memberId === studentMember?.id

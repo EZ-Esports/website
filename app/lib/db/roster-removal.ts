@@ -68,7 +68,7 @@ export function removalNotice(result: RosterRemovalResult, studentName?: string)
   const who = studentName ? `${studentName} was` : 'The player was';
   if (!result.removed) return 'This player was already removed. Refresh the page.';
   if (result.studentRecord === 'deleted') {
-    return `${who} removed from the roster and their onboarding record was deleted.`;
+    return `${who} removed from the roster and their onboarding record was deleted. They will need a new invite to rejoin.`;
   }
   return `${who} removed from the roster. Their student record was kept because ${KEEP_REASON_TEXT[result.keptReason]}.`;
 }

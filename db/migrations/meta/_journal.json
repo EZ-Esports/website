@@ -393,6 +393,13 @@
       "when": 1790882000010,
       "tag": "0055_onboarding_content_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790882000011,
+      "tag": "0056_player_invites_season",
+      "breakpoints": true
     }
   ]
 }

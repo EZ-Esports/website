@@ -2,6 +2,7 @@ import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { resolveManagerSeason } from '@/app/lib/onboarding/manager-season';
 
 /** Transaction handle passed to the onboarding write steps. */
 export type OnboardingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -446,8 +447,40 @@ export async function ensurePlayerSubmission(
     tokenHash: string;
   }
 ): Promise<boolean> {
+  // The application belongs to the manager's own season of the game: the same season the portal
+  // resolves for them (`resolveManagerSeason`, spec-026) from their active manager rows at this
+  // school, which include the row provisioned moments ago in this transaction. If none resolves
+  // (no season named like their affiliation) it falls back to the game's active season; with
+  // neither it is stored seasonless, which the manager's queue will not show.
+  const [game] = await tx
+    .select({ id: schema.games.id, slug: schema.games.slug })
+    .from(schema.games)
+    .where(eq(schema.games.id, params.gameId));
+  const managerRows = await tx
+    .select({ academicYear: schema.schoolManagers.academicYear, managedGames: schema.schoolManagers.managedGames })
+    .from(schema.schoolManagers)
+    .where(
+      and(
+        eq(schema.schoolManagers.memberId, params.memberId),
+        eq(schema.schoolManagers.schoolId, params.schoolId),
+        eq(schema.schoolManagers.isActive, true)
+      )
+    );
+  const gameSeasons = await tx
+    .select({ id: schema.seasons.id, name: schema.seasons.name, isActive: schema.seasons.isActive })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.gameId, params.gameId));
+  const season =
+    (game ? resolveManagerSeason(managerRows, game, gameSeasons) : null) ??
+    gameSeasons.find((s) => s.isActive) ??
+    null;
+
   const existing = await tx
-    .select({ id: schema.playerInvites.id, status: schema.playerInvites.status })
+    .select({
+      id: schema.playerInvites.id,
+      status: schema.playerInvites.status,
+      seasonId: schema.playerInvites.seasonId,
+    })
     .from(schema.playerInvites)
     .where(
       and(
@@ -455,14 +488,24 @@ export async function ensurePlayerSubmission(
         eq(schema.playerInvites.schoolId, params.schoolId),
         eq(schema.playerInvites.gameId, params.gameId)
       )
+    );
+  // A live application only blocks a new one in the same season: a student re-applies each season.
+  if (
+    existing.some(
+      (row) =>
+        row.status !== 'rejected' &&
+        row.status !== 'expired' &&
+        (!season || row.seasonId === season.id)
     )
-    .limit(1);
-  if (existing.some((row) => row.status !== 'rejected' && row.status !== 'expired')) return false;
+  ) {
+    return false;
+  }
 
   const now = new Date();
   await tx.insert(schema.playerInvites).values({
     schoolId: params.schoolId,
     gameId: params.gameId,
+    seasonId: season?.id ?? null,
     tokenHash: params.tokenHash,
     intendedFirstName: params.intendedFirstName,
     intendedLastName: params.intendedLastName,

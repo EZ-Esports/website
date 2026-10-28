@@ -334,7 +334,7 @@ describe('outcome wording and cache tags', () => {
 
   it('says what happened to the student record', () => {
     expect(removalNotice(deleted, 'Ada Lovelace')).toBe(
-      'Ada Lovelace was removed from the roster and their onboarding record was deleted.');
+      'Ada Lovelace was removed from the roster and their onboarding record was deleted. They will need a new invite to rejoin.');
     expect(removalNotice(kept, 'Ada Lovelace')).toBe(
       'Ada Lovelace was removed from the roster. Their student record was kept because they have match history.');
     expect(removalNotice({ removed: false })).toMatch(/already removed/);

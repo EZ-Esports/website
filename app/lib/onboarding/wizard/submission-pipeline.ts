@@ -193,6 +193,24 @@ export async function upsertDemographicsVault(
 }
 
 /**
+ * The season a manager is affiliated with: the one picked in the wizard, else the invite's seeded
+ * one, else the default. Also names the season a manager's own player application belongs to.
+ */
+export function resolveManagerAcademicYear(
+  submitted: string | undefined,
+  draft: Record<string, any> | null
+): string {
+  const submittedSeason = submitted?.trim();
+  if (submittedSeason && !isValidSeasonName(submittedSeason)) {
+    throw new Error('A valid season (e.g. 2026-27) is required.');
+  }
+  return (
+    submittedSeason ||
+    (isValidSeasonName(draft?.academicYear) ? draft!.academicYear : DEFAULT_MANAGER_SEASON)
+  );
+}
+
+/**
  * Pipeline step: Provisions School Manager account, linking Supabase Auth and tenancy.
  */
 export async function provisionManagerAccount(
@@ -249,15 +267,7 @@ export async function provisionManagerAccount(
   }
 
   const draft = submissionDraft || {};
-  const submittedSeason = params.academicYear?.trim();
-  if (submittedSeason) {
-    if (!isValidSeasonName(submittedSeason)) {
-      throw new Error('A valid season (e.g. 2026-27) is required.');
-    }
-  }
-  const academicYear =
-    submittedSeason ||
-    (isValidSeasonName(draft.academicYear) ? draft.academicYear : DEFAULT_MANAGER_SEASON);
+  const academicYear = resolveManagerAcademicYear(params.academicYear, draft);
   const managedGames = draft.managedGames ?? null;
   const isPrimaryContact = Boolean(draft.isPrimaryContact);
 
