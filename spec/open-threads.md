@@ -216,7 +216,6 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).
 ## Generate season follow-ups (spec-045)
 
-- Generation is refused for any season that already has a match, so the JV schedule cannot be added after Varsity without removing matches. Consider scoping the check to the chosen division.
 - The lock, bulk inserts and UI have not been exercised against a real database or in a browser.
 - Week 1 date and the fixed 7 PM ET slot are the only schedule inputs; holidays and per-week skips are not modelled.
 - `createMatch`/`deleteMatch` do not lock the season row, so a hand-scheduled match racing Generate's commit can slip in between its check and insert (spec-045). Left as is; revisit if it ever happens.

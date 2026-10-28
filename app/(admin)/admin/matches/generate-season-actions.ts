@@ -1,7 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { and, eq, inArray, isNull, count } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { revalidatePath, updateTag } from 'next/cache';
 import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
@@ -99,14 +100,21 @@ async function loadPlan(exec: Pick<typeof db, 'select'>, raw: z.infer<typeof inp
     throw new GenerateError(`${season.gameName} does not have a ${raw.division} division.`);
   }
 
-  const [existing] = await exec
-    .select({ value: count() })
+  // Only matches in the chosen division block: Varsity and JV are separate competitions, so each
+  // can be generated once, in either order. A match counts when either of its rosters is in the division.
+  const awayRoster = alias(schema.rosters, 'away_roster');
+  const seasonMatches = await exec
+    .select({ homeDivision: schema.rosters.division, awayDivision: awayRoster.division })
     .from(schema.matches)
+    .innerJoin(schema.rosters, eq(schema.matches.homeRosterId, schema.rosters.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
     .where(eq(schema.matches.seasonId, season.id));
-  const existingCount = existing?.value ?? 0;
+  const existingCount = seasonMatches.filter(
+    (m) => canonicalDivision(m.homeDivision) === raw.division || canonicalDivision(m.awayDivision) === raw.division
+  ).length;
   if (existingCount > 0) {
     throw new GenerateError(
-      `${season.name} already has ${existingCount} match${existingCount === 1 ? '' : 'es'}. Generate only works on a season with no matches; delete them first or schedule individually.`
+      `${season.name} already has ${existingCount} ${raw.division} match${existingCount === 1 ? '' : 'es'}. Generate only works once per division; delete those matches first or schedule individually.`
     );
   }
 

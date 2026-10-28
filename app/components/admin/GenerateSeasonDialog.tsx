@@ -312,7 +312,7 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
         title="Generate this season?"
         message={
           preview
-            ? `This creates ${preview.matchCount} scheduled matches${preview.teamsToCreate.length ? ` and ${preview.teamsToCreate.length} new teams` : ''} for ${preview.seasonName}. It cannot be repeated for a season that already has matches.`
+            ? `This creates ${preview.matchCount} scheduled matches${preview.teamsToCreate.length ? ` and ${preview.teamsToCreate.length} new teams` : ''} for ${preview.seasonName}. It cannot be repeated for a season that already has ${preview.division} matches.`
             : ''
         }
         confirmLabel="Generate"

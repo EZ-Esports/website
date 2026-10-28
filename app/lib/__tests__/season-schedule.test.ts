@@ -125,6 +125,13 @@ describe('buildSeasonPlan', () => {
     expect(new Set(plan.matches.map((m) => m.kickoff.toISOString())).size).toBe(7);
   });
 
+  it('seeds by division so Varsity and JV do not share a pairing pattern', () => {
+    const v = buildSeasonPlan({ ...base, existingTeams: [], existingRosters: [] });
+    const j = buildSeasonPlan({ ...base, division: 'JV', existingTeams: [], existingRosters: [] });
+    expect(j.rounds).not.toEqual(v.rounds);
+    for (const s of schools) expect(j.matchesPerSchool[s.id]).toBe(7);
+  });
+
   it('fingerprint is stable and changes with date, division or pairing', () => {
     const a = buildSeasonPlan({ ...base, existingTeams: [], existingRosters: [] });
     const b = buildSeasonPlan({ ...base, existingTeams: [], existingRosters: [] });

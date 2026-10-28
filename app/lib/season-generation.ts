@@ -96,10 +96,10 @@ export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
     rostersToCreate.push({ ...s, rosterName: name });
   }
 
-  // Seeded by the season so re-running the preview reproduces the same schedule.
+  // Seeded by season and division, so Varsity and JV differ and re-running the preview reproduces the same schedule.
   const rounds = generateRegularSeasonRounds(
     schools.map((s) => s.id),
-    seasonId
+    `${seasonId}:${division}`
   );
   const matches: SeasonPlanMatch[] = rounds.flatMap((r) => {
     const kickoff = kickoffForRound(startYmd, r.round);

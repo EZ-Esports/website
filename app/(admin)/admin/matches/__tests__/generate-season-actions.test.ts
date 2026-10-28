@@ -62,8 +62,14 @@ const seasonRow = { id: SEASON, name: 'Fall 2026', gameId: uuid(800), gameName: 
 const schoolRows = schoolIds.map((id, i) => ({ id, name: `School ${i}` }));
 
 /** Queue the reads loadPlan makes: season, match count, schools, teams, (rosters when teams exist). */
-function queueLoad({ matchCount = 0, teams = [] as any[], rosters = [] as any[] } = {}) {
-  mocks.queue.push([seasonRow], [{ value: matchCount }], schoolRows, teams);
+function queueLoad({
+  matchCount = 0,
+  matchDivision = 'A',
+  teams = [] as any[],
+  rosters = [] as any[],
+} = {}) {
+  const seasonMatches = Array.from({ length: matchCount }, () => ({ homeDivision: matchDivision, awayDivision: matchDivision }));
+  mocks.queue.push([seasonRow], seasonMatches, schoolRows, teams);
   if (teams.length) mocks.queue.push(rosters);
 }
 
@@ -117,13 +123,72 @@ describe('previewGenerateSeason', () => {
     queueLoad({ matchCount: 3 });
     const res = await previewGenerateSeason(input());
     expect(res).toMatchObject({ success: false });
-    expect((res as any).error).toMatch(/already has 3 matches/);
+    expect((res as any).error).toMatch(/already has 3 Varsity matches/);
   });
 
   it('refuses a game without the requested division', async () => {
     mocks.queue.push([{ ...seasonRow, gameSlug: 'tetris', gameName: 'Tetris' }]);
     const res = await previewGenerateSeason(input());
     expect((res as any).error).toMatch(/does not have a Varsity division/);
+  });
+});
+
+describe('Varsity and JV are generated independently', () => {
+  const varsityTeams = () => schoolIds.map((id, i) => ({ id: uuid(100 + i), schoolId: id }));
+  const varsityRosters = () => varsityTeams().map((t, i) => ({ id: uuid(200 + i), teamId: t.id, name: 'Varsity', division: 'A' }));
+  const jvRosters = () => varsityTeams().map((t, i) => ({ id: uuid(300 + i), teamId: t.id, name: 'JV', division: 'B' }));
+
+  it('JV can be generated after Varsity: the teams are reused and only JV rosters are created', async () => {
+    queueLoad({ matchCount: 28, matchDivision: 'A', teams: varsityTeams(), rosters: varsityRosters() });
+    const res = await previewGenerateSeason(input({ division: 'JV' }));
+    expect(res.success).toBe(true);
+    if (!res.success) return;
+    expect(res.preview.teamsToCreate).toHaveLength(0);
+    expect(res.preview.rostersToCreate).toHaveLength(8);
+    expect(res.preview.matchCount).toBe(28);
+  });
+
+  it('Varsity can be generated after JV', async () => {
+    queueLoad({ matchCount: 28, matchDivision: 'B', teams: varsityTeams(), rosters: jvRosters() });
+    const res = await previewGenerateSeason(input({ division: 'Varsity' }));
+    expect(res.success).toBe(true);
+  });
+
+  it('refuses the same division twice, with a message naming the division', async () => {
+    queueLoad({ matchCount: 28, matchDivision: 'B' });
+    const res = await previewGenerateSeason(input({ division: 'JV' }));
+    expect((res as any).error).toMatch(/already has 28 JV matches/);
+  });
+
+  it('a single hand-made match in the other division does not block', async () => {
+    queueLoad({ matchCount: 1, matchDivision: 'B' });
+    expect((await previewGenerateSeason(input({ division: 'Varsity' }))).success).toBe(true);
+  });
+
+  it('a mixed-division match counts toward either division it touches', async () => {
+    mocks.queue.push([seasonRow], [{ homeDivision: 'B', awayDivision: 'A' }]);
+    const res = await previewGenerateSeason(input({ division: 'Varsity' }));
+    expect((res as any).error).toMatch(/already has 1 Varsity match\./);
+  });
+
+  it('the same teams get different pairings in each division', async () => {
+    queueLoad();
+    const v = await previewGenerateSeason(input({ division: 'Varsity' }));
+    queueLoad();
+    const j = await previewGenerateSeason(input({ division: 'JV' }));
+    expect((v as any).preview.weeks).not.toEqual((j as any).preview.weeks);
+    expect((v as any).preview.fingerprint).not.toBe((j as any).preview.fingerprint);
+  });
+
+  it('commit under the lock still writes JV matches when Varsity matches exist', async () => {
+    queueLoad({ matchCount: 28, matchDivision: 'A', teams: varsityTeams(), rosters: varsityRosters() });
+    const pre = await previewGenerateSeason(input({ division: 'JV' }));
+    mocks.queue.push([{ id: SEASON }]);
+    queueLoad({ matchCount: 28, matchDivision: 'A', teams: varsityTeams(), rosters: varsityRosters() });
+    mocks.insertResults.push(schoolIds.map((_, i) => ({ id: uuid(300 + i), teamId: uuid(100 + i) })));
+    const res = await commitGenerateSeason(input({ division: 'JV' }), (pre as any).preview.fingerprint);
+    expect(res).toEqual({ success: true, teamsCreated: 0, matchesCreated: 28 });
+    expect(mocks.inserts.map((i) => i.table)).toEqual([schema.rosters, schema.matches]);
   });
 });
 
@@ -182,7 +247,7 @@ describe('commitGenerateSeason', () => {
     queueLoad({ matchCount: 28 });
     const res = await commitGenerateSeason(input(), fp);
     expect(res).toMatchObject({ success: false });
-    expect((res as any).error).toMatch(/already has 28 matches/);
+    expect((res as any).error).toMatch(/already has 28 Varsity matches/);
     expect(mocks.inserts).toHaveLength(0);
   });
 
