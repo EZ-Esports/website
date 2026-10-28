@@ -8,8 +8,9 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { dbErrorChain, sanitizeDbError } from '@/app/lib/text-utils';
 import {
   lockRoster, lockRosterMember, memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool,
-  rosterPlayerRoles, siblingEnrollment, teamInSchool,
+  memberGraduationYear, rosterPlayerRoles, seasonNameForTeam, siblingEnrollment, teamInSchool,
 } from '@/app/lib/db/roster-scope';
+import { isEligibleForSeason, notEligibleForSeasonError } from '@/app/lib/season-name';
 import { occupancyOf, rosterCapacityError } from '@/app/lib/onboarding/roster-limits';
 import { notifyRosterMembershipChanged } from '@/app/lib/onboarding/roster-membership-events';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
@@ -291,6 +292,15 @@ export async function createPlayer(schoolId: string, formData: FormData) {
       const roster = await rosterInSchool(rosterId, schoolId, tx);
       if (!roster) return 'not-found' as const;
       if (memberId && !(await memberInSchool(memberId, schoolId, tx))) return 'not-found' as const;
+
+      // Season scope (spec-045): a student who graduated before the roster's season cannot be
+      // added to it. For a new member the class year typed in the form is the one that counts.
+      const seasonName = await seasonNameForTeam(roster.teamId, tx);
+      const classYear = memberId ? await memberGraduationYear(memberId, tx) : (gradYear as number | null);
+      if (seasonName && classYear != null && !isEligibleForSeason(classYear, seasonName)) {
+        const name = memberId ? await memberDisplayName(memberId, tx) : `${firstName} ${lastName}`;
+        return { kind: 'conflict' as const, message: notEligibleForSeasonError(name, classYear, seasonName, 'staff') };
+      }
 
       // One tier per game: a member already on a sibling roster is moved, not added a second time.
       // The lock serializes concurrent adds/moves of this member within the team, so two requests

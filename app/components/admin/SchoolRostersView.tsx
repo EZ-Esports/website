@@ -390,7 +390,7 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
         </div>
       </div>
       {panel === 'edit' && <RosterEditForm roster={roster} block={block} onClose={() => setPanel(null)} />}
-      {panel === 'add' && <AddPlayerPanel roster={roster} onClose={() => setPanel(null)} />}
+      {panel === 'add' && <AddPlayerPanel roster={roster} seasonName={block.seasonName} onClose={() => setPanel(null)} />}
       {roster.players.length === 0 ? (
         <p className="text-sm text-foreground-secondary">No players on this roster.</p>
       ) : (

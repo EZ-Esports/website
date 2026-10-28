@@ -14,6 +14,7 @@ import {
   updateRoster,
 } from '@/app/(admin)/admin/schools/[schoolId]/rosters/actions';
 import { toHubDivision } from '@/app/lib/db/match-page';
+import { isEligibleForSeason } from '@/app/lib/season-name';
 import type { RosterEditOptions, RosterViewPlayer, RosterViewRoster, SeasonBlock } from '@/app/lib/school-roster-view';
 import { AdminField, PendingLabel } from '@/app/components/admin/AdminUI';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
@@ -251,11 +252,14 @@ function RoleSelect({ defaultValue = 'player' }: { defaultValue?: string }) {
 }
 
 /** Add an existing school member, or create a new member and add them, to one roster. */
-export function AddPlayerPanel({ roster, onClose }: { roster: RosterViewRoster; onClose: () => void }) {
+export function AddPlayerPanel({ roster, seasonName, onClose }: { roster: RosterViewRoster; seasonName: string; onClose: () => void }) {
   const { schoolId, options, run } = useEdit();
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const onRoster = new Set(roster.players.map((p) => p.memberId));
-  const eligible = options.members.filter((m) => !onRoster.has(m.id));
+  const notOnRoster = options.members.filter((m) => !onRoster.has(m.id));
+  // Same season rule the server enforces: students who graduated before the season are not offered.
+  const eligible = notOnRoster.filter((m) => isEligibleForSeason(m.graduationYear, seasonName));
+  const hiddenCount = notOnRoster.length - eligible.length;
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -278,7 +282,7 @@ export function AddPlayerPanel({ roster, onClose }: { roster: RosterViewRoster; 
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3" key={mode}>
         {mode === 'existing' ? (
           eligible.length === 0 ? (
-            <p className="text-sm text-foreground-secondary">Every member of this school is already on this roster. Use New member to add someone else.</p>
+            <p className="text-sm text-foreground-secondary">No other member of this school can be added to this roster. Use New member to add someone else.</p>
           ) : (
             <AdminField label="Member" required>
               <select name="memberId" required defaultValue="" className={cx(selectClass, 'w-56')}>
@@ -306,6 +310,11 @@ export function AddPlayerPanel({ roster, onClose }: { roster: RosterViewRoster; 
               <input name="graduationYear" type="number" inputMode="numeric" placeholder="2027" className={cx(input, 'w-24')} />
             </AdminField>
           </>
+        )}
+        {mode === 'existing' && hiddenCount > 0 && (
+          <p className="basis-full text-xs text-foreground-secondary">
+            {hiddenCount} {hiddenCount === 1 ? 'member is' : 'members are'} not listed: class year is before the {seasonName} season.
+          </p>
         )}
         {(mode === 'new' || eligible.length > 0) && (
           <>

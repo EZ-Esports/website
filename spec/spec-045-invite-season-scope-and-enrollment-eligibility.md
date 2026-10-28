@@ -20,7 +20,7 @@
 Adds the column, FK (guarded by `duplicate_object`) and index, then three idempotent backfills that only touch rows still NULL, in this order:
 
 1. **Accepted** invites whose student is on exactly one team of the invite's school and game: that team's season.
-2. **Open** (`pending` / `submitted`) invites: the game's active season, when the game has exactly one.
+2. **Open** invites (`submitted`, or `pending` and not yet expired): the game's active season, when the game has exactly one. A lapsed pending link is dead and is not placed by this rule.
 3. **Any remaining** invite of a game that has only ever had one season: that season.
 
 Everything else (for example a rejected or expired invite of a multi-season game, or an accepted one whose student sits on teams of two seasons) stays NULL and is therefore invisible to managers. No `created_at` cut-off is used (rejected as unsound in spec-019), and the multi-season ambiguity is intentionally not guessed. Tested against an in-memory PGlite built from all migrations (`player-invites-season-migration.test.ts`): each rule, unplaceable rows, idempotence, `SET NULL`.
@@ -33,12 +33,12 @@ A player may be put on roster R (team T: school X, game G, season S) only if ALL
 
 1. **Roster/season access (existing, reused):** `assertManagerForRoster` -> the manager's resolved season equals `T.season_id`, it is active (spec-028) and unlocked (spec-020). Staff admins are exempt from those three, so they can still correct a past or locked season.
 2. **School:** the member's `school_id` equals `T.school_id` (existing check; the invite's school too).
-3. **Invite approval only (new, applies to staff too):** an explicit `rosterId` must be in the invite's game and, when the invite has a season, in the invite's season. A seasonless legacy invite has no season to compare (staff only). The default-roster lookup already uses the approver's season.
+3. **Invite approval only (new, applies to staff too):** an explicit `rosterId` must be in the invite's game and, when the invite has a season, in the invite's season. Without a `rosterId` the default roster is the one of the invite's own season, and only if that is the season being managed (the manager's, or the game's active season for staff); otherwise approval is refused with a returned error asking for an explicit roster. A seasonless legacy invite (staff only) always needs an explicit roster.
 4. **Student eligibility for the season (new, `isEligibleForSeason` in `season-name.ts`):** members have no season column, so the only season-bound fact about a student is `members.graduation_year`. A student whose class year is before the year S ends (`seasonEndYear`: `2026-27` -> 2027) had already graduated when the season began and is refused ("(class of 2026) graduated before the 2026-27 season"). A null class year or a non-`YYYY-YY` season name is never excluded: the rule only fires on data that proves ineligibility. Applied in `enrollPlayerToRoster` and the approve path of `reviewPlayerInvite`, to managers AND staff admins using the portal. The refusal is RETURNED (`{ success: false, error }`, spec-034); for an invite it stays pending.
 
-Staff `createPlayer` / `moveRosterMember` (admin roster editor) deliberately do NOT get rule 4: they are the override channel for odd cases and also create brand-new members with a free-form class year. They remain school-bound, size-capped and one-tier-per-game as before.
+Staff `createPlayer` (admin roster editor) enforces rule 4 too (there is no staff carve-out): for an existing member the stored class year, for a new member the class year typed in the form, against the roster's season (`seasonNameForTeam`). The refusal says to correct the class year on the member first (managers are told to ask a league admin). `moveRosterMember` stays within one team, hence one season. Staff `updatePlayer` can still change a class year, which is how a wrong one is corrected.
 
-**UI:** `EnrollPlayerModal` filters the pool with the same `isEligibleForSeason(p.graduationYear, roster.seasonName)`, so ineligible students are not offered. The server rule is authoritative.
+**UI:** `EnrollPlayerModal` (portal) and `AddPlayerPanel` (staff) filter their pickers with the same `isEligibleForSeason`, and each says how many students are hidden and why. The server rule is authoritative.
 
 ## Invariants
 
@@ -48,7 +48,7 @@ Staff `createPlayer` / `moveRosterMember` (admin roster editor) deliberately do 
 
 ## Verification
 
-`npx tsc --noEmit`, `npx vitest run`, `npm run lint`. Tests: `milestone3-portal-actions.test.ts` section 13 (stamp on create for manager and staff, no active season refused, lists with match / past-season / no-season invites for a manager and for staff, review approve and reject refused for past and no-season invites, staff may review them, explicit roster of another season or game refused, graduated-student refusals for approve and direct enroll, eligible and null-class-year students enrolled); existing sections 3, 4, 8-12 updated for seasoned invites and class-of-2027 fixtures; `season-name.test.ts` (eligibility helpers); `app/lib/db/__tests__/player-invites-season-migration.test.ts` (PGlite). Not verified: the portal UI in a browser; `ensurePlayerSubmission` has no dedicated test; `npm run build`.
+`npx tsc --noEmit`, `npx vitest run`, `npm run lint`. Tests: `milestone3-portal-actions.test.ts` section 13 (stamp on create for manager and staff, no active season refused, lists with match / past-season / no-season invites for a manager and for staff, review approve and reject refused for past and no-season invites, staff may review them, explicit roster of another season or game refused, graduated-student refusals for approve and direct enroll, eligible and null-class-year students enrolled); existing sections 3, 4, 8-12 updated for seasoned invites and class-of-2027 fixtures; `roster-edit-actions.test.ts` (staff `createPlayer` eligibility), a staff past-season invite approved without `rosterId`, `ensurePlayerSubmission` stamping; `season-name.test.ts` (eligibility helpers); `app/lib/db/__tests__/player-invites-season-migration.test.ts` (PGlite). Not verified: the portal UI in a browser; `npm run build`.
 
 ## Open
 

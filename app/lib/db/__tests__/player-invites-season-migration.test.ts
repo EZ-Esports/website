@@ -16,10 +16,10 @@ let db: PGlite;
 const q = async (text: string, params: unknown[] = []) => (await db.query(text, params)).rows as Record<string, any>[];
 const seasonOf = async (inviteId: string) => (await q('select season_id from player_invites where id = $1', [inviteId]))[0].season_id;
 
-async function addInvite(id: string, school: string, game: string, status: string, member: string | null) {
+async function addInvite(id: string, school: string, game: string, status: string, member: string | null, expires = "now() + interval '1 day'") {
   await q(
     `insert into player_invites (id, school_id, game_id, token_hash, intended_first_name, intended_last_name, invited_by_user_id, status, expires_at, member_id)
-     values ($1, $2, $3, $4, 'A', 'B', $5, $6, now(), $7)`,
+     values ($1, $2, $3, $4, 'A', 'B', $5, $6, ${expires}, $7)`,
     [id, school, game, `hash-${id}`, U(900), status, member],
   );
 }
@@ -56,6 +56,7 @@ describe('player_invites.season_id migration (0056)', () => {
     await addInvite(U(64), U(1), U(11), 'rejected', null); // game with a single season -> that season
     await addInvite(U(65), U(1), U(11), 'pending', null); // open queue, no active season, single season -> that season
     await addInvite(U(66), U(1), U(10), 'expired', null); // closed, game has two seasons -> unplaceable
+    await addInvite(U(67), U(1), U(10), 'pending', null, "now() - interval '1 day'"); // lapsed pending link -> not placed by rule 2
     // The seeded rows were inserted after 0056 ran, so run its backfill statements now.
     const statements = SQL.split('--> statement-breakpoint').map((x) => x.trim()).filter(Boolean);
     for (const st of statements.slice(3)) await db.exec(st);
@@ -75,7 +76,7 @@ describe('player_invites.season_id migration (0056)', () => {
     expect(await seasonOf(U(60))).toBe(U(20));
   });
 
-  it('places open (pending / submitted) invites in the only active season of the game', async () => {
+  it('places submitted and unexpired pending invites in the only active season of the game', async () => {
     expect(await seasonOf(U(62))).toBe(U(21));
   });
 
@@ -85,7 +86,7 @@ describe('player_invites.season_id migration (0056)', () => {
   });
 
   it('leaves unplaceable rows null (managers never see them)', async () => {
-    for (const id of [U(61), U(63), U(66)]) expect(await seasonOf(id)).toBeNull();
+    for (const id of [U(61), U(63), U(66), U(67)]) expect(await seasonOf(id)).toBeNull();
   });
 
   it('is idempotent and never overwrites an existing season', async () => {

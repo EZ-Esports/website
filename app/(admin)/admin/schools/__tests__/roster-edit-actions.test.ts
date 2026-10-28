@@ -59,6 +59,11 @@ const mocks = vi.hoisted(() => ({
     return mocks.onTarget;
   }),
   memberDisplayName: vi.fn(async (_m: string, _tx?: unknown) => 'Ada Lovelace'),
+  /** Season of the roster's team and the existing member's class year, for the eligibility rule. */
+  seasonName: '2026-27' as string | null,
+  classYear: 2027 as number | null,
+  seasonNameForTeam: vi.fn(async (_t: string, _tx?: unknown) => mocks.seasonName),
+  memberGraduationYear: vi.fn(async (_m: string, _tx?: unknown) => mocks.classYear),
   /** Rows the deleteRoster pre-read of the roster's players returns. */
   rosterPlayers: [] as Array<{ memberId: string }>,
   notify: vi.fn(async (_ids: string[]) => {}),
@@ -90,6 +95,8 @@ vi.mock('@/app/lib/db/roster-scope', () => ({
   rosterPlayerRoles: mocks.rosterPlayerRoles,
   memberOnRoster: mocks.memberOnRoster,
   memberDisplayName: mocks.memberDisplayName,
+  seasonNameForTeam: mocks.seasonNameForTeam,
+  memberGraduationYear: mocks.memberGraduationYear,
 }));
 vi.mock('@/app/lib/onboarding/roster-membership-events', () => ({ notifyRosterMembershipChanged: mocks.notify }));
 vi.mock('@/app/lib/db', () => {
@@ -838,5 +845,40 @@ describe('stale /admin/roster revalidation', () => {
       /revalidatePath\(\s*['"`]\/admin\/roster['"`]/.test(readFileSync(f, 'utf8')),
     );
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('school roster edit actions: season eligibility (spec-045)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.writes.length = 0;
+    mocks.seasonName = '2026-27';
+    mocks.classYear = 2027;
+    mocks.requirePermission.mockImplementation(async () => ({}));
+  });
+
+  it('adds an existing member whose class year fits the roster season', async () => {
+    expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }))).toMatchObject({ success: true });
+  });
+
+  it('refuses an existing member who graduated before the season, writing nothing', async () => {
+    mocks.classYear = 2026;
+    const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }));
+    expect(res).toMatchObject({ success: false, error: expect.stringMatching(/graduated before the 2026-27 season.*correct it/) });
+    expect(mocks.writes).toHaveLength(0);
+  });
+
+  it('refuses a NEW member typed in with an ineligible class year, creating no member', async () => {
+    const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', firstName: 'A', lastName: 'B', graduationYear: '2025', role: 'player' }));
+    expect(res).toMatchObject({ success: false, error: expect.stringMatching(/class of 2025/) });
+    expect(mocks.writes).toHaveLength(0);
+  });
+
+  it('allows a member with no class year, and a past season roster for an old class', async () => {
+    mocks.classYear = null;
+    expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }))).toMatchObject({ success: true });
+    mocks.classYear = 2026;
+    mocks.seasonName = '2025-26';
+    expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }))).toMatchObject({ success: true });
   });
 });

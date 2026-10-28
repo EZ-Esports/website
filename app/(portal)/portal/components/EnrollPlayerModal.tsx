@@ -50,6 +50,7 @@ export function EnrollPlayerModal({
 
   // Only students who can play in this roster's season are offered; the server refuses the rest.
   const playerPool = schoolPool.filter((p) => isEligibleForSeason(p.graduationYear, roster.seasonName));
+  const hiddenCount = schoolPool.length - playerPool.length;
 
   return (
     <div
@@ -165,6 +166,12 @@ export function EnrollPlayerModal({
                   );
                 })}
             </select>
+
+            {hiddenCount > 0 && (
+              <p className="text-xs text-zinc-500 mt-1">
+                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: class year is before the {roster.seasonName} season. If a class year is wrong, ask a league admin to correct it.
+              </p>
+            )}
 
             {playerPool.length === 0 && (
               <p className="text-xs text-amber-400/80 mt-1">

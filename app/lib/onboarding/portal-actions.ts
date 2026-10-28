@@ -68,22 +68,14 @@ function siblingConflictMessage(playerName: string, onRoster: string, targetRost
 }
 
 /** Name of the season a team plays in; the caller's already-resolved season is the fallback. */
-async function seasonNameOf(teamId: string, known: { id: string; name: string } | null): Promise<string | null> {
-  const [team] = await db
-    .select({ seasonId: schema.teams.seasonId })
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
+async function seasonNameOf(seasonId: string, known: { id: string; name: string } | null): Promise<string | null> {
+  if (known?.id === seasonId) return known.name;
+  const [season] = await db
+    .select({ name: schema.seasons.name })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.id, seasonId))
     .limit(1);
-  if (team) {
-    if (known?.id === team.seasonId) return known.name;
-    const [season] = await db
-      .select({ name: schema.seasons.name })
-      .from(schema.seasons)
-      .where(eq(schema.seasons.id, team.seasonId))
-      .limit(1);
-    if (season) return season.name;
-  }
-  return known?.name ?? null;
+  return season?.name ?? null;
 }
 
 /**
@@ -512,10 +504,19 @@ export async function reviewPlayerInvite(
     let targetRosterId = rosterId;
     let targetTeamId = explicitTarget?.team.id;
     let targetRosterName = explicitTarget?.roster.name;
+    let targetSeasonId = explicitTarget?.team.seasonId;
 
     if (invite.memberId && !targetRosterId && invite.gameId) {
-      // Find the school's team for the approver's season (a manager's resolved season, a staff
-      // admin's active season); no other season's roster is ever the default target
+      // Find the school's team for the invite's own season; no other season's roster is ever the
+      // default target. A manager's invite season equals their resolved season (checked above).
+      // For staff it may differ from the active season, in which case the default is refused and
+      // an explicit roster must be chosen, so approving an old invite never lands in a new season.
+      if (!invite.seasonId) {
+        return reject('This invite has no season. Choose a roster explicitly to approve it.');
+      }
+      if (approvalSeason?.id !== invite.seasonId) {
+        return reject('This invite belongs to a different season than the one being managed. Choose a roster explicitly to approve it.');
+      }
       const [team] = approvalSeason
         ? await db
             .select({ id: schema.teams.id })
@@ -524,7 +525,7 @@ export async function reviewPlayerInvite(
               and(
                 eq(schema.teams.schoolId, invite.schoolId),
                 eq(schema.teams.gameId, invite.gameId),
-                eq(schema.teams.seasonId, approvalSeason.id)
+                eq(schema.teams.seasonId, invite.seasonId)
               )
             )
             .limit(1)
@@ -542,6 +543,7 @@ export async function reviewPlayerInvite(
         targetRosterId = firstRoster?.id;
         targetRosterName = firstRoster?.name;
         targetTeamId = team.id;
+        targetSeasonId = invite.seasonId;
       }
     }
 
@@ -570,7 +572,7 @@ export async function reviewPlayerInvite(
       : `${invite.intendedFirstName} ${invite.intendedLastName}`;
 
     if (enrolling && member) {
-      const seasonName = await seasonNameOf(targetTeamId!, approvalSeason);
+      const seasonName = await seasonNameOf(targetSeasonId!, approvalSeason);
       const ineligible = seasonIneligibility(member, playerName, seasonName);
       if (ineligible) return reject(ineligible);
     }
@@ -1527,7 +1529,7 @@ export async function enrollPlayerToRoster(
   const ineligible = seasonIneligibility(
     member,
     `${member.firstName} ${member.lastName}`,
-    await seasonNameOf(team.id, null)
+    await seasonNameOf(team.seasonId, null)
   );
   if (ineligible) return reject(ineligible);
 

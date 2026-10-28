@@ -21,8 +21,9 @@ FROM (
 	HAVING COUNT(DISTINCT t."season_id") = 1
 ) x
 WHERE pi."id" = x."invite_id";--> statement-breakpoint
--- 2. Invites still in the manager queue (pending or submitted) belong to the game's active season,
---    when the game has exactly one, so the in-flight queue does not vanish for managers on deploy.
+-- 2. Invites still in the manager queue belong to the game's active season, when the game has
+--    exactly one, so the in-flight queue does not vanish for managers on deploy: submitted ones,
+--    and pending ones that have not expired (a lapsed pending link is dead and stays unplaced).
 UPDATE "player_invites" AS pi
 SET "season_id" = a."season_id"
 FROM (
@@ -32,7 +33,8 @@ FROM (
 	GROUP BY "game_id"
 	HAVING COUNT(*) = 1
 ) a
-WHERE pi."season_id" IS NULL AND pi."status" IN ('pending', 'submitted') AND pi."game_id" = a."game_id";--> statement-breakpoint
+WHERE pi."season_id" IS NULL AND pi."game_id" = a."game_id"
+	AND (pi."status" = 'submitted' OR (pi."status" = 'pending' AND pi."expires_at" > now()));--> statement-breakpoint
 -- 3. Any other invite of a game that has only ever had one season belongs to that season.
 UPDATE "player_invites" AS pi
 SET "season_id" = s."season_id"

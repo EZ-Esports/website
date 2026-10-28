@@ -72,6 +72,20 @@ export function isEligibleForSeason(graduationYear: number | null | undefined, s
   return graduationYear >= endYear;
 }
 
-export function notEligibleForSeasonError(playerName: string, graduationYear: number, seasonName: string): string {
-  return `${playerName} (class of ${graduationYear}) graduated before the ${seasonName} season and cannot be added to its rosters.`;
+/**
+ * Refusal text for a student the eligibility rule excludes. The class year is the only thing the
+ * rule can act on, so the advice is to fix it if it is wrong: managers ask a league admin (they
+ * cannot edit it), staff correct it themselves.
+ */
+export function notEligibleForSeasonError(
+  playerName: string,
+  graduationYear: number,
+  seasonName: string,
+  audience: 'manager' | 'staff' = 'manager'
+): string {
+  const fix =
+    audience === 'staff'
+      ? 'If the class year is wrong, correct it on the member first.'
+      : 'If the class year is wrong, ask a league admin to correct it.';
+  return `${playerName} (class of ${graduationYear}) graduated before the ${seasonName} season and cannot be added to its rosters. ${fix}`;
 }

@@ -2863,6 +2863,22 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         expect(mocks.state.playerInvitesStore[0].status).toBe('submitted');
       });
 
+      it('never defaults a staff approval of a past-season or seasonless invite into the active season', async () => {
+        makeAdmin();
+        mocks.state.playerInvitesStore = [mkInvite('inv-past', 'season-val-past'), mkInvite('inv-null', null)];
+        for (const id of ['inv-past', 'inv-null']) {
+          await expect(reviewPlayerInvite({ inviteId: id, action: 'approve' })).resolves.toMatchObject({
+            success: false,
+            error: expect.stringMatching(/Choose a roster explicitly/),
+          });
+        }
+        expect(mocks.state.playersStore).toHaveLength(0);
+        expect(mocks.state.playerInvitesStore.map((i) => i.status)).toEqual(['submitted', 'submitted']);
+        // With an explicit roster of the invite's own season, staff can still approve it.
+        await expect(reviewPlayerInvite({ inviteId: 'inv-past', action: 'approve', rosterId: 'r-past' })).resolves.toMatchObject({ success: true });
+        expect(mocks.state.playersStore.find((p) => p.memberId === 'm-kid')?.rosterId).toBe('r-past');
+      });
+
       it("returns a refusal (invite stays pending) when the student graduated before the roster's season", async () => {
         mocks.state.playerInvitesStore = [mkInvite('inv-grad', 'season-val-now', { memberId: 'm-grad' })];
         await expect(reviewPlayerInvite({ inviteId: 'inv-grad', action: 'approve' })).resolves.toMatchObject({
