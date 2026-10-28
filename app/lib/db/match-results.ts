@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { db } from './index';
 import { dbErrorChain } from '../text-utils';
 import * as schema from './schema';
@@ -483,6 +483,12 @@ export async function reserveSubmissionAttempt(params: {
     // Always lock the match first, then the user, so concurrent callers cannot deadlock.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'match-result:match:' + params.matchId}, 0))`);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'match-result:user:' + params.userId}, 0))`);
+
+    // Rows older than the one-hour window can no longer affect either limit, so drop them here
+    // instead of running a separate cleanup job.
+    await tx
+      .delete(schema.matchResultAttempts)
+      .where(lt(schema.matchResultAttempts.createdAt, new Date(now.getTime() - USER_WINDOW_MS)));
 
     const [last] = await tx
       .select({ createdAt: schema.matchResultAttempts.createdAt })

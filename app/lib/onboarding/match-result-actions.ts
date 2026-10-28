@@ -143,7 +143,8 @@ async function submit(
   match: LoadedMatch,
   schoolId: string,
   userId: string,
-  matchIds: string[]
+  matchIds: string[],
+  options: { closePendingOnInvalid?: boolean } = {}
 ): Promise<MatchResultActionResult> {
   const rosters = await getMatchRosterRiotIds(match.homeRosterId, match.awayRosterId);
   const outcome = await resolveSeries({
@@ -156,6 +157,12 @@ async function submit(
   });
 
   if (outcome.status === 'invalid') {
+    if (options.closePendingOnInvalid) {
+      // The saved ids can never succeed as they are (a rejected game, not an outage), so leave no
+      // stuck "waiting" row behind; the manager sees the errors and submits corrected ids.
+      await cancelPendingSubmission(match.id);
+      revalidatePath('/portal');
+    }
     return { success: false, error: 'This result could not be accepted.', errors: outcome.errors };
   }
 
@@ -220,7 +227,6 @@ async function submitMatchResultImpl(params: SubmitMatchResultParams): Promise<M
   const { userId } = await authorizeForMatch(params.schoolId, match, true);
   const refusal = await refusalFor(match);
   if (refusal) return { success: false, error: refusal };
-  // Fresh submissions only: "Check again" (retryMatchResult) reuses ids already paid for.
   const allowed = await reserveSubmissionAttempt({ matchId: match.id, userId });
   if (!allowed.ok) return { success: false, error: allowed.message };
   return submit(match, params.schoolId, userId, parsed.ids);
@@ -247,7 +253,11 @@ async function retryMatchResultImpl(params: PendingResultParams): Promise<MatchR
   if (pending.retryAfter && pending.retryAfter.getTime() > Date.now()) {
     return { success: false, pending: true, error: 'The match data service asked us to wait. Try again shortly.' };
   }
-  return submit(match, params.schoolId, userId, pending.riotMatchIds);
+  // Retries count toward the same limits as a fresh submission (they cost the same API calls), so
+  // repeated "Check again" clicks are bounded; the service's own retry_after is honoured above.
+  const allowed = await reserveSubmissionAttempt({ matchId: match.id, userId });
+  if (!allowed.ok) return { success: false, pending: true, error: allowed.message };
+  return submit(match, params.schoolId, userId, pending.riotMatchIds, { closePendingOnInvalid: true });
 }
 
 export async function retryMatchResult(params: PendingResultParams): Promise<MatchResultActionResult> {

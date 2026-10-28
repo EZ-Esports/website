@@ -77,3 +77,6 @@ __pycache__/
 
 # Local thumbnail previews from db/backfill-gallery-thumbnails.ts --preview-dir
 /db/thumbnail-previews/
+
+# Local-only dev tooling and data (throwaway Postgres, scratch scripts); may hold seeded data
+/.dev-local/

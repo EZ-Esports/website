@@ -183,3 +183,4 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Matching is by Riot `Name#Tag`**, not PUUID; renamed accounts or a roster without Riot IDs will be refused ("do not match either roster"). Consider storing PUUIDs.
 - **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
 - **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.
+- **`match_result_attempts` grows by one row per fresh submission or Check again.** Rows older than one hour are deleted opportunistically inside `reserveSubmissionAttempt`, so the table stays small; staff admins are throttled the same as managers (no exemption). A pending submission whose retry is refused as invalid is cancelled, not left waiting.

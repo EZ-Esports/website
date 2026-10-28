@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  cancelPendingSubmission: vi.fn(),
   loadRows: vi.fn(),
   assertManagerForSchoolGame: vi.fn(),
   resolveSeries: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock('@/app/lib/db', () => {
 vi.mock('next/cache', () => ({ updateTag: mocks.updateTag, revalidatePath: mocks.revalidatePath }));
 vi.mock('@/app/lib/onboarding/manager-auth', () => ({ assertManagerForSchoolGame: mocks.assertManagerForSchoolGame }));
 vi.mock('@/app/lib/db/match-results', () => ({
-  cancelPendingSubmission: vi.fn(),
+  cancelPendingSubmission: mocks.cancelPendingSubmission,
   gameRepository: {},
   isUniqueViolation: (e: unknown) => (e as { code?: string })?.code === '23505',
   getMatchRosterRiotIds: mocks.getMatchRosterRiotIds,
@@ -169,7 +170,33 @@ describe('retryMatchResult', () => {
     const result = await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
     expect(result.success).toBe(true);
     expect(mocks.resolveSeries.mock.calls[0][0].matchIds).toEqual([ID_1, ID_2]);
-    // Check again reuses ids already paid for, so it is not counted against the submission limits.
-    expect(mocks.reserveSubmissionAttempt).not.toHaveBeenCalled();
+    // Check again costs the same API calls, so it counts toward the submission limits too.
+    expect(mocks.reserveSubmissionAttempt).toHaveBeenCalledTimes(1);
+    expect(mocks.cancelPendingSubmission).not.toHaveBeenCalled();
+  });
+
+  it('bounds repeated Check again clicks with the throttle and leaves the pending row alone', async () => {
+    mocks.getPendingSubmissionForMatch.mockResolvedValue({ riotMatchIds: [ID_1, ID_2], retryAfter: new Date(Date.now() - 1000) });
+    mocks.reserveSubmissionAttempt.mockResolvedValue({ ok: false, waitSeconds: 12, message: 'Wait 12 seconds before submitting again.' });
+    const result = await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
+    expect(result).toMatchObject({ success: false, pending: true, error: 'Wait 12 seconds before submitting again.' });
+    expect(mocks.resolveSeries).not.toHaveBeenCalled();
+    expect(mocks.cancelPendingSubmission).not.toHaveBeenCalled();
+  });
+
+  it('closes the pending row when the retry is refused as invalid, so nothing is left stuck', async () => {
+    mocks.getPendingSubmissionForMatch.mockResolvedValue({ riotMatchIds: [ID_1, ID_2], retryAfter: new Date(Date.now() - 1000) });
+    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game 1: not custom'] });
+    const result = await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
+    expect(result).toMatchObject({ success: false, errors: ['Game 1: not custom'] });
+    expect(mocks.cancelPendingSubmission).toHaveBeenCalledWith('m1');
+  });
+
+  it('keeps the pending row when the retry is still rate limited', async () => {
+    mocks.getPendingSubmissionForMatch.mockResolvedValue({ riotMatchIds: [ID_1, ID_2], retryAfter: new Date(Date.now() - 1000) });
+    mocks.resolveSeries.mockResolvedValue({ status: 'pending', message: 'busy', retryAfterSeconds: 30, fetchedCount: 0 });
+    await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
+    expect(mocks.cancelPendingSubmission).not.toHaveBeenCalled();
+    expect(mocks.upsertPendingSubmission).toHaveBeenCalled();
   });
 });

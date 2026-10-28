@@ -14,6 +14,8 @@ export const WINS_TO_TAKE_SERIES = 2;
  * deliberately no upper bound: a late or overrunning start is legitimate (spec-038).
  */
 export const EARLY_START_LEEWAY_MS = 60 * 60 * 1000;
+/** A Valorant team has exactly five players; every one of them must be on the school's roster. */
+export const PLAYERS_PER_SIDE = 5;
 /** The only queue a league match may be played in. */
 export const CUSTOM_QUEUE_ID = 'custom';
 
@@ -77,8 +79,11 @@ export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): Att
   const rosterBySide = {} as Record<TeamSide, RosterSlot>;
   for (const side of ['Red', 'Blue'] as const) {
     const players = game.players.filter((p) => p.side === side);
-    if (players.length === 0) {
-      return { ok: false, error: `The ${side} team has no players in this game's data.` };
+    if (players.length !== PLAYERS_PER_SIDE) {
+      return {
+        ok: false,
+        error: `The ${side} team has ${players.length} player${players.length === 1 ? '' : 's'}; a league game has ${PLAYERS_PER_SIDE} per side.`,
+      };
     }
     const entries = players.map((p) => ({
       id: `${p.name}#${p.tag}`,

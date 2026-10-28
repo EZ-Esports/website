@@ -213,6 +213,17 @@ describe.skipIf(!enabled)('match results against a real Postgres', () => {
       expect(later.ok).toBe(true);
     });
 
+    it('prunes attempts older than the one-hour window and leaves recent ones', async () => {
+      const matchId = await newMatch();
+      const user = randomUUID();
+      const old = new Date('2026-10-27T10:00:00Z');
+      await repo.reserveSubmissionAttempt({ matchId, userId: user, now: old });
+      const later = new Date(old.getTime() + 2 * 60 * 60 * 1000);
+      expect((await repo.reserveSubmissionAttempt({ matchId, userId: user, now: later })).ok).toBe(true);
+      const rows = await raw<{ created_at: Date }[]>`select created_at from match_result_attempts where match_id = ${matchId}`;
+      expect(rows).toHaveLength(1);
+    });
+
     it('lets exactly one of several concurrent fresh submissions for a match through', async () => {
       const matchId = await newMatch();
       const now = new Date('2026-10-27T13:00:00Z');

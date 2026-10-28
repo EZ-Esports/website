@@ -135,6 +135,17 @@ describe('scoreSeries: every player on a side must be on one school roster', () 
     expect(!out.ok && out.errors[0]).toContain('on both schools');
   });
 
+  it.each([
+    ['1v1', ['RedOne'], ['BlueOne'], 'The Red team has 1 player; a league game has 5 per side.'],
+    ['2v2', RED_PLAYERS.slice(0, 2), BLUE_PLAYERS.slice(0, 2), 'The Red team has 2 players; a league game has 5 per side.'],
+    ['4v5', RED_PLAYERS.slice(0, 4), BLUE_PLAYERS, 'The Red team has 4 players; a league game has 5 per side.'],
+    ['5v4', RED_PLAYERS, BLUE_PLAYERS.slice(0, 4), 'The Blue team has 4 players; a league game has 5 per side.'],
+    ['6v5', [...RED_PLAYERS, 'HomeSub1'], BLUE_PLAYERS, 'The Red team has 6 players; a league game has 5 per side.'],
+  ])('refuses a %s game even when everyone is rostered', (_label, home, away, message) => {
+    const out = scoreSeries([game(1, { homeWins: true, home, away }), game(2, { homeWins: true })], rosters);
+    expect(!out.ok && out.errors[0]).toBe(`Game 1: ${message}`);
+  });
+
   it('refuses a game where both teams are the same school', () => {
     const out = scoreSeries([game(1, { homeWins: true, away: RED_PLAYERS }), game(2, { homeWins: true })], rosters);
     expect(!out.ok && out.errors[0]).toContain('same school');
