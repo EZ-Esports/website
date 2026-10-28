@@ -75,7 +75,7 @@ export function DiscordStep({
                   aria-disabled={connecting}
                   className="mt-1 min-h-[44px] text-xs text-accent underline aria-disabled:opacity-50"
                 >
-                  Use a different Discord account
+                  Use a different Discord account (opens a new tab)
                 </button>
               </div>
             </div>
@@ -87,8 +87,15 @@ export function DiscordStep({
           <div className="space-y-3">
             <p className="text-xs text-foreground-muted leading-relaxed">
               Sign in with Discord and we will add you to the official server automatically. We only
-              read your Discord username and ID; we never see your password or messages.
+              read your Discord username and ID; we never see your password or messages. Discord opens in
+              a new tab: when it says you are connected, come back to this tab. Everything you have
+              entered here stays as it is.
             </p>
+            {connecting && (
+              <p role="status" className="text-xs text-foreground-muted leading-relaxed">
+                Waiting for Discord in the other tab. If you do not see it, check for a blocked pop-up.
+              </p>
+            )}
             <button
               type="button"
               onClick={handleConnect}
@@ -97,7 +104,7 @@ export function DiscordStep({
             >
               {connecting ? (
                 <>
-                  <FiClock className="w-4 h-4 animate-spin" /> Opening Discord...
+                  <FiClock className="w-4 h-4 animate-spin" /> Waiting for Discord...
                 </>
               ) : (
                 <>

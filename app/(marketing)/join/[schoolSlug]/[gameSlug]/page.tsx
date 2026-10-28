@@ -11,6 +11,7 @@ import { validateInviteToken } from '@/app/lib/onboarding/wizard-actions';
 import { readVerifiedDiscord } from '@/app/lib/onboarding/discord-session';
 import { DISCORD_FAILURE_MESSAGES, type DiscordFailureCode } from '@/app/lib/onboarding/adapters/discord-rest';
 import PlayerOnboardingWizard from './PlayerOnboardingWizard';
+import { DiscordPopupDone } from './components/DiscordPopupDone';
 
 interface JoinPageProps {
   params: Promise<{
@@ -21,6 +22,7 @@ interface JoinPageProps {
     token?: string;
     discord?: string;
     discord_error?: string;
+    popup?: string;
   }>;
 }
 
@@ -203,6 +205,19 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
           ? DISCORD_FAILURE_MESSAGES[errorCode]
           : DISCORD_FAILURE_MESSAGES.unknown)
       : null;
+
+  // A Discord sign-in started from the wizard's second tab ends here instead of re-rendering the
+  // wizard, so the first tab keeps its fields and password. The outcome shown is the cookie's, not the URL's.
+  if (searchParams.popup) {
+    const connected = !errorCode && Boolean(verified?.inGuild);
+    return (
+      <DiscordPopupDone
+        inviteId={validation.inviteId}
+        status={connected ? 'connected' : 'error'}
+        message={connected ? null : (discordError ?? DISCORD_FAILURE_MESSAGES.unknown)}
+      />
+    );
+  }
 
   return (
     <main className="min-h-[80vh] py-6">

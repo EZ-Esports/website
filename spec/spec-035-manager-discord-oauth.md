@@ -31,3 +31,5 @@ Pipeline tests (`milestone4-player-wizard.test.ts`): manager success via cookie 
 ## Consequences and follow-ups
 
 Existing onboarded managers and players have unverified Discord ids from before OAuth; the owner treats all onboarding data as test data and will purge it, so there is no backfill. A manager whose Discord account is already linked to a player record cannot onboard with that account until the old row is removed. Staff application, careers and school application forms still collect a typed Discord name as plain contact info, and `people.discord`/leadership are untouched; those are not identity claims.
+
+> **Update (28 Oct 2026):** the wizard now starts this flow in a second tab so it keeps its state; see [spec-041](spec-041-discord-oauth-second-tab.md). The same-tab redirect described above remains the fallback when a pop-up is blocked.

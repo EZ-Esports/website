@@ -373,6 +373,18 @@ export async function saveOnboardingDraft(
 }
 
 /**
+ * Server Action: the Discord identity currently verified for this invite, read from the signed
+ * httpOnly cookie. The wizard calls it after the second tab finishes OAuth; nothing the browser
+ * sends (including the cross-tab message) is ever used as the identity.
+ */
+export async function getVerifiedDiscordForInvite(
+  token: string
+): Promise<{ username: string; inGuild: boolean } | null> {
+  const verified = await readVerifiedDiscord(token);
+  return verified ? { username: verified.discordUsername, inGuild: verified.inGuild } : null;
+}
+
+/**
  * Server Action: Validates and atomically processes a player onboarding submission.
  * Delegates execution to the modular submission pipeline.
  */
