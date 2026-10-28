@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 import { formatNY } from '@/app/lib/dates';
+import { matchTabOf } from '@/app/lib/db/match-page';
 import {
   divisionOptions,
   filterByDivision,
@@ -206,7 +207,11 @@ export function MatchesSection({
   const divisions = divisionOptions(matches);
   // The pick survives a game change only while that division still exists in the list.
   const division = pickedDivision !== null && divisions.includes(pickedDivision) ? pickedDivision : null;
-  const { upcoming, past } = splitSchoolMatches(filterByDivision(matches, division), now);
+  const split = splitSchoolMatches(filterByDivision(matches, division), now);
+  const upcoming = split.upcoming;
+  // Overdue matches with no result yet get their own tab; Past keeps only the rest.
+  const needsResults = split.past.filter((m) => matchTabOf(m, now) === 'needs-results');
+  const past = split.past.filter((m) => matchTabOf(m, now) !== 'needs-results');
   // Only a staff admin's list can span seasons; a manager works in one season per game.
   const showSeason = new Set(matches.map((m) => `${m.gameId}|${m.seasonName}`)).size >
     new Set(matches.map((m) => m.gameId)).size;
@@ -248,10 +253,26 @@ export function MatchesSection({
           <Tab id="upcoming" className={TAB_CLASS}>
             Upcoming ({upcoming.length})
           </Tab>
+          <Tab id="needs-results" className={TAB_CLASS}>
+            Needs result ({needsResults.length})
+          </Tab>
           <Tab id="past" className={TAB_CLASS}>
             Past ({past.length})
           </Tab>
         </TabList>
+        <TabPanel id="needs-results" className={PANEL_CLASS}>
+          <MatchTable
+            matches={needsResults}
+            now={now}
+            showGame={showGame}
+            showSeason={showSeason}
+            showResult
+            showReschedule={false}
+            schoolId={schoolId}
+            viewOnlyGameIds={viewOnlyGameIds}
+            emptyText="No matches are waiting for a result."
+          />
+        </TabPanel>
         <TabPanel id="upcoming" className={PANEL_CLASS}>
           <MatchTable
             matches={upcoming}
