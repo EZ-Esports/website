@@ -944,6 +944,9 @@ export const playerInvites = pgTable('player_invites', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
   gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }).notNull(),
+  // The season the invite was issued for. Null only for legacy rows whose season could not be
+  // derived; managers never see or review those (spec-045). Set null if the season is deleted.
+  seasonId: uuid('season_id').references(() => seasons.id, { onDelete: 'set null' }),
   tokenHash: text('token_hash').notNull().unique(), // SHA-256
   intendedFirstName: text('intended_first_name').notNull(),
   intendedLastName: text('intended_last_name').notNull(),
@@ -958,6 +961,7 @@ export const playerInvites = pgTable('player_invites', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('player_invites_school_game_idx').on(t.schoolId, t.gameId),
+  index('player_invites_season_id_idx').on(t.seasonId),
   uniqueIndex('player_invites_token_hash_idx').on(t.tokenHash),
   index('player_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();

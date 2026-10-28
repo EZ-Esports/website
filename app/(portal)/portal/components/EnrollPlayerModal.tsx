@@ -7,6 +7,7 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2';
+import { isEligibleForSeason } from '@/app/lib/season-name';
 import type {
   SchoolRosterDetails,
   SchoolPoolPlayer,
@@ -31,7 +32,7 @@ interface EnrollPlayerModalProps {
 
 export function EnrollPlayerModal({
   roster,
-  playerPool,
+  playerPool: schoolPool,
   selectedMemberId,
   setSelectedMemberId,
   enrollRole,
@@ -46,6 +47,9 @@ export function EnrollPlayerModal({
   onClose,
 }: EnrollPlayerModalProps) {
   if (!roster) return null;
+
+  // Only students who can play in this roster's season are offered; the server refuses the rest.
+  const playerPool = schoolPool.filter((p) => isEligibleForSeason(p.graduationYear, roster.seasonName));
 
   return (
     <div

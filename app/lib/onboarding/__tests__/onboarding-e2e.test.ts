@@ -744,7 +744,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           legalFirstName: 'David',
           legalLastName: 'Kim',
           email: 'david.kim@nycstudents.net',
-          graduationYear: 2026,
+          graduationYear: 2027,
           riotId: 'DavidK#NA1',
           birthDate: new Date('2008-03-21'),
           codeOfConductAccepted: true,

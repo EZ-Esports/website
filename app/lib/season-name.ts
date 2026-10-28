@@ -49,3 +49,29 @@ export const SEASON_NAME_ERROR = 'Season must be in the format YYYY-YY (for exam
 export function inactiveSeasonViewOnlyError(seasonName: string): string {
   return `${seasonName} is an inactive season and is view-only.`;
 }
+
+/**
+ * The calendar year a season ends in, taken from its `YYYY-YY` name (`2026-27` -> 2027). Null for a
+ * name that is not canonical (League Setup lets legacy free-text names through), so callers can
+ * skip any rule that needs a date instead of guessing one.
+ */
+export function seasonEndYear(seasonName: string): number | null {
+  if (!isValidSeasonName(seasonName)) return null;
+  return Number(seasonName.slice(0, 4)) + 1;
+}
+
+/**
+ * Season-eligibility rule for putting a student on a roster (spec-045): a student whose class year
+ * is before the year the season ends had already graduated when it began, so they cannot play in
+ * it. A student with no recorded class year, or a season with a non-canonical name, is never
+ * excluded: the rule only fires on data that proves ineligibility.
+ */
+export function isEligibleForSeason(graduationYear: number | null | undefined, seasonName: string): boolean {
+  const endYear = seasonEndYear(seasonName);
+  if (endYear === null || graduationYear == null) return true;
+  return graduationYear >= endYear;
+}
+
+export function notEligibleForSeasonError(playerName: string, graduationYear: number, seasonName: string): string {
+  return `${playerName} (class of ${graduationYear}) graduated before the ${seasonName} season and cannot be added to its rosters.`;
+}

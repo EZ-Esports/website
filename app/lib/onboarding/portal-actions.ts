@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, desc, asc, inArray } from 'drizzle-orm';
+import { eq, and, or, desc, asc, inArray, type SQL } from 'drizzle-orm';
 import {
   assertManagerForSchool,
   assertManagerForSchoolGame,
@@ -14,6 +14,7 @@ import {
   NO_ACTIVE_SEASON_ERROR,
   type AuthorizedGameScope,
 } from './manager-auth';
+import { isEligibleForSeason, notEligibleForSeasonError } from '@/app/lib/season-name';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
@@ -66,6 +67,39 @@ function siblingConflictMessage(playerName: string, onRoster: string, targetRost
   return `${playerName} is already on ${onRoster}. Use Move to put them on ${targetRoster}.`;
 }
 
+/** Name of the season a team plays in; the caller's already-resolved season is the fallback. */
+async function seasonNameOf(teamId: string, known: { id: string; name: string } | null): Promise<string | null> {
+  const [team] = await db
+    .select({ seasonId: schema.teams.seasonId })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, teamId))
+    .limit(1);
+  if (team) {
+    if (known?.id === team.seasonId) return known.name;
+    const [season] = await db
+      .select({ name: schema.seasons.name })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.id, team.seasonId))
+      .limit(1);
+    if (season) return season.name;
+  }
+  return known?.name ?? null;
+}
+
+/**
+ * Season-eligibility refusal for enrolling a member into a roster of the named season (spec-045),
+ * or null when allowed. One rule for every portal enrollment path; see `isEligibleForSeason`.
+ */
+function seasonIneligibility(
+  member: { graduationYear: number | null },
+  playerName: string,
+  seasonName: string | null
+): string | null {
+  if (!seasonName || member.graduationYear == null) return null;
+  if (isEligibleForSeason(member.graduationYear, seasonName)) return null;
+  return notEligibleForSeasonError(playerName, member.graduationYear, seasonName);
+}
+
 export interface CreatePlayerInviteParams {
   schoolId: string;
   gameId: string;
@@ -107,6 +141,21 @@ async function resolveManagerScope(
 }
 
 /**
+ * Restricts invite queries to the manager's own season of each game (spec-045): an invite is
+ * visible only when its `season_id` is the manager's resolved season for its game. Legacy invites
+ * with no season never match, so they stay hidden from managers. Staff admins (scopes === null)
+ * get no condition.
+ */
+function inviteSeasonCondition(scopes: AuthorizedGameScope[] | null): SQL | undefined {
+  if (!scopes) return undefined;
+  return or(
+    ...scopes.map((s) =>
+      and(eq(schema.playerInvites.gameId, s.gameId), eq(schema.playerInvites.seasonId, s.seasonId))
+    )
+  );
+}
+
+/**
  * Generates a personalized, single-use player invite link for a school and game.
  * Asserts manager authorization and stores the token SHA-256 hash.
  */
@@ -123,7 +172,12 @@ export async function createPlayerInvite(
   }
 
   // Mutation: refused on an inactive (view-only) season by default (spec-028).
-  const context = await assertManagerForSchool(schoolId, gameId);
+  const { context, season: managerSeason } = await assertManagerForSchoolGame(schoolId, gameId);
+  // The invite is stamped with the season it is issued for: a manager's own (necessarily active)
+  // season, or for a staff admin the game's active season. Without one the invite could never be
+  // shown to or approved by a manager, so creation is refused.
+  const inviteSeason = managerSeason ?? (await getActiveSeasonForGame(gameId));
+  if (!inviteSeason) throw new Error(NO_ACTIVE_SEASON_ERROR);
 
   const { token, tokenHash } = await generateInviteToken();
   const days = expiresInDays && expiresInDays > 0 ? expiresInDays : 7;
@@ -134,6 +188,7 @@ export async function createPlayerInvite(
     .values({
       schoolId,
       gameId,
+      seasonId: inviteSeason.id,
       tokenHash,
       intendedFirstName: intendedFirstName.trim(),
       intendedLastName: intendedLastName.trim(),
@@ -201,11 +256,9 @@ export async function getSchoolInvites(
   if (gameId) {
     whereConditions.push(eq(schema.playerInvites.gameId, gameId));
   }
-  // Invites carry no season column, so a manager is limited to the games they currently manage
-  // (a season of that game matching their affiliation by name) rather than to a single season (spec-019 open gap).
-  if (scopes) {
-    whereConditions.push(inArray(schema.playerInvites.gameId, scopes.map((g) => g.gameId)));
-  }
+  // A manager sees only invites of their own season of each game (spec-045); staff see all.
+  const seasonCondition = inviteSeasonCondition(scopes);
+  if (seasonCondition) whereConditions.push(seasonCondition);
 
   const invites = await db
     .select({
@@ -269,9 +322,8 @@ export async function getPendingSubmissions(
   if (gameId) {
     whereConditions.push(eq(schema.playerInvites.gameId, gameId));
   }
-  if (scopes) {
-    whereConditions.push(inArray(schema.playerInvites.gameId, scopes.map((g) => g.gameId)));
-  }
+  const seasonCondition = inviteSeasonCondition(scopes);
+  if (seasonCondition) whereConditions.push(seasonCondition);
 
   const submittedInvites = await db
     .select({
@@ -425,11 +477,25 @@ export async function reviewPlayerInvite(
     throw new Error('Forbidden: This invite is not tied to a game in your season');
   }
 
+  // A manager reviews only invites of their own season (spec-045); a legacy invite with no season
+  // never matches. Staff admins review any invite.
+  if (!reviewContext.isStaffAdmin && (!managerSeason || invite.seasonId !== managerSeason.id)) {
+    throw new Error('Forbidden: This invite belongs to a different season than your manager affiliation and cannot be reviewed from the portal');
+  }
+
   let explicitTarget: Awaited<ReturnType<typeof assertManagerForRoster>> | null = null;
   if (rosterId) {
     explicitTarget = await assertManagerForRoster(rosterId);
     if (explicitTarget.team.schoolId !== invite.schoolId) {
       throw new Error('Target roster does not belong to authorized school');
+    }
+    // The invite is for one game and season; it may only be rostered in that same game and
+    // season (a seasonless legacy invite, reviewable by staff only, has no season to compare).
+    if (explicitTarget.team.gameId !== invite.gameId) {
+      throw new Error('Target roster is for a different game than the invite');
+    }
+    if (invite.seasonId && explicitTarget.team.seasonId !== invite.seasonId) {
+      throw new Error('Target roster belongs to a different season than the invite');
     }
   }
 
@@ -502,6 +568,12 @@ export async function reviewPlayerInvite(
     const playerName = member
       ? `${member.firstName} ${member.lastName}`
       : `${invite.intendedFirstName} ${invite.intendedLastName}`;
+
+    if (enrolling && member) {
+      const seasonName = await seasonNameOf(targetTeamId!, approvalSeason);
+      const ineligible = seasonIneligibility(member, playerName, seasonName);
+      if (ineligible) return reject(ineligible);
+    }
 
     // The invite is accepted and the student rostered in ONE transaction, so a refused
     // enrollment leaves the invite pending instead of accepted-but-unrostered.
@@ -1450,6 +1522,14 @@ export async function enrollPlayerToRoster(
   if (member.schoolId !== team.schoolId) {
     throw new Error('Member does not belong to the school managing this roster');
   }
+
+  // Season scope: the student must be eligible for the season this roster plays in.
+  const ineligible = seasonIneligibility(
+    member,
+    `${member.firstName} ${member.lastName}`,
+    await seasonNameOf(team.id, null)
+  );
+  if (ineligible) return reject(ineligible);
 
   // 3. Resolve IGN from Riot identity or draft if not passed
   let ign = customIgn?.trim();

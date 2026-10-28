@@ -444,10 +444,27 @@ export async function ensurePlayerSubmission(
     intendedFirstName: string;
     intendedLastName: string;
     tokenHash: string;
+    /** The manager's chosen season (`YYYY-YY`); the application belongs to that season of the game. */
+    seasonName: string;
   }
 ): Promise<boolean> {
+  // The application belongs to the manager's own season of the game (the one their affiliation
+  // names, which is what the portal resolves for them), else the game's active season. Without
+  // either it would never appear in the manager's queue, so it is stored seasonless only as a
+  // last resort.
+  const gameSeasons = await tx
+    .select({ id: schema.seasons.id, name: schema.seasons.name, isActive: schema.seasons.isActive })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.gameId, params.gameId));
+  const season =
+    gameSeasons.find((s) => s.name === params.seasonName) ?? gameSeasons.find((s) => s.isActive) ?? null;
+
   const existing = await tx
-    .select({ id: schema.playerInvites.id, status: schema.playerInvites.status })
+    .select({
+      id: schema.playerInvites.id,
+      status: schema.playerInvites.status,
+      seasonId: schema.playerInvites.seasonId,
+    })
     .from(schema.playerInvites)
     .where(
       and(
@@ -455,14 +472,24 @@ export async function ensurePlayerSubmission(
         eq(schema.playerInvites.schoolId, params.schoolId),
         eq(schema.playerInvites.gameId, params.gameId)
       )
+    );
+  // A live application only blocks a new one in the same season: a student re-applies each season.
+  if (
+    existing.some(
+      (row) =>
+        row.status !== 'rejected' &&
+        row.status !== 'expired' &&
+        (!season || row.seasonId === season.id)
     )
-    .limit(1);
-  if (existing.some((row) => row.status !== 'rejected' && row.status !== 'expired')) return false;
+  ) {
+    return false;
+  }
 
   const now = new Date();
   await tx.insert(schema.playerInvites).values({
     schoolId: params.schoolId,
     gameId: params.gameId,
+    seasonId: season?.id ?? null,
     tokenHash: params.tokenHash,
     intendedFirstName: params.intendedFirstName,
     intendedLastName: params.intendedLastName,
