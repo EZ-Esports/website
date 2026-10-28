@@ -10,6 +10,8 @@ interface DiscordStepProps {
   verified: { username: string; inGuild: boolean } | null;
   connecting: boolean;
   onConnect: () => void;
+  /** Ends the wait for the other tab (and closes it) so a stuck sign-in never traps the person. */
+  onCancel?: () => void;
   /** Offensive-content warnings and overrides for this step's fields. */
   contentFlags?: ContentFlagControls;
 }
@@ -18,6 +20,7 @@ export function DiscordStep({
   verified,
   connecting,
   onConnect,
+  onCancel,
   contentFlags,
 }: DiscordStepProps) {
   // aria-disabled keeps the button focusable (native `disabled` would drop keyboard focus), so the
@@ -60,8 +63,8 @@ export function DiscordStep({
           </div>
         </div>
 
-        {/* Always mounted so a screen reader announces the change when the banner appears. */}
-        <div role="status" aria-live="polite">
+        {/* Always mounted so a screen reader announces both the banner and the waiting text when they appear. */}
+        <div role="status" aria-live="polite" className="space-y-2">
           {verified?.inGuild && (
             <div className="flex items-start gap-3 p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10">
               <FiCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
@@ -80,7 +83,22 @@ export function DiscordStep({
               </div>
             </div>
           )}
+          {connecting && (
+            <p className="text-xs text-foreground-muted leading-relaxed">
+              Waiting for Discord in the other tab. When it says you are connected, come back here. If you do
+              not see it, check for a blocked pop-up.
+            </p>
+          )}
         </div>
+        {connecting && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-[44px] text-xs text-accent underline"
+          >
+            Cancel and stop waiting
+          </button>
+        )}
         {verified?.inGuild && <ContentFlagNotice field="discordUsername" controls={contentFlags} />}
 
         {!verified?.inGuild && (
@@ -91,11 +109,6 @@ export function DiscordStep({
               a new tab: when it says you are connected, come back to this tab. Everything you have
               entered here stays as it is.
             </p>
-            {connecting && (
-              <p role="status" className="text-xs text-foreground-muted leading-relaxed">
-                Waiting for Discord in the other tab. If you do not see it, check for a blocked pop-up.
-              </p>
-            )}
             <button
               type="button"
               onClick={handleConnect}

@@ -87,29 +87,64 @@ export default function PlayerOnboardingWizard({
     }
   }
 
-  // Cleanup for the in-flight Discord tab (listeners, timers); runs on finish and on unmount.
+  // The in-flight Discord tab: `stopWaitingRef` ends the wait (listeners, timers); the popup ref lets
+  // Cancel close the tab we opened. Both are cleaned up on unmount.
   const stopWaitingRef = useRef<(() => void) | null>(null);
+  const popupRef = useRef<Window | null>(null);
+  // Mirrors state so click handlers and timers see the latest values without stale closures.
+  const connectingRef = useRef(false);
+  const discordRef = useRef<VerifiedDiscordView | null>(discordProp);
+  useEffect(() => {
+    discordRef.current = discord;
+  }, [discord]);
   useEffect(() => () => stopWaitingRef.current?.(), []);
 
-  /** Asks the server what the signed cookie says; the cross-tab message is never the identity. */
-  const refreshDiscord = useCallback(async () => {
+  /**
+   * What the signed cookie says right now. `undefined` means the check itself failed (network),
+   * which callers treat as "unknown", never as "not connected". The cross-tab message is never the identity.
+   */
+  const fetchVerifiedDiscord = useCallback(async (): Promise<VerifiedDiscordView | null | undefined> => {
     try {
-      const verified = await getVerifiedDiscordForInvite(token);
-      setDiscord(verified);
-      return verified;
+      return await getVerifiedDiscordForInvite(token);
     } catch {
-      return null;
+      return undefined;
     }
   }, [token]);
+
+  /** Old behaviour: save the draft, then leave for Discord in this tab (the page unloads). */
+  function connectInThisTab(qs: URLSearchParams) {
+    void (async () => {
+      try {
+        await saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() });
+      } catch {
+        // Losing the draft is not worth blocking the connection; the student can re-enter steps.
+      }
+      window.location.assign(`/api/discord/start?${qs.toString()}`);
+    })();
+  }
+
+  function cancelDiscordWait() {
+    try {
+      popupRef.current?.close();
+    } catch {
+      // The tab may already be gone.
+    }
+    stopWaitingRef.current?.();
+  }
 
   /**
    * Opens Discord sign-in in a second tab so this tab keeps its step, fields, password and
    * overrides. `window.open` has to run synchronously inside the click for pop-up blockers; the
-   * draft save is fired without waiting. If the browser blocks the tab, falls back to the old
-   * same-tab redirect (saving first, since that navigation unloads the page).
+   * draft save is fired without waiting. A blocked tab (null, or already closed) falls back to the
+   * same-tab redirect.
+   *
+   * The tab is opened without `noopener` on purpose: the wizard needs the returned handle to detect a
+   * blocked pop-up and to poll `closed` when the person abandons the tab. The only page that could
+   * reach `window.opener` is Discord's own sign-in (and our callback page), both trusted origins, and
+   * nothing sensitive is reachable through it.
    */
   function handleConnectDiscord() {
-    if (discordConnecting) return;
+    if (connectingRef.current) return;
     draft.setErrorMessage(null);
     const qs = new URLSearchParams({
       token,
@@ -118,65 +153,97 @@ export default function PlayerOnboardingWizard({
     });
     const popup = window.open(`/api/discord/start?${qs.toString()}&popup=1`, '_blank');
 
-    if (!popup) {
-      setDiscordConnecting(true);
-      void (async () => {
-        try {
-          await saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() });
-        } catch {
-          // Losing the draft is not worth blocking the connection; the student can re-enter steps.
-        }
-        window.location.assign(`/api/discord/start?${qs.toString()}`);
-      })();
+    connectingRef.current = true;
+    setDiscordConnecting(true);
+    if (!popup || popup.closed) {
+      connectInThisTab(qs);
       return;
     }
-
-    setDiscordConnecting(true);
+    popupRef.current = popup;
     saveOnboardingDraft({ token, draftData: draft.buildCurrentPayload() }).catch(() => {});
 
     stopWaitingRef.current?.();
+    const identityAtStart = discordRef.current;
     let finished = false;
-    const timers: number[] = [];
+    let refreshing = false;
+    const intervals: number[] = [];
+
     const finish = () => {
       if (finished) return;
       finished = true;
+      connectingRef.current = false;
+      popupRef.current = null;
       stopWaitingRef.current = null;
       stopListening();
-      timers.forEach((t) => window.clearInterval(t));
+      intervals.forEach((t) => window.clearInterval(t));
+      window.clearTimeout(capTimer);
+      window.clearTimeout(blockedTimer);
       window.removeEventListener('focus', onFocus);
       setDiscordConnecting(false);
     };
+
+    // Some blockers hand back a window that is closed a moment later.
+    const blockedTimer = window.setTimeout(() => {
+      if (!finished && popup.closed) {
+        finish();
+        connectingRef.current = true;
+        setDiscordConnecting(true);
+        connectInThisTab(qs);
+      }
+    }, 0);
+
+    // The other tab finished and said so. Authoritative: re-read the server and show whatever it says.
     const onWake = async (message: { status: 'connected' | 'error'; error?: string }) => {
+      if (finished) return;
       finish();
-      const verified = await refreshDiscord();
+      const verified = await fetchVerifiedDiscord();
+      if (verified !== undefined) setDiscord(verified);
       if (message.status === 'error' || !verified?.inGuild) {
         draft.setErrorMessage(message.error ?? 'We could not confirm your Discord connection. Please try again.');
       }
     };
     const stopListening = listenDiscordResult(inviteData.inviteId, onWake);
-    // Safety nets when no message arrives (storage blocked, tab closed early): re-check the server
-    // when this tab regains focus or the other tab closes.
-    const recheck = async () => {
-      if (finished) return;
-      const verified = await refreshDiscord();
-      if (verified?.inGuild) finish();
-    };
-    const onFocus = () => void recheck();
-    window.addEventListener('focus', onFocus);
-    timers.push(
-      window.setInterval(() => {
-        if (popup.closed) {
-          void (async () => {
-            if (finished) return;
-            const verified = await refreshDiscord();
-            finish();
-            if (!verified?.inGuild) draft.setErrorMessage('Discord was not connected. Please try again.');
-          })();
+
+    // Safety net when no message arrives (storage blocked, message lost). One check at a time. While
+    // the tab is still open, only a *different* identity than the one shown at the start counts: the
+    // old cookie is expected until the new sign-in finishes, and must neither end the wait nor blank
+    // the identity on screen. Once the tab has closed, the server's answer is final.
+    const recheck = async (popupClosed: boolean) => {
+      if (finished || refreshing) return;
+      refreshing = true;
+      try {
+        const verified = await fetchVerifiedDiscord();
+        if (finished) return;
+        if (popupClosed) {
+          finish();
+          if (verified !== undefined) setDiscord(verified);
+          if (!verified?.inGuild) draft.setErrorMessage('Discord was not connected. Please try again.');
+          return;
         }
+        const changed =
+          verified &&
+          (!identityAtStart ||
+            verified.username !== identityAtStart.username ||
+            verified.inGuild !== identityAtStart.inGuild);
+        if (changed) {
+          finish();
+          setDiscord(verified);
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+    const onFocus = () => void recheck(Boolean(popup.closed));
+    window.addEventListener('focus', onFocus);
+    // Fast poll for "the tab was closed"; slow poll for a result whose message was lost.
+    intervals.push(
+      window.setInterval(() => {
+        if (popup.closed) void recheck(true);
       }, 800)
     );
-    // Give up waiting after ten minutes (the flow cookie lasts far less).
-    timers.push(window.setTimeout(finish, 10 * 60_000) as unknown as number);
+    intervals.push(window.setInterval(() => void recheck(Boolean(popup.closed)), 5000));
+    // Give up after ten minutes (the flow cookie lasts far less).
+    const capTimer = window.setTimeout(finish, 10 * 60_000);
     stopWaitingRef.current = finish;
   }
 
@@ -357,6 +424,7 @@ export default function PlayerOnboardingWizard({
             verified={discord}
             connecting={discordConnecting}
             onConnect={handleConnectDiscord}
+            onCancel={cancelDiscordWait}
           />
         )}
 

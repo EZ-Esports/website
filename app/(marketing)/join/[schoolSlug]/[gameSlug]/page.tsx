@@ -208,7 +208,7 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
 
   // A Discord sign-in started from the wizard's second tab ends here instead of re-rendering the
   // wizard, so the first tab keeps its fields and password. The outcome shown is the cookie's, not the URL's.
-  if (searchParams.popup) {
+  if (searchParams.popup === '1') {
     const connected = !errorCode && Boolean(verified?.inGuild);
     return (
       <DiscordPopupDone

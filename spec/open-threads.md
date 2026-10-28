@@ -192,3 +192,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Detector limits:** word lists are reasonable coverage, not an audit by native speakers; expect false positives to report (add to `INNOCENT_WORDS` or move the term to `word`) and misses. No profanity check on staff-typed invite names, portal free text, or emails.
 - **No roster filter / cross-school queue** for flagged info; only the per-row badge, the roster header count and the managers dialog badge. The review action records the reviewer's email but there is no un-review.
 - **`drizzle-kit generate` is still blocked** by the duplicate snapshot parent (above), so 0055 is hand-written like 0043-0054.
+
+## Discord second tab (spec-041)
+
+- **Unverified in real conditions:** real Discord OAuth, real browsers' pop-up blockers (Safari/iOS in particular), in-app webviews and embedded browsers (may not support `window.open` or `BroadcastChannel`; they rely on the same-tab fallback, the focus/5 s cookie re-check and the closed-tab poll), and real two-tab messaging. Tests are jsdom and mocks only; the UI was not checked in a browser.
+- `window.close()` from the finished tab only works for tabs the wizard opened; otherwise the person closes it from the on-screen instruction.
+- A callback with an expired or missing flow cookie shows a plain error page in the second tab and sends no message; the wizard tab recovers through Cancel, closing the tab, or the ten-minute cap.
