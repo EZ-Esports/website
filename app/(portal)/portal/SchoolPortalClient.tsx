@@ -20,6 +20,7 @@ import {
 import type { SchoolMatchItem } from '@/app/lib/school-matches';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
+import { rosterRemovalConfirmMessage } from '@/app/lib/roster-removal-copy';
 import { PortalHeader } from './components/PortalHeader';
 import { GameTabs, type GameItem } from './components/GameTabs';
 import { GenerateInviteCard } from './components/GenerateInviteCard';
@@ -347,27 +348,52 @@ export default function SchoolPortalClient({
     });
   };
 
-  const handleRemovePlayer = async (rosterId: string, playerId: string) => {
-    try {
-      await removePlayerFromRoster({ rosterId, playerId });
-      setRosters((prev) =>
-        prev.map((r) => {
-          if (r.id !== rosterId) return r;
-          return {
-            ...r,
-            players: r.players.filter((p) => p.id !== playerId),
-          };
-        })
-      );
-      setPlayerPool((prev) =>
-        prev.map((p) => ({
-          ...p,
-          enrolledRosters: p.enrolledRosters.filter((er) => er.rosterId !== rosterId),
-        }))
-      );
-    } catch (err: any) {
-      alert(`Failed to remove player: ${err.message}`);
-    }
+  // Removing only runs from the confirm dialog. Whether the student's own record also goes depends
+  // on the server (other roster, staff, match history), so the outcome sentence comes from it.
+  const playerRemoval = useConfirmAction<{ rosterId: string; playerId: string; memberId: string | null; playerName: string; rosterName: string }>(
+    async ({ rosterId, playerId, memberId }) => {
+      try {
+        const result = await removePlayerFromRoster({ rosterId, playerId });
+        setRosters((prev) =>
+          prev.map((r) => {
+            if (r.id !== rosterId) return r;
+            return {
+              ...r,
+              players: r.players.filter((p) => p.id !== playerId),
+            };
+          })
+        );
+        setPlayerPool((prev) =>
+          result.studentRecord === 'deleted'
+            ? prev.filter((p) => p.memberId !== memberId)
+            : prev.map((p) =>
+                p.memberId === memberId
+                  ? { ...p, enrolledRosters: p.enrolledRosters.filter((er) => er.rosterId !== rosterId) }
+                  : p
+              )
+        );
+        setRosterNotice({ kind: 'success', text: result.message });
+        return { success: true };
+      } catch (err: any) {
+        const text = `Failed to remove player: ${err?.message || 'unknown error'}`;
+        setRosterNotice({ kind: 'error', text });
+        return { success: false, error: text };
+      }
+    },
+    'Failed to remove player'
+  );
+
+  const handleRemovePlayer = (rosterId: string, playerId: string) => {
+    setRosterNotice(null);
+    const roster = rosters.find((r) => r.id === rosterId);
+    const player = roster?.players.find((p) => p.id === playerId);
+    playerRemoval.request({
+      rosterId,
+      playerId,
+      memberId: player?.memberId ?? null,
+      playerName: player?.playerName ?? 'This player',
+      rosterName: roster?.name ?? 'this roster',
+    });
   };
 
   const handleMovePlayer = async (fromRosterId: string, playerId: string, toRosterId: string) => {
@@ -642,6 +668,19 @@ export default function SchoolPortalClient({
       <InvitesHistoryTable
         invites={filteredInvites}
         onCopyLink={handleCopyLink}
+      />
+
+      <ConfirmActionDialog
+        {...playerRemoval.dialogProps}
+        appearance="portal"
+        tone="danger"
+        title="Remove player?"
+        message={rosterRemovalConfirmMessage(
+          playerRemoval.target?.playerName ?? 'This player',
+          playerRemoval.target?.rosterName ?? 'this roster',
+        )}
+        confirmLabel="Remove player"
+        pendingLabel="Removing…"
       />
 
       <ConfirmActionDialog

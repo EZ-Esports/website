@@ -34,6 +34,8 @@ const mocks = vi.hoisted(() => {
     playerIdentitiesStore: [] as any[],
     studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
+    /** Whether the stand-in removal helper reports the member record as deleted (else kept). */
+    removalDeletesMember: false,
   };
 
   function extractConditions(clause: any): Array<{ col: string; op: 'eq' | 'in' | 'isNull'; val?: any }> {
@@ -368,6 +370,22 @@ vi.mock('@/app/lib/cache', () => ({
     TEAMS: 'teams',
   },
   updateCacheTags: mocks.mockUpdateCacheTags,
+}));
+
+// The shared removal helper has its own suite (app/lib/db/__tests__/roster-removal.test.ts). Here it
+// is a stand-in that removes the player from the fake store, so these tests prove the manager
+// action's authorization, transaction, cache tags and notification around it.
+vi.mock('@/app/lib/db/roster-removal', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/lib/db/roster-removal')>()),
+  removePlayerFromRosterTx: vi.fn(async (_tx: unknown, input: { playerId: string; rosterId: string }) => {
+    const store = mocks.state.playersStore;
+    const i = store.findIndex((p: any) => p.id === input.playerId && p.rosterId === input.rosterId);
+    if (i < 0) return { removed: false };
+    const [row] = store.splice(i, 1);
+    return mocks.state.removalDeletesMember
+      ? { removed: true, memberId: row.memberId, studentRecord: 'deleted', deleted: { consents: 1, demographics: 1, identities: 1, invites: 1 } }
+      : { removed: true, memberId: row.memberId, studentRecord: 'kept', keptReason: 'other_roster' };
+  }),
 }));
 
 vi.mock('@/app/lib/onboarding/roster-membership-events', () => ({
@@ -1236,6 +1254,28 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
 
       const found = mocks.state.playersStore.find((p) => p.id === 'player-cap');
       expect(found).toBeUndefined();
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'teams');
+      expect(result.studentRecord).toBe('kept');
+      expect(result.message).toContain('Their student record was kept because they are still on another roster');
+    });
+
+    it('removePlayerFromRoster runs the shared cleanup in a transaction and reports a deleted student record', async () => {
+      const { removePlayerFromRosterTx } = await import('@/app/lib/db/roster-removal');
+      mocks.state.removalDeletesMember = true;
+      mocks.mockDb.transaction.mockClear();
+      const result = await removePlayerFromRoster({ rosterId, playerId: 'player-cap' });
+      expect(mocks.mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(removePlayerFromRosterTx).toHaveBeenLastCalledWith(expect.anything(), { playerId: 'player-cap', rosterId });
+      expect(result).toMatchObject({ success: true, studentRecord: 'deleted' });
+      expect(result.message).toContain('onboarding record was deleted');
+      // members joins the tags only because a member record was deleted
+      expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'members', 'teams');
+      mocks.state.removalDeletesMember = false;
+    });
+
+    it('removePlayerFromRoster for a missing row reports unchanged and refreshes nothing about members', async () => {
+      const result = await removePlayerFromRoster({ rosterId, playerId: 'no-such-player' });
+      expect(result).toMatchObject({ success: true, studentRecord: 'unchanged' });
       expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'players', 'teams');
     });
 

@@ -184,7 +184,7 @@ export default function LeagueSetupClient({
                 onDelete={() =>
                   confirmDelete(
                     'Delete game?',
-                    `Delete "${g.displayName}"? This will also delete all linked seasons (cascade). This is permanent.`,
+                    `Permanently delete "${g.displayName}"? This also deletes all of its seasons and, with them, every team, roster spot and standing in those seasons. A game with any matches cannot be deleted until those matches are removed. Students and schools are not deleted. This cannot be undone.`,
                     () => deleteGame(g.id),
                     'Game deleted.',
                   )
@@ -310,7 +310,7 @@ export default function LeagueSetupClient({
                       onDelete={() =>
                         confirmDelete(
                           'Delete season?',
-                          `Delete season "${s.name}"? Seasons with existing matches cannot be deleted until those matches are removed or reassigned. This is permanent.`,
+                          `Permanently delete season "${s.name}"? This also deletes its teams, rosters and standings. A season with matches cannot be deleted until those matches are removed. Students are not deleted. This cannot be undone.`,
                           () => deleteSeason(s.id),
                           'Season deleted.',
                         )

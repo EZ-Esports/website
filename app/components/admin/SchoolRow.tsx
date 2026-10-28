@@ -187,7 +187,7 @@ export default function SchoolRow({ school, games, canViewRosters = false }: Sch
           />
           <ConfirmDeleteButton
             action={() => deleteSchool(school.id)}
-            message={`Delete school "${school.name}"? This cannot be undone.`}
+            message={`Remove school "${school.name}"? It disappears from the site and the admin, and its logo and uploaded images are permanently deleted. Its teams, rosters and students stay in the database but can no longer be reached from here. This cannot be undone.`}
             label={`Delete school ${school.name}`}
           />
         </div>

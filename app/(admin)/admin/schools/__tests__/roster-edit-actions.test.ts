@@ -62,8 +62,21 @@ const mocks = vi.hoisted(() => ({
   /** Rows the deleteRoster pre-read of the roster's players returns. */
   rosterPlayers: [] as Array<{ memberId: string }>,
   notify: vi.fn(async (_ids: string[]) => {}),
+  /**
+   * What the shared removal helper reports. The helper's own decisions are tested in
+   * app/lib/db/__tests__/roster-removal.test.ts; here we prove the staff actions call it inside
+   * their transaction, with the school-scoped player's roster.
+   */
+  removal: { removed: true, memberId: 'member-ok', studentRecord: 'deleted', deleted: { consents: 0, demographics: 0, identities: 0, invites: 0 } } as Record<string, unknown>,
+  removePlayerFromRosterTx: vi.fn(),
+  cleanupOrphanMember: vi.fn(async (_tx: unknown, _input: unknown) => ({ studentRecord: 'kept', keptReason: 'other_roster' })),
 }));
 
+vi.mock('@/app/lib/db/roster-removal', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/lib/db/roster-removal')>()),
+  removePlayerFromRosterTx: mocks.removePlayerFromRosterTx,
+  cleanupOrphanMember: mocks.cleanupOrphanMember,
+}));
 vi.mock('@/app/lib/auth', () => ({ requirePermission: mocks.requirePermission }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath, updateTag: mocks.updateTag }));
 vi.mock('@/app/lib/db/roster-scope', () => ({
@@ -105,8 +118,9 @@ vi.mock('@/app/lib/db', () => {
           },
         };
       },
-      where: async () => {
+      where: () => {
         record(sink, { op, table });
+        return Object.assign(Promise.resolve(undefined), { returning: async () => [{ id: 'deleted' }] });
       },
     });
     return {
@@ -116,7 +130,7 @@ vi.mock('@/app/lib/db', () => {
           where: () =>
             table === schema.players
               ? Promise.resolve(mocks.rosterPlayers)
-              : Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow }),
+              : Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow, for: async () => [{ id: 'locked' }] }),
         }),
       }),
       insert: (table: unknown) => chain('insert', table),
@@ -145,6 +159,15 @@ vi.mock('@/app/lib/db', () => {
 import {
   createPlayer, createRoster, createTeam, deleteRoster, deleteRosterMember, moveRosterMember, updatePlayer, updateRoster,
 } from '../[schoolId]/rosters/actions';
+
+// The stand-in deletes the players row through the transaction it is given, so the write is staged
+// and committed (or rolled back) exactly like the real one.
+mocks.removePlayerFromRosterTx.mockImplementation(
+  async (tx: { delete: (t: unknown) => { where: (c?: unknown) => Promise<unknown> } }, _input: unknown) => {
+    await tx.delete(schema.players).where();
+    return mocks.removal;
+  },
+);
 
 const form = (o: Record<string, string>) => {
   const f = new FormData();
@@ -464,6 +487,75 @@ describe('deleteRoster: matches protection', () => {
     expect(res).toMatchObject({ success: false });
     expect(mocks.rosterInSchool).toHaveBeenCalledWith(OTHER_ROSTER, SCHOOL);
     expect(mocks.writes).toHaveLength(0);
+  });
+});
+
+describe('removing a player runs the shared orphan cleanup (spec-042)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.writes.length = 0;
+    mocks.matchCount = 0;
+    mocks.rosterPlayers = [];
+    mocks.requirePermission.mockImplementation(async () => ({}));
+    mocks.removal = { removed: true, memberId: 'member-ok', studentRecord: 'deleted', deleted: { consents: 0, demographics: 0, identities: 0, invites: 0 } };
+  });
+
+  it('deleteRosterMember calls the helper inside a transaction with the school-scoped player and roster', async () => {
+    const res = await deleteRosterMember(SCHOOL, 'player-ok');
+    expect(mocks.playerInSchool).toHaveBeenCalledWith('player-ok', SCHOOL);
+    expect(mocks.removePlayerFromRosterTx).toHaveBeenCalledTimes(1);
+    expect(mocks.removePlayerFromRosterTx).toHaveBeenCalledWith(expect.anything(), { playerId: 'player-ok', rosterId: 'roster-ok' });
+    // The helper's delete was staged in the transaction and committed with it.
+    expect(mocks.writes.filter((w) => w.op === 'delete')).toHaveLength(1);
+    expect(res).toMatchObject({ success: true, studentRecord: 'deleted' });
+    expect((res as { message: string }).message).toMatch(/onboarding record was deleted/);
+  });
+
+  it('refreshes rosters, players and members when the member went, and not members when kept', async () => {
+    await deleteRosterMember(SCHOOL, 'player-ok');
+    for (const tag of ['rosters', 'players', 'members']) expect(mocks.updateTag).toHaveBeenCalledWith(tag);
+    mocks.updateTag.mockClear();
+    mocks.removal = { removed: true, memberId: 'member-ok', studentRecord: 'kept', keptReason: 'match_history' };
+    const res = await deleteRosterMember(SCHOOL, 'player-ok');
+    expect(mocks.updateTag).toHaveBeenCalledWith('rosters');
+    expect(mocks.updateTag).toHaveBeenCalledWith('players');
+    expect(mocks.updateTag).not.toHaveBeenCalledWith('members');
+    expect(res).toMatchObject({ success: true, studentRecord: 'kept' });
+    expect((res as { message: string }).message).toContain('kept because they have match history');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/admin/schools/${SCHOOL}/rosters`);
+    expect(mocks.notify).toHaveBeenCalledWith(['member-ok']);
+  });
+
+  it('a player of another school is refused before the helper runs', async () => {
+    const res = await deleteRosterMember(SCHOOL, 'player-elsewhere');
+    expect(res).toMatchObject({ success: false });
+    expect(mocks.removePlayerFromRosterTx).not.toHaveBeenCalled();
+  });
+
+  it('a helper failure rolls the transaction back and reports an error without notifying', async () => {
+    mocks.removePlayerFromRosterTx.mockRejectedValueOnce(new Error('boom'));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await deleteRosterMember(SCHOOL, 'player-ok');
+    spy.mockRestore();
+    expect(res).toMatchObject({ success: false });
+    expect(mocks.notify).not.toHaveBeenCalled();
+    expect(mocks.updateTag).not.toHaveBeenCalled();
+  });
+
+  it('deleteRoster runs the cleanup for each distinct member after the roster delete, in the same transaction', async () => {
+    mocks.rosterPlayers = [{ memberId: 'm1' }, { memberId: 'm2' }, { memberId: 'm1' }];
+    await deleteRoster(SCHOOL, 'roster-ok');
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledTimes(2);
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm1', rosterId: 'roster-ok', teamId: 'team-ok', ign: null });
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm2', rosterId: 'roster-ok', teamId: 'team-ok', ign: null });
+    expect(mocks.updateTag).toHaveBeenCalledWith('members');
+  });
+
+  it('deleteRoster refused for matches never runs the cleanup', async () => {
+    mocks.matchCount = 1;
+    mocks.rosterPlayers = [{ memberId: 'm1' }];
+    await deleteRoster(SCHOOL, 'roster-ok');
+    expect(mocks.cleanupOrphanMember).not.toHaveBeenCalled();
   });
 });
 
