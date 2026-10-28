@@ -1,4 +1,4 @@
-# spec-043: Generate season (staff Matches page)
+# spec-045: Generate season (staff Matches page)
 
 - **Status:** Implemented on branch `feat/generate-season`; no migration; not run against any database.
 - **Date:** 2026-10-28

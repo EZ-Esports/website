@@ -1257,6 +1257,247 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(managerRow.userId).toBe(existingStaffUserId);
     });
 
+    describe('manager who also plays (issue #296)', () => {
+      beforeEach(() => {
+        stubSupabaseEnv();
+      });
+      const managerSub = (extra: Partial<PlayerOnboardingSubmission> = {}): PlayerOnboardingSubmission => ({
+        legalFirstName: 'Samuel',
+        legalLastName: 'Miller',
+        email: 'smiller@stuy.edu',
+        password: 'securePassword123!',
+        graduationYear: 2027,
+        riotId: 'CoachSam#NA1',
+        birthDate: '1988-08-20',
+        codeOfConductAccepted: true,
+        consent: { tosAcknowledged: true },
+        ...extra,
+      });
+      const playerSub = (): PlayerOnboardingSubmission => ({
+        legalFirstName: 'Samuel',
+        legalLastName: 'Miller',
+        email: 'smiller@stuy.edu',
+        graduationYear: 2027,
+        riotId: 'CoachSam#NA1',
+        birthDate: '1988-08-20',
+        codeOfConductAccepted: true,
+        consent: { tosAcknowledged: true },
+      });
+
+      it('manager-only onboarding is unchanged: no player submission is created', async () => {
+        const result = await submitOk({ token: managerToken, submission: managerSub() });
+        expect(result.role).toBe('manager');
+        expect(mocks.state.playerInvitesStore.filter((i) => i.memberId === result.memberId)).toHaveLength(0);
+        expect(mocks.state.schoolManagersStore).toHaveLength(1);
+      });
+
+      it('alsoPlays=false ignores any game ids the browser sent', async () => {
+        const result = await submitOk({
+          token: managerToken,
+          submission: managerSub({ alsoPlays: false, playGameIds: [gameId] }),
+        });
+        expect(mocks.state.playerInvitesStore.filter((i) => i.memberId === result.memberId)).toHaveLength(0);
+      });
+
+      it('creates one member with the manager role, one Discord identity and a submitted player application', async () => {
+        const result = await submitOk({
+          token: managerToken,
+          submission: managerSub({ alsoPlays: true, playGameIds: [gameId] }),
+        });
+        expect(mocks.state.membersStore.filter((m) => m.email === 'smiller@stuy.edu')).toHaveLength(1);
+        expect(mocks.state.schoolManagersStore).toHaveLength(1);
+        expect(mocks.state.schoolManagersStore[0].memberId).toBe(result.memberId);
+        expect(
+          mocks.state.playerIdentitiesStore.filter((i) => i.memberId === result.memberId && i.provider === 'discord')
+        ).toHaveLength(1);
+        expect(
+          mocks.state.playerIdentitiesStore.filter((i) => i.memberId === result.memberId && i.provider === 'riot')
+        ).toHaveLength(1);
+
+        // Goes through the normal review queue (reviewPlayerInvite enforces season scope and roster lock).
+        const submissions = mocks.state.playerInvitesStore.filter((i) => i.memberId === result.memberId);
+        expect(submissions).toHaveLength(1);
+        expect(submissions[0]).toMatchObject({ status: 'submitted', gameId, schoolId, invitedByUserId: 'staff-admin-id' });
+        expect(submissions[0].reviewedAt).toBeUndefined();
+        expect(mocks.state.managerInvitesStore.find((i) => i.id === 'manager-invite-1').status).toBe('accepted');
+      });
+
+      it('rejects alsoPlays without a valid game and writes nothing', async () => {
+        for (const playGameIds of [[], undefined, ['not-a-real-game']]) {
+          const result = await submitPlayerOnboarding({
+            token: managerToken,
+            submission: managerSub({ alsoPlays: true, playGameIds }),
+          });
+          expect(result).toMatchObject({ success: false, code: 'play_games_required' });
+        }
+        expect(mocks.state.membersStore).toHaveLength(0);
+        expect(mocks.state.schoolManagersStore).toHaveLength(0);
+        expect(authMock.createUser).not.toHaveBeenCalled();
+      });
+
+      it('still rejects a Discord account that belongs to a different member', async () => {
+        mocks.state.membersStore.push({ id: 'other-member', email: 'someone.else@nycstudents.net' });
+        mocks.state.playerIdentitiesStore.push({
+          id: 'ident-other',
+          memberId: 'other-member',
+          provider: 'discord',
+          providerUserId: '123456789012345678',
+          providerUsername: 'someone',
+          inGuild: true,
+        });
+        const result = await submitPlayerOnboarding({
+          token: managerToken,
+          submission: managerSub({ alsoPlays: true, playGameIds: [gameId] }),
+        });
+        expect(result).toMatchObject({ success: false, code: 'discord_already_linked' });
+        expect(mocks.state.schoolManagersStore).toHaveLength(0);
+        expect(mocks.state.playerInvitesStore.filter((i) => i.status === 'submitted')).toHaveLength(0);
+      });
+
+      it('an existing manager who later uses a player invite attaches to the same member', async () => {
+        const manager = await submitOk({ token: managerToken, submission: managerSub() });
+        const player = await submitOk({ token: rawToken, submission: playerSub() });
+        expect(player.memberId).toBe(manager.memberId);
+        expect(mocks.state.membersStore.filter((m) => m.email === 'smiller@stuy.edu')).toHaveLength(1);
+        expect(
+          mocks.state.playerIdentitiesStore.filter((i) => i.provider === 'discord' && i.memberId === manager.memberId)
+        ).toHaveLength(1);
+      });
+
+      it('a player who later becomes a manager attaches to the same member', async () => {
+        const player = await submitOk({ token: rawToken, submission: playerSub() });
+        const manager = await submitOk({ token: managerToken, submission: managerSub() });
+        expect(manager.memberId).toBe(player.memberId);
+        expect(mocks.state.membersStore.filter((m) => m.email === 'smiller@stuy.edu')).toHaveLength(1);
+        expect(mocks.state.schoolManagersStore[0].memberId).toBe(player.memberId);
+      });
+
+      it('does not duplicate a player application the member already has for that game', async () => {
+        const player = await submitOk({ token: rawToken, submission: playerSub() });
+        await submitOk({ token: managerToken, submission: managerSub({ alsoPlays: true, playGameIds: [gameId] }) });
+        expect(
+          mocks.state.playerInvitesStore.filter((i) => i.memberId === player.memberId && i.gameId === gameId)
+        ).toHaveLength(1);
+      });
+
+      it('reports how many applications were created versus already on file', async () => {
+        const first = await submitOk({
+          token: managerToken,
+          submission: managerSub({ alsoPlays: true, playGameIds: [gameId] }),
+        });
+        expect(first).toMatchObject({ playerApplicationsCreated: 1, playerApplicationsExisting: 0 });
+
+        // Re-run for the same person with a fresh manager invite: the live application is not filed again.
+        const token2 = 'manager_second_token_4242';
+        mocks.state.managerInvitesStore.push({
+          id: 'manager-invite-2',
+          schoolId,
+          tokenHash: crypto.createHash('sha256').update(token2).digest('hex'),
+          intendedFirstName: 'Sam',
+          intendedLastName: 'Miller',
+          invitedByUserId: 'staff-admin-id',
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+          submissionDraft: { email: 'smiller@stuy.edu', academicYear: '2026-27', managedGames: null },
+          memberId: null,
+        });
+        const second = await submitOk({
+          token: token2,
+          submission: managerSub({ alsoPlays: true, playGameIds: [gameId] }),
+        });
+        expect(second.memberId).toBe(first.memberId);
+        expect(second).toMatchObject({ playerApplicationsCreated: 0, playerApplicationsExisting: 1 });
+        expect(mocks.state.playerInvitesStore.filter((i) => i.memberId === first.memberId)).toHaveLength(1);
+      });
+
+      it('manager-only results carry no application counts', async () => {
+        const result = await submitOk({ token: managerToken, submission: managerSub() });
+        expect(result.playerApplicationsCreated).toBeUndefined();
+        expect(result.playerApplicationsExisting).toBeUndefined();
+      });
+
+      it('ignores alsoPlays on a player invite (no extra applications, no rejection)', async () => {
+        const result = await submitOk({
+          token: rawToken,
+          submission: { ...playerSub(), alsoPlays: true, playGameIds: ['not-a-real-game'] },
+        });
+        expect(result.role).toBe('player');
+        expect(mocks.state.playerInvitesStore.filter((i) => i.memberId === result.memberId)).toHaveLength(1);
+        expect(mocks.state.schoolManagersStore).toHaveLength(0);
+      });
+
+      describe('games limited by the invite (managedGames)', () => {
+        const lolId = 'game-lol-uuid';
+        beforeEach(() => {
+          mocks.state.gamesStore.push({ id: lolId, name: 'LoL', displayName: 'League of Legends', slug: 'league-of-legends' });
+          const invite = mocks.state.managerInvitesStore.find((i) => i.id === 'manager-invite-1');
+          invite.submissionDraft = { ...invite.submissionDraft, managedGames: ['valorant'] };
+        });
+
+        it('offers only the managed games', async () => {
+          const result = await validateInviteToken({ schoolSlug: 'stuyvesant', gameSlug: 'manager', token: managerToken });
+          expect(result.valid && result.playableGames?.map((g) => g.slug)).toEqual(['valorant']);
+        });
+
+        it('rejects a game outside the managed list and writes nothing', async () => {
+          const result = await submitPlayerOnboarding({
+            token: managerToken,
+            submission: managerSub({ alsoPlays: true, playGameIds: [lolId] }),
+          });
+          expect(result).toMatchObject({ success: false, code: 'play_games_required' });
+          expect(mocks.state.membersStore).toHaveLength(0);
+          expect(mocks.state.schoolManagersStore).toHaveLength(0);
+        });
+
+        it('rejects a mix of a managed and an unmanaged game', async () => {
+          const result = await submitPlayerOnboarding({
+            token: managerToken,
+            submission: managerSub({ alsoPlays: true, playGameIds: [gameId, lolId] }),
+          });
+          expect(result).toMatchObject({ success: false, code: 'play_games_required' });
+        });
+
+        it('accepts a managed game', async () => {
+          const result = await submitOk({
+            token: managerToken,
+            submission: managerSub({ alsoPlays: true, playGameIds: [gameId] }),
+          });
+          expect(mocks.state.playerInvitesStore.filter((i) => i.memberId === result.memberId)).toHaveLength(1);
+        });
+      });
+
+      it('exposes the playable games to a manager invite only', async () => {
+        const manager = await validateInviteToken({ schoolSlug: 'stuyvesant', gameSlug: 'manager', token: managerToken });
+        expect(manager.valid && manager.playableGames).toEqual([
+          expect.objectContaining({ id: gameId, slug: 'valorant' }),
+        ]);
+        const player = await validateInviteToken({ schoolSlug: 'stuyvesant', gameSlug: 'valorant', token: rawToken });
+        expect(player.valid && player.playableGames).toBeUndefined();
+      });
+
+      it('draft save keeps a manager choice (shape-checked) and drops it from player drafts', async () => {
+        await saveOnboardingDraft({
+          token: managerToken,
+          draftData: { alsoPlays: 'yes', playGameIds: [gameId, gameId, 42, { x: 1 }] },
+        });
+        let draft = mocks.state.managerInvitesStore.find((i) => i.id === 'manager-invite-1').submissionDraft;
+        expect(draft.alsoPlays).toBe(false);
+        expect(draft.playGameIds).toEqual([gameId]);
+        // Staff-seeded keys still cannot be set by the browser alongside the new fields.
+        await saveOnboardingDraft({
+          token: managerToken,
+          draftData: { alsoPlays: true, managedGames: ['x'], isPrimaryContact: false },
+        });
+        draft = mocks.state.managerInvitesStore.find((i) => i.id === 'manager-invite-1').submissionDraft;
+        expect(draft).toMatchObject({ alsoPlays: true, managedGames: null, isPrimaryContact: true });
+
+        await saveOnboardingDraft({ token: rawToken, draftData: { alsoPlays: true, playGameIds: [gameId] } });
+        const playerDraft = mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1').submissionDraft;
+        expect(playerDraft).not.toHaveProperty('alsoPlays');
+        expect(playerDraft).not.toHaveProperty('playGameIds');
+      });
+    });
+
     describe('verified Discord requirement (managers use the same OAuth gate as players)', () => {
       beforeEach(() => {
         stubSupabaseEnv();

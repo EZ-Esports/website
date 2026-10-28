@@ -7,6 +7,7 @@ export type OnboardingRejectionCode =
   | 'discord_not_in_guild'
   | 'discord_already_linked'
   | 'manager_password_required'
+  | 'play_games_required'
   | 'content_flagged'
   | 'field_too_long';
 

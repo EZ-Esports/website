@@ -226,7 +226,7 @@ export function DeleteRosterButton({ roster }: { roster: RosterViewRoster }) {
   return (
     <ConfirmDeleteButton
       label={`Delete roster ${roster.name}`}
-      message={`Permanently delete roster "${roster.name}"? This removes ${roster.players.length === 1 ? 'its 1 player' : `its ${roster.players.length} players`} from the roster. Any of them who is on no other roster has their student record (profile, onboarding answers, consent form, linked accounts, used invite) deleted too, unless they are staff, a school manager or have match history. This cannot be undone. A roster that has matches cannot be deleted.`}
+      message={`Delete roster "${roster.name}"? This will remove it permanently. This action cannot be undone.`}
       action={async () => {
         const res = await deleteRoster(schoolId, roster.id);
         if (res.success) notify('Roster deleted.');

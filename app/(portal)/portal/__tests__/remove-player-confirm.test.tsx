@@ -68,15 +68,14 @@ function setup() {
 const trigger = () => screen.getByRole('button', { name: 'Remove Ana Lee from Varsity' });
 
 describe('SchoolPortalClient: remove a player', () => {
-  it('asks first, in the app, and states exactly what is deleted and that it cannot be undone', async () => {
+  it('asks first, in the app, and says it is permanent and cannot be undone', async () => {
     const user = userEvent.setup();
     setup();
     await user.click(trigger());
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent('Remove Ana Lee from Varsity?');
-    expect(dialog).toHaveTextContent('permanently deletes their roster spot');
-    expect(dialog).toHaveTextContent('not on any other roster and have no match history');
-    expect(dialog).toHaveTextContent('This cannot be undone.');
+    expect(dialog).toHaveTextContent('This will remove them permanently.');
+    expect(dialog).toHaveTextContent('This action cannot be undone.');
     expect(actions.removePlayerFromRoster).not.toHaveBeenCalled();
   });
 

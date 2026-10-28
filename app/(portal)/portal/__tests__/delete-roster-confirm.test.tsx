@@ -80,7 +80,7 @@ describe('SchoolPortalClient: delete empty roster', () => {
     setup();
     await user.click(trigger());
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Are you sure you want to delete this empty roster?');
+    expect(dialog).toHaveTextContent('This will remove it permanently. This action cannot be undone.');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(actions.deleteSchoolRoster).not.toHaveBeenCalled();
