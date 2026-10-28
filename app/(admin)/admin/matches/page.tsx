@@ -1,4 +1,4 @@
-import { getCachedTeams, getCachedRosters, getCachedSeasons, getStaffSeasons, getCachedGames, getMatchesPage, getMatchTabCounts } from '@/app/lib/db/queries';
+import { getCachedTeams, getCachedRosters, getCachedSeasons, getStaffSeasons, getCachedGames, getCachedSchools, getMatchesPage, getMatchTabCounts } from '@/app/lib/db/queries';
 import AdminMatchExplorer from '@/app/components/admin/AdminMatchExplorer';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { defaultSortForTab, toMatchesPageDto, type MatchPageResponse, type MatchTabCounts } from '@/app/lib/db/match-page';
@@ -25,6 +25,7 @@ export default async function AdminMatchesPage({
   let activeSeasons: Awaited<ReturnType<typeof getCachedSeasons>> = [];
   let allSeasons: Awaited<ReturnType<typeof getStaffSeasons>> = [];
   let games: Awaited<ReturnType<typeof getCachedGames>> = [];
+  let schools: Awaited<ReturnType<typeof getCachedSchools>> = [];
   let initialPage: MatchPageResponse = { items: [], nextCursor: null };
   let initialCounts: MatchTabCounts | null = null;
   let initialFilters = { gameId: '', seasonId: '' };
@@ -41,13 +42,14 @@ export default async function AdminMatchesPage({
       gameId: initialFilters.gameId || undefined,
       seasonId: initialFilters.seasonId || undefined,
     };
-    const [firstPage, counts, teamsRes, rostersRes, activeSeasonsRes, queueRes] = await Promise.all([
+    const [firstPage, counts, teamsRes, rostersRes, activeSeasonsRes, schoolsRes, queueRes] = await Promise.all([
       // Raw staff read (spec-022): never the redacting public query.
       getMatchesPage({ ...facets, tab: initialTab, now, sort: defaultSortForTab(initialTab), limit: 25 }),
       getMatchTabCounts({ ...facets, now }),
       getCachedTeams(),
       getCachedRosters(),
       getCachedSeasons(),
+      getCachedSchools(),
       // Fail soft: a problem with the queue must not take the results page down with it.
       getStaffRescheduleQueue().catch((error) => {
         console.error('Failed to load reschedule requests', error);
@@ -55,6 +57,7 @@ export default async function AdminMatchesPage({
       }),
     ]);
     rescheduleQueue = queueRes;
+    schools = schoolsRes;
     initialPage = toMatchesPageDto(firstPage);
     initialCounts = counts;
     teams = teamsRes;
@@ -85,6 +88,7 @@ export default async function AdminMatchesPage({
       initialCounts={initialCounts}
       serverNow={now.toISOString()}
       back={matchesBackLink(rawParams.from, allSeasons.find((s) => s.id === initialFilters.seasonId)) ?? undefined}
+      generateSchools={schools.map((s) => ({ id: s.id, name: s.name }))}
       scheduleForm={{
         seasons: activeSeasons,
         // The form narrows its own roster shape; the cached query returns the full rows.

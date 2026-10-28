@@ -96,7 +96,7 @@ describe('staff status tabs and counts (spec-030)', () => {
     const GAME = '22222222-2222-4222-8222-222222222222';
     const res = await fetchStaffMatchTabCounts({
       gameId: GAME, seasonId: SEASON, division: 'JV', search: 'bronx', tab: 'completed', sort: 'asc',
-      cursor: { scheduledAt: '2026-10-01T00:00:00Z', id: SEASON },
+      cursor: { scheduledAt: '2026-10-01T00:00:00Z', home: 'Bronx Science', division: 'JV', id: SEASON },
     });
     expect(res).toEqual(counts);
     expect(mocks.getStaffForAdminSection).toHaveBeenLastCalledWith('/admin/matches');
@@ -126,5 +126,28 @@ describe('staff match reads stay raw with season and game filters (spec-022, spe
     const params = mocks.getMatchesPage.mock.calls.at(-1)![0];
     expect(params.gameId).toBeUndefined();
     expect(params.seasonId).toBeUndefined();
+  });
+});
+
+describe('match list cursor validation', () => {
+  const good = { scheduledAt: '2026-11-02T00:00:00.000Z', home: 'Bronx Science', division: 'JV', id: SEASON };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+  });
+
+  it('passes a complete cursor through', async () => {
+    await fetchStaffMatchesPage({ cursor: good });
+    expect(mocks.getMatchesPage.mock.calls[0][0].cursor).toEqual(good);
+  });
+
+  it('drops cursors with a missing home school, an unknown division or a bad id', async () => {
+    for (const bad of [{ ...good, home: undefined }, { ...good, division: 'Bogus' }, { ...good, id: 'x' }]) {
+      mocks.getMatchesPage.mockClear();
+      await fetchStaffMatchesPage({ cursor: bad as never });
+      expect(mocks.getMatchesPage.mock.calls[0][0].cursor).toBeNull();
+    }
   });
 });
