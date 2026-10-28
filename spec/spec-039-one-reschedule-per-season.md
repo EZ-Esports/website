@@ -15,6 +15,8 @@
 - A school at its allowance gets "Your school has already used its one reschedule for this season." from the request action, and the portal hides "Request reschedule".
 - The portal shows a callout per season above the Matches tabs: "<season>: Reschedules remaining 1 of 1" (green) or "0 of 1" (amber). The count follows the same per-requester rule as the server: a request by this school drops it to 0 and cancelling a request (which does not count) restores it. The per-row note was removed (it repeated under every eligible match).
 - A match moved by an approved request reads "Match rescheduled" in the Reschedule column (with "Moved from …"), not a request prompt or the allowance text.
+- A school at its allowance sees "No reschedules remaining this season." in the Reschedule column of its other eligible matches, in place of the request button.
+- Every proposed time must start at 7:00 PM America/New_York (`PROPOSED_START_TIME_ET`, checked in `validateProposedTimes`). The portal asks for dates only and appends 19:00 before submitting, so a schedule change moves the day, never the time of day. The matches themselves are not moved by the rule.
 
 ## Enforcement (race-safe, no migration)
 

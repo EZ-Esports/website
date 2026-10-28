@@ -9,6 +9,7 @@ import {
   MAX_PROPOSED_TIMES,
   MAX_REASON_LENGTH,
   MIN_PROPOSED_TIMES,
+  PROPOSED_START_TIME_ET,
   canCancelRequest,
   canOpponentRespond,
   canRequesterRespond,
@@ -102,7 +103,12 @@ function useRescheduleAction(onDone?: () => void) {
   return { pending, error, setError, run };
 }
 
-/** The 2 to 5 time pickers (Eastern Time) shared by a request and a counter-offer. */
+/** A proposal is a day: every match starts at 7:00 PM ET, so that time is added before parsing. */
+function toProposedTime(day: string): string {
+  return day ? `${day}T${PROPOSED_START_TIME_ET}` : '';
+}
+
+/** The 2 to 5 day pickers (every match starts at 7:00 PM ET) shared by a request and a counter-offer. */
 function ProposedTimesFields({
   times,
   setTimes,
@@ -114,13 +120,13 @@ function ProposedTimesFields({
 }) {
   return (
     <fieldset className="space-y-2">
-      <legend className="text-xs font-semibold text-zinc-300">Proposed times (Eastern Time, ET)</legend>
+      <legend className="text-xs font-semibold text-zinc-300">Proposed dates (matches start at 7:00 PM ET)</legend>
       <p className="text-[11px] text-zinc-500">{hint}</p>
       {times.map((value, index) => (
         <input
           key={index}
-          type="datetime-local"
-          aria-label={`Proposed time ${index + 1}`}
+          type="date"
+          aria-label={`Proposed date ${index + 1}`}
           value={value}
           onChange={(e) => setTimes(times.map((t, i) => (i === index ? e.target.value : t)))}
           required
@@ -155,12 +161,12 @@ function RequestDialog({ match, schoolId, now }: { match: SchoolMatchItem; schoo
     e.preventDefault();
     if (!reason.trim()) return setError('Explain why the match needs to move.');
     const problem = validateProposedTimes(
-      times.map((t) => parseEastern(t)),
+      times.map((t) => parseEastern(toProposedTime(t))),
       new Date(),
       new Date(match.scheduledAt)
     );
     if (problem) return setError(problem);
-    run(() => requestReschedule({ matchId: match.id, schoolId, reason, proposedTimes: times }));
+    run(() => requestReschedule({ matchId: match.id, schoolId, reason, proposedTimes: times.map(toProposedTime) }));
   };
 
   return (
@@ -242,16 +248,16 @@ function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: 
   const sendCounter = (e: React.FormEvent) => {
     e.preventDefault();
     const problem = validateProposedTimes(
-      times.map((t) => parseEastern(t)),
+      times.map((t) => parseEastern(toProposedTime(t))),
       new Date(),
       new Date(match.scheduledAt)
     );
     if (problem) return setError(problem);
     const offered = new Set(request.options.map((o) => new Date(o.proposedAt).getTime()));
-    if (times.some((t) => offered.has(parseEastern(t).getTime()))) {
-      return setError('One of those times was already proposed. Accept it instead.');
+    if (times.some((t) => offered.has(parseEastern(toProposedTime(t)).getTime()))) {
+      return setError('One of those dates was already proposed. Accept it instead.');
     }
-    run(() => counterReschedule({ requestId: request.id, schoolId, proposedTimes: times }));
+    run(() => counterReschedule({ requestId: request.id, schoolId, proposedTimes: times.map(toProposedTime) }));
   };
 
   return (
@@ -551,6 +557,12 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
       {!viewOnly && canRequestReschedule(match, now) && (
         <RequestDialog match={match} schoolId={schoolId} now={now} />
       )}
+      {!viewOnly &&
+        !match.rescheduledFrom &&
+        match.rescheduleAllowanceUsed &&
+        canRequestReschedule({ ...match, rescheduleAllowanceUsed: false }, now) && (
+          <div className="text-zinc-400">No reschedules remaining this season.</div>
+        )}
     </div>
   );
 }

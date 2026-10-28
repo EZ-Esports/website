@@ -13,6 +13,9 @@ export const LATE_REQUEST_WINDOW_MS = 72 * 60 * 60 * 1000;
 /** Proposed times must be at least this far apart so they are genuinely different options. */
 export const MIN_OPTION_GAP_MS = 60 * 60 * 1000;
 
+/** Every match starts at this Eastern wall-clock time, so a reschedule only changes the day. */
+export const PROPOSED_START_TIME_ET = '19:00';
+
 export const MIN_PROPOSED_TIMES = 2;
 export const MAX_PROPOSED_TIMES = 5;
 export const MAX_REASON_LENGTH = 500;
@@ -65,6 +68,19 @@ export function rescheduleAllowanceMessage(): string {
     : `Your school has already used its ${MAX_RESCHEDULE_REQUESTS_PER_SEASON} reschedules for this season.`;
 }
 
+/** True when `date` falls on PROPOSED_START_TIME_ET in America/New_York (EST or EDT). */
+export function isProposedStartTime(date: Date): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const hour = parts.find((p) => p.type === 'hour')?.value;
+  const minute = parts.find((p) => p.type === 'minute')?.value;
+  return `${hour}:${minute}` === PROPOSED_START_TIME_ET;
+}
+
 /** True when `now` is closer than 72 hours to the match's current start (equal is on time). */
 export function isLateRequest(matchScheduledAt: Date, now: Date): boolean {
   return matchScheduledAt.getTime() - now.getTime() < LATE_REQUEST_WINDOW_MS;
@@ -88,6 +104,9 @@ export function validateProposedTimes(
   }
   if (times.some((t) => Number.isNaN(t.getTime()))) {
     return 'One of the proposed times is not a valid date and time.';
+  }
+  if (times.some((t) => !isProposedStartTime(t))) {
+    return 'Every proposed match starts at 7:00 PM ET.';
   }
   if (times.some((t) => t.getTime() <= now.getTime())) {
     return 'Proposed times must be in the future.';

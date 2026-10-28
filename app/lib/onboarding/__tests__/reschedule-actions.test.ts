@@ -186,15 +186,21 @@ describe('requestReschedule', () => {
     expect((await requestReschedule(params)).error).toMatch(/not started/);
   });
 
-  it('enforces two proposed times at least an hour apart', async () => {
+  it('enforces two proposed times, all at 7:00 PM ET, and no duplicates', async () => {
     mocks.queue.push([match()]);
     expect((await requestReschedule({ ...params, proposedTimes: [PROPOSALS[0]] })).error).toMatch(/at least 2/);
     mocks.queue.push([match()]);
-    const tooClose = await requestReschedule({
+    const notSevenPm = await requestReschedule({
       ...params,
-      proposedTimes: ['2026-11-12T19:00', '2026-11-12T19:30'],
+      proposedTimes: ['2026-11-12T19:00', '2026-11-13T18:30'],
     });
-    expect(tooClose.error).toMatch(/one hour apart/);
+    expect(notSevenPm.error).toMatch(/7:00 PM ET/);
+    mocks.queue.push([match()]);
+    const duplicate = await requestReschedule({
+      ...params,
+      proposedTimes: ['2026-11-12T19:00', '2026-11-12T19:00'],
+    });
+    expect(duplicate.error).toMatch(/one hour apart/);
     expect(mocks.inserted).toEqual([]);
   });
 
@@ -333,8 +339,11 @@ describe('counterReschedule', () => {
     mocks.queue.push([request()], [match()]);
     expect((await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00'] })).error).toMatch(/at least 2/);
     mocks.queue.push([request()], [match()]);
-    const tooClose = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-14T19:30'] });
-    expect(tooClose.error).toMatch(/one hour apart/);
+    const duplicate = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-14T19:00'] });
+    expect(duplicate.error).toMatch(/one hour apart/);
+    mocks.queue.push([request()], [match()]);
+    const notSevenPm = await counterReschedule({ ...counter, proposedTimes: ['2026-11-14T19:00', '2026-11-15T20:00'] });
+    expect(notSevenPm.error).toMatch(/7:00 PM ET/);
   });
 
   it('tells the opponent to accept a time the requester already offered', async () => {

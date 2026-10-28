@@ -15,11 +15,15 @@ import {
   RESCHEDULE_STATUSES,
 } from '../reschedule-rules';
 import { canRequestReschedule } from '../school-matches';
+import { parseEastern } from '../dates';
 
 const NOW = new Date('2026-10-25T12:00:00.000Z');
 const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 const at = (hoursFromNow: number) => new Date(NOW.getTime() + hoursFromNow * HOUR);
-const MATCH_AT = at(24 * 10);
+/** 7:00 PM Eastern on the calendar day `days` after NOW: the only start time a proposal may use. */
+const sevenPm = (days: number) => parseEastern(`${new Date(NOW.getTime() + days * DAY).toISOString().slice(0, 10)}T19:00`);
+const MATCH_AT = sevenPm(10);
 
 describe('isLateRequest', () => {
   it('is on time at exactly 72 hours', () => {
@@ -36,44 +40,38 @@ describe('isLateRequest', () => {
 });
 
 describe('validateProposedTimes', () => {
-  it('accepts two future times an hour or more apart', () => {
-    expect(validateProposedTimes([at(100), at(101)], NOW, MATCH_AT)).toBeNull();
+  it('accepts two future 7:00 PM ET times on different days', () => {
+    expect(validateProposedTimes([sevenPm(2), sevenPm(3)], NOW, MATCH_AT)).toBeNull();
   });
 
   it('requires at least two times', () => {
-    expect(validateProposedTimes([at(100)], NOW, MATCH_AT)).toMatch(/at least 2/);
+    expect(validateProposedTimes([sevenPm(2)], NOW, MATCH_AT)).toMatch(/at least 2/);
     expect(validateProposedTimes([], NOW, MATCH_AT)).toMatch(/at least 2/);
   });
 
   it('allows at most five times', () => {
-    const six = [100, 102, 104, 106, 108, 110].map(at);
+    const six = [2, 3, 4, 5, 6, 7].map(sevenPm);
     expect(validateProposedTimes(six, NOW, MATCH_AT)).toMatch(/no more than 5/);
     expect(validateProposedTimes(six.slice(0, 5), NOW, MATCH_AT)).toBeNull();
   });
 
-  it('rejects two times under an hour apart, in any order', () => {
-    expect(validateProposedTimes([at(100), new Date(at(100).getTime() + HOUR - 1)], NOW, MATCH_AT)).toMatch(
-      /one hour apart/
-    );
-    expect(validateProposedTimes([at(102), at(100), at(100.5)], NOW, MATCH_AT)).toMatch(/one hour apart/);
+  it('requires every time to start at 7:00 PM ET', () => {
+    expect(validateProposedTimes([sevenPm(2), at(100)], NOW, MATCH_AT)).toMatch(/7:00 PM ET/);
+    const sevenThirty = parseEastern(`${sevenPm(3).toISOString().slice(0, 10)}T19:30`);
+    expect(validateProposedTimes([sevenPm(2), sevenThirty], NOW, MATCH_AT)).toMatch(/7:00 PM ET/);
   });
 
-  it('treats exactly an hour apart as acceptable', () => {
-    expect(validateProposedTimes([at(100), at(101)], NOW, MATCH_AT)).toBeNull();
+  it('rejects duplicate times, which are less than an hour apart', () => {
+    expect(validateProposedTimes([sevenPm(2), sevenPm(2)], NOW, MATCH_AT)).toMatch(/one hour apart/);
   });
 
-  it('rejects duplicates', () => {
-    expect(validateProposedTimes([at(100), at(100)], NOW, MATCH_AT)).toMatch(/one hour apart/);
-  });
-
-  it('rejects past times and the current time', () => {
-    expect(validateProposedTimes([at(-1), at(100)], NOW, MATCH_AT)).toMatch(/future/);
-    expect(validateProposedTimes([NOW, at(100)], NOW, MATCH_AT)).toMatch(/future/);
-    expect(validateProposedTimes([MATCH_AT, at(100)], NOW, MATCH_AT)).toMatch(/current time/);
+  it('rejects past times and the current match time', () => {
+    expect(validateProposedTimes([sevenPm(-1), sevenPm(3)], NOW, MATCH_AT)).toMatch(/future/);
+    expect(validateProposedTimes([MATCH_AT, sevenPm(3)], NOW, MATCH_AT)).toMatch(/current time/);
   });
 
   it('rejects an unparseable time', () => {
-    expect(validateProposedTimes([new Date(NaN), at(100)], NOW, MATCH_AT)).toMatch(/not a valid/);
+    expect(validateProposedTimes([new Date(NaN), sevenPm(3)], NOW, MATCH_AT)).toMatch(/not a valid/);
   });
 });
 
