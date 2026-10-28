@@ -30,7 +30,27 @@ function makeTx() {
     select: () => ({
       from: (table: unknown) => {
         const name = getTableName(table as never);
+        let locked = false;
         const run = () => {
+          // The keep-checks are ONE select (EXISTS subqueries) on `members` after the lock. The script
+          // stays per table: a table's rows make its flag true, a scripted failure for it throws.
+          if (name === 'members' && !locked) {
+            const flag = (...tables: string[]) => {
+              for (const t of tables) {
+                state.calls[t] = (state.calls[t] ?? 0) + 1;
+                if (state.fail[`select:${t}`]) throw state.fail[`select:${t}`];
+              }
+              return tables.some((t) => {
+                const s = state.selects[t];
+                return (typeof s === 'function' ? s(state.calls[t]) : (s ?? [])).length > 0;
+              });
+            };
+            state.log.push('select keep-checks');
+            return [{
+              otherRoster: flag('players'), staff: flag('staff_members'), schoolManager: flag('school_managers'),
+              managerInvite: flag('manager_invites'), leadership: flag('leadership'), people: flag('people'),
+            }];
+          }
           state.calls[name] = (state.calls[name] ?? 0) + 1;
           state.log.push(`select ${name}`);
           if (state.fail[`select:${name}`]) throw state.fail[`select:${name}`];
@@ -43,7 +63,7 @@ function makeTx() {
         for (const k of ['innerJoin', 'where', 'for', 'limit']) {
           chain[k] = (...args: unknown[]) => {
             void args;
-            if (k === 'for') state.log.push(`lock ${name}`);
+            if (k === 'for') { locked = true; state.log.push(`lock ${name}`); }
             return chain;
           };
         }
@@ -117,7 +137,7 @@ describe('removePlayerFromRosterTx: orphan', () => {
   it('locks the member row before it looks at any other table', async () => {
     await removePlayerFromRosterTx(makeTx(), { playerId: 'p1', rosterId: 'r1' });
     const lock = state.log.indexOf('lock members');
-    const firstCheck = state.log.indexOf('select players');
+    const firstCheck = state.log.indexOf('select keep-checks');
     expect(lock).toBeGreaterThan(-1);
     expect(lock).toBeLessThan(firstCheck);
   });

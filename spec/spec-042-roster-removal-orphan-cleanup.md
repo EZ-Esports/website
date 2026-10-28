@@ -2,8 +2,8 @@
 
 - **Spec ID:** spec-042
 - **Title:** Removing a player from a roster also deletes the student's onboarding record when nothing else needs it
-- **Status:** Implemented on branch `fix/roster-removal-orphan-cleanup` (not merged at the time of writing). No migration, no schema change. (Numbered 042 because 040 and 041 are taken by the unmerged PR #304.)
-- **PR / Commit:** pending
+- **Status:** Implemented on branch `fix/roster-removal-orphan-cleanup` (PR #305, not merged at the time of writing). No migration, no schema change. (Numbered 042 because 040 and 041 are taken by PR #304 and the Discord second-tab work; #304 is merged and its conflicts with this branch are resolved.)
+- **PR / Commit:** PR #305
 - **Date:** 2026-10-28
 - **Scope:** `app/lib/db/roster-removal.ts` (one shared helper), staff `deleteRosterMember` and `deleteRoster`, manager `removePlayerFromRoster`, the confirmation wording (`app/lib/roster-removal-copy.ts`), the manager portal's new remove confirmation, and a small wording audit of other delete buttons.
 
@@ -11,7 +11,7 @@
 
 Both removal paths used to delete only the `players` row. The student's `members` row and onboarding leftovers (invite, consent, identities, demographics) stayed behind, and those rows kept colliding with new onboarding (spent invites, a Discord id still bound to a person who is no longer on a roster, a member found by email with stale data). Owner's rule: "just delete their roster data, not all historical data from them. At this time there shouldn't be any [historical data] anyway."
 
-The request mentioned "onboarding content flags"; they do not exist in this repo (no table, no `app/lib/db/content-flags.ts`); nothing to clean there. The tolerant-of-missing-table pattern used here follows `app/lib/db/thumbnail-columns.ts` (42703) extended to 42P01.
+`onboarding_content_flags` (added by #304, spec-040) is covered: it is deleted with the member and counted in the result and the confirmation copy. Deleting the staff-reviewed flags along with an orphaned student is intended (owner decision, 2026-10-28). The tolerant-of-missing-table pattern used here follows `app/lib/db/thumbnail-columns.ts` (42703) extended to 42P01.
 
 ## Reference graph (from `app/lib/db/schema.ts` and `db/migrations/`)
 
@@ -23,6 +23,7 @@ Nothing has a foreign key to `players.id`; the only table that points at `player
 | `onboarding_consents` | `member_id` | cascade | Deleted explicitly (count reported). Onboarding leftover. |
 | `student_demographics` | `member_id` | cascade | Deleted explicitly. Onboarding leftover (PII). |
 | `player_identities` | `member_id` | cascade | Deleted explicitly. Frees the Discord/Riot id (`player_identities_provider_user_idx` is unique). Riot ids are first read to look for match history. |
+| `onboarding_content_flags` | `member_id` | cascade | Deleted explicitly (count reported). Staff-reviewed offensive-content records go with the orphan member by design; kept with a kept member. |
 | `player_invites` | `member_id` | set null | **Deleted**, not reset (see Invites). |
 | `manager_invites` | `member_id` | set null | Read only. Any row linked to the member, or (the table has no email column) one whose intended first and last name equal the member's at the same school, trimmed and case-insensitive = keep (`school_manager`). Never deleted here. |
 | `school_managers` | `member_id` | set null | Read only. Any row (active or not) = keep (`school_manager`). The table has no email or name column (only an Auth `user_id`), so there is nothing to match case-insensitively beyond the member link. |
@@ -53,6 +54,13 @@ Name matches are deliberately loose: a false positive keeps a record that could 
 - **Result shape.** Staff `deleteRosterMember` returns `{ success, studentRecord: 'deleted' | 'kept' | 'unchanged', message }`; the manager action returns the same (`RemovePlayerFromRosterResult`). `message` is the sentence from `removalNotice` ("... was removed from the roster. Their student record was kept because they have match history."). The UI shows it as the toast (staff) or the roster notice (portal). `unchanged` = the row was already gone.
 - **Cache tags.** `rosters` and `players` always; `members` only when a member was deleted (manager adds `teams` as before; staff roster delete keeps `rosters, players, teams, matches` and adds `members`). `refreshSchoolRosters`, the permission checks, `playerInSchool` school scoping and the post-commit `notifyRosterMembershipChanged` are unchanged.
 - **Portal player pool.** After a removal the manager's local pool drops the person entirely when the member was deleted, and otherwise drops only that person's enrolment on the roster (the old code stripped the roster from every pool entry).
+
+## Review follow-ups (2026-10-28)
+
+- **Staff roster delete is race-safe.** `deleteRoster` locks the roster row, reads its players, deletes the roster and cleans up the orphans in one transaction, so a player enrolled concurrently is either on the list or blocked by the lock.
+- **Keep-checks are one query.** `keepReason` reads `players`, `staff_members`, `school_managers`, `manager_invites`, `leadership` and `people` with a single SELECT of EXISTS subqueries (still fail closed, and no pipelined queries on the pooler). History reads stay in separate savepoints.
+- **Membership notification can name a deleted member.** The callers still notify after commit; the seam's contract now says a missing member means "no roster membership left".
+- **Team-wide history is accepted.** Any played match on a sibling roster keeps the record, so cleanup is conservative on established teams (owner: fine).
 
 ## Confirmations
 

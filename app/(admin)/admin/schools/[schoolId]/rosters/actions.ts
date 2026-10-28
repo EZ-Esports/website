@@ -201,29 +201,31 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
       };
     }
 
-    // Deleting a roster cascades to its players, so remember who was on it for the seam.
-    const affected = await db
-      .select({ memberId: schema.players.memberId, ign: schema.players.ign })
-      .from(schema.players)
-      .where(eq(schema.players.rosterId, rosterId));
-
-    // The NOT EXISTS guard closes the window where a match is created after the count above.
     // The roster has no matches, so a member left on no roster at all has no history to protect and
     // gets the same orphan cleanup as a single removal; members still elsewhere are untouched.
-    const memberIds = [...new Set(affected.map((p) => p.memberId))];
-    const ignOf = new Map(affected.map((p) => [p.memberId, p.ign ?? null]));
-    await db.transaction(async (tx) => {
+    // Locking the roster row first makes a concurrent enrol (its FK takes a key-share lock) wait, so
+    // the list of players read below is exactly what the delete cascades to.
+    const affected = await db.transaction(async (tx) => {
+      await tx.select({ id: schema.rosters.id }).from(schema.rosters)
+        .where(eq(schema.rosters.id, rosterId)).for('update');
+      const players = await tx
+        .select({ memberId: schema.players.memberId, ign: schema.players.ign })
+        .from(schema.players)
+        .where(eq(schema.players.rosterId, rosterId));
+      // The NOT EXISTS guard closes the window where a match is created after the count above.
       const removed = await tx.delete(schema.rosters).where(
         and(
           eq(schema.rosters.id, rosterId),
           sql`not exists (select 1 from ${schema.matches} where ${schema.matches.homeRosterId} = ${rosterId} or ${schema.matches.awayRosterId} = ${rosterId})`,
         ),
       ).returning({ id: schema.rosters.id });
-      if (removed.length === 0) return;
-      for (const memberId of memberIds) {
+      if (removed.length === 0) return players;
+      const ignOf = new Map(players.map((p) => [p.memberId, p.ign ?? null]));
+      for (const memberId of new Set(players.map((p) => p.memberId))) {
         // The roster row is gone, so its team is passed in to let the history check see its siblings.
         await cleanupOrphanMember(tx, { memberId, rosterId, teamId: target.teamId, ign: ignOf.get(memberId) ?? null });
       }
+      return players;
     });
     updateTag('rosters');
     updateTag('players');

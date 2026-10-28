@@ -7,7 +7,9 @@
  * It is a documented no-op today. A consumer plugs in here and receives the ids of the members
  * whose roster membership (enrolled, removed, moved, or role changed) may have changed. The
  * consumer is expected to re-derive the member's desired state from the database rather than
- * trust the call as a diff, and the call may arrive more than once for the same member.
+ * trust the call as a diff, and the call may arrive more than once for the same member. A removal
+ * can delete the member itself (spec-042), so an id may no longer exist: treat a missing member as
+ * "no roster membership left" (for example, remove its Discord roles), not as an error.
  *
  * Contract: this function never throws. Failures are logged (message only, no stack or member
  * data) and swallowed, because the roster change has already been committed.

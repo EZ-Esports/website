@@ -249,36 +249,28 @@ async function keepReason(
   const email = member.email ? norm(member.email) : null;
   const first = norm(member.firstName);
   const last = norm(member.lastName);
-  const exists = async (run: (t: DbOrTx) => Promise<unknown[]>) => (await run(tx)).length > 0;
-
-  if (await exists((t) => t.select({ id: schema.players.id }).from(schema.players)
-    .where(eq(schema.players.memberId, memberId)).limit(1))) return 'other_roster';
-
-  if (await exists((t) => t.select({ id: schema.staffMembers.userId }).from(schema.staffMembers)
-    .where(email
-      ? or(eq(schema.staffMembers.memberId, memberId), sql`lower(btrim(${schema.staffMembers.email})) = ${email}`)
-      : eq(schema.staffMembers.memberId, memberId)).limit(1))) return 'staff';
-
-  if (await exists((t) => t.select({ id: schema.schoolManagers.id }).from(schema.schoolManagers)
-    .where(eq(schema.schoolManagers.memberId, memberId)).limit(1))) return 'school_manager';
-  // manager_invites and school_managers have no email column, so a manager invite is matched by the
-  // member link or by the intended name at the member's own school (same-name is ambiguous: keep).
-  if (await exists((t) => t.select({ id: schema.managerInvites.id }).from(schema.managerInvites)
-    .where(or(
-      eq(schema.managerInvites.memberId, memberId),
-      and(
-        eq(schema.managerInvites.schoolId, member.schoolId),
-        sql`${normCol(schema.managerInvites.intendedFirstName)} = ${first}`,
-        sql`${normCol(schema.managerInvites.intendedLastName)} = ${last}`,
-      ),
-    )).limit(1))) return 'school_manager';
-
-  if (await exists((t) => t.select({ id: schema.leadership.id }).from(schema.leadership)
-    .where(eq(schema.leadership.memberId, memberId)).limit(1))) return 'profile';
-  if (await exists((t) => t.select({ id: schema.people.id }).from(schema.people)
-    .where(email
-      ? or(eq(schema.people.memberId, memberId), sql`lower(btrim(${schema.people.email})) = ${email}`)
-      : eq(schema.people.memberId, memberId)).limit(1))) return 'profile';
+  // One round trip for every cheap keep-check. Each flag is an EXISTS subquery, so any error (a
+  // missing table included) still propagates and keeps the member.
+  const [flags] = await tx.select({
+    otherRoster: sql<boolean>`exists (select 1 from ${schema.players} where ${schema.players.memberId} = ${memberId})`,
+    staff: sql<boolean>`exists (select 1 from ${schema.staffMembers} where ${schema.staffMembers.memberId} = ${memberId}${
+      email ? sql` or lower(btrim(${schema.staffMembers.email})) = ${email}` : sql``})`,
+    schoolManager: sql<boolean>`exists (select 1 from ${schema.schoolManagers} where ${schema.schoolManagers.memberId} = ${memberId})`,
+    // manager_invites and school_managers have no email column, so a manager invite is matched by the
+    // member link or by the intended name at the member's own school (same-name is ambiguous: keep).
+    managerInvite: sql<boolean>`exists (select 1 from ${schema.managerInvites} where ${schema.managerInvites.memberId} = ${memberId}
+      or (${schema.managerInvites.schoolId} = ${member.schoolId}
+        and ${normCol(schema.managerInvites.intendedFirstName)} = ${first}
+        and ${normCol(schema.managerInvites.intendedLastName)} = ${last}))`,
+    leadership: sql<boolean>`exists (select 1 from ${schema.leadership} where ${schema.leadership.memberId} = ${memberId})`,
+    people: sql<boolean>`exists (select 1 from ${schema.people} where ${schema.people.memberId} = ${memberId}${
+      email ? sql` or lower(btrim(${schema.people.email})) = ${email}` : sql``})`,
+  }).from(schema.members).where(eq(schema.members.id, memberId));
+  if (!flags) return 'cleanup_error';
+  if (flags.otherRoster) return 'other_roster';
+  if (flags.staff) return 'staff';
+  if (flags.schoolManager || flags.managerInvite) return 'school_manager';
+  if (flags.leadership || flags.people) return 'profile';
 
   if (member.memberKey) return 'archive_member';
 

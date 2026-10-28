@@ -130,7 +130,7 @@ vi.mock('@/app/lib/db', () => {
           where: () =>
             table === schema.players
               ? Promise.resolve(mocks.rosterPlayers)
-              : Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow }),
+              : Object.assign(Promise.resolve([{ n: mocks.matchCount }]), { limit: async () => mocks.seasonRow, for: async () => [{ id: 'locked' }] }),
         }),
       }),
       insert: (table: unknown) => chain('insert', table),
