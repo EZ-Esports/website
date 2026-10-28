@@ -69,23 +69,29 @@ function TeamStandingsTable({
    */
   if (!outcomesPublic) {
     // Rows arrive alphabetical and stat-free (see redactStandingRows); no rank
-    // or medal column, so nothing here implies an order of finish. The record
-    // reads 0-0 for every team rather than a number the redaction removed.
+    // or medal column, so nothing here implies an order of finish. Every stat
+    // column reads 0 (record 0-0, win % 0%) rather than a number the redaction removed.
     return (
       <Table>
         <thead className="bg-surface-sunken/60 border-b border-line">
           <tr>
+            <Th>Rank</Th>
             <Th>Team</Th>
             <Th>Record</Th>
+            <Th>Win Percentage</Th>
+            <Th>Games</Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((entry) => (
             <Tr key={`${entry.division}-${entry.schoolName}`} interactive>
+              <Td className="font-bold">0</Td>
               <Td className="font-bold text-foreground">
                 {standingsTeamLabel(entry, standingsFormat)}
               </Td>
               <Td className="font-medium">0-0</Td>
+              <Td className="font-bold text-foreground">0%</Td>
+              <Td className="font-medium">0</Td>
             </Tr>
           ))}
         </tbody>
@@ -132,17 +138,21 @@ function TeamStandingsTable({
 /** Individual (per-player) standings, e.g. TFT point leaderboards. */
 function PlayerStandingsTable({ rows, outcomesPublic }: { rows: StandingRow[]; outcomesPublic: boolean }) {
   if (!outcomesPublic) {
+    // Every stat column reads 0 for hidden seasons; no points are shown.
     return (
       <Table>
         <thead className="bg-surface-sunken/60 border-b border-line">
           <tr>
+            <Th>Rank</Th>
             <Th>Player</Th>
             <Th>School</Th>
+            <Th>Points</Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((entry) => (
             <Tr key={`${entry.schoolName}-${entry.playerName}`} interactive>
+              <Td className="font-bold">0</Td>
               <Td className="font-bold text-foreground">
                 {entry.playerName}
                 {entry.playerIgn && (
@@ -150,6 +160,7 @@ function PlayerStandingsTable({ rows, outcomesPublic }: { rows: StandingRow[]; o
                 )}
               </Td>
               <Td className="font-medium">{entry.schoolName}</Td>
+              <Td className="font-bold text-foreground">0</Td>
             </Tr>
           ))}
         </tbody>
