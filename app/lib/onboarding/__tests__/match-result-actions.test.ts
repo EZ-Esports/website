@@ -126,6 +126,7 @@ describe('submitMatchResult', () => {
   it('says a game is already counted when the unique index fires, and when the match was completed meanwhile', async () => {
     mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
     mocks.saveSeriesResult.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: '23505' }));
+    mocks.cancelPendingSubmission.mockClear();
     expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).error).toBe(
       'One of these games is already counted for another match.'
     );
@@ -186,10 +187,28 @@ describe('retryMatchResult', () => {
 
   it('closes the pending row when the retry is refused as invalid, so nothing is left stuck', async () => {
     mocks.getPendingSubmissionForMatch.mockResolvedValue({ riotMatchIds: [ID_1, ID_2], retryAfter: new Date(Date.now() - 1000) });
-    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game 1: not custom'] });
+    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game 1: not custom'], definitive: true });
     const result = await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
     expect(result).toMatchObject({ success: false, errors: ['Game 1: not custom'] });
     expect(mocks.cancelPendingSubmission).toHaveBeenCalledWith('m1');
+  });
+
+  it('keeps the pending row when the retry fails for a reason that is not definitive (rotated key, schema drift)', async () => {
+    mocks.getPendingSubmissionForMatch.mockResolvedValue({ riotMatchIds: [ID_1, ID_2], retryAfter: new Date(Date.now() - 1000) });
+    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game ...000001: not set up'], definitive: false });
+    const result = await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
+    expect(result).toMatchObject({ success: false, errors: ['Game ...000001: not set up'] });
+    expect(mocks.cancelPendingSubmission).not.toHaveBeenCalled();
+  });
+
+  it('closes the pending row when the save finds the match can no longer take a result (retry and fresh submit)', async () => {
+    mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
+    mocks.saveSeriesResult.mockResolvedValue(false);
+    mocks.getPendingSubmissionForMatch.mockResolvedValue({ riotMatchIds: [ID_1, ID_2], retryAfter: new Date(Date.now() - 1000) });
+    expect((await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' })).error).toBe('This match can no longer take a result.');
+    expect(mocks.cancelPendingSubmission).toHaveBeenCalledTimes(1);
+    expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).error).toBe('This match can no longer take a result.');
+    expect(mocks.cancelPendingSubmission).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the pending row when the retry is still rate limited', async () => {

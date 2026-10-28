@@ -157,9 +157,11 @@ async function submit(
   });
 
   if (outcome.status === 'invalid') {
-    if (options.closePendingOnInvalid) {
-      // The saved ids can never succeed as they are (a rejected game, not an outage), so leave no
-      // stuck "waiting" row behind; the manager sees the errors and submits corrected ids.
+    if (options.closePendingOnInvalid && outcome.definitive) {
+      // Every error is a definitive rejection (a rejected game, a missing match), so the saved ids
+      // can never succeed as they are: leave no stuck "waiting" row behind; the manager sees the
+      // errors and submits corrected ids. A misconfigured key or an unusable response is NOT
+      // definitive, so the row is kept and a rotated key never makes a manager re-paste IDs.
       await cancelPendingSubmission(match.id);
       revalidatePath('/portal');
     }
@@ -194,13 +196,21 @@ async function submit(
     saved = await saveSeriesResult({ matchId: match.id, series: outcome.series });
   } catch (error) {
     if (isUniqueViolation(error)) {
-      // The unique index on a game's id: another match claimed one of these games first.
+      // The unique index on a game's id: another match claimed one of these games first, so the
+      // saved ids cannot succeed; do not leave them waiting.
+      await cancelPendingSubmission(match.id);
       return { success: false, error: 'One of these games is already counted for another match.' };
     }
     console.error('Failed to save series result', error);
     return { success: false, error: 'Could not save the result. Please try again.' };
   }
-  if (!saved) return { success: false, error: 'This match can no longer take a result.' };
+  if (!saved) {
+    // The match was completed or cancelled meanwhile (for example staff entered a result), so a
+    // saved submission would wait forever: close it.
+    await cancelPendingSubmission(match.id);
+    revalidatePath('/portal');
+    return { success: false, error: 'This match can no longer take a result.' };
+  }
   revalidateResults();
 
   const own = schoolId === match.homeSchoolId ? 'home' : 'away';

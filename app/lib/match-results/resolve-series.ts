@@ -17,7 +17,18 @@ export interface GameRepository {
 
 export type ResolveOutcome =
   | { status: 'ok'; series: SeriesResult; games: NormalizedGame[] }
-  | { status: 'invalid'; errors: string[] }
+  | {
+      status: 'invalid';
+      errors: string[];
+      /**
+       * True when every error is a definitive rejection that re-asking cannot change (a roster,
+       * player-count, start-time, ended-early or not-custom refusal, a match that does not exist,
+       * a game already counted elsewhere). False when any error could stem from our side or the
+       * provider (a missing or rotated key, schema drift, a refused request), so a saved
+       * submission must be kept and retried later rather than discarded.
+       */
+      definitive: boolean;
+    }
   | { status: 'pending'; message: string; retryAfterSeconds: number | null; fetchedCount: number };
 
 /** The last characters of an id, enough for a manager to tell their pasted entries apart. */
@@ -45,12 +56,14 @@ export async function resolveSeries(params: {
     return {
       status: 'invalid',
       errors: taken.map((id) => `Game ${shortId(id)} is already counted for a different match.`),
+      definitive: true,
     };
   }
 
   const stored = await repo.findStored(matchIds);
   const games = new Map(stored);
   const errors: string[] = [];
+  let definitive = true;
   let pending: { message: string; retryAfterSeconds: number | null } | null = null;
 
   for (const id of matchIds) {
@@ -69,15 +82,17 @@ export async function resolveSeries(params: {
       break; // the remaining calls would be refused too
     }
     errors.push(`Game ${shortId(id)}: ${result.message}`);
+    // Only a missing match is definitive; a missing/rotated key or an unusable response is not.
+    if (result.kind !== 'not_found') definitive = false;
   }
 
-  if (errors.length > 0) return { status: 'invalid', errors };
+  if (errors.length > 0) return { status: 'invalid', errors, definitive };
   if (pending) {
     return { status: 'pending', ...pending, fetchedCount: games.size };
   }
 
   const ordered = matchIds.map((id) => games.get(id)!);
   const outcome = scoreSeries(ordered, rosters, scheduledAt);
-  if (!outcome.ok) return { status: 'invalid', errors: outcome.errors };
+  if (!outcome.ok) return { status: 'invalid', errors: outcome.errors, definitive: true };
   return { status: 'ok', series: outcome.series, games: ordered };
 }

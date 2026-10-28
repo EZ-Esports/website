@@ -92,6 +92,25 @@ describe('resolveSeries', () => {
     const out = await run(s, [uuid(1), uuid(2)]);
     expect(out).toMatchObject({ status: 'invalid' });
     expect(out.status === 'invalid' && out.errors[0]).toContain('gone');
+    expect(out.status === 'invalid' && out.definitive).toBe(true); // a missing match will not appear
+  });
+
+  it.each(['misconfigured', 'invalid_response'] as const)('marks a %s failure as not definitive so a saved submission survives', async (kind) => {
+    const s = setup({ fetch: () => ({ ok: false, kind, message: 'nope' }) });
+    const out = await run(s, [uuid(1), uuid(2)]);
+    expect(out).toMatchObject({ status: 'invalid', definitive: false });
+  });
+
+  it('is not definitive when any one error is not (a missing match plus a bad key)', async () => {
+    const s = setup({ fetch: (id) => (id === uuid(1) ? { ok: false, kind: 'not_found', message: 'gone' } : { ok: false, kind: 'misconfigured', message: 'key' }) });
+    expect(await run(s, [uuid(1), uuid(2)])).toMatchObject({ status: 'invalid', definitive: false });
+  });
+
+  it('marks scoring refusals and games counted elsewhere as definitive', async () => {
+    const taken = setup({ attached: { [uuid(1)]: 'other-league-match' } });
+    expect(await run(taken, [uuid(1), uuid(2)])).toMatchObject({ status: 'invalid', definitive: true });
+    const split = setup({ fetch: (id) => ({ ok: true, game: build(Number(id.slice(-1)), id === uuid(2) ? 'Blue' : 'Red') }) });
+    expect(await run(split, [uuid(1), uuid(2)])).toMatchObject({ status: 'invalid', definitive: true });
   });
 
   it('stores a fetched game even if the series is then refused, so it is not requested again', async () => {
