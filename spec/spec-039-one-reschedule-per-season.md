@@ -12,7 +12,9 @@
 - `MAX_RESCHEDULE_REQUESTS_PER_SEASON = 1` in `app/lib/reschedule-rules.ts` is the single source.
 - A school's count is its `match_reschedule_requests` rows with `requested_by_school_id` = that school, whose match is in the season, and whose status is not `cancelled`. Open, approved and declined requests all count; a request the requester cancelled does not.
 - Counter-offers and the opponent's accept or decline do not use the opponent's allowance. Staff edits do not count, and staff are not limited.
-- A school at its allowance gets "Your school has already used its one reschedule for this season." from the request action, and the portal hides "Request reschedule" with that note.
+- A school at its allowance gets "Your school has already used its one reschedule for this season." from the request action, and the portal hides "Request reschedule".
+- The portal shows one line per season above the Matches tabs: "<season>: your school has used its one reschedule for this season" or "… has one reschedule for this season, not yet used". The per-row note was removed (it repeated under every eligible match).
+- A match moved by an approved request reads "Match rescheduled" in the Reschedule column (with "Moved from …"), not a request prompt or the allowance text.
 
 ## Enforcement (race-safe, no migration)
 
