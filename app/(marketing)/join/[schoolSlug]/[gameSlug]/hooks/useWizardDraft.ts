@@ -269,6 +269,10 @@ export function useWizardDraft(
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email.trim() && !email.includes('@')) {
+      setErrorMessage('Your email address must include an @ symbol.');
+      return false;
+    }
     if (!email.trim() || !emailRegex.test(email.trim())) {
       setErrorMessage(
         isManager
