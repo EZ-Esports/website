@@ -8,6 +8,7 @@ import {
   HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2';
 import { isEligibleForSeason } from '@/app/lib/season-name';
+import { hasUnacceptedApplication } from '@/app/lib/onboarding/enroll-eligibility';
 import type {
   SchoolRosterDetails,
   SchoolPoolPlayer,
@@ -49,7 +50,11 @@ export function EnrollPlayerModal({
   if (!roster) return null;
 
   // Only students who can play in this roster's season are offered; the server refuses the rest.
-  const playerPool = schoolPool.filter((p) => isEligibleForSeason(p.graduationYear, roster.seasonName));
+  const playerPool = schoolPool.filter(
+    (p) =>
+      isEligibleForSeason(p.graduationYear, roster.seasonName) &&
+      !hasUnacceptedApplication(p.invites, roster.gameId, roster.seasonId)
+  );
   const hiddenCount = schoolPool.length - playerPool.length;
 
   return (
@@ -169,7 +174,7 @@ export function EnrollPlayerModal({
 
             {hiddenCount > 0 && (
               <p className="text-xs text-zinc-500 mt-1">
-                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: class year is before the {roster.seasonName} season. If a class year is wrong, ask a league admin to correct it.
+                {hiddenCount} {hiddenCount === 1 ? 'student is' : 'students are'} not listed: their class year is before the {roster.seasonName} season, or their application has not been accepted yet. Approve pending applications first; if a class year is wrong, ask a league admin to correct it.
               </p>
             )}
 

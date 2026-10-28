@@ -235,7 +235,14 @@ export default function SchoolPortalClient({
       // so the Enroll dialog offers them without a reload.
       if (sub?.memberId) {
         setPlayerPool((prev) => {
-          if (prev.some((p) => p.memberId === sub.memberId)) return prev;
+          if (prev.some((p) => p.memberId === sub.memberId)) {
+            // Mark this application accepted so the Enroll dialog now offers the student.
+            return prev.map((p) =>
+              p.memberId === sub.memberId
+                ? { ...p, invites: p.invites.map((i) => (i.id === inviteId ? { ...i, status: 'accepted' } : i)) }
+                : p
+            );
+          }
           const accepted: SchoolPoolPlayer = {
             memberId: sub.memberId!,
             firstName: sub.intendedFirstName,
@@ -246,6 +253,7 @@ export default function SchoolPortalClient({
             inGuild: true,
             riotVerified: true,
             graduationYear: null,
+            invites: [],
             enrolledRosters: [],
           };
           return [accepted, ...prev];

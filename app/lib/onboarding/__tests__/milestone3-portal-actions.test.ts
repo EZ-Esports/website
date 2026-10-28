@@ -2642,7 +2642,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           gameId: valGameId,
           seasonId: 'season-val-now',
           memberId: 'm-new',
-          status: 'submitted',
+          status: 'accepted',
           intendedFirstName: 'New',
           intendedLastName: 'Kid',
           submissionDraft: { ign: 'New#1' },
@@ -2958,6 +2958,66 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
           await expect(reviewPlayerInvite({ inviteId: id, action: 'approve' })).resolves.toMatchObject({ success: true, status: 'accepted' });
         }
         expect(mocks.state.playersStore).toHaveLength(0);
+      });
+    });
+
+    describe('enrolling is limited to students whose application is accepted (or who have none)', () => {
+      const NOT_ACCEPTED = /application that has not been accepted yet\. Approve it first\./;
+      const seed = (...invites: ReturnType<typeof mkInvite>[]) => {
+        mocks.state.playerInvitesStore = invites;
+      };
+      const enroll = () => enrollPlayerToRoster({ rosterId: 'r-now', memberId: 'm-kid' });
+      const pool = async () => (await getSchoolPlayerPool(schoolId)).find((p) => p.memberId === 'm-kid');
+
+      it.each(['submitted', 'pending', 'rejected'])('refuses a student whose application is %s, writing nothing', async (status) => {
+        seed(mkInvite('i1', 'season-val-now', { status }));
+        await expect(enroll()).resolves.toMatchObject({ success: false, error: expect.stringMatching(NOT_ACCEPTED) });
+        expect(mocks.state.playersStore).toHaveLength(0);
+      });
+
+      it('allows a student with an accepted application for this season', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'accepted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('allows a student with no application at all (returning or imported player)', async () => {
+        seed();
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('an accepted application for this season beats an older rejected or unreviewed one', async () => {
+        seed(
+          mkInvite('old-rej', 'season-val-past', { status: 'rejected' }),
+          mkInvite('old-sub', null, { status: 'submitted' }),
+          mkInvite('now-acc', 'season-val-now', { status: 'accepted' })
+        );
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('an unreviewed past-season or seasonless application still blocks, and an accepted one from another season does not rescue it', async () => {
+        seed(mkInvite('past', 'season-val-past', { status: 'submitted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+        seed(mkInvite('none', null, { status: 'submitted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+        seed(mkInvite('past-acc', 'season-val-past', { status: 'accepted' }), mkInvite('now-rej', 'season-val-now', { status: 'rejected' }));
+        await expect(enroll()).resolves.toMatchObject({ success: false });
+      });
+
+      it('applications for another game do not matter', async () => {
+        seed(mkInvite('lol', 'season-val-now', { status: 'rejected', gameId: lolGameId }));
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+      });
+
+      it('a staff admin is exempt and sees no application state in the pool', async () => {
+        makeAdmin();
+        seed(mkInvite('i1', 'season-val-now', { status: 'submitted' }));
+        await expect(enroll()).resolves.toMatchObject({ success: true });
+        expect((await pool())?.invites).toEqual([]);
+      });
+
+      it('the pool exposes only game, season and status per application to a manager', async () => {
+        seed(mkInvite('i1', 'season-val-now', { status: 'submitted' }));
+        expect((await pool())?.invites).toEqual([{ id: 'i1', gameId: valGameId, seasonId: 'season-val-now', status: 'submitted' }]);
       });
     });
 

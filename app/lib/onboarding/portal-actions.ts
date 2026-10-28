@@ -15,6 +15,7 @@ import {
   type AuthorizedGameScope,
 } from './manager-auth';
 import { isEligibleForSeason, notEligibleForSeasonError } from '@/app/lib/season-name';
+import { applicationNotAcceptedError, hasUnacceptedApplication, type EnrollmentInvite } from './enroll-eligibility';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } from './invite-expiry';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
@@ -1287,6 +1288,11 @@ export interface SchoolPoolPlayer {
   inGuild: boolean;
   riotVerified: boolean;
   graduationYear: number | null;
+  /**
+   * The student's applications (game, season, status only: no PII) so the Enroll dialog can hide
+   * students whose application is not accepted. Always empty for a staff admin, who is exempt.
+   */
+  invites: EnrollmentInvite[];
   enrolledRosters: Array<{
     rosterId: string;
     rosterName: string;
@@ -1358,6 +1364,10 @@ export async function getSchoolPlayerPool(
     .select({
       memberId: schema.playerInvites.memberId,
       draft: schema.playerInvites.submissionDraft,
+      id: schema.playerInvites.id,
+      gameId: schema.playerInvites.gameId,
+      seasonId: schema.playerInvites.seasonId,
+      status: schema.playerInvites.status,
     })
     .from(schema.playerInvites)
     .where(
@@ -1403,6 +1413,11 @@ export async function getSchoolPlayerPool(
       inGuild: discord?.inGuild ?? false,
       riotVerified: !!riot,
       graduationYear: m.graduationYear,
+      invites: scopes
+        ? invites
+            .filter((inv) => inv.memberId === m.id)
+            .map((inv) => ({ id: inv.id, gameId: inv.gameId, seasonId: inv.seasonId, status: inv.status }))
+        : [],
       enrolledRosters: memberRosters,
     };
   });
@@ -1438,7 +1453,7 @@ export async function enrollPlayerToRoster(
   }
 
   // 1. Manager authorization check
-  const { roster, team } = await assertManagerForRoster(rosterId);
+  const { context: managerContext, roster, team } = await assertManagerForRoster(rosterId);
 
   // 2. Tenancy check: Verify member belongs to this school
   const [member] = await db
@@ -1453,6 +1468,28 @@ export async function enrollPlayerToRoster(
 
   if (member.schoolId !== team.schoolId) {
     throw new Error('Member does not belong to the school managing this roster');
+  }
+
+  // Application state: a manager cannot enroll a student whose application is unreviewed,
+  // rejected or not accepted for this season (staff admins may override).
+  if (!managerContext.isStaffAdmin) {
+    const applications = await db
+      .select({
+        gameId: schema.playerInvites.gameId,
+        seasonId: schema.playerInvites.seasonId,
+        status: schema.playerInvites.status,
+      })
+      .from(schema.playerInvites)
+      .where(
+        and(
+          eq(schema.playerInvites.memberId, memberId),
+          eq(schema.playerInvites.schoolId, team.schoolId),
+          eq(schema.playerInvites.gameId, team.gameId)
+        )
+      );
+    if (hasUnacceptedApplication(applications, team.gameId, team.seasonId)) {
+      return reject(applicationNotAcceptedError(`${member.firstName} ${member.lastName}`));
+    }
   }
 
   // Season scope: the student must be eligible for the season this roster plays in.
