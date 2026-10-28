@@ -12,6 +12,10 @@ import * as schema from '../schema';
 import { removePlayerFromRosterTx, cleanupOrphanMember, type RosterRemovalResult } from '../roster-removal';
 import { applyMigrations } from '../../../../db/__tests__/helpers/pglite-migrations';
 
+// Every PGlite here replays all migrations (the suite's own plus the one in 'failure isolation'), which
+// outlasts the 15s default per-test timeout when the full suite runs in parallel under the pre-push hook.
+vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
+
 let client: PGlite;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 let world: { school: string; game: string; season: string; team: string; varsity: string; jv: string; other: string };
