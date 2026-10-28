@@ -29,6 +29,7 @@ export default function SchoolManagersModal({
 
   const {
     managers,
+    contentFlags,
     invites,
     registeredManagers,
     loading,
@@ -116,6 +117,7 @@ export default function SchoolManagersModal({
               <AdminTabPanel id="active">
                 <ActiveManagersTab
                   managers={managers}
+                  contentFlags={contentFlags}
                   loading={loading}
                   isRemovingId={isRemovingId}
                   onRemoveManager={handleRemoveManager}

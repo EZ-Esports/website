@@ -668,9 +668,10 @@ describe('schema audit', () => {
 
   it('every table with a foreign key to members is one this script knows about', () => {
     // A new FK to members must be classified (delete, keep or protect) before this passes.
+    // onboarding_content_flags is ON DELETE CASCADE: it goes with its member and needs no step of its own.
     expect(tablesReferencing('members')).toEqual(
       [
-        'leadership', 'manager_invites', 'onboarding_consents', 'people', 'player_identities',
+        'leadership', 'manager_invites', 'onboarding_consents', 'onboarding_content_flags', 'people', 'player_identities',
         'player_invites', 'players', 'school_managers', 'staff_members', 'student_demographics',
       ].sort()
     );

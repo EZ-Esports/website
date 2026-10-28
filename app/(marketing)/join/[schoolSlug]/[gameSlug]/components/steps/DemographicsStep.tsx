@@ -4,6 +4,9 @@ import { FiShield } from 'react-icons/fi';
 import { CAREER_INTEREST_OPTIONS, RACE_ETHNICITY_OPTIONS } from '../../types';
 import { MIN_BIRTH_DATE } from '@/app/lib/onboarding/consent';
 import { RequiredMark } from '../RequiredMark';
+import { ROUTES } from '@/app/lib/constants';
+import { ContentFlagNotice, contentFieldProps } from '../ContentFlagNotice';
+import type { ContentFlagControls } from '../../types';
 
 interface DemographicsStepProps {
   birthDate: string;
@@ -34,6 +37,8 @@ interface DemographicsStepProps {
   setFeedback: (val: string) => void;
   codeOfConductAccepted: boolean;
   setCodeOfConductAccepted: (val: boolean) => void;
+  /** Offensive-content warnings and overrides for this step's fields. */
+  contentFlags?: ContentFlagControls;
 }
 
 export function DemographicsStep({
@@ -65,6 +70,7 @@ export function DemographicsStep({
   setFeedback,
   codeOfConductAccepted,
   setCodeOfConductAccepted,
+  contentFlags,
 }: DemographicsStepProps) {
   return (
     <div className="space-y-6">
@@ -190,10 +196,12 @@ export function DemographicsStep({
               id="demo-country-of-birth"
               type="text"
               value={countryOfBirth}
+              {...contentFieldProps('countryOfBirth', contentFlags)}
               onChange={(e) => setCountryOfBirth(e.target.value)}
               placeholder="e.g. United States, Dominican Republic"
               className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            <ContentFlagNotice field="countryOfBirth" controls={contentFlags} />
           </div>
 
           <div>
@@ -207,10 +215,12 @@ export function DemographicsStep({
               id="demo-primary-language"
               type="text"
               value={primaryLanguageAtHome}
+              {...contentFieldProps('primaryLanguageAtHome', contentFlags)}
               onChange={(e) => setPrimaryLanguageAtHome(e.target.value)}
               placeholder="e.g. English, Spanish, Cantonese"
               className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            <ContentFlagNotice field="primaryLanguageAtHome" controls={contentFlags} />
           </div>
         </div>
 
@@ -411,11 +421,13 @@ export function DemographicsStep({
           <textarea
             id="demo-feedback"
             value={feedback}
+              {...contentFieldProps('feedback', contentFlags)}
             onChange={(e) => setFeedback(e.target.value)}
             rows={2}
             className="w-full px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder="Schedule constraints, accommodations, questions..."
           />
+            <ContentFlagNotice field="feedback" controls={contentFlags} />
         </div>
       </div>
 
@@ -431,6 +443,11 @@ export function DemographicsStep({
           />
           <span className="text-xs text-foreground leading-relaxed">
             <strong>Code of Conduct & Rules Agreement<RequiredMark />:</strong> I have read and agree to abide by the EZ Esports Rulebook, Code of Conduct, and Tournament Regulations. I understand that unsportsmanlike behavior, toxicity, or ringing will result in immediate disqualification.
+            I also understand that offensive or inappropriate names, usernames, Riot IDs, or other information I submit are prohibited under{' '}
+            <a href={`${ROUTES.rules}#submitted-information`} target="_blank" rel="noreferrer" className="text-accent underline">
+              Rule 3.4 of the league rules
+            </a>
+            , and that EZ Esports may change or reject any entry that breaks them.
           </span>
         </label>
       </div>

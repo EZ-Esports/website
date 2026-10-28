@@ -98,6 +98,11 @@ export interface PlayerOnboardingSubmission {
     [key: string]: any;
   };
   codeOfConductAccepted: boolean;
+  /**
+   * Fields the person confirmed are genuinely their information after being warned that they look
+   * offensive (see content-check.ts). Only honored for fields the server itself flags.
+   */
+  contentOverrides?: string[];
   /** Terms of Service acknowledgment and, for under-18s, the guardian authorization. Validated server-side. */
   consent: ConsentSubmission;
 }
@@ -126,6 +131,8 @@ export interface SubmitPlayerOnboardingFailure {
   success: false;
   code: OnboardingRejectionCode;
   error: string;
+  /** Flagged field keys when `code` is `content_flagged`. */
+  fields?: string[];
 }
 
 export type SubmitPlayerOnboardingOutcome =
@@ -374,7 +381,7 @@ export async function submitPlayerOnboarding(
     return await processOnboardingSubmission({ ...params, verifiedDiscord });
   } catch (err) {
     if (err instanceof OnboardingRejection) {
-      return { success: false, code: err.code, error: err.message };
+      return { success: false, code: err.code, error: err.message, ...(err.fields ? { fields: err.fields } : {}) };
     }
     throw err;
   }

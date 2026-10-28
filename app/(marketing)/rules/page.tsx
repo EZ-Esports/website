@@ -258,6 +258,28 @@ export default function RulesPage() {
                 occurring either on campus or within league competition.
               </p>
             </div>
+
+            <div id="submitted-information" className="space-y-3 scroll-mt-24">
+              <h3 className="text-lg font-bold text-foreground">3.4 Names, Usernames &amp; Submitted Information</h3>
+              <p>
+                Offensive, vulgar, hateful, or otherwise inappropriate content is prohibited in any name, username, in-game name, Riot ID,
+                Discord handle, or other information submitted to EZ Esports, including during onboarding, in any language and however it is
+                disguised (for example with substituted characters or spacing).
+              </p>
+              <ul className="list-disc pl-6 space-y-1.5 text-sm">
+                <li>
+                  Onboarding forms warn about entries that look offensive. A participant whose real information trips the warning may confirm it
+                  is genuine, and EZ Esports staff will review every confirmed entry.
+                </li>
+                <li>
+                  EZ Esports may change, hide, or reject any entry, and may require a participant to supply a different name or username, at
+                  staff&apos;s discretion. Confirming an entry does not guarantee it will be accepted.
+                </li>
+                <li>
+                  Knowingly submitting offensive information is a Section 3.2 violation and is handled under Section 5.
+                </li>
+              </ul>
+            </div>
           </section>
 
           {/* Section 4: Match Operations & Scheduling */}

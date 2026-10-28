@@ -6,6 +6,8 @@ import {
   formatConsentIntro,
 } from '@/app/lib/onboarding/consent';
 import { RequiredMark } from '../RequiredMark';
+import { ContentFlagNotice, contentFieldProps } from '../ContentFlagNotice';
+import type { ContentFlagControls } from '../../types';
 
 interface ConsentStepProps {
   /** Age computed from the date of birth entered in Step 4; null if none was entered. */
@@ -23,6 +25,8 @@ interface ConsentStepProps {
   setGuardianEmail: (val: string) => void;
   guardianSignature: string;
   setGuardianSignature: (val: string) => void;
+  /** Offensive-content warnings and overrides for this step's fields. */
+  contentFlags?: ContentFlagControls;
 }
 
 const inputClass =
@@ -55,6 +59,7 @@ export function ConsentStep({
   setGuardianEmail,
   guardianSignature,
   setGuardianSignature,
+  contentFlags,
 }: ConsentStepProps) {
   const termsLink = (
     <a
@@ -122,6 +127,7 @@ export function ConsentStep({
               </label>
               <input
                 id="consent-participant-name"
+                {...contentFieldProps('participantLegalName', contentFlags)}
                 type="text"
                 autoComplete="off"
                 value={participantLegalName}
@@ -129,6 +135,7 @@ export function ConsentStep({
                 className={inputClass}
                 required
               />
+              <ContentFlagNotice field="participantLegalName" controls={contentFlags} />
             </div>
           </section>
 
@@ -164,6 +171,7 @@ export function ConsentStep({
                 </label>
                 <input
                   id="consent-guardian-name"
+                {...contentFieldProps('guardianFullName', contentFlags)}
                   type="text"
                   autoComplete="off"
                   value={guardianFullName}
@@ -171,6 +179,7 @@ export function ConsentStep({
                   className={inputClass}
                   required
                 />
+              <ContentFlagNotice field="guardianFullName" controls={contentFlags} />
               </div>
               <div>
                 <label htmlFor="consent-guardian-relationship" className={labelClass}>
@@ -179,6 +188,7 @@ export function ConsentStep({
                 </label>
                 <input
                   id="consent-guardian-relationship"
+                {...contentFieldProps('guardianRelationship', contentFlags)}
                   type="text"
                   autoComplete="off"
                   value={guardianRelationship}
@@ -186,6 +196,7 @@ export function ConsentStep({
                   className={inputClass}
                   required
                 />
+              <ContentFlagNotice field="guardianRelationship" controls={contentFlags} />
               </div>
             </div>
             <div>
@@ -224,6 +235,7 @@ export function ConsentStep({
                 </label>
                 <input
                   id="consent-guardian-signature"
+                {...contentFieldProps('guardianSignature', contentFlags)}
                   type="text"
                   autoComplete="off"
                   value={guardianSignature}
@@ -231,6 +243,7 @@ export function ConsentStep({
                   className={inputClass}
                   required
                 />
+              <ContentFlagNotice field="guardianSignature" controls={contentFlags} />
               </div>
               <div>
                 <label htmlFor="consent-date" className={labelClass}>

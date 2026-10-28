@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => {
     schoolManagersStore: [] as any[],
     staffMembersStore: [] as any[],
     onboardingConsentsStore: [] as any[],
+    onboardingContentFlagsStore: [] as any[],
+    /** When set, inserting an onboarding_content_flags row throws it (simulates a missing table). */
+    flagsInsertError: null as any,
   };
 
   function extractConditions(clause: any): Array<{ col: string; op: 'eq' | 'in' | 'isNull'; val?: any }> {
@@ -92,6 +95,7 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.staffMembers) return state.staffMembersStore;
     if (tbl === schema.onboardingConsents) return state.onboardingConsentsStore;
+    if (tbl === schema.onboardingContentFlags) return state.onboardingContentFlagsStore;
     return null;
   }
 
@@ -180,6 +184,7 @@ const mocks = vi.hoisted(() => {
       const store = getStore(tbl);
       return {
         values: vi.fn((data: any) => {
+          if (tbl === schema.onboardingContentFlags && state.flagsInsertError) throw state.flagsInsertError;
           const record = {
             id: data.id || `gen-${Math.random().toString(36).substring(2, 9)}`,
             createdAt: new Date(),
@@ -1477,4 +1482,214 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       });
     });
   });
+
+  describe('7. Offensive-content screen and staff-review record', () => {
+    const baseSubmission = (): PlayerOnboardingSubmission => ({
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.chen@nycstudents.net',
+      graduationYear: 2027,
+      riotId: 'Demon1#LFT1',
+      birthDate: '2008-05-14',
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    });
+
+    async function submitRaw(submission: PlayerOnboardingSubmission, token = rawToken) {
+      return submitPlayerOnboarding({ token, submission });
+    }
+
+    beforeEach(() => {
+      mocks.state.onboardingContentFlagsStore = [];
+      mocks.state.flagsInsertError = null;
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('rejects an offensive name with no override and writes nothing', async () => {
+      const result = await submitRaw({ ...baseSubmission(), legalFirstName: 'Fuckface' });
+      expect(result).toMatchObject({ success: false, code: 'content_flagged', fields: ['legalFirstName'] });
+      expect(mocks.state.membersStore).toHaveLength(0);
+      expect(mocks.state.onboardingConsentsStore).toHaveLength(0);
+      expect(mocks.state.onboardingContentFlagsStore).toHaveLength(0);
+      expect(mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1').status).toBe('pending');
+    });
+
+    it('lists every flagged field, across the free-text fields', async () => {
+      const result = await submitRaw({
+        ...baseSubmission(),
+        riotId: 'ShitLord#NA1',
+        countryOfBirth: 'bullshit',
+        surveyDetails: { feedback: 'this is dumbass' },
+      });
+      expect(result).toMatchObject({ success: false, code: 'content_flagged' });
+      if (!result.success) expect(result.fields).toEqual(['riotId', 'countryOfBirth', 'feedback']);
+    });
+
+    it('rejects when only some flagged fields are overridden', async () => {
+      const result = await submitRaw({
+        ...baseSubmission(),
+        legalFirstName: 'Fuckface',
+        riotId: 'ShitLord#NA1',
+        contentOverrides: ['legalFirstName'],
+      });
+      expect(result).toMatchObject({ success: false, code: 'content_flagged', fields: ['riotId'] });
+      expect(mocks.state.membersStore).toHaveLength(0);
+    });
+
+    it('accepts an overridden field and records who overrode what, for staff', async () => {
+      const result = await submitRaw({
+        ...baseSubmission(),
+        riotId: 'ShitLord#NA1',
+        contentOverrides: ['riotId'],
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const rows = mocks.state.onboardingContentFlagsStore;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        memberId: result.memberId,
+        schoolId,
+        inviteKind: 'player',
+        inviteId: 'invite-pending-1',
+      });
+      expect(rows[0].flaggedFields).toEqual([
+        expect.objectContaining({ field: 'riotId', label: 'Riot ID', value: 'ShitLord#NA1', languages: ['english'] }),
+      ]);
+      expect(rows[0].flaggedFields[0].matchedTerms).toContain('shit');
+    });
+
+    it('writes no flag record when nothing was flagged, even if overrides are sent', async () => {
+      const result = await submitRaw({ ...baseSubmission(), contentOverrides: ['legalFirstName', 'riotId', 'bogus'] });
+      expect(result.success).toBe(true);
+      expect(mocks.state.onboardingContentFlagsStore).toHaveLength(0);
+    });
+
+    it('does not flag real names that merely contain a short bad word', async () => {
+      const result = await submitRaw({ ...baseSubmission(), legalFirstName: 'Dickson', legalLastName: 'Cockburn-Hancock' });
+      expect(result.success).toBe(true);
+      expect(mocks.state.onboardingContentFlagsStore).toHaveLength(0);
+    });
+
+    it('screens the verified Discord username too, and records its override', async () => {
+      discordSession.override = {
+        discordUserId: '123456789012345678',
+        discordUsername: 'xX_fuckboy_Xx',
+        inGuild: true,
+        inviteHash: tokenHash,
+      };
+      const blocked = await submitRaw(baseSubmission());
+      expect(blocked).toMatchObject({ success: false, code: 'content_flagged', fields: ['discordUsername'] });
+      const ok = await submitRaw({ ...baseSubmission(), contentOverrides: ['discordUsername'] });
+      expect(ok.success).toBe(true);
+      expect(mocks.state.onboardingContentFlagsStore[0].flaggedFields[0]).toMatchObject({ field: 'discordUsername' });
+    });
+
+    it('screens the guardian fields of a minor, and ignores leftover guardian text for an adult', async () => {
+      const minorBirth = new Date(Date.UTC(new Date().getUTCFullYear() - 15, 0, 1)).toISOString().slice(0, 10);
+      const guardian = {
+        tosAcknowledged: true,
+        participantLegalName: 'Riley Chen',
+        guardianFullName: 'Morgan Chen',
+        guardianRelationship: 'Parent',
+        guardianEmail: 'morgan@example.com',
+        guardianSignature: 'MC',
+      };
+      const minor = await submitRaw({
+        ...baseSubmission(),
+        birthDate: minorBirth,
+        consent: { ...guardian, guardianFullName: 'Fuck Chen' },
+      });
+      expect(minor).toMatchObject({ success: false, code: 'content_flagged', fields: ['guardianFullName'] });
+
+      const adult = await submitRaw({ ...baseSubmission(), consent: { tosAcknowledged: true, guardianFullName: 'Fuck Chen' } });
+      expect(adult.success).toBe(true);
+    });
+
+    it('asks once for a prefilled participant name, not twice', async () => {
+      const result = await submitRaw({
+        ...baseSubmission(),
+        legalLastName: 'Fucker',
+        consent: { tosAcknowledged: true, participantLegalName: 'Alex Fucker' },
+      });
+      expect(result).toMatchObject({ success: false, code: 'content_flagged', fields: ['legalLastName'] });
+    });
+
+    it('still completes onboarding, without the record, when migration 0055 is not applied yet', async () => {
+      const missing: any = new Error('relation "onboarding_content_flags" does not exist');
+      missing.code = '42P01';
+      mocks.state.flagsInsertError = missing;
+      const result = await submitRaw({ ...baseSubmission(), riotId: 'ShitLord#NA1', contentOverrides: ['riotId'] });
+      expect(result.success).toBe(true);
+      expect(mocks.state.membersStore).toHaveLength(1);
+      expect(mocks.state.onboardingContentFlagsStore).toHaveLength(0);
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('0055'));
+    });
+
+    it('does not swallow unrelated database errors while recording the override', async () => {
+      mocks.state.flagsInsertError = Object.assign(new Error('connection reset'), { code: '08006' });
+      await expect(
+        submitRaw({ ...baseSubmission(), riotId: 'ShitLord#NA1', contentOverrides: ['riotId'] })
+      ).rejects.toThrow('connection reset');
+    });
+
+    describe('school managers', () => {
+      const managerToken = 'manager_content_token_1';
+      const managerHash = crypto.createHash('sha256').update(managerToken).digest('hex');
+
+      beforeEach(() => {
+        mocks.state.managerInvitesStore.push({
+          id: 'manager-invite-9',
+          schoolId,
+          tokenHash: managerHash,
+          intendedFirstName: 'Sam',
+          intendedLastName: 'Miller',
+          invitedByUserId: 'staff-admin-id',
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+          submissionDraft: { email: 'smiller@stuy.edu', academicYear: '2026-27', managedGames: null, isPrimaryContact: false },
+          memberId: null,
+        });
+        discordSession.override = { discordUserId: '999', discordUsername: 'coach_sam', inGuild: true, inviteHash: managerHash };
+        vi.stubEnv('SUPABASE_SECRET_KEY', 'test-key');
+        vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
+        authMock.listUsers.mockResolvedValue({ data: { users: [] } });
+        authMock.createUser.mockResolvedValue({ data: { user: { id: 'auth-user-1' } }, error: null });
+      });
+
+      const managerSub = (): PlayerOnboardingSubmission => ({
+        ...baseSubmission(),
+        legalFirstName: 'Samuel',
+        legalLastName: 'Miller',
+        email: 'smiller@stuy.edu',
+        password: 'securePassword123!',
+        birthDate: '1988-08-20',
+        riotId: 'DumbassCoach#NA1',
+      });
+
+      it('applies the same screen and records kind=manager', async () => {
+        const blocked = await submitRaw(managerSub(), managerToken);
+        expect(blocked).toMatchObject({ success: false, code: 'content_flagged', fields: ['riotId'] });
+        expect(authMock.createUser).not.toHaveBeenCalled();
+
+        const ok = await submitRaw({ ...managerSub(), contentOverrides: ['riotId'] }, managerToken);
+        expect(ok.success).toBe(true);
+        expect(mocks.state.onboardingContentFlagsStore[0]).toMatchObject({
+          inviteKind: 'manager',
+          inviteId: 'manager-invite-9',
+        });
+      });
+
+      it('requires the code of conduct acknowledgement for managers as well as players', async () => {
+        await expect(
+          submitRaw({ ...managerSub(), riotId: 'CoachSam#NA1', codeOfConductAccepted: false }, managerToken)
+        ).rejects.toThrow(/code of conduct/i);
+        expect(mocks.state.membersStore).toHaveLength(0);
+      });
+    });
+  });
+
 });

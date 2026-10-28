@@ -68,6 +68,7 @@ export default function PlayerOnboardingWizard({
         ? [discordError, MANAGER_PASSWORD_REENTRY_NOTE].filter(Boolean).join(' ')
         : discordError,
     discordVerified,
+    discordUsername: discord?.username ?? null,
   });
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const { isManager } = draft;
@@ -148,6 +149,7 @@ export default function PlayerOnboardingWizard({
           },
           codeOfConductAccepted: draft.codeOfConductAccepted,
           consent: draft.buildConsent(),
+          contentOverrides: draft.contentOverrideKeys(),
         };
 
         const result = await submitPlayerOnboarding({
@@ -157,8 +159,10 @@ export default function PlayerOnboardingWizard({
 
         if (!result.success) {
           // Expected rejections: send the invitee to the step that fixes them rather than a dead end.
-          const target = stepForRejection(result.code);
-          if (target === 2) setDiscord(null);
+          const target = stepForRejection(result.code, result.fields);
+          // Only a Discord rejection means the connection itself is bad; a flagged Discord username
+          // keeps its connection so the person can override or switch accounts.
+          if (target === 2 && result.code !== 'content_flagged') setDiscord(null);
           setStep(target);
           draft.setErrorMessage(result.error);
           return;
@@ -255,6 +259,7 @@ export default function PlayerOnboardingWizard({
       <div className="bg-surface-elevated border border-border rounded-2xl p-6 sm:p-8 shadow-sm">
         {step === 1 && (
           <AccountInfoStep
+            contentFlags={draft.contentFlags}
             legalFirstName={draft.legalFirstName}
             setLegalFirstName={draft.setLegalFirstName}
             legalLastName={draft.legalLastName}
@@ -273,6 +278,7 @@ export default function PlayerOnboardingWizard({
 
         {step === 2 && (
           <DiscordStep
+            contentFlags={draft.contentFlags}
             verified={discord}
             connecting={discordConnecting}
             onConnect={handleConnectDiscord}
@@ -281,6 +287,7 @@ export default function PlayerOnboardingWizard({
 
         {step === 3 && (
           <GameIdentityStep
+            contentFlags={draft.contentFlags}
             riotId={draft.riotId}
             setRiotId={draft.setRiotId}
             ignConfirmed={draft.ignConfirmed}
@@ -294,6 +301,7 @@ export default function PlayerOnboardingWizard({
 
         {step === 4 && (
           <DemographicsStep
+            contentFlags={draft.contentFlags}
             birthDate={draft.birthDate}
             setBirthDate={draft.setBirthDate}
             gender={draft.gender}
@@ -327,6 +335,7 @@ export default function PlayerOnboardingWizard({
 
         {step === 5 && (
           <ConsentStep
+            contentFlags={draft.contentFlags}
             age={draft.age}
             isMinor={draft.isMinor}
             tosAcknowledged={draft.tosAcknowledged}

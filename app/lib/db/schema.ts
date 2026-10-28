@@ -1054,6 +1054,38 @@ export const onboardingConsents = pgTable('onboarding_consents', {
   ),
 ]).enableRLS();
 
+// One row per onboarding submission in which the person overrode an offensive-content warning
+// ("This is actually my real information"). It is a review queue for staff, not a log of every
+// warning: a submission with nothing overridden writes nothing. Kept out of `members` so the
+// roster and member queries never depend on it (it may be absent until its migration is applied).
+export interface StoredFlaggedField {
+  field: string;
+  label: string;
+  value: string;
+  matchedTerms: string[];
+  languages: string[];
+}
+
+export const onboardingContentFlags = pgTable('onboarding_content_flags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // The person who ticked the override: the member created or updated by the submission.
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'set null' }),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  flaggedFields: jsonb('flagged_fields').$type<StoredFlaggedField[]>().notNull(),
+  // Stamped by the server at submission.
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at'),
+  // Staff user id of whoever marked it reviewed.
+  reviewedBy: text('reviewed_by'),
+}, (t) => [
+  uniqueIndex('onboarding_content_flags_invite_idx').on(t.inviteKind, t.inviteId),
+  index('onboarding_content_flags_member_id_idx').on(t.memberId),
+  check('onboarding_content_flags_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
+]).enableRLS();
+
 export type SchoolManager = typeof schoolManagers.$inferSelect;
 export type NewSchoolManager = typeof schoolManagers.$inferInsert;
 export type PlayerInvite = typeof playerInvites.$inferSelect;
@@ -1066,4 +1098,6 @@ export type StudentDemographics = typeof studentDemographics.$inferSelect;
 export type NewStudentDemographics = typeof studentDemographics.$inferInsert;
 export type OnboardingConsent = typeof onboardingConsents.$inferSelect;
 export type NewOnboardingConsent = typeof onboardingConsents.$inferInsert;
+export type OnboardingContentFlag = typeof onboardingContentFlags.$inferSelect;
+export type NewOnboardingContentFlag = typeof onboardingContentFlags.$inferInsert;
 

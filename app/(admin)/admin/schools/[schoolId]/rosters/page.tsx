@@ -2,11 +2,12 @@ import { notFound } from 'next/navigation';
 import { getStaffWithPermission } from '@/app/lib/auth';
 import { ADMIN_ROSTER_VIEW_PERMISSION } from '@/app/lib/staff-access';
 import { getRosterEditOptions, getSchoolForRosterView, getSchoolRosterBlocks } from '@/app/lib/db/school-rosters';
-import { parseRosterFilters, type RosterEditOptions, type SeasonBlock } from '@/app/lib/school-roster-view';
+import { countUnreviewedContentFlags, parseRosterFilters, type RosterEditOptions, type SeasonBlock } from '@/app/lib/school-roster-view';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import SchoolRostersView from '@/app/components/admin/SchoolRostersView';
 import { AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
+import { chip, chipDot } from '@/app/components/admin/styles';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,6 +43,8 @@ export default async function SchoolRostersPage({ params, searchParams }: School
   }
   if (!dbError && !school) notFound();
 
+  const flaggedCount = countUnreviewedContentFlags(blocks);
+
   const filters = parseRosterFilters(
     (await searchParams) ?? {},
     blocks.map((b) => b.gameSlug),
@@ -54,6 +57,14 @@ export default async function SchoolRostersPage({ params, searchParams }: School
         title={school ? `${school.name} rosters` : 'School rosters'}
         description="Every roster this school has fielded, newest season first. Add, change and remove teams, rosters and players here; staff edits are not blocked by a season's roster lock."
         back={{ href: '/admin/schools', label: 'Schools & Rosters' }}
+        meta={
+          flaggedCount > 0 ? (
+            <span className={chip('warning')}>
+              <span aria-hidden className={chipDot} />
+              {flaggedCount} {flaggedCount === 1 ? 'player has' : 'players have'} flagged information to review
+            </span>
+          ) : undefined
+        }
       />
       {dbError || !school ? (
         <DbErrorNotice variant="error" />

@@ -3,12 +3,16 @@
 import { FiStar, FiTrash2 } from 'react-icons/fi';
 import ConfirmActionDialog from '../ConfirmActionDialog';
 import { useConfirmAction } from '../useConfirmAction';
+import ContentFlagBadge from '../ContentFlagBadge';
+import type { ContentFlagView } from '@/app/lib/db/content-flags';
 import type { ManagerItem } from './types';
 import { chip, deleteIconBtn } from '../styles';
 
 
 interface ActiveManagersTabProps {
   managers: ManagerItem[];
+  /** Onboarding content-flag overrides by member id; empty when none or not migrated yet. */
+  contentFlags?: Record<string, ContentFlagView>;
   loading: boolean;
   isRemovingId: string | null;
   onRemoveManager: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -17,6 +21,7 @@ interface ActiveManagersTabProps {
 
 export function ActiveManagersTab({
   managers,
+  contentFlags = {},
   loading,
   isRemovingId,
   onRemoveManager,
@@ -97,6 +102,9 @@ export function ActiveManagersTab({
                       ))
                     )}
                   </div>
+                  {m.memberId && contentFlags[m.memberId] && (
+                    <ContentFlagBadge flag={contentFlags[m.memberId]} who={displayName || displayEmail} />
+                  )}
                 </div>
 
                 <button

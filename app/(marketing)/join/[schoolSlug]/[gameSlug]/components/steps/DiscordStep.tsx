@@ -2,18 +2,23 @@
 
 import { FiCheck, FiClock, FiExternalLink } from 'react-icons/fi';
 import { SiDiscord } from 'react-icons/si';
+import { ContentFlagNotice } from '../ContentFlagNotice';
+import type { ContentFlagControls } from '../../types';
 
 interface DiscordStepProps {
   /** Server-verified identity from Discord OAuth. */
   verified: { username: string; inGuild: boolean } | null;
   connecting: boolean;
   onConnect: () => void;
+  /** Offensive-content warnings and overrides for this step's fields. */
+  contentFlags?: ContentFlagControls;
 }
 
 export function DiscordStep({
   verified,
   connecting,
   onConnect,
+  contentFlags,
 }: DiscordStepProps) {
   // aria-disabled keeps the button focusable (native `disabled` would drop keyboard focus), so the
   // handler itself ignores presses while a connection is already opening.
@@ -76,6 +81,7 @@ export function DiscordStep({
             </div>
           )}
         </div>
+        {verified?.inGuild && <ContentFlagNotice field="discordUsername" controls={contentFlags} />}
 
         {!verified?.inGuild && (
           <div className="space-y-3">
