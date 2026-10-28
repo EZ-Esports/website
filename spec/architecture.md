@@ -126,7 +126,7 @@ School managers are scoped by season, not just school and game (spec-019). Seaso
 
 ---
 
-## Roster removal and orphan cleanup (spec-040)
+## Roster removal and orphan cleanup (spec-042)
 
 `app/lib/db/roster-removal.ts` is the only place a roster spot is removed together with the student's own record. `removePlayerFromRosterTx(tx, ...)` deletes the `players` row, then `cleanupOrphanMember` locks the member (`FOR UPDATE`), checks the keep-reasons (other roster, staff, school manager or manager invite, leadership/people profile, gold-archive `member_key`, match-history evidence) and otherwise deletes consents, demographics, identities, player invites and the member. The cleanup runs in a savepoint: unexpected errors keep the member and still commit the roster removal; 42P01/42703 on an optional table counts as "no rows" (no migration needed). Nothing references `players.id`; history is inferred (see the spec). Callers keep their own permission, school scope, cache tags (`members` joins `rosters`/`players` only when a member was deleted) and the post-commit `notifyRosterMembershipChanged`.
 

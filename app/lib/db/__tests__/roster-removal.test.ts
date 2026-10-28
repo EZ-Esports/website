@@ -78,7 +78,9 @@ function makeTx() {
 }
 
 const MEMBER = { id: 'm1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', memberKey: null };
-const missing = (code: string) => Object.assign(new Error('relation missing'), { cause: { code } });
+// Drizzle wraps the driver error; Postgres' own message (with the quoted relation) is on `cause`.
+const missing = (code: string, table: string) =>
+  Object.assign(new Error('Failed query'), { cause: { code, message: `relation "${table}" does not exist` } });
 
 beforeEach(() => {
   state.log = [];
@@ -212,22 +214,38 @@ describe('removePlayerFromRosterTx: member is kept', () => {
 });
 
 describe('fail-closed and missing tables', () => {
-  it('a table missing from this database (42P01) is treated as empty and does not throw', async () => {
-    for (const t of ['match_games', 'season_standings', 'valorant_game_players', 'manager_invites', 'people']) {
-      state.fail[`select:${t}`] = missing('42P01');
+  it('a history table or delete target missing from this database (42P01 naming it) is treated as empty', async () => {
+    for (const t of ['match_games', 'season_standings', 'valorant_game_players']) {
+      state.fail[`select:${t}`] = missing('42P01', t);
     }
-    state.fail['delete:onboarding_consents'] = missing('42P01');
+    state.fail['delete:onboarding_consents'] = missing('42P01', 'onboarding_consents');
     state.selects.player_identities = [{ id: 'Ada#NA1' }];
     const result = await removePlayerFromRosterTx(makeTx(), { playerId: 'p1', rosterId: 'r1' });
     expect(result).toMatchObject({ removed: true, studentRecord: 'deleted', deleted: { consents: 0 } });
     expect(deletes()).toContain('delete members');
   });
 
-  it('a missing column (42703) is treated like a missing table', async () => {
-    state.fail['select:season_standings'] = missing('42703');
+  it('a missing column (42703) on an optional table is treated like a missing table', async () => {
+    state.fail['select:season_standings'] = missing('42703', 'season_standings');
     const result = await removePlayerFromRosterTx(makeTx(), { playerId: 'p1', rosterId: 'r1' });
     expect(result).toMatchObject({ studentRecord: 'deleted' });
   });
+
+  it('a missing table that is NOT the one being read does not count as "optional table absent"', async () => {
+    state.fail['select:season_standings'] = missing('42P01', 'some_other_table');
+    const result = await removePlayerFromRosterTx(makeTx(), { playerId: 'p1', rosterId: 'r1' });
+    expect(result).toMatchObject({ studentRecord: 'kept', keptReason: 'cleanup_error' });
+  });
+
+  it.each(['players', 'staff_members', 'school_managers', 'manager_invites', 'leadership', 'people', 'player_identities'])(
+    'keep-checks fail closed: %s missing keeps the member and deletes nothing else',
+    async (table) => {
+      state.fail[`select:${table}`] = missing('42P01', table);
+      const result = await removePlayerFromRosterTx(makeTx(), { playerId: 'p1', rosterId: 'r1' });
+      expect(result).toEqual({ removed: true, memberId: 'm1', studentRecord: 'kept', keptReason: 'cleanup_error' });
+      expect(deletes()).toEqual(['delete players']);
+    },
+  );
 
   it('any other error keeps the member, rolls the cleanup back and keeps the roster removal', async () => {
     state.fail['select:season_standings'] = Object.assign(new Error('deadlock'), { code: '40P01' });
@@ -235,7 +253,7 @@ describe('fail-closed and missing tables', () => {
     expect(result).toEqual({ removed: true, memberId: 'm1', studentRecord: 'kept', keptReason: 'cleanup_error' });
     expect(state.log).toContain('ROLLBACK SAVEPOINT');
     expect(deletes()).toEqual(['delete players']);
-    expect(String(vi.mocked(console.error).mock.calls[0]?.join(' '))).toContain('40P01');
+    expect(String(vi.mocked(console.error).mock.calls.at(-1)?.join(' '))).toContain('40P01');
   });
 
   it('a failure halfway through the deletes undoes the ones already done', async () => {
@@ -253,10 +271,11 @@ describe('fail-closed and missing tables', () => {
   });
 
   it('isMissingRelationError sees the Postgres code through drizzle\'s cause wrapper', () => {
-    expect(isMissingRelationError(missing('42P01'))).toBe(true);
-    expect(isMissingRelationError(missing('42703'))).toBe(true);
-    expect(isMissingRelationError(missing('23505'))).toBe(false);
-    expect(isMissingRelationError(new Error('x'))).toBe(false);
+    expect(isMissingRelationError(missing('42P01', 'match_games'), 'match_games')).toBe(true);
+    expect(isMissingRelationError(missing('42703', 'match_games'), 'match_games')).toBe(true);
+    expect(isMissingRelationError(missing('42P01', 'people'), 'match_games')).toBe(false);
+    expect(isMissingRelationError(missing('23505', 'match_games'), 'match_games')).toBe(false);
+    expect(isMissingRelationError(new Error('x'), 'match_games')).toBe(false);
   });
 });
 
@@ -322,7 +341,11 @@ describe('confirmation copy', () => {
   it('states exactly when the student record is deleted too, and what is kept', () => {
     expect(msg).toContain('not on any other roster and have no match history');
     expect(msg).toContain('student record is deleted too');
-    expect(msg).toContain('Staff, school managers and anyone with match history keep their student record');
+    for (const keeper of ['on another roster', 'a staff member', 'a school manager', 'leadership or people profile', 'in the league archive', 'have match history']) {
+      expect(msg).toContain(keeper);
+    }
+    expect(msg).toContain('signed consent form');
+    expect(msg).toContain('demographic answers');
   });
 
   it('says it cannot be undone and never claims the member stays in the list', () => {

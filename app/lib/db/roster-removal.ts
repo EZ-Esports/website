@@ -18,9 +18,11 @@ import { dbErrorChain } from '../text-utils';
  * recognised by what the roster played and by in-game identity (see `findHistory`).
  *
  * Everything is fail-closed. The player delete always sticks, but the member cleanup runs in its own
- * savepoint: any doubt or unexpected error rolls back the cleanup alone and keeps the member. A table
- * that does not exist in this database (42P01/42703) cannot hold references, so it is treated as empty
- * instead of failing the removal.
+ * savepoint: any doubt or unexpected error rolls back the cleanup alone and keeps the member. The
+ * keep-checks (who must be preserved) have no tolerance at all: a missing table there keeps the
+ * member. Only the delete counts and the match-history reads tolerate a missing table, and only
+ * when the error names that very table (42P01/42703), because a table that is not migrated yet
+ * holds nothing to delete and no history.
  *
  * The caller owns the transaction, the permission and school-scope checks, cache tags and the
  * post-commit notification.
@@ -73,29 +75,41 @@ export function removalNotice(result: RosterRemovalResult, studentName?: string)
 const UNDEFINED_TABLE = '42P01';
 const UNDEFINED_COLUMN = '42703';
 
-/** True for "relation/column does not exist": the schema in this database is behind the code. */
-export function isMissingRelationError(err: unknown): boolean {
+/**
+ * True for "relation/column does not exist" that NAMES `table` (in this error's own message or its
+ * cause chain). Scoping to the table keeps a missing unrelated table, or a typo in a column of a
+ * required table, from being mistaken for "this optional table has not been migrated yet".
+ */
+export function isMissingRelationError(err: unknown, table: string): boolean {
   return dbErrorChain(err).some((e) => {
-    const code = (e as { code?: unknown }).code;
-    return code === UNDEFINED_TABLE || code === UNDEFINED_COLUMN;
+    const { code, message } = e as { code?: unknown; message?: unknown };
+    if (code !== UNDEFINED_TABLE && code !== UNDEFINED_COLUMN) return false;
+    return typeof message === 'string' && message.includes(`"${table}"`);
   });
 }
 
 /**
  * Runs one query in its own savepoint. A failed statement aborts a Postgres transaction, so catching
  * the error is only safe if the statement ran in a nested transaction that rolls back by itself.
- * A missing table or column yields `whenMissing`; any other error propagates (and keeps the member).
+ * Used ONLY for the delete counts and the history reads, where a table that is not in this database
+ * yet cannot hold anything to delete or any history: `table` missing yields `whenMissing`. Every
+ * other error, and every error about any other table, propagates and keeps the member. The
+ * keep-checks (who must be preserved) never use it: they fail closed.
  */
-async function optional<T>(tx: DbOrTx, run: (t: DbOrTx) => Promise<T>, whenMissing: T): Promise<T> {
+async function optional<T>(tx: DbOrTx, table: string, run: (t: DbOrTx) => Promise<T>, whenMissing: T): Promise<T> {
   try {
     return await tx.transaction((t) => run(t as DbOrTx));
   } catch (err) {
-    if (isMissingRelationError(err)) return whenMissing;
+    if (isMissingRelationError(err, table)) return whenMissing;
     throw err;
   }
 }
 
-const lower = (s: string) => s.trim().toLowerCase();
+/** Trimmed, whitespace-collapsed, lower-cased. Both sides of every name comparison go through this. */
+const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+/** The same normalisation in SQL, for a column. */
+const normCol = (col: unknown) => sql`lower(regexp_replace(btrim(${col}), '[[:space:]]+', ' ', 'g'))`;
+const inList = (values: string[]) => sql.join(values.map((v) => sql`${v}`), sql`, `);
 
 interface MemberRow {
   id: string;
@@ -103,6 +117,7 @@ interface MemberRow {
   lastName: string;
   email: string | null;
   memberKey: string | null;
+  schoolId: string;
 }
 
 /** Locks the member row so a concurrent enrol (which takes a key-share lock via the FK) waits for us. */
@@ -114,6 +129,7 @@ async function lockMember(tx: DbOrTx, memberId: string): Promise<MemberRow | nul
       lastName: schema.members.lastName,
       email: schema.members.email,
       memberKey: schema.members.memberKey,
+      schoolId: schema.members.schoolId,
     })
     .from(schema.members)
     .where(eq(schema.members.id, memberId))
@@ -124,24 +140,37 @@ async function lockMember(tx: DbOrTx, memberId: string): Promise<MemberRow | nul
 
 /**
  * Is there any record that this student played? Nothing references `players.id`, so this looks at:
- * the removed roster's matches that have a result or are live/completed/forfeit; stored game data on
- * those matches; standings rows, match MVP text and stored Valorant scoreboards that name the
- * student's full name, in-game name or Riot id. Name matches are deliberately loose: a false match
- * only keeps a record that could have been deleted.
+ * the matches of the removed roster AND its sibling rosters (same team: a student can have played
+ * for Varsity and JV) that have a result or are live/completed/forfeit; stored game data on those
+ * matches; standings rows, match MVP text and stored Valorant scoreboards that name the student's
+ * full name, in-game name or Riot id. Names are compared trimmed, whitespace-collapsed and
+ * case-insensitively on both sides. Name matches are deliberately loose: a false match only keeps a
+ * record that could have been deleted.
+ *
+ * Each read tolerates only its own table being absent from this database (see `optional`).
  */
 async function findHistory(
   tx: DbOrTx,
-  input: { rosterId: string; member: MemberRow; ign: string | null; riotIds: string[] },
+  input: { rosterId: string; teamId: string | null; member: MemberRow; ign: string | null; riotIds: string[] },
 ): Promise<boolean> {
-  const { rosterId, member, ign, riotIds } = input;
-  const onRoster = or(eq(schema.matches.homeRosterId, rosterId), eq(schema.matches.awayRosterId, rosterId));
+  const { rosterId, teamId, member, ign, riotIds } = input;
 
-  const played = await optional(tx, async (t) => {
+  // Required table: if rosters cannot be read the member is kept (the error propagates).
+  const siblings = await tx
+    .select({ id: schema.rosters.id })
+    .from(schema.rosters)
+    .where(teamId
+      ? or(eq(schema.rosters.id, rosterId), eq(schema.rosters.teamId, teamId))
+      : or(eq(schema.rosters.id, rosterId), sql`${schema.rosters.teamId} = (select team_id from rosters where id = ${rosterId})`));
+  const rosterIds = [...new Set([rosterId, ...siblings.map((r) => r.id)])];
+  const onRosters = or(inArray(schema.matches.homeRosterId, rosterIds), inArray(schema.matches.awayRosterId, rosterIds));
+
+  const played = await optional(tx, 'matches', async (t) => {
     const rows = await t
       .select({ id: schema.matches.id })
       .from(schema.matches)
       .where(and(
-        onRoster,
+        onRosters,
         or(
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
@@ -153,103 +182,120 @@ async function findHistory(
   }, false);
   if (played) return true;
 
-  const hasGames = await optional(tx, async (t) => {
+  const hasGames = await optional(tx, 'match_games', async (t) => {
     const rows = await t
       .select({ id: schema.matchGames.id })
       .from(schema.matchGames)
       .innerJoin(schema.matches, eq(schema.matchGames.matchId, schema.matches.id))
-      .where(onRoster)
+      .where(onRosters)
       .limit(1);
     return rows.length > 0;
   }, false);
   if (hasGames) return true;
 
-  const fullName = lower(`${member.firstName} ${member.lastName}`);
-  const handles = [ign, ...riotIds].map((h) => (h ? lower(h) : '')).filter((h) => h.length > 0);
+  const fullName = norm(`${member.firstName} ${member.lastName}`);
+  const handles = [ign, ...riotIds].map((h) => (h ? norm(h) : '')).filter((h) => h.length > 0);
   const names = [fullName, ...handles];
 
-  const inStandings = await optional(tx, async (t) => {
+  const inStandings = await optional(tx, 'season_standings', async (t) => {
     const rows = await t
       .select({ id: schema.seasonStandings.id })
       .from(schema.seasonStandings)
       .where(or(
-        sql`lower(${schema.seasonStandings.playerName}) in (${sql.join(names.map((n) => sql`${n}`), sql`, `)})`,
-        sql`lower(${schema.seasonStandings.playerIgn}) in (${sql.join(handles.length ? handles.map((n) => sql`${n}`) : [sql`''`], sql`, `)})`,
+        sql`${normCol(schema.seasonStandings.playerName)} in (${inList(names)})`,
+        sql`${normCol(schema.seasonStandings.playerIgn)} in (${inList(handles.length ? handles : [''])})`,
       ))
       .limit(1);
     return rows.length > 0;
   }, false);
   if (inStandings) return true;
 
-  const mvp = await optional(tx, async (t) => {
+  const mvp = await optional(tx, 'matches', async (t) => {
     const rows = await t
       .select({ id: schema.matches.id })
       .from(schema.matches)
-      .where(or(...names.map((n) => sql`position(${n} in lower(${schema.matches.mvp})) > 0`)))
+      .where(or(...names.map((n) => sql`position(${n} in ${normCol(schema.matches.mvp)}) > 0`)))
       .limit(1);
     return rows.length > 0;
   }, false);
   if (mvp) return true;
 
   if (handles.length === 0) return false;
-  return optional(tx, async (t) => {
+  return optional(tx, 'valorant_game_players', async (t) => {
     const rows = await t
       .select({ id: schema.valorantGamePlayers.id })
       .from(schema.valorantGamePlayers)
       .where(or(
-        sql`lower(${schema.valorantGamePlayers.name} || '#' || ${schema.valorantGamePlayers.tag}) in (${sql.join(handles.map((n) => sql`${n}`), sql`, `)})`,
-        sql`lower(${schema.valorantGamePlayers.name}) in (${sql.join(handles.map((n) => sql`${n}`), sql`, `)})`,
+        // Name and tag are normalised separately, so padding around either does not break "name#tag".
+        sql`${normCol(schema.valorantGamePlayers.name)} || '#' || ${normCol(schema.valorantGamePlayers.tag)} in (${inList(handles)})`,
+        sql`${normCol(schema.valorantGamePlayers.name)} in (${inList(handles)})`,
       ))
       .limit(1);
     return rows.length > 0;
   }, false);
 }
 
-/** First reason this member must be kept, or null when it is an orphan. Cheapest checks first. */
+/**
+ * First reason this member must be kept, or null when it is an orphan. Cheapest checks first.
+ * FAIL CLOSED: none of these reads tolerates a missing table or column. Any error, including a
+ * 42P01, propagates to `cleanupOrphanMember`, which keeps the member (`cleanup_error`).
+ */
 async function keepReason(
   tx: DbOrTx,
-  input: { memberId: string; rosterId: string; ign: string | null; member: MemberRow },
+  input: { memberId: string; rosterId: string; teamId: string | null; ign: string | null; member: MemberRow },
 ): Promise<KeepReason | null> {
   const { memberId, member } = input;
-  const email = member.email ? lower(member.email) : null;
-  const exists = (run: (t: DbOrTx) => Promise<unknown[]>) => optional(tx, async (t) => (await run(t)).length > 0, false);
+  const email = member.email ? norm(member.email) : null;
+  const first = norm(member.firstName);
+  const last = norm(member.lastName);
+  const exists = async (run: (t: DbOrTx) => Promise<unknown[]>) => (await run(tx)).length > 0;
 
   if (await exists((t) => t.select({ id: schema.players.id }).from(schema.players)
     .where(eq(schema.players.memberId, memberId)).limit(1))) return 'other_roster';
 
   if (await exists((t) => t.select({ id: schema.staffMembers.userId }).from(schema.staffMembers)
     .where(email
-      ? or(eq(schema.staffMembers.memberId, memberId), sql`lower(${schema.staffMembers.email}) = ${email}`)
+      ? or(eq(schema.staffMembers.memberId, memberId), sql`lower(btrim(${schema.staffMembers.email})) = ${email}`)
       : eq(schema.staffMembers.memberId, memberId)).limit(1))) return 'staff';
 
   if (await exists((t) => t.select({ id: schema.schoolManagers.id }).from(schema.schoolManagers)
     .where(eq(schema.schoolManagers.memberId, memberId)).limit(1))) return 'school_manager';
+  // manager_invites and school_managers have no email column, so a manager invite is matched by the
+  // member link or by the intended name at the member's own school (same-name is ambiguous: keep).
   if (await exists((t) => t.select({ id: schema.managerInvites.id }).from(schema.managerInvites)
-    .where(eq(schema.managerInvites.memberId, memberId)).limit(1))) return 'school_manager';
+    .where(or(
+      eq(schema.managerInvites.memberId, memberId),
+      and(
+        eq(schema.managerInvites.schoolId, member.schoolId),
+        sql`${normCol(schema.managerInvites.intendedFirstName)} = ${first}`,
+        sql`${normCol(schema.managerInvites.intendedLastName)} = ${last}`,
+      ),
+    )).limit(1))) return 'school_manager';
 
   if (await exists((t) => t.select({ id: schema.leadership.id }).from(schema.leadership)
     .where(eq(schema.leadership.memberId, memberId)).limit(1))) return 'profile';
   if (await exists((t) => t.select({ id: schema.people.id }).from(schema.people)
     .where(email
-      ? or(eq(schema.people.memberId, memberId), sql`lower(${schema.people.email}) = ${email}`)
+      ? or(eq(schema.people.memberId, memberId), sql`lower(btrim(${schema.people.email})) = ${email}`)
       : eq(schema.people.memberId, memberId)).limit(1))) return 'profile';
 
   if (member.memberKey) return 'archive_member';
 
-  const riotRows = await optional(tx, (t) => t
+  const riotRows = await tx
     .select({ id: schema.playerIdentities.providerUserId })
     .from(schema.playerIdentities)
-    .where(and(eq(schema.playerIdentities.memberId, memberId), eq(schema.playerIdentities.provider, 'riot'))),
-  [] as Array<{ id: string }>);
-  if (await findHistory(tx, { rosterId: input.rosterId, member, ign: input.ign, riotIds: riotRows.map((r) => r.id) })) {
+    .where(and(eq(schema.playerIdentities.memberId, memberId), eq(schema.playerIdentities.provider, 'riot')));
+  if (await findHistory(tx, {
+    rosterId: input.rosterId, teamId: input.teamId, member, ign: input.ign, riotIds: riotRows.map((r) => r.id),
+  })) {
     return 'match_history';
   }
   return null;
 }
 
-/** Deletes one table's rows for the member; a table missing from this database counts as zero. */
-async function deleteCount(tx: DbOrTx, run: (t: DbOrTx) => Promise<unknown[]>): Promise<number> {
-  return optional(tx, async (t) => (await run(t)).length, 0);
+/** Deletes one table's rows for the member; the table being absent from this database counts as zero. */
+async function deleteCount(tx: DbOrTx, table: string, run: (t: DbOrTx) => Promise<unknown[]>): Promise<number> {
+  return optional(tx, table, async (t) => (await run(t)).length, 0);
 }
 
 /**
@@ -259,13 +305,13 @@ async function deleteCount(tx: DbOrTx, run: (t: DbOrTx) => Promise<unknown[]>): 
  * again; the member row goes last. `players` restricts the member delete, a final guard.
  */
 async function deleteMember(tx: DbOrTx, memberId: string): Promise<DeletedCounts> {
-  const consents = await deleteCount(tx, (t) => t.delete(schema.onboardingConsents)
+  const consents = await deleteCount(tx, 'onboarding_consents', (t) => t.delete(schema.onboardingConsents)
     .where(eq(schema.onboardingConsents.memberId, memberId)).returning({ id: schema.onboardingConsents.id }));
-  const demographics = await deleteCount(tx, (t) => t.delete(schema.studentDemographics)
+  const demographics = await deleteCount(tx, 'student_demographics', (t) => t.delete(schema.studentDemographics)
     .where(eq(schema.studentDemographics.memberId, memberId)).returning({ id: schema.studentDemographics.id }));
-  const identities = await deleteCount(tx, (t) => t.delete(schema.playerIdentities)
+  const identities = await deleteCount(tx, 'player_identities', (t) => t.delete(schema.playerIdentities)
     .where(eq(schema.playerIdentities.memberId, memberId)).returning({ id: schema.playerIdentities.id }));
-  const invites = await deleteCount(tx, (t) => t.delete(schema.playerInvites)
+  const invites = await deleteCount(tx, 'player_invites', (t) => t.delete(schema.playerInvites)
     .where(eq(schema.playerInvites.memberId, memberId)).returning({ id: schema.playerInvites.id }));
   const gone = await tx.delete(schema.members).where(eq(schema.members.id, memberId))
     .returning({ id: schema.members.id });
@@ -283,14 +329,14 @@ type CleanupOutcome =
  */
 export async function cleanupOrphanMember(
   tx: DbOrTx,
-  input: { memberId: string; rosterId: string; ign?: string | null },
+  input: { memberId: string; rosterId: string; ign?: string | null; teamId?: string | null },
 ): Promise<CleanupOutcome> {
   try {
     return await tx.transaction(async (sp): Promise<CleanupOutcome> => {
       const s = sp as DbOrTx;
       const member = await lockMember(s, input.memberId);
       if (!member) return { studentRecord: 'kept', keptReason: 'member_missing' };
-      const reason = await keepReason(s, { ...input, ign: input.ign ?? null, member });
+      const reason = await keepReason(s, { ...input, ign: input.ign ?? null, teamId: input.teamId ?? null, member });
       if (reason) return { studentRecord: 'kept', keptReason: reason };
       return { studentRecord: 'deleted', deleted: await deleteMember(s, input.memberId) };
     });

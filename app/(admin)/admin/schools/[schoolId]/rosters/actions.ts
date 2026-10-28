@@ -185,7 +185,8 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
   await requireRosterPermission();
   if (!UUID.test(schoolId)) return BAD_SCHOOL;
   try {
-    if (!(await rosterInSchool(rosterId, schoolId))) return NOT_FOUND;
+    const target = await rosterInSchool(rosterId, schoolId);
+    if (!target) return NOT_FOUND;
 
     // matches.home_roster_id / away_roster_id are ON DELETE CASCADE: deleting a roster would
     // silently delete every match it played (scores, standings). Refuse instead.
@@ -202,7 +203,7 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
 
     // Deleting a roster cascades to its players, so remember who was on it for the seam.
     const affected = await db
-      .select({ memberId: schema.players.memberId })
+      .select({ memberId: schema.players.memberId, ign: schema.players.ign })
       .from(schema.players)
       .where(eq(schema.players.rosterId, rosterId));
 
@@ -210,6 +211,7 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
     // The roster has no matches, so a member left on no roster at all has no history to protect and
     // gets the same orphan cleanup as a single removal; members still elsewhere are untouched.
     const memberIds = [...new Set(affected.map((p) => p.memberId))];
+    const ignOf = new Map(affected.map((p) => [p.memberId, p.ign ?? null]));
     await db.transaction(async (tx) => {
       const removed = await tx.delete(schema.rosters).where(
         and(
@@ -219,7 +221,8 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
       ).returning({ id: schema.rosters.id });
       if (removed.length === 0) return;
       for (const memberId of memberIds) {
-        await cleanupOrphanMember(tx, { memberId, rosterId });
+        // The roster row is gone, so its team is passed in to let the history check see its siblings.
+        await cleanupOrphanMember(tx, { memberId, rosterId, teamId: target.teamId, ign: ignOf.get(memberId) ?? null });
       }
     });
     updateTag('rosters');

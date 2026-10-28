@@ -43,7 +43,7 @@ describe('LeagueSetupClient: delete game', () => {
     await user.click(screen.getByRole('button', { name: 'Delete game Valorant' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent(
-      'Permanently delete "Valorant"? This also deletes all of its seasons and, with them, every team, roster spot, match, result and standing in those seasons. Students and schools are not deleted. This cannot be undone.',
+      'Permanently delete "Valorant"? This also deletes all of its seasons and, with them, every team, roster spot and standing in those seasons. A game with any matches cannot be deleted until those matches are removed. Students and schools are not deleted. This cannot be undone.',
     );
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());

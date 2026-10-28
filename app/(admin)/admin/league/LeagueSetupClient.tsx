@@ -184,7 +184,7 @@ export default function LeagueSetupClient({
                 onDelete={() =>
                   confirmDelete(
                     'Delete game?',
-                    `Permanently delete "${g.displayName}"? This also deletes all of its seasons and, with them, every team, roster spot, match, result and standing in those seasons. Students and schools are not deleted. This cannot be undone.`,
+                    `Permanently delete "${g.displayName}"? This also deletes all of its seasons and, with them, every team, roster spot and standing in those seasons. A game with any matches cannot be deleted until those matches are removed. Students and schools are not deleted. This cannot be undone.`,
                     () => deleteGame(g.id),
                     'Game deleted.',
                   )

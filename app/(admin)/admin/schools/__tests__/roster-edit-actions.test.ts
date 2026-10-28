@@ -490,7 +490,7 @@ describe('deleteRoster: matches protection', () => {
   });
 });
 
-describe('removing a player runs the shared orphan cleanup (spec-040)', () => {
+describe('removing a player runs the shared orphan cleanup (spec-042)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.writes.length = 0;
@@ -546,8 +546,8 @@ describe('removing a player runs the shared orphan cleanup (spec-040)', () => {
     mocks.rosterPlayers = [{ memberId: 'm1' }, { memberId: 'm2' }, { memberId: 'm1' }];
     await deleteRoster(SCHOOL, 'roster-ok');
     expect(mocks.cleanupOrphanMember).toHaveBeenCalledTimes(2);
-    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm1', rosterId: 'roster-ok' });
-    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm2', rosterId: 'roster-ok' });
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm1', rosterId: 'roster-ok', teamId: 'team-ok', ign: null });
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm2', rosterId: 'roster-ok', teamId: 'team-ok', ign: null });
     expect(mocks.updateTag).toHaveBeenCalledWith('members');
   });
 
