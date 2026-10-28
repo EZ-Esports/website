@@ -1,9 +1,10 @@
 import 'server-only';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from './index';
 import { dbErrorChain } from '../text-utils';
 import * as schema from './schema';
 import { normalizeRiotId, type RosterRiotIds, type SeriesResult } from '../match-results/series';
+import { throttleDecision, USER_WINDOW_MS, type ThrottleDecision } from '../match-results/throttle';
 import type { GameRepository } from '../match-results/resolve-series';
 import type { NormalizedGame, NormalizedPlayer, TeamSide } from '../match-results/types';
 
@@ -214,7 +215,6 @@ export async function saveSeriesResult(params: {
         homeSide: g.homeSide,
         homeRounds: g.homeRounds,
         awayRounds: g.awayRounds,
-        nonRosterPlayers: g.unrostered,
       }))
     );
     await tx
@@ -383,8 +383,6 @@ export interface ScoreboardGame {
   mapName: string;
   startedAt: string;
   rounds: number;
-  /** Riot IDs who played for a school without being on its roster. */
-  nonRosterPlayers: string[];
   teams: [ScoreboardTeam, ScoreboardTeam];
 }
 
@@ -418,7 +416,6 @@ export async function getMatchScoreboard(
       homeSide: schema.matchGames.homeSide,
       homeRounds: schema.matchGames.homeRounds,
       awayRounds: schema.matchGames.awayRounds,
-      nonRosterPlayers: schema.matchGames.nonRosterPlayers,
       gameId: schema.valorantGames.id,
       mapName: schema.valorantGames.mapName,
       startedAt: schema.valorantGames.startedAt,
@@ -461,7 +458,6 @@ export async function getMatchScoreboard(
       mapName: link.mapName,
       startedAt: link.startedAt.toISOString(),
       rounds,
-      nonRosterPlayers: link.nonRosterPlayers,
       teams: [
         { slot: 'home', side: homeSide, schoolName: names.homeSchoolName, rounds: link.homeRounds, won: homeWon, players: forSide(homeSide) },
         { slot: 'away', side: awaySide, schoolName: names.awaySchoolName, rounds: link.awayRounds, won: !homeWon, players: forSide(awaySide) },
@@ -469,4 +465,49 @@ export async function getMatchScoreboard(
     };
   });
   return { matchId, homeSchoolName: names.homeSchoolName, awaySchoolName: names.awaySchoolName, homeWins, awayWins, games };
+}
+
+/**
+ * Applies the fresh-submission limits and, when allowed, records the attempt, atomically: the
+ * match and the user are each serialized with a transaction advisory lock, so two concurrent
+ * submissions cannot both pass the check. Timestamps are written explicitly from `now` (never the
+ * database clock) so the comparison does not depend on the server's timezone.
+ */
+export async function reserveSubmissionAttempt(params: {
+  matchId: string;
+  userId: string;
+  now?: Date;
+}): Promise<ThrottleDecision> {
+  const now = params.now ?? new Date();
+  return db.transaction(async (tx) => {
+    // Always lock the match first, then the user, so concurrent callers cannot deadlock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'match-result:match:' + params.matchId}, 0))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'match-result:user:' + params.userId}, 0))`);
+
+    const [last] = await tx
+      .select({ createdAt: schema.matchResultAttempts.createdAt })
+      .from(schema.matchResultAttempts)
+      .where(eq(schema.matchResultAttempts.matchId, params.matchId))
+      .orderBy(desc(schema.matchResultAttempts.createdAt))
+      .limit(1);
+    const userRows = await tx
+      .select({ createdAt: schema.matchResultAttempts.createdAt })
+      .from(schema.matchResultAttempts)
+      .where(
+        and(
+          eq(schema.matchResultAttempts.userId, params.userId),
+          gt(schema.matchResultAttempts.createdAt, new Date(now.getTime() - USER_WINDOW_MS))
+        )
+      );
+
+    const decision = throttleDecision({
+      now,
+      lastForMatch: last?.createdAt ?? null,
+      userAttempts: userRows.map((r) => r.createdAt),
+    });
+    if (decision.ok) {
+      await tx.insert(schema.matchResultAttempts).values({ matchId: params.matchId, userId: params.userId, createdAt: now });
+    }
+    return decision;
+  });
 }

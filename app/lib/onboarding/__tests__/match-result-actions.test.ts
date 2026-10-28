@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   upsertPendingSubmission: vi.fn(),
   getPendingSubmissionForMatch: vi.fn(),
   getMatchRosterRiotIds: vi.fn(),
+  reserveSubmissionAttempt: vi.fn(),
   fetchMatch: vi.fn(),
   updateTag: vi.fn(),
   revalidatePath: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('@/app/lib/db/match-results', () => ({
   gameRepository: {},
   isUniqueViolation: (e: unknown) => (e as { code?: string })?.code === '23505',
   getMatchRosterRiotIds: mocks.getMatchRosterRiotIds,
+  reserveSubmissionAttempt: mocks.reserveSubmissionAttempt,
   getMatchScoreboard: vi.fn(),
   getPendingSubmissionForMatch: mocks.getPendingSubmissionForMatch,
   saveSeriesResult: mocks.saveSeriesResult,
@@ -46,6 +48,7 @@ const matchRow = (over: Record<string, unknown> = {}) => ({
   gameId: 'g1',
   gameSlug: 'valorant',
   status: 'scheduled',
+  scheduledAt: new Date('2026-10-20T23:00:00.000Z'),
   homeScore: null,
   homeRosterId: 'hr',
   awayRosterId: 'ar',
@@ -64,6 +67,7 @@ beforeEach(() => {
     season: { id: 's1' },
   });
   mocks.getMatchRosterRiotIds.mockResolvedValue({ home: new Set(), away: new Set() });
+  mocks.reserveSubmissionAttempt.mockResolvedValue({ ok: true });
 });
 
 describe('submitMatchResult', () => {
@@ -105,16 +109,17 @@ describe('submitMatchResult', () => {
     expect(mocks.updateTag).toHaveBeenCalledWith('teams');
   });
 
-  it('reports players who are not on a roster as warnings on a successful save', async () => {
-    mocks.resolveSeries.mockResolvedValue({
-      status: 'ok',
-      series: { homeWins: 2, awayWins: 0, winner: 'home', games: [{ gameNumber: 1, unrostered: ['Pug#NA1'] }, { gameNumber: 2, unrostered: [] }] },
-      games: [],
-    });
-    mocks.saveSeriesResult.mockResolvedValue(true);
+  it('stops a fresh submission the throttle refuses, before any lookup or API call', async () => {
+    mocks.reserveSubmissionAttempt.mockResolvedValue({ ok: false, waitSeconds: 20, message: 'Wait 20 seconds before submitting again.' });
     const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
-    expect(result.success).toBe(true);
-    expect(result.warnings).toEqual(['Game 1: Pug#NA1 is not on a roster. This was accepted and recorded for staff.']);
+    expect(result).toEqual({ success: false, error: 'Wait 20 seconds before submitting again.' });
+    expect(mocks.resolveSeries).not.toHaveBeenCalled();
+  });
+
+  it('passes the match start to the series check so early games are refused', async () => {
+    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game 1: It started at ...'] });
+    await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
+    expect(mocks.resolveSeries.mock.calls[0][0].scheduledAt).toEqual(new Date('2026-10-20T23:00:00.000Z'));
   });
 
   it('says a game is already counted when the unique index fires, and when the match was completed meanwhile', async () => {
@@ -164,5 +169,7 @@ describe('retryMatchResult', () => {
     const result = await retryMatchResult({ matchId: 'm1', schoolId: 'school-a' });
     expect(result.success).toBe(true);
     expect(mocks.resolveSeries.mock.calls[0][0].matchIds).toEqual([ID_1, ID_2]);
+    // Check again reuses ids already paid for, so it is not counted against the submission limits.
+    expect(mocks.reserveSubmissionAttempt).not.toHaveBeenCalled();
   });
 });

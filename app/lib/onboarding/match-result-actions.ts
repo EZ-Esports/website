@@ -12,6 +12,7 @@ import {
   getMatchRosterRiotIds,
   getMatchScoreboard,
   getPendingSubmissionForMatch,
+  reserveSubmissionAttempt,
   saveSeriesResult,
   upsertPendingSubmission,
   type MatchScoreboard,
@@ -35,8 +36,6 @@ export interface MatchResultActionResult {
   pending?: boolean;
   /** Set on success: the series as home-away maps won, from the submitting school's side. */
   summary?: string;
-  /** Set on success: players who are not on their school's roster (allowed, but worth a look). */
-  warnings?: string[];
 }
 
 class ActionError extends Error {}
@@ -56,6 +55,7 @@ async function loadMatch(matchId: string) {
       gameId: schema.seasons.gameId,
       gameSlug: schema.games.slug,
       status: schema.matches.status,
+      scheduledAt: schema.matches.scheduledAt,
       homeScore: schema.matches.homeScore,
       homeRosterId: schema.matches.homeRosterId,
       awayRosterId: schema.matches.awayRosterId,
@@ -150,6 +150,7 @@ async function submit(
     leagueMatchId: match.id,
     matchIds,
     rosters,
+    scheduledAt: match.scheduledAt,
     port: getMatchDataPort(),
     repo: gameRepository,
   });
@@ -198,12 +199,7 @@ async function submit(
   const own = schoolId === match.homeSchoolId ? 'home' : 'away';
   const mine = own === 'home' ? outcome.series.homeWins : outcome.series.awayWins;
   const theirs = own === 'home' ? outcome.series.awayWins : outcome.series.homeWins;
-  const warnings = outcome.series.games.flatMap((g) =>
-    g.unrostered.length > 0
-      ? [`Game ${g.gameNumber}: ${g.unrostered.join(', ')} ${g.unrostered.length === 1 ? 'is' : 'are'} not on a roster. This was accepted and recorded for staff.`]
-      : []
-  );
-  return { success: true, summary: `${mine}-${theirs}`, ...(warnings.length > 0 ? { warnings } : {}) };
+  return { success: true, summary: `${mine}-${theirs}` };
 }
 
 export interface SubmitMatchResultParams {
@@ -224,6 +220,9 @@ async function submitMatchResultImpl(params: SubmitMatchResultParams): Promise<M
   const { userId } = await authorizeForMatch(params.schoolId, match, true);
   const refusal = await refusalFor(match);
   if (refusal) return { success: false, error: refusal };
+  // Fresh submissions only: "Check again" (retryMatchResult) reuses ids already paid for.
+  const allowed = await reserveSubmissionAttempt({ matchId: match.id, userId });
+  if (!allowed.ok) return { success: false, error: allowed.message };
   return submit(match, params.schoolId, userId, parsed.ids);
 }
 

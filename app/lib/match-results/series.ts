@@ -1,18 +1,19 @@
 /**
  * Pure rules for turning fetched games into a best-of-3 series result: which school played which
- * side of each game, whether the participants really are the two schools, and the series score.
- * No I/O, so every refusal is unit-tested against fixtures.
+ * side of each game, whether the participants really are the two schools, when the game was
+ * played, and the series score. No I/O, so every refusal is unit-tested against fixtures.
  */
+import { formatNY } from '../dates';
 import type { NormalizedGame, TeamSide } from './types';
 
 /** Wins that decide a best-of-3. */
 export const WINS_TO_TAKE_SERIES = 2;
 /**
- * A side belongs to a school when at least this many of its players are on that school's roster.
- * Rosters are locked and include subs, so one rostered player is enough to place a side; the rest
- * of the side may be anyone and is reported, not refused.
+ * How long before the match's scheduled start a game may have started. Teams sometimes begin a
+ * little early; anything earlier is a different game (a scrim or last week's match). There is
+ * deliberately no upper bound: a late or overrunning start is legitimate (spec-038).
  */
-export const MIN_ROSTERED_PER_SIDE = 1;
+export const EARLY_START_LEEWAY_MS = 60 * 60 * 1000;
 /** The only queue a league match may be played in. */
 export const CUSTOM_QUEUE_ID = 'custom';
 
@@ -34,7 +35,7 @@ export function riotIdKey(name: string, tag: string): string {
   return normalizeRiotId(`${name}#${tag}`);
 }
 
-/** The Riot IDs of every enrolled player (subs included, coaches excluded) of each school's roster. */
+/** The Riot IDs of every enrolled player (starters and subs, coaches excluded) of each school's roster. */
 export interface RosterRiotIds {
   home: ReadonlySet<string>;
   away: ReadonlySet<string>;
@@ -43,8 +44,6 @@ export interface RosterRiotIds {
 export interface GameAttribution {
   /** Which roster played Red and which played Blue. */
   rosterBySide: Record<TeamSide, RosterSlot>;
-  /** Players (`Name#Tag`) on a side who are not on that side's school roster: warnings for staff. */
-  unrostered: string[];
 }
 
 export type AttributionResult =
@@ -52,11 +51,10 @@ export type AttributionResult =
   | { ok: false; error: string };
 
 /**
- * Decides which school played each side of one game. Both rosters are checked against both sides;
- * a side belongs to the school with more of its players on the roster (at least
- * `MIN_ROSTERED_PER_SIDE`; a tie is ambiguous and refused), and the two sides must belong to
- * different schools. Sides may swap between games. Players who are not on their side's roster are
- * allowed (a roster member may be a sub) but are returned for the manager and staff to see.
+ * Decides which school played each side of one game. A side belongs to a school only when EVERY
+ * player on it is on that school's roster (starters and subs alike: a roster holds up to 7 and any
+ * 5 may play), and the two sides must belong to different schools. Sides may swap between games.
+ * Anyone on a side who is not on that school's roster rejects the game, naming the Riot IDs.
  */
 export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): AttributionResult {
   if (game.queueId !== CUSTOM_QUEUE_ID) {
@@ -78,22 +76,42 @@ export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): Att
 
   const rosterBySide = {} as Record<TeamSide, RosterSlot>;
   for (const side of ['Red', 'Blue'] as const) {
-    const keys = game.players.filter((p) => p.side === side).map((p) => riotIdKey(p.name, p.tag));
-    const home = keys.filter((k) => rosters.home.has(k)).length;
-    const away = keys.filter((k) => rosters.away.has(k)).length;
-    if (Math.max(home, away) < MIN_ROSTERED_PER_SIDE) {
+    const players = game.players.filter((p) => p.side === side);
+    if (players.length === 0) {
+      return { ok: false, error: `The ${side} team has no players in this game's data.` };
+    }
+    const entries = players.map((p) => ({
+      id: `${p.name}#${p.tag}`,
+      home: rosters.home.has(riotIdKey(p.name, p.tag)),
+      away: rosters.away.has(riotIdKey(p.name, p.tag)),
+    }));
+    const allHome = entries.every((e) => e.home);
+    const allAway = entries.every((e) => e.away);
+    if (allHome && allAway) {
       return {
         ok: false,
-        error: `No one on the ${side} team is on either school's roster. Check the Riot IDs on both rosters.`,
+        error: `Every player on the ${side} team is on both schools' rosters, so it cannot be placed. Check the Riot IDs on both rosters.`,
       };
     }
-    if (home === away) {
+    if (allHome || allAway) {
+      rosterBySide[side] = allHome ? 'home' : 'away';
+      continue;
+    }
+    const homeCount = entries.filter((e) => e.home).length;
+    const awayCount = entries.filter((e) => e.away).length;
+    if (homeCount > 0 && awayCount > 0) {
       return {
         ok: false,
-        error: `The ${side} team has as many players from one school's roster as the other's, so it cannot be placed. Check the Riot IDs on both rosters.`,
+        error: `The ${side} team mixes players from both schools' rosters (${entries.map((e) => e.id).join(', ')}). Each team must be one school.`,
       };
     }
-    rosterBySide[side] = home > away ? 'home' : 'away';
+    const owner: RosterSlot = homeCount > 0 ? 'home' : 'away';
+    const outsiders = entries.filter((e) => !e[owner]).map((e) => e.id);
+    const one = outsiders.length === 1;
+    return {
+      ok: false,
+      error: `The ${side} team has ${one ? 'a player' : 'players'} who ${one ? 'is' : 'are'} not on the roster: ${outsiders.join(', ')}.`,
+    };
   }
   if (rosterBySide.Red === rosterBySide.Blue) {
     return {
@@ -101,15 +119,17 @@ export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): Att
       error: 'Both teams in this game match the same school. It is not a game between these two schools.',
     };
   }
+  return { ok: true, attribution: { rosterBySide } };
+}
 
-  const unrostered: string[] = [];
-  for (const side of ['Red', 'Blue'] as const) {
-    const roster = rosters[rosterBySide[side]];
-    for (const p of game.players) {
-      if (p.side === side && !roster.has(riotIdKey(p.name, p.tag))) unrostered.push(`${p.name}#${p.tag}`);
-    }
-  }
-  return { ok: true, attribution: { rosterBySide, unrostered } };
+function formatET(date: Date): string {
+  return `${formatNY(date, 'date-short')}, ${formatNY(date, 'time')} ET`;
+}
+
+/** A refusal when the game began more than the leeway before the match's scheduled start; else null. */
+export function earlyStartError(startedAt: Date, scheduledAt: Date): string | null {
+  if (startedAt.getTime() >= scheduledAt.getTime() - EARLY_START_LEEWAY_MS) return null;
+  return `It started at ${formatET(startedAt)}, more than 1 hour before this match's scheduled start (${formatET(scheduledAt)}). It looks like a different game.`;
 }
 
 export interface ScoredGame {
@@ -121,8 +141,6 @@ export interface ScoredGame {
   homeRounds: number;
   awayRounds: number;
   winner: RosterSlot;
-  /** Players not on their side's roster in this game; shown as a warning and kept for staff. */
-  unrostered: string[];
 }
 
 export interface SeriesResult {
@@ -139,7 +157,12 @@ export type SeriesOutcome = { ok: true; series: SeriesResult } | { ok: false; er
  * order they were pasted. A best-of-3 needs a side to reach two wins, with no game played after
  * it was decided; a 1-1 split after two games asks for the third.
  */
-export function scoreSeries(games: readonly NormalizedGame[], rosters: RosterRiotIds): SeriesOutcome {
+export function scoreSeries(
+  games: readonly NormalizedGame[],
+  rosters: RosterRiotIds,
+  /** The match's current scheduled start (an approved reschedule has already moved it). */
+  scheduledAt?: Date
+): SeriesOutcome {
   const ordered = [...games].sort(
     (a, b) => a.startedAt.getTime() - b.startedAt.getTime() || a.matchId.localeCompare(b.matchId)
   );
@@ -153,7 +176,12 @@ export function scoreSeries(games: readonly NormalizedGame[], rosters: RosterRio
       errors.push(`${label}: ${result.error}`);
       return;
     }
-    const { rosterBySide, unrostered } = result.attribution;
+    const early = scheduledAt ? earlyStartError(game.startedAt, scheduledAt) : null;
+    if (early) {
+      errors.push(`${label}: ${early}`);
+      return;
+    }
+    const { rosterBySide } = result.attribution;
     const homeSide: TeamSide = rosterBySide.Red === 'home' ? 'Red' : 'Blue';
     const homeRounds = homeSide === 'Red' ? game.redRounds : game.blueRounds;
     const awayRounds = homeSide === 'Red' ? game.blueRounds : game.redRounds;
@@ -165,7 +193,6 @@ export function scoreSeries(games: readonly NormalizedGame[], rosters: RosterRio
       homeRounds,
       awayRounds,
       winner: homeRounds > awayRounds ? 'home' : 'away',
-      unrostered,
     });
   });
   if (errors.length > 0) return { ok: false, errors };

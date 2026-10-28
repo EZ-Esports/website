@@ -43,7 +43,6 @@ CREATE TABLE IF NOT EXISTS "match_games" (
 	"home_side" text NOT NULL,
 	"home_rounds" integer NOT NULL,
 	"away_rounds" integer NOT NULL,
-	"non_roster_players" text[] DEFAULT '{}'::text[] NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "match_games_home_side_check" CHECK ("match_games"."home_side" in ('Red', 'Blue')),
 	CONSTRAINT "match_games_game_number_check" CHECK ("match_games"."game_number" between 1 and 3)
@@ -61,6 +60,16 @@ CREATE TABLE IF NOT EXISTS "match_result_submissions" (
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "match_result_submissions_status_check" CHECK ("match_result_submissions"."status" in ('pending', 'completed', 'cancelled'))
 );--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "match_result_attempts" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"match_id" uuid NOT NULL,
+	"user_id" uuid NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);--> statement-breakpoint
+ALTER TABLE "match_result_attempts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "match_result_attempts" ADD CONSTRAINT "match_result_attempts_match_id_matches_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "match_result_attempts_match_created_idx" ON "match_result_attempts" USING btree ("match_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "match_result_attempts_user_created_idx" ON "match_result_attempts" USING btree ("user_id","created_at");--> statement-breakpoint
 ALTER TABLE "valorant_games" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "valorant_game_players" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "match_games" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint

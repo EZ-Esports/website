@@ -379,9 +379,6 @@ export const matchGames = pgTable('match_games', {
   homeSide: text('home_side').notNull(),
   homeRounds: integer('home_rounds').notNull(),
   awayRounds: integer('away_rounds').notNull(),
-  // Riot IDs (`Name#Tag`) who played for a school but are not on its roster. Allowed (a roster
-  // member may be a sub) but recorded so staff can review stand-ins.
-  nonRosterPlayers: text('non_roster_players').array().default(sql`'{}'::text[]`).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   uniqueIndex('match_games_game_id_idx').on(t.gameId),
@@ -413,6 +410,20 @@ export const matchResultSubmissions = pgTable('match_result_submissions', {
     .on(t.matchId)
     .where(sql`status = 'pending'`),
   check('match_result_submissions_status_check', sql`${t.status} in ('pending', 'completed', 'cancelled')`),
+]).enableRLS();
+
+// One row per FRESH result submission (not "Check again"), kept to throttle submissions across
+// serverless instances: at most one per match every 30 seconds and ten per user per hour.
+export const matchResultAttempts = pgTable('match_result_attempts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  userId: uuid('user_id').notNull(), // Supabase auth.users.id
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('match_result_attempts_match_created_idx').on(t.matchId, t.createdAt),
+  index('match_result_attempts_user_created_idx').on(t.userId, t.createdAt),
 ]).enableRLS();
 
 // --- TOURNAMENTS ---

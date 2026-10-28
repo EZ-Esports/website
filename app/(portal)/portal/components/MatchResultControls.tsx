@@ -82,21 +82,12 @@ function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) 
   return { pending, message, errors, reset, run, setMessage, setErrors };
 }
 
-function SubmitDialog({
-  match,
-  schoolId,
-  onSubmitted,
-}: {
-  match: SchoolMatchItem;
-  schoolId: string;
-  onSubmitted: (result: MatchResultActionResult) => void;
-}) {
+function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: string }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const { pending, message, errors, reset, run, setMessage, setErrors } = useResultAction((result) => {
+  const { pending, message, errors, reset, run, setMessage, setErrors } = useResultAction(() => {
     setOpen(false);
     setInput('');
-    onSubmitted(result);
   });
 
   const submit = (e: React.FormEvent) => {
@@ -287,11 +278,6 @@ function Scoreboard({ scoreboard }: { scoreboard: MatchScoreboard }) {
               {g.mapName} · {g.teams[0].rounds}–{g.teams[1].rounds} · {g.rounds} rounds ·{' '}
               {formatNY(new Date(g.startedAt), 'date-short')}
             </p>
-            {g.nonRosterPlayers.length > 0 && (
-              <p className="text-[11px] text-amber-300">
-                Not on a roster: {g.nonRosterPlayers.join(', ')}
-              </p>
-            )}
             <TeamTable team={g.teams[0]} />
             <TeamTable team={g.teams[1]} />
           </TabPanel>
@@ -356,37 +342,16 @@ interface ResultCellProps {
   viewOnly: boolean;
 }
 
-/**
- * The result actions for one match: submit, check again, or open the scoreboard. The outcome of a
- * just-saved submission is kept here (this component stays mounted while the row re-renders from
- * Submit to Scoreboard), so the manager sees the score and any non-roster warnings.
- */
+/** The result actions for one match: submit, check again, or open the scoreboard. */
 export function ResultActions({ match, schoolId, viewOnly }: ResultCellProps) {
-  const [outcome, setOutcome] = useState<MatchResultActionResult | null>(null);
-  const notice = outcome && (
-    <div role="status" aria-live="polite" className="mb-2 max-w-[16rem] space-y-1 rounded-lg border border-emerald-800/40 bg-emerald-950/30 p-2 text-[11px] text-emerald-300">
-      <p>Result saved: {outcome.summary}.</p>
-      {outcome.warnings?.map((w) => (
-        <p key={w} className="text-amber-300">{w}</p>
-      ))}
-      <button type="button" onClick={() => setOutcome(null)} className="underline cursor-pointer min-h-[44px] sm:min-h-0">
-        Dismiss
-      </button>
-    </div>
-  );
-  let control: React.ReactNode = null;
   if (match.gameCount > 0) {
-    control = <ScoreboardDialog match={match} schoolId={schoolId} />;
-  } else if (match.pendingResult) {
-    control = <PendingNotice match={match} schoolId={schoolId} viewOnly={viewOnly} />;
-  } else if (!viewOnly && canSubmitGameResult(match)) {
-    control = <SubmitDialog match={match} schoolId={schoolId} onSubmitted={setOutcome} />;
+    return <ScoreboardDialog match={match} schoolId={schoolId} />;
   }
-  if (!control && !notice) return null;
-  return (
-    <>
-      {notice}
-      {control}
-    </>
-  );
+  if (match.pendingResult) {
+    return <PendingNotice match={match} schoolId={schoolId} viewOnly={viewOnly} />;
+  }
+  if (!viewOnly && canSubmitGameResult(match)) {
+    return <SubmitDialog match={match} schoolId={schoolId} />;
+  }
+  return null;
 }
