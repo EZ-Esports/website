@@ -11,7 +11,7 @@ import { normalizeSort, resolveSelectedSeason, toMatchesPageDto, toScheduleCalen
 import CalendarSchedule from './CalendarSchedule';
 import ArchiveMatchList from './ArchiveMatchList';
 import SeasonSelect from '@/app/components/ui/SeasonSelect';
-import { OUTCOMES_PENDING_NOTICE } from '@/app/lib/season-outcomes';
+import { SCHEDULE_PENDING_NOTICE } from '@/app/lib/season-outcomes';
 
 
 interface SchedulePageProps {
@@ -50,13 +50,15 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
 
   const selectedSeason = resolveSelectedSeason(seasons, seasonParam);
   const isArchived = Boolean(selectedSeason && !selectedSeason.isActive);
-  // The data below is already redacted server-side; this only drives copy.
+  // An unpublished season has no public matches at all; the queries below also enforce it.
   const outcomesHidden = Boolean(selectedSeason && !selectedSeason.outcomesPublic);
 
   // Active season -> full-season calendar; archived -> lazy-loaded list.
   let calendarMatches: Awaited<ReturnType<typeof getPublicSeasonMatches>> = [];
   let archivePage: Awaited<ReturnType<typeof getPublicMatchesPage>> = { items: [], nextCursor: null };
-  if (selectedSeason && !isArchived) {
+  if (outcomesHidden) {
+    // Nothing to fetch: the schedule is not public yet.
+  } else if (selectedSeason && !isArchived) {
     calendarMatches = await getPublicSeasonMatches(selectedSeason.id, division);
   } else if (selectedSeason) {
     archivePage = await getPublicMatchesPage({
@@ -89,12 +91,6 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
         <p className="text-xs text-foreground-muted -mt-8 mb-8 text-center font-medium">
           All match times are Eastern Time (ET).
         </p>
-        {outcomesHidden && (
-          <p className="mb-6 text-center text-sm font-medium text-foreground-secondary" role="note">
-            {OUTCOMES_PENDING_NOTICE}
-          </p>
-        )}
-
         {/* Filters: division tabs, season picker, sort (archive only) */}
         <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <FilterTabs
@@ -127,6 +123,13 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
           <div className="text-center p-12 text-foreground-muted text-sm bg-surface-raised/40 border border-line rounded-2xl">
             No seasons found for {gameConfig.displayName} yet.
           </div>
+        ) : outcomesHidden ? (
+          <div
+            className="text-center p-12 text-foreground-secondary text-sm font-medium bg-surface-raised/40 border border-line rounded-2xl"
+            role="note"
+          >
+            {SCHEDULE_PENDING_NOTICE}
+          </div>
         ) : isArchived ? (
           <ArchiveMatchList
             key={`${selectedSeason.id}-${division}-${sort}`}
@@ -135,7 +138,6 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             sort={sort}
             initialItems={toMatchesPageDto(archivePage).items}
             initialCursor={archivePage.nextCursor}
-            outcomesHidden={outcomesHidden}
           />
         ) : (
           <CalendarSchedule
@@ -143,7 +145,6 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
             matches={schedule}
             gameSlug={game}
             division={division}
-            outcomesHidden={outcomesHidden}
           />
         )}
       </Section>

@@ -89,7 +89,7 @@ function toParams(request: MatchPageRequest) {
 }
 
 /**
- * Public: outcomes of unpublished seasons are redacted server-side. The status
+ * Public: matches of unpublished seasons are excluded server-side (the client `seasonId` is not trusted). The status
  * filter is ignored here (the public list never sends one) because filtering a
  * hidden season by `forfeit` would reveal which matches were forfeits. The
  * staff tab filter is ignored for the same reason (Completed would do it too).

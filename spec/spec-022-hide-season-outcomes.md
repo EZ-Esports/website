@@ -1,6 +1,6 @@
 # spec-022 — Hide season outcomes until staff publish them
 
-**Status:** Shipped. Migration `0051` applied to production 18 Oct 2026 (backup of `seasons` first; 11 inactive seasons stamped, 4 active left hidden). **PR:** #261 (issue #228). **Date:** 18 Oct 2026. **Scope:** `seasons.outcomes_finalized_at` (migration `0051`), `app/lib/season-outcomes.ts`, `app/lib/db/{standings,matches,league,match-page}.ts`, `app/lib/match-actions.ts`, public standings / schedule / game hub / team pages / homepage / archives, Admin -> League Setup.
+**Status:** Shipped. Superseded in part by [spec-049](spec-049-publish-season-hides-matches.md): the toggle is now "Publish season" / "Unpublish season" and an unpublished season's matches are hidden outright rather than shown as "0 - 0". Migration `0051` applied to production 18 Oct 2026 (backup of `seasons` first; 11 inactive seasons stamped, 4 active left hidden). **PR:** #261 (issue #228). **Date:** 18 Oct 2026. **Scope:** `seasons.outcomes_finalized_at` (migration `0051`), `app/lib/season-outcomes.ts`, `app/lib/db/{standings,matches,league,match-page}.ts`, `app/lib/match-actions.ts`, public standings / schedule / game hub / team pages / homepage / archives, Admin -> League Setup.
 
 **Deploy order:** apply `0051` to production (after a backup) **before** the code deploys. Every `db.select().from(schema.seasons)` selects the new column, so the code without the column breaks the whole site (same hazard as `0050`).
 
