@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { saveOnboardingDraft } from '@/app/lib/onboarding/wizard-actions';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/riot-manual';
 import {
   calculateAge,
@@ -46,10 +47,10 @@ export function useWizardDraft(
 
   // Step 1: Account Information
   const [legalFirstName, setLegalFirstName] = useState(
-    initialDraft.legalFirstName || inviteData.intendedFirstName || ''
+    initialDraft.legalFirstName || capitalizeNameWords(inviteData.intendedFirstName) || ''
   );
   const [legalLastName, setLegalLastName] = useState(
-    initialDraft.legalLastName || inviteData.intendedLastName || ''
+    initialDraft.legalLastName || capitalizeNameWords(inviteData.intendedLastName) || ''
   );
   const [email, setEmail] = useState(initialDraft.email || '');
   const [password, setPassword] = useState(initialDraft.password || '');
@@ -145,7 +146,7 @@ export function useWizardDraft(
   const isMinor = age !== null && isMinorAge(age);
   // Prefilled from the Step 1 legal name until the signer edits it.
   const participantLegalName =
-    participantNameEdit ?? `${legalFirstName.trim()} ${legalLastName.trim()}`.trim();
+    participantNameEdit ?? capitalizeNameWords(`${legalFirstName} ${legalLastName}`);
   const isRiotIdValid = RIOT_ID_REGEX.test(riotId.trim());
   const trackerUrl = isRiotIdValid
     ? deriveTrackerUrl(inviteData.gameSlug, riotId.trim())
@@ -154,8 +155,9 @@ export function useWizardDraft(
   function buildConsent(): ConsentSubmission {
     return {
       tosAcknowledged,
-      participantLegalName,
-      guardianFullName,
+      // Normalized here too: a name edited right before Continue may not have blurred yet.
+      participantLegalName: capitalizeNameWords(participantLegalName),
+      guardianFullName: capitalizeNameWords(guardianFullName),
       guardianRelationship,
       guardianEmail,
       guardianSignature,

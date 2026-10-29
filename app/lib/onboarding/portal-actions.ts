@@ -1,6 +1,7 @@
 'use server';
 
 import crypto from 'node:crypto';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { eq, and, or, desc, inArray, type SQL } from 'drizzle-orm';
@@ -173,8 +174,8 @@ export async function createPlayerInvite(
       gameId,
       seasonId: inviteSeason.id,
       tokenHash,
-      intendedFirstName: intendedFirstName.trim(),
-      intendedLastName: intendedLastName.trim(),
+      intendedFirstName: capitalizeNameWords(intendedFirstName),
+      intendedLastName: capitalizeNameWords(intendedLastName),
       invitedByUserId: context.userId,
       expiresAt,
       status: 'pending',
