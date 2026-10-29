@@ -16,6 +16,7 @@ import {
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
 import { listenDiscordResult } from '@/app/lib/onboarding/discord-channel';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { stepForRejection, type InviteData } from './types';
 import { useWizardDraft } from './hooks/useWizardDraft';
 import { WizardProgressStepper } from './components/WizardProgressStepper';
@@ -272,8 +273,8 @@ export default function PlayerOnboardingWizard({
     startTransition(async () => {
       try {
         const submission: PlayerOnboardingSubmission = {
-          legalFirstName: draft.legalFirstName.trim(),
-          legalLastName: draft.legalLastName.trim(),
+          legalFirstName: capitalizeNameWords(draft.legalFirstName),
+          legalLastName: capitalizeNameWords(draft.legalLastName),
           email: draft.email.trim().toLowerCase(),
           password: isManager ? draft.password : undefined,
           graduationYear: draft.graduationYear,
@@ -357,7 +358,7 @@ export default function PlayerOnboardingWizard({
               {isManager ? 'School Manager Onboarding' : 'Official Player Registration'}
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-              Welcome, {inviteData.intendedFirstName} {inviteData.intendedLastName}!
+              Welcome, {capitalizeNameWords(inviteData.intendedFirstName)} {capitalizeNameWords(inviteData.intendedLastName)}!
             </h1>
             <p className="text-foreground-muted text-sm mt-1">
               {isManager ? (

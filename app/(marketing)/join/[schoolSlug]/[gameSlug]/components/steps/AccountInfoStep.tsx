@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { ContentFlagNotice, contentFieldProps } from '../ContentFlagNotice';
 import type { ContentFlagControls } from '../../types';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 
 interface AccountInfoStepProps {
   legalFirstName: string;
@@ -90,6 +91,7 @@ export function AccountInfoStep({
             type="text"
             value={legalFirstName}
             onChange={(e) => setLegalFirstName(e.target.value)}
+            onBlur={(e) => setLegalFirstName(capitalizeNameWords(e.target.value))}
             className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder="e.g. Alex"
             required
@@ -110,6 +112,7 @@ export function AccountInfoStep({
             type="text"
             value={legalLastName}
             onChange={(e) => setLegalLastName(e.target.value)}
+            onBlur={(e) => setLegalLastName(capitalizeNameWords(e.target.value))}
             className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder="e.g. Chen"
             required

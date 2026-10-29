@@ -5,6 +5,7 @@ import {
   TERMS_OF_SERVICE_PATH,
   formatConsentIntro,
 } from '@/app/lib/onboarding/consent';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { RequiredMark } from '../RequiredMark';
 import { ContentFlagNotice, contentFieldProps } from '../ContentFlagNotice';
 import type { ContentFlagControls } from '../../types';
@@ -132,6 +133,10 @@ export function ConsentStep({
                 autoComplete="off"
                 value={participantLegalName}
                 onChange={(e) => setParticipantLegalName(e.target.value)}
+                onBlur={(e) => {
+                  const capitalized = capitalizeNameWords(e.target.value);
+                  if (capitalized !== e.target.value) setParticipantLegalName(capitalized);
+                }}
                 className={inputClass}
                 required
               />

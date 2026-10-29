@@ -14,6 +14,7 @@ import {
   type SchoolInviteItem,
 } from '@/app/lib/onboarding/portal-actions';
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS } from '@/app/lib/onboarding/invite-expiry';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import type { GameItem } from './GameTabs';
 
 interface GenerateInviteCardProps {
@@ -77,8 +78,8 @@ export function GenerateInviteCard({
         const result = await createPlayerInvite({
           schoolId,
           gameId: inviteGameId,
-          intendedFirstName: firstName.trim(),
-          intendedLastName: lastName.trim(),
+          intendedFirstName: capitalizeNameWords(firstName),
+          intendedLastName: capitalizeNameWords(lastName),
           expiresInDays: expiryDays,
         });
 
@@ -156,6 +157,7 @@ export function GenerateInviteCard({
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
+              onBlur={(e) => setFirstName(capitalizeNameWords(e.target.value))}
               placeholder="Alex"
               className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
             />
@@ -168,6 +170,7 @@ export function GenerateInviteCard({
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
+              onBlur={(e) => setLastName(capitalizeNameWords(e.target.value))}
               placeholder="Chen"
               className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
             />
