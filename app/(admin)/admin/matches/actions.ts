@@ -129,3 +129,46 @@ export async function deleteMatch(id: string) {
 
   revalidateMatches();
 }
+
+/** Upper bound for one bulk delete; the explorer pages 25 at a time, so this is generous. */
+export const MAX_BULK_DELETE_MATCHES = 200;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type DeleteMatchesResult = { success: boolean; error?: string; deleted?: number };
+
+/**
+ * Deletes several matches at once. Same permission and cascade behaviour as
+ * deleteMatch (results, game data and reschedule requests go with each match via
+ * foreign keys), but all-or-nothing: ids are validated server-side and the delete
+ * runs in one transaction.
+ */
+export async function deleteMatches(ids: string[]): Promise<DeleteMatchesResult> {
+  await requirePermission(Permissions.MANAGE_MATCHES);
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { success: false, error: 'Select at least one match to delete.' };
+  }
+  if (!ids.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
+    return { success: false, error: 'One or more selected matches are invalid.' };
+  }
+  const unique = [...new Set(ids.map((id) => id.toLowerCase()))];
+  if (unique.length > MAX_BULK_DELETE_MATCHES) {
+    return { success: false, error: `You can delete at most ${MAX_BULK_DELETE_MATCHES} matches at once.` };
+  }
+
+  try {
+    const deleted = await db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(schema.matches)
+        .where(inArray(schema.matches.id, unique))
+        .returning({ id: schema.matches.id });
+      return rows.length;
+    });
+    revalidateMatches();
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Failed to delete matches', error);
+    return { success: false, error: 'Could not delete the selected matches. Please try again.' };
+  }
+}

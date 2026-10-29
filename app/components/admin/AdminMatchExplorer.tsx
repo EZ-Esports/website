@@ -3,13 +3,15 @@
 import { useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Button, Menu, MenuItem, MenuTrigger, Popover, Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
-import { updateMatchScore, deleteMatch } from '@/app/(admin)/admin/matches/actions';
-import { HiOutlineCalendarDays, HiOutlineEllipsisVertical, HiOutlineNoSymbol, HiOutlineTrash, HiPlus } from 'react-icons/hi2';
+import { updateMatchScore, deleteMatch, deleteMatches } from '@/app/(admin)/admin/matches/actions';
+import { HiOutlineCalendarDays, HiOutlineCheckCircle, HiOutlineEllipsisVertical, HiOutlineNoSymbol, HiOutlineTrash, HiPlus } from 'react-icons/hi2';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import ScheduleMatchDialog from '@/app/components/admin/ScheduleMatchDialog';
 import GenerateSeasonDialog, { type GenerateSchoolOption } from '@/app/components/admin/GenerateSeasonDialog';
 import {
   chip,
+  dangerBtn,
   ghostBtnSm,
   input,
   primaryBtn,
@@ -191,6 +193,13 @@ export default function AdminMatchExplorer({
   const [deleteTarget, setDeleteTarget] = useState<MatchPageItemDto | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  // Bulk delete: select mode shows a checkbox per row; the selection is ids only and is
+  // intersected with the rows on screen, so a filter change can never delete hidden matches.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkPending, setBulkPending] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   // A link navigation re-renders the server page with a new initialPage for the new URL
   // filters: show it now (no stale rows, no refetch) and reset local facets as a remount
@@ -429,6 +438,47 @@ export default function AdminMatchExplorer({
   };
 
   const groups = useMemo(() => groupMatchesByDay(items), [items]);
+  const selectedVisible = useMemo(() => items.filter((m) => selectedIds.has(m.id)), [items, selectedIds]);
+  const selectedCount = selectedVisible.length;
+  const allSelected = items.length > 0 && selectedCount === items.length;
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setBulkOpen(false);
+    setBulkError(null);
+  };
+  const toggleSelected = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleSelectAll = () => setSelectedIds(allSelected ? new Set() : new Set(items.map((m) => m.id)));
+
+  const confirmBulkDelete = async () => {
+    if (bulkPending || selectedCount === 0) return;
+    const ids = selectedVisible.map((m) => m.id);
+    setBulkPending(true);
+    setBulkError(null);
+    try {
+      const res = await deleteMatches(ids);
+      if (!res.success) {
+        setBulkError(res.error || 'Could not delete the selected matches.');
+        return;
+      }
+      const gone = new Set(ids);
+      setItems((prev) => prev.filter((m) => !gone.has(m.id)));
+      setToast({ message: `${res.deleted ?? ids.length} ${(res.deleted ?? ids.length) === 1 ? 'match' : 'matches'} deleted.`, type: 'success' });
+      void refreshCounts();
+      exitSelectMode();
+    } catch {
+      setBulkError('Could not delete the selected matches.');
+    } finally {
+      setBulkPending(false);
+    }
+  };
   const resetMore = () => {
     setDivision(DEFAULT_MATCH_FACETS.division);
     setSort(DEFAULT_MATCH_FACETS.sort);
@@ -445,6 +495,15 @@ export default function AdminMatchExplorer({
         description="Enter results for matches that have been played, and schedule what is next."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={selectMode}
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+              className={cx(selectMode ? primaryBtn : secondaryBtn, 'max-sm:h-11')}
+            >
+              <HiOutlineCheckCircle aria-hidden className="h-4 w-4" />
+              {selectMode ? 'Done selecting' : 'Select'}
+            </button>
             <button type="button" onClick={() => setGenerateOpen(true)} className={cx(secondaryBtn, 'max-sm:h-11')}>
               <HiOutlineCalendarDays aria-hidden className="h-4 w-4" />
               Generate season
@@ -608,6 +667,35 @@ export default function AdminMatchExplorer({
               </div>
             )}
 
+            {selectMode && !scopeStale && items.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-admin-panel px-4 py-3">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-foreground sm:min-h-0">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 cursor-pointer accent-accent"
+                  />
+                  Select all shown ({items.length})
+                </label>
+                <span role="status" className="text-sm text-foreground-secondary">
+                  {selectedCount} selected
+                </span>
+                <button
+                  type="button"
+                  disabled={selectedCount === 0}
+                  onClick={() => {
+                    setBulkError(null);
+                    setBulkOpen(true);
+                  }}
+                  className={cx(dangerBtn, 'max-sm:h-11 sm:ml-auto')}
+                >
+                  <HiOutlineTrash aria-hidden className="h-4 w-4" />
+                  Delete selected ({selectedCount})
+                </button>
+              </div>
+            )}
+
             {scopeStale || items.length === 0 ? (
               (scopeStale || isLoading || isStale) && !refetchFailed ? (
                 <AdminSkeletonRows rows={5} />
@@ -652,9 +740,18 @@ export default function AdminMatchExplorer({
                               {divisionLabel(blockStart.division)} · {blockStart.count} {blockStart.count === 1 ? 'match' : 'matches'}
                             </li>
                           )}
-                          <li className={editing ? 'bg-surface-raised/40' : undefined}>
+                          <li className={editing ? 'bg-surface-raised/40' : selectMode && selectedIds.has(match.id) ? 'bg-surface-raised/30' : undefined}>
                             <div className="grid grid-cols-2 items-center gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[5.5rem_minmax(0,1fr)_auto_auto]">
-                              <span className="text-sm font-medium tabular-nums text-foreground-secondary max-sm:order-1">
+                              <span className="flex items-center gap-3 text-sm font-medium tabular-nums text-foreground-secondary max-sm:order-1">
+                                {selectMode && (
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Select ${name}`}
+                                    checked={selectedIds.has(match.id)}
+                                    onChange={() => toggleSelected(match.id)}
+                                    className="h-5 w-5 shrink-0 cursor-pointer accent-accent sm:h-4 sm:w-4"
+                                  />
+                                )}
                                 {formatNY(new Date(match.scheduledAt), 'time-bare')}
                               </span>
 
@@ -828,6 +925,19 @@ export default function AdminMatchExplorer({
           </div>
         </TabPanel>
       </Tabs>
+
+      <ConfirmActionDialog
+        isOpen={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title={`Delete ${selectedCount} ${selectedCount === 1 ? 'match' : 'matches'}?`}
+        message={`This permanently deletes ${selectedCount} ${selectedCount === 1 ? 'match' : 'matches'}, along with their results, game data and reschedule requests. This cannot be undone.`}
+        confirmLabel={`Delete ${selectedCount}`}
+        pendingLabel="Deleting…"
+        isPending={bulkPending}
+        tone="danger"
+        error={bulkError}
+        onConfirm={() => void confirmBulkDelete()}
+      />
 
       {/* One shared confirmation for the row menus' "Delete match…"; deletion stays explicit. */}
       <ConfirmDeleteButton
