@@ -131,7 +131,7 @@ export async function deleteMatch(id: string) {
 }
 
 /** Upper bound for one bulk delete; the explorer pages 25 at a time, so this is generous. */
-export const MAX_BULK_DELETE_MATCHES = 200;
+const MAX_BULK_DELETE_MATCHES = 200;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -29,7 +29,10 @@ vi.mock('@/app/lib/db', () => ({
 import { inArray } from 'drizzle-orm';
 import { updateTag } from 'next/cache';
 import { requirePermission } from '@/app/lib/auth';
-import { MAX_BULK_DELETE_MATCHES, deleteMatches } from '../actions';
+import { deleteMatches } from '../actions';
+
+// Not exported from the "use server" module (only async functions may be).
+const MAX_BULK_DELETE_MATCHES = 200;
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
