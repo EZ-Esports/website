@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mocks = vi.hoisted(() => ({ deleteMatches: vi.fn() }));
+const mocks = vi.hoisted(() => ({ deleteMatches: vi.fn(), fetchPage: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -16,7 +16,7 @@ vi.mock('@/app/(admin)/admin/matches/actions', () => ({
   deleteMatches: mocks.deleteMatches,
 }));
 vi.mock('@/app/lib/match-actions', () => ({
-  fetchStaffMatchesPage: vi.fn(async () => ({ items: [], nextCursor: null })),
+  fetchStaffMatchesPage: mocks.fetchPage,
   fetchStaffMatchTabCounts: vi.fn(async () => ({ 'needs-results': 0, upcoming: 3, completed: 0, all: 3 })),
 }));
 vi.mock('@/app/components/admin/ScheduleMatchDialog', () => ({ default: () => null }));
@@ -27,6 +27,7 @@ import AdminMatchExplorer from '../AdminMatchExplorer';
 afterEach(() => {
   cleanup();
   mocks.deleteMatches.mockReset();
+  mocks.fetchPage.mockReset();
 });
 
 const item = (n: number) => ({
@@ -83,8 +84,9 @@ describe('AdminMatchExplorer select mode', () => {
     expect((screen.getByRole('button', { name: 'Delete selected (0)' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('confirms with the count, deletes in one call, then exits select mode', async () => {
+  it('confirms with the count, deletes in one call, then refills from the server and stays in select mode', async () => {
     mocks.deleteMatches.mockResolvedValue({ success: true, deleted: 2 });
+    mocks.fetchPage.mockResolvedValue({ items: [item(3), item(4), item(5)], nextCursor: null });
     const user = userEvent.setup();
     renderExplorer();
     await user.click(screen.getByRole('button', { name: 'Select' }));
@@ -98,9 +100,10 @@ describe('AdminMatchExplorer select mode', () => {
 
     await waitFor(() => expect(mocks.deleteMatches).toHaveBeenCalledTimes(1));
     expect(mocks.deleteMatches).toHaveBeenCalledWith([item(1).id, item(2).id]);
-    await waitFor(() => expect(screen.queryAllByRole('checkbox')).toHaveLength(0));
+    expect(await screen.findByText('Home 5')).toBeTruthy();
     expect(screen.queryByText('Home 1')).toBeNull();
-    expect(screen.getByText('Home 3')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Done selecting' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete selected (0)' })).toBeTruthy();
   });
 
   it('keeps the dialog open and shows the error when the action fails', async () => {

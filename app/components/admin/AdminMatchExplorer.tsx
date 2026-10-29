@@ -483,8 +483,10 @@ export default function AdminMatchExplorer({
       const gone = new Set(ids);
       setItems((prev) => prev.filter((m) => !gone.has(m.id)));
       setToast({ message: `${res.deleted ?? ids.length} ${(res.deleted ?? ids.length) === 1 ? 'match' : 'matches'} deleted.`, type: 'success' });
-      void refreshCounts();
-      exitSelectMode();
+      // Stay in select mode and refetch page 1 so the next matches fill in; clearing a long list is repeated batches.
+      setSelectedIds(new Set());
+      setBulkOpen(false);
+      reload();
     } catch {
       setBulkError('Could not delete the selected matches.');
     } finally {
