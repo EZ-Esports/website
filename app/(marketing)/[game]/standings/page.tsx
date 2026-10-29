@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
@@ -50,10 +51,12 @@ function RankCell({ rank }: { rank: number | null }) {
 }
 
 function TeamStandingsTable({
+  game,
   rows,
   standingsFormat,
   outcomesPublic,
 }: {
+  game: string;
   rows: StandingRow[];
   standingsFormat: StandingsFormat;
   outcomesPublic: boolean;
@@ -83,17 +86,29 @@ function TeamStandingsTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
-          {rows.map((entry) => (
-            <Tr key={`${entry.division}-${entry.schoolName}`} interactive>
-              <Td className="font-bold">0</Td>
-              <Td className="font-bold text-foreground">
-                {standingsTeamLabel(entry, standingsFormat)}
-              </Td>
-              <Td className="font-medium">0-0</Td>
-              <Td className="font-bold text-foreground">0%</Td>
-              <Td className="font-medium">0</Td>
-            </Tr>
-          ))}
+          {rows.map((entry) => {
+            const teamLabel = standingsTeamLabel(entry, standingsFormat);
+            return (
+              <Tr key={`${entry.division}-${entry.schoolName}`} interactive>
+                <Td className="font-bold">0</Td>
+                <Td className="font-bold text-foreground">
+                  {entry.schoolSlug ? (
+                    <Link
+                      href={`/${game}/teams/${entry.schoolSlug}`}
+                      className="hover:text-[var(--game-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game-accent)] rounded transition-colors"
+                    >
+                      {teamLabel}
+                    </Link>
+                  ) : (
+                    teamLabel
+                  )}
+                </Td>
+                <Td className="font-medium">0-0</Td>
+                <Td className="font-bold text-foreground">0%</Td>
+                <Td className="font-medium">0</Td>
+              </Tr>
+            );
+          })}
         </tbody>
       </Table>
     );
@@ -111,32 +126,52 @@ function TeamStandingsTable({
         </tr>
       </thead>
       <tbody className="divide-y divide-line">
-        {rows.map((entry) => (
-          // The division is part of the key: in a combined table one school is
-          // two rows, and rank can be null on an unranked snapshot.
-          <Tr key={`${entry.rank}-${entry.division}-${entry.schoolName}`} interactive>
-            <Td className="font-bold">
-              <RankCell rank={entry.rank} />
-            </Td>
-            <Td className="font-bold text-foreground">
-              {standingsTeamLabel(entry, standingsFormat)}
-            </Td>
-            <Td className="font-medium">
-              {entry.wins ?? 0}-{entry.losses ?? 0}
-            </Td>
-            <Td className="font-bold text-foreground">
-              {entry.winPct !== null ? `${(entry.winPct * 100).toFixed(1)}%` : '—'}
-            </Td>
-            <Td className="font-medium">{entry.gamesPlayed ?? '—'}</Td>
-          </Tr>
-        ))}
+        {rows.map((entry) => {
+          const teamLabel = standingsTeamLabel(entry, standingsFormat);
+          return (
+            // The division is part of the key: in a combined table one school is
+            // two rows, and rank can be null on an unranked snapshot.
+            <Tr key={`${entry.rank}-${entry.division}-${entry.schoolName}`} interactive>
+              <Td className="font-bold">
+                <RankCell rank={entry.rank} />
+              </Td>
+              <Td className="font-bold text-foreground">
+                {entry.schoolSlug ? (
+                  <Link
+                    href={`/${game}/teams/${entry.schoolSlug}`}
+                    className="hover:text-[var(--game-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game-accent)] rounded transition-colors"
+                  >
+                    {teamLabel}
+                  </Link>
+                ) : (
+                  teamLabel
+                )}
+              </Td>
+              <Td className="font-medium">
+                {entry.wins ?? 0}-{entry.losses ?? 0}
+              </Td>
+              <Td className="font-bold text-foreground">
+                {entry.winPct !== null ? `${(entry.winPct * 100).toFixed(1)}%` : '—'}
+              </Td>
+              <Td className="font-medium">{entry.gamesPlayed ?? '—'}</Td>
+            </Tr>
+          );
+        })}
       </tbody>
     </Table>
   );
 }
 
 /** Individual (per-player) standings, e.g. TFT point leaderboards. */
-function PlayerStandingsTable({ rows, outcomesPublic }: { rows: StandingRow[]; outcomesPublic: boolean }) {
+function PlayerStandingsTable({
+  game,
+  rows,
+  outcomesPublic,
+}: {
+  game: string;
+  rows: StandingRow[];
+  outcomesPublic: boolean;
+}) {
   if (!outcomesPublic) {
     // Every stat column reads 0 for hidden seasons; no points are shown.
     return (
@@ -159,7 +194,18 @@ function PlayerStandingsTable({ rows, outcomesPublic }: { rows: StandingRow[]; o
                   <span className="text-foreground-muted font-medium ml-2">{entry.playerIgn}</span>
                 )}
               </Td>
-              <Td className="font-medium">{entry.schoolName}</Td>
+              <Td className="font-medium">
+                {entry.schoolSlug ? (
+                  <Link
+                    href={`/${game}/teams/${entry.schoolSlug}`}
+                    className="hover:text-[var(--game-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game-accent)] rounded transition-colors"
+                  >
+                    {entry.schoolName}
+                  </Link>
+                ) : (
+                  entry.schoolName
+                )}
+              </Td>
               <Td className="font-bold text-foreground">0</Td>
             </Tr>
           ))}
@@ -190,7 +236,18 @@ function PlayerStandingsTable({ rows, outcomesPublic }: { rows: StandingRow[]; o
                 <span className="text-foreground-muted font-medium ml-2">{entry.playerIgn}</span>
               )}
             </Td>
-            <Td className="font-medium">{entry.schoolName}</Td>
+            <Td className="font-medium">
+              {entry.schoolSlug ? (
+                <Link
+                  href={`/${game}/teams/${entry.schoolSlug}`}
+                  className="hover:text-[var(--game-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game-accent)] rounded transition-colors"
+                >
+                  {entry.schoolName}
+                </Link>
+              ) : (
+                entry.schoolName
+              )}
+            </Td>
             <Td className="font-bold text-foreground">
               {entry.points ?? pointsFromNotes(entry.notes) ?? '—'}
             </Td>
@@ -273,7 +330,7 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
   const isReconstructedTable = outcomesPublic && isDerivedStandings(standings);
 
   return (
-    <main>
+    <main style={{ '--game-accent': gameConfig.accent.color } as React.CSSProperties}>
       <Section>
         <SectionHeader
           as="h1"
@@ -336,9 +393,10 @@ export default async function StandingsPage({ params, searchParams }: StandingsP
               No standings recorded for this season and division yet.
             </div>
           ) : isIndividual ? (
-            <PlayerStandingsTable rows={standings} outcomesPublic={outcomesPublic} />
+            <PlayerStandingsTable game={game} rows={standings} outcomesPublic={outcomesPublic} />
           ) : (
             <TeamStandingsTable
+              game={game}
               rows={standings}
               standingsFormat={standingsFormat}
               outcomesPublic={outcomesPublic}
