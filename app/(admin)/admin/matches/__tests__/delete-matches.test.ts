@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   fail: false,
 }));
 
+vi.mock('drizzle-orm', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('drizzle-orm')>();
+  return { ...actual, inArray: vi.fn(actual.inArray) };
+});
 vi.mock('@/app/lib/auth', () => ({ requirePermission: vi.fn(async () => ({})) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }));
 vi.mock('@/app/lib/db', () => ({
@@ -22,6 +26,7 @@ vi.mock('@/app/lib/db', () => ({
   },
 }));
 
+import { inArray } from 'drizzle-orm';
 import { updateTag } from 'next/cache';
 import { requirePermission } from '@/app/lib/auth';
 import { MAX_BULK_DELETE_MATCHES, deleteMatches } from '../actions';
@@ -35,7 +40,9 @@ describe('deleteMatches', () => {
     mocks.fail = false;
     mocks.returned = [{ id: A }, { id: B }];
     vi.mocked(updateTag).mockClear();
-    vi.mocked(requirePermission).mockClear();
+    vi.mocked(requirePermission).mockReset();
+    vi.mocked(requirePermission).mockResolvedValue({} as never);
+    vi.mocked(inArray).mockClear();
   });
 
   it('requires the manage-matches permission', async () => {
@@ -59,6 +66,18 @@ describe('deleteMatches', () => {
     expect(res).toEqual({ success: true, deleted: 2 });
     expect(mocks.txCalls).toBe(1);
     expect(vi.mocked(updateTag).mock.calls.map((c) => c[0])).toEqual(['matches', 'rosters', 'teams']);
+  });
+
+  it('passes lowercased, de-duplicated ids to the delete', async () => {
+    await deleteMatches([A.toUpperCase(), A, B]);
+    const ids = vi.mocked(inArray).mock.calls[0][1];
+    expect(ids).toEqual([A, B]);
+  });
+
+  it('makes no database call when the permission check rejects', async () => {
+    vi.mocked(requirePermission).mockRejectedValueOnce(new Error('forbidden'));
+    await expect(deleteMatches([A])).rejects.toThrow('forbidden');
+    expect(mocks.txCalls).toBe(0);
   });
 
   it('returns an error and skips invalidation when the transaction fails', async () => {

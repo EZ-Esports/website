@@ -441,6 +441,18 @@ export default function AdminMatchExplorer({
   const selectedVisible = useMemo(() => items.filter((m) => selectedIds.has(m.id)), [items, selectedIds]);
   const selectedCount = selectedVisible.length;
   const allSelected = items.length > 0 && selectedCount === items.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  // Drop ids whose rows left the list (filter, tab or search change, a reload) so the
+  // selection never refers to matches staff can no longer see.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(items.map((m) => m.id));
+      const next = new Set([...prev].filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [items]);
 
   const exitSelectMode = () => {
     setSelectMode(false);
@@ -672,7 +684,11 @@ export default function AdminMatchExplorer({
                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-foreground sm:min-h-0">
                   <input
                     type="checkbox"
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected;
+                    }}
                     checked={allSelected}
+                    aria-checked={someSelected ? 'mixed' : allSelected}
                     onChange={toggleSelectAll}
                     className="h-4 w-4 cursor-pointer accent-accent"
                   />

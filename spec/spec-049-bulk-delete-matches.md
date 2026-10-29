@@ -13,7 +13,7 @@ Status: implemented, unmerged. No migration.
 - On success calls the shared `revalidateMatches()` (`updateTag` matches, rosters, teams, plus the same `revalidatePath`s). Returns `{ success, deleted }`; a failed transaction returns an error and invalidates nothing.
 
 ## Client notes
-The selection is a set of ids intersected with the rows on screen at delete time, so changing filters can never delete matches that are no longer visible.
+The selection is a set of ids, pruned whenever the loaded rows change (filter, tab, search, reload) and intersected with the rows on screen at delete time, so matches no longer visible can never be deleted. The select-all checkbox is indeterminate (`aria-checked="mixed"`) when only some rows are selected; pressing it then selects all, and pressing it when all are selected clears.
 
 ## Tests
-`app/(admin)/admin/matches/__tests__/delete-matches.test.ts` (permission, validation, single transaction, tags, failure). Not run against a database.
+`app/(admin)/admin/matches/__tests__/delete-matches.test.ts` (permission rejection means no DB call, validation, lowercased and de-duplicated ids passed to `inArray`, single transaction, tags, failure) and `app/components/admin/__tests__/AdminMatchExplorer.select.test.tsx` (select mode, mixed select-all, confirm and delete, error stays in dialog). Not run against a database.
