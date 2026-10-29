@@ -31,7 +31,7 @@ import {
   getSeasonStandingsFor,
   getTeamStandingsRecords,
 } from '../standings';
-import { getPublicSeasonMatches } from '../matches';
+import { getPublicMatchesPage, getPublicSeasonMatches } from '../matches';
 
 const FINALIZED = new Date('2026-10-18T00:00:00Z');
 
@@ -143,19 +143,24 @@ describe('season outcome gating in the data layer', () => {
     expect(map.get('t-public-Varsity')).toEqual({ wins: 3, losses: 4 });
   });
 
-  it('getPublicSeasonMatches strips scores only for seasons that are not published', async () => {
-    const m = (id: string, seasonId: string) => ({
-      id,
-      seasonId,
-      status: 'forfeit',
-      homeScore: 1,
-      awayScore: 0,
-      mvp: 'Ace',
-      notes: 'won',
-    });
-    mocks.queue.push([m('a', 'hidden'), m('b', 'public')], [{ id: 'public' }]);
-    const out = await getPublicSeasonMatches('whatever');
-    expect(out[0]).toMatchObject({ homeScore: null, awayScore: null, mvp: null, notes: null, status: 'completed' });
-    expect(out[1]).toMatchObject({ homeScore: 1, awayScore: 0, status: 'forfeit' });
+  it('getPublicSeasonMatches returns nothing for an unpublished or unknown season', async () => {
+    mocks.queue.push([{ id: 'public' }]);
+    expect(await getPublicSeasonMatches('hidden')).toEqual([]);
+    // Only the published-ids lookup ran; the match query was never issued.
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('getPublicSeasonMatches returns the raw schedule and scores of a published season', async () => {
+    const row = { id: 'a', seasonId: 'public', status: 'forfeit', homeScore: 1, awayScore: 0, mvp: 'Ace', notes: 'won' };
+    mocks.queue.push([{ id: 'public' }], [row]);
+    expect(await getPublicSeasonMatches('public')).toEqual([row]);
+  });
+
+  it('getPublicMatchesPage only queries published seasons and keeps rows as-is', async () => {
+    const row = { id: 'a', seasonId: 'public', status: 'scheduled', homeScore: null, awayScore: null };
+    mocks.queue.push([row]);
+    const page = await getPublicMatchesPage({ seasonId: 'public', limit: 20 });
+    expect(page.items).toEqual([row]);
+    expect(mocks.select).toHaveBeenCalledTimes(1);
   });
 });

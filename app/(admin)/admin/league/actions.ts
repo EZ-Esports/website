@@ -222,7 +222,7 @@ export async function unlockSeasonRosters(seasonId: string) {
 
 /**
  * Sets or clears `seasons.outcomes_finalized_at`, which gates every public view of
- * the season's scores, results, standings and records (see `areOutcomesPublic`).
+ * the season's matches, scores, results, standings and records (see `areOutcomesPublic`).
  * Public reads sit behind the `seasons`, `matches`, `teams` and `rosters` tags and
  * several per-route pages, so all of them are refreshed here.
  */
@@ -253,6 +253,8 @@ async function setSeasonOutcomesFinalized(seasonId: string, finalized: boolean) 
       }
     }
     revalidateLeague();
+    // `matches` backs the cached homepage results; `seasons` (via revalidateLeague, which also
+    // refreshes `/`) backs the public season list that carries the published flag.
     updateTag('matches');
     updateTag('rosters');
     for (const path of [

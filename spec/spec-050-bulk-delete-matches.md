@@ -1,4 +1,4 @@
-# spec-049: Bulk delete matches
+# spec-050: Bulk delete matches
 
 Status: implemented, unmerged. No migration.
 
