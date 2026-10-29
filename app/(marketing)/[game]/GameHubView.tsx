@@ -507,7 +507,14 @@ export default async function GameHubView({ params, division }: GameHubViewProps
                           the form guide was keyed by, and only the label carries
                           the squad that tells a combined table's two Brooklyn
                           Technical rows apart. */}
-                      <Td className="font-bold text-foreground">{entry.teamLabel}</Td>
+                      <Td className="font-bold text-foreground">
+                        <Link
+                          href={`/${slug}/teams/${entry.schoolSlug}`}
+                          className="hover:text-[var(--game-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--game-accent)] rounded transition-colors"
+                        >
+                          {entry.teamLabel}
+                        </Link>
+                      </Td>
                       {/* Hidden outcomes: every record reads 0-0, never a redacted blank. */}
                       {!outcomesPublic && <Td className="font-medium whitespace-nowrap">0-0</Td>}
                       {outcomesPublic && entry.wins !== null && entry.losses !== null && (
