@@ -17,6 +17,7 @@ import {
   type StandingsFormat,
 } from './match-page';
 import { areOutcomesPublic, redactStandingRows } from '../season-outcomes';
+import { slugify } from '../text-utils';
 
 /**
  * `canonicalDivision` as a SQL expression, so a division filter can be pushed
@@ -97,6 +98,7 @@ export function buildSeasonStandingsSnapshotQuery(opts: {
   return db
     .select({
       schoolName: schema.schools.name,
+      schoolSlug: schema.schools.slug,
       division: schema.seasonStandings.division,
       rank: schema.seasonStandings.rank,
       wins: schema.seasonStandings.wins,
@@ -130,6 +132,7 @@ export function buildSeasonStandingsComputedQuery(opts: {
   return db
     .select({
       schoolName: schema.schools.name,
+      schoolSlug: schema.schools.slug,
       division: schema.rosterStandings.division,
       wins: schema.rosterStandings.wins,
       losses: schema.rosterStandings.losses,
@@ -314,6 +317,7 @@ export async function getGameSeasonSummary(seasonId: string) {
     db
       .select({
         schoolName: schema.schools.name,
+        schoolSlug: schema.schools.slug,
         division: schema.seasonStandings.division,
         rank: schema.seasonStandings.rank,
         wins: schema.seasonStandings.wins,
@@ -358,6 +362,7 @@ export async function getGameSeasonSummary(seasonId: string) {
     (outcomesPublic ? rows.slice(0, 5) : rows).map((r, i) => ({
       rank: outcomesPublic ? (r.rank ?? i + 1) : null,
       team: r.schoolName,
+      schoolSlug: r.schoolSlug ?? slugify(r.schoolName),
       teamLabel: r.playerName ? `${r.playerName} (${r.schoolName})` : standingsTeamLabel(r, standingsFormat),
       division: canonicalDivision(r.division),
       wins: outcomesPublic ? (r.wins ?? 0) : null,

@@ -465,6 +465,7 @@ export function normalizeSort(sort: unknown): MatchSort {
 /** Unified row served to standings UIs from either source. */
 export interface StandingRow {
   schoolName: string;
+  schoolSlug?: string | null;
   division: string;
   rank: number | null;
   wins: number | null;
@@ -508,7 +509,13 @@ export interface SeasonStandingsResult {
  * the computed fallback and the derived snapshot order a tie the same way.
  */
 export function rankComputedStandings(
-  rows: { schoolName: string; division: string; wins: number | null; losses: number | null }[]
+  rows: {
+    schoolName: string;
+    schoolSlug?: string | null;
+    division: string;
+    wins: number | null;
+    losses: number | null;
+  }[]
 ): StandingRow[] {
   const sorted = [...rows].sort((a, b) => {
     const winsDiff = (b.wins ?? 0) - (a.wins ?? 0);
@@ -525,6 +532,7 @@ export function rankComputedStandings(
     const played = wins + losses;
     return {
       schoolName: row.schoolName,
+      schoolSlug: row.schoolSlug ?? null,
       division: row.division,
       rank: i + 1,
       wins,
