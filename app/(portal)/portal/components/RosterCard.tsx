@@ -228,7 +228,7 @@ export function RosterCard({
                 <HiOutlineXCircle className="w-4 h-4 text-rose-400 shrink-0" />
               )}
               <span className="min-w-0">
-                Size: {gateResult.stats.startersCount} Starters + {gateResult.stats.subsCount} Sub (Min 6)
+                Size: {gateResult.stats.startersCount} Starters + {gateResult.stats.subsCount} Sub (Min 5)
               </span>
             </div>
 

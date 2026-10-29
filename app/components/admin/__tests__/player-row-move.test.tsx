@@ -46,21 +46,21 @@ describe('staff PlayerRowActions: Move control', () => {
   });
 
   it('does not offer a full roster: the button is disabled and says why', () => {
-    const html = render([{ id: 'r-jv', name: 'JV', playerCount: 7, subCount: 0 }]);
-    expect(html).toContain('aria-label="JV is full (7/7): Ana Lee (currently Varsity)"');
+    const html = render([{ id: 'r-jv', name: 'JV', playerCount: 10, subCount: 0 }]);
+    expect(html).toContain('aria-label="JV is full (10/10): Ana Lee (currently Varsity)"');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="JV is full/);
     expect(html).not.toContain('Move to JV');
   });
 
-  it('does not offer a roster with 2 subs to a sub, but does to a starter', () => {
-    const target = [{ id: 'r-jv', name: 'JV', playerCount: 5, subCount: 2 }];
-    expect(render(target, { id: 'p1', name: 'Ana Lee', role: 'sub' } as never)).toContain('JV has 2 subs');
+  it('does not offer a roster with 5 subs to a sub, but does to a starter', () => {
+    const target = [{ id: 'r-jv', name: 'JV', playerCount: 5, subCount: 5 }];
+    expect(render(target, { id: 'p1', name: 'Ana Lee', role: 'sub' } as never)).toContain('JV has 5 subs');
     expect(render(target)).toContain('Move to JV');
   });
 
   it('disables a full roster inside the menu too', () => {
     const html = render([
-      { id: 'r-jv', name: 'JV', playerCount: 7, subCount: 0 },
+      { id: 'r-jv', name: 'JV', playerCount: 10, subCount: 0 },
       { id: 'r-alt', name: 'Academy', playerCount: 3, subCount: 0 },
     ]);
     // Items render when the menu opens; the trigger stays enabled because Academy can take the player.
@@ -70,9 +70,9 @@ describe('staff PlayerRowActions: Move control', () => {
 });
 
 describe('staff AddPlayerButton', () => {
-  it('says "Roster full (7/7)" and is disabled at the cap', () => {
-    const html = renderToStaticMarkup(<AddPlayerButton open={false} onClick={vi.fn()} full playerCount={7} />);
-    expect(html).toContain('Roster full (7/7)');
+  it('says "Roster full (10/10)" and is disabled at the cap', () => {
+    const html = renderToStaticMarkup(<AddPlayerButton open={false} onClick={vi.fn()} full playerCount={10} />);
+    expect(html).toContain('Roster full (10/10)');
     expect(html).toContain('disabled=""');
   });
 

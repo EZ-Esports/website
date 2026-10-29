@@ -11,8 +11,8 @@
  *   import these constants: being allowed to field a roster and being allowed to grow it are
  *   separate rules.
  */
-export const MAX_ROSTER_PLAYERS = 7;
-export const MAX_ROSTER_SUBS = 2;
+export const MAX_ROSTER_PLAYERS = 10;
+export const MAX_ROSTER_SUBS = 5;
 
 export interface RosterOccupancy {
   /** All players on the roster, counting the person being added or changed only if already there. */

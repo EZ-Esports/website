@@ -683,7 +683,7 @@ export interface RosterEligibilityResult {
 
 /**
  * Evaluates the 5-Point Validation Gate for tournament registration:
- * 1. Roster size meets game minimum (>= 5 starters, >= 1 sub, total >= 6).
+ * 1. Roster size meets the minimum (>= 5 starters; substitutes are optional). No maximum.
  * 2. Exactly 1 team captain.
  * 3. 100% of players have linked Riot ID.
  * 4. 100% of players have linked Discord account.
@@ -744,15 +744,13 @@ export async function getRosterEligibility(params: {
 
   const reasons: string[] = [];
 
-  // Gate 1: Roster size (5 starters + >= 1 sub = min 6)
-  const minSizePass = totalPlayers >= 6 && starters.length >= 5 && subs.length >= 1;
+  // Gate 1: Roster size (min 5 starters; subs are optional, and there is no maximum here)
+  const minSizePass = totalPlayers >= 5 && starters.length >= 5;
   if (!minSizePass) {
-    if (totalPlayers < 6) {
-      reasons.push(`Roster size must be at least 6 players (currently ${totalPlayers})`);
-    } else if (starters.length < 5) {
+    if (totalPlayers < 5) {
+      reasons.push(`Roster size must be at least 5 players (currently ${totalPlayers})`);
+    } else {
       reasons.push(`Roster must have at least 5 starters (currently ${starters.length})`);
-    } else if (subs.length < 1) {
-      reasons.push('Roster must have at least 1 substitute player');
     }
   }
 
@@ -1741,7 +1739,7 @@ const MOVE_RACE_MESSAGE =
  * survive. Both rosters are authorized and lock-checked through `assertManagerForRoster`, and
  * must share a team: a move never crosses games, seasons or schools. A captain arrives as a
  * regular starter because captaincy is per roster; a sub stays a sub. The target roster must have
- * room under the size limits in roster-limits.ts (7 players, 2 subs).
+ * room under the size limits in roster-limits.ts (10 players, 5 subs).
  *
  * Expected rejections (wrong team, already on the target, full target, a stale row) are RETURNED as
  * `{ success: false, error }` because Next.js hides thrown messages in production. Authorization,
