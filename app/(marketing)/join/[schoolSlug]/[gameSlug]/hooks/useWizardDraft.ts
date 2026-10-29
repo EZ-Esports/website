@@ -157,7 +157,7 @@ export function useWizardDraft(
       tosAcknowledged,
       // Normalized here too: a name edited right before Continue may not have blurred yet.
       participantLegalName: capitalizeNameWords(participantLegalName),
-      guardianFullName,
+      guardianFullName: capitalizeNameWords(guardianFullName),
       guardianRelationship,
       guardianEmail,
       guardianSignature,

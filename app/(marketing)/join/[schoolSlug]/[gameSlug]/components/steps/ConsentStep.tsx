@@ -181,6 +181,7 @@ export function ConsentStep({
                   autoComplete="off"
                   value={guardianFullName}
                   onChange={(e) => setGuardianFullName(e.target.value)}
+                  onBlur={(e) => setGuardianFullName(capitalizeNameWords(e.target.value))}
                   className={inputClass}
                   required
                 />
