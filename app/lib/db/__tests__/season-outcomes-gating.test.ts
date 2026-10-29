@@ -102,6 +102,7 @@ describe('season outcome gating in the data layer', () => {
       expect(t.wins).toBeNull();
       expect(t.losses).toBeNull();
       expect(t.winPct).toBeNull();
+      expect(t.schoolSlug).toBeDefined();
     }
   });
 
@@ -114,6 +115,7 @@ describe('season outcome gating in the data layer', () => {
     expect(summary.outcomesPublic).toBe(true);
     expect(summary.topTeams).toHaveLength(5);
     expect(summary.topTeams[0]).toMatchObject({ team: 'Echo', rank: 1, wins: 8 });
+    expect(summary.topTeams[0].schoolSlug).toBe('echo');
   });
 
   it('getTeamStandingsRecords publishes nothing for hidden seasons and keeps finalized ones', async () => {

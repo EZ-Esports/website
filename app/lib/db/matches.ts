@@ -665,6 +665,7 @@ export interface GameHubData {
     rank: number | null;
     team: string;
     teamLabel: string;
+    schoolSlug: string;
     division: CanonicalDivision;
     wins: number | null;
     losses: number | null;
