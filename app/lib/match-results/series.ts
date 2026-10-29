@@ -54,7 +54,7 @@ export type AttributionResult =
 
 /**
  * Decides which school played each side of one game. A side belongs to a school only when EVERY
- * player on it is on that school's roster (starters and subs alike: a roster holds up to 7 and any
+ * player on it is on that school's roster (starters and subs alike: a roster holds up to 10 and any
  * 5 may play), and the two sides must belong to different schools. Sides may swap between games.
  * Anyone on a side who is not on that school's roster rejects the game, naming the Riot IDs.
  */

@@ -1030,20 +1030,20 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(gate.stats.subsCount).toBe(1);
     });
 
-    it('a full roster (7 players, 2 subs) is still eligible: eligibility has no maximum', async () => {
-      setupRosterWithPlayers({ totalCount: 7, captainCount: 1, subCount: 2 });
+    it('a full roster (10 players, 5 subs) is still eligible: eligibility has no maximum', async () => {
+      setupRosterWithPlayers({ totalCount: 10, captainCount: 1, subCount: 5 });
 
       const gate = await getRosterEligibility({ rosterId });
 
       expect(gate.eligible).toBe(true);
       expect(gate.reasons).toEqual([]);
-      expect(gate.stats.totalPlayers).toBe(7);
-      expect(gate.stats.subsCount).toBe(2);
+      expect(gate.stats.totalPlayers).toBe(10);
+      expect(gate.stats.subsCount).toBe(5);
       expect(gate.gateChecks).toEqual({ minSize: true, singleCaptain: true, riotLinked: true, discordLinked: true, inGuild: true });
     });
 
-    it('an over-the-cap roster (9 players, 4 subs) gets no max-based reason either', async () => {
-      setupRosterWithPlayers({ totalCount: 9, captainCount: 1, subCount: 4 });
+    it('an over-the-cap roster (12 players, 7 subs) gets no max-based reason either', async () => {
+      setupRosterWithPlayers({ totalCount: 12, captainCount: 1, subCount: 7 });
 
       const gate = await getRosterEligibility({ rosterId });
 
@@ -1059,17 +1059,36 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(end).toBeGreaterThan(start);
       const body = source.slice(start, end);
       expect(body).not.toMatch(/MAX_ROSTER|roster-limits|rosterCapacityError|moveBlockedReason/);
-      expect(body).toContain('totalPlayers >= 6');
+      expect(body).toContain('totalPlayers >= 5');
     });
 
-    it('fails Gate 1 if roster has fewer than 6 players or no substitute', async () => {
-      // 5 starters, 0 subs
+    it('passes Gate 1 with the bare minimum: 5 starters and no substitutes', async () => {
+      // 5 starters (one captain), 0 subs
       setupRosterWithPlayers({ totalCount: 5, captainCount: 1, subCount: 0 });
+
+      const gate = await getRosterEligibility({ rosterId });
+      expect(gate.gateChecks.minSize).toBe(true);
+      expect(gate.reasons.some((r) => /substitute|at least 5 players|starters/.test(r))).toBe(false);
+      expect(gate.eligible).toBe(true);
+    });
+
+    it('fails Gate 1 if the roster has fewer than 5 starters, even with a substitute', async () => {
+      // 4 starters + 1 sub: five players in total, but only four of them start
+      setupRosterWithPlayers({ totalCount: 5, captainCount: 1, subCount: 1 });
 
       const gate = await getRosterEligibility({ rosterId });
       expect(gate.eligible).toBe(false);
       expect(gate.gateChecks.minSize).toBe(false);
-      expect(gate.reasons.some((r) => r.includes('Roster size must be at least 6'))).toBe(true);
+      expect(gate.stats.startersCount).toBe(4);
+      expect(gate.reasons).toContain('Roster must have at least 5 starters (currently 4)');
+    });
+
+    it('fails Gate 1 with fewer than 5 players in total', async () => {
+      setupRosterWithPlayers({ totalCount: 4, captainCount: 1, subCount: 0 });
+
+      const gate = await getRosterEligibility({ rosterId });
+      expect(gate.eligible).toBe(false);
+      expect(gate.reasons).toContain('Roster size must be at least 5 players (currently 4)');
     });
 
     it('fails Gate 2 if roster has 0 captains or multiple captains', async () => {
@@ -2621,7 +2640,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
   });
 
-  describe('12. Roster size limits (7 players, 2 subs)', () => {
+  describe('12. Roster size limits (10 players, 5 subs)', () => {
     const val = 'team-val';
     const varsity = 'roster-varsity';
     const jv = 'roster-jv';
@@ -2682,34 +2701,34 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     describe('enrolling', () => {
-      it('allows the 7th player and refuses the 8th, writing nothing', async () => {
-        fill(varsity, 6);
+      it('allows the 10th player and refuses the 11th, writing nothing', async () => {
+        fill(varsity, 9);
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' })).resolves.toMatchObject({ success: true });
-        expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+        expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(10);
 
         mocks.mockNotify.mockClear();
         const before = snapshot();
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-mover' })).resolves.toEqual({
           success: false,
-          error: 'Varsity is full (7 of 7 players).',
+          error: 'Varsity is full (10 of 10 players).',
         });
         expect(snapshot()).toBe(before);
         expect(mocks.mockNotify).not.toHaveBeenCalled();
       });
 
-      it('refuses a third substitute but accepts the second', async () => {
-        fill(varsity, 4, 1);
+      it('refuses a sixth substitute but accepts the fifth', async () => {
+        fill(varsity, 5, 4);
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' })).resolves.toMatchObject({ success: true });
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-mover', role: 'sub' })).resolves.toEqual({
           success: false,
-          error: 'Varsity already has 2 substitutes.',
+          error: 'Varsity already has 5 substitutes.',
         });
-        // A starter still fits: the roster has 5 players, so this is the 6th.
+        // A starter still fits: the roster has 6 players, so this is the 7th.
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-mover', role: 'player' })).resolves.toMatchObject({ success: true });
       });
 
       it('lets someone already on a full roster have their role edited (nobody joins)', async () => {
-        fill(varsity, 6);
+        fill(varsity, 9);
         mocks.state.playersStore.push({ id: 'pl-new', rosterId: varsity, memberId: 'm-new', role: 'player', isCaptain: false, ign: 'x' });
         await expect(enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' })).resolves.toMatchObject({ success: true });
       });
@@ -2732,8 +2751,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     describe('self-exclusion', () => {
-      it('a student already on the roster as one of its 2 subs can be re-enrolled as a sub (they are not counted twice)', async () => {
-        fill(varsity, 4, 1);
+      it('a student already on the roster as one of its 5 subs can be re-enrolled as a sub (they are not counted twice)', async () => {
+        fill(varsity, 5, 4);
         mocks.state.playersStore.push({ id: 'pl-self', rosterId: varsity, memberId: 'm-new', role: 'sub', isCaptain: false, ign: 'x' });
         const res = await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new', role: 'sub' });
         expect(res).toMatchObject({ success: true });
@@ -2746,30 +2765,30 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       });
 
       it('refuses a full target roster and leaves the player where they were', async () => {
-        fill(jv, 7);
+        fill(jv, 10);
         const before = snapshot();
         const res = await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' });
-        expect(res).toEqual({ success: false, error: 'JV is full (7 of 7 players).' });
+        expect(res).toEqual({ success: false, error: 'JV is full (10 of 10 players).' });
         expect(snapshot()).toBe(before);
         expect(mocks.mockNotify).not.toHaveBeenCalled();
       });
 
-      it('accepts a target with 6 players (becomes 7)', async () => {
-        fill(jv, 6);
+      it('accepts a target with 9 players (becomes 10)', async () => {
+        fill(jv, 9);
         await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' })).resolves.toMatchObject({ success: true });
       });
 
       it('moving OUT of a full roster is fine', async () => {
-        fill(varsity, 6); // plus the mover: 7
+        fill(varsity, 9); // plus the mover: 10
         await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' })).resolves.toMatchObject({ success: true });
       });
 
-      it('refuses a sub when the target already has 2 subs, but a starter may go', async () => {
-        fill(jv, 3, 2);
+      it('refuses a sub when the target already has 5 subs, but a starter may go', async () => {
+        fill(jv, 6, 5);
         mocks.state.playersStore.push({ id: 'pl-sub', rosterId: varsity, memberId: 'm-new', role: 'sub', isCaptain: false, ign: 'S' });
         await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' })).resolves.toEqual({
           success: false,
-          error: 'JV already has 2 substitutes.',
+          error: 'JV already has 5 substitutes.',
         });
         await expect(movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' })).resolves.toMatchObject({ success: true });
       });
@@ -2792,14 +2811,14 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
 
     describe('role changes', () => {
       beforeEach(() => {
-        fill(varsity, 4, 2); // two subs already
+        fill(varsity, 6, 5); // five subs already
         mocks.state.playersStore.push({ id: 'pl-starter', rosterId: varsity, memberId: 'm-new', role: 'player', isCaptain: false, ign: 'S' });
       });
 
-      it('refuses changing a starter to sub when two OTHER subs exist, and changes nothing', async () => {
+      it('refuses changing a starter to sub when five OTHER subs exist, and changes nothing', async () => {
         const before = snapshot();
         const res = await updateRosterPlayerRole({ rosterId: varsity, playerId: 'pl-starter', role: 'sub' });
-        expect(res).toEqual({ success: false, error: 'Varsity already has 2 substitutes.' });
+        expect(res).toEqual({ success: false, error: 'Varsity already has 5 substitutes.' });
         expect(snapshot()).toBe(before);
         expect(mocks.mockNotify).not.toHaveBeenCalled();
       });
@@ -2809,12 +2828,13 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         await expect(updateRosterPlayerRole({ rosterId: varsity, playerId: subId, role: 'sub' })).resolves.toMatchObject({ success: true });
       });
 
-      it('does not apply the player-count cap (7 players, role edit to captain works)', async () => {
+      it('does not apply the player-count cap (10 players, role edit to captain works)', async () => {
         mocks.state.playersStore.push(
           { id: 'x1', rosterId: varsity, memberId: 'xm1', role: 'player', isCaptain: false, ign: 'x' },
-          { id: 'x2', rosterId: varsity, memberId: 'xm2', role: 'player', isCaptain: false, ign: 'x' }
+          { id: 'x2', rosterId: varsity, memberId: 'xm2', role: 'player', isCaptain: false, ign: 'x' },
+          { id: 'x3', rosterId: varsity, memberId: 'xm3', role: 'player', isCaptain: false, ign: 'x' }
         );
-        expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+        expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(10);
         await expect(updateRosterPlayerRole({ rosterId: varsity, playerId: 'pl-starter', role: 'captain' })).resolves.toMatchObject({ success: true });
       });
 
@@ -2831,19 +2851,19 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       });
     });
 
-    it('emergencySwapSub keeps the sub count unchanged, so a full 7/2 roster can still swap', async () => {
-      fill(varsity, 5, 1);
+    it('emergencySwapSub keeps the sub count unchanged, so a full 10/5 roster can still swap', async () => {
+      fill(varsity, 8, 4);
       mocks.state.playersStore.push(
         { id: 'pl-out', rosterId: varsity, memberId: 'm-new', role: 'player', isCaptain: false, ign: 'O' },
         { id: 'pl-in', rosterId: varsity, memberId: 'm-mover', role: 'sub', isCaptain: false, ign: 'I' }
       );
       const subsBefore = mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.role === 'sub').length;
-      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
-      expect(subsBefore).toBe(2);
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(10);
+      expect(subsBefore).toBe(5);
 
       await expect(emergencySwapSub({ rosterId: varsity, outPlayerId: 'pl-out', inPlayerId: 'pl-in' })).resolves.toMatchObject({ success: true });
-      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.role === 'sub')).toHaveLength(2);
-      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(7);
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity && p.role === 'sub')).toHaveLength(5);
+      expect(mocks.state.playersStore.filter((p) => p.rosterId === varsity)).toHaveLength(10);
     });
   });
   describe('13. Invite season scope and roster enrollment eligibility (spec-047)', () => {

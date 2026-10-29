@@ -145,38 +145,38 @@ describe('RosterCard: roster size limits', () => {
   });
 
   it('shows the player count against the cap and keeps Enroll available below it', () => {
-    const html = render({ roster: withPlayers(6, 1) });
-    expect(html).toContain('6/7 players');
-    expect(html).toContain('(1/2 subs)');
+    const html = render({ roster: withPlayers(9, 4) });
+    expect(html).toContain('9/10 players');
+    expect(html).toContain('(4/5 subs)');
     expect(html).toContain('Enroll Player');
   });
 
-  it('at 7 players the Enroll control is disabled and reads "Roster full (7/7)"', () => {
-    const html = render({ roster: withPlayers(7, 2) });
-    expect(html).toContain('7/7 players');
-    expect(html).toContain('Roster full (7/7)');
+  it('at 10 players the Enroll control is disabled and reads "Roster full (10/10)"', () => {
+    const html = render({ roster: withPlayers(10, 5) });
+    expect(html).toContain('10/10 players');
+    expect(html).toContain('Roster full (10/10)');
     expect(html).not.toContain('Enroll Player');
-    expect(/<button[^>]*\sdisabled=""[^>]*>(?:(?!<\/button>).)*Roster full \(7\/7\)/s.test(html)).toBe(true);
+    expect(/<button[^>]*\sdisabled=""[^>]*>(?:(?!<\/button>).)*Roster full \(10\/10\)/s.test(html)).toBe(true);
   });
 
-  it('disables the Sub option in the role select when two other subs already fill the slots', () => {
-    const html = render({ roster: withPlayers(5, 2) });
-    // Starters cannot become a third sub; the two subs themselves are not blocked from staying subs.
+  it('disables the Sub option in the role select when five other subs already fill the slots', () => {
+    const html = render({ roster: withPlayers(8, 5) });
+    // Starters cannot become a sixth sub; the five subs themselves are not blocked from staying subs.
     expect(html).toMatch(/<option value="sub" disabled="">Sub<\/option>/);
   });
 
   it('does not offer a full roster as a Move target, and says why', () => {
-    const html = render({ onMovePlayer: vi.fn(), siblingRosters: [{ id: 'r-jv', name: 'JV', playerCount: 7, subCount: 2 }] });
-    expect(html).toContain('JV is full (7/7)');
-    expect(html).toContain('aria-label="JV is full (7/7): Ana Lee (currently Varsity)"');
+    const html = render({ onMovePlayer: vi.fn(), siblingRosters: [{ id: 'r-jv', name: 'JV', playerCount: 10, subCount: 5 }] });
+    expect(html).toContain('JV is full (10/10)');
+    expect(html).toContain('aria-label="JV is full (10/10): Ana Lee (currently Varsity)"');
     expect(html).not.toContain('Move to JV');
     // Disabled (RAC renders disabled=""), not merely labelled.
     expect(/<button[^>]*\sdisabled=""[^>]*aria-label="JV is full/.test(html)).toBe(true);
   });
 
-  it('does not offer a roster with 2 subs to a sub player', () => {
+  it('does not offer a roster with 5 subs to a sub player', () => {
     const subRoster: SchoolRosterDetails = { ...roster, players: [{ ...roster.players[0], role: 'sub' }] };
-    const html = render({ roster: subRoster, onMovePlayer: vi.fn(), siblingRosters: [{ id: 'r-jv', name: 'JV', playerCount: 4, subCount: 2 }] });
-    expect(html).toContain('JV has 2 subs');
+    const html = render({ roster: subRoster, onMovePlayer: vi.fn(), siblingRosters: [{ id: 'r-jv', name: 'JV', playerCount: 4, subCount: 5 }] });
+    expect(html).toContain('JV has 5 subs');
   });
 });

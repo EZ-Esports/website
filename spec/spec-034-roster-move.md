@@ -1,7 +1,7 @@
 # spec-034: Move a player between sibling rosters, and roster size limits
 
 - **Spec ID:** spec-034
-- **Title:** One tier per game: managers and staff move a player between a team's rosters; enrolling twice is refused; a roster holds at most 7 players and 2 subs
+- **Title:** One tier per game: managers and staff move a player between a team's rosters; enrolling twice is refused; a roster holds at most 10 players and 5 subs (numbers superseded by [spec-048](spec-048-roster-size-10-and-five-subs.md))
 - **Status:** Implemented on branch `feat/roster-move` (not merged at the time of writing). No migration.
 - **PR / Commit:** pending
 - **Date:** 2026-10-26
@@ -11,23 +11,25 @@
 
 The league rule: a student cannot be on both Varsity and JV of the same game. A team is one school, one game and one season; its rows in `rosters` (Varsity, JV, and any extra the school made) are **siblings**. Across different games a student can still be on a different tier. Until now nothing enforced this: enrolling a student on the second roster silently double-enrolled them, and fixing a wrong placement meant removing and re-enrolling (losing the in-game name and bio).
 
-## Roster size limits (7 players, 2 subs)
+## Roster size limits (10 players, 5 subs)
 
-Owner's rule: a roster holds at most `MAX_ROSTER_PLAYERS = 7` players and at most `MAX_ROSTER_SUBS = 2` of them substitutes; at 7 players, adding to the roster is locked. Both constants live in `app/lib/onboarding/roster-limits.ts` (pure, shared by the server actions and the UIs; the pure helpers `rosterCapacityError`, `occupancyOf`, `moveBlockedReason` live there too). Every row in `players` counts toward the 7, whatever its role (player, captain, sub, coach), which matches the count the roster cards show.
+> **Superseded numbers.** This section was first written with 7 players and 2 subs. [spec-048](spec-048-roster-size-10-and-five-subs.md) raised them to 10 and 5 and changed the tournament eligibility minimum; the rules below are otherwise unchanged. Read the numbers here as historical.
 
-| Path | Player cap (7) | Sub cap (2) |
+Owner's rule (original): a roster holds at most `MAX_ROSTER_PLAYERS` players and at most `MAX_ROSTER_SUBS` of them substitutes (now 10 and 5); at the cap, adding to the roster is locked. Both constants live in `app/lib/onboarding/roster-limits.ts` (pure, shared by the server actions and the UIs; the pure helpers `rosterCapacityError`, `occupancyOf`, `moveBlockedReason` live there too). Every row in `players` counts toward the 10, whatever its role (player, captain, sub, coach), which matches the count the roster cards show.
+
+| Path | Player cap (10) | Sub cap (5) |
 | --- | --- | --- |
-| Manager `enrollPlayerToRoster`, invite approval (`reviewPlayerInvite`), staff `createPlayer` (existing or new member) | Refused when the roster already has 7 | Refused when the role is sub and 2 other subs exist |
-| Manager `movePlayerToRoster`, staff `moveRosterMember` | Refused when the TARGET has 7 (moving out of a full roster is fine) | Refused when the mover is a sub and the target has 2 subs |
-| Manager `updateRosterPlayerRole`, staff `updatePlayer` | Not applied (nobody joins) | Refused when changing to sub and 2 OTHER subs exist; a sub may stay a sub |
+| Manager `enrollPlayerToRoster` (the placement step after an invite is accepted; `reviewPlayerInvite` itself writes no `players` row), staff `createPlayer` (existing or new member) | Refused when the roster already has 10 | Refused when the role is sub and 5 other subs exist |
+| Manager `movePlayerToRoster`, staff `moveRosterMember` | Refused when the TARGET has 10 (moving out of a full roster is fine) | Refused when the mover is a sub and the target has 5 subs |
+| Manager `updateRosterPlayerRole`, staff `updatePlayer` | Not applied (nobody joins) | Refused when changing to sub and 5 OTHER subs exist; a sub may stay a sub |
 | `emergencySwapSub` | Not applied | Not applied: it swaps a starter and a sub, so both counts are unchanged (a test documents this) |
 
-- Messages: "Varsity is full (7 of 7 players)." and "Varsity already has 2 substitutes." Returned as `{ success: false, error }` like the other roster rejections; staff actions add "Nothing was saved." on add/edit.
+- Messages: "Varsity is full (10 of 10 players)." and "Varsity already has 5 substitutes." Returned as `{ success: false, error }` like the other roster rejections; staff actions add "Nothing was saved." on add/edit.
 - **Race-safe counting.** Each transaction that counts takes `pg_advisory_xact_lock` on the roster (`lockRoster`, key `roster:<rosterId>`) and counts inside the transaction. Locks are always acquired member-then-roster (`lockRosterMember`, then `lockRoster`), and a transaction takes the roster lock of only one roster (a move locks the target), so lock order is consistent and cannot deadlock. Tests assert the lock is taken before the count.
-- **Eligibility stays minimum-only.** `getRosterEligibility` (>= 6 players, >= 5 starters, >= 1 sub, exactly 1 captain, Riot, Discord, in guild) has no maximum and must not import these constants. A test proves a 7-player/2-sub roster is eligible, that even an over-cap roster gets no max-based reason, and that the function body does not reference the limits.
+- **Eligibility stays minimum-only.** `getRosterEligibility` (>= 5 starters, exactly 1 captain, Riot, Discord, in guild; as of spec-048 no substitute is required) has no maximum and must not import these constants. A test proves a 10-player/5-sub roster is eligible, that even an over-cap roster gets no max-based reason, and that the function body does not reference the limits.
 - **App-level only.** There is no database constraint, so seed scripts and hand-run SQL bypass the caps. Rosters that already exceed them are left alone and are not auto-fixed (they cannot be added to, and can still be edited, moved out of or emptied).
 - **Staff are held to the caps** by default because they are league rules. An override for staff was not built (see the report on this change): it would need an explicit, audited action rather than a silent bypass.
-- **UI.** Roster cards show `N/7 players` (and `(n/2 subs)`); at 7 the Enroll / Add player control is disabled and reads "Roster full (7/7)"; the Move control does not offer a full target (the button stays, disabled, reading e.g. "JV is full (7/7)"; in the menu the item is disabled) and does not offer a roster with 2 subs to a sub ("JV has 2 subs"); the Sub option of the role select is disabled when 2 other subs exist. The live region for outcomes is unchanged.
+- **UI.** Roster cards show `N/10 players` (and `(n/5 subs)`); at 10 the Enroll / Add player control is disabled and reads "Roster full (10/10)"; the Move control does not offer a full target (the button stays, disabled, reading e.g. "JV is full (10/10)"; in the menu the item is disabled) and does not offer a roster with 5 subs to a sub ("JV has 5 subs"); the Sub option of the role select is disabled when 5 other subs exist. The live region for outcomes is unchanged.
 - **Captain behaviour is unchanged by this change**: one captain per roster, enforced by the database (see below), nothing across Varsity and JV.
 
 ### How captain uniqueness works today

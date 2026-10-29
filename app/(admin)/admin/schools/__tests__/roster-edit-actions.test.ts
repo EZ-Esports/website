@@ -687,45 +687,45 @@ describe('staff roster moves and the sibling-roster rule', () => {
     expect(mocks.notify).not.toHaveBeenCalled();
   });
 
-  describe('roster size limits (7 players, 2 subs)', () => {
+  describe('roster size limits (10 players, 5 subs)', () => {
     const rows = (n: number, subs = 0, prefix = 'r') =>
       Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, role: i >= n - subs ? 'sub' : 'player' }));
 
-    it('createPlayer refuses an 8th player on a full roster and writes nothing', async () => {
-      mocks.rosterRoles = rows(7);
+    it('createPlayer refuses an 11th player on a full roster and writes nothing', async () => {
+      mocks.rosterRoles = rows(10);
       const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }));
-      expect(res).toEqual({ success: false, error: 'Varsity is full (7 of 7 players). Nothing was saved.' });
+      expect(res).toEqual({ success: false, error: 'Varsity is full (10 of 10 players). Nothing was saved.' });
       expect(mocks.writes).toHaveLength(0);
       expect(mocks.notify).not.toHaveBeenCalled();
       expect(mocks.updateTag).not.toHaveBeenCalled();
     });
 
-    it('createPlayer accepts the 7th player', async () => {
-      mocks.rosterRoles = rows(6);
+    it('createPlayer accepts the 10th player', async () => {
+      mocks.rosterRoles = rows(9);
       expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'player' }))).toEqual({ success: true });
     });
 
     it('createPlayer applies the cap to a brand-new member too, without creating the member', async () => {
-      mocks.rosterRoles = rows(7);
+      mocks.rosterRoles = rows(10);
       const res = await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', firstName: 'A', lastName: 'B', role: 'player' }));
       expect(res).toMatchObject({ success: false });
       expect(mocks.writes).toHaveLength(0);
     });
 
-    it('createPlayer refuses a third sub but accepts a second', async () => {
-      mocks.rosterRoles = rows(5, 2);
+    it('createPlayer refuses a sixth sub but accepts a fifth', async () => {
+      mocks.rosterRoles = rows(8, 5);
       expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'sub' }))).toEqual({
         success: false,
-        error: 'Varsity already has 2 substitutes. Nothing was saved.',
+        error: 'Varsity already has 5 substitutes. Nothing was saved.',
       });
-      mocks.rosterRoles = rows(5, 1);
+      mocks.rosterRoles = rows(8, 4);
       expect(await createPlayer(SCHOOL, form({ rosterId: 'roster-ok', memberId: 'member-ok', role: 'sub' }))).toEqual({ success: true });
     });
 
-    it('updatePlayer refuses changing someone to sub when two OTHER subs exist', async () => {
-      mocks.rosterRoles = [...rows(3), { id: 's1', role: 'sub' }, { id: 's2', role: 'sub' }, { id: 'player-ok', role: 'player' }];
+    it('updatePlayer refuses changing someone to sub when five OTHER subs exist', async () => {
+      mocks.rosterRoles = [...rows(3), ...rows(5, 5, 's'), { id: 'player-ok', role: 'player' }];
       const res = await updatePlayer(SCHOOL, 'player-ok', form({ role: 'sub', firstName: 'A', lastName: 'B' }));
-      expect(res).toEqual({ success: false, error: 'Varsity already has 2 substitutes. Nothing was saved.' });
+      expect(res).toEqual({ success: false, error: 'Varsity already has 5 substitutes. Nothing was saved.' });
       expect(playerWrites()).toHaveLength(0);
       expect(mocks.notify).not.toHaveBeenCalled();
     });
@@ -736,23 +736,23 @@ describe('staff roster moves and the sibling-roster rule', () => {
     });
 
     it('updatePlayer to a non-sub role is not capped and does not count at all', async () => {
-      mocks.rosterRoles = rows(7, 2);
+      mocks.rosterRoles = rows(10, 5);
       expect(await updatePlayer(SCHOOL, 'player-ok', form({ role: 'captain', firstName: 'A', lastName: 'B' }))).toEqual({ success: true });
       expect(mocks.rosterPlayerRoles).not.toHaveBeenCalled();
     });
 
     it('moveRosterMember refuses a full target roster', async () => {
-      mocks.rosterRoles = rows(7);
+      mocks.rosterRoles = rows(10);
       const res = await moveRosterMember(SCHOOL, 'player-captain', 'roster-jv');
-      expect(res).toEqual({ success: false, error: 'JV is full (7 of 7 players).' });
+      expect(res).toEqual({ success: false, error: 'JV is full (10 of 10 players).' });
       expect(mocks.writes).toHaveLength(0);
       expect(mocks.notify).not.toHaveBeenCalled();
     });
 
-    it('moveRosterMember refuses a sub when the target has 2 subs, but a starter may go', async () => {
-      mocks.rosterRoles = rows(5, 2);
+    it('moveRosterMember refuses a sub when the target has 5 subs, but a starter may go', async () => {
+      mocks.rosterRoles = rows(8, 5);
       // player-ok is a sub in the fixture.
-      expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).toEqual({ success: false, error: 'JV already has 2 substitutes.' });
+      expect(await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv')).toEqual({ success: false, error: 'JV already has 5 substitutes.' });
       // A captain arrives as a starter, so only the player-count cap could stop it.
       expect(await moveRosterMember(SCHOOL, 'player-captain', 'roster-jv')).toMatchObject({ success: true });
     });
