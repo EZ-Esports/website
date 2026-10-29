@@ -45,7 +45,6 @@ import {
   getOutcomesPublicSeasonIds,
   hubDivisionSql,
 } from './standings';
-import { redactHiddenMatches } from '../season-outcomes';
 import type { SchoolMatchRow } from '../school-matches';
 import { canonicalGameSlug, dbGameSlug } from '../constants';
 
@@ -116,8 +115,11 @@ function matchListOrder(direction: typeof asc | typeof desc) {
 }
 
 /** Every facet except the tab, sort and cursor: shared by the page query and the tab counts. */
-function facetConditions(params: MatchesPageParams): SQL[] {
+function facetConditions(params: MatchesPageParams, publicOnly = false): SQL[] {
   const conditions: SQL[] = [];
+  // Public reads see only published seasons' matches; an unpublished season's schedule is as
+  // hidden as its scores. `seasons` is joined by every query that passes this flag.
+  if (publicOnly) conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
   if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
   if (params.division && params.division !== COMBINED_DIVISION) {
@@ -145,11 +147,11 @@ function facetConditions(params: MatchesPageParams): SQL[] {
  * the previous page. Fetches one extra row to detect whether more remain.
  * Uncached: filter permutations are unbounded and admin edits must be fresh.
  */
-export function buildMatchesPageQuery(params: MatchesPageParams) {
+export function buildMatchesPageQuery(params: MatchesPageParams, publicOnly = false) {
   const sort = normalizeSort(params.sort);
   const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
 
-  const conditions: SQL[] = facetConditions(params);
+  const conditions: SQL[] = facetConditions(params, publicOnly);
   if (params.tab) {
     const tabCondition = matchTabCondition(params.tab, params.now ?? new Date());
     if (tabCondition) conditions.push(tabCondition);
@@ -204,9 +206,12 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     .limit(limit + 1);
 }
 
-export async function getMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+export async function getMatchesPage(
+  params: MatchesPageParams,
+  publicOnly = false
+): Promise<MatchesPage> {
   const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
-  const rows = await buildMatchesPageQuery({ ...params, limit });
+  const rows = await buildMatchesPageQuery({ ...params, limit }, publicOnly);
 
   const items = rows.slice(0, limit);
   const last = items[items.length - 1];
@@ -257,14 +262,13 @@ export async function getMatchTabCounts(
 }
 
 /**
- * Public schedule page: same rows, but a season whose outcomes are not
- * published has its scores, MVP, notes and forfeit flag stripped here. Public
- * code must use this (and `getPublicSeasonMatches`), not the raw
- * `getMatchesPage`, which is for staff views.
+ * Public schedule page: same rows, but only for seasons staff have published.
+ * Matches of an unpublished season (scheduled or played) are filtered in SQL so
+ * keyset paging stays exact. Public code must use this (and
+ * `getPublicSeasonMatches`), not the raw `getMatchesPage`, which is for staff views.
  */
 export async function getPublicMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
-  const [page, publicIds] = await Promise.all([getMatchesPage(params), getOutcomesPublicSeasonIds()]);
-  return { ...page, items: redactHiddenMatches(page.items, publicIds) };
+  return getMatchesPage(params, true);
 }
 
 export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
@@ -311,13 +315,11 @@ export async function getSeasonMatches(seasonId: string, division?: string) {
   return buildSeasonMatchesQuery(seasonId, division);
 }
 
-/** Public counterpart of `getSeasonMatches`; see `getPublicMatchesPage`. */
+/** Public counterpart of `getSeasonMatches`: an unpublished (or unknown) season yields no matches. */
 export async function getPublicSeasonMatches(seasonId: string, division?: string) {
-  const [matches, publicIds] = await Promise.all([
-    getSeasonMatches(seasonId, division),
-    getOutcomesPublicSeasonIds(),
-  ]);
-  return redactHiddenMatches(matches, publicIds);
+  const publicIds = await getOutcomesPublicSeasonIds();
+  if (!publicIds.has(seasonId)) return [];
+  return getSeasonMatches(seasonId, division);
 }
 
 /**
@@ -533,7 +535,8 @@ export async function getArchiveIndex() {
     const c = s.outcomesPublic ? championBySeason.get(s.id) : undefined;
     return {
       ...s,
-      matchCount: countBySeason.get(s.id) ?? 0,
+      // An unpublished season's match count would reveal its schedule size.
+      matchCount: s.outcomesPublic ? (countBySeason.get(s.id) ?? 0) : 0,
       champion: c?.champion ?? null,
       championSchool: c?.championSchool ?? null,
     };
@@ -760,7 +763,8 @@ export async function getGameHubData(
         form: formGuides.get(entry.team) ?? [],
       }));
 
-      if (scheduledRows[0]) {
+      // An unpublished season's next fixture is hidden along with the rest of its schedule.
+      if (outcomesPublic && scheduledRows[0]) {
         nextMatch = {
           date: scheduledRows[0].scheduledAt.toLocaleDateString('en-US', {
             timeZone: 'America/New_York',

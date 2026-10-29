@@ -40,7 +40,7 @@ interface DBSeason {
   standingsFormat?: string;
   /** Set while staff have locked this season's rosters against manager changes. */
   rostersLockedAt?: Date | string | null;
-  /** Set once staff publish this season's results; null keeps scores, standings and records off the public site. */
+  /** Set once staff publish the season; null keeps its matches, scores, standings and records off the public site. */
   outcomesFinalizedAt?: Date | string | null;
 }
 
@@ -214,7 +214,7 @@ export default function LeagueSetupClient({
             />
           ) : undefined
         }
-        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager works on the season whose name matches their affiliation (YYYY-YY), active or not. Scores, results, standings and records stay hidden from the public until you publish a season's results."
+        description="Matches and team registrations attach to a season. Active seasons show on the public site, and a school manager works on the season whose name matches their affiliation (YYYY-YY), active or not. A season's matches, scores, standings and records stay hidden from the public until you publish the season."
       >
         {games.length === 0 ? (
           <AdminEmptyState compact icon={<HiOutlineCalendarDays />} title="Create a game first before adding seasons." />
@@ -301,10 +301,10 @@ export default function LeagueSetupClient({
                         setOutcomesTarget({
                           seasonId: s.id,
                           publishing,
-                          title: `${publishing ? 'Publish' : 'Hide'} results for ${game?.displayName ?? 'this game'} ${s.name}?`,
+                          title: `${publishing ? 'Publish' : 'Unpublish'} season for ${game?.displayName ?? 'this game'} ${s.name}?`,
                           message: publishing
-                            ? 'Scores, match results, standings, team records and champions for this season will become visible on the public site, the homepage and the archive. Only publish once the results for the season are complete.'
-                            : 'Scores, match results, standings, team records and champions for this season will be removed from the public site. Schedules and team lists stay. Staff views are not affected.',
+                            ? 'The schedule, match results, standings, team records and champions for this season will become visible on the public site, the homepage and the archive. Publish once the season schedule and results are ready for the public.'
+                            : 'The schedule, match results, standings, team records and champions for this season will be removed from the public site. Team lists stay. Staff views are not affected.',
                         });
                       }}
                       onDelete={() =>
@@ -340,8 +340,8 @@ export default function LeagueSetupClient({
         }}
         title={outcomesTarget?.title ?? ''}
         message={outcomesTarget?.message ?? ''}
-        confirmLabel={outcomesTarget?.publishing ? 'Publish results' : 'Hide results'}
-        pendingLabel={outcomesTarget?.publishing ? 'Publishing…' : 'Hiding…'}
+        confirmLabel={outcomesTarget?.publishing ? 'Publish season' : 'Unpublish season'}
+        pendingLabel={outcomesTarget?.publishing ? 'Publishing…' : 'Unpublishing…'}
         isPending={isPending}
         icon={outcomesTarget?.publishing ? <FiEye className="h-5 w-5" /> : <FiEyeOff className="h-5 w-5" />}
         onConfirm={async () => {
@@ -349,7 +349,7 @@ export default function LeagueSetupClient({
           const { seasonId, publishing } = outcomesTarget;
           await runAction(
             () => (publishing ? publishSeasonOutcomes(seasonId) : hideSeasonOutcomes(seasonId)),
-            publishing ? 'Results published.' : 'Results hidden.',
+            publishing ? 'Season published.' : 'Season unpublished.',
           );
           setOutcomesTarget(null);
         }}
@@ -520,7 +520,7 @@ function SeasonRow({
             <span className={`${chip('neutral')} capitalize`}>{season.standingsFormat ?? 'divided'}</span>
             <span className={chip(published ? 'success' : 'neutral')}>
               {published ? <FiEye aria-hidden className="h-3 w-3" /> : <FiEyeOff aria-hidden className="h-3 w-3" />}
-              {published ? 'Results public' : 'Results hidden'}
+              {published ? 'Season published' : 'Season unpublished'}
             </span>
             {locked && (
               <span className={chip('warning')}>
@@ -556,11 +556,11 @@ function SeasonRow({
               onClick={onToggleOutcomes}
               disabled={isPending}
               className={chipButton(published ? 'ghost' : 'warning')}
-              aria-label={published ? `Hide results for season ${season.name}` : `Publish results for season ${season.name}`}
-              title={published ? 'Remove scores, standings and records from the public site' : 'Show scores, standings and records on the public site'}
+              aria-label={published ? `Unpublish season ${season.name}` : `Publish season ${season.name}`}
+              title={published ? 'Remove the schedule, scores, standings and records from the public site' : 'Show the schedule, scores, standings and records on the public site'}
             >
               {published ? <FiEyeOff aria-hidden className="h-3.5 w-3.5" /> : <FiEye aria-hidden className="h-3.5 w-3.5" />}
-              {published ? 'Hide results' : 'Publish results'}
+              {published ? 'Unpublish season' : 'Publish season'}
             </button>
             <RowIconButton kind="edit" onClick={() => setEditing(true)} label={`Edit season ${season.name}`} />
             <button type="button" onClick={onDelete} className={deleteIconBtn} aria-label={`Delete season ${season.name}`} title={`Delete season ${season.name}`}><FiTrash2 aria-hidden="true" className="h-4 w-4" /></button>
