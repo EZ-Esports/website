@@ -214,6 +214,16 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Members are matched by email only. A person who uses a different email on a second invite but the same Discord account is still refused with `discord_already_linked`; matching by Discord was deliberately not added.
 - `upsertMemberRecord` overwrites `members.school_id`, so a person who uses an invite from a second school is moved to it (existing behaviour, now reachable for managers who play).
 - The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).
+## Google Form onboarding (spec-051, #322)
+
+- **Migration `0057` is not applied.** Deploy the code first, then migrate (it drops `student_demographics`), then set `GOOGLE_FORM_WEBHOOK_SECRET` and configure the form. Owner action.
+- **Never tested against a real Google Form or Apps Script.** First real run should add the trigger, submit a test response from a pending invite's prefilled link and watch the completion count.
+- **No manual staff override** for a missing completion. `source = 'manual'` is reserved in the table and unused. Add a staff action if a student's Google trigger ever fails.
+- The webhook rate limiter is the existing in-process one (resets on cold start, per instance). Replace together with the other limiters if they move to Redis.
+- The staff page and the wizard step have not been looked at in a browser.
+- The role editor drops retired bit 12 from a role only when that role is saved; stored masks are not rewritten by the migration.
+- Retiring the bit left `Permissions` with a gap at 12; new permissions start at 13.
+
 ## Generate season follow-ups (spec-046)
 
 - The lock, bulk inserts and UI have not been exercised against a real database or in a browser.

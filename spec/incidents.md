@@ -212,6 +212,12 @@ Migration 0052 (consents) was merged and deployed before it was applied, and onb
 
 ---
 
+## 22. Review of the lost Google Form attempt: nine failure modes (spec-051, Oct 2026)
+
+An earlier attempt at the Google Form step (never pushed, unrecoverable) was reviewed and nine defects listed on issue #322. They are now design rules in [spec-051](spec-051-google-form-onboarding.md): retry 408/429/5xx in the Apps Script and charge the rate limiter only after failed auth (Google's script comes from a shared address pool, and a 429 silently dropped a completion); the generic `MANAGE_CONTENT` editor must never write rows that belong to a `MANAGE_LEAGUE` page (`ONBOARDING_FORM_KEYS` refused in save and restore); a retired permission bit must be masked in `canGrantPermissions`, otherwise stored roles become un-assignable with no visible reason; an expired token must be explained to the student, not just rejected; only links that honour prefill (`/viewform`, `/d/e/`) are accepted; the bearer credential and the HMAC root must be different derived keys; every completion row needs a cleanup path (member cascade, roster removal, invite delete, purge); the form's setup steps must say what the verification question's description is; a `manual` source is reserved, not built. Also: deploying code before its migration (pattern 21) applies in reverse here, since `0057` drops a table the old code writes, so code goes first.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
