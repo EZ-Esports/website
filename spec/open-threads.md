@@ -221,6 +221,8 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **No manual staff override** for a missing completion. `source = 'manual'` is reserved in the table and unused. Add a staff action if a student's Google trigger ever fails.
 - The webhook's failed-auth rate limiter is the existing in-memory one (`rate-limit.ts`): per serverless instance, reset on cold start, not shared. Best-effort only; valid callers are never counted. Replace with Upstash together with the other limiters.
 - Swapping the Google Form needs the script and `WEBHOOK_KEY` pasted into the new form and its trigger authorized (each form has its own Apps Script); the old form's trigger should be deleted. Documented on the staff page.
+- **Second invite vs "Limit to 1 response".** The staff page recommends Google's "Limit to 1 response" (sign-in required). Completions are per invite, so a person with a second invite (another game or season) cannot submit the same form again and cannot get a second completion. Needs a new form per round, response editing, or the manual override (not built).
+- **Prefill with sign-in required is untested.** Whether a pre-filled link still carries the verification code when the form requires Google sign-in has not been tried against a real form; the checklist's test step is where it would show.
 - The wizard hides the form step when the page-load lookup fails; the server's `onboarding_form_required` rejection reveals it.
 - The staff page and the wizard step have not been looked at in a browser.
 - The role editor drops retired bit 12 from a role only when that role is saved; stored masks are not rewritten by the migration.

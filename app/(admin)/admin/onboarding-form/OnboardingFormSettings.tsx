@@ -65,8 +65,9 @@ export function OnboardingFormSettingsForm({ initialUrl, initialEntryId }: Setti
         />
       </AdminField>
       <p className="text-xs leading-5 text-foreground-secondary">
-        Leave both empty to turn the onboarding form off. Students and managers then skip that step. Saving a
-        different link replaces the form for everyone who has not finished yet.
+        Leave both empty to turn the onboarding form off. Students and managers then skip that step. Saving is what switches
+        the requirement on for students, and saving a different link replaces the form for everyone who has not
+        finished yet.
       </p>
       {message && <AdminNotice tone={message.tone}>{message.text}</AdminNotice>}
       <AdminFormActions>
