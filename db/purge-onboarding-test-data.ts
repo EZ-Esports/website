@@ -42,12 +42,14 @@ import { assertSeedTargetAllowed, seedTargetHost } from './seed-target';
  * Tables this script deletes from, in the order it deletes (children first).
  * `onboarding_content_flags` (staff review records for overridden content warnings) is not listed:
  * its member FK is ON DELETE CASCADE, so deleting a member removes it, and it may not exist yet.
+ * `onboarding_form_completions` is listed (it must exist: run this only after migration 0057) because
+ * a completion can exist before its member does, so the member cascade alone would leave it behind.
  */
 export const DELETE_ORDER = [
   'match_reschedule_options',
   'match_reschedule_requests',
   'onboarding_consents',
-  'student_demographics',
+  'onboarding_form_completions',
   'player_identities',
   'players',
   'player_invites',
@@ -79,7 +81,8 @@ export interface Snapshot {
   teams: { id: string; seasonId: string }[];
   seasons: { id: string; name: string; isActive: boolean }[];
   playerIdentities: { id: string; memberId: string; provider: string }[];
-  studentDemographics: { id: string; memberId: string }[];
+  /** Id-only rows (spec-051). `memberId` is null until the submission creates the member. */
+  onboardingFormCompletions: { id: string; memberId: string | null; inviteKind: string; inviteId: string }[];
   onboardingConsents: { id: string; memberId: string; inviteId: string }[];
   /** `draftText` is the submission draft serialised to text, or null. Searched for staff emails. */
   playerInvites: { id: string; memberId: string | null; draftText: string | null }[];
@@ -194,7 +197,7 @@ const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
  *   - their name equals a staff member's or a people row's name (ambiguous, so protect);
  *   - an invite's saved draft mentions a staff email.
  * Anything protected keeps its member row, school_managers rows, invites, consents,
- * demographics, identities, players and (via authProtected) its auth user.
+ * form completions, identities, players and (via authProtected) its auth user.
  *
  * Roster history is never destroyed on a guess. A member is deleted only when every one of
  * their `players` rows sits on a roster whose season is the ACTIVE season of its game, and
@@ -325,7 +328,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
   for (const x of s.managerInvites) if (x.memberId) linked.add(x.memberId);
   for (const x of s.schoolManagers) if (x.memberId) linked.add(x.memberId);
   for (const x of s.onboardingConsents) linked.add(x.memberId);
-  for (const x of s.studentDemographics) linked.add(x.memberId);
+  for (const x of s.onboardingFormCompletions) if (x.memberId) linked.add(x.memberId);
   for (const x of s.playerIdentities) linked.add(x.memberId);
 
   // --- roster history: which season is each players row on? -------------------
@@ -404,7 +407,11 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
     match_reschedule_options: s.rescheduleOptions.filter((o) => deletedRequestIds.has(o.requestId)).map((o) => o.id),
     match_reschedule_requests: [...deletedRequestIds],
     onboarding_consents: s.onboardingConsents.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
-    student_demographics: s.studentDemographics.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
+    // Deleted unless its invite is protected or it belongs to a protected (staff) member. Completions
+    // whose invite is already gone and that never reached a member are deleted too: they are inert.
+    onboarding_form_completions: s.onboardingFormCompletions
+      .filter((r) => !protectedInvite.has(r.inviteId) && !(r.memberId && staffMemberIds.has(r.memberId)))
+      .map((r) => r.id),
     player_identities: s.playerIdentities.filter((r) => nonStaffLinked.has(r.memberId)).map((r) => r.id),
     players: s.players.filter((r) => deleteMemberSet.has(r.memberId)).map((r) => r.id),
     player_invites: s.playerInvites.filter((r) => !protectedInvite.has(r.id)).map((r) => r.id),
@@ -419,7 +426,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
     match_reschedule_options: s.rescheduleOptions.length,
     match_reschedule_requests: s.rescheduleRequests.length,
     onboarding_consents: s.onboardingConsents.length,
-    student_demographics: s.studentDemographics.length,
+    onboarding_form_completions: s.onboardingFormCompletions.length,
     player_identities: s.playerIdentities.length,
     players: s.players.length,
     player_invites: s.playerInvites.length,
@@ -432,7 +439,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
     match_reschedule_options: s.rescheduleOptions.filter((o) => keptRequestIds.has(o.requestId)).length,
     match_reschedule_requests: keptRequestIds.size,
     onboarding_consents: s.onboardingConsents.filter((r) => inScopeProtectedMembers(r.memberId)).length,
-    student_demographics: s.studentDemographics.filter((r) => inScopeProtectedMembers(r.memberId)).length,
+    onboarding_form_completions: s.onboardingFormCompletions.filter((r) => protectedInvite.has(r.inviteId) || (r.memberId !== null && staffMemberIds.has(r.memberId))).length,
     player_identities: s.playerIdentities.filter((r) => inScopeProtectedMembers(r.memberId)).length,
     players: s.players.filter((r) => inScopeProtectedMembers(r.memberId)).length,
     player_invites: s.playerInvites.filter((r) => protectedInvite.has(r.id)).length,
@@ -969,7 +976,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
     for (const run of thunks) out.push(await run());
     return out;
   };
-  const [members, players, rosters, teams, seasons, identities, demos, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead] =
+  const [members, players, rosters, teams, seasons, identities, formCompletions, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead] =
     await runOneAtATime([
       q('select m.id, m.first_name, m.last_name, m.email, m.member_key, coalesce(s.name, \'\') as school_name from members m left join schools s on s.id = m.school_id'),
       q('select id, member_id, roster_id from players'),
@@ -977,7 +984,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
       q('select id, season_id from teams'),
       q('select id, name, is_active from seasons'),
       q('select id, member_id, provider from player_identities'),
-      q('select id, member_id from student_demographics'),
+      q('select id, member_id, invite_kind, invite_id from onboarding_form_completions'),
       q('select id, member_id, invite_id from onboarding_consents'),
       q('select id, member_id, submission_draft::text as draft from player_invites'),
       q('select id, member_id, submission_draft::text as draft from manager_invites'),
@@ -1004,7 +1011,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
     teams: teams.map((r) => ({ id: String(r.id), seasonId: String(r.season_id) })),
     seasons: seasons.map((r) => ({ id: String(r.id), name: String(r.name), isActive: r.is_active === true })),
     playerIdentities: identities.map((r) => ({ id: String(r.id), memberId: String(r.member_id), provider: String(r.provider) })),
-    studentDemographics: demos.map((r) => ({ id: String(r.id), memberId: String(r.member_id) })),
+    onboardingFormCompletions: formCompletions.map((r) => ({ id: String(r.id), memberId: str(r.member_id), inviteKind: String(r.invite_kind), inviteId: String(r.invite_id) })),
     onboardingConsents: consents.map((r) => ({ id: String(r.id), memberId: String(r.member_id), inviteId: String(r.invite_id) })),
     playerInvites: pInv.map((r) => ({ id: String(r.id), memberId: str(r.member_id), draftText: str(r.draft) })),
     managerInvites: mInv.map((r) => ({ id: String(r.id), memberId: str(r.member_id), draftText: str(r.draft) })),

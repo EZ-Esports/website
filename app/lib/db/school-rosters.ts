@@ -16,9 +16,7 @@ import {
  * Roster data for one school, across every game and season, for the staff
  * Schools & Rosters page (where staff also edit it). Deliberately uncached
  * (admin reads are raw so an edit shows immediately) and limited to the
- * columns the admin roster views already show. `student_demographics` is never joined: it
- * has its own permission (VIEW_STUDENT_DEMOGRAPHICS). Callers must have already
- * checked MANAGE_ROSTERS.
+ * columns the admin roster views already show. Callers must have already checked MANAGE_ROSTERS.
  */
 export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlock[]> {
   const teams = await db
@@ -125,7 +123,7 @@ export async function getSchoolForRosterView(schoolId: string) {
   return school ?? null;
 }
 
-/** What the staff editing controls need beyond the rosters themselves. Never reads demographics. */
+/** What the staff editing controls need beyond the rosters themselves. Display fields only. */
 export async function getRosterEditOptions(schoolId: string): Promise<RosterEditOptions> {
   const [members, games, seasons] = await Promise.all([
     db

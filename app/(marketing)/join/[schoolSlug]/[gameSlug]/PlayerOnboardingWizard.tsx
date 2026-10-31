@@ -17,14 +17,15 @@ import {
 } from '@/app/lib/onboarding/wizard-actions';
 import { listenDiscordResult } from '@/app/lib/onboarding/discord-channel';
 import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
-import { stepForRejection, type InviteData } from './types';
+import { FORM_STEP, stepForRejection, type InviteData } from './types';
 import { useWizardDraft } from './hooks/useWizardDraft';
 import { WizardProgressStepper } from './components/WizardProgressStepper';
 import { SuccessStep } from './components/SuccessStep';
 import { AccountInfoStep } from './components/steps/AccountInfoStep';
 import { DiscordStep } from './components/steps/DiscordStep';
 import { GameIdentityStep } from './components/steps/GameIdentityStep';
-import { DemographicsStep } from './components/steps/DemographicsStep';
+import { BirthDateRulesStep } from './components/steps/BirthDateRulesStep';
+import { OnboardingFormStep } from './components/steps/OnboardingFormStep';
 import { ConsentStep } from './components/steps/ConsentStep';
 
 export type { InviteData };
@@ -46,6 +47,12 @@ interface PlayerOnboardingWizardProps {
   discordError?: string | null;
   /** True when returning from the Discord callback, so the wizard resumes at the Discord step. */
   resumeAtDiscord?: boolean;
+  /**
+   * Staff-configured onboarding Google Form. When `enabled` the wizard has a sixth step and the server
+   * refuses a submission until the form's completion is recorded. `completed` is the server's answer
+   * at page load; it is never set from the browser alone.
+   */
+  onboardingForm?: { enabled: boolean; completed: boolean };
 }
 
 export default function PlayerOnboardingWizard({
@@ -54,7 +61,17 @@ export default function PlayerOnboardingWizard({
   discord: discordProp = null,
   discordError = null,
   resumeAtDiscord = false,
+  onboardingForm = { enabled: false, completed: false },
 }: PlayerOnboardingWizardProps) {
+  // State, not a constant: the page-load answer can be stale (staff turned the form on while this page was
+  // open) or missing (the lookup failed). The server's `onboarding_form_required` rejection is the authority
+  // and switches the step on, so a student can never be stuck on a wizard that has no way to satisfy it.
+  const [formEnabled, setFormEnabled] = useState<boolean>(onboardingForm.enabled);
+  const totalSteps = formEnabled ? FORM_STEP : 5;
+  const [formCompleted, setFormCompleted] = useState<boolean>(onboardingForm.completed);
+  // The server's "form required" message, so it can be withdrawn once the completion shows up instead of
+  // sitting in red next to the green "we received your form" state. Other errors are left alone.
+  const formRequiredMessage = useRef<string | null>(null);
   const isManagerInvite = inviteData.role === 'manager';
   // The password is deliberately not kept in the saved draft, so a manager coming back from Discord
   // starts again at step 1 to re-enter it; a player resumes straight at the Discord step.
@@ -81,6 +98,19 @@ export default function PlayerOnboardingWizard({
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const { isManager } = draft;
 
+  const handleFormCompleted = useCallback(
+    (completed: boolean) => {
+      setFormCompleted(completed);
+      if (completed && formRequiredMessage.current) {
+        const stale = formRequiredMessage.current;
+        formRequiredMessage.current = null;
+        draft.setErrorMessage((current) => (current === stale ? null : current));
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setErrorMessage is a stable state setter
+    [draft.setErrorMessage]
+  );
+
   function handleNext() {
     if (step === 1 && draft.validateStep1()) {
       setStep(2);
@@ -90,6 +120,8 @@ export default function PlayerOnboardingWizard({
       setStep(4);
     } else if (step === 4 && draft.validateStep4()) {
       setStep(5);
+    } else if (step === 5 && formEnabled && draft.validateStep5()) {
+      setStep(FORM_STEP);
     }
   }
 
@@ -264,6 +296,12 @@ export default function PlayerOnboardingWizard({
     if (!draft.validateStep5()) {
       return;
     }
+    // Early feedback only: the server re-checks the recorded completion and is the authority.
+    if (formEnabled && !formCompleted) {
+      setStep(FORM_STEP);
+      draft.setErrorMessage('Please finish the onboarding form on this step first. We will unlock the button as soon as we receive it.');
+      return;
+    }
     // A lost or short password would otherwise only fail on the server; send the manager back to fix it.
     if (isManager && !draft.validateStep1()) {
       setStep(1);
@@ -283,20 +321,6 @@ export default function PlayerOnboardingWizard({
           playGameIds: isManager && draft.alsoPlays ? draft.playGameIds : undefined,
           riotId: draft.riotId.trim(),
           birthDate: draft.birthDate,
-          gender: draft.gender || undefined,
-          race: draft.selectedRaces.length > 0 ? draft.selectedRaces : undefined,
-          countryOfBirth: draft.countryOfBirth.trim() || undefined,
-          primaryLanguageAtHome: draft.primaryLanguageAtHome.trim() || undefined,
-          isFreeOrReducedLunch: draft.isFreeOrReducedLunch,
-          isFirstGenCollege: draft.isFirstGenCollege,
-          doePetitionConsent: draft.doePetitionConsent,
-          surveyDetails: {
-            ping: draft.ping,
-            hoursPerWeek: draft.hoursPerWeek,
-            internetReliability: draft.internetReliability,
-            careerInterests: draft.careerInterests,
-            feedback: draft.feedback.trim() || undefined,
-          },
           codeOfConductAccepted: draft.codeOfConductAccepted,
           consent: draft.buildConsent(),
           contentOverrides: draft.contentOverrideKeys(),
@@ -316,6 +340,11 @@ export default function PlayerOnboardingWizard({
           setStep(target);
           draft.setErrorMessage(result.error);
           if (result.code === 'play_games_required') draft.flagPlayGamesError();
+          if (result.code === 'onboarding_form_required') {
+            setFormEnabled(true);
+            setFormCompleted(false);
+            formRequiredMessage.current = result.error;
+          }
           return;
         }
         setApplications({
@@ -403,7 +432,7 @@ export default function PlayerOnboardingWizard({
       </div>
 
       {/* Step Progression Indicator */}
-      <WizardProgressStepper step={step} isManager={isManager} />
+      <WizardProgressStepper step={step} isManager={isManager} totalSteps={totalSteps} />
 
       {/* Error Callout */}
       {draft.errorMessage && (
@@ -465,34 +494,9 @@ export default function PlayerOnboardingWizard({
         )}
 
         {step === 4 && (
-          <DemographicsStep
-            contentFlags={draft.contentFlags}
+          <BirthDateRulesStep
             birthDate={draft.birthDate}
             setBirthDate={draft.setBirthDate}
-            gender={draft.gender}
-            setGender={draft.setGender}
-            selectedRaces={draft.selectedRaces}
-            setSelectedRaces={draft.setSelectedRaces}
-            countryOfBirth={draft.countryOfBirth}
-            setCountryOfBirth={draft.setCountryOfBirth}
-            primaryLanguageAtHome={draft.primaryLanguageAtHome}
-            setPrimaryLanguageAtHome={draft.setPrimaryLanguageAtHome}
-            isFreeOrReducedLunch={draft.isFreeOrReducedLunch}
-            setIsFreeOrReducedLunch={draft.setIsFreeOrReducedLunch}
-            isFirstGenCollege={draft.isFirstGenCollege}
-            setIsFirstGenCollege={draft.setIsFirstGenCollege}
-            doePetitionConsent={draft.doePetitionConsent}
-            setDoePetitionConsent={draft.setDoePetitionConsent}
-            ping={draft.ping}
-            setPing={draft.setPing}
-            hoursPerWeek={draft.hoursPerWeek}
-            setHoursPerWeek={draft.setHoursPerWeek}
-            internetReliability={draft.internetReliability}
-            setInternetReliability={draft.setInternetReliability}
-            careerInterests={draft.careerInterests}
-            setCareerInterests={draft.setCareerInterests}
-            feedback={draft.feedback}
-            setFeedback={draft.setFeedback}
             codeOfConductAccepted={draft.codeOfConductAccepted}
             setCodeOfConductAccepted={draft.setCodeOfConductAccepted}
           />
@@ -518,6 +522,10 @@ export default function PlayerOnboardingWizard({
           />
         )}
 
+        {step === FORM_STEP && formEnabled && (
+          <OnboardingFormStep token={token} completed={formCompleted} onCompletedChange={handleFormCompleted} />
+        )}
+
         {/* Wizard Navigation Buttons */}
         <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
           <div>
@@ -534,7 +542,7 @@ export default function PlayerOnboardingWizard({
           </div>
 
           <div className="flex items-center gap-3">
-            {step < 5 ? (
+            {step < totalSteps ? (
               <button
                 type="button"
                 onClick={handleNext}
@@ -547,7 +555,8 @@ export default function PlayerOnboardingWizard({
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-accent text-on-accent text-xs sm:text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
+                aria-disabled={formEnabled && !formCompleted}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-accent text-on-accent text-xs sm:text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 aria-disabled:opacity-50"
               >
                 {isPending ? (
                   <>

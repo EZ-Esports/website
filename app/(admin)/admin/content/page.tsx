@@ -5,6 +5,7 @@ import { asc, desc } from 'drizzle-orm';
 import ContentEditor from './ContentEditor';
 import HandbookUploader from './HandbookUploader';
 import { HANDBOOK_PDF_CONTENT_KEY, isHandbookStorageKey } from '@/app/lib/handbook';
+import { isOnboardingFormKey } from '@/app/lib/onboarding/google-form/settings';
 import { BUCKET, buildPublicObjectUrl } from '@/app/lib/storage-constants';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
@@ -40,6 +41,7 @@ export default async function ContentAdminPage() {
         .select()
         .from(schema.pageContentHistory)
         .orderBy(desc(schema.pageContentHistory.savedAt));
+      historyRows = historyRows.filter((h) => !isOnboardingFormKey(h.contentKey));
       dbConfigured = true;
     }
   } catch {
@@ -47,7 +49,8 @@ export default async function ContentAdminPage() {
   }
 
   // The handbook row stores a storage key and is managed by its own uploader, not the text editor.
-  const rows = allRows.filter((row) => row.key !== HANDBOOK_PDF_CONTENT_KEY);
+  // The onboarding form settings have their own page and permission, so they are not editable text here.
+  const rows = allRows.filter((row) => row.key !== HANDBOOK_PDF_CONTENT_KEY && !isOnboardingFormKey(row.key));
   const handbookKey = allRows.find((row) => row.key === HANDBOOK_PDF_CONTENT_KEY)?.content;
   const handbookUrl = isHandbookStorageKey(handbookKey)
     ? buildPublicObjectUrl(process.env.NEXT_PUBLIC_SUPABASE_URL, BUCKET, handbookKey)

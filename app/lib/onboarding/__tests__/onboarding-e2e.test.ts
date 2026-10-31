@@ -29,7 +29,6 @@ const mocks = vi.hoisted(() => {
     playerInvitesStore: [] as any[],
     managerInvitesStore: [] as any[],
     playerIdentitiesStore: [] as any[],
-    studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
     staffAuditLogsStore: [] as any[],
     rolesStore: [] as any[],
@@ -173,9 +172,6 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.playerIdentities) {
           return state.playerIdentitiesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
-        if (currentTable === schema.studentDemographics) {
-          return state.studentDemographicsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
-        }
 
         if (currentTable === schema.schoolManagers) {
           const rows = state.schoolManagersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
@@ -276,10 +272,6 @@ const mocks = vi.hoisted(() => {
         }
         if (tbl === schema.playerIdentities) {
           state.playerIdentitiesStore.push(record);
-          return [record];
-        }
-        if (tbl === schema.studentDemographics) {
-          state.studentDemographicsStore.push(record);
           return [record];
         }
         if (tbl === schema.players) {
@@ -522,7 +514,6 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
     mocks.state.playerInvitesStore = [];
     mocks.state.managerInvitesStore = [];
     mocks.state.playerIdentitiesStore = [];
-    mocks.state.studentDemographicsStore = [];
     mocks.state.staffMembersStore = [
       {
         userId: staffSuperAdmin.id,

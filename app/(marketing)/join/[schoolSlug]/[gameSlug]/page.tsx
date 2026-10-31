@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fi';
 import { validateInviteToken } from '@/app/lib/onboarding/wizard-actions';
 import { readVerifiedDiscord } from '@/app/lib/onboarding/discord-session';
+import { resolveOnboardingFormState } from '@/app/lib/onboarding/google-form-actions';
 import { DISCORD_FAILURE_MESSAGES, type DiscordFailureCode } from '@/app/lib/onboarding/adapters/discord-rest';
 import PlayerOnboardingWizard from './PlayerOnboardingWizard';
 import { DiscordPopupDone } from './components/DiscordPopupDone';
@@ -219,6 +220,17 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
     );
   }
 
+  // Whether the wizard has the Google Form step, and whether it is already done (a student returning
+  // from Discord or a refresh). Read on the server; a failure must not take the wizard down. On failure
+  // the step starts hidden, and the server's `onboarding_form_required` rejection at submit reveals it
+  // (the wizard treats that rejection as authoritative), so nobody is left without a way forward.
+  let onboardingForm = { enabled: false, completed: false };
+  try {
+    onboardingForm = await resolveOnboardingFormState(validation.role, validation.inviteId);
+  } catch (err) {
+    console.error('Could not read the onboarding form state', err);
+  }
+
   return (
     <main className="min-h-[80vh] py-6">
       <PlayerOnboardingWizard
@@ -227,6 +239,7 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
         discord={verified ? { username: verified.discordUsername, inGuild: verified.inGuild } : null}
         discordError={discordError}
         resumeAtDiscord={Boolean(searchParams.discord || errorCode)}
+        onboardingForm={onboardingForm}
       />
     </main>
   );

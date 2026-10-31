@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'node:crypto';
 import * as schema from '@/app/lib/db/schema';
 import { CONSENT_FORM_VERSION } from '@/app/lib/onboarding/consent';
-import { Permissions } from '@/app/lib/roles';
-import { ForbiddenPiiAccessError } from '@/app/lib/db/queries';
 
 // --- HOISTED MOCKS ---
 const mocks = vi.hoisted(() => {
@@ -16,7 +14,7 @@ const mocks = vi.hoisted(() => {
     managerInvitesStore: [] as any[],
     membersStore: [] as any[],
     playerIdentitiesStore: [] as any[],
-    studentDemographicsStore: [] as any[],
+    formCompletionLinks: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
     schoolManagersStore: [] as any[],
     staffMembersStore: [] as any[],
     onboardingConsentsStore: [] as any[],
@@ -91,7 +89,6 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.managerInvites) return state.managerInvitesStore;
     if (tbl === schema.members) return state.membersStore;
     if (tbl === schema.playerIdentities) return state.playerIdentitiesStore;
-    if (tbl === schema.studentDemographics) return state.studentDemographicsStore;
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.staffMembers) return state.staffMembersStore;
     if (tbl === schema.onboardingConsents) return state.onboardingConsentsStore;
@@ -266,6 +263,19 @@ vi.mock('@/app/lib/onboarding/discord-session', () => ({
   },
 }));
 
+// Onboarding Google Form gate (spec-051): config and completion lookups are stand-ins so these tests
+// exercise only the pipeline's decision, never a database.
+const formGate = vi.hoisted(() => ({ enabled: false, completed: false }));
+vi.mock('@/app/lib/onboarding/google-form/config', () => ({
+  getOnboardingFormConfig: async () => ({ enabled: formGate.enabled, formUrl: null, entryId: null, secretConfigured: formGate.enabled }),
+}));
+vi.mock('@/app/lib/db/onboarding-form', () => ({
+  hasFormCompletion: async () => formGate.completed,
+  linkFormCompletionToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    mocks.state.formCompletionLinks.push({ kind, inviteId, memberId });
+  },
+}));
+
 // Fake Supabase admin client so tests can assert whether an auth user was (not) created.
 const authMock = vi.hoisted(() => ({ createUser: vi.fn(), listUsers: vi.fn() }));
 vi.mock('@/app/lib/supabase/service', () => ({
@@ -290,7 +300,6 @@ import {
   submitPlayerOnboarding,
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
-import { getStudentDemographics } from '@/app/lib/db/queries';
 
 /** Success-path wrapper: expected rejections come back as `{success:false}`; surface them as errors here. */
 async function submitOk(params: Parameters<typeof submitPlayerOnboarding>[0]) {
@@ -345,7 +354,9 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     mocks.state.membersStore = [];
     mocks.state.playerIdentitiesStore = [];
-    mocks.state.studentDemographicsStore = [];
+    mocks.state.formCompletionLinks = [];
+    formGate.enabled = false;
+    formGate.completed = false;
     mocks.state.schoolManagersStore = [];
     mocks.state.staffMembersStore = [];
     mocks.state.onboardingConsentsStore = [];
@@ -613,26 +624,11 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       graduationYear: 2026,
       riotId: 'Demon1#LFT1',
       birthDate: '2008-05-14',
-      gender: 'Male',
-      race: ['Asian'],
-      ethnicity: ['East Asian'],
-      countryOfBirth: 'United States',
-      primaryLanguageAtHome: 'English',
-      isFreeOrReducedLunch: true,
-      isFirstGenCollege: false,
-      doePetitionConsent: true,
-      surveyDetails: {
-        ping: '20-40ms',
-        hoursPerWeek: '6-10 hrs',
-        internetReliability: 'Fiber',
-        careerInterests: ['Competitive Esports Player'],
-        feedback: 'Excited for the upcoming season!',
-      },
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     };
 
-    it('atomically creates member, Riot identity, Discord identity, demographics vault, and marks invite submitted', async () => {
+    it('atomically creates member, Riot identity, Discord identity, and marks invite submitted', async () => {
       const result = await submitOk({
         token: rawToken,
         submission: validSubmission,
@@ -672,28 +668,13 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(discordIdentity.providerUsername).toBe('alexchen');
       expect(discordIdentity.inGuild).toBe(true);
 
-      // 4. Verify student demographics vault
-      const demographics = mocks.state.studentDemographicsStore.find(
-        (d) => d.memberId === result.memberId
-      );
-      expect(demographics).toBeDefined();
-      expect(demographics.legalFirstName).toBe('Alex');
-      expect(demographics.legalLastName).toBe('Chen');
-      expect(demographics.birthDate).toEqual(new Date('2008-05-14'));
-      expect(demographics.gender).toBe('Male');
-      expect(demographics.race).toEqual(['Asian']);
-      expect(demographics.isFreeOrReducedLunch).toBe(true);
-      expect(demographics.doePetitionConsent).toBe(true);
-      expect(demographics.surveyDetails?.ping).toBe('20-40ms');
-      expect(demographics.surveyDetails?.careerInterests).toEqual(['Competitive Esports Player']);
-
-      // 5. Verify invite updated to submitted
+      // 4. Verify invite updated to submitted
       const invite = mocks.state.playerInvitesStore.find((inv) => inv.id === 'invite-pending-1');
       expect(invite.status).toBe('submitted');
       expect(invite.memberId).toBe(result.memberId);
       expect(invite.submittedAt).toBeDefined();
 
-      // 6. Verify cache invalidation was triggered
+      // 5. Verify cache invalidation was triggered
       expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('players', 'members');
     });
 
@@ -1005,64 +986,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     });
   });
 
-  describe('5. Zero-PII Invariant & Permissions Protection', () => {
-    it('restricts studentDemographics access to actors with VIEW_STUDENT_DEMOGRAPHICS permission', async () => {
-      const memberId = 'member-demographics-test-id';
-      mocks.state.studentDemographicsStore.push({
-        id: 'demographics-1',
-        memberId,
-        legalFirstName: 'Alex',
-        legalLastName: 'Chen',
-        birthDate: new Date('2008-05-14'),
-        gender: 'Male',
-        race: ['Asian'],
-        countryOfBirth: 'United States',
-        isFreeOrReducedLunch: true,
-      });
-
-      // 1. General staff without VIEW_STUDENT_DEMOGRAPHICS permission -> throws ForbiddenPiiAccessError
-      const generalStaffPerms = Permissions.MANAGE_ROSTERS | Permissions.MANAGE_MATCHES;
-      await expect(
-        getStudentDemographics(memberId, generalStaffPerms, false)
-      ).rejects.toThrow(ForbiddenPiiAccessError);
-
-      // 2. Staff with VIEW_STUDENT_DEMOGRAPHICS permission -> succeeds
-      const compliancePerms = Permissions.VIEW_STUDENT_DEMOGRAPHICS;
-      const demo = await getStudentDemographics(memberId, compliancePerms, false);
-      expect(demo).toBeDefined();
-      expect(demo!.legalFirstName).toBe('Alex');
-      expect(demo!.isFreeOrReducedLunch).toBe(true);
-
-      // 3. Administrator / Owner -> succeeds
-      const adminDemo = await getStudentDemographics(memberId, Permissions.ADMINISTRATOR, false);
-      expect(adminDemo).toBeDefined();
-      expect(adminDemo!.race).toEqual(['Asian']);
-
-      const ownerDemo = await getStudentDemographics(memberId, BigInt(0), true);
-      expect(ownerDemo).toBeDefined();
-    });
-
-    it('ensures manager queries never project or leak demographic fields', () => {
-      // In manager portal queries, only non-PII fields are projected
-      const managerAllowedFields = ['playerName', 'ign', 'discord', 'grade', 'schoolName', 'gameName'];
-      const sensitivePiiFields = [
-        'birthDate',
-        'gender',
-        'race',
-        'ethnicity',
-        'countryOfBirth',
-        'parentsCountryOfBirth',
-        'primaryLanguageAtHome',
-        'isFreeOrReducedLunch',
-        'isFirstGenCollege',
-      ];
-
-      for (const pii of sensitivePiiFields) {
-        expect(managerAllowedFields).not.toContain(pii);
-      }
-    });
-  });
-
   describe('6. Manager Onboarding & Provisioning Flow', () => {
     const managerToken = 'manager_test_token_secret_999';
     const managerTokenHash = crypto.createHash('sha256').update(managerToken).digest('hex');
@@ -1114,7 +1037,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         graduationYear: 2026,
         riotId: 'CoachSam#NA1',
         birthDate: '1988-08-20',
-        gender: 'Male',
         codeOfConductAccepted: true,
         consent: { tosAcknowledged: true },
       };
@@ -1763,23 +1685,23 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       const start = performance.now();
       const result = await submitRaw({
         ...baseSubmission(),
-        surveyDetails: { feedback: 'a'.repeat(100_000) },
+        riotId: 'a'.repeat(100_000),
         legalLastName: 'f '.repeat(50_000),
       });
       expect(performance.now() - start).toBeLessThan(1000);
-      expect(result).toMatchObject({ success: false, code: 'field_too_long', fields: ['legalLastName', 'feedback'] });
+      expect(result).toMatchObject({ success: false, code: 'field_too_long', fields: ['legalLastName', 'riotId'] });
       expect(mocks.state.membersStore).toHaveLength(0);
     });
 
     it('lists every flagged field, across the free-text fields', async () => {
       const result = await submitRaw({
         ...baseSubmission(),
+        legalFirstName: 'Fuckface',
+        legalLastName: 'dumbass',
         riotId: 'ShitLord#NA1',
-        countryOfBirth: 'bullshit',
-        surveyDetails: { feedback: 'this is dumbass' },
       });
       expect(result).toMatchObject({ success: false, code: 'content_flagged' });
-      if (!result.success) expect(result.fields).toEqual(['riotId', 'countryOfBirth', 'feedback']);
+      if (!result.success) expect(result.fields).toEqual(['legalFirstName', 'legalLastName', 'riotId']);
     });
 
     it('rejects when only some flagged fields are overridden', async () => {
@@ -1942,6 +1864,72 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         ).rejects.toThrow(/code of conduct/i);
         expect(mocks.state.membersStore).toHaveLength(0);
       });
+    });
+  });
+
+  describe('8. Onboarding Google Form gate (spec-051)', () => {
+    const submission = (): PlayerOnboardingSubmission => ({
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.chen@nycstudents.net',
+      graduationYear: 2027,
+      riotId: 'Demon1#LFT1',
+      birthDate: '2008-05-14',
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    });
+
+    it('does not require the form when it is not configured', async () => {
+      formGate.enabled = false;
+      formGate.completed = false;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: submission() });
+      expect(result.success).toBe(true);
+      expect(mocks.state.formCompletionLinks).toEqual([]);
+    });
+
+    it('rejects with onboarding_form_required and writes nothing when configured and not completed', async () => {
+      formGate.enabled = true;
+      formGate.completed = false;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: submission() });
+      expect(result).toMatchObject({ success: false, code: 'onboarding_form_required' });
+      expect(mocks.state.membersStore).toHaveLength(0);
+      expect(mocks.state.onboardingConsentsStore).toHaveLength(0);
+      expect(mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1').status).toBe('pending');
+    });
+
+    it('accepts when configured and completed, and ties the completion to the new member', async () => {
+      formGate.enabled = true;
+      formGate.completed = true;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: submission() });
+      expect(result.success).toBe(true);
+      expect(mocks.state.formCompletionLinks).toEqual([
+        { kind: 'player', inviteId: 'invite-pending-1', memberId: (result as { memberId: string }).memberId },
+      ]);
+    });
+
+    it('applies to managers too, before any account is provisioned', async () => {
+      const managerToken = 'manager_form_gate_token';
+      mocks.state.managerInvitesStore.push({
+        id: 'manager-invite-form',
+        schoolId,
+        tokenHash: crypto.createHash('sha256').update(managerToken).digest('hex'),
+        intendedFirstName: 'Sam',
+        intendedLastName: 'Miller',
+        invitedByUserId: 'staff-admin-id',
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        submissionDraft: { email: 'smiller@stuy.edu', academicYear: '2026-27', managedGames: null, isPrimaryContact: true },
+        memberId: null,
+      });
+      formGate.enabled = true;
+      formGate.completed = false;
+      const result = await submitPlayerOnboarding({
+        token: managerToken,
+        submission: { ...submission(), email: 'smiller@stuy.edu', password: 'securePassword123!', birthDate: '1988-08-20' },
+      });
+      expect(result).toMatchObject({ success: false, code: 'onboarding_form_required' });
+      expect(authMock.createUser).not.toHaveBeenCalled();
+      expect(mocks.state.membersStore).toHaveLength(0);
     });
   });
 

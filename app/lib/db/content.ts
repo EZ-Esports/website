@@ -5,6 +5,7 @@ import * as schema from './schema';
 import { withThumbnailColumnFallback } from './thumbnail-columns';
 import { and, asc, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { HANDBOOK_PDF_CONTENT_KEY, HANDBOOK_PDF_LABEL, isHandbookStorageKey } from '@/app/lib/handbook';
+import { ONBOARDING_FORM_PAGE_CONTENT_ERROR, isOnboardingFormKey } from '@/app/lib/onboarding/google-form/settings';
 
 export const NEWS_PAGE_SIZE = 20;
 const DEFAULT_PAGE_SIZE = NEWS_PAGE_SIZE;
@@ -150,6 +151,11 @@ export async function savePageContentWithHistory(id: string, content: string): P
     if (current?.key === HANDBOOK_PDF_CONTENT_KEY) {
       throw new Error('Use the handbook uploader to change the handbook PDF.');
     }
+    // The onboarding form settings need MANAGE_LEAGUE and validation; the generic editor
+    // (MANAGE_CONTENT) must not be a way around either.
+    if (isOnboardingFormKey(current?.key)) {
+      throw new Error(ONBOARDING_FORM_PAGE_CONTENT_ERROR);
+    }
 
     if (current) {
       await tx.insert(schema.pageContentHistory).values({
@@ -173,6 +179,7 @@ export async function restorePageContentFromHistory(id: string, historyId: strin
     .limit(1);
 
   if (!entry) throw new Error('History entry not found.');
+  if (isOnboardingFormKey(entry.contentKey)) throw new Error(ONBOARDING_FORM_PAGE_CONTENT_ERROR);
 
   await db.transaction(async (tx) => {
     const [current] = await tx
@@ -182,6 +189,7 @@ export async function restorePageContentFromHistory(id: string, historyId: strin
       .limit(1);
 
     if (!current) throw new Error('Content block not found.');
+    if (isOnboardingFormKey(current.key)) throw new Error(ONBOARDING_FORM_PAGE_CONTENT_ERROR);
     if (current.key !== entry.contentKey) {
       throw new Error('History entry does not belong to this content block.');
     }

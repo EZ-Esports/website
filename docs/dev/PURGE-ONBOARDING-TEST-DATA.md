@@ -6,11 +6,11 @@
 
 ## What it deletes
 
-In this order, inside one transaction: `match_reschedule_options`, `match_reschedule_requests`, `onboarding_consents`, `student_demographics`, `player_identities`, `players`, `player_invites`, `manager_invites`, `school_managers`, `members`.
+In this order, inside one transaction: `match_reschedule_options`, `match_reschedule_requests`, `onboarding_consents`, `onboarding_form_completions`, `player_identities`, `players`, `player_invites`, `manager_invites`, `school_managers`, `members`.
 
 A `members` row is deleted only when all of these hold:
 
-- it has an onboarding footprint (an invite, manager row, consent, demographics row or identity);
+- it has an onboarding footprint (an invite, manager row, consent, form completion or identity);
 - it has no gold-archive `member_key`;
 - every `players` row it has sits on a roster of a season that is **currently active**. Anyone with a row on a past season, or on a season the script cannot determine, keeps their member row and roster history, but their onboarding records are still deleted. The dry run counts them on the line "Kept: has past-season roster history".
 
@@ -20,7 +20,7 @@ Reschedule requests made through the portal by deleted managers (and their propo
 
 ## What it protects
 
-Never deleted, together with their member row, manager rows, invites, consents, demographics, identities, roster rows and Auth user:
+Never deleted, together with their member row, manager rows, invites, consents, form completions, identities, roster rows and Auth user:
 
 - any user in `staff_members`, `user_roles`, `staff_revocations`, `staff_audit_logs`, `people.user_id`, or who invited staff;
 - any member linked from `staff_members.member_id`, `people.member_id` or `leadership.member_id`;

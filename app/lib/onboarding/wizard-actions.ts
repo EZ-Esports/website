@@ -92,23 +92,8 @@ export interface PlayerOnboardingSubmission {
   alsoPlays?: boolean;
   playGameIds?: string[];
   riotId: string;
+  /** Validated and used for the guardian-authorization age check, but not stored anywhere. */
   birthDate: string | Date;
-  gender?: string;
-  race?: string[];
-  ethnicity?: string[];
-  countryOfBirth?: string;
-  primaryLanguageAtHome?: string;
-  isFreeOrReducedLunch?: boolean;
-  isFirstGenCollege?: boolean;
-  doePetitionConsent?: boolean;
-  surveyDetails?: {
-    ping?: string | number;
-    hoursPerWeek?: string | number;
-    internetReliability?: string;
-    careerInterests?: string[];
-    feedback?: string;
-    [key: string]: any;
-  };
   codeOfConductAccepted: boolean;
   /**
    * Fields the person confirmed are genuinely their information after being warned that they look
@@ -157,7 +142,11 @@ export type SubmitPlayerOnboardingOutcome =
   | SubmitPlayerOnboardingResult
   | SubmitPlayerOnboardingFailure;
 
-const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
+/**
+ * Keys a draft never carries. The survey keys are legacy: drafts saved while the demographics
+ * survey existed may still hold them, and they are dropped on read and write rather than trusted.
+ */
+const NEVER_DRAFTED_KEYS = new Set([
   'gender',
   'race',
   'ethnicity',
@@ -181,8 +170,8 @@ const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
 ]);
 
 /**
- * Sanitizes in-progress onboarding drafts to strictly exclude sensitive FERPA / PII
- * demographics from being read via invite tokens or persisted in unauthenticated draft slots.
+ * Sanitizes in-progress onboarding drafts so personal data (date of birth, password, guardian
+ * details) is never read back via invite tokens or persisted in unauthenticated draft slots.
  */
 function sanitizeDraftData(
   draft: Record<string, any> | null
@@ -197,7 +186,7 @@ function sanitizeDraftData(
       sanitized[key] = value === true;
     } else if (key === 'playGameIds') {
       sanitized[key] = sanitizeGameIds(value);
-    } else if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
+    } else if (!NEVER_DRAFTED_KEYS.has(key)) {
       sanitized[key] = value;
     }
   }
