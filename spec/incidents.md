@@ -218,6 +218,10 @@ An earlier attempt at the Google Form step (never pushed, unrecoverable) was rev
 
 ---
 
+## 23. `vercel link --yes` created a new project (Oct 2026)
+
+Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find the existing `ezesports` project; it created an empty project named `website` in the personal scope and linked to it. The wrong link was visible only because that project had no environment variables. It had no deployments and was deleted with `vercel project rm website`; the checkout was relinked with `vercel link --project ezesports --yes`. Rule: before setting any variable, check the linked project's name in `.vercel/project.json` and that `vercel env ls production` shows `DATABASE_URL`; link with an explicit `--project ezesports`. The same session also showed the webhook bearer is the derived key, not the raw secret (see spec-051).
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
