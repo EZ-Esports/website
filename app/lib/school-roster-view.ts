@@ -13,7 +13,7 @@ export interface RosterViewPlayer {
   memberId: string;
   firstName: string;
   lastName: string;
-  /** Member's display name. Only the fields the admin roster views already show; never demographics. */
+  /** Member's display name. Only the fields the admin roster views already show. */
   name: string;
   ign: string | null;
   discord: string | null;
@@ -266,7 +266,7 @@ export function mergeRosterFilterQuery(currentSearch: string, f: RosterViewFilte
   return sp.toString();
 }
 
-/** What the staff editing controls need beyond the rosters themselves. Display fields only; never demographics. */
+/** What the staff editing controls need beyond the rosters themselves. Display fields only. */
 export interface RosterEditOptions {
   /** The school's members, for the add-player picker. */
   members: { id: string; firstName: string; lastName: string; discord: string | null; graduationYear: number | null }[];

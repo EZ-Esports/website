@@ -133,17 +133,6 @@ const PERMISSION_GROUPS = [
       { bit: Permissions.MANAGE_CONTENT, name: 'Manage CMS Content', desc: 'Modify editable text blocks across public pages.' },
     ],
   },
-  {
-    title: 'Student Data & Privacy Vault',
-    permissions: [
-      {
-        bit: Permissions.VIEW_STUDENT_DEMOGRAPHICS,
-        name: 'View Student Demographics',
-        desc: 'Access sensitive student demographic, Title I equity, and survey records. Restricted strictly to Superadmins.',
-        superadminOnly: true,
-      },
-    ],
-  },
 ];
 
 const PERMISSION_LABELS = PERMISSION_GROUPS.flatMap((g) => g.permissions);

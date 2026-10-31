@@ -1,6 +1,6 @@
 # spec-011: Player Onboarding, School Manager Portal, and Hexagonal Tournament Verification (V1)
 
-- **Status:** Shipped
+- **Status:** Shipped. **Demographics parts superseded by [spec-051](spec-051-google-form-onboarding.md)** (survey, `student_demographics`, `/admin/demographics` and permission bit 12 removed).
 - **PR:** #216 (merged 2026-10-02); follow-ups in #217 and #232
 - **Date:** 2026-09-30
 - **Implementation note (2026-10-16):** Only the V1 honor-system path shipped. `DiscordRestAdapter` (`adapters/discord-rest.ts`) and `RiotSignOnAdapter` were never written; only the `CommunityPlatformPort` interface and `riot-manual.ts` exist. There is no Discord OAuth, no `guilds.join`, no bot token, no Riot Sign-On and no stored PUUID. The wizard submits `inGuild: true` unconditionally, so the "Live Discord Guild Check" and "verified Riot ID" gates below are satisfied by self-report. Treat the Discord OAuth and RSO sections as design, not behaviour. Follow-ups: #249 (Discord OAuth), #247 (Riot Sign-On, blocked on the production Riot key).

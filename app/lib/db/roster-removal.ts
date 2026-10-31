@@ -52,7 +52,7 @@ export const KEEP_REASON_TEXT: Record<KeepReason, string> = {
 
 export interface DeletedCounts {
   consents: number;
-  demographics: number;
+  formCompletions: number;
   identities: number;
   contentFlags: number;
   invites: number;
@@ -292,7 +292,7 @@ async function deleteCount(tx: DbOrTx, table: string, run: (t: DbOrTx) => Promis
 }
 
 /**
- * Deletes the onboarding leftovers and the member itself. Order matters: consents, demographics and
+ * Deletes the onboarding leftovers and the member itself. Order matters: consents, form completions and
  * identities would cascade anyway but are removed explicitly so the counts are known; the player
  * invites are removed (not reset) because an accepted invite is spent and its token must never work
  * again; the member row goes last. `players` restricts the member delete, a final guard.
@@ -300,8 +300,15 @@ async function deleteCount(tx: DbOrTx, table: string, run: (t: DbOrTx) => Promis
 async function deleteMember(tx: DbOrTx, memberId: string): Promise<DeletedCounts> {
   const consents = await deleteCount(tx, 'onboarding_consents', (t) => t.delete(schema.onboardingConsents)
     .where(eq(schema.onboardingConsents.memberId, memberId)).returning({ id: schema.onboardingConsents.id }));
-  const demographics = await deleteCount(tx, 'student_demographics', (t) => t.delete(schema.studentDemographics)
-    .where(eq(schema.studentDemographics.memberId, memberId)).returning({ id: schema.studentDemographics.id }));
+  // A completion is tied to the member once the submission is made, and to the invite before that.
+  // Either route removes it, so a spent invite and its completion never outlive the member.
+  const formCompletions = await deleteCount(tx, 'onboarding_form_completions', (t) => t.delete(schema.onboardingFormCompletions)
+    .where(sql`${schema.onboardingFormCompletions.memberId} = ${memberId}
+      or (${schema.onboardingFormCompletions.inviteKind} = 'player'
+          and ${schema.onboardingFormCompletions.inviteId} in (select id from player_invites where member_id = ${memberId}))
+      or (${schema.onboardingFormCompletions.inviteKind} = 'manager'
+          and ${schema.onboardingFormCompletions.inviteId} in (select id from manager_invites where member_id = ${memberId}))`)
+    .returning({ id: schema.onboardingFormCompletions.id }));
   const identities = await deleteCount(tx, 'player_identities', (t) => t.delete(schema.playerIdentities)
     .where(eq(schema.playerIdentities.memberId, memberId)).returning({ id: schema.playerIdentities.id }));
   const contentFlags = await deleteCount(tx, 'onboarding_content_flags', (t) => t.delete(schema.onboardingContentFlags)
@@ -311,7 +318,7 @@ async function deleteMember(tx: DbOrTx, memberId: string): Promise<DeletedCounts
   const gone = await tx.delete(schema.members).where(eq(schema.members.id, memberId))
     .returning({ id: schema.members.id });
   if (gone.length !== 1) throw new Error('member delete affected an unexpected number of rows');
-  return { consents, demographics, identities, contentFlags, invites };
+  return { consents, formCompletions, identities, contentFlags, invites };
 }
 
 type CleanupOutcome =

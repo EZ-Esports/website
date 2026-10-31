@@ -86,44 +86,8 @@ export function useWizardDraft(
     Boolean(initialDraft.ignConfirmed)
   );
 
-  // Step 4: Demographics & Research Survey
+  // Step 4: Date of birth (used for the guardian-authorization age check, never stored) and rules
   const [birthDate, setBirthDate] = useState(initialDraft.birthDate || '');
-  const [gender, setGender] = useState(initialDraft.gender || '');
-  const [selectedRaces, setSelectedRaces] = useState<string[]>(
-    Array.isArray(initialDraft.race) ? initialDraft.race : []
-  );
-  const [countryOfBirth, setCountryOfBirth] = useState(
-    initialDraft.countryOfBirth || ''
-  );
-  const [primaryLanguageAtHome, setPrimaryLanguageAtHome] = useState(
-    initialDraft.primaryLanguageAtHome || ''
-  );
-  const [isFreeOrReducedLunch, setIsFreeOrReducedLunch] = useState<boolean | undefined>(
-    initialDraft.isFreeOrReducedLunch
-  );
-  const [isFirstGenCollege, setIsFirstGenCollege] = useState<boolean | undefined>(
-    initialDraft.isFirstGenCollege
-  );
-  const [doePetitionConsent, setDoePetitionConsent] = useState<boolean>(
-    Boolean(initialDraft.doePetitionConsent ?? true)
-  );
-
-  // Tech & Gaming Survey
-  const [ping, setPing] = useState(initialDraft.surveyDetails?.ping || '');
-  const [hoursPerWeek, setHoursPerWeek] = useState(
-    initialDraft.surveyDetails?.hoursPerWeek || ''
-  );
-  const [internetReliability, setInternetReliability] = useState(
-    initialDraft.surveyDetails?.internetReliability || ''
-  );
-  const [careerInterests, setCareerInterests] = useState<string[]>(
-    Array.isArray(initialDraft.surveyDetails?.careerInterests)
-      ? initialDraft.surveyDetails.careerInterests
-      : []
-  );
-  const [feedback, setFeedback] = useState(
-    initialDraft.surveyDetails?.feedback || ''
-  );
 
   // Rules Acceptance
   const [codeOfConductAccepted, setCodeOfConductAccepted] = useState<boolean>(
@@ -180,9 +144,6 @@ export function useWizardDraft(
       legalFirstName,
       legalLastName,
       riotId,
-      countryOfBirth,
-      primaryLanguageAtHome,
-      surveyDetails: { feedback },
       consent: consentForCheck,
     },
     options.discordUsername
@@ -238,20 +199,6 @@ export function useWizardDraft(
       riotId,
       ignConfirmed,
       birthDate,
-      gender,
-      race: selectedRaces,
-      countryOfBirth,
-      primaryLanguageAtHome,
-      isFreeOrReducedLunch,
-      isFirstGenCollege,
-      doePetitionConsent,
-      surveyDetails: {
-        ping,
-        hoursPerWeek,
-        internetReliability,
-        careerInterests,
-        feedback,
-      },
       codeOfConductAccepted,
       contentOverrides: overrides,
     };
@@ -419,30 +366,6 @@ export function useWizardDraft(
     setIgnConfirmed,
     birthDate,
     setBirthDate,
-    gender,
-    setGender,
-    selectedRaces,
-    setSelectedRaces,
-    countryOfBirth,
-    setCountryOfBirth,
-    primaryLanguageAtHome,
-    setPrimaryLanguageAtHome,
-    isFreeOrReducedLunch,
-    setIsFreeOrReducedLunch,
-    isFirstGenCollege,
-    setIsFirstGenCollege,
-    doePetitionConsent,
-    setDoePetitionConsent,
-    ping,
-    setPing,
-    hoursPerWeek,
-    setHoursPerWeek,
-    internetReliability,
-    setInternetReliability,
-    careerInterests,
-    setCareerInterests,
-    feedback,
-    setFeedback,
     codeOfConductAccepted,
     setCodeOfConductAccepted,
 

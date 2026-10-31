@@ -31,7 +31,7 @@ function snap(over: Partial<Snapshot> = {}): Snapshot {
     rescheduleRequests: [],
     rescheduleOptions: [],
     playerIdentities: [],
-    studentDemographics: [],
+    onboardingFormCompletions: [],
     onboardingConsents: [],
     playerInvites: [],
     managerInvites: [],
@@ -65,7 +65,10 @@ function world(): Snapshot {
       { id: 'p-staff', memberId: 'm-staff', rosterId: 'r-act' },
     ],
     playerIdentities: [{ id: 'i1', memberId: 'm-student', provider: 'discord' }],
-    studentDemographics: [{ id: 'd1', memberId: 'm-student' }, { id: 'd2', memberId: 'm-staff' }],
+    onboardingFormCompletions: [
+      { id: 'd1', memberId: 'm-student', inviteKind: 'player', inviteId: 'pi-student' },
+      { id: 'd2', memberId: 'm-staff', inviteKind: 'player', inviteId: 'pi-staff' },
+    ],
     onboardingConsents: [
       { id: 'c1', memberId: 'm-student', inviteId: 'pi-student' },
       { id: 'c2', memberId: 'm-staff', inviteId: 'mi-staff' },
@@ -91,12 +94,12 @@ describe('buildPurgePlan: roster history and reschedules', () => {
     const s = world();
     s.members.push(member('m-hist', 'Hi', 'Story', 'hist@x.org'));
     s.players.push({ id: 'p-hist', memberId: 'm-hist', rosterId: 'r-past' });
-    s.studentDemographics.push({ id: 'd-hist', memberId: 'm-hist' });
+    s.onboardingFormCompletions.push({ id: 'd-hist', memberId: 'm-hist', inviteKind: 'player', inviteId: 'pi-hist' });
     s.playerInvites.push({ id: 'pi-hist', memberId: 'm-hist', draftText: null });
     const plan = buildPurgePlan(s);
     expect(plan.deletes.members).not.toContain('m-hist');
     expect(plan.deletes.players).not.toContain('p-hist');
-    expect(plan.deletes.student_demographics).toContain('d-hist');
+    expect(plan.deletes.onboarding_form_completions).toContain('d-hist');
     expect(plan.deletes.player_invites).toContain('pi-hist');
     expect(plan.pastSeasonKept).toHaveLength(1);
     expect(plan.pastSeasonKept[0].playersBySeason).toEqual(['2025-26 (past): 1']);
@@ -145,7 +148,7 @@ describe('buildPurgePlan: staff protection', () => {
     expect(plan.deletes.school_managers).toEqual(['sm-mgr']);
     expect(plan.deletes.players).toEqual(['p-student']);
     expect(plan.deletes.player_identities).toEqual(['i1']);
-    expect(plan.deletes.student_demographics).toEqual(['d1']);
+    expect(plan.deletes.onboarding_form_completions).toEqual(['d1']);
     expect(plan.deletes.onboarding_consents).toEqual(['c1']);
     expect(plan.deletes.player_invites.sort()).toEqual(['pi-pending', 'pi-student']);
     expect(plan.deletes.manager_invites).toEqual(['mi-mgr']);
@@ -158,7 +161,7 @@ describe('buildPurgePlan: staff protection', () => {
       for (const id of plan.deletes[t]) expect(id).not.toMatch(/staff/);
     }
     expect(plan.deletes.players).not.toContain('p-staff');
-    expect(plan.deletes.student_demographics).not.toContain('d2');
+    expect(plan.deletes.onboarding_form_completions).not.toContain('d2');
     expect(plan.deletes.onboarding_consents).not.toContain('c2');
     expect(plan.authCandidates).not.toContain('u-staff');
     expect(plan.authProtected).toContain('u-staff');
@@ -244,12 +247,12 @@ describe('buildPurgePlan: staff protection', () => {
     const s = world();
     s.members.push(member('m-alum', 'Al', 'Um', 'al@x.org', 'school|al|um'));
     s.players.push({ id: 'p-alum', memberId: 'm-alum', rosterId: 'r-past' });
-    s.studentDemographics.push({ id: 'd-alum', memberId: 'm-alum' });
+    s.onboardingFormCompletions.push({ id: 'd-alum', memberId: 'm-alum', inviteKind: 'player', inviteId: 'pi-alum' });
     s.playerInvites.push({ id: 'pi-alum', memberId: 'm-alum', draftText: null });
     const plan = buildPurgePlan(s);
     expect(plan.deletes.members).not.toContain('m-alum');
     expect(plan.deletes.players).not.toContain('p-alum');
-    expect(plan.deletes.student_demographics).toContain('d-alum');
+    expect(plan.deletes.onboarding_form_completions).toContain('d-alum');
     expect(plan.deletes.player_invites).toContain('pi-alum');
     expect(plan.archiveKeptMemberIds).toContain('m-alum');
   });
@@ -269,9 +272,20 @@ describe('buildPurgePlan: staff protection', () => {
     expect(plan.authCandidates).toEqual([]);
   });
 
+  it('purges form completions that never reached a member, but keeps a staff member one', () => {
+    const s = world();
+    s.onboardingFormCompletions.push(
+      { id: 'd-mgr', memberId: null, inviteKind: 'manager', inviteId: 'mi-mgr' },
+      { id: 'd-orphan', memberId: null, inviteKind: 'player', inviteId: 'invite-long-gone' },
+    );
+    const plan = buildPurgePlan(s);
+    expect(plan.deletes.onboarding_form_completions).toEqual(expect.arrayContaining(['d1', 'd-mgr', 'd-orphan']));
+    expect(plan.deletes.onboarding_form_completions).not.toContain('d2');
+  });
+
   it('orders players before members and children before parents', () => {
     expect(DELETE_ORDER.indexOf('players')).toBeLessThan(DELETE_ORDER.indexOf('members'));
-    for (const child of ['onboarding_consents', 'student_demographics', 'player_identities', 'school_managers'] as const) {
+    for (const child of ['onboarding_consents', 'onboarding_form_completions', 'player_identities', 'school_managers'] as const) {
       expect(DELETE_ORDER.indexOf(child)).toBeLessThan(DELETE_ORDER.indexOf('members'));
     }
   });
@@ -671,8 +685,8 @@ describe('schema audit', () => {
     // onboarding_content_flags is ON DELETE CASCADE: it goes with its member and needs no step of its own.
     expect(tablesReferencing('members')).toEqual(
       [
-        'leadership', 'manager_invites', 'onboarding_consents', 'onboarding_content_flags', 'people', 'player_identities',
-        'player_invites', 'players', 'school_managers', 'staff_members', 'student_demographics',
+        'leadership', 'manager_invites', 'onboarding_consents', 'onboarding_content_flags', 'onboarding_form_completions', 'people',
+        'player_identities', 'player_invites', 'players', 'school_managers', 'staff_members',
       ].sort()
     );
   });

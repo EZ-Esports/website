@@ -10,7 +10,7 @@ vi.mock('@/app/lib/onboarding/wizard-actions', () => ({
 
 import { useWizardDraft } from '../hooks/useWizardDraft';
 import { AccountInfoStep } from '../components/steps/AccountInfoStep';
-import { DemographicsStep } from '../components/steps/DemographicsStep';
+import { BirthDateRulesStep } from '../components/steps/BirthDateRulesStep';
 import type { InviteData } from '../types';
 
 const invite = (role: 'player' | 'manager' = 'player'): InviteData => ({
@@ -136,7 +136,7 @@ describe('useWizardDraft content screen', () => {
     expect(result.current.contentFlags.state('discordUsername')).toEqual({ flagged: true, overridden: true });
   });
 
-  it('screens the Riot ID on step 3 and the free text on step 4', () => {
+  it('screens the Riot ID on step 3 and has no screened free text on step 4', () => {
     const { result } = setup();
     act(() => {
       result.current.setRiotId('ShitLord#NA1');
@@ -151,13 +151,11 @@ describe('useWizardDraft content screen', () => {
     act(() => {
       result.current.setBirthDate('2008-05-14');
       result.current.setCodeOfConductAccepted(true);
-      result.current.setFeedback('this is bullshit');
     });
     act(() => {
       ok = result.current.validateStep4();
     });
-    expect(ok).toBe(false);
-    expect(result.current.contentFlags.state('feedback').flagged).toBe(true);
+    expect(ok).toBe(true);
   });
 
   it('screens the verified Discord username on step 2', () => {
@@ -243,16 +241,11 @@ describe('content warning in the form', () => {
 
 describe('code of conduct acknowledgement', () => {
   const props = {
-    birthDate: '', setBirthDate: () => {}, gender: '', setGender: () => {}, selectedRaces: [], setSelectedRaces: () => {},
-    countryOfBirth: '', setCountryOfBirth: () => {}, primaryLanguageAtHome: '', setPrimaryLanguageAtHome: () => {},
-    isFreeOrReducedLunch: undefined, setIsFreeOrReducedLunch: () => {}, isFirstGenCollege: undefined, setIsFirstGenCollege: () => {},
-    doePetitionConsent: true, setDoePetitionConsent: () => {}, ping: '', setPing: () => {}, hoursPerWeek: '', setHoursPerWeek: () => {},
-    internetReliability: '', setInternetReliability: () => {}, careerInterests: [], setCareerInterests: () => {}, feedback: '',
-    setFeedback: () => {}, codeOfConductAccepted: false, setCodeOfConductAccepted: () => {},
+    birthDate: '', setBirthDate: () => {}, codeOfConductAccepted: false, setCodeOfConductAccepted: () => {},
   };
 
   it('tells the person offensive information is prohibited and links the rules', () => {
-    render(<DemographicsStep {...props} />);
+    render(<BirthDateRulesStep {...props} />);
     expect(screen.getByText(/offensive or inappropriate names, usernames, Riot IDs/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /rule 3\.4/i })).toHaveAttribute('href', '/rules#submitted-information');
     expect(screen.getByText(/may change or reject any entry/i)).toBeInTheDocument();
