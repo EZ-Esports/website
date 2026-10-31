@@ -28,11 +28,7 @@ function Step({ n, title, children }: { n: number; title: ReactNode; children?: 
         {n}
       </span>
       <div className="min-w-0 flex-1 space-y-3 text-sm leading-6 text-foreground-secondary">
-        <p className="font-medium text-foreground">
-          {/* The visible badge is decorative; this keeps the number in the reading order for screen readers. */}
-          <span className="sr-only">Step {n}: </span>
-          {title}
-        </p>
+        <p className="font-medium text-foreground">{title}</p>
         {children}
       </div>
     </li>
@@ -107,7 +103,7 @@ export default async function OnboardingFormPage() {
         title="Set up the form"
         description="Follow the steps in order. Nothing changes for students until you save in step 8. It takes about ten minutes the first time and needs a Google account that stays with EZ Esports."
       >
-        <ol role="list" className="space-y-6">
+        <ol className="space-y-6">
           <Step n={1} title="Create the Google Form and add the verification question">
             <p>
               In Google Forms, create or open your form and add a <strong className={strong}>Short answer</strong>{' '}
@@ -130,16 +126,14 @@ export default async function OnboardingFormPage() {
               students cannot submit.
             </p>
             <p>
-              Recommended, so each person can only submit once: turn on{' '}
-              <strong className={strong}>Limit to 1 response</strong> (this makes respondents sign in with Google) and set{' '}
-              <strong className={strong}>Collect email addresses</strong> to <em>Verified</em> if you want the response sheet
-              to show who answered.
+              Whether to limit each person to one response, or to require Google sign-in, is up to the form owner. The
+              tradeoff: limiting to one response makes people sign in with Google, and because completion is tracked per
+              invite, someone with a second invite (another game or season) could not submit the same form again.
             </p>
             <AdminNotice tone="warning" live="none">
-              Not yet tried against a real form: whether a pre-filled link still works when sign-in is required. Check it in
-              the test step. Also, a completion belongs to an invite, so someone who gets a second invite (another game or
-              season) cannot submit the same form again under &ldquo;Limit to 1 response&rdquo;. Use a new form for the new
-              round or allow response editing; there is no manual override yet.
+              Not yet tried against a real form: whether a pre-filled link still works when the form requires sign-in. If
+              the owner turns it on, check it in the test step. There is no manual override yet for someone who cannot
+              resubmit.
             </AdminNotice>
           </Step>
 

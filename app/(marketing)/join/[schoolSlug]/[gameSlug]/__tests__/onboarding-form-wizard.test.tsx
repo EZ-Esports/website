@@ -157,6 +157,25 @@ describe('wizard without the form step at page load', () => {
   });
 });
 
+describe('stale "form required" message', () => {
+  it('is removed as soon as the completion check succeeds, so red and green never show together', async () => {
+    const message = 'We have not received your onboarding form yet.';
+    mocks.submitPlayerOnboarding.mockResolvedValue({ success: false, code: 'onboarding_form_required', error: message });
+    renderWizard(playerInvite(), { enabled: false, completed: false });
+    walkToLastStep('player');
+    await submit();
+    await screen.findByText('Step 6 of 6');
+    expect(screen.getByText(message)).toBeInTheDocument();
+
+    mocks.getOnboardingFormState.mockResolvedValue({ enabled: true, completed: true });
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    await waitFor(() => expect(screen.getByText(/we received your form/i)).toBeInTheDocument());
+    expect(screen.queryByText(message)).toBeNull();
+  });
+});
+
 describe('wizard with the form step on', () => {
   it('shows six steps for a manager who also plays and blocks submission until the form is recorded', async () => {
     renderWizard(managerInvite(), { enabled: true, completed: false });

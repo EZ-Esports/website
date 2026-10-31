@@ -69,6 +69,9 @@ export default function PlayerOnboardingWizard({
   const [formEnabled, setFormEnabled] = useState<boolean>(onboardingForm.enabled);
   const totalSteps = formEnabled ? FORM_STEP : 5;
   const [formCompleted, setFormCompleted] = useState<boolean>(onboardingForm.completed);
+  // The server's "form required" message, so it can be withdrawn once the completion shows up instead of
+  // sitting in red next to the green "we received your form" state. Other errors are left alone.
+  const formRequiredMessage = useRef<string | null>(null);
   const isManagerInvite = inviteData.role === 'manager';
   // The password is deliberately not kept in the saved draft, so a manager coming back from Discord
   // starts again at step 1 to re-enter it; a player resumes straight at the Discord step.
@@ -94,6 +97,19 @@ export default function PlayerOnboardingWizard({
   });
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const { isManager } = draft;
+
+  const handleFormCompleted = useCallback(
+    (completed: boolean) => {
+      setFormCompleted(completed);
+      if (completed && formRequiredMessage.current) {
+        const stale = formRequiredMessage.current;
+        formRequiredMessage.current = null;
+        draft.setErrorMessage((current) => (current === stale ? null : current));
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setErrorMessage is a stable state setter
+    [draft.setErrorMessage]
+  );
 
   function handleNext() {
     if (step === 1 && draft.validateStep1()) {
@@ -327,6 +343,7 @@ export default function PlayerOnboardingWizard({
           if (result.code === 'onboarding_form_required') {
             setFormEnabled(true);
             setFormCompleted(false);
+            formRequiredMessage.current = result.error;
           }
           return;
         }
@@ -506,7 +523,7 @@ export default function PlayerOnboardingWizard({
         )}
 
         {step === FORM_STEP && formEnabled && (
-          <OnboardingFormStep token={token} completed={formCompleted} onCompletedChange={setFormCompleted} />
+          <OnboardingFormStep token={token} completed={formCompleted} onCompletedChange={handleFormCompleted} />
         )}
 
         {/* Wizard Navigation Buttons */}

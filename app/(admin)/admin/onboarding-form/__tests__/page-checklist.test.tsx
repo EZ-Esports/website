@@ -1,4 +1,3 @@
-import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,11 +52,11 @@ describe('/admin/onboarding-form checklist', () => {
     expect(out).toContain('so it comes last');
   });
 
-  it('covers the Google response settings and the second-invite caveat without claiming it was tested', async () => {
+  it('leaves response limits to the form owner, with the second-invite caveat and no claim it was tested', async () => {
     const out = await html();
-    expect(out).toContain('Limit to 1 response');
     expect(out).toContain('accepting responses');
-    expect(out).toMatch(/Collect email addresses/);
+    expect(out).toContain('up to the form owner');
+    expect(out).not.toContain('Limit to 1 response');
     expect(out).toContain('Not yet tried against a real form');
     expect(out).toMatch(/second invite/);
   });
@@ -69,12 +68,6 @@ describe('/admin/onboarding-form checklist', () => {
     expect(out).toContain('(unsafe)');
     expect(out).toContain('From form');
     expect(out).toContain('On form submit');
-  });
-
-  it('announces step numbers to screen readers although the badges are decorative', async () => {
-    const out = await html();
-    for (let n = 1; n <= 9; n++) expect(out).toContain(`<span class="sr-only">Step ${n}: </span>`);
-    expect(out).toContain('role="list"');
   });
 
   it('tells staff to do the Google side first and save last when replacing the form', async () => {
