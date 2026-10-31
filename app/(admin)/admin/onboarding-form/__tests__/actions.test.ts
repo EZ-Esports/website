@@ -47,6 +47,16 @@ describe('saveOnboardingFormSettings', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/admin/onboarding-form');
   });
 
+  it('swaps in a new form: the latest link and entry id win and the cache tag is expired each time', async () => {
+    const other = FORM.replace('1FAIpQLSd', '1FAIpQLSe');
+    await saveOnboardingFormSettings(form({ formUrl: FORM, entryId: '111111' }));
+    await saveOnboardingFormSettings(form({ formUrl: other, entryId: '222222' }));
+    expect(writeOnboardingFormSettingRows).toHaveBeenNthCalledWith(1, { url: FORM, entryId: '111111' });
+    expect(writeOnboardingFormSettingRows).toHaveBeenNthCalledWith(2, { url: other, entryId: '222222' });
+    expect(updateCacheTags).toHaveBeenCalledTimes(2);
+    expect(updateCacheTags).toHaveBeenLastCalledWith('page-content');
+  });
+
   it('turns the form off when both fields are empty', async () => {
     const res = await saveOnboardingFormSettings(form({ formUrl: '  ', entryId: '' }));
     expect(res.success).toBe(true);

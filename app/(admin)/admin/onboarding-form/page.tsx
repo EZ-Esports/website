@@ -1,27 +1,38 @@
-import { headers } from 'next/headers';
+import type { ReactNode } from 'react';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import { AdminNotice, AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
 import { chip, chipDot } from '@/app/components/admin/styles';
-import { CANONICAL_APP_URL } from '@/app/lib/constants';
 import { countFormCompletions, readOnboardingFormSettingRows } from '@/app/lib/db/onboarding-form';
 import { resolveOnboardingFormConfig } from '@/app/lib/onboarding/google-form/config';
-import { buildAppsScript } from '@/app/lib/onboarding/google-form/apps-script';
+import { buildAppsScript, googleFormWebhookEndpoint } from '@/app/lib/onboarding/google-form/apps-script';
 import { deriveWebhookKey, isWebhookSecretConfigured } from '@/app/lib/onboarding/google-form/token';
-import { CopyBlock, OnboardingFormSettingsForm } from './OnboardingFormSettings';
+import { CopyBlock, OnboardingFormSettingsForm, ScriptGenerator } from './OnboardingFormSettings';
 
 export const metadata = {
   title: 'Onboarding Form | Admin',
 };
 
-/** Where Google's script should post: this deployment's own origin, so a preview shows its own URL. */
-async function webhookEndpoint(): Promise<string> {
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? (host?.startsWith('localhost') ? 'http' : 'https');
-  const origin = host ? `${proto}://${host}` : process.env.NEXT_PUBLIC_APP_URL || CANONICAL_APP_URL;
-  return `${origin}/api/google-form/complete`;
+const code = 'rounded bg-surface-sunken px-1.5 py-0.5 text-foreground';
+const strong = 'text-foreground';
+
+/** One numbered step: a badge, the instruction, and optionally a control that belongs to it. */
+function Step({ n, title, children }: { n: number; title: ReactNode; children?: ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span
+        aria-hidden
+        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/20 text-xs font-bold text-accent"
+      >
+        {n}
+      </span>
+      <div className="min-w-0 flex-1 space-y-3 text-sm leading-6 text-foreground-secondary">
+        <p className="font-medium text-foreground">{title}</p>
+        {children}
+      </div>
+    </li>
+  );
 }
 
 export default async function OnboardingFormPage() {
@@ -45,7 +56,8 @@ export default async function OnboardingFormPage() {
   const secretConfigured = isWebhookSecretConfigured();
   const hasSettings = Boolean(settings.url || settings.entryId);
   const invalidSettings = hasSettings && !(config.formUrl && config.entryId);
-  const endpoint = await webhookEndpoint();
+  const endpoint = googleFormWebhookEndpoint();
+  const script = buildAppsScript(endpoint);
   const webhookKey = secretConfigured ? deriveWebhookKey() : null;
 
   const status = config.enabled
@@ -87,71 +99,130 @@ export default async function OnboardingFormPage() {
         </AdminNotice>
       )}
 
-      {dbConfigured && (
-        <AdminSection title="Form settings" description="Changes apply to the next onboarding page load.">
-          <OnboardingFormSettingsForm initialUrl={settings.url} initialEntryId={settings.entryId} />
-        </AdminSection>
-      )}
-
       <AdminSection
         title="Set up the form"
-        description="Do this once per form. The Google account that adds the trigger must keep owning it."
+        description="Follow the steps in order. It takes about ten minutes the first time and needs a Google account that stays with EZ Esports."
       >
-        <ol className="list-decimal space-y-3 pl-5 text-sm leading-6 text-foreground-secondary marker:text-accent">
-          <li>
-            Add a <strong className="text-foreground">required short-answer</strong> question titled exactly{' '}
-            <code className="rounded bg-surface-sunken px-1.5 py-0.5 text-foreground">Verification code</code>.
-          </li>
-          <li>
-            Give that question this description so people do not change it:{' '}
-            <em className="text-foreground">&ldquo;Leave this code as is. It is filled in for you and tells EZ Esports this response is yours.&rdquo;</em>
-          </li>
-          <li>
-            In the form menu choose <strong className="text-foreground">Get pre-filled link</strong>, type any value in
-            that question, choose <strong className="text-foreground">Get link</strong>, and copy the link. The number after{' '}
-            <code className="rounded bg-surface-sunken px-1.5 py-0.5 text-foreground">entry.</code> is the entry id. Use the
-            full docs.google.com link, never a forms.gle short link.
-          </li>
-          <li>
-            Open <strong className="text-foreground">Extensions &gt; Apps Script</strong>, replace the code with the script
-            below, and save.
-          </li>
-          <li>
-            In the script&apos;s <strong className="text-foreground">Project Settings &gt; Script properties</strong>, add{' '}
-            <code className="rounded bg-surface-sunken px-1.5 py-0.5 text-foreground">WEBHOOK_KEY</code> with the key
-            below. Send the key through a private channel; it is the only secret the script holds.
-          </li>
-          <li>
-            Open <strong className="text-foreground">Triggers</strong>, add a trigger for{' '}
-            <code className="rounded bg-surface-sunken px-1.5 py-0.5 text-foreground">onFormSubmit</code>, event source{' '}
-            <em>From form</em>, event type <em>On form submit</em>, and authorize it. The trigger runs as whoever adds it,
-            so the form owner (or a long-lived shared staff account) should do this.
-          </li>
-          <li>
-            Paste the link and entry id above, save, submit a test response from the prefilled link of a pending invite, and
-            watch the completion count go up.
-          </li>
+        <ol className="space-y-6">
+          <Step n={1} title="Create the Google Form and add the verification question">
+            <p>
+              In Google Forms, create or open your form and add a <strong className={strong}>Short answer</strong>{' '}
+              question. Title it exactly <code className={code}>Verification code</code> and switch on{' '}
+              <strong className={strong}>Required</strong>.
+            </p>
+            <p>
+              Under the question&apos;s three-dot menu choose <strong className={strong}>Description</strong> and type:{' '}
+              <em className="text-foreground">
+                &ldquo;Leave this code as is. It is filled in for you and tells EZ Esports this response is yours.&rdquo;
+              </em>
+            </p>
+          </Step>
+
+          <Step n={2} title="Get the pre-filled link and the entry id">
+            <p>
+              Click the three-dot menu at the top right of the form and choose{' '}
+              <strong className={strong}>Get pre-filled link</strong>. Type anything in the Verification code box, choose{' '}
+              <strong className={strong}>Get link</strong>, then <strong className={strong}>Copy link</strong>.
+            </p>
+            <p>
+              The link ends in something like <code className={code}>entry.1234567890=abc</code>. The number after{' '}
+              <code className={code}>entry.</code> is the <strong className={strong}>entry id</strong>. Always use the long
+              <code className={code}> docs.google.com </code> link, never a short <code className={code}>forms.gle</code> one.
+            </p>
+          </Step>
+
+          <Step n={3} title="Paste the link and the entry id here, then save">
+            {dbConfigured ? (
+              <div className="rounded-xl bg-surface-sunken/60 p-4">
+                <OnboardingFormSettingsForm initialUrl={settings.url} initialEntryId={settings.entryId} />
+              </div>
+            ) : (
+              <p>Connect the database to save the form settings.</p>
+            )}
+          </Step>
+
+          <Step n={4} title={<>Click <em>Generate script</em> and copy it</>}>
+            <p>
+              The script already points at <code className={`${code} break-all`}>{endpoint}</code>. It is the same for every
+              form, and it holds no password.
+            </p>
+            <ScriptGenerator script={script} />
+          </Step>
+
+          <Step n={5} title="Paste the script into the form">
+            <p>
+              In the form, click the three-dot menu at the top right and choose{' '}
+              <strong className={strong}>Apps Script</strong>. A new tab opens. Delete the code that is there, paste the
+              script, and click the save icon.
+            </p>
+          </Step>
+
+          <Step n={6} title={<>Add the key as the script property <code className={code}>WEBHOOK_KEY</code></>}>
+            <p>
+              In the Apps Script tab open <strong className={strong}>Project Settings</strong> (the gear icon), scroll to{' '}
+              <strong className={strong}>Script Properties</strong>, click <strong className={strong}>Add script property</strong>,
+              enter <code className={code}>WEBHOOK_KEY</code> as the name and the key below as the value, and save. Send the key
+              to other people only through a private channel.
+            </p>
+            {webhookKey ? (
+              <CopyBlock label="WEBHOOK_KEY value" value={webhookKey} secret />
+            ) : (
+              <p>
+                The key appears here once <code className={code}>GOOGLE_FORM_WEBHOOK_SECRET</code> is set on the server.
+              </p>
+            )}
+          </Step>
+
+          <Step n={7} title={<>Add an <em>On form submit</em> trigger and authorize it</>}>
+            <p>
+              Click <strong className={strong}>Triggers</strong> (the alarm-clock icon), then{' '}
+              <strong className={strong}>Add Trigger</strong>. Choose the function{' '}
+              <code className={code}>onFormSubmit</code>, event source <em>From form</em>, event type{' '}
+              <em>On form submit</em>, and save. Google asks you to sign in and allow access: approve it. The trigger runs as
+              whoever adds it, so the form owner (or a long-lived shared staff account) should do this.
+            </p>
+          </Step>
+
+          <Step n={8} title="Test it">
+            <p>
+              Create a test invite, open its onboarding link, go to the last step and press{' '}
+              <strong className={strong}>Open the form</strong>, then submit the form. Within a few seconds the onboarding
+              page shows the form as received. Reload this page: the completion count above should have gone up by one.
+            </p>
+          </Step>
         </ol>
-        <p className="mt-4 text-xs leading-5 text-foreground-secondary">
-          A new form, a copy of the form, or a change of owner means redoing the script, key and trigger and updating the
-          link and entry id here. Deleting and re-adding the verification question changes its entry id.
-        </p>
       </AdminSection>
 
-      <AdminSection title="Script and key" description="The script already points at this site.">
-        <div className="space-y-6">
-          <CopyBlock label="Apps Script" value={buildAppsScript(endpoint)} multiline />
-          {webhookKey ? (
-            <CopyBlock label="WEBHOOK_KEY script property" value={webhookKey} secret />
-          ) : (
-            <p className="text-sm text-foreground-secondary">
-              The key appears here once <code className="text-foreground">GOOGLE_FORM_WEBHOOK_SECRET</code> is set on the server.
-            </p>
-          )}
-          <p className="text-xs leading-5 text-foreground-secondary">
-            The key is derived from the server secret and can only report that a form was submitted. It cannot create a
-            verification code, and changing the server secret invalidates it and every code already handed out.
+      <AdminSection title="Replacing the form later" description="Use a different Google Form whenever you like.">
+        <div className="space-y-3 text-sm leading-6 text-foreground-secondary">
+          <p>
+            Do steps 1 to 7 again for the new form, using the <strong className={strong}>same script and the same key</strong>
+            . Saving the new link in step 3 is what makes onboarding show the new form: the change applies on the next
+            page load, no deploy needed.
           </p>
+          <ul className="list-disc space-y-1.5 pl-5 marker:text-accent">
+            <li>
+              <strong className={strong}>Each Google Form has its own Apps Script.</strong> The script text and key do not
+              change, but they must be pasted into, and authorized on, every new form. A new form without them never reports
+              back, and students would wait on the last step forever.
+            </li>
+            <li>
+              People who already finished stay finished: a completion belongs to the invite, not to a form. Everyone who has
+              not finished gets the new form the next time they press <em>Open the form</em>.
+            </li>
+            <li>
+              A student who already opened the old form can still submit it. That only counts while the old form&apos;s
+              trigger exists. To stop counting old-form submissions, delete the trigger on the old form (Apps Script &gt;
+              Triggers &gt; the three dots &gt; Delete trigger).
+            </li>
+            <li>
+              Deleting and re-adding the Verification code question changes its entry id, so update the entry id here too.
+            </li>
+            <li>
+              Changing the server secret invalidates the key and every code already handed out: paste the new key into each
+              form&apos;s script properties.
+            </li>
+          </ul>
         </div>
       </AdminSection>
     </AdminPage>

@@ -65,7 +65,8 @@ export function OnboardingFormSettingsForm({ initialUrl, initialEntryId }: Setti
         />
       </AdminField>
       <p className="text-xs leading-5 text-foreground-secondary">
-        Leave both empty to turn the onboarding form off. Students and managers then skip that step.
+        Leave both empty to turn the onboarding form off. Students and managers then skip that step. Saving a
+        different link replaces the form for everyone who has not finished yet.
       </p>
       {message && <AdminNotice tone={message.tone}>{message.text}</AdminNotice>}
       <AdminFormActions>
@@ -142,4 +143,25 @@ export function CopyBlock({ label, value, secret = false, multiline = false }: C
       )}
     </div>
   );
+}
+
+interface ScriptGeneratorProps {
+  /** The finished script. It holds the webhook address only, never a secret, so it may sit in the page. */
+  script: string;
+}
+
+/**
+ * Shows the Apps Script only after "Generate script" is pressed, with a Copy button. The key the script
+ * needs is not part of it: it is entered separately as a script property.
+ */
+export function ScriptGenerator({ script }: ScriptGeneratorProps) {
+  const [generated, setGenerated] = useState(false);
+  if (!generated) {
+    return (
+      <button type="button" onClick={() => setGenerated(true)} className={primaryBtn}>
+        Generate script
+      </button>
+    );
+  }
+  return <CopyBlock label="Apps Script" value={script} multiline />;
 }

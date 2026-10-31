@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/app/lib/db/content', () => ({ getCachedPageContent: vi.fn() }));
 
 import { resolveOnboardingFormConfig } from '../google-form/config';
-import { buildAppsScript } from '../google-form/apps-script';
+import { buildAppsScript, googleFormWebhookEndpoint } from '../google-form/apps-script';
 
 const ID = '1FAIpQLSdAbCdEfGhIjKlMnOpQrStUvWxYz0123456789';
 let saved: string | undefined;
@@ -55,5 +55,21 @@ describe('buildAppsScript', () => {
 
   it('quotes an endpoint safely', () => {
     expect(() => new Function(buildAppsScript('https://x.test/a";alert(1);//'))).not.toThrow();
+  });
+});
+
+describe('googleFormWebhookEndpoint', () => {
+  it('is pinned to the production origin outside local development', () => {
+    expect(googleFormWebhookEndpoint('production')).toBe('https://ezesports.org/api/google-form/complete');
+    expect(googleFormWebhookEndpoint('test')).toBe('https://ezesports.org/api/google-form/complete');
+    expect(googleFormWebhookEndpoint(undefined)).toBe('https://ezesports.org/api/google-form/complete');
+  });
+
+  it('uses localhost only for next dev', () => {
+    expect(googleFormWebhookEndpoint('development')).toBe('http://localhost:3000/api/google-form/complete');
+  });
+
+  it('takes no request input at all', () => {
+    expect(googleFormWebhookEndpoint.length).toBeLessThanOrEqual(1);
   });
 });

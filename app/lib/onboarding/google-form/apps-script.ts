@@ -1,3 +1,19 @@
+import { CANONICAL_APP_URL } from '@/app/lib/constants';
+
+export const GOOGLE_FORM_WEBHOOK_PATH = '/api/google-form/complete';
+
+/**
+ * Where the Apps Script posts. Pinned to the production origin and never derived from request headers
+ * (a Host or forwarded header is caller-controlled and would put an attacker's URL, next to the webhook
+ * key, into a script staff paste into Google). Only a local `next dev` uses localhost, so a developer
+ * can try the flow against their own machine. Vercel preview builds also run with NODE_ENV=production
+ * and so also show the production URL, which is what the Google Form must always use.
+ */
+export function googleFormWebhookEndpoint(nodeEnv: string | undefined = process.env.NODE_ENV): string {
+  const origin = nodeEnv === 'development' ? 'http://localhost:3000' : CANONICAL_APP_URL;
+  return `${origin}${GOOGLE_FORM_WEBHOOK_PATH}`;
+}
+
 /**
  * The Apps Script staff paste into the onboarding Google Form (spec-051). Kept as a function of the
  * endpoint URL so the staff page shows a script that already points at this deployment.

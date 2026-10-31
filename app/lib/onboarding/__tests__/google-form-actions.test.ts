@@ -88,6 +88,27 @@ describe('issueOnboardingFormLink', () => {
     expect(result.expiresAt).toBeLessThanOrEqual(Date.now() + 6 * 3600_000 + 1000);
   });
 
+  it('follows a swap of the form: the next link uses the new form and entry id, for the same invite', async () => {
+    const first = await issueOnboardingFormLink(TOKEN);
+    const NEW_FORM = FORM.replace('1FAIpQLSd', '1FAIpQLSe');
+    getOnboardingFormConfig.mockResolvedValue({ ...enabled, formUrl: NEW_FORM, entryId: '555555555' });
+    const second = await issueOnboardingFormLink(TOKEN);
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(first.url).toContain('1FAIpQLSd');
+    const url = new URL(second.url);
+    expect(url.pathname).toContain('1FAIpQLSe');
+    const code = url.searchParams.get('entry.555555555')!;
+    // The code is bound to the invite, not the form, so a code from the old link still verifies for it.
+    expect(verifyFormToken(code)).toMatchObject({ status: 'ok', inviteId: INVITE });
+  });
+
+  it('keeps a completed invite completed after a swap (completions belong to the invite)', async () => {
+    hasFormCompletion.mockResolvedValue(true);
+    getOnboardingFormConfig.mockResolvedValue({ ...enabled, formUrl: FORM.replace('1FAIpQLSd', '1FAIpQLSe') });
+    expect(await resolveOnboardingFormState('player', INVITE)).toEqual({ enabled: true, completed: true });
+  });
+
   it('refuses when the invite is not live or the form is not configured, and limits repeated requests', async () => {
     findInviteByTokenHash.mockResolvedValueOnce(undefined);
     expect((await issueOnboardingFormLink(TOKEN)).ok).toBe(false);

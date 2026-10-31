@@ -219,7 +219,9 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - **Migration `0057` is not applied.** Deploy the code first, then migrate (it drops `student_demographics`), then set `GOOGLE_FORM_WEBHOOK_SECRET` and configure the form. Owner action.
 - **Never tested against a real Google Form or Apps Script.** First real run should add the trigger, submit a test response from a pending invite's prefilled link and watch the completion count.
 - **No manual staff override** for a missing completion. `source = 'manual'` is reserved in the table and unused. Add a staff action if a student's Google trigger ever fails.
-- The webhook rate limiter is the existing in-process one (resets on cold start, per instance). Replace together with the other limiters if they move to Redis.
+- The webhook's failed-auth rate limiter is the existing in-memory one (`rate-limit.ts`): per serverless instance, reset on cold start, not shared. Best-effort only; valid callers are never counted. Replace with Upstash together with the other limiters.
+- Swapping the Google Form needs the script and `WEBHOOK_KEY` pasted into the new form and its trigger authorized (each form has its own Apps Script); the old form's trigger should be deleted. Documented on the staff page.
+- The wizard hides the form step when the page-load lookup fails; the server's `onboarding_form_required` rejection reveals it.
 - The staff page and the wizard step have not been looked at in a browser.
 - The role editor drops retired bit 12 from a role only when that role is saved; stored masks are not rewritten by the migration.
 - Retiring the bit left `Permissions` with a gap at 12; new permissions start at 13.
