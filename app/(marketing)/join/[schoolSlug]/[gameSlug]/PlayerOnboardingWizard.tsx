@@ -63,7 +63,10 @@ export default function PlayerOnboardingWizard({
   resumeAtDiscord = false,
   onboardingForm = { enabled: false, completed: false },
 }: PlayerOnboardingWizardProps) {
-  const formEnabled = onboardingForm.enabled;
+  // State, not a constant: the page-load answer can be stale (staff turned the form on while this page was
+  // open) or missing (the lookup failed). The server's `onboarding_form_required` rejection is the authority
+  // and switches the step on, so a student can never be stuck on a wizard that has no way to satisfy it.
+  const [formEnabled, setFormEnabled] = useState<boolean>(onboardingForm.enabled);
   const totalSteps = formEnabled ? FORM_STEP : 5;
   const [formCompleted, setFormCompleted] = useState<boolean>(onboardingForm.completed);
   const isManagerInvite = inviteData.role === 'manager';
@@ -321,7 +324,10 @@ export default function PlayerOnboardingWizard({
           setStep(target);
           draft.setErrorMessage(result.error);
           if (result.code === 'play_games_required') draft.flagPlayGamesError();
-          if (result.code === 'onboarding_form_required') setFormCompleted(false);
+          if (result.code === 'onboarding_form_required') {
+            setFormEnabled(true);
+            setFormCompleted(false);
+          }
           return;
         }
         setApplications({

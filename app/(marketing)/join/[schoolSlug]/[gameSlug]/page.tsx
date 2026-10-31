@@ -221,7 +221,9 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
   }
 
   // Whether the wizard has the Google Form step, and whether it is already done (a student returning
-  // from Discord or a refresh). Read on the server; a failure must not take the wizard down.
+  // from Discord or a refresh). Read on the server; a failure must not take the wizard down. On failure
+  // the step starts hidden, and the server's `onboarding_form_required` rejection at submit reveals it
+  // (the wizard treats that rejection as authoritative), so nobody is left without a way forward.
   let onboardingForm = { enabled: false, completed: false };
   try {
     onboardingForm = await resolveOnboardingFormState(validation.role, validation.inviteId);

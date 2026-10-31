@@ -48,6 +48,8 @@ export function OnboardingFormStep({ token, completed, onCompletedChange }: Onbo
   useEffect(() => {
     if (completed) return;
     let timer: number | undefined;
+    // Check straight away: the step may appear after a rejection for a student who already finished.
+    void check();
     const schedule = () => {
       const delay = Date.now() - startedAt.current > SLOW_AFTER_MS ? POLL_SLOW_MS : POLL_FAST_MS;
       timer = window.setTimeout(async () => {
