@@ -276,31 +276,6 @@ export async function upsertPlayerIdentities(
   }
 }
 
-/** Upserts the sensitive demographic survey in the FERPA / NY § 2-D vault. */
-export async function upsertStudentDemographics(
-  tx: OnboardingTx,
-  memberId: string,
-  values: Omit<typeof schema.studentDemographics.$inferInsert, 'memberId'>
-): Promise<void> {
-  const [existingDemo] = await tx
-    .select()
-    .from(schema.studentDemographics)
-    .where(eq(schema.studentDemographics.memberId, memberId))
-    .limit(1);
-
-  if (existingDemo) {
-    await tx
-      .update(schema.studentDemographics)
-      .set(values)
-      .where(eq(schema.studentDemographics.id, existingDemo.id));
-  } else {
-    await tx.insert(schema.studentDemographics).values({
-      memberId,
-      ...values,
-    });
-  }
-}
-
 /** Auth user id of the staff member with this email (case-insensitive), if any. */
 export async function findStaffUserIdByEmail(
   tx: OnboardingTx | typeof db,
