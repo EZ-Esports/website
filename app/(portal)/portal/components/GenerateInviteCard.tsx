@@ -16,6 +16,7 @@ import {
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS } from '@/app/lib/onboarding/invite-expiry';
 import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import type { GameItem } from './GameTabs';
+import { useStaffActing } from './StaffActing';
 
 interface GenerateInviteCardProps {
   games: GameItem[];
@@ -37,6 +38,7 @@ export function GenerateInviteCard({
   viewOnlyGameIds = [],
   onInviteCreated,
 }: GenerateInviteCardProps) {
+  const { confirmed } = useStaffActing();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [expiryDays, setExpiryDays] = useState<number>(DEFAULT_INVITE_EXPIRY_DAYS);
@@ -73,7 +75,7 @@ export function GenerateInviteCard({
     }
 
     setGenerateError(null);
-    startGenerating(async () => {
+    confirmed(() => startGenerating(async () => {
       try {
         const result = await createPlayerInvite({
           schoolId,
@@ -122,7 +124,7 @@ export function GenerateInviteCard({
       } catch (err: any) {
         setGenerateError(err.message || 'Failed to create invite link');
       }
-    });
+    }));
   };
 
   return (

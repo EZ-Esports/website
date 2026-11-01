@@ -13,6 +13,7 @@ import {
 } from '@/app/lib/school-matches';
 import { RescheduleCell } from './RescheduleControls';
 import { ResultActions } from './MatchResultControls';
+import { useStaffActing } from './StaffActing';
 
 interface MatchesSectionProps {
   matches: SchoolMatchItem[];
@@ -161,6 +162,8 @@ function MatchTable({
 
 /** A callout per season showing how many reschedules this school has left (each school gets one). */
 function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) {
+  // Staff are exempt from the allowance (spec-055), so the school's count is not theirs to read.
+  const { isStaff } = useStaffActing();
   const seasons = new Map<string, { name: string; used: boolean }>();
   for (const match of matches) {
     const key = `${match.gameId}|${match.seasonName}`;
@@ -168,7 +171,7 @@ function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) 
     if (match.rescheduleAllowanceUsed) entry.used = true;
     seasons.set(key, entry);
   }
-  if (seasons.size === 0) return null;
+  if (isStaff || seasons.size === 0) return null;
   return (
     <div className="space-y-2">
       {[...seasons.entries()].map(([key, season]) => (

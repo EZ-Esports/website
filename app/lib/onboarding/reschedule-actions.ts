@@ -2,6 +2,7 @@
 
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { revalidatePath, updateTag } from 'next/cache';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
 import { parseEastern } from '@/app/lib/dates';
@@ -71,12 +72,18 @@ async function loadMatch(matchId: string) {
 type LoadedMatch = NonNullable<Awaited<ReturnType<typeof loadMatch>>>;
 
 /**
- * Authorizes a manager to act for `schoolId` on this match: they must manage that school and the
- * match's game in the match's own season (a write, so an inactive season is refused), and the
- * school must be one of the two sides. Staff admins are refused: staff move matches from the
- * staff portal, and acting here would blur which side a request came from.
+ * Authorizes the caller to act for `schoolId` on this match, and says whether that is a staff admin.
+ * A manager must manage that school and the match's game in the match's own season (a write, so an
+ * inactive season is refused). A staff admin (spec-055) acts as the school whose portal they are
+ * viewing: `schoolId` comes from the UI but is validated here, since it must be one of the two
+ * sides of the match, and the season checks do not apply to them. Either way the side taken
+ * (requester or responder) is derived from `schoolId` alone, and the acting user's own id is what
+ * callers record, so a staff action is never attributed to a manager.
  */
-async function authorizeForMatch(schoolId: string, match: LoadedMatch): Promise<{ userId: string }> {
+async function authorizeForMatch(
+  schoolId: string,
+  match: LoadedMatch
+): Promise<{ userId: string; isStaff: boolean }> {
   let authorized: Awaited<ReturnType<typeof assertManagerForSchoolGame>>;
   try {
     authorized = await assertManagerForSchoolGame(schoolId, match.gameId);
@@ -85,16 +92,13 @@ async function authorizeForMatch(schoolId: string, match: LoadedMatch): Promise<
     throw new ActionError(error instanceof Error ? error.message : 'You cannot do this.');
   }
   const { context, season } = authorized;
-  if (context.isStaffAdmin) {
-    throw new ActionError('Staff review reschedules from the staff portal.');
-  }
-  if (!season || season.id !== match.seasonId) {
+  if (!context.isStaffAdmin && (!season || season.id !== match.seasonId)) {
     throw new ActionError('This match is not in your season.');
   }
   if (match.homeSchoolId !== schoolId && match.awaySchoolId !== schoolId) {
     throw new ActionError('Your school is not playing in this match.');
   }
-  return { userId: context.userId };
+  return { userId: context.userId, isStaff: context.isStaffAdmin };
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -122,7 +126,7 @@ async function requestRescheduleImpl(
 
   const match = await loadMatch(params.matchId);
   if (!match) return { success: false, error: 'Match not found.' };
-  const { userId } = await authorizeForMatch(params.schoolId, match);
+  const { userId, isStaff } = await authorizeForMatch(params.schoolId, match);
 
   if (match.homeSchoolId === match.awaySchoolId) {
     return { success: false, error: 'A match between two squads of one school is moved by staff.' };
@@ -157,7 +161,8 @@ async function requestRescheduleImpl(
             ne(schema.matchRescheduleRequests.status, 'cancelled')
           )
         );
-      if (hasUsedRescheduleAllowance(Number(used.used))) throw new ActionError(rescheduleAllowanceMessage());
+      // Staff are exempt from the one-request-per-season limit (spec-039, spec-055).
+      if (!isStaff && hasUsedRescheduleAllowance(Number(used.used))) throw new ActionError(rescheduleAllowanceMessage());
 
       const [request] = await tx
         .insert(schema.matchRescheduleRequests)
@@ -209,8 +214,8 @@ export interface RespondToRescheduleParams {
 /**
  * Accepts one of the other school's times, or declines. Who answers depends on the status: the
  * opponent answers the requester's times (`pending_opponent`); after a counter-offer the
- * requester answers the opponent's times (`pending_requester`). Either way an accept goes to
- * staff, and a school can only pick times the other side proposed.
+ * requester answers the opponent's times (`pending_requester`). Either way an accept moves the
+ * match at once (no staff step, spec-054), and a school can only pick times the other side proposed.
  */
 async function respondToRescheduleImpl(
   params: RespondToRescheduleParams
@@ -283,19 +288,50 @@ async function respondToRescheduleImpl(
     return { success: false, error: 'That time has already passed. Choose another or decline.' };
   }
 
-  const updated = await db
-    .update(schema.matchRescheduleRequests)
-    .set({ ...answer, status: 'pending_staff', acceptedOptionId: option.id })
-    .where(
-      and(
-        eq(schema.matchRescheduleRequests.id, request.id),
-        eq(schema.matchRescheduleRequests.status, awaiting)
-      )
-    )
-    .returning({ id: schema.matchRescheduleRequests.id });
-  return updated.length
-    ? { success: true }
-    : { success: false, error: 'This request was already resolved.' };
+  // The move and the close are one transaction. The match only moves from the exact state the
+  // request was made against, and the request only closes from the status read above; either
+  // guard failing throws, which rolls the other write back, so a race loses cleanly.
+  try {
+    await db.transaction(async (tx) => {
+      const moved = await tx
+        .update(schema.matches)
+        .set({ scheduledAt: option.proposedAt })
+        .where(
+          and(
+            eq(schema.matches.id, request.matchId),
+            eq(schema.matches.status, 'scheduled'),
+            eq(schema.matches.scheduledAt, request.originalScheduledAt)
+          )
+        )
+        .returning({ id: schema.matches.id });
+      if (moved.length === 0) {
+        throw new ActionError('The match has changed since this request was made. Decline it.');
+      }
+      const closed = await tx
+        .update(schema.matchRescheduleRequests)
+        .set({ ...answer, status: 'approved', acceptedOptionId: option.id })
+        .where(
+          and(
+            eq(schema.matchRescheduleRequests.id, request.id),
+            eq(schema.matchRescheduleRequests.status, awaiting)
+          )
+        )
+        .returning({ id: schema.matchRescheduleRequests.id });
+      if (closed.length === 0) throw new ActionError('This request was already resolved.');
+    });
+  } catch (error) {
+    if (error instanceof ActionError) throw error;
+    console.error('Failed to accept reschedule', error);
+    return { success: false, error: 'Could not move the match. Please try again.' };
+  }
+
+  updateTag('matches');
+  updateTag('rosters');
+  updateTag('teams');
+  revalidatePath('/admin/matches');
+  revalidatePath('/portal');
+  revalidatePath('/');
+  return { success: true };
 }
 
 export interface CounterRescheduleParams {

@@ -29,6 +29,7 @@ import {
   respondToReschedule,
   type RescheduleActionResult,
 } from '@/app/lib/onboarding/reschedule-actions';
+import { useStaffActing } from './StaffActing';
 
 interface RescheduleCellProps {
   match: SchoolMatchItem;
@@ -62,6 +63,7 @@ function resolvedLabel(request: RescheduleRequestItem, match: SchoolMatchItem, i
     case 'declined_requester':
       return iAmRequester ? 'You declined' : `Declined by ${request.requestedBySchoolName}`;
     case 'declined_staff':
+      // Legacy rows only (spec-054): staff no longer decide reschedules.
       return 'Declined by EZ Esports staff';
     case 'approved':
       return 'Match rescheduled';
@@ -82,24 +84,27 @@ function ErrorNotice({ message }: { message: string | null }) {
 /** Runs an action, refreshes the server-rendered portal on success, and reports a failure inline. */
 function useRescheduleAction(onDone?: () => void) {
   const router = useRouter();
+  const { confirmed } = useStaffActing();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const run = (action: () => Promise<RescheduleActionResult>) => {
-    setError(null);
-    start(async () => {
-      try {
-        const result = await action();
-        if (!result.success) {
-          setError(result.error ?? 'Something went wrong.');
-          return;
+  // A staff admin confirms "acting as <School>" before the action is sent (spec-055).
+  const run = (action: () => Promise<RescheduleActionResult>) =>
+    confirmed(() => {
+      setError(null);
+      start(async () => {
+        try {
+          const result = await action();
+          if (!result.success) {
+            setError(result.error ?? 'Something went wrong.');
+            return;
+          }
+          onDone?.();
+          router.refresh();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Something went wrong.');
         }
-        onDone?.();
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Something went wrong.');
-      }
+      });
     });
-  };
   return { pending, error, setError, run };
 }
 
@@ -123,15 +128,32 @@ function ProposedTimesFields({
       <legend className="text-xs font-semibold text-zinc-300">Proposed dates (matches start at 7:00 PM ET)</legend>
       <p className="text-[11px] text-zinc-500">{hint}</p>
       {times.map((value, index) => (
-        <input
-          key={index}
-          type="date"
-          aria-label={`Proposed date ${index + 1}`}
-          value={value}
-          onChange={(e) => setTimes(times.map((t, i) => (i === index ? e.target.value : t)))}
-          required
-          className={INPUT}
-        />
+        <div key={index} className="flex items-center gap-2">
+          <input
+            type="date"
+            aria-label={`Proposed date ${index + 1}`}
+            value={value}
+            // Browsers let a date field take a 5 or 6 digit year; a value that long is ignored
+            // so the field stays on a four-digit year.
+            onChange={(e) => {
+              if (/^\d{5,}-/.test(e.target.value)) return;
+              setTimes(times.map((t, i) => (i === index ? e.target.value : t)));
+            }}
+            max="9999-12-31"
+            required
+            className={`${INPUT} flex-1`}
+          />
+          {times.length > MIN_PROPOSED_TIMES && (
+            <button
+              type="button"
+              onClick={() => setTimes(times.filter((_, i) => i !== index))}
+              aria-label={`Remove proposed date ${index + 1}`}
+              className="text-xs text-zinc-400 hover:text-[#f4cccc] hover:underline cursor-pointer min-h-[44px] sm:min-h-0 px-1"
+            >
+              Remove
+            </button>
+          )}
+        </div>
       ))}
       {times.length < MAX_PROPOSED_TIMES && (
         <button
@@ -320,8 +342,8 @@ function RespondDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: 
                   ))}
                 </fieldset>
                 <p className="text-[11px] text-zinc-500">
-                  Once you accept, staff still have to approve it, and neither school can go back to the
-                  original time after that.
+                  Once you accept, the match moves to that time right away, and neither school can go back
+                  to the original time after that.
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
@@ -454,11 +476,6 @@ function ViewDialog({
             </div>
             <p className="text-sm text-zinc-200">
               {statusLine}
-              {request.status === 'pending_staff' && (
-                <span className="block text-xs text-zinc-400">
-                  Both schools agreed. EZ Esports staff still have to approve it.
-                </span>
-              )}
             </p>
             {request.isLate && (
               <p className={LATE_NOTICE}>
@@ -507,6 +524,7 @@ function ViewDialog({
  * this school can take on it. The server enforces every rule again; this only decides what to show.
  */
 export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCellProps) {
+  const { isStaff } = useStaffActing();
   const request = match.reschedule;
   const iAmRequester = request?.requestedBySchoolId === schoolId;
 
@@ -518,15 +536,15 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
       (canOpponentRespond(request.status) && !iAmRequester) ||
       (canRequesterRespond(request.status) && iAmRequester);
     const label =
-      request.status === 'pending_staff'
-        ? 'Waiting for staff'
-        : request.status === 'pending_opponent'
+      request.status === 'pending_opponent'
+        ? iAmRequester
+          ? `Waiting for ${match.opponentName}`
+          : `${request.requestedBySchoolName} requested a reschedule`
+        : request.status === 'pending_requester'
           ? iAmRequester
-            ? `Waiting for ${match.opponentName}`
-            : `${request.requestedBySchoolName} requested a reschedule`
-          : iAmRequester
             ? `${match.opponentName} suggested other times`
-            : `Waiting for ${match.opponentName} to choose`;
+            : `Waiting for ${match.opponentName} to choose`
+          : rescheduleStatusLabel(request.status); // legacy `pending_staff` rows only
     // Before the opponent answers only the requester may cancel; after a counter-offer either may.
     const mayCancel =
       canCancelRequest(request.status) && (iAmRequester || request.status === 'pending_requester');
@@ -554,10 +572,14 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
           {request.staffNote && <div className="text-zinc-500">{request.staffNote}</div>}
         </div>
       )}
-      {!viewOnly && canRequestReschedule(match, now) && (
-        <RequestDialog match={match} schoolId={schoolId} now={now} />
-      )}
+      {/* Staff are exempt from the one-request-per-season limit (spec-039, spec-055). */}
       {!viewOnly &&
+        canRequestReschedule(
+          isStaff ? { ...match, rescheduleAllowanceUsed: false, rescheduledFrom: null } : match,
+          now,
+        ) && <RequestDialog match={match} schoolId={schoolId} now={now} />}
+      {!viewOnly &&
+        !isStaff &&
         !match.rescheduledFrom &&
         match.rescheduleAllowanceUsed &&
         canRequestReschedule({ ...match, rescheduleAllowanceUsed: false }, now) && (
