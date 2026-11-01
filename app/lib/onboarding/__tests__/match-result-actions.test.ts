@@ -117,12 +117,6 @@ describe('submitMatchResult', () => {
     expect(mocks.resolveSeries).not.toHaveBeenCalled();
   });
 
-  it('passes the match start to the series check so early games are refused', async () => {
-    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game 1: It started at ...'] });
-    await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
-    expect(mocks.resolveSeries.mock.calls[0][0].scheduledAt).toEqual(new Date('2026-10-20T23:00:00.000Z'));
-  });
-
   it('says a game is already counted when the unique index fires, and when the match was completed meanwhile', async () => {
     mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
     mocks.saveSeriesResult.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: '23505' }));

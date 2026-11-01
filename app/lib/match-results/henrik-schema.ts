@@ -44,12 +44,22 @@ export const henrikMatchResponseSchema = z.object({
       game_length_in_ms: count,
       started_at: z.string(),
       is_completed: z.boolean(),
-      queue: z.object({ id: z.string() }),
+      queue: z.object({ id: z.string(), name: z.string().nullish() }),
     }),
     players: z.array(playerSchema).min(1),
     teams: z.array(teamSchema).min(1),
   }),
 });
+
+/**
+ * Henrik reports a custom game with an empty queue id and the name "Custom Game", so the id alone
+ * cannot be trusted to say `custom`.
+ */
+function queueIdOf(queue: { id: string; name?: string | null }): string {
+  const id = queue.id.trim().toLowerCase();
+  if (id) return id;
+  return queue.name?.trim().toLowerCase() === 'custom game' ? 'custom' : id;
+}
 
 export type HenrikMatchResponse = z.infer<typeof henrikMatchResponseSchema>;
 
@@ -132,7 +142,7 @@ export function normalizeHenrikMatch(body: unknown): NormalizedGame {
     mapName: data.metadata.map.name,
     startedAt,
     gameLengthMs: data.metadata.game_length_in_ms,
-    queueId: data.metadata.queue.id.toLowerCase(),
+    queueId: queueIdOf(data.metadata.queue),
     isCompleted: data.metadata.is_completed,
     gameVersion: data.metadata.game_version ?? null,
     redRounds: roundsBySide.Red,

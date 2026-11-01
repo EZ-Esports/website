@@ -27,7 +27,7 @@ Gate 1 now reads `totalPlayers >= 5 && starters.length >= 5`. Reasons: "Roster s
 - **App-level caps only.** No database constraint. The caps still apply to adding (manager enroll, which is where an accepted invite is placed, staff add, moves) and to changing someone to sub, with the same messages and locks as before.
 - **Existing rosters are not retroactive.** A roster above 10 players or 5 subs is left alone (it can still be edited, moved out of or emptied). Rosters that were legal under 7 and 2 stay legal.
 - **Captain, sibling-roster and move rules** are unchanged.
-- **Match results** ([spec-038](spec-038-match-results-from-game-data.md)) still score 5 players per side. Only a comment that quoted the roster size changed.
+- **Match results** ([spec-038](spec-038-match-results-from-game-data.md)) originally scored 5 players per side; spec-052 later removed the fixed team size (players need only be on the rosters).
 
 ## Open question
 

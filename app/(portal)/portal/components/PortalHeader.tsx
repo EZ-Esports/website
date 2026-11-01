@@ -15,7 +15,7 @@ interface PortalHeaderProps {
 export function PortalHeader({ schoolName, seasonLabel, hasInactiveSeason, actions }: PortalHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-      <div>
+      <div data-tour="portal-header">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="text-xs uppercase font-bold tracking-widest text-[#f4cccc]">
             School Operations

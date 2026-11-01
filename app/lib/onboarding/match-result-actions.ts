@@ -151,7 +151,6 @@ async function submit(
     leagueMatchId: match.id,
     matchIds,
     rosters,
-    scheduledAt: match.scheduledAt,
     port: getMatchDataPort(),
     repo: gameRepository,
   });

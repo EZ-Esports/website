@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMatchReference, parseMatchReferences } from '../parse-match-ref';
+import { parseMatchReference, parseMatchReferences, validateGameLinks } from '../parse-match-ref';
 import { uuid } from './fixtures';
 
 describe('parseMatchReference', () => {
@@ -45,5 +45,38 @@ describe('parseMatchReferences', () => {
       'Entry 2 is not a match ID or a tracker.gg match link.',
       'Entry 3 repeats a match that is already listed.',
     ]);
+  });
+});
+
+describe('validateGameLinks', () => {
+  it('accepts two games and joins them with newlines', () => {
+    const r = validateGameLinks([uuid(1), `https://tracker.gg/valorant/match/${uuid(2)}`, '']);
+    expect(r.ok).toBe(true);
+    expect(r.fieldErrors).toEqual([null, null, null]);
+    expect(parseMatchReferences(r.input).ids).toEqual([uuid(1), uuid(2)]);
+  });
+
+  it('accepts an optional third game', () => {
+    const r = validateGameLinks([uuid(1), uuid(2), uuid(3)]);
+    expect(r.ok).toBe(true);
+    expect(r.input.split('\n')).toHaveLength(3);
+  });
+
+  it('requires games 1 and 2 but not game 3', () => {
+    const r = validateGameLinks(['', '  ', '']);
+    expect(r.fieldErrors).toEqual(['Game 1 is required.', 'Game 2 is required.', null]);
+    expect(r.ok).toBe(false);
+  });
+
+  it('flags a malformed field and a multi-value field on that field only', () => {
+    const r = validateGameLinks([uuid(1), 'nonsense', `${uuid(2)} ${uuid(3)}`]);
+    expect(r.fieldErrors[0]).toBeNull();
+    expect(r.fieldErrors[1]).toMatch(/Game 2 is not a match ID/);
+    expect(r.fieldErrors[2]).toMatch(/single match ID/);
+  });
+
+  it('flags a duplicate on the later field, even across id and link forms', () => {
+    const r = validateGameLinks([uuid(1), `https://tracker.gg/valorant/match/${uuid(1)}`, uuid(3)]);
+    expect(r.fieldErrors).toEqual([null, 'Game 2 repeats a match that is already listed.', null]);
   });
 });
