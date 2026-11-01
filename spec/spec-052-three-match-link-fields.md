@@ -26,3 +26,7 @@ One textarea ("one per game") left managers guessing how many entries were wante
 ## Roster rule change: no fixed team size
 
 The "exactly 5 players per side" check in `attributeGame` (`series.ts`, `PLAYERS_PER_SIDE`) was removed. A game is now accepted when every player on each side is on one school's roster (starters and subs), whatever the head-count. A side with no players is still refused. Ringer, mixed-school, same-school and both-rosters refusals are unchanged. Tests in `series.test.ts` now assert 1v1, 2v2, 4v5 and 6v5 are accepted when rostered, and that a short-handed side with a non-roster player is still refused.
+
+## Scheduled-start window removed
+
+The "game started more than 1 hour before the scheduled start" refusal (`earlyStartError`, `EARLY_START_LEEWAY_MS`, the `scheduledAt` argument of `scoreSeries`/`resolveSeries`) was removed. Games are no longer compared against `matches.scheduled_at`. The duplicate rule (a game attaches to one match) and the roster checks remain the only guards against reusing an unrelated game.

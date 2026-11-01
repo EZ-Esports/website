@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeHenrikMatch } from '../henrik-schema';
-import { EARLY_START_LEEWAY_MS, normalizeRiotId, riotIdKey, scoreSeries, type RosterRiotIds } from '../series';
+import { normalizeRiotId, riotIdKey, scoreSeries, type RosterRiotIds } from '../series';
 import type { NormalizedGame } from '../types';
 import { BLUE_PLAYERS, henrikPayload, playersFor, RED_PLAYERS, uuid } from './fixtures';
 
@@ -168,37 +168,3 @@ describe('scoreSeries: every player on a side must be on one school roster', () 
   });
 });
 
-describe('scoreSeries: scheduled-start window', () => {
-  const scheduled = new Date('2026-10-20T23:00:00.000Z');
-  const at = (offsetMs: number) => new Date(scheduled.getTime() + offsetMs).toISOString();
-  const pair = (firstStart: string) => [
-    game(1, { homeWins: true, startedAt: firstStart }),
-    game(2, { homeWins: true, startedAt: at(3_600_000) }),
-  ];
-
-  it('accepts a game that starts exactly one hour before the scheduled start', () => {
-    expect(scoreSeries(pair(at(-EARLY_START_LEEWAY_MS)), rosters, scheduled).ok).toBe(true);
-  });
-
-  it('rejects a game one millisecond past the leeway, with both times in the message', () => {
-    const out = scoreSeries(pair(at(-EARLY_START_LEEWAY_MS - 1)), rosters, scheduled);
-    expect(out.ok).toBe(false);
-    const message = !out.ok ? out.errors[0] : '';
-    expect(message).toContain('Game 1: It started at');
-    expect(message).toContain("more than 1 hour before this match's scheduled start");
-    expect(message).toMatch(/7:00 PM ET/); // 23:00Z is 7:00 PM Eastern (EDT)
-    expect(message).toMatch(/5:59 PM ET|6:00 PM ET/);
-  });
-
-  it('has no upper bound: a game days after the scheduled start is accepted', () => {
-    const late = [
-      game(1, { homeWins: true, startedAt: at(5 * 24 * 3_600_000) }),
-      game(2, { homeWins: true, startedAt: at(5 * 24 * 3_600_000 + 3_600_000) }),
-    ];
-    expect(scoreSeries(late, rosters, scheduled).ok).toBe(true);
-  });
-
-  it('skips the check when no scheduled time is given', () => {
-    expect(scoreSeries(pair('2020-01-01T00:00:00.000Z'), rosters).ok).toBe(true);
-  });
-});

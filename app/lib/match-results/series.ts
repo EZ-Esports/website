@@ -3,17 +3,10 @@
  * side of each game, whether the participants really are the two schools, when the game was
  * played, and the series score. No I/O, so every refusal is unit-tested against fixtures.
  */
-import { formatNY } from '../dates';
 import type { NormalizedGame, TeamSide } from './types';
 
 /** Wins that decide a best-of-3. */
 export const WINS_TO_TAKE_SERIES = 2;
-/**
- * How long before the match's scheduled start a game may have started. Teams sometimes begin a
- * little early; anything earlier is a different game (a scrim or last week's match). There is
- * deliberately no upper bound: a late or overrunning start is legitimate (spec-038).
- */
-export const EARLY_START_LEEWAY_MS = 60 * 60 * 1000;
 /** The only queue a league match may be played in. */
 export const CUSTOM_QUEUE_ID = 'custom';
 
@@ -122,16 +115,6 @@ export function attributeGame(game: NormalizedGame, rosters: RosterRiotIds): Att
   return { ok: true, attribution: { rosterBySide } };
 }
 
-function formatET(date: Date): string {
-  return `${formatNY(date, 'date-short')}, ${formatNY(date, 'time')} ET`;
-}
-
-/** A refusal when the game began more than the leeway before the match's scheduled start; else null. */
-export function earlyStartError(startedAt: Date, scheduledAt: Date): string | null {
-  if (startedAt.getTime() >= scheduledAt.getTime() - EARLY_START_LEEWAY_MS) return null;
-  return `It started at ${formatET(startedAt)}, more than 1 hour before this match's scheduled start (${formatET(scheduledAt)}). It looks like a different game.`;
-}
-
 export interface ScoredGame {
   /** The provider match id. */
   matchId: string;
@@ -159,9 +142,7 @@ export type SeriesOutcome = { ok: true; series: SeriesResult } | { ok: false; er
  */
 export function scoreSeries(
   games: readonly NormalizedGame[],
-  rosters: RosterRiotIds,
-  /** The match's current scheduled start (an approved reschedule has already moved it). */
-  scheduledAt?: Date
+  rosters: RosterRiotIds
 ): SeriesOutcome {
   const ordered = [...games].sort(
     (a, b) => a.startedAt.getTime() - b.startedAt.getTime() || a.matchId.localeCompare(b.matchId)
@@ -174,11 +155,6 @@ export function scoreSeries(
     const result = attributeGame(game, rosters);
     if (!result.ok) {
       errors.push(`${label}: ${result.error}`);
-      return;
-    }
-    const early = scheduledAt ? earlyStartError(game.startedAt, scheduledAt) : null;
-    if (early) {
-      errors.push(`${label}: ${early}`);
       return;
     }
     const { rosterBySide } = result.attribution;
