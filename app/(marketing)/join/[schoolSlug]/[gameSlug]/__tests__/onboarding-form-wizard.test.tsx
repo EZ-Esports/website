@@ -70,7 +70,7 @@ function walkToLastStep(kind: 'manager' | 'player') {
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Demon1#NA1' } });
   fireEvent.click(screen.getByRole('checkbox'));
   next(); // 3 -> 4
-  fireEvent.change(screen.getByLabelText(/date of birth/i), { target: { value: '1980-01-01' } });
+  fireEvent.change(screen.getByLabelText(/date of birth/i), { target: { value: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10) } });
   fireEvent.click(screen.getByRole('checkbox'));
   next(); // 4 -> 5
   fireEvent.click(screen.getByRole('checkbox'));

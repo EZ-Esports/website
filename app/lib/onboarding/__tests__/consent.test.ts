@@ -8,6 +8,9 @@ import {
   formatConsentIntro,
   isMinorAge,
   isPlausibleBirthDate,
+  isStudentAgeInRange,
+  MAX_STUDENT_AGE,
+  MIN_STUDENT_AGE,
   validateConsent,
 } from '../consent';
 
@@ -146,5 +149,40 @@ describe('validateConsent', () => {
     } catch (err: any) {
       expect(err.message).not.toContain('secret-guardian');
     }
+  });
+});
+
+describe('student age range (13 to 21 inclusive)', () => {
+  const now = new Date('2026-10-23T16:00:00Z');
+  const accepted = (dob: string) => isStudentAgeInRange(calculateAge(new Date(dob), now));
+
+  it('pins the range', () => {
+    expect([MIN_STUDENT_AGE, MAX_STUDENT_AGE]).toEqual([13, 21]);
+  });
+
+  it('rejects 12 and accepts 13, including the day before and of the 13th birthday', () => {
+    expect(accepted('2014-06-01')).toBe(false); // 12
+    expect(accepted('2013-10-24')).toBe(false); // turns 13 tomorrow
+    expect(accepted('2013-10-23')).toBe(true); // turns 13 today
+    expect(accepted('2013-01-01')).toBe(true); // 13
+  });
+
+  it('accepts 21 and rejects 22, including the day before and of the 22nd birthday', () => {
+    expect(accepted('2005-10-23')).toBe(true); // 21
+    expect(accepted('2004-10-24')).toBe(true); // turns 22 tomorrow
+    expect(accepted('2004-10-23')).toBe(false); // turns 22 today
+    expect(accepted('2000-01-01')).toBe(false); // 26
+  });
+
+  it('uses the New York calendar date for the birthday edge', () => {
+    const lateUtc = new Date('2026-10-24T02:00:00Z'); // still 23 Oct in New York
+    expect(isStudentAgeInRange(calculateAge(new Date('2013-10-24'), lateUtc))).toBe(false);
+    expect(isStudentAgeInRange(calculateAge(new Date('2004-10-24'), lateUtc))).toBe(true);
+  });
+
+  it('keeps 13-17 in the guardian flow', () => {
+    expect(isMinorAge(MIN_STUDENT_AGE)).toBe(true);
+    expect(isMinorAge(17)).toBe(true);
+    expect(isMinorAge(18)).toBe(false);
   });
 });

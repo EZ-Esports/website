@@ -738,7 +738,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
           email: 'david.kim@nycstudents.net',
           graduationYear: 2027,
           riotId: 'DavidK#NA1',
-          birthDate: new Date('2008-03-21'),
+          birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)), // always age 19
           codeOfConductAccepted: true,
           consent: { tosAcknowledged: true },
         },

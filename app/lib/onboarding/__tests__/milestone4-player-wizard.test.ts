@@ -623,7 +623,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2026,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     };
@@ -749,6 +749,16 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       ).rejects.toThrow('valid date of birth is required');
     });
 
+    it('rejects a student date of birth outside the 13 to 21 range', async () => {
+      const dob = (years: number) =>
+        new Date(Date.UTC(new Date().getUTCFullYear() - years, 0, 1)).toISOString().slice(0, 10);
+      for (const years of [8, 12, 23, 40]) {
+        await expect(
+          submitOk({ token: rawToken, submission: { ...validSubmission, birthDate: dob(years) } })
+        ).rejects.toThrow('aged 13 to 21');
+      }
+    });
+
     describe('consent (Terms of Service and guardian authorization)', () => {
       const guardianConsent = {
         tosAcknowledged: true,
@@ -866,7 +876,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2027,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     };
@@ -1201,7 +1211,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         email: 'smiller@stuy.edu',
         graduationYear: 2027,
         riotId: 'CoachSam#NA1',
-        birthDate: '1988-08-20',
+        birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
         codeOfConductAccepted: true,
         consent: { tosAcknowledged: true },
       });
@@ -1653,7 +1663,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2027,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     });
@@ -1874,7 +1884,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2027,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     });

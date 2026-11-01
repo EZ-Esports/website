@@ -29,6 +29,8 @@ import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
   calculateAge,
+  isStudentAgeInRange,
+  STUDENT_AGE_RANGE_MESSAGE,
   isPlausibleBirthDate,
   validateConsent,
   type NormalizedConsent,
@@ -48,7 +50,8 @@ import type {
  */
 export function validateSubmissionInputs(
   submission: PlayerOnboardingSubmission,
-  now: Date = new Date()
+  now: Date = new Date(),
+  options: { enforceStudentAge?: boolean } = {}
 ): {
   email: string;
   legalFirstName: string;
@@ -82,10 +85,15 @@ export function validateSubmissionInputs(
     throw new Error('A valid date of birth is required.');
   }
 
+  // Age comes from the submitted date of birth, never from a client-supplied age.
+  const age = calculateAge(birthDateObj, now);
+  if (options.enforceStudentAge && !isStudentAgeInRange(age)) {
+    throw new Error(STUDENT_AGE_RANGE_MESSAGE);
+  }
+
   // Consent is enforced here, server-side, so it cannot be skipped by calling the action directly.
-  // Age comes from the stored date of birth, never from a client-supplied age.
   const consent = validateConsent(submission.consent, {
-    age: calculateAge(birthDateObj, now),
+    age,
     fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
   });
 
@@ -289,7 +297,9 @@ export async function processOnboardingSubmission(
   }
 
   // Step 1: Validate inputs
-  const validated = validateSubmissionInputs(submission);
+  const validated = validateSubmissionInputs(submission, new Date(), {
+    enforceStudentAge: !isManager,
+  });
   const discord = resolveDiscordIdentity({
     verifiedDiscord:
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,

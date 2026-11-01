@@ -6,6 +6,8 @@ import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/riot-manual';
 import {
   calculateAge,
+  isStudentAgeInRange,
+  STUDENT_AGE_RANGE_MESSAGE,
   isMinorAge,
   isPlausibleBirthDate,
   validateConsent,
@@ -309,6 +311,10 @@ export function useWizardDraft(
     }
     if (!isPlausibleBirthDate(new Date(birthDate))) {
       setErrorMessage('Please enter a valid date of birth (4-digit year).');
+      return false;
+    }
+    if (!isManager && !isStudentAgeInRange(calculateAge(new Date(birthDate)))) {
+      setErrorMessage(STUDENT_AGE_RANGE_MESSAGE);
       return false;
     }
     if (!codeOfConductAccepted) {
