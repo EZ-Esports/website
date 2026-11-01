@@ -15,9 +15,9 @@ Why: NYC kindergarten requires turning 5 by 31 Dec, so incoming 9th graders are 
 
 ## Enforcement
 
-- **Server (authoritative):** `validateSubmissionInputs(submission, now, { enforceStudentAge })` throws `STUDENT_AGE_RANGE_MESSAGE` before consent validation. The age is computed from `birthDate`, never client-supplied. The caller passes `enforceStudentAge: !isManager`.
+- **Server (authoritative):** `validateSubmissionInputs(submission, now, { enforceStudentAge })` throws `STUDENT_AGE_RANGE_MESSAGE` before consent validation. The age is computed from `birthDate`, never client-supplied. The caller passes `enforceStudentAge: !isManager || submission.alsoPlays === true`.
 - **Client:** `BirthDateRulesStep` shows an inline `role="alert"` message and marks the input `aria-invalid`; `validateStep4` in `useWizardDraft` blocks Next with the same message.
-- **Managers are exempt** (school staff, including managers who also play per spec-043). Only player invites are age-limited.
+- **Managers who do not play are exempt** (school staff). A manager who ticks "I also play" (spec-043, chosen in step 1, so known by the birth date step) is age-limited like a student, client-side (`enforceStudentAge={!isManagerInvite || draft.alsoPlays}`, `validateStep4`) and on submit.
 - The under-18 guardian flow is unchanged and still covers 13-17.
 
 ## Tests

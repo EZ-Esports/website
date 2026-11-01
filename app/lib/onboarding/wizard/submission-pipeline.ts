@@ -29,9 +29,9 @@ import { ManualRiotIdAdapter } from '../adapters/riot-manual';
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
   calculateAge,
+  isPlausibleBirthDate,
   isStudentAgeInRange,
   STUDENT_AGE_RANGE_MESSAGE,
-  isPlausibleBirthDate,
   validateConsent,
   type NormalizedConsent,
 } from '../consent';
@@ -298,7 +298,7 @@ export async function processOnboardingSubmission(
 
   // Step 1: Validate inputs
   const validated = validateSubmissionInputs(submission, new Date(), {
-    enforceStudentAge: !isManager,
+    enforceStudentAge: !isManager || submission.alsoPlays === true,
   });
   const discord = resolveDiscordIdentity({
     verifiedDiscord:
