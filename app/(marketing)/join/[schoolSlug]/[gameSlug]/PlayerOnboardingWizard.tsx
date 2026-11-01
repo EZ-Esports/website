@@ -499,6 +499,7 @@ export default function PlayerOnboardingWizard({
             setBirthDate={draft.setBirthDate}
             codeOfConductAccepted={draft.codeOfConductAccepted}
             setCodeOfConductAccepted={draft.setCodeOfConductAccepted}
+            enforceStudentAge={!isManagerInvite || draft.alsoPlays}
           />
         )}
 

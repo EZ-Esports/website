@@ -71,7 +71,7 @@ interface SchoolPortalClientProps {
 
 /**
  * The portal for one school. A staff admin viewing it can do everything its manager can; each
- * mutation then asks for one confirmation first (spec-054). A manager is never asked.
+ * mutation then asks for one confirmation first (spec-055). A manager is never asked.
  */
 export default function SchoolPortalClient(props: SchoolPortalClientProps) {
   return (

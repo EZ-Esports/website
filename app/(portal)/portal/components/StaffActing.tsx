@@ -36,7 +36,7 @@ export function useStaffActing(): StaffActingValue {
 }
 
 /**
- * The one confirmation for staff admins acting as a school (spec-054). Authorization stays on the
+ * The one confirmation for staff admins acting as a school (spec-055). Authorization stays on the
  * server; this only adds the "are you sure you mean this school" step. Managers get the
  * pass-through value and never see a dialog.
  */

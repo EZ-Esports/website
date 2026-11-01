@@ -63,7 +63,7 @@ function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) 
     setMessage(null);
     setErrors([]);
   };
-  // A staff admin confirms "acting as <School>" before the action is sent (spec-054).
+  // A staff admin confirms "acting as <School>" before the action is sent (spec-055).
   const run = (action: () => Promise<MatchResultActionResult>) =>
     confirmed(() => {
       reset();

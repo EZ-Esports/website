@@ -1,6 +1,12 @@
 'use client';
 
-import { MIN_BIRTH_DATE } from '@/app/lib/onboarding/consent';
+import {
+  MIN_BIRTH_DATE,
+  STUDENT_AGE_RANGE_MESSAGE,
+  calculateAge,
+  isPlausibleBirthDate,
+  isStudentAgeInRange,
+} from '@/app/lib/onboarding/consent';
 import { RequiredMark } from '../RequiredMark';
 import { ROUTES } from '@/app/lib/constants';
 
@@ -9,6 +15,8 @@ interface BirthDateRulesStepProps {
   setBirthDate: (val: string) => void;
   codeOfConductAccepted: boolean;
   setCodeOfConductAccepted: (val: boolean) => void;
+  /** Students must be 13-21; managers (school staff) are not age-limited. */
+  enforceStudentAge?: boolean;
 }
 
 /**
@@ -20,7 +28,14 @@ export function BirthDateRulesStep({
   setBirthDate,
   codeOfConductAccepted,
   setCodeOfConductAccepted,
+  enforceStudentAge = true,
 }: BirthDateRulesStepProps) {
+  const parsed = birthDate ? new Date(birthDate) : null;
+  const ageOutOfRange =
+    enforceStudentAge &&
+    parsed !== null &&
+    isPlausibleBirthDate(parsed) &&
+    !isStudentAgeInRange(calculateAge(parsed));
   return (
     <div className="space-y-6">
       <div>
@@ -49,9 +64,16 @@ export function BirthDateRulesStep({
           }}
           min={MIN_BIRTH_DATE}
           max={new Date().toISOString().slice(0, 10)}
+          aria-invalid={ageOutOfRange || undefined}
+          aria-describedby={ageOutOfRange ? 'onboarding-birthdate-error' : undefined}
           className="w-full min-h-[44px] px-3.5 py-2 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           required
         />
+        {ageOutOfRange && (
+          <p id="onboarding-birthdate-error" role="alert" className="mt-1.5 text-xs text-danger-on-tint">
+            {STUDENT_AGE_RANGE_MESSAGE}
+          </p>
+        )}
       </div>
 
       <div className="pt-4 border-t border-border">

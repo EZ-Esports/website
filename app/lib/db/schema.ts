@@ -246,7 +246,7 @@ export const matches = pgTable('matches', {
 ]).enableRLS();
 
 // A school manager's request to move a scheduled match (rules page 4.3). It only ever proposes:
-// the match moves when the other school accepts a time (spec-053; earlier requests waited in
+// the match moves when the other school accepts a time (spec-054; earlier requests waited in
 // 'pending_staff', which is kept valid but never entered now). See spec-032 for the status flow.
 export const matchRescheduleRequests = pgTable('match_reschedule_requests', {
   id: uuid('id').defaultRandom().primaryKey(),

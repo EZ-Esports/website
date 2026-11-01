@@ -40,10 +40,10 @@ Rules page 4.3 sets the league's rescheduling rules (72 hours, two proposed time
 
 ## Known limits (accepted for now)
 
-- A user who manages both schools of a match could request and accept alone; staff approval was the backstop (and a reason to think twice before dropping that step). Superseded: staff approval was removed in [spec-053](spec-053-reschedule-no-staff-approval.md), so there is now no backstop.
+- A user who manages both schools of a match could request and accept alone; staff approval was the backstop (and a reason to think twice before dropping that step). Superseded: staff approval was removed in [spec-054](spec-054-reschedule-no-staff-approval.md), so there is now no backstop.
 - After `approved`, either school may immediately request a new move of the same match. Each school is limited to one request per season across all its matches ([spec-039](spec-039-one-reschedule-per-season.md)), but nothing stops a second move by the other school.
 - The approval guard compares `scheduled_at` for equality; a match time stored with sub-millisecond precision (only possible from raw SQL) would always read as "changed".
-- Staff admins viewing a school's portal see the request buttons and can use them as the viewed school, after a confirm dialog ([spec-054](spec-054-staff-act-in-manager-portal.md)); this was once refused by the server.
+- Staff admins viewing a school's portal see the request buttons and can use them as the viewed school, after a confirm dialog ([spec-055](spec-055-staff-act-in-manager-portal.md)); this was once refused by the server.
 - A second request on a match that already has an open one returns the generic "Could not send the request" message instead of the friendly one ([#277](https://github.com/EZ-Esports/website/issues/277)); no data is affected, and the portal hides the button while a request is open.
 - While a tour step shows, the page is inert, which also blocks wheel and touch scrolling inside inner containers such as the matches table; a Matches step whose table is wider than a phone screen cannot be scrolled sideways during the tour (window scrolling still works).
 - The moved-from marker comes from the latest approved request; a later manual staff edit of a match's time leaves the "was ..." text unchanged.

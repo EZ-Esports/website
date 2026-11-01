@@ -63,7 +63,7 @@ function resolvedLabel(request: RescheduleRequestItem, match: SchoolMatchItem, i
     case 'declined_requester':
       return iAmRequester ? 'You declined' : `Declined by ${request.requestedBySchoolName}`;
     case 'declined_staff':
-      // Legacy rows only (spec-053): staff no longer decide reschedules.
+      // Legacy rows only (spec-054): staff no longer decide reschedules.
       return 'Declined by EZ Esports staff';
     case 'approved':
       return 'Match rescheduled';
@@ -87,7 +87,7 @@ function useRescheduleAction(onDone?: () => void) {
   const { confirmed } = useStaffActing();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // A staff admin confirms "acting as <School>" before the action is sent (spec-054).
+  // A staff admin confirms "acting as <School>" before the action is sent (spec-055).
   const run = (action: () => Promise<RescheduleActionResult>) =>
     confirmed(() => {
       setError(null);
@@ -572,7 +572,7 @@ export function RescheduleCell({ match, schoolId, now, viewOnly }: RescheduleCel
           {request.staffNote && <div className="text-zinc-500">{request.staffNote}</div>}
         </div>
       )}
-      {/* Staff are exempt from the one-request-per-season limit (spec-039, spec-054). */}
+      {/* Staff are exempt from the one-request-per-season limit (spec-039, spec-055). */}
       {!viewOnly &&
         canRequestReschedule(
           isStaff ? { ...match, rescheduleAllowanceUsed: false, rescheduledFrom: null } : match,

@@ -92,7 +92,7 @@ describe('submitMatchResult', () => {
     expect(result.error).toBe('This match is not in your season.');
   });
 
-  it('lets a staff admin submit as the viewed school, attributing the attempt to the staff user (spec-054)', async () => {
+  it('lets a staff admin submit as the viewed school, attributing the attempt to the staff user (spec-055)', async () => {
     mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
     mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
     mocks.saveSeriesResult.mockResolvedValue(true);

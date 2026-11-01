@@ -1,6 +1,6 @@
-# spec-053: Reschedules no longer need staff approval
+# spec-054: Reschedules no longer need staff approval
 
-- **Spec ID:** spec-053
+- **Spec ID:** spec-054
 - **Title:** An accepted reschedule time moves the match at once; the staff approve/decline step and queue are removed
 - **Status:** Implemented on branch `worktree-remove-reschedule-staff-approval`, unmerged. No migration. Not exercised against a real database or in a browser; covered by unit tests with a mocked database.
 - **Date:** 2026-11-01

@@ -162,7 +162,7 @@ function MatchTable({
 
 /** A callout per season showing how many reschedules this school has left (each school gets one). */
 function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) {
-  // Staff are exempt from the allowance (spec-054), so the school's count is not theirs to read.
+  // Staff are exempt from the allowance (spec-055), so the school's count is not theirs to read.
   const { isStaff } = useStaffActing();
   const seasons = new Map<string, { name: string; used: boolean }>();
   for (const match of matches) {

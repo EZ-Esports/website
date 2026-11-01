@@ -74,7 +74,7 @@ type LoadedMatch = NonNullable<Awaited<ReturnType<typeof loadMatch>>>;
 /**
  * Authorizes the caller to act for `schoolId` on this match, and says whether that is a staff admin.
  * A manager must manage that school and the match's game in the match's own season (a write, so an
- * inactive season is refused). A staff admin (spec-054) acts as the school whose portal they are
+ * inactive season is refused). A staff admin (spec-055) acts as the school whose portal they are
  * viewing: `schoolId` comes from the UI but is validated here, since it must be one of the two
  * sides of the match, and the season checks do not apply to them. Either way the side taken
  * (requester or responder) is derived from `schoolId` alone, and the acting user's own id is what
@@ -161,7 +161,7 @@ async function requestRescheduleImpl(
             ne(schema.matchRescheduleRequests.status, 'cancelled')
           )
         );
-      // Staff are exempt from the one-request-per-season limit (spec-039, spec-054).
+      // Staff are exempt from the one-request-per-season limit (spec-039, spec-055).
       if (!isStaff && hasUsedRescheduleAllowance(Number(used.used))) throw new ActionError(rescheduleAllowanceMessage());
 
       const [request] = await tx
@@ -215,7 +215,7 @@ export interface RespondToRescheduleParams {
  * Accepts one of the other school's times, or declines. Who answers depends on the status: the
  * opponent answers the requester's times (`pending_opponent`); after a counter-offer the
  * requester answers the opponent's times (`pending_requester`). Either way an accept moves the
- * match at once (no staff step, spec-053), and a school can only pick times the other side proposed.
+ * match at once (no staff step, spec-054), and a school can only pick times the other side proposed.
  */
 async function respondToRescheduleImpl(
   params: RespondToRescheduleParams

@@ -1,8 +1,8 @@
-# spec-054: Staff admins can act in a school's manager portal
+# spec-055: Staff admins can act in a school's manager portal
 
-- **Spec ID:** spec-054
+- **Spec ID:** spec-055
 - **Title:** A staff admin viewing a school's portal can perform every manager action as that school, behind one confirmation
-- **Status:** Implemented on branch `worktree-remove-reschedule-staff-approval`, unmerged (builds on spec-053's uncommitted work). No migration. Covered by unit and jsdom tests with mocked actions and database; not exercised against a real database or by a logged-in staff user in a browser.
+- **Status:** Implemented on branch `worktree-remove-reschedule-staff-approval`, unmerged (builds on spec-054's uncommitted work). No migration. Covered by unit and jsdom tests with mocked actions and database; not exercised against a real database or by a logged-in staff user in a browser.
 - **Date:** 2026-11-01
 - **Scope:** `app/lib/onboarding/reschedule-actions.ts` (`authorizeForMatch`, `requestRescheduleImpl`), `app/(portal)/portal/components/StaffActing.tsx` (new), `SchoolPortalClient.tsx`, `GenerateInviteCard.tsx`, `RescheduleControls.tsx`, `MatchResultControls.tsx`, `MatchesSection.tsx`, and their tests.
 - **Amends:** [spec-032](spec-032-match-reschedule-requests.md) (staff were refused), [spec-039](spec-039-one-reschedule-per-season.md) (staff exempt). Builds on [spec-028](spec-028-manager-past-season-view-only.md) and the roster lock, which staff already bypassed.
@@ -43,7 +43,7 @@ One mechanism, `StaffActingProvider` (`components/StaffActing.tsx`), mounted by 
 ## Risks and notes
 
 - A confirm dialog opened from inside another modal (Send request, Accept, Send these times) stacks on top of it; the jsdom test covers cancel from the View dialog, not every stacked case, and it was not checked in a real browser.
-- The one-request-per-season exemption means a staff admin can chain reschedules of one match; the accepted-time guards still apply, and spec-053 already removed the staff backstop.
+- The one-request-per-season exemption means a staff admin can chain reschedules of one match; the accepted-time guards still apply, and spec-054 already removed the staff backstop.
 - Result submissions by staff count toward the per-user submission throttle under the staff user id.
 
 ## Tests

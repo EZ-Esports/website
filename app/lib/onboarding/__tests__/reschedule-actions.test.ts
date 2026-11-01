@@ -153,7 +153,7 @@ describe('requestReschedule', () => {
     expect(mocks.inserted).toEqual([]);
   });
 
-  describe('as a staff admin acting as the viewed school (spec-054)', () => {
+  describe('as a staff admin acting as the viewed school (spec-055)', () => {
     const asStaff = () => asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
 
     it('requests as the viewed school, recording the staff user, with no season match needed', async () => {

@@ -5,7 +5,7 @@
  * Not modelled here on purpose: forfeits (staff record them), the end-of-regular-season
  * deadline (a season has no end date to check against) and "both teams already agreed to the
  * original date" (nothing records that). There is no staff review step: an accepted time moves
- * the match at once (spec-053), and staff can still edit a match's time directly.
+ * the match at once (spec-054), and staff can still edit a match's time directly.
  */
 
 /** A request made with less notice than this is "late": the opposing team may decline at will. */
@@ -32,7 +32,7 @@ export const RESCHEDULE_STATUSES = [
   'pending_opponent',
   // The opponent answered with times of their own; the requester now picks one or declines.
   'pending_requester',
-  // Legacy (spec-053): nothing enters this status any more; kept so existing rows stay valid.
+  // Legacy (spec-054): nothing enters this status any more; kept so existing rows stay valid.
   'pending_staff',
   'approved',
   'declined_opponent',
@@ -155,7 +155,7 @@ export function rescheduleStatusLabel(status: RescheduleStatus): string {
     case 'pending_requester':
       return 'Counter-offer sent';
     case 'pending_staff':
-      // Legacy rows only (spec-053); nothing newly enters this status.
+      // Legacy rows only (spec-054); nothing newly enters this status.
       return 'Pending';
     case 'approved':
       return 'Rescheduled';
