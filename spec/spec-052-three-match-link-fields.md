@@ -30,3 +30,9 @@ The "exactly 5 players per side" check in `attributeGame` (`series.ts`, `PLAYERS
 ## Scheduled-start window removed
 
 The "game started more than 1 hour before the scheduled start" refusal (`earlyStartError`, `EARLY_START_LEEWAY_MS`, the `scheduledAt` argument of `scoreSeries`/`resolveSeries`) was removed. Games are no longer compared against `matches.scheduled_at`. The duplicate rule (a game attaches to one match) and the roster checks remain the only guards against reusing an unrelated game.
+
+## Tracker-link help and tutorial expansion
+
+- The Submit result dialog has a "How do I get a match link?" click-to-open popover (`TrackerLinkHelp`, React Aria `Popover`, so it works on touch and keyboard). The four steps (open your tracker.gg Valorant page, click Customs, click the three dots on the match, then Open in new tab and copy the URL or Share and copy the link) live in `app/lib/match-results/tracker-link-help.ts` and feed both the popover and the tutorial.
+- The portal tutorial (`portal/tour/steps.ts`) now covers the whole manager portal: season and view-only/locked status, ET times, the invite form and what the student does, invite history actions, approvals, roster creation, enrolling, roles/move/remove, the 5-point eligibility gate, the three match tabs (Upcoming, Needs result, Past), reschedules and the one-per-season allowance, and a new "Submit match results" section (submit, getting the link, one link per game, validity rules, timing/limits/pending, scoreboard). New anchors: `portal-header` and `matches-list`. Several steps share an existing anchor so the empty-portal anchors test still holds.
+- Tests: every declared anchor is used by a step, and the tour step for getting a link contains exactly the shared steps.

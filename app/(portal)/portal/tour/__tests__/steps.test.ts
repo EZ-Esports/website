@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { TRACKER_LINK_STEPS } from '@/app/lib/match-results/tracker-link-help';
 import { CLOSING_STEP, TOUR_ANCHORS, TOUR_SECTIONS, resolveTourSteps } from '../steps';
 
 const everything = () => true;
@@ -17,6 +18,26 @@ describe('tour definition', () => {
       for (const step of section.steps) expect(TOUR_ANCHORS).toContain(step.anchor);
     }
     expect(TOUR_ANCHORS).toContain(CLOSING_STEP.anchor);
+  });
+});
+
+describe('tour coverage', () => {
+  it('uses every declared anchor in at least one step', () => {
+    const used = new Set([...TOUR_SECTIONS.flatMap((s) => s.steps), CLOSING_STEP].map((step) => step.anchor));
+    for (const anchor of TOUR_ANCHORS) expect(used, `unused anchor ${anchor}`).toContain(anchor);
+  });
+
+  it('teaches how to get a tracker.gg match link, using the same steps as the dialog help', () => {
+    const step = TOUR_SECTIONS.flatMap((s) => s.steps).find((st) => st.id === 'result-get-link');
+    expect(step).toBeDefined();
+    for (const line of TRACKER_LINK_STEPS) expect(step!.body).toContain(line);
+  });
+
+  it('covers match results, rosters, invites, approvals and reschedules', () => {
+    const ids = TOUR_SECTIONS.flatMap((s) => s.steps.map((st) => st.id));
+    for (const id of ['result-submit', 'result-rules', 'result-scoreboard', 'enroll-players', 'eligibility', 'invite-history', 'approvals', 'reschedule', 'match-tabs']) {
+      expect(ids).toContain(id);
+    }
   });
 });
 

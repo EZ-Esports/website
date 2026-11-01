@@ -245,6 +245,7 @@ export function MatchesSection({
 
       <RescheduleAllowanceNotice matches={matches} />
 
+      <div data-tour="matches-list">
       <Tabs>
         <TabList
           aria-label="Matches"
@@ -309,6 +310,7 @@ export function MatchesSection({
           />
         </TabPanel>
       </Tabs>
+      </div>
     </section>
   );
 }

@@ -17,6 +17,7 @@ import {
   type MatchResultActionResult,
 } from '@/app/lib/onboarding/match-result-actions';
 import type { MatchScoreboard } from '@/app/lib/db/match-results';
+import { TrackerLinkHelp } from './TrackerLinkHelp';
 
 const BUTTON =
   'min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer';
@@ -139,6 +140,7 @@ function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: s
                 vs {match.opponentName} · {formatNY(new Date(match.scheduledAt), 'date-short')}
               </p>
             </div>
+            <TrackerLinkHelp />
             <ErrorList message={message} errors={errors} />
             <form onSubmit={submit} noValidate className="space-y-4">
               {GAME_FIELDS.map((field, index) => {
