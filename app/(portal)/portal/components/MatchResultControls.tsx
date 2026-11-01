@@ -18,6 +18,7 @@ import {
 } from '@/app/lib/onboarding/match-result-actions';
 import type { MatchScoreboard } from '@/app/lib/db/match-results';
 import { TrackerLinkHelp } from './TrackerLinkHelp';
+import { useStaffActing } from './StaffActing';
 
 const BUTTON =
   'min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer';
@@ -54,6 +55,7 @@ function ErrorList({ message, errors }: { message: string | null; errors: string
 /** Runs a result action, refreshes the portal on success and keeps the message and per-game problems. */
 function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) {
   const router = useRouter();
+  const { confirmed } = useStaffActing();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -61,25 +63,27 @@ function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) 
     setMessage(null);
     setErrors([]);
   };
-  const run = (action: () => Promise<MatchResultActionResult>) => {
-    reset();
-    start(async () => {
-      try {
-        const result = await action();
-        if (!result.success) {
-          setMessage(result.error ?? 'Something went wrong.');
-          setErrors(result.errors ?? []);
-          // A pending save changes what the row shows even though the call "failed".
-          if (result.pending) router.refresh();
-          return;
+  // A staff admin confirms "acting as <School>" before the action is sent (spec-054).
+  const run = (action: () => Promise<MatchResultActionResult>) =>
+    confirmed(() => {
+      reset();
+      start(async () => {
+        try {
+          const result = await action();
+          if (!result.success) {
+            setMessage(result.error ?? 'Something went wrong.');
+            setErrors(result.errors ?? []);
+            // A pending save changes what the row shows even though the call "failed".
+            if (result.pending) router.refresh();
+            return;
+          }
+          onSuccess?.(result);
+          router.refresh();
+        } catch {
+          setMessage('Something went wrong. Please try again.');
         }
-        onSuccess?.(result);
-        router.refresh();
-      } catch {
-        setMessage('Something went wrong. Please try again.');
-      }
+      });
     });
-  };
   return { pending, message, errors, reset, run, setMessage, setErrors };
 }
 
@@ -198,6 +202,7 @@ function PendingNotice({ match, schoolId, viewOnly }: { match: SchoolMatchItem; 
   const pendingResult = match.pendingResult!;
   const router = useRouter();
   const { pending, message, errors, run } = useResultAction();
+  const { actingNotice } = useStaffActing();
   // Discarding drops the saved IDs, so it asks first (in-app dialog, never a native confirm).
   const discard = useConfirmAction<null>(async () => {
     const result = await cancelPendingResult({ matchId: match.id, schoolId });
@@ -240,7 +245,7 @@ function PendingNotice({ match, schoolId, viewOnly }: { match: SchoolMatchItem; 
         appearance="portal"
         tone="danger"
         title="Discard saved match IDs?"
-        message={`The ${match.pendingResult?.gameCount ?? 0} saved games stay stored, but you will need to paste the match IDs again to submit a result.`}
+        message={`${actingNotice ? `${actingNotice} ` : ''}The ${match.pendingResult?.gameCount ?? 0} saved games stay stored, but you will need to paste the match IDs again to submit a result.`}
         confirmLabel="Discard"
         pendingLabel="Discarding…"
       />

@@ -60,10 +60,15 @@ const mocks = vi.hoisted(() => {
     return [];
   }
 
-  return { queue, inserted, updated, wheres, paramValues, db, assertManagerForSchoolGame: vi.fn() };
+  return { queue, inserted, updated, wheres, paramValues, db,
+    assertManagerForSchoolGame: vi.fn(),
+    updateTag: vi.fn(),
+    revalidatePath: vi.fn(),
+  };
 });
 
 vi.mock('@/app/lib/db', () => ({ db: mocks.db }));
+vi.mock('next/cache', () => ({ updateTag: mocks.updateTag, revalidatePath: mocks.revalidatePath }));
 vi.mock('../manager-auth', () => ({ assertManagerForSchoolGame: mocks.assertManagerForSchoolGame }));
 
 import { MAX_RESCHEDULE_REQUESTS_PER_SEASON } from '@/app/lib/reschedule-rules';
@@ -117,6 +122,8 @@ beforeEach(() => {
   mocks.updated.length = 0;
   mocks.wheres.length = 0;
   mocks.assertManagerForSchoolGame.mockReset();
+  mocks.updateTag.mockReset();
+  mocks.revalidatePath.mockReset();
   asManager();
 });
 
@@ -146,10 +153,40 @@ describe('requestReschedule', () => {
     expect(mocks.inserted).toEqual([]);
   });
 
-  it('refuses a staff admin', async () => {
-    mocks.queue.push([match()]);
-    asManager({ context: { userId: 'staff', isStaffAdmin: true }, season: null });
-    expect((await requestReschedule(params)).error).toMatch(/staff portal/);
+  describe('as a staff admin acting as the viewed school (spec-054)', () => {
+    const asStaff = () => asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+
+    it('requests as the viewed school, recording the staff user, with no season match needed', async () => {
+      asStaff();
+      mocks.queue.push([match({ seasonId: 'any-season' })], [], [{ used: 0 }], [{ id: 'req-1' }], []);
+      expect(await requestReschedule(params)).toEqual({ success: true });
+      expect(mocks.inserted[0][0]).toMatchObject({ requestedBySchoolId: 'school-a', requestedByUserId: 'staff-1' });
+    });
+
+    it('is exempt from the one-request-per-season limit', async () => {
+      asStaff();
+      mocks.queue.push([match()], [], [{ used: MAX_RESCHEDULE_REQUESTS_PER_SEASON }], [{ id: 'req-1' }], []);
+      expect(await requestReschedule(params)).toEqual({ success: true });
+    });
+
+    it('still refuses a school that is not playing in the match', async () => {
+      asStaff();
+      mocks.queue.push([match()]);
+      const result = await requestReschedule({ ...params, schoolId: 'school-z' });
+      expect(result.error).toMatch(/not playing/);
+      expect(mocks.inserted).toEqual([]);
+    });
+
+    it('still leaves a one-school match to the admin matches page', async () => {
+      asStaff();
+      mocks.queue.push([match({ awaySchoolId: 'school-a' })]);
+      expect((await requestReschedule(params)).error).toMatch(/moved by staff/);
+    });
+  });
+
+  it('keeps the limit for a manager', async () => {
+    mocks.queue.push([match()], [], [{ used: MAX_RESCHEDULE_REQUESTS_PER_SEASON }]);
+    expect((await requestReschedule(params)).error).toMatch(/already used/);
   });
 
   it("refuses a match outside the manager's season", async () => {
@@ -269,7 +306,7 @@ describe('respondToReschedule', () => {
   });
 
   it('refuses a request that is no longer waiting for the opponent', async () => {
-    mocks.queue.push([request({ status: 'pending_staff' })], [match()]);
+    mocks.queue.push([request({ status: 'approved' })], [match()]);
     expect((await respondToReschedule(accept)).error).toMatch(/no longer waiting/);
   });
 
@@ -305,15 +342,54 @@ describe('respondToReschedule', () => {
     expect((await respondToReschedule(accept)).error).toMatch(/already passed/);
   });
 
-  it('moves an accepted request on to staff and records the chosen time', async () => {
-    mocks.queue.push([request()], [match()], [option()], [{ id: 'req-1' }]);
+  it('moves the match to the accepted time and approves the request in one step, with no staff step', async () => {
+    const chosen = option();
+    mocks.queue.push([request()], [match()], [chosen], [{ id: 'm1' }], [{ id: 'req-1' }]);
     expect(await respondToReschedule(accept)).toEqual({ success: true });
-    expect(mocks.updated[0]).toMatchObject({ status: 'pending_staff', acceptedOptionId: 'opt-1' });
+    expect(mocks.updated[0]).toEqual({ scheduledAt: chosen.proposedAt });
+    expect(mocks.updated[1]).toMatchObject({
+      status: 'approved',
+      acceptedOptionId: 'opt-1',
+      opponentRespondedByUserId: 'user-1',
+    });
+    expect(mocks.updated.some((u) => u.status === 'pending_staff')).toBe(false);
+    expect(mocks.updateTag.mock.calls.map((c) => c[0])).toEqual(['matches', 'rosters', 'teams']);
   });
 
-  it('loses gracefully when the request resolved in the meantime', async () => {
+  it('lets a staff admin answer as the viewed school, recording the staff user on the responder column', async () => {
+    asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.queue.push([request()], [match()], [option()], [{ id: 'm1' }], [{ id: 'req-1' }]);
+    expect(await respondToReschedule(accept)).toEqual({ success: true });
+    expect(mocks.updated[1]).toMatchObject({ status: 'approved', opponentRespondedByUserId: 'staff-1' });
+  });
+
+  it('still derives the side from the viewed school for staff: the requester cannot answer its own request', async () => {
+    asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.queue.push([request()], [match()]);
+    const result = await respondToReschedule({ ...accept, schoolId: 'school-a' });
+    expect(result.error).toMatch(/other school has to answer/);
+    expect(mocks.updated).toEqual([]);
+  });
+
+  it('guards the match move on status and the original time, and the close on the awaited status', async () => {
+    mocks.queue.push([request()], [match()], [option()], [{ id: 'm1' }], [{ id: 'req-1' }]);
+    await respondToReschedule(accept);
+    const params = (i: number) => mocks.paramValues(mocks.wheres[i]);
+    // wheres: request read, match read, option read, match move, request close.
+    expect(params(3)).toEqual(expect.arrayContaining(['m1', 'scheduled', MATCH_AT]));
+    expect(params(4)).toEqual(expect.arrayContaining(['req-1', 'pending_opponent']));
+  });
+
+  it('loses gracefully, moving nothing, when the match changed under the accept', async () => {
     mocks.queue.push([request()], [match()], [option()], []);
+    expect((await respondToReschedule(accept)).error).toMatch(/changed since/);
+    expect(mocks.updateTag).not.toHaveBeenCalled();
+  });
+
+  it('loses gracefully when the request resolved in the meantime (the transaction rolls back)', async () => {
+    mocks.queue.push([request()], [match()], [option()], [{ id: 'm1' }], []);
     expect((await respondToReschedule(accept)).error).toMatch(/already resolved/);
+    expect(mocks.updateTag).not.toHaveBeenCalled();
   });
 });
 
@@ -333,6 +409,13 @@ describe('counterReschedule', () => {
     mocks.queue.push([request()], [match({ status: 'live' })]);
     expect((await counterReschedule(counter)).error).toMatch(/changed since/);
     expect(mocks.inserted).toEqual([]);
+  });
+
+  it('lets a staff admin send a counter-offer as the viewed opponent, recording the staff user', async () => {
+    asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.queue.push([request()], [match()], offered, [{ id: 'req-1' }], []);
+    expect(await counterReschedule(counter)).toEqual({ success: true });
+    expect(mocks.updated[0]).toMatchObject({ status: 'pending_requester', opponentRespondedByUserId: 'staff-1' });
   });
 
   it('applies the same time rules as a request', async () => {
@@ -388,15 +471,17 @@ describe('answering a counter-offer', () => {
     expect(mocks.updated).toEqual([]);
   });
 
-  it('sends an accepted counter-time to staff and records the requester’s answer', async () => {
-    mocks.queue.push([countered()], [match()], [counterOption()], [{ id: 'req-1' }]);
+  it('moves the match to an accepted counter-time at once and records the requester’s answer', async () => {
+    const chosen = counterOption();
+    mocks.queue.push([countered()], [match()], [chosen], [{ id: 'm1' }], [{ id: 'req-1' }]);
     expect(await respondToReschedule(answer)).toEqual({ success: true });
-    expect(mocks.updated[0]).toMatchObject({
-      status: 'pending_staff',
+    expect(mocks.updated[0]).toEqual({ scheduledAt: chosen.proposedAt });
+    expect(mocks.updated[1]).toMatchObject({
+      status: 'approved',
       acceptedOptionId: 'opt-9',
       counterRespondedByUserId: 'user-1',
     });
-    expect(mocks.updated[0]).not.toHaveProperty('opponentRespondedByUserId');
+    expect(mocks.updated[1]).not.toHaveProperty('opponentRespondedByUserId');
   });
 
   it('lets the requester decline, which ends the request', async () => {
@@ -463,6 +548,14 @@ describe('cancelReschedule', () => {
     expect(mocks.wheres.flatMap(mocks.paramValues)).toContain('pending_requester');
   });
 
+  it('lets a staff admin cancel as the viewed requesting school', async () => {
+    asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.queue.push([request()], [match()], [{ id: 'req-1' }]);
+    expect(await cancelReschedule(cancel)).toEqual({ success: true });
+    mocks.queue.push([request()], [match()]);
+    expect((await cancelReschedule({ ...cancel, schoolId: 'school-b' })).error).toMatch(/Only the school that made/);
+  });
+
   it('lets either school cancel while a counter-offer is waiting', async () => {
     mocks.queue.push([request({ status: 'pending_requester' })], [match()], [{ id: 'req-1' }]);
     expect(await cancelReschedule({ ...cancel, schoolId: 'school-b' })).toEqual({ success: true });
@@ -483,7 +576,7 @@ describe('cancelReschedule', () => {
   });
 
   it('refuses once the opponent agreed, before touching the row', async () => {
-    mocks.queue.push([request({ status: 'pending_staff' })], [match()]);
+    mocks.queue.push([request({ status: 'approved' })], [match()]);
     expect((await cancelReschedule(cancel)).error).toMatch(/already been agreed/);
     expect(mocks.updated).toEqual([]);
   });

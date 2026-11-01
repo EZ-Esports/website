@@ -233,3 +233,14 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - The lock, bulk inserts and UI have not been exercised against a real database or in a browser.
 - Week 1 date and the fixed 7 PM ET slot are the only schedule inputs; holidays and per-week skips are not modelled.
 - `createMatch`/`deleteMatch` do not lock the season row, so a hand-scheduled match racing Generate's commit can slip in between its check and insert (spec-046). Left as is; revisit if it ever happens.
+
+## Reschedule without staff approval (spec-053)
+
+- Any `match_reschedule_requests` rows already in `pending_staff` in production are stranded: nothing can approve or decline them any more, and they still block a new request on their match (open-request unique index). They need a manual look (query `status = 'pending_staff'`, then move the match by hand and set the row to `approved`/`declined_staff`, or cancel it). Not checked here, since this work never touched the production database.
+- The spec-032 Known limit (a user managing both schools of a match can request and accept alone) no longer has staff approval as a backstop.
+- Not exercised against a real database or in a browser.
+
+## Staff acting in the portal (spec-054)
+
+- No explicit "acted as staff" flag is stored; a staff action is identifiable only by its user id (the reschedule and result rows hold the staff user, the school columns the viewed school). Add a column if reports ever need to filter on it.
+- The confirm dialog stacking on top of the reschedule and result modals has been tested in jsdom only; check it in a real browser as a staff admin.

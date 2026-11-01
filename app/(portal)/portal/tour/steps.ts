@@ -162,7 +162,7 @@ export const TOUR_SECTIONS: TourSection[] = [
         id: 'reschedule',
         anchor: 'reschedule',
         title: 'Ask to move a match',
-        body: 'Use Request reschedule on an upcoming match to propose at least two new times and give a reason. The other school picks one, or suggests times of their own for you to choose from. Then EZ Esports staff approve it. Under 72 hours’ notice, the other school can say no. Open View request to see or cancel yours until a time is agreed.',
+        body: 'Use Request reschedule on an upcoming match to propose at least two new times and give a reason. The other school picks one, which moves the match right away, or suggests times of their own for you to choose from. Under 72 hours’ notice, the other school can say no. Open View request to see or cancel yours until a time is agreed.',
       },
       {
         id: 'reschedule-allowance',

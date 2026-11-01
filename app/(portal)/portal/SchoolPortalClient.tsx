@@ -23,6 +23,7 @@ import type { SchoolMatchItem } from '@/app/lib/school-matches';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { rosterRemovalConfirmMessage } from '@/app/lib/roster-removal-copy';
+import { StaffActingProvider, useStaffActing } from './components/StaffActing';
 import { PortalHeader } from './components/PortalHeader';
 import { GameTabs, type GameItem } from './components/GameTabs';
 import { GenerateInviteCard } from './components/GenerateInviteCard';
@@ -68,7 +69,19 @@ interface SchoolPortalClientProps {
   tourCompleted: boolean;
 }
 
-export default function SchoolPortalClient({
+/**
+ * The portal for one school. A staff admin viewing it can do everything its manager can; each
+ * mutation then asks for one confirmation first (spec-054). A manager is never asked.
+ */
+export default function SchoolPortalClient(props: SchoolPortalClientProps) {
+  return (
+    <StaffActingProvider isStaff={!!props.context?.isStaffAdmin} schoolName={props.activeSchool.schoolName}>
+      <SchoolPortalContent {...props} />
+    </StaffActingProvider>
+  );
+}
+
+function SchoolPortalContent({
   context: _context,
   activeSchool,
   games,
@@ -87,6 +100,10 @@ export default function SchoolPortalClient({
   lockedSeasonLabel = '',
   tourCompleted,
 }: SchoolPortalClientProps) {
+  const { confirmed, actingNotice } = useStaffActing();
+  // Staff see one dialog, not two, for the portal's own confirms: the notice leads their message.
+  const withNotice = (message: string) => (actingNotice ? `${actingNotice} ${message}` : message);
+
   // --- Game Selection Tab ---
   const [selectedGame, setSelectedGame] = useState<string>(initialGameId || 'all');
 
@@ -291,7 +308,8 @@ export default function SchoolPortalClient({
     }
 
     setEnrollError(null);
-    startEnrolling(async () => {
+    // The check above ran first, so staff are only asked about an enrollment that can be sent.
+    confirmed(() => startEnrolling(async () => {
       try {
         const result = await enrollPlayerToRoster({
           rosterId: activeEnrollRoster.id,
@@ -351,7 +369,7 @@ export default function SchoolPortalClient({
       } catch (err: any) {
         setEnrollError(err.message || 'Failed to enroll player to roster');
       }
-    });
+    }));
   };
 
   // Removing only runs from the confirm dialog. Whether the student's own record also goes depends
@@ -624,8 +642,8 @@ export default function SchoolPortalClient({
             rejectingId={rejectingId}
             approvalFeedback={approvalFeedback}
             viewOnlyGameIds={viewOnlyGameIds}
-            onApprove={handleApprove}
-            onReject={handleReject}
+            onApprove={(id) => confirmed(() => handleApprove(id))}
+            onReject={(id) => confirmed(() => handleReject(id))}
           />
         </div>
       </div>
@@ -647,9 +665,11 @@ export default function SchoolPortalClient({
         }}
         onOpenEnrollModal={handleOpenEnrollModal}
         onCheckRosterGate={handleCheckRosterGate}
-        onUpdateRole={handleUpdateRole}
+        onUpdateRole={(rosterId, playerId, role) => confirmed(() => handleUpdateRole(rosterId, playerId, role))}
         onRemovePlayer={handleRemovePlayer}
-        onMovePlayer={handleMovePlayer}
+        onMovePlayer={(fromRosterId, playerId, toRosterId) =>
+          confirmed(() => handleMovePlayer(fromRosterId, playerId, toRosterId))
+        }
         movingPlayerId={movingPlayerId}
         notice={rosterNotice}
         onDeleteRoster={handleDeleteRoster}
@@ -684,7 +704,9 @@ export default function SchoolPortalClient({
         appearance="portal"
         tone="danger"
         title="Copy a new invite link?"
-        message={`This replaces the current link for ${inviteStudentName(inviteLinkCopy.target)}. The old link will stop working and the new link is copied to your clipboard.`}
+        message={withNotice(
+          `This replaces the current link for ${inviteStudentName(inviteLinkCopy.target)}. The old link will stop working and the new link is copied to your clipboard.`,
+        )}
         confirmLabel="Copy new link"
         pendingLabel="Creating…"
       />
@@ -694,7 +716,9 @@ export default function SchoolPortalClient({
         appearance="portal"
         tone="danger"
         title="Delete invite?"
-        message={`Delete the invite for ${inviteStudentName(inviteDeletion.target)}? Its link will stop working. This action cannot be undone.`}
+        message={withNotice(
+          `Delete the invite for ${inviteStudentName(inviteDeletion.target)}? Its link will stop working. This action cannot be undone.`,
+        )}
         confirmLabel="Delete invite"
         pendingLabel="Deleting…"
       />
@@ -704,9 +728,11 @@ export default function SchoolPortalClient({
         appearance="portal"
         tone="danger"
         title="Remove player?"
-        message={rosterRemovalConfirmMessage(
-          playerRemoval.target?.playerName ?? 'This player',
-          playerRemoval.target?.rosterName ?? 'this roster',
+        message={withNotice(
+          rosterRemovalConfirmMessage(
+            playerRemoval.target?.playerName ?? 'This player',
+            playerRemoval.target?.rosterName ?? 'this roster',
+          ),
         )}
         confirmLabel="Remove player"
         pendingLabel="Removing…"
@@ -717,7 +743,7 @@ export default function SchoolPortalClient({
         appearance="portal"
         tone="danger"
         title="Delete roster?"
-        message="Delete this roster? This will remove it permanently. This action cannot be undone."
+        message={withNotice('Delete this roster? This will remove it permanently. This action cannot be undone.')}
         confirmLabel="Delete roster"
         pendingLabel="Deleting…"
       />
@@ -748,7 +774,7 @@ export default function SchoolPortalClient({
         defaultGameId={selectedGame}
         isCreating={isCreatingRoster}
         createError={createRosterError}
-        onConfirmCreate={handleConfirmCreateRoster}
+        onConfirmCreate={(input) => confirmed(() => handleConfirmCreateRoster(input))}
         onClose={() => {
           setIsCreateRosterOpen(false);
           setCreateRosterError(null);

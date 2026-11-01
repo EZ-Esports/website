@@ -92,6 +92,21 @@ describe('submitMatchResult', () => {
     expect(result.error).toBe('This match is not in your season.');
   });
 
+  it('lets a staff admin submit as the viewed school, attributing the attempt to the staff user (spec-054)', async () => {
+    mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
+    mocks.saveSeriesResult.mockResolvedValue(true);
+    const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
+    expect(result).toEqual({ success: true, summary: '2-0' });
+    expect(mocks.reserveSubmissionAttempt).toHaveBeenCalledWith({ matchId: 'm1', userId: 'staff-1' });
+  });
+
+  it('still refuses a staff admin acting as a school that is not in the match', async () => {
+    mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-z', input: `${ID_1} ${ID_2}` });
+    expect(result.error).toBe('Your school is not playing in this match.');
+  });
+
   it('refuses a match that already has a result, and non-Valorant games', async () => {
     mocks.loadRows.mockResolvedValue([matchRow({ status: 'completed', homeScore: 2 })]);
     expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).error).toContain('already has a result');

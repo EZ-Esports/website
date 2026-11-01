@@ -84,4 +84,9 @@ describe('resolveTourSteps', () => {
     expect(resolveTourSteps('nope', everything)).toEqual([]);
     expect(resolveTourSteps('full', () => false)).toEqual([]);
   });
+
+  it('does not mention a staff approval step for reschedules', () => {
+    const step = TOUR_SECTIONS.flatMap((sec) => sec.steps).find((st) => st.id === 'reschedule');
+    expect(step?.body).not.toMatch(/staff approve/i);
+  });
 });
