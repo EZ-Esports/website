@@ -164,7 +164,7 @@ function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: s
                       className={`${INPUT} min-h-[44px] sm:min-h-0 font-mono text-xs`}
                     />
                     {error && (
-                      <p id={`${id}-error`} className="mt-1 text-[11px] text-rose-400">
+                      <p id={`${id}-error`} role="alert" className="mt-1 text-[11px] text-rose-400">
                         {error}
                       </p>
                     )}
