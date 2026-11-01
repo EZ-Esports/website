@@ -251,3 +251,23 @@ describe('code of conduct acknowledgement', () => {
     expect(screen.getByText(/may change or reject any entry/i)).toBeInTheDocument();
   });
 });
+
+describe('student age range on the birth date step', () => {
+  const props = {
+    birthDate: '', setBirthDate: () => {}, codeOfConductAccepted: false, setCodeOfConductAccepted: () => {},
+  };
+  const yearsAgo = (n: number) =>
+    new Date(Date.UTC(new Date().getUTCFullYear() - n, 0, 1)).toISOString().slice(0, 10);
+
+  it('shows an inline error for a student outside 13 to 21', () => {
+    render(<BirthDateRulesStep {...props} birthDate={yearsAgo(10)} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/aged 13 to 21/i);
+  });
+
+  it('shows no error for an in-range student, or for a manager of any age', () => {
+    const { rerender } = render(<BirthDateRulesStep {...props} birthDate={yearsAgo(16)} />);
+    expect(screen.queryByRole('alert')).toBeNull();
+    rerender(<BirthDateRulesStep {...props} birthDate={yearsAgo(40)} enforceStudentAge={false} />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});

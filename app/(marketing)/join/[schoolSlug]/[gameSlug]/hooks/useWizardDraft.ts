@@ -8,6 +8,8 @@ import {
   calculateAge,
   isMinorAge,
   isPlausibleBirthDate,
+  isStudentAgeInRange,
+  STUDENT_AGE_RANGE_MESSAGE,
   validateConsent,
   type ConsentSubmission,
 } from '@/app/lib/onboarding/consent';
@@ -309,6 +311,10 @@ export function useWizardDraft(
     }
     if (!isPlausibleBirthDate(new Date(birthDate))) {
       setErrorMessage('Please enter a valid date of birth (4-digit year).');
+      return false;
+    }
+    if ((!isManager || alsoPlays) && !isStudentAgeInRange(calculateAge(new Date(birthDate)))) {
+      setErrorMessage(STUDENT_AGE_RANGE_MESSAGE);
       return false;
     }
     if (!codeOfConductAccepted) {
