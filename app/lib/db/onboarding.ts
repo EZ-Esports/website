@@ -130,6 +130,8 @@ export async function upsertMemberRecord(
   tx: OnboardingTx,
   params: {
     email: string;
+    /** Lower-cased nycstudents.net address, already validated (spec-056). */
+    schoolEmail: string;
     legalFirstName: string;
     legalLastName: string;
     discordUsername: string;
@@ -137,7 +139,7 @@ export async function upsertMemberRecord(
     schoolId: string;
   }
 ): Promise<string> {
-  const { email, legalFirstName, legalLastName, discordUsername, gradYear, schoolId } = params;
+  const { email, schoolEmail, legalFirstName, legalLastName, discordUsername, gradYear, schoolId } = params;
 
   const [existingMember] = await tx
     .select()
@@ -151,6 +153,7 @@ export async function upsertMemberRecord(
       .set({
         firstName: legalFirstName,
         lastName: legalLastName,
+        schoolEmail,
         discord: discordUsername,
         graduationYear: gradYear,
         schoolId,
@@ -166,6 +169,7 @@ export async function upsertMemberRecord(
       firstName: legalFirstName,
       lastName: legalLastName,
       email,
+      schoolEmail,
       discord: discordUsername,
       graduationYear: gradYear,
       schoolId,
@@ -173,6 +177,22 @@ export async function upsertMemberRecord(
     .returning();
 
   return newMember.id;
+}
+
+/**
+ * The member whose school email is this address (case-insensitive), if any. Lets the pipeline answer
+ * with a readable rejection instead of surfacing the unique index error.
+ */
+export async function findSchoolEmailOwner(
+  tx: OnboardingTx,
+  schoolEmail: string
+): Promise<{ id: string; email: string | null } | null> {
+  const [row] = await tx
+    .select({ id: schema.members.id, email: schema.members.email })
+    .from(schema.members)
+    .where(sql`lower(${schema.members.schoolEmail}) = ${schoolEmail.toLowerCase()}`)
+    .limit(1);
+  return row ?? null;
 }
 
 /**

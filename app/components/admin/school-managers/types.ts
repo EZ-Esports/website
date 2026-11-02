@@ -21,6 +21,10 @@ export interface ManagerItem {
   firstName?: string | null;
   lastName?: string | null;
   email: string | null;
+  /** nycstudents.net address typed in onboarding. */
+  schoolEmail?: string | null;
+  /** A student ID photo is on file (opened through the staff signed-URL route). */
+  hasStudentId?: boolean;
 }
 
 export interface ManagerInviteItem {

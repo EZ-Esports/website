@@ -1147,6 +1147,15 @@ async function main(): Promise<void> {
       log: (l) => console.log(l),
     });
     if (result.authFailed.length > 0) process.exitCode = 2;
+    // Student ID photos (spec-056) live in a private Storage bucket, which a SQL delete cannot reach.
+    // Deleting members/invites left their upload rows orphaned (member_id set null); remove those
+    // objects and rows now. Needs the migration 0058 table and the Supabase service credentials; a
+    // missing table is a no-op, and a failure only means "run the sweep again", never a rollback.
+    if (opts.execute && result.deleted > 0) {
+      const { sweepOrphanStudentIds } = await import('../app/lib/onboarding/student-id-sweep');
+      const removed = await sweepOrphanStudentIds();
+      console.log(`Removed ${removed} orphaned student ID photo(s) from private storage.`);
+    }
   } finally {
     await sql.end({ timeout: 5 });
   }

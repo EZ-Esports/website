@@ -22,6 +22,7 @@ import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } fr
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
+import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
 import { removalCacheTags, removalNotice, removePlayerFromRosterTx } from '@/app/lib/db/roster-removal';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
@@ -417,6 +418,8 @@ export async function deletePlayerInvite(
   } catch (err) {
     console.error('Could not remove the onboarding form completion for a deleted invite', err);
   }
+  // A student ID the invitee uploaded before the invite was deleted has no owner now (never throws).
+  await sweepOrphanStudentIds();
 
   return { success: true, inviteId: invite.id };
 }
@@ -1700,6 +1703,7 @@ export async function removePlayerFromRoster(
 
   const removal = await db.transaction((tx) => removePlayerFromRosterTx(tx, { playerId, rosterId }));
 
+  if (removal.removed && removal.studentRecord === 'deleted') await sweepOrphanStudentIds();
   updateCacheTags(...removalCacheTags(removal), CACHE_TAGS.TEAMS);
   if (removal.removed) await notifyMembershipChanged([removal.memberId]);
 

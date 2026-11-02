@@ -276,6 +276,26 @@ vi.mock('@/app/lib/db/onboarding-form', () => ({
   },
 }));
 
+// Student ID photo (spec-056): the upload is held server-side against the invite. These tests exercise
+// the pipeline's decisions, so the persistence layer and Storage are stand-ins.
+const studentId = vi.hoisted(() => ({
+  pending: true,
+  linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
+  replacedKey: null as string | null,
+  removed: [] as Array<string | null>,
+}));
+vi.mock('@/app/lib/db/student-ids', () => ({
+  findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
+  linkUploadToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    if (!studentId.pending) return null;
+    studentId.linked.push({ kind, inviteId, memberId });
+    return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
+  },
+}));
+vi.mock('@/app/lib/onboarding/student-id-storage', () => ({
+  removeStudentIds: async (keys: Array<string | null>) => { studentId.removed.push(...keys); },
+}));
+
 // Fake Supabase admin client so tests can assert whether an auth user was (not) created.
 const authMock = vi.hoisted(() => ({ createUser: vi.fn(), listUsers: vi.fn() }));
 vi.mock('@/app/lib/supabase/service', () => ({
@@ -357,6 +377,10 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     mocks.state.formCompletionLinks = [];
     formGate.enabled = false;
     formGate.completed = false;
+    studentId.pending = true;
+    studentId.linked = [];
+    studentId.replacedKey = null;
+    studentId.removed = [];
     mocks.state.schoolManagersStore = [];
     mocks.state.staffMembersStore = [];
     mocks.state.onboardingConsentsStore = [];
@@ -525,6 +549,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
   describe('3. Draft Save & Retrieval', () => {
     it('saves draft data to pending invite and retrieves it upon validation', async () => {
       const draftData = {
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Alexander',
         legalLastName: 'Chen',
         email: 'alex.chen@nycstudents.net',
@@ -618,6 +643,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('4. Complete Onboarding Submission Transaction', () => {
     const validSubmission: PlayerOnboardingSubmission = {
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
@@ -871,6 +897,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('4b. Verified Discord requirement (players)', () => {
     const submission: PlayerOnboardingSubmission = {
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
@@ -1040,6 +1067,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('completes manager onboarding, provisions school_managers record, and transitions invite to accepted', async () => {
       const managerSubmission: PlayerOnboardingSubmission = {
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1089,6 +1117,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       const result = await submitOk({
         token: managerToken,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'Samuel',
           legalLastName: 'Miller',
           email: 'smiller@stuy.edu',
@@ -1114,6 +1143,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         submitOk({
           token: managerToken,
           submission: {
+            schoolEmail: 'student.school@nycstudents.net',
             legalFirstName: 'Samuel',
             legalLastName: 'Miller',
             email: 'smiller@stuy.edu',
@@ -1134,6 +1164,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         submitOk({
           token: managerToken,
           submission: {
+            schoolEmail: 'student.school@nycstudents.net',
             legalFirstName: 'Samuel',
             legalLastName: 'Miller',
             email: 'smiller@stuy.edu',
@@ -1167,6 +1198,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       });
 
       const managerSubmission: PlayerOnboardingSubmission = {
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1194,6 +1226,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         stubSupabaseEnv();
       });
       const managerSub = (extra: Partial<PlayerOnboardingSubmission> = {}): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1206,6 +1239,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         ...extra,
       });
       const playerSub = (): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1465,6 +1499,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         stubSupabaseEnv();
       });
       const managerSub = (): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1575,6 +1610,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     describe('manager password (never kept in the draft, so the server must insist on it)', () => {
       const sub = (password?: string): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1688,6 +1724,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('7. Offensive-content screen and staff-review record', () => {
     const baseSubmission = (): PlayerOnboardingSubmission => ({
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
@@ -1736,6 +1773,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     it('lists every flagged field, across the free-text fields', async () => {
       const result = await submitRaw({
         ...baseSubmission(),
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Fuckface',
         legalLastName: 'dumbass',
         riotId: 'ShitLord#NA1',
@@ -1747,6 +1785,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     it('rejects when only some flagged fields are overridden', async () => {
       const result = await submitRaw({
         ...baseSubmission(),
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Fuckface',
         riotId: 'ShitLord#NA1',
         contentOverrides: ['legalFirstName'],
@@ -1877,6 +1916,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       const managerSub = (): PlayerOnboardingSubmission => ({
         ...baseSubmission(),
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1909,6 +1949,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('8. Onboarding Google Form gate (spec-051)', () => {
     const submission = (): PlayerOnboardingSubmission => ({
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
@@ -1970,6 +2011,112 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(result).toMatchObject({ success: false, code: 'onboarding_form_required' });
       expect(authMock.createUser).not.toHaveBeenCalled();
       expect(mocks.state.membersStore).toHaveLength(0);
+    });
+  });
+
+
+  describe('school email and student ID (spec-056)', () => {
+    const base = (): PlayerOnboardingSubmission => ({
+      schoolEmail: 'achen@nycstudents.net',
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.personal@gmail.com',
+      graduationYear: 2028,
+      riotId: 'Demon1#LFT1',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 16, 0, 1)).toISOString().slice(0, 10),
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    });
+    // Under 18 needs guardian fields; use an adult date of birth so only the school-email rules are under test.
+    const adult = (extra: Partial<PlayerOnboardingSubmission> = {}): PlayerOnboardingSubmission => ({
+      ...base(),
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10),
+      ...extra,
+    });
+
+    it('stores the school email trimmed and lower-cased next to the personal email', async () => {
+      const result = await submitOk({ token: rawToken, submission: adult({ schoolEmail: '  AChen@NYCStudents.NET ' }) });
+      const member = mocks.state.membersStore.find((m) => m.id === result.memberId);
+      expect(member.schoolEmail).toBe('achen@nycstudents.net');
+      expect(member.email).toBe('alex.personal@gmail.com');
+    });
+
+    it.each([
+      ['a look-alike suffix domain', 'x@nycstudents.net.evil.com'],
+      ['a second @ and another domain', 'x@nycstudents.net@evil.com'],
+      ['a prefix domain', 'x@evilnycstudents.net'],
+      ['a subdomain', 'x@mail.nycstudents.net'],
+      ['another school domain', 'x@schools.nyc.gov'],
+      ['an empty value', '   '],
+      ['no local part', '@nycstudents.net'],
+    ])('rejects %s with school_email_invalid and writes nothing', async (_label, value) => {
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult({ schoolEmail: value }) });
+      expect(result).toMatchObject({ success: false, code: 'school_email_invalid' });
+      expect(mocks.state.membersStore).toHaveLength(0);
+      expect(studentId.linked).toHaveLength(0);
+    });
+
+    it('rejects a school email equal to the personal email, ignoring case', async () => {
+      const result = await submitPlayerOnboarding({
+        token: rawToken,
+        submission: adult({ email: 'achen@nycstudents.net', schoolEmail: 'AChen@nycstudents.net' }),
+      });
+      expect(result).toMatchObject({ success: false, code: 'school_email_invalid' });
+      expect((result as { error: string }).error).toMatch(/different/i);
+    });
+
+    it('rejects a missing school email (direct action call without the field)', async () => {
+      const submission = adult();
+      delete (submission as Partial<PlayerOnboardingSubmission>).schoolEmail;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission });
+      expect(result).toMatchObject({ success: false, code: 'school_email_invalid' });
+    });
+
+    it('returns school_email_already_used when another member holds the address', async () => {
+      mocks.state.membersStore.push({ id: 'other-member', email: 'someone.else@gmail.com', schoolEmail: 'achen@nycstudents.net' });
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult() });
+      expect(result).toMatchObject({ success: false, code: 'school_email_already_used' });
+      expect(mocks.state.membersStore).toHaveLength(1);
+    });
+
+    it('returns school_email_already_used when the unique index decides a race', async () => {
+      const dup = Object.assign(new Error('duplicate key'), { code: '23505', constraint_name: 'members_school_email_lower_idx' });
+      const spy = vi.spyOn(mocks.mockDb, 'transaction').mockRejectedValueOnce(dup);
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult() });
+      spy.mockRestore();
+      expect(result).toMatchObject({ success: false, code: 'school_email_already_used' });
+    });
+
+    it('requires an uploaded student ID before any write', async () => {
+      studentId.pending = false;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult() });
+      expect(result).toMatchObject({ success: false, code: 'student_id_required' });
+      expect(mocks.state.membersStore).toHaveLength(0);
+    });
+
+    it('links the pending upload of the invite to the member and deletes a replaced older photo after commit', async () => {
+      studentId.replacedKey = 'old.jpg';
+      const result = await submitOk({ token: rawToken, submission: adult() });
+      expect(studentId.linked).toEqual([{ kind: 'player', inviteId: 'invite-pending-1', memberId: result.memberId }]);
+      expect(studentId.removed).toContain('old.jpg');
+    });
+
+    it('ignores a client-supplied storage key: the submission type has no field for it and extras are never read', async () => {
+      const result = await submitOk({
+        token: rawToken,
+        submission: { ...adult(), studentIdKey: '../../etc/passwd', studentIdStorageKey: 'other.jpg' } as PlayerOnboardingSubmission,
+      });
+      expect(studentId.linked).toHaveLength(1);
+      expect(JSON.stringify(mocks.state.membersStore.find((m) => m.id === result.memberId))).not.toMatch(/passwd|other\.jpg/);
+    });
+
+    it('never keeps a student ID reference or the school email contents of a draft beyond the typed string', async () => {
+      await saveOnboardingDraft({
+        token: rawToken,
+        draftData: { schoolEmail: 'achen@nycstudents.net', studentIdUploaded: true, studentIdKey: 'k.jpg', legalFirstName: 'Alex' },
+      });
+      const stored = mocks.state.playerInvitesStore[0].submissionDraft;
+      expect(stored).toEqual({ schoolEmail: 'achen@nycstudents.net', legalFirstName: 'Alex' });
     });
   });
 

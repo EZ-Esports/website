@@ -12,6 +12,8 @@ export interface InviteData {
   gameName: string;
   gameSlug: string;
   submissionDraft: Record<string, any> | null;
+  /** A student ID photo is already uploaded for this invite (e.g. the person resumed after a refresh). */
+  studentIdUploaded?: boolean;
   expiresAt: Date;
   /** Manager invites only: games a manager can say they also play. */
   playableGames?: Array<{ id: string; slug: string; displayName: string }>;
@@ -27,7 +29,16 @@ export const FORM_STEP = 6;
 export function stepForRejection(code: string, fields: readonly string[] = []): 1 | 2 | 3 | 4 | 5 | 6 {
   if (code === 'content_flagged' || code === 'field_too_long') return stepForContentFields(fields);
   if (code === 'onboarding_form_required') return FORM_STEP;
-  return code === 'manager_password_required' || code === 'play_games_required' ? 1 : 2;
+  if (
+    code === 'manager_password_required' ||
+    code === 'play_games_required' ||
+    code === 'school_email_invalid' ||
+    code === 'school_email_already_used' ||
+    code === 'student_id_required'
+  ) {
+    return 1;
+  }
+  return 2;
 }
 
 /** What a step needs to warn about, and let the person override, one offensive-content flag. */
@@ -40,6 +51,8 @@ export interface WizardFormData {
   legalFirstName: string;
   legalLastName: string;
   email: string;
+  /** nycstudents.net address; the student ID photo is never part of a draft (it is uploaded separately). */
+  schoolEmail: string;
   password?: string;
   graduationYear: number;
   /** Manager only: season the manager is applying for, e.g. "2026-27". */

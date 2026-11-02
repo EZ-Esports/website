@@ -53,6 +53,10 @@ export const members = pgTable('members', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   email: text('email').unique(),
+  // The nycstudents.net address typed in onboarding (spec-056). Held in lower case; the unique index is on
+  // lower() as well so a row written by any other path cannot collide on case alone. Nullable because
+  // archive members and admin-created members never went through onboarding.
+  schoolEmail: text('school_email'),
   discord: text('discord'),
   graduationYear: integer('graduation_year'),
   schoolId: uuid('school_id')
@@ -77,6 +81,7 @@ export const members = pgTable('members', {
 }, (table) => [
   index('members_school_id_idx').on(table.schoolId),
   uniqueIndex('members_member_key_unique_idx').on(table.memberKey),
+  uniqueIndex('members_school_email_lower_idx').on(sql`lower(${table.schoolEmail})`),
 ]).enableRLS();
 
 // Seasons config
@@ -1024,6 +1029,31 @@ export const onboardingFormCompletions = pgTable('onboarding_form_completions', 
   index('onboarding_form_completions_member_id_idx').on(t.memberId),
   check('onboarding_form_completions_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
   check('onboarding_form_completions_source_check', sql`${t.source} in ('google_form', 'manual')`),
+]).enableRLS();
+
+// Student ID photo uploaded during onboarding (spec-056). The image lives in the PRIVATE `student-ids`
+// bucket; this table holds only the object key, never a URL. A row is created by the upload route bound
+// to the invite (so the browser can never name a key), and `member_id` is set when the submission
+// succeeds. A row is live while its member exists or its invite is still pending; anything else is an
+// orphan that the sweep deletes together with its object. Kept apart from `members` so the key is never carried by a members `select()` that ends up
+// in a cache or a page. RLS on, no policies: service role only.
+export const studentIdUploads = pgTable('student_id_uploads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  // SET NULL, not CASCADE: deleting a member must not silently drop the only pointer to the stored
+  // photo. The row stays as an orphan until `sweepOrphanStudentIds` has removed the object and the row.
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  storageKey: text('storage_key').notNull(),
+  contentType: text('content_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('student_id_uploads_invite_idx').on(t.inviteKind, t.inviteId),
+  uniqueIndex('student_id_uploads_member_idx').on(t.memberId),
+  uniqueIndex('student_id_uploads_storage_key_idx').on(t.storageKey),
+  check('student_id_uploads_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
 ]).enableRLS();
 
 // 5. Onboarding Consent Records (append-only audit trail of the Terms of Service

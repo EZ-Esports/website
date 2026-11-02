@@ -8,6 +8,8 @@
 
 In this order, inside one transaction: `match_reschedule_options`, `match_reschedule_requests`, `onboarding_consents`, `onboarding_form_completions`, `player_identities`, `players`, `player_invites`, `manager_invites`, `school_managers`, `members`.
 
+After `--execute` commits, the script also runs `sweepOrphanStudentIds()` (spec-056): student ID photos in the private `student-ids` bucket whose member or invite was just deleted are removed from Storage, then their `student_id_uploads` rows. It needs migration `0058` and the Supabase service credentials; if Storage is unreachable the rows stay and the next sweep (any roster removal, invite delete or upload) retries.
+
 A `members` row is deleted only when all of these hold:
 
 - it has an onboarding footprint (an invite, manager row, consent, form completion or identity);

@@ -39,6 +39,13 @@ function AccountHarness() {
       setLegalLastName={setLast}
       email=""
       setEmail={() => {}}
+      schoolEmail=""
+      setSchoolEmail={() => {}}
+      studentIdUploaded={false}
+      studentIdUploading={false}
+      studentIdError={null}
+      studentIdLabel={null}
+      onStudentIdChosen={() => {}}
       graduationYear={0}
       setGraduationYear={() => {}}
       isManager={false}
@@ -56,6 +63,13 @@ function DraftAccountHarness() {
       setLegalLastName={draft.setLegalLastName}
       email={draft.email}
       setEmail={draft.setEmail}
+      schoolEmail={draft.schoolEmail}
+      setSchoolEmail={draft.setSchoolEmail}
+      studentIdUploaded={draft.studentIdUploaded}
+      studentIdUploading={draft.studentIdUploading}
+      studentIdError={draft.studentIdError}
+      studentIdLabel={draft.studentIdLabel}
+      onStudentIdChosen={draft.uploadStudentId}
       graduationYear={draft.graduationYear}
       setGraduationYear={draft.setGraduationYear}
       isManager={false}

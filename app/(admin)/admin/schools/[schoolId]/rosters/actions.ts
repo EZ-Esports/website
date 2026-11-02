@@ -11,6 +11,7 @@ import {
   rosterPlayerRoles, siblingEnrollment, teamInSchool,
 } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from '@/app/lib/onboarding/roster-limits';
+import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
 import { notifyRosterMembershipChanged } from '@/app/lib/onboarding/roster-membership-events';
 import { allowedRosterDivisions, storedDivision } from '@/app/lib/school-roster-view';
 import { toHubDivision, type CanonicalDivision } from '@/app/lib/db/match-page';
@@ -227,6 +228,8 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
       }
       return players;
     });
+    // A deleted member's ID photo is now unreferenced; remove it from private storage (never throws).
+    await sweepOrphanStudentIds();
     updateTag('rosters');
     updateTag('players');
     updateTag('teams');
@@ -427,6 +430,7 @@ export async function deleteRosterMember(schoolId: string, playerId: string) {
     // One transaction: the roster spot and, when nothing else needs it, the student's own record.
     const removal = await db.transaction((tx) =>
       removePlayerFromRosterTx(tx, { playerId, rosterId: player.rosterId }));
+    if (removal.removed && removal.studentRecord === 'deleted') await sweepOrphanStudentIds();
     for (const tag of removalCacheTags(removal)) updateTag(tag);
     refreshSchoolRosters(schoolId);
     await notifyMembershipChanged([player.memberId]);

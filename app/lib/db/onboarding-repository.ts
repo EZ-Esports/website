@@ -1,6 +1,7 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
+import { listMembersWithStudentId } from './student-ids';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { PlayerSubmissionDraft } from '@/app/lib/onboarding/core/domain/types';
 
@@ -137,7 +138,7 @@ export async function findStaffUserIdByNormalizedEmail(email: string): Promise<s
 }
 
 export async function listActiveSchoolManagers(schoolId: string) {
-  return db
+  const rows = await db
     .select({
       id: schema.schoolManagers.id,
       schoolId: schema.schoolManagers.schoolId,
@@ -152,6 +153,7 @@ export async function listActiveSchoolManagers(schoolId: string) {
       firstName: schema.members.firstName,
       lastName: schema.members.lastName,
       email: sql<string | null>`coalesce(${schema.members.email}, ${schema.staffMembers.email})`,
+      schoolEmail: schema.members.schoolEmail,
     })
     .from(schema.schoolManagers)
     .leftJoin(schema.members, eq(schema.schoolManagers.memberId, schema.members.id))
@@ -163,6 +165,11 @@ export async function listActiveSchoolManagers(schoolId: string) {
       )
     )
     .orderBy(desc(schema.schoolManagers.isPrimaryContact), asc(schema.schoolManagers.createdAt));
+  // Only a flag: staff open the photo through the permission-checked signed-URL route.
+  const withStudentId = await listMembersWithStudentId(
+    rows.map((r) => r.memberId).filter((id): id is string => Boolean(id))
+  );
+  return rows.map((r) => ({ ...r, hasStudentId: Boolean(r.memberId && withStudentId.has(r.memberId)) }));
 }
 
 /** Raw manager and member rows behind the registered-manager account list. */
