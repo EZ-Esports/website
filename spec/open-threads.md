@@ -244,3 +244,16 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 - No explicit "acted as staff" flag is stored; a staff action is identifiable only by its user id (the reschedule and result rows hold the staff user, the school columns the viewed school). Add a column if reports ever need to filter on it.
 - The confirm dialog stacking on top of the reschedule and result modals has been tested in jsdom only; check it in a real browser as a staff admin.
+
+## School email and student ID (spec-056)
+
+- **DEPLOY ORDER: apply migration `0058` BEFORE deploying; the code does not degrade without it.** Before production: apply migration `0058` first, confirm the `student-ids` bucket exists and is private (the migration creates it only if the migration role can write the `storage` schema; otherwise create it by hand: Public off, 5 MB, image/jpeg, image/png, image/webp), then deploy. Never applied or tested against production by the implementer.
+- The school email is typed, not verified; staff comparison with the ID is the only check. If NYCPS ever allows Google sign-in, replace it with OAuth.
+- No staff approve/reject step for the ID yet, and no retention rule beyond "deleted with the member or invite" (decide how long to keep ID photos of accepted students).
+- Student ID view audit rows are in `staff_audit_logs` (`student_id_viewed`); there is no UI to read them.
+- Roster pages select `members.school_email` and the ID flag reads `student_id_uploads`, so both fail loudly until `0058` is applied. No graceful degradation is intended.
+- The orphan sweep has no scheduler (a cron route calling `sweepOrphanStudentIds` is a follow-up); photos orphaned by an expired invite wait for the next upload, removal or purge.
+- Plus-addressing is not canonicalised for the school email (`a+1@` and `a@` are different to the unique index).
+- A chunked upload skips the early `Content-Length` 413 (the 4 MB check after reading still applies).
+- Not exercised against real Supabase Storage or in a browser.
+- Dev-only local student ID storage (`STUDENT_ID_STORAGE=local`, `STUDENT_ID_LOCAL_DIR`) exists for local testing only; it is guarded against production and a non-loopback database (spec-056). Files in that directory are never cleaned by anything except the same sweep paths, so delete the directory by hand when done.

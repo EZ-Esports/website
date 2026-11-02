@@ -15,6 +15,7 @@ import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
 import { OnboardingRejection, type OnboardingRejectionCode } from './rejection';
 import { readVerifiedDiscord } from './discord-session';
+import { findPendingUpload } from '@/app/lib/db/student-ids';
 
 export interface ValidateInviteTokenParams {
   schoolSlug?: string;
@@ -38,6 +39,8 @@ export type ValidateInviteTokenResult =
       gameName: string;
       gameSlug: string;
       submissionDraft: Record<string, any> | null;
+      /** True when a student ID photo is already uploaded for this invite (the file itself never comes back). */
+      studentIdUploaded: boolean;
       expiresAt: Date;
       /** Manager invites only: games the manager can say they also play. */
       playableGames?: OnboardingGameOption[];
@@ -78,7 +81,13 @@ export interface SaveOnboardingDraftParams {
 }
 
 export interface PlayerOnboardingSubmission {
+  /** Personal email (sign-in for managers, notifications for everyone). */
   email: string;
+  /**
+   * The student's nycstudents.net address, typed and checked for format and domain only (NYCPS blocks
+   * Google sign-in, so it is not verified). Must differ from `email`. Staff compare it with the ID photo.
+   */
+  schoolEmail: string;
   legalFirstName: string;
   legalLastName: string;
   graduationYear: number;
@@ -158,6 +167,10 @@ const NEVER_DRAFTED_KEYS = new Set([
   'surveyDetails',
   'birthDate',
   'password',
+  // The student ID photo is held server-side against the invite; a draft never names or carries it.
+  'studentIdUploaded',
+  'studentIdKey',
+  'studentIdFile',
   // Guardian PII and signature are collected at final submit only, never persisted in the draft.
   'consent',
   // Discord identity comes only from the signed OAuth cookie. Drafts saved before OAuth existed may
@@ -182,6 +195,8 @@ function sanitizeDraftData(
     if (key === 'contentOverrides') {
       // Only known fields with bounded string values are kept; never trusted as an override at submit.
       sanitized[key] = parseSavedOverrides(value);
+    } else if (key === 'schoolEmail') {
+      sanitized[key] = typeof value === 'string' ? value.slice(0, 254) : '';
     } else if (key === 'alsoPlays') {
       sanitized[key] = value === true;
     } else if (key === 'playGameIds') {
@@ -327,6 +342,7 @@ export async function validateInviteToken(
       gameName: resolvedGameName,
       gameSlug: resolvedGameSlug,
       submissionDraft: sanitizeDraftData(invite.submissionDraft as Record<string, any> | null),
+      studentIdUploaded: Boolean(await findPendingUpload(row.isManager ? 'manager' : 'player', invite.id).catch(() => null)),
       expiresAt: invite.expiresAt,
       ...(isManager
         ? {

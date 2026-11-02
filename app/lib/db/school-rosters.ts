@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from './index';
 import * as schema from './schema';
 import { getContentFlagsByMember, type ContentFlagView } from './content-flags';
+import { listMembersWithStudentId } from './student-ids';
 import {
   buildSeasonBlocks,
   type RosterEditOptions,
@@ -60,6 +61,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
           lastName: schema.members.lastName,
           discord: schema.members.discord,
           graduationYear: schema.members.graduationYear,
+          schoolEmail: schema.members.schoolEmail,
         })
         .from(schema.players)
         .innerJoin(schema.members, eq(schema.players.memberId, schema.members.id))
@@ -67,6 +69,7 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
     : [];
 
   const contentFlags = await loadContentFlags(playerRows.map((p) => p.memberId));
+  const withStudentId = await listMembersWithStudentId([...new Set(playerRows.map((p) => p.memberId))]);
 
   const playersByRoster = new Map<string, RosterViewPlayer[]>();
   for (const p of playerRows) {
@@ -80,6 +83,8 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
       ign: p.ign,
       discord: p.discord,
       graduationYear: p.graduationYear,
+      schoolEmail: p.schoolEmail,
+      hasStudentId: withStudentId.has(p.memberId),
       role: p.role,
       contentFlags: contentFlags.get(p.memberId),
     });

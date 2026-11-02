@@ -369,6 +369,27 @@ vi.mock('@/app/lib/onboarding/discord-session', () => ({
   },
 }));
 
+// Student ID photo (spec-056): the upload is held server-side against the invite. These tests exercise
+// the pipeline's decisions, so the persistence layer and Storage are stand-ins.
+const studentId = vi.hoisted(() => ({
+  pending: true,
+  linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
+  replacedKey: null as string | null,
+  swept: 0,
+}));
+vi.mock('@/app/lib/db/student-ids', () => ({
+  findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
+  listMembersWithStudentId: async () => new Set<string>(),
+  linkUploadToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    if (!studentId.pending) return null;
+    studentId.linked.push({ kind, inviteId, memberId });
+    return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
+  },
+}));
+vi.mock('@/app/lib/onboarding/student-id-sweep', () => ({
+  sweepOrphanStudentIds: async () => { studentId.swept += 1; return 0; },
+}));
+
 vi.mock('@/app/lib/auth', () => ({
   requirePermission: mocks.mockRequirePermission,
 }));
@@ -607,6 +628,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       const subRes = await submitOk({
         token,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'Alex',
           legalLastName: 'Chen',
           email: 'alex.chen@stuy.edu',
@@ -733,6 +755,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       const submitPlayerRes = await submitOk({
         token: playerToken,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'David',
           legalLastName: 'Kim',
           email: 'david.kim@nycstudents.net',

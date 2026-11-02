@@ -25,6 +25,7 @@ const invite = (role: 'player' | 'manager' = 'player'): InviteData => ({
   gameName: 'Valorant',
   gameSlug: 'valorant',
   submissionDraft: null,
+  studentIdUploaded: true,
   expiresAt: new Date(),
 });
 
@@ -36,6 +37,7 @@ function setup(role: 'player' | 'manager' = 'player', discordUsername: string | 
 function fillStep1(result: { current: ReturnType<typeof useWizardDraft> }) {
   act(() => {
     result.current.setEmail('sam@school.edu');
+    result.current.setSchoolEmail('sam@nycstudents.net');
     result.current.setGraduationYear(2027);
   });
 }
@@ -206,6 +208,13 @@ describe('content warning in the form', () => {
         setLegalLastName={draft.setLegalLastName}
         email={draft.email}
         setEmail={draft.setEmail}
+        schoolEmail={draft.schoolEmail}
+        setSchoolEmail={draft.setSchoolEmail}
+        studentIdUploaded={draft.studentIdUploaded}
+        studentIdUploading={draft.studentIdUploading}
+        studentIdError={draft.studentIdError}
+        studentIdLabel={draft.studentIdLabel}
+        onStudentIdChosen={draft.uploadStudentId}
         graduationYear={draft.graduationYear}
         setGraduationYear={draft.setGraduationYear}
         isManager={false}

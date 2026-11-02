@@ -21,6 +21,12 @@ import {
   parseSavedOverrides,
   type ContentFieldKey,
 } from '@/app/lib/onboarding/content-check';
+import { checkSchoolEmail } from '@/app/lib/onboarding/school-email';
+import { compressImage } from '@/app/lib/image-compression';
+import {
+  STUDENT_ID_REQUIRED_MESSAGE,
+  checkStudentIdFile,
+} from '@/app/lib/onboarding/student-id';
 import {
   DEFAULT_MANAGER_SEASON,
   GRADUATION_YEAR_OPTIONS,
@@ -55,7 +61,60 @@ export function useWizardDraft(
     initialDraft.legalLastName || capitalizeNameWords(inviteData.intendedLastName) || ''
   );
   const [email, setEmail] = useState(initialDraft.email || '');
+  const [schoolEmail, setSchoolEmail] = useState<string>(
+    typeof initialDraft.schoolEmail === 'string' ? initialDraft.schoolEmail : ''
+  );
   const [password, setPassword] = useState(initialDraft.password || '');
+
+  // Student ID photo. The file is uploaded as soon as it is chosen and held by the server against this
+  // invite; the wizard only remembers that an upload exists (nothing about the file is drafted).
+  const [studentIdUploaded, setStudentIdUploaded] = useState<boolean>(inviteData.studentIdUploaded === true);
+  const [studentIdUploading, setStudentIdUploading] = useState(false);
+  const [studentIdError, setStudentIdError] = useState<string | null>(null);
+  const [studentIdLabel, setStudentIdLabel] = useState<string | null>(null);
+
+  async function uploadStudentId(file: File | null) {
+    setStudentIdError(null);
+    if (!file) {
+      setStudentIdError(STUDENT_ID_REQUIRED_MESSAGE);
+      return;
+    }
+    // Type and emptiness now; size after the browser has had a chance to shrink the photo.
+    const typeError = checkStudentIdFile({ size: Math.min(file.size, 1), type: file.type });
+    if (typeError || file.size === 0) {
+      setStudentIdError(typeError ?? 'That file is empty. Please choose a photo of your student ID.');
+      return;
+    }
+    // Oversized phone photos are shrunk in the browser first; the server still enforces its own limits.
+    // Falls back to the original if the browser never decodes the image, so the picker cannot hang.
+    const prepared = await Promise.race([
+      compressImage(file, { maxDimension: 2000, targetMimeType: 'image/jpeg', quality: 0.85 }),
+      new Promise<File>((resolve) => setTimeout(() => resolve(file), 8000)),
+    ]);
+    const problem = checkStudentIdFile(prepared);
+    if (problem) {
+      setStudentIdError(problem);
+      return;
+    }
+    setStudentIdUploading(true);
+    try {
+      const body = new FormData();
+      body.set('token', token);
+      body.set('file', prepared);
+      const res = await fetch('/api/onboarding/student-id', { method: 'POST', body });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setStudentIdError(json.error || 'Could not upload your photo. Please try again.');
+        return;
+      }
+      setStudentIdUploaded(true);
+      setStudentIdLabel(file.name);
+    } catch {
+      setStudentIdError('Could not upload your photo. Check your connection and try again.');
+    } finally {
+      setStudentIdUploading(false);
+    }
+  }
   // Drafts saved with a year that is no longer offered (e.g. 2026) start unset instead of blank-but-valid.
   const [graduationYear, setGraduationYear] = useState<number>(
     GRADUATION_YEAR_OPTIONS.some((o) => o.value === Number(initialDraft.graduationYear))
@@ -193,6 +252,7 @@ export function useWizardDraft(
       legalFirstName,
       legalLastName,
       email,
+      schoolEmail,
       password: isManager ? password : undefined,
       graduationYear,
       academicYear: isManager ? academicYear : undefined,
@@ -245,6 +305,19 @@ export function useWizardDraft(
           ? 'Please enter a valid email address.'
           : 'Please enter a valid student email address.'
       );
+      return false;
+    }
+    const schoolEmailProblem = checkSchoolEmail(schoolEmail, email);
+    if (schoolEmailProblem) {
+      setErrorMessage(schoolEmailProblem);
+      return false;
+    }
+    if (studentIdUploading) {
+      setErrorMessage('Please wait for your student ID photo to finish uploading.');
+      return false;
+    }
+    if (!studentIdUploaded) {
+      setErrorMessage(STUDENT_ID_REQUIRED_MESSAGE);
       return false;
     }
     if (isManager && (!password || password.length < 8)) {
@@ -354,6 +427,13 @@ export function useWizardDraft(
     setLegalLastName,
     email,
     setEmail,
+    schoolEmail,
+    setSchoolEmail,
+    studentIdUploaded,
+    studentIdUploading,
+    studentIdError,
+    studentIdLabel,
+    uploadStudentId,
     password,
     setPassword,
     graduationYear,

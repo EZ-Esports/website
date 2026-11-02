@@ -39,6 +39,7 @@ const invite = (role: 'player' | 'manager' = 'player'): InviteData => ({
   gameName: role === 'manager' ? 'School Manager' : 'Valorant',
   gameSlug: role === 'manager' ? 'manager' : 'valorant',
   submissionDraft: null,
+  studentIdUploaded: true,
   expiresAt: new Date(),
 });
 
@@ -173,7 +174,8 @@ describe('Discord second tab: edge cases', () => {
 
     fireEvent.change(screen.getByLabelText(/legal first name/i), { target: { value: 'Fuckface' } });
     fireEvent.click(screen.getByRole('checkbox', { name: /this is actually my real information/i }));
-    fireEvent.change(screen.getByLabelText(/manager email/i), { target: { value: 'sam@school.edu' } });
+    fireEvent.change(screen.getByLabelText(/personal email/i), { target: { value: 'sam@school.edu' } });
+    fireEvent.change(screen.getByLabelText(/school email/i), { target: { value: 'sam@nycstudents.net' } });
     fireEvent.change(screen.getByLabelText(/create portal account password/i), { target: { value: 'hunter2hunter2' } });
     fireEvent.change(screen.getByLabelText(/graduation year/i), { target: { value: '2027' } });
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));

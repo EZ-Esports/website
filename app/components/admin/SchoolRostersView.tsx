@@ -417,6 +417,21 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                       .filter(Boolean)
                       .join(' · ') || 'No further details'}
                   </p>
+                  {(p.schoolEmail || p.hasStudentId) && (
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 break-words text-xs text-foreground-secondary">
+                      {p.schoolEmail && <span>School email: {p.schoolEmail}</span>}
+                      {p.hasStudentId && (
+                        <a
+                          href={`/admin/schools/student-id/${p.memberId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-accent underline underline-offset-2"
+                        >
+                          View student ID<span className="sr-only"> for {p.name} (opens in a new tab)</span>
+                        </a>
+                      )}
+                    </p>
+                  )}
                   {p.contentFlags?.map((flag) => <ContentFlagBadge key={flag.id} flag={flag} who={p.name} />)}
                 </>
               )}

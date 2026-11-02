@@ -152,6 +152,10 @@ Completion of the staff-configured Google Form is verified server-side, as Disco
 
 ---
 
+## School email and student ID photo (spec-056)
+
+`members.school_email` (unique on `lower(...)`) is validated by `app/lib/onboarding/school-email.ts` on both client and server. The student ID image is in the private `student-ids` bucket, reachable only through `app/lib/onboarding/student-id-storage.ts` (service role, no public URL). `student_id_uploads` holds the object key (never a URL) and is bound to the invite by the upload route, so the submission pipeline finds it by invite and the browser never names a key. Keys, signed URLs and the image never enter `unstable_cache`, pages or CSVs; staff read it only via `/admin/schools/student-id/[memberId]` (permission-checked, `no-store`, 120 s signed URL, audit-logged). `member_id` is ON DELETE SET NULL so `sweepOrphanStudentIds()` (objects first, rows after) can always find what to delete; any new flow that deletes members or invites must call it after commit.
+
 ## CI / agent tooling
 
 `f5563e7` (#70): GitHub Actions on push/PR to `main` — `npm ci` → lint → Vitest → `tsc --noEmit` → build (dummy env). `.githooks/pre-push` mirrors the three local checks; `prepare` sets `core.hooksPath`. No `.github/dependabot.yml`; alerts handled as manual PRs (`02011df`, `27909e4`, `9d40278`, `0463b43`, `ae86069`).

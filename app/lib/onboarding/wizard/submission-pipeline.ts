@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {
   ensurePlayerSubmission,
   findDiscordIdentityOwner,
+  findSchoolEmailOwner,
   listOnboardingGames,
   findInviteForSubmission,
   findStaffUserIdByEmail,
@@ -36,7 +37,15 @@ import {
   type NormalizedConsent,
 } from '../consent';
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
-import { OnboardingRejection, isDiscordIdentityUniqueViolation } from '../rejection';
+import {
+  OnboardingRejection,
+  isDiscordIdentityUniqueViolation,
+  isSchoolEmailUniqueViolation,
+} from '../rejection';
+import { SCHOOL_EMAIL_ALREADY_USED_MESSAGE, checkSchoolEmail, normalizeEmail } from '../school-email';
+import { STUDENT_ID_REQUIRED_MESSAGE } from '../student-id';
+import { findPendingUpload, linkUploadToMember } from '@/app/lib/db/student-ids';
+import { sweepOrphanStudentIds } from '../student-id-sweep';
 import type { VerifiedDiscord } from '../discord-verification';
 import { filterGamesByManaged, sanitizeGameIds } from '../play-games';
 import type {
@@ -54,6 +63,7 @@ export function validateSubmissionInputs(
   options: { enforceStudentAge?: boolean } = {}
 ): {
   email: string;
+  schoolEmail: string;
   legalFirstName: string;
   legalLastName: string;
   gradYear: number;
@@ -61,9 +71,15 @@ export function validateSubmissionInputs(
   consent: NormalizedConsent;
 } {
   const email = (submission.email || '').trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || email.length > 254 || !/^[^\s@\p{Cc}]+@[^\s@\p{Cc}]+\.[^\s@\p{Cc}]+$/u.test(email)) {
     throw new Error('A valid email address is required.');
   }
+
+  // The school email is checked here, server-side, so calling the action directly cannot skip it.
+  // Returned as a rejection (not a thrown Error) so the message survives production error masking.
+  const schoolEmailProblem = checkSchoolEmail(submission.schoolEmail, email);
+  if (schoolEmailProblem) throw new OnboardingRejection('school_email_invalid', schoolEmailProblem);
+  const schoolEmail = normalizeEmail(submission.schoolEmail);
 
   const legalFirstName = (submission.legalFirstName || '').trim();
   const legalLastName = (submission.legalLastName || '').trim();
@@ -99,6 +115,7 @@ export function validateSubmissionInputs(
 
   return {
     email,
+    schoolEmail,
     legalFirstName,
     legalLastName,
     gradYear,
@@ -305,10 +322,17 @@ export async function processOnboardingSubmission(
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
   });
 
+  const inviteKind = isManager ? 'manager' : 'player';
+
+  // Student ID photo (spec-056). Looked up by invite, never by anything the browser sends, so the
+  // submission cannot name an arbitrary storage object. Checked before any write.
+  if (!(await findPendingUpload(inviteKind, invite.id))) {
+    throw new OnboardingRejection('student_id_required', STUDENT_ID_REQUIRED_MESSAGE);
+  }
+
   // Onboarding Google Form (spec-051). When staff have configured it, the webhook must have recorded
   // this invite's completion; the browser's say-so is never enough. With no usable configuration the
   // requirement does not exist, so an unconfigured or half-configured form can never block anyone.
-  const inviteKind = isManager ? 'manager' : 'player';
   const formRequired = (await getOnboardingFormConfig()).enabled;
   if (formRequired && !(await hasFormCompletion(inviteKind, invite.id))) {
     throw new OnboardingRejection('onboarding_form_required', ONBOARDING_FORM_REQUIRED_MESSAGE);
@@ -377,9 +401,15 @@ export async function processOnboardingSubmission(
   // Step 3: Atomic database transaction
   try {
     await runOnboardingTransaction(async (tx) => {
-      // 3a. Member
+      // 3a. Member. Another member holding this school email is a readable rejection; the unique index
+      // below it still decides a race.
+      const schoolEmailOwner = await findSchoolEmailOwner(tx, validated.schoolEmail);
+      if (schoolEmailOwner && (schoolEmailOwner.email ?? '').toLowerCase() !== validated.email) {
+        throw new OnboardingRejection('school_email_already_used', SCHOOL_EMAIL_ALREADY_USED_MESSAGE);
+      }
       createdOrUpdatedMemberId = await upsertMemberRecord(tx, {
         email: validated.email,
+        schoolEmail: validated.schoolEmail,
         legalFirstName: validated.legalFirstName,
         legalLastName: validated.legalLastName,
         discordUsername: discord.discordUsername,
@@ -403,6 +433,11 @@ export async function processOnboardingSubmission(
       if (formRequired) {
         await linkFormCompletionToMember(tx, inviteKind, invite.id, createdOrUpdatedMemberId);
       }
+
+      // 3b2. Attach the invite's student ID photo to the member. Inside the transaction, so a rejected
+      // or failed submission leaves the upload pending and the person can simply retry.
+      const linked = await linkUploadToMember(tx, inviteKind, invite.id, createdOrUpdatedMemberId);
+      if (!linked) throw new OnboardingRejection('student_id_required', STUDENT_ID_REQUIRED_MESSAGE);
 
       // 3c. Consent record (ToS acknowledgment + guardian authorization for under-18s).
       // signedAt is stamped here on the server, never accepted from the client.
@@ -463,8 +498,15 @@ export async function processOnboardingSubmission(
     if (isDiscordIdentityUniqueViolation(err)) {
       throw new OnboardingRejection('discord_already_linked', DISCORD_ALREADY_LINKED_MESSAGE);
     }
+    if (isSchoolEmailUniqueViolation(err)) {
+      throw new OnboardingRejection('school_email_already_used', SCHOOL_EMAIL_ALREADY_USED_MESSAGE);
+    }
     throw err;
   }
+
+  // Committed: an older photo this member had was demoted to an orphan row. Sweep removes its object,
+  // and keeps the row for a retry if Storage refuses. Never throws.
+  await sweepOrphanStudentIds();
 
   // Step 4: Invalidate cache tags
   if (isManager) {

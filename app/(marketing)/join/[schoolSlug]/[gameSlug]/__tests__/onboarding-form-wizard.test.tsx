@@ -38,6 +38,7 @@ const managerInvite = (): InviteData => ({
   gameName: 'School Manager',
   gameSlug: 'manager',
   submissionDraft: null,
+  studentIdUploaded: true,
   expiresAt: new Date(),
   playableGames: GAMES,
 });
@@ -56,13 +57,15 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: /continue/
 /** Walks an adult through steps 1-5 so the next press of the last button submits. */
 function walkToLastStep(kind: 'manager' | 'player') {
   if (kind === 'manager') {
-    fireEvent.change(screen.getByLabelText(/manager email/i), { target: { value: 'sam@school.edu' } });
+    fireEvent.change(screen.getByLabelText(/personal email/i), { target: { value: 'sam@school.edu' } });
+    fireEvent.change(screen.getByLabelText(/school email/i), { target: { value: 'sam@nycstudents.net' } });
     fireEvent.change(screen.getByLabelText(/portal account password/i), { target: { value: 'longenough1' } });
     fireEvent.change(screen.getByLabelText(/graduation year/i), { target: { value: '2027' } });
     fireEvent.click(screen.getByRole('checkbox', { name: /i also play in this league/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'VALORANT' }));
   } else {
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'sam@school.edu' } });
+    fireEvent.change(screen.getByLabelText(/personal email/i), { target: { value: 'sam@school.edu' } });
+    fireEvent.change(screen.getByLabelText(/school email/i), { target: { value: 'sam@nycstudents.net' } });
     fireEvent.change(screen.getByLabelText(/graduation year/i), { target: { value: '2027' } });
   }
   next(); // 1 -> 2 (Discord is connected through the prop)

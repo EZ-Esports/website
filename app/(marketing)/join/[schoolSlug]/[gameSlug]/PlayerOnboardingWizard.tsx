@@ -314,6 +314,7 @@ export default function PlayerOnboardingWizard({
           legalFirstName: capitalizeNameWords(draft.legalFirstName),
           legalLastName: capitalizeNameWords(draft.legalLastName),
           email: draft.email.trim().toLowerCase(),
+          schoolEmail: draft.schoolEmail.trim().toLowerCase(),
           password: isManager ? draft.password : undefined,
           graduationYear: draft.graduationYear,
           academicYear: isManager ? draft.academicYear : undefined,
@@ -453,6 +454,13 @@ export default function PlayerOnboardingWizard({
             setLegalLastName={draft.setLegalLastName}
             email={draft.email}
             setEmail={draft.setEmail}
+            schoolEmail={draft.schoolEmail}
+            setSchoolEmail={draft.setSchoolEmail}
+            studentIdUploaded={draft.studentIdUploaded}
+            studentIdUploading={draft.studentIdUploading}
+            studentIdError={draft.studentIdError}
+            studentIdLabel={draft.studentIdLabel}
+            onStudentIdChosen={draft.uploadStudentId}
             password={draft.password}
             setPassword={draft.setPassword}
             graduationYear={draft.graduationYear}
