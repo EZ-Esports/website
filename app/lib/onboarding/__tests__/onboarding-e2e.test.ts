@@ -375,7 +375,7 @@ const studentId = vi.hoisted(() => ({
   pending: true,
   linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
   replacedKey: null as string | null,
-  removed: [] as Array<string | null>,
+  swept: 0,
 }));
 vi.mock('@/app/lib/db/student-ids', () => ({
   findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
@@ -386,8 +386,8 @@ vi.mock('@/app/lib/db/student-ids', () => ({
     return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
   },
 }));
-vi.mock('@/app/lib/onboarding/student-id-storage', () => ({
-  removeStudentIds: async (keys: Array<string | null>) => { studentId.removed.push(...keys); },
+vi.mock('@/app/lib/onboarding/student-id-sweep', () => ({
+  sweepOrphanStudentIds: async () => { studentId.swept += 1; return 0; },
 }));
 
 vi.mock('@/app/lib/auth', () => ({

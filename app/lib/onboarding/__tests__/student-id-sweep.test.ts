@@ -44,12 +44,11 @@ describe('sweepOrphanStudentIds', () => {
     expect(mocks.removeStudentIds).not.toHaveBeenCalled();
   });
 
-  it('never throws, including before migration 0058 is applied', async () => {
-    mocks.findOrphanUploads.mockRejectedValue(Object.assign(new Error('relation does not exist'), { code: '42P01' }));
-    await expect(sweepOrphanStudentIds()).resolves.toBe(0);
+  it('never throws, and logs the failure', async () => {
     mocks.findOrphanUploads.mockRejectedValue(new Error('boom'));
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await expect(sweepOrphanStudentIds()).resolves.toBe(0);
+    expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
 });

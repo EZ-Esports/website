@@ -21,10 +21,7 @@ export async function sweepOrphanStudentIds(): Promise<number> {
     await deleteUploadRows(orphans.map((o) => o.id));
     return orphans.length;
   } catch (err) {
-    // A missing table (migration 0058 not applied yet) means there is nothing to sweep.
-    if ((err as { code?: string })?.code !== '42P01') {
-      console.error('Student ID sweep failed:', err instanceof Error ? err.message : 'unexpected error');
-    }
+    console.error('Student ID sweep failed:', err instanceof Error ? err.message : 'unexpected error');
     return 0;
   }
 }

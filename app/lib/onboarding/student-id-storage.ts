@@ -12,13 +12,25 @@ export async function putStudentId(
   key: string,
   bytes: Uint8Array,
   contentType: string
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; bucketMissing?: boolean }> {
   if (!isStudentIdStorageKey(key)) return { error: 'invalid key' };
   const { error } = await createServiceClient()
     .storage.from(STUDENT_ID_BUCKET)
     // The detected type, never the client's header. No long cache-control: this is private data.
     .upload(key, bytes, { contentType, upsert: false, cacheControl: '0' });
+  if (error && isBucketMissing(error)) {
+    console.error(
+      `Student ID upload failed: the private Storage bucket "${STUDENT_ID_BUCKET}" does not exist. ` +
+        'Create it (Public OFF, 5 MB, image/jpeg, image/png, image/webp) before accepting onboarding submissions.'
+    );
+    return { error: error.message, bucketMissing: true };
+  }
   return { error: error ? error.message : null };
+}
+
+/** Supabase answers 404 / "Bucket not found" when the bucket was never created. */
+function isBucketMissing(error: { message?: string; statusCode?: string | number; status?: number }): boolean {
+  return /bucket not found/i.test(error.message ?? '') || String(error.statusCode ?? error.status ?? '') === '404';
 }
 
 /**
@@ -46,7 +58,11 @@ export async function signStudentIdUrl(key: string): Promise<string | null> {
     .storage.from(STUDENT_ID_BUCKET)
     .createSignedUrl(key, STUDENT_ID_SIGNED_URL_TTL_SECONDS);
   if (error || !data?.signedUrl) {
-    console.error('Failed to sign student ID URL:', error?.message);
+    console.error(
+      /bucket not found/i.test(error?.message ?? '')
+        ? `Failed to sign student ID URL: the private Storage bucket "${STUDENT_ID_BUCKET}" does not exist; create it.`
+        : `Failed to sign student ID URL: ${error?.message}`
+    );
     return null;
   }
   return data.signedUrl;

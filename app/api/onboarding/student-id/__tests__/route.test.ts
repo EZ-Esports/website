@@ -124,10 +124,19 @@ describe('POST /api/onboarding/student-id', () => {
     expect(mocks.replacePendingUpload).toHaveBeenCalledWith('manager', 'invite-1', expect.any(Object));
   });
 
-  it('deletes the earlier photo of the same invite when it is replaced', async () => {
+  it('hands the earlier photo of the same invite to the sweep (it is an orphan row, not deleted here)', async () => {
     mocks.replacePendingUpload.mockResolvedValue({ replacedKey: 'old-key.jpg' });
     await POST(request({ token: 't', file: new File([JPEG], 'a.jpg') }));
-    expect(mocks.removeStudentIds).toHaveBeenCalledWith(['old-key.jpg']);
+    expect(mocks.sweep).toHaveBeenCalled();
+    expect(mocks.removeStudentIds).not.toHaveBeenCalledWith(['old-key.jpg']);
+  });
+
+  it('answers 503 with an actionable message when the private bucket does not exist', async () => {
+    mocks.putStudentId.mockResolvedValue({ error: 'Bucket not found', bucketMissing: true });
+    const res = await POST(request({ token: 't', file: new File([JPEG], 'a.jpg') }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/contact EZ Esports/i);
+    expect(mocks.replacePendingUpload).not.toHaveBeenCalled();
   });
 
   it('removes the just-uploaded object when it cannot be recorded, so no unowned photo is left', async () => {

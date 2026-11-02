@@ -37,10 +37,24 @@ describe('school email rules (spec-056)', () => {
     'nycstudents.net',
     'x@NYCSTUDENTS.NET\n@evil.com',
     'x@schools.nyc.gov',
+    'x\u0000y@nycstudents.net',
+    'x\u0001@nycstudents.net',
+    `${'a'.repeat(250)}@nycstudents.net`,
     '',
   ])('rejects %j', (value) => {
     expect(isSchoolEmail(value)).toBe(false);
     expect(checkSchoolEmail(value, 'personal@gmail.com')).not.toBeNull();
+  });
+
+  it('accepts a long local part up to the 254 character limit and rejects one over it', () => {
+    const atLimit = `${'a'.repeat(254 - '@nycstudents.net'.length)}@nycstudents.net`;
+    expect(atLimit).toHaveLength(254);
+    expect(isSchoolEmail(atLimit)).toBe(true);
+    expect(checkSchoolEmail(`a${atLimit}`, 'p@gmail.com')).toMatch(/254 characters/);
+  });
+
+  it('rejects a NUL byte with a message instead of letting it reach the database', () => {
+    expect(checkSchoolEmail('x\u0000@nycstudents.net', 'p@gmail.com')).not.toBeNull();
   });
 
   it('returns a specific message for each failure', () => {

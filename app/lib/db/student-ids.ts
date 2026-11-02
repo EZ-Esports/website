@@ -59,8 +59,12 @@ export async function replacePendingUpload(
   upload: { storageKey: string; contentType: string; sizeBytes: number }
 ): Promise<{ replacedKey: string | null }> {
   return db.transaction(async (tx) => {
-    const removed = await tx
-      .delete(schema.studentIdUploads)
+    // The earlier photo is demoted, never deleted: its row is re-pointed at a random invite id that
+    // matches nothing, which makes it an orphan. The row stays the only pointer to the object until a
+    // sweep has removed the object, so a failed Storage removal can never strand a photo.
+    const demoted = await tx
+      .update(schema.studentIdUploads)
+      .set({ inviteId: sql`gen_random_uuid()` })
       .where(
         and(
           eq(schema.studentIdUploads.inviteKind, kind),
@@ -70,7 +74,7 @@ export async function replacePendingUpload(
       )
       .returning({ storageKey: schema.studentIdUploads.storageKey });
     await tx.insert(schema.studentIdUploads).values({ inviteKind: kind, inviteId, ...upload });
-    return { replacedKey: removed[0]?.storageKey ?? null };
+    return { replacedKey: demoted[0]?.storageKey ?? null };
   });
 }
 
@@ -92,8 +96,10 @@ export async function linkUploadToMember(
 ): Promise<{ linkedKey: string; replacedKey: string | null } | null> {
   const pending = await findPendingUpload(kind, inviteId, tx);
   if (!pending) return null;
+  // An older photo of the same member is demoted to an orphan (see replacePendingUpload), not deleted.
   const replaced = await tx
-    .delete(schema.studentIdUploads)
+    .update(schema.studentIdUploads)
+    .set({ memberId: null, inviteId: sql`gen_random_uuid()` })
     .where(eq(schema.studentIdUploads.memberId, memberId))
     .returning({ storageKey: schema.studentIdUploads.storageKey });
   const updated = await tx
@@ -118,17 +124,12 @@ export async function findStudentIdKeyForMember(memberId: string): Promise<strin
 /** Which of these members have an ID photo on file. Booleans only, never keys. */
 export async function listMembersWithStudentId(memberIds: string[]): Promise<Set<string>> {
   if (memberIds.length === 0) return new Set();
-  try {
-    const rows = await db
-      .select({ memberId: schema.studentIdUploads.memberId })
-      .from(schema.studentIdUploads)
-      .where(inArray(schema.studentIdUploads.memberId, memberIds));
-    return new Set(rows.map((r) => r.memberId).filter((id): id is string => Boolean(id)));
-  } catch (err) {
-    // Migration 0058 not applied yet: the staff views render without the ID link.
-    if ((err as { code?: string })?.code === '42P01') return new Set();
-    throw err;
-  }
+  // Migration 0058 must be applied before this code is deployed; a missing table fails loudly.
+  const rows = await db
+    .select({ memberId: schema.studentIdUploads.memberId })
+    .from(schema.studentIdUploads)
+    .where(inArray(schema.studentIdUploads.memberId, memberIds));
+  return new Set(rows.map((r) => r.memberId).filter((id): id is string => Boolean(id)));
 }
 
 /**

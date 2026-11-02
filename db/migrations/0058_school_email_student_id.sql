@@ -27,17 +27,22 @@ END $$;--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "student_id_uploads_invite_idx" ON "student_id_uploads" USING btree ("invite_kind","invite_id");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "student_id_uploads_member_idx" ON "student_id_uploads" USING btree ("member_id");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "student_id_uploads_storage_key_idx" ON "student_id_uploads" USING btree ("storage_key");--> statement-breakpoint
--- Private Storage bucket for the ID photos. Created here only where Supabase Storage exists (the guard
--- makes this a no-op on plain Postgres and PGlite). public = false and NO storage.objects policies:
--- with row level security on and no policy, anon and authenticated roles can neither list nor read it;
--- only the service role (server code) can. Safe to re-run: an existing bucket is forced back to private.
--- If your database role cannot write to the storage schema, create the bucket by hand instead
+-- Private Storage bucket for the ID photos. public = false and NO storage.objects policies: with row
+-- level security on and no policy, anon and authenticated roles can neither list nor read it; only the
+-- service role (server code) can. Safe to re-run: an existing bucket is forced back to private.
+-- Two cases are tolerated so the column and table above still apply: no `storage` schema at all
+-- (PGlite, plain Postgres), and a migration role that may not write it (insufficient_privilege, which
+-- only RAISES A NOTICE). In the second case the bucket is NOT created: create it by hand before deploying
 -- (Dashboard > Storage > New bucket "student-ids", Public OFF, 5 MB limit, image/jpeg, image/png, image/webp).
 DO $$ BEGIN
 	IF to_regclass('storage.buckets') IS NOT NULL THEN
-		INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-		VALUES ('student-ids', 'student-ids', false, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp'])
-		ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 5242880,
-			allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
+		BEGIN
+			INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+			VALUES ('student-ids', 'student-ids', false, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp'])
+			ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 5242880,
+				allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
+		EXCEPTION WHEN insufficient_privilege THEN
+			RAISE NOTICE 'student-ids bucket NOT created (insufficient privilege on storage.buckets): create it by hand as a private bucket before deploying.';
+		END;
 	END IF;
 END $$;

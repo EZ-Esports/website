@@ -67,20 +67,24 @@ export async function POST(request: NextRequest) {
   if (!checked.ok) return fail(checked.error);
 
   const storageKey = buildStudentIdStorageKey(randomUUID(), checked.type);
-  const { error: uploadError } = await putStudentId(storageKey, bytes, checked.type);
+  const { error: uploadError, bucketMissing } = await putStudentId(storageKey, bytes, checked.type);
   if (uploadError) {
+    if (bucketMissing) {
+      // Already logged with the fix. Tell the student something actionable instead of "try again".
+      return fail('Photo uploads are not available right now. Please contact EZ Esports so we can fix it, then try again.', 503);
+    }
     console.error('Failed to store student ID:', uploadError);
     return fail('Could not save your photo. Please try again.', 500);
   }
 
   try {
-    const { replacedKey } = await replacePendingUpload(kind, invite.id, {
+    await replacePendingUpload(kind, invite.id, {
       storageKey,
       contentType: checked.type,
       sizeBytes: bytes.length,
     });
-    // An earlier photo for this same invite is now unreferenced.
-    await removeStudentIds([replacedKey]);
+    // An earlier photo for this same invite was demoted to an orphan row; the sweep below removes its
+    // object and keeps the row for a retry if Storage refuses.
   } catch (err) {
     console.error('Failed to record student ID upload:', err instanceof Error ? err.message : 'unexpected error');
     // No row points at the object, so remove it rather than leave an unowned ID photo around.

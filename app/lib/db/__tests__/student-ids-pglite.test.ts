@@ -98,6 +98,27 @@ describe('student_id_uploads', () => {
     expect(await lib.findStudentIdKeyForMember(memberId)).toBe('m2.jpg');
   });
 
+  it('keeps a replaced photo as a retrievable orphan record until its object is confirmed removed', async () => {
+    const inviteId = await invite();
+    await lib.replacePendingUpload('player', inviteId, { storageKey: 'r1.jpg', contentType: 'image/jpeg', sizeBytes: 1 });
+    await lib.replacePendingUpload('player', inviteId, { storageKey: 'r2.jpg', contentType: 'image/jpeg', sizeBytes: 1 });
+    // Storage removal "failed": nothing deleted any row, so the old key is still found by the sweep.
+    const orphans = await lib.findOrphanUploads();
+    expect(orphans.map((o) => o.storageKey)).toContain('r1.jpg');
+    expect(orphans.map((o) => o.storageKey)).not.toContain('r2.jpg');
+    // Same for a member whose older photo is replaced by a newer invite's.
+    const memberId = await member('rep@gmail.com', 'rep@nycstudents.net');
+    const db = holder.db as ReturnType<typeof drizzle<typeof schema>>;
+    const a = await invite();
+    await lib.replacePendingUpload('player', a, { storageKey: 'ma.jpg', contentType: 'image/jpeg', sizeBytes: 1 });
+    await db.transaction((tx) => lib.linkUploadToMember(tx as never, 'player', a, memberId));
+    const b = await invite();
+    await lib.replacePendingUpload('player', b, { storageKey: 'mb.jpg', contentType: 'image/jpeg', sizeBytes: 1 });
+    await db.transaction((tx) => lib.linkUploadToMember(tx as never, 'player', b, memberId));
+    expect((await lib.findOrphanUploads()).map((o) => o.storageKey)).toContain('ma.jpg');
+    expect(await lib.findStudentIdKeyForMember(memberId)).toBe('mb.jpg');
+  });
+
   it('returns null from the link when the invite has no pending upload', async () => {
     const memberId = await member('none@gmail.com', 'none@nycstudents.net');
     const db = holder.db as ReturnType<typeof drizzle<typeof schema>>;
@@ -124,7 +145,8 @@ describe('student_id_uploads', () => {
     // Deleting the member keeps the row (set null) so the sweep still knows which object to remove.
     await client.query('delete from members where id = $1', [memberId]);
     const orphans = (await lib.findOrphanUploads()).map((o) => o.storageKey).sort();
-    expect(orphans).toEqual(['del.jpg', 'expired.jpg', 'gone.jpg', 'spent.jpg']);
+    // (earlier tests' demoted photos are orphans too)
+    expect(orphans).toEqual(expect.arrayContaining(['del.jpg', 'expired.jpg', 'gone.jpg', 'spent.jpg']));
     expect(orphans).not.toContain('live.jpg');
 
     const rows = await lib.findOrphanUploads();

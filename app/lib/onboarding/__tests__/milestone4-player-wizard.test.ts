@@ -282,7 +282,7 @@ const studentId = vi.hoisted(() => ({
   pending: true,
   linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
   replacedKey: null as string | null,
-  removed: [] as Array<string | null>,
+  swept: 0,
 }));
 vi.mock('@/app/lib/db/student-ids', () => ({
   findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
@@ -292,8 +292,8 @@ vi.mock('@/app/lib/db/student-ids', () => ({
     return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
   },
 }));
-vi.mock('@/app/lib/onboarding/student-id-storage', () => ({
-  removeStudentIds: async (keys: Array<string | null>) => { studentId.removed.push(...keys); },
+vi.mock('@/app/lib/onboarding/student-id-sweep', () => ({
+  sweepOrphanStudentIds: async () => { studentId.swept += 1; return 0; },
 }));
 
 // Fake Supabase admin client so tests can assert whether an auth user was (not) created.
@@ -380,7 +380,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     studentId.pending = true;
     studentId.linked = [];
     studentId.replacedKey = null;
-    studentId.removed = [];
+    studentId.swept = 0;
     mocks.state.schoolManagersStore = [];
     mocks.state.staffMembersStore = [];
     mocks.state.onboardingConsentsStore = [];
@@ -2094,11 +2094,11 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(mocks.state.membersStore).toHaveLength(0);
     });
 
-    it('links the pending upload of the invite to the member and deletes a replaced older photo after commit', async () => {
+    it('links the pending upload of the invite to the member and sweeps a replaced older photo after commit', async () => {
       studentId.replacedKey = 'old.jpg';
       const result = await submitOk({ token: rawToken, submission: adult() });
       expect(studentId.linked).toEqual([{ kind: 'player', inviteId: 'invite-pending-1', memberId: result.memberId }]);
-      expect(studentId.removed).toContain('old.jpg');
+      expect(studentId.swept).toBe(1);
     });
 
     it('ignores a client-supplied storage key: the submission type has no field for it and extras are never read', async () => {

@@ -45,7 +45,7 @@ import {
 import { SCHOOL_EMAIL_ALREADY_USED_MESSAGE, checkSchoolEmail, normalizeEmail } from '../school-email';
 import { STUDENT_ID_REQUIRED_MESSAGE } from '../student-id';
 import { findPendingUpload, linkUploadToMember } from '@/app/lib/db/student-ids';
-import { removeStudentIds } from '../student-id-storage';
+import { sweepOrphanStudentIds } from '../student-id-sweep';
 import type { VerifiedDiscord } from '../discord-verification';
 import { filterGamesByManaged, sanitizeGameIds } from '../play-games';
 import type {
@@ -71,7 +71,7 @@ export function validateSubmissionInputs(
   consent: NormalizedConsent;
 } {
   const email = (submission.email || '').trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || email.length > 254 || !/^[^\s@\p{Cc}]+@[^\s@\p{Cc}]+\.[^\s@\p{Cc}]+$/u.test(email)) {
     throw new Error('A valid email address is required.');
   }
 
@@ -397,8 +397,6 @@ export async function processOnboardingSubmission(
   const resolvedRiot = await riotAdapter.resolveIdentity(effectiveGameSlug, submission.riotId);
 
   let createdOrUpdatedMemberId = '';
-  // Objects to delete from Storage once the transaction has committed (a replaced older photo).
-  let replacedStudentIdKey: string | null = null;
 
   // Step 3: Atomic database transaction
   try {
@@ -440,7 +438,6 @@ export async function processOnboardingSubmission(
       // or failed submission leaves the upload pending and the person can simply retry.
       const linked = await linkUploadToMember(tx, inviteKind, invite.id, createdOrUpdatedMemberId);
       if (!linked) throw new OnboardingRejection('student_id_required', STUDENT_ID_REQUIRED_MESSAGE);
-      replacedStudentIdKey = linked.replacedKey;
 
       // 3c. Consent record (ToS acknowledgment + guardian authorization for under-18s).
       // signedAt is stamped here on the server, never accepted from the client.
@@ -507,8 +504,9 @@ export async function processOnboardingSubmission(
     throw err;
   }
 
-  // Committed: an older photo this member had is now unreferenced. Best effort, never throws.
-  await removeStudentIds([replacedStudentIdKey]);
+  // Committed: an older photo this member had was demoted to an orphan row. Sweep removes its object,
+  // and keeps the row for a retry if Storage refuses. Never throws.
+  await sweepOrphanStudentIds();
 
   // Step 4: Invalidate cache tags
   if (isManager) {
