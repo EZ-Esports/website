@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import LoginForm from './LoginForm';
 
@@ -39,6 +40,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {/* Login Form (renders action errors via useActionState) */}
         <LoginForm />
+
+        {/* Footer Links */}
+        <div className="pt-2 text-center border-t border-border/60">
+          <p className="text-xs text-foreground-muted">
+            Are you a school manager?{' '}
+            <Link href="/portal/login" className="text-accent hover:underline font-medium">
+              Manager Portal Login &rarr;
+            </Link>
+          </p>
+        </div>
 
       </Card>
     </main>

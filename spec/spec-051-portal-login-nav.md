@@ -7,7 +7,7 @@ Status: implemented, unmerged. No migration.
 
 - The page renders `<Header />` above its body. `Header` is fixed, so the `<main>` takes `pt-[88px]`, matching `MainContentWrapper`.
 - The school selector, user badge and sign-out from `PortalShell` are not shown, because the visitor is logged out.
-- The card's own footer link to Staff Portal Login stays.
+- The manager card no longer has a link to the staff login. The staff login (`app/(marketing)/login/page.tsx`) gained a footer link to the Manager Portal Login instead, so each login links to the other.
 
 ## Layout
 The outer element is a plain `div` holding the header, a `<main>` with `min-h-screen flex items-center justify-center px-4 pt-[88px]`, and the shared `Footer`. The `<main>` fills the viewport below the fixed header, so the card is centered in the visible area. The footer sits below the fold and appears on scroll. The card keeps its size (`w-full max-w-md`) and the form is unchanged.

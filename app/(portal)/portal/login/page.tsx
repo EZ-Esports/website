@@ -48,15 +48,6 @@ export default async function PortalLoginPage({ searchParams }: PortalLoginPageP
           {/* Login Form */}
           <PortalLoginForm defaultEmail={email} />
 
-          {/* Footer Links */}
-          <div className="pt-2 text-center border-t border-border/60">
-            <p className="text-xs text-foreground-muted">
-              Are you a league administrator?{' '}
-              <Link href="/login" className="text-accent hover:underline font-medium">
-                Staff Portal Login &rarr;
-              </Link>
-            </p>
-          </div>
         </Card>
       </main>
       <Footer />
