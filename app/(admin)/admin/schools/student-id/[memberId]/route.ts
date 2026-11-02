@@ -5,7 +5,7 @@ import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import { staffAuditLogs } from '@/app/lib/db/schema';
 import { findStudentIdKeyForMember } from '@/app/lib/db/student-ids';
-import { signStudentIdUrl } from '@/app/lib/onboarding/student-id-storage';
+import { isLocalStudentIdStorage, readLocalStudentId, signStudentIdUrl } from '@/app/lib/onboarding/student-id-storage';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -32,12 +32,39 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ mem
     return NextResponse.json({ error: 'No student ID on file for this member.' }, { status: 404, headers: noStore });
   }
 
+  // Dev-only local driver: there is no URL to sign, so serve the verified bytes directly (same auth and
+  // audit as below). Production never takes this branch.
+  if (isLocalStudentIdStorage()) {
+    const stored = await readLocalStudentId(key);
+    if (!stored) {
+      return NextResponse.json({ error: 'The stored student ID file is missing.' }, { status: 404, headers: noStore });
+    }
+    await recordView(staff, memberId);
+    return new NextResponse(stored.bytes as BodyInit, {
+      status: 200,
+      headers: {
+        ...noStore,
+        'Content-Type': stored.contentType,
+        'Content-Disposition': 'inline; filename="student-id"',
+        'X-Content-Type-Options': 'nosniff',
+        // User-supplied bytes: forbid any script, frame or subresource if the browser renders them as a document.
+        'Content-Security-Policy': "default-src 'none'; img-src 'self'; sandbox",
+      },
+    });
+  }
+
   const signedUrl = await signStudentIdUrl(key);
   if (!signedUrl) {
     return NextResponse.json({ error: 'Could not open the student ID. Please try again.' }, { status: 502, headers: noStore });
   }
 
-  // Who looked at a minor's ID is worth knowing. Best effort: an audit failure never blocks staff.
+  await recordView(staff, memberId);
+
+  return NextResponse.redirect(signedUrl, { status: 303, headers: noStore });
+}
+
+/** Who looked at a minor's ID is worth knowing. Best effort: an audit failure never blocks staff. */
+async function recordView(staff: { id: string; email: string }, memberId: string) {
   try {
     await db.insert(staffAuditLogs).values({
       event: 'student_id_viewed',
@@ -48,6 +75,4 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ mem
   } catch (err) {
     console.error('Could not record student ID view:', err instanceof Error ? err.message : 'unexpected error');
   }
-
-  return NextResponse.redirect(signedUrl, { status: 303, headers: noStore });
 }

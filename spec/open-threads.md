@@ -256,3 +256,4 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Plus-addressing is not canonicalised for the school email (`a+1@` and `a@` are different to the unique index).
 - A chunked upload skips the early `Content-Length` 413 (the 4 MB check after reading still applies).
 - Not exercised against real Supabase Storage or in a browser.
+- Dev-only local student ID storage (`STUDENT_ID_STORAGE=local`, `STUDENT_ID_LOCAL_DIR`) exists for local testing only; it is guarded against production and a non-loopback database (spec-056). Files in that directory are never cleaned by anything except the same sweep paths, so delete the directory by hand when done.
