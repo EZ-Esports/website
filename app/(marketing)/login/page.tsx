@@ -16,7 +16,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const displayMessage = message ? (MESSAGE_MAP[message] ?? null) : null;
 
   return (
-    <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
+    // The marketing layout already offsets content by the fixed header (88px), so fill only the rest of the viewport.
+    <main className="min-h-[calc(100vh-88px)] bg-surface flex flex-col justify-center items-center px-4 py-12">
       <Card padding="lg" className="w-full max-w-md space-y-6">
 
         {/* Header */}
