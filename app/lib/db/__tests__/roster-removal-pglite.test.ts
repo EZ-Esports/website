@@ -73,7 +73,7 @@ async function student(opts: { roster?: string; memberKey?: string; ign?: string
      values ($1, $2, 'player', $3, 'v1', false, 17, true, $4)`,
     [memberId, world.school, invite, `${first} ${last}`],
   );
-  await client.query(`insert into student_demographics (member_id, legal_first_name, legal_last_name, birth_date) values ($1, $2, $3, now())`, [memberId, first, last]);
+  await client.query(`insert into onboarding_form_completions (member_id, invite_kind, invite_id) values ($1, 'player', $2)`, [memberId, invite]);
   await client.query(`insert into player_identities (member_id, provider, provider_user_id, provider_username) values ($1, 'discord', $2, 'd')`, [memberId, `disc-${i}`]);
   await client.query(
     `insert into onboarding_content_flags (member_id, school_id, invite_kind, invite_id, flagged_fields)
@@ -93,26 +93,34 @@ const playerRows = async (playerId: string) => Number((await one<{ n: string }>(
 async function expectKept(s: Student, reason: string, result: RosterRemovalResult) {
   expect(result).toMatchObject({ removed: true, studentRecord: 'kept', keptReason: reason });
   expect(Number((await one<{ n: string }>(`select count(*) as n from members where id = $1`, [s.memberId])).n)).toBe(1);
-  for (const t of ['onboarding_consents', 'student_demographics', 'player_identities', 'onboarding_content_flags', 'player_invites']) {
+  for (const t of ['onboarding_consents', 'onboarding_form_completions', 'player_identities', 'onboarding_content_flags', 'player_invites']) {
     expect(await count(t, s.memberId), t).toBe(1);
   }
 }
 
 describe('orphan: deleted with every leftover', () => {
-  it('removes the player, the member, consents, demographics, identities and invites', async () => {
+  it('removes the player, the member, consents, form completion, identities and invites', async () => {
     const s = await student();
     const result = await remove(s);
     expect(result).toEqual({
       removed: true,
       memberId: s.memberId,
       studentRecord: 'deleted',
-      deleted: { consents: 1, demographics: 1, identities: 1, contentFlags: 1, invites: 1 },
+      deleted: { consents: 1, formCompletions: 1, identities: 1, contentFlags: 1, invites: 1 },
     });
     expect(await playerRows(s.playerId)).toBe(0);
-    for (const t of ['onboarding_consents', 'student_demographics', 'player_identities', 'onboarding_content_flags', 'player_invites']) {
+    for (const t of ['onboarding_consents', 'onboarding_form_completions', 'player_identities', 'onboarding_content_flags', 'player_invites']) {
       expect(await count(t, s.memberId), t).toBe(0);
     }
     expect(Number((await one<{ n: string }>(`select count(*) as n from members where id = $1`, [s.memberId])).n)).toBe(0);
+  });
+
+  it('also removes a form completion that was never tied to the member, through its invite', async () => {
+    const s = await student();
+    await client.query(`update onboarding_form_completions set member_id = null where member_id = $1`, [s.memberId]);
+    const result = await remove(s);
+    expect(result).toMatchObject({ removed: true, studentRecord: 'deleted', deleted: { formCompletions: 1 } });
+    expect(Number((await one<{ n: string }>(`select count(*) as n from onboarding_form_completions`)).n)).toBe(0);
   });
 
   it('a stale player row reports removed:false and changes nothing', async () => {
@@ -279,7 +287,7 @@ describe('failure isolation', () => {
     expect(await playerRows(s.playerId)).toBe(0); // the roster removal still committed
     expect(Number((await one<{ n: string }>(`select count(*) as n from members where id = $1`, [s.memberId])).n)).toBe(1);
     // The savepoint rolled back the leftovers' deletes too.
-    for (const t of ['onboarding_consents', 'student_demographics', 'player_identities', 'onboarding_content_flags', 'player_invites']) {
+    for (const t of ['onboarding_consents', 'onboarding_form_completions', 'player_identities', 'onboarding_content_flags', 'player_invites']) {
       expect(await count(t, s.memberId), t).toBe(1);
     }
     vi.restoreAllMocks();

@@ -1,4 +1,4 @@
-# spec-051: Portal login nav bar
+# spec-057: Portal login nav bar
 
 Status: implemented, unmerged. No migration.
 
@@ -17,4 +17,4 @@ Logged-out managers landed on a page with no way back to the public site. Using 
 
 ## Files
 - `app/(portal)/portal/login/page.tsx`
-- `spec/spec-051-portal-login-nav.md`, `spec/README.md`, `spec/timeline.md`
+- `spec/spec-057-portal-login-nav.md`, `spec/README.md`, `spec/timeline.md`

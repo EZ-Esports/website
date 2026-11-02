@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { db } from '@/app/lib/db';
+import { deleteFormCompletionsForInvites } from '@/app/lib/db/onboarding-form';
 import * as schema from '@/app/lib/db/schema';
 import { eq, and, or, desc, inArray, type SQL } from 'drizzle-orm';
 import {
@@ -21,6 +22,7 @@ import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } fr
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
+import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
 import { removalCacheTags, removalNotice, removePlayerFromRosterTx } from '@/app/lib/db/roster-removal';
 import { getSchoolMatchRows } from '@/app/lib/db/matches';
 import { getOutcomesPublicSeasonIds } from '@/app/lib/db/standings';
@@ -409,6 +411,16 @@ export async function deletePlayerInvite(
     .returning({ id: schema.playerInvites.id });
   if (deleted.length === 0) return rejectLostRace(invite.id);
 
+  // The invite's form completion (if any) is inert without it. Best effort: a failure here leaves a
+  // harmless id-only row, and must not turn a successful delete into an error.
+  try {
+    await deleteFormCompletionsForInvites('player', [invite.id]);
+  } catch (err) {
+    console.error('Could not remove the onboarding form completion for a deleted invite', err);
+  }
+  // A student ID the invitee uploaded before the invite was deleted has no owner now (never throws).
+  await sweepOrphanStudentIds();
+
   return { success: true, inviteId: invite.id };
 }
 
@@ -433,8 +445,8 @@ export interface PendingSubmission {
 
 /**
  * Returns submitted player applications waiting for manager approval.
- * Guarantees Zero-PII Invariant: does NOT select any sensitive demographic data
- * (birthdate, race, ethnicity, free lunch status, family background).
+ * Guarantees Zero-PII Invariant: does NOT select sensitive personal data
+ * (birthdate, guardian details, consent records).
  */
 export async function getPendingSubmissions(
   schoolId: string,
@@ -1296,7 +1308,7 @@ export interface SchoolPoolPlayer {
 
 /**
  * Returns the pool of all verified/onboarded players belonging to the school.
- * Maintains Zero-PII Invariant: does NOT expose any sensitive demographics.
+ * Maintains Zero-PII Invariant: does NOT expose birthdate, guardian details or consent records.
  */
 export async function getSchoolPlayerPool(
   schoolId: string,
@@ -1691,6 +1703,7 @@ export async function removePlayerFromRoster(
 
   const removal = await db.transaction((tx) => removePlayerFromRosterTx(tx, { playerId, rosterId }));
 
+  if (removal.removed && removal.studentRecord === 'deleted') await sweepOrphanStudentIds();
   updateCacheTags(...removalCacheTags(removal), CACHE_TAGS.TEAMS);
   if (removal.removed) await notifyMembershipChanged([removal.memberId]);
 

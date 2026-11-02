@@ -21,6 +21,25 @@ export const TERMS_OF_SERVICE_PATH = ROUTES.terms;
 /** Participants younger than this need a parent or legal guardian to authorize. */
 export const ADULT_AGE = 18;
 
+/**
+ * Student onboarding accepts only NYC high-school-age players: 13 to 21 inclusive.
+ * NYC kindergarten requires turning 5 by Dec 31, so incoming 9th graders are usually
+ * 13-14 and seniors 17-18. NY Education Law entitles students to public school through
+ * the end of the school year in which they turn 21, so over-age students up to 21 are
+ * real. Ages are whole years from the date of birth (calculateAge, New York date).
+ * Managers (school staff) are not subject to this range.
+ */
+export const MIN_STUDENT_AGE = 13;
+export const MAX_STUDENT_AGE = 21;
+
+/** True when the age is inside the accepted student range. */
+export function isStudentAgeInRange(age: number): boolean {
+  return age >= MIN_STUDENT_AGE && age <= MAX_STUDENT_AGE;
+}
+
+/** User-facing message when a student's date of birth is outside the accepted range. */
+export const STUDENT_AGE_RANGE_MESSAGE = `EZ Esports is for New York City high school students aged ${MIN_STUDENT_AGE} to ${MAX_STUDENT_AGE}. The date of birth you entered is outside that range.`;
+
 export const CONSENT_TEXT = {
   guardianHeading: 'Parent or Legal Guardian Authorization',
   /** Intro shown only to participants under 18; `{age}` is replaced with the computed age. */

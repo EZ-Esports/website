@@ -179,7 +179,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 - **Migration 0054 applied to production (28 Oct 2026).** `npm run db:migrate` with `SEED_ALLOW_REMOTE` set and `PG_DUMP` pointing at a PostgreSQL 18 `pg_dump.exe` (the repo's default candidates did not find it); the five new tables exist with RLS on. Still open: set `VALORANTAPI` in Vercel as well as the local `.env`, and compare the zod schema with one real Henrik match response (never verified, including how surrenders appear).
 - **The Henrik response shape is unverified against a live payload.** The schema follows the published v4 docs; a real match should be fetched once and compared. MVP is derived (top score on winners / losers), not an API field; confirm against tracker.gg.
-- **Roster rule is strict:** all 5 players on each side must be on one school's roster (starters or subs), otherwise the game is refused naming the non-roster Riot IDs. Rosters are assumed locked after finalization; submission does not itself check the season lock. A game rejected by the per-game checks is not cached, so resubmitting it requests it again. The scheduled-start check has a 1-hour lower bound only and no upper bound (deliberate).
+- **Roster rule is strict:** every player on each side must be on one school's roster (starters or subs; no fixed team size since spec-052), otherwise the game is refused naming the non-roster Riot IDs. Rosters are assumed locked after finalization; submission does not itself check the season lock. A game rejected by the per-game checks is not cached, so resubmitting it requests it again. There is no scheduled-start check any more (removed in spec-052).
 - **Matching is by Riot `Name#Tag`**, not PUUID; renamed accounts or a roster without Riot IDs will be refused ("The Red team has a player who is not on the roster: ..."). Consider storing PUUIDs.
 - **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
 - **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.
@@ -214,8 +214,46 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Members are matched by email only. A person who uses a different email on a second invite but the same Discord account is still refused with `discord_already_linked`; matching by Discord was deliberately not added.
 - `upsertMemberRecord` overwrites `members.school_id`, so a person who uses an invite from a second school is moved to it (existing behaviour, now reachable for managers who play).
 - The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).
+## Google Form onboarding (spec-051, #322)
+
+- **Owner steps left after the 31 Oct rollout.** Code is deployed, `0057` is applied and `GOOGLE_FORM_WEBHOOK_SECRET` is set in Vercel. Still to do: confirm the form link and entry id on `/admin/onboarding-form`, press Generate script and paste it into the real form's Apps Script, add the `WEBHOOK_KEY` script property (the key shown on that page, derived from the secret) and the `onFormSubmit` trigger.
+- **Never tested against a real Google Form or Apps Script** (only locally, with the webhook called by hand). First real run should add the trigger, submit a test response from a pending invite's prefilled link and watch the completion count.
+- **No manual staff override** for a missing completion. `source = 'manual'` is reserved in the table and unused. Add a staff action if a student's Google trigger ever fails.
+- The webhook's failed-auth rate limiter is the existing in-memory one (`rate-limit.ts`): per serverless instance, reset on cold start, not shared. Best-effort only; valid callers are never counted. Replace with Upstash together with the other limiters.
+- Swapping the Google Form needs the script and `WEBHOOK_KEY` pasted into the new form and its trigger authorized (each form has its own Apps Script); the old form's trigger should be deleted. Documented on the staff page.
+- **Second invite vs "Limit to 1 response".** If the form owner enables Google's "Limit to 1 response" (sign-in required), then because completions are per invite, a person with a second invite (another game or season) cannot submit the same form again and cannot get a second completion. Needs a new form per round, response editing, or the manual override (not built).
+- **Prefill with sign-in required is untested.** If the form owner requires sign-in, whether a pre-filled link still carries the verification code has not been tried against a real form; the checklist's test step is where it would show.
+- The wizard hides the form step when the page-load lookup fails; the server's `onboarding_form_required` rejection reveals it.
+- The wizard step was exercised in a browser locally; the staff page was not looked at.
+- The role editor drops retired bit 12 from a role only when that role is saved; stored masks are not rewritten by the migration.
+- Retiring the bit left `Permissions` with a gap at 12; new permissions start at 13.
+
 ## Generate season follow-ups (spec-046)
 
 - The lock, bulk inserts and UI have not been exercised against a real database or in a browser.
 - Week 1 date and the fixed 7 PM ET slot are the only schedule inputs; holidays and per-week skips are not modelled.
 - `createMatch`/`deleteMatch` do not lock the season row, so a hand-scheduled match racing Generate's commit can slip in between its check and insert (spec-046). Left as is; revisit if it ever happens.
+
+## Reschedule without staff approval (spec-054)
+
+- Any `match_reschedule_requests` rows already in `pending_staff` in production are stranded: nothing can approve or decline them any more, and they still block a new request on their match (open-request unique index). They need a manual look (query `status = 'pending_staff'`, then move the match by hand and set the row to `approved`/`declined_staff`, or cancel it). Not checked here, since this work never touched the production database.
+- The spec-032 Known limit (a user managing both schools of a match can request and accept alone) no longer has staff approval as a backstop.
+- Not exercised against a real database or in a browser.
+
+## Staff acting in the portal (spec-055)
+
+- No explicit "acted as staff" flag is stored; a staff action is identifiable only by its user id (the reschedule and result rows hold the staff user, the school columns the viewed school). Add a column if reports ever need to filter on it.
+- The confirm dialog stacking on top of the reschedule and result modals has been tested in jsdom only; check it in a real browser as a staff admin.
+
+## School email and student ID (spec-056)
+
+- **DEPLOY ORDER: apply migration `0058` BEFORE deploying; the code does not degrade without it.** Before production: apply migration `0058` first, confirm the `student-ids` bucket exists and is private (the migration creates it only if the migration role can write the `storage` schema; otherwise create it by hand: Public off, 5 MB, image/jpeg, image/png, image/webp), then deploy. Never applied or tested against production by the implementer.
+- The school email is typed, not verified; staff comparison with the ID is the only check. If NYCPS ever allows Google sign-in, replace it with OAuth.
+- No staff approve/reject step for the ID yet, and no retention rule beyond "deleted with the member or invite" (decide how long to keep ID photos of accepted students).
+- Student ID view audit rows are in `staff_audit_logs` (`student_id_viewed`); there is no UI to read them.
+- Roster pages select `members.school_email` and the ID flag reads `student_id_uploads`, so both fail loudly until `0058` is applied. No graceful degradation is intended.
+- The orphan sweep has no scheduler (a cron route calling `sweepOrphanStudentIds` is a follow-up); photos orphaned by an expired invite wait for the next upload, removal or purge.
+- Plus-addressing is not canonicalised for the school email (`a+1@` and `a@` are different to the unique index).
+- A chunked upload skips the early `Content-Length` 413 (the 4 MB check after reading still applies).
+- Not exercised against real Supabase Storage or in a browser.
+- Dev-only local student ID storage (`STUDENT_ID_STORAGE=local`, `STUDENT_ID_LOCAL_DIR`) exists for local testing only; it is guarded against production and a non-loopback database (spec-056). Files in that directory are never cleaned by anything except the same sweep paths, so delete the directory by hand when done.

@@ -114,8 +114,8 @@ async function seed(db: PGlite) {
   const consent = (mem: string, kind: 'player' | 'manager', invite: string) =>
     id(`insert into onboarding_consents (member_id, school_id, invite_kind, invite_id, form_version, is_minor, age_at_signing, tos_acknowledged, participant_legal_name)
         values ($1, $2, $3, $4, 'v1', false, 18, true, 'x') returning id`, [mem, school, kind, invite]);
-  const demo = (mem: string) =>
-    id(`insert into student_demographics (member_id, legal_first_name, legal_last_name, birth_date) values ($1, 'a', 'b', now()) returning id`, [mem]);
+  const demo = (mem: string | null, kind: 'player' | 'manager', invite: string) =>
+    id(`insert into onboarding_form_completions (member_id, invite_kind, invite_id) values ($1, $2, $3) returning id`, [mem, kind, invite]);
   const ident = (mem: string, provider: string, pid: string) =>
     id(`insert into player_identities (member_id, provider, provider_user_id, provider_username) values ($1, $2, $3, 'u') returning id`, [mem, provider, pid]);
   const c = {
@@ -124,10 +124,12 @@ async function seed(db: PGlite) {
     staffMgr: await consent(m.staffMgr, 'manager', inv.staffMgr),
   };
   const d = {
-    student: await demo(m.student),
-    staffMgr: await demo(m.staffMgr),
-    archiveKey: await demo(m.archiveKey),
-    archiveNoKey: await demo(m.archiveNoKey),
+    student: await demo(m.student, 'player', inv.student),
+    staffMgr: await demo(m.staffMgr, 'manager', inv.staffMgr),
+    archiveKey: await demo(m.archiveKey, 'player', U(91)),
+    archiveNoKey: await demo(m.archiveNoKey, 'player', U(92)),
+    // A manager's completion that never got a member id: removed with its manager invite.
+    mgrOnly: await demo(null, 'manager', inv.mgrOnly),
   };
   const i = {
     studentDiscord: await ident(m.student, 'discord', 'd1'),
@@ -222,7 +224,7 @@ describe('PGlite rehearsal of the purge SQL', () => {
     const by = Object.fromEntries((r.rows as { t: string; d: string }[]).map((x) => [x.t, x.d]));
     expect(by.players).toBe('r'); // restrict
     expect(by.player_identities).toBe('c');
-    expect(by.student_demographics).toBe('c');
+    expect(by.onboarding_form_completions).toBe('c');
     expect(by.onboarding_consents).toBe('c');
     expect(by.school_managers).toBe('n'); // set null
     expect(by.leadership).toBe('n');
@@ -231,7 +233,7 @@ describe('PGlite rehearsal of the purge SQL', () => {
 
   it('dry run: reads the real schema, mutates nothing, lists the right people', async () => {
     w = await seed(db);
-    const before = Object.fromEntries(await Promise.all(['members', 'players', 'school_managers', 'student_demographics', 'match_reschedule_requests'].map(async (t) => [t, await count(db, t)])));
+    const before = Object.fromEntries(await Promise.all(['members', 'players', 'school_managers', 'onboarding_form_completions', 'match_reschedule_requests'].map(async (t) => [t, await count(db, t)])));
     const { deps, logs } = depsFor(db);
     const res = await runPurge(parseArgs([]), deps);
     for (const [t, n] of Object.entries(before)) expect(await count(db, t)).toBe(n);
@@ -281,7 +283,7 @@ describe('PGlite rehearsal of the purge SQL', () => {
     }
     const players = await ids(db, 'players');
     for (const k of ['archiveKey', 'archiveNoKey', 'admin', 'staffMgr'] as const) expect(players).toContain(w.p[k]);
-    expect(await ids(db, 'student_demographics')).toEqual([w.d.staffMgr]); // archive members' demographics are purged
+    expect(await ids(db, 'onboarding_form_completions')).toEqual([w.d.staffMgr]); // everything else, memberless manager rows included, is purged
     expect(await ids(db, 'onboarding_consents')).toEqual([w.c.staffMgr]);
     expect(await count(db, 'staff_members')).toBe(2);
     expect(await count(db, 'user_roles')).toBe(1);

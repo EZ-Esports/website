@@ -6,6 +6,7 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { sanitizeDbError } from '@/app/lib/text-utils';
 import { DrizzleOnboardingRepository } from '@/app/lib/onboarding/adapters/db/drizzle-onboarding-repository';
 import { StaffManagerService } from '@/app/lib/onboarding/core/services/staff-manager-service';
+import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
 import type * as schema from '@/app/lib/db/schema';
 
 const repo = new DrizzleOnboardingRepository();
@@ -129,7 +130,10 @@ export async function getSchoolManagerInvites(schoolId: string) {
 export async function revokeManagerInvite(inviteId: string) {
   const actor = await requireSchoolsPermission();
   try {
-    return await staffManagerService.revokeManagerInvite(actor, inviteId);
+    const result = await staffManagerService.revokeManagerInvite(actor, inviteId);
+    // The revoked invite's pending student ID upload, if any, has no owner now (never throws).
+    await sweepOrphanStudentIds();
+    return result;
   } catch (error) {
     return { success: false, error: sanitizeDbError(error) };
   }

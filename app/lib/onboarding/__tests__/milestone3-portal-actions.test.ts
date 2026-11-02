@@ -32,7 +32,6 @@ const mocks = vi.hoisted(() => {
     playersStore: [] as any[],
     membersStore: [] as any[],
     playerIdentitiesStore: [] as any[],
-    studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
     /** Whether the stand-in removal helper reports the member record as deleted (else kept). */
     removalDeletesMember: false,
@@ -110,7 +109,6 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.players) return state.playersStore;
     if (tbl === schema.members) return state.membersStore;
     if (tbl === schema.playerIdentities) return state.playerIdentitiesStore;
-    if (tbl === schema.studentDemographics) return state.studentDemographicsStore;
     if (tbl === schema.staffMembers) return state.staffMembersStore;
     return null;
   }
@@ -393,7 +391,7 @@ vi.mock('@/app/lib/db/roster-removal', async (importOriginal) => ({
       mocks.state.playerInvitesStore = mocks.state.playerInvitesStore.filter((inv: any) => inv.memberId !== row.memberId);
     }
     return mocks.state.removalDeletesMember
-      ? { removed: true, memberId: row.memberId, studentRecord: 'deleted', deleted: { consents: 1, demographics: 1, identities: 1, invites: 1 } }
+      ? { removed: true, memberId: row.memberId, studentRecord: 'deleted', deleted: { consents: 1, formCompletions: 1, identities: 1, invites: 1 } }
       : { removed: true, memberId: row.memberId, studentRecord: 'kept', keptReason: 'other_roster' };
   }),
 }));
@@ -497,7 +495,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     mocks.state.playersStore = [];
     mocks.state.membersStore = [];
     mocks.state.playerIdentitiesStore = [];
-    mocks.state.studentDemographicsStore = [];
   });
 
   describe('1. Secure Token Generation & Expiration', () => {
@@ -781,7 +778,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
   });
 
   describe('3. Pending Submissions & Zero-PII Invariant', () => {
-    it('returns pending submissions with IGN, Discord, and Grade WITHOUT leaking demographic PII', async () => {
+    it('returns pending submissions with IGN, Discord, and Grade WITHOUT leaking personal fields', async () => {
       // 1. Setup student member and identities
       const memberId = 'member-alex-chen';
       mocks.state.membersStore.push({
@@ -812,19 +809,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         }
       );
 
-      // 2. Sensitive demographic vault contains minor demographic PII
-      mocks.state.studentDemographicsStore.push({
-        id: 'vault-alex',
-        memberId,
-        legalFirstName: 'Alexander',
-        legalLastName: 'Chen',
-        birthDate: new Date('2009-04-12'),
-        isFreeOrReducedLunch: true, // Title I
-        race: ['Asian'],
-        countryOfBirth: 'China',
-      });
-
-      // 3. Submitted invite
+      // 2. Submitted invite
       mocks.state.playerInvitesStore.push({
         id: 'inv-alex-submitted',
         schoolId,
@@ -851,11 +836,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(sub.discord).toBe('comaticx');
       expect(sub.grade).toBe('11th Grade');
 
-      // CRITICAL ZERO-PII INVARIANT: Sensitive demographic keys MUST NOT exist
-      expect((sub as any).isFreeOrReducedLunch).toBeUndefined();
+      // CRITICAL ZERO-PII INVARIANT: Personal keys MUST NOT exist
       expect((sub as any).birthDate).toBeUndefined();
-      expect((sub as any).race).toBeUndefined();
-      expect((sub as any).countryOfBirth).toBeUndefined();
       expect((sub as any).legalFirstName).toBeUndefined();
     });
   });
@@ -1474,7 +1456,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(justin?.discordUsername).toBe('jwong');
       expect(justin?.riotVerified).toBe(true);
 
-      // Verify Zero-PII Invariant: No demographic data fields present
+      // Verify Zero-PII Invariant: No personal data fields present
       for (const p of pool) {
         expect((p as any).birthDate).toBeUndefined();
         expect((p as any).race).toBeUndefined();

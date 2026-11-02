@@ -47,7 +47,7 @@ export interface SchoolMatchItem {
   sameSchool: boolean;
   /** The match's most recent reschedule request, open or resolved; null when it never had one. */
   reschedule: RescheduleRequestItem | null;
-  /** The time staff moved this match from (ISO), when an approved request ever moved it. */
+  /** The time an accepted reschedule moved this match from (ISO), when one ever did. */
   rescheduledFrom: string | null;
   /** The school has used its reschedule allowance for this match's season (see `MAX_RESCHEDULE_REQUESTS_PER_SEASON`). */
   rescheduleAllowanceUsed?: boolean;

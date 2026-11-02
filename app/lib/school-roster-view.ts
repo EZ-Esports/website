@@ -13,11 +13,15 @@ export interface RosterViewPlayer {
   memberId: string;
   firstName: string;
   lastName: string;
-  /** Member's display name. Only the fields the admin roster views already show; never demographics. */
+  /** Member's display name. Only the fields the admin roster views already show. */
   name: string;
   ign: string | null;
   discord: string | null;
   graduationYear: number | null;
+  /** nycstudents.net address the player typed in onboarding; null for members who never onboarded. */
+  schoolEmail?: string | null;
+  /** A student ID photo is on file. Only the flag travels here; staff open it through the signed-URL route. */
+  hasStudentId?: boolean;
   role: 'captain' | 'player' | 'coach' | 'sub';
   /** Every onboarding offensive-content override for this person (a player and a manager record can both exist), newest first; absent when none or when its table is not migrated yet. */
   contentFlags?: ContentFlagView[];
@@ -266,7 +270,7 @@ export function mergeRosterFilterQuery(currentSearch: string, f: RosterViewFilte
   return sp.toString();
 }
 
-/** What the staff editing controls need beyond the rosters themselves. Display fields only; never demographics. */
+/** What the staff editing controls need beyond the rosters themselves. Display fields only. */
 export interface RosterEditOptions {
   /** The school's members, for the add-player picker. */
   members: { id: string; firstName: string; lastName: string; discord: string | null; graduationYear: number | null }[];

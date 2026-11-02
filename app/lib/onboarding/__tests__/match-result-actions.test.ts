@@ -92,6 +92,21 @@ describe('submitMatchResult', () => {
     expect(result.error).toBe('This match is not in your season.');
   });
 
+  it('lets a staff admin submit as the viewed school, attributing the attempt to the staff user (spec-055)', async () => {
+    mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
+    mocks.saveSeriesResult.mockResolvedValue(true);
+    const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
+    expect(result).toEqual({ success: true, summary: '2-0' });
+    expect(mocks.reserveSubmissionAttempt).toHaveBeenCalledWith({ matchId: 'm1', userId: 'staff-1' });
+  });
+
+  it('still refuses a staff admin acting as a school that is not in the match', async () => {
+    mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-z', input: `${ID_1} ${ID_2}` });
+    expect(result.error).toBe('Your school is not playing in this match.');
+  });
+
   it('refuses a match that already has a result, and non-Valorant games', async () => {
     mocks.loadRows.mockResolvedValue([matchRow({ status: 'completed', homeScore: 2 })]);
     expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).error).toContain('already has a result');
@@ -115,12 +130,6 @@ describe('submitMatchResult', () => {
     const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
     expect(result).toEqual({ success: false, error: 'Wait 20 seconds before submitting again.' });
     expect(mocks.resolveSeries).not.toHaveBeenCalled();
-  });
-
-  it('passes the match start to the series check so early games are refused', async () => {
-    mocks.resolveSeries.mockResolvedValue({ status: 'invalid', errors: ['Game 1: It started at ...'] });
-    await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
-    expect(mocks.resolveSeries.mock.calls[0][0].scheduledAt).toEqual(new Date('2026-10-20T23:00:00.000Z'));
   });
 
   it('says a game is already counted when the unique index fires, and when the match was completed meanwhile', async () => {

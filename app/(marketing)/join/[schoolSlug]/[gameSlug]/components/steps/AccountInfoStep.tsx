@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Button as AriaButton, FileTrigger } from 'react-aria-components';
+import { SCHOOL_EMAIL_DOMAIN } from '@/app/lib/onboarding/school-email';
+import { STUDENT_ID_ACCEPT, STUDENT_ID_MAX_BYTES, formatMegabytes } from '@/app/lib/onboarding/student-id';
 import { RequiredMark } from '../RequiredMark';
 import {
   DEFAULT_MANAGER_SEASON,
@@ -18,6 +21,15 @@ interface AccountInfoStepProps {
   setLegalLastName: (val: string) => void;
   email: string;
   setEmail: (val: string) => void;
+  /** nycstudents.net address, required for players and managers. */
+  schoolEmail: string;
+  setSchoolEmail: (val: string) => void;
+  /** Student ID photo: uploaded on selection and held by the server against this invite. */
+  studentIdUploaded: boolean;
+  studentIdUploading: boolean;
+  studentIdError: string | null;
+  studentIdLabel: string | null;
+  onStudentIdChosen: (file: File | null) => void;
   password?: string;
   setPassword?: (val: string) => void;
   graduationYear: number;
@@ -44,6 +56,13 @@ export function AccountInfoStep({
   setLegalLastName,
   email,
   setEmail,
+  schoolEmail,
+  setSchoolEmail,
+  studentIdUploaded,
+  studentIdUploading,
+  studentIdError,
+  studentIdLabel,
+  onStudentIdChosen,
   password,
   setPassword,
   graduationYear,
@@ -73,7 +92,7 @@ export function AccountInfoStep({
           Step 1: Student Information
         </h2>
         <p className="text-xs sm:text-sm text-foreground-muted mt-1">
-          Verify your legal name and student email address for tournament roster eligibility.
+          Verify your legal name, your emails and your student ID for tournament roster eligibility.
         </p>
       </div>
 
@@ -126,7 +145,7 @@ export function AccountInfoStep({
           htmlFor="account-email"
           className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
         >
-          {isManager ? <>Manager Email Address<RequiredMark /></> : <>Student Email Address<RequiredMark /></>}
+          Personal Email Address<RequiredMark />
         </label>
         <input
           id="account-email"
@@ -136,16 +155,83 @@ export function AccountInfoStep({
           className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder={
             isManager
-              ? 'e.g. coach@school.edu'
-              : 'e.g. achen@nycstudents.net or student@gmail.com'
+              ? 'e.g. coach@gmail.com'
+              : 'e.g. student@gmail.com'
           }
           required
         />
         <p className="text-xs text-foreground-muted mt-1">
           {isManager
             ? 'Used to sign in to your School Manager Portal account and receive league updates.'
-            : 'Used for tournament notifications, official roster verification, and bracket updates.'}
+            : 'Used for tournament notifications and bracket updates. This must be different from your school email.'}
         </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="account-school-email"
+          className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+        >
+          School Email (must end in @{SCHOOL_EMAIL_DOMAIN})<RequiredMark />
+        </label>
+        <input
+          id="account-school-email"
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          value={schoolEmail}
+          onChange={(e) => setSchoolEmail(e.target.value)}
+          className="w-full px-3.5 py-2.5 rounded-lg bg-surface border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          placeholder={`e.g. achen@${SCHOOL_EMAIL_DOMAIN}`}
+          aria-describedby="account-school-email-hint"
+          required
+        />
+        <p id="account-school-email-hint" className="text-xs text-foreground-muted mt-1">
+          Your NYC Public Schools student address. Staff match it against your student ID.
+        </p>
+      </div>
+
+      <div>
+        <span
+          id="student-id-label"
+          className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5"
+        >
+          Photo of Your Student ID<RequiredMark />
+        </span>
+        <p id="student-id-hint" className="text-xs text-foreground-muted mb-2">
+          A clear photo of your school ID card (JPEG, PNG or WebP, up to {formatMegabytes(STUDENT_ID_MAX_BYTES)}).
+          It is stored privately and only reviewed by EZ Esports staff.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <FileTrigger
+            acceptedFileTypes={STUDENT_ID_ACCEPT.split(',')}
+            onSelect={(files) => onStudentIdChosen(files && files.length > 0 ? files[0] : null)}
+          >
+            <AriaButton
+              id="student-id"
+              isDisabled={studentIdUploading}
+              aria-labelledby="student-id-label student-id"
+              aria-describedby={['student-id-hint', 'student-id-status', studentIdError ? 'student-id-error' : null]
+                .filter(Boolean)
+                .join(' ')}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-bold text-foreground cursor-pointer outline-none data-[hovered]:border-accent/50 data-[focus-visible]:ring-2 data-[focus-visible]:ring-accent data-[disabled]:opacity-60"
+            >
+              {studentIdUploading ? 'Uploading...' : studentIdUploaded ? 'Replace photo' : 'Choose photo'}
+            </AriaButton>
+          </FileTrigger>
+          <span
+            id="student-id-status"
+            aria-live="polite"
+            className={`min-w-0 break-all text-sm ${studentIdUploaded ? 'font-semibold text-foreground' : 'text-foreground-muted'}`}
+          >
+            {studentIdUploaded ? `Uploaded${studentIdLabel ? `: ${studentIdLabel}` : ''}` : 'No photo uploaded yet'}
+          </span>
+        </div>
+        {studentIdError && (
+          <p id="student-id-error" role="alert" className="text-xs text-rose-300 mt-1.5">
+            {studentIdError}
+          </p>
+        )}
       </div>
 
       {isManager && setPassword && (

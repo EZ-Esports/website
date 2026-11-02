@@ -14,6 +14,17 @@ describe('normalizeHenrikMatch', () => {
     expect(game.players[0]).toMatchObject({ name: 'RedOne', side: 'Red', kills: 20, damageDealt: 2800, tier: 'Gold 2' });
   });
 
+  it('reads a live custom game, which Henrik sends with an empty queue id and the name "Custom Game"', () => {
+    const game = normalizeHenrikMatch(henrikPayload({ matchId: uuid(1), winner: 'Red', queue: '' }));
+    expect(game.queueId).toBe('custom');
+  });
+
+  it('does not treat an unnamed empty queue as custom', () => {
+    const payload = henrikPayload({ matchId: uuid(1), winner: 'Red', queue: '' }) as { data: { metadata: { queue: { name?: string } } } };
+    payload.data.metadata.queue.name = 'Competitive';
+    expect(normalizeHenrikMatch(payload).queueId).toBe('');
+  });
+
   it('derives the match MVP from the winners and the team MVP from the losers', () => {
     const game = normalizeHenrikMatch(henrikPayload({ matchId: uuid(1), winner: 'Red' }));
     expect(game.players.filter((p) => p.isMatchMvp).map((p) => p.name)).toEqual(['RedOne']);

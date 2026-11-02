@@ -5,7 +5,6 @@ import {
   canOpponentRespond,
   canRequesterRespond,
   MAX_RESCHEDULE_REQUESTS_PER_SEASON,
-  canStaffDecide,
   hasUsedRescheduleAllowance,
   isLateRequest,
   rescheduleAllowanceMessage,
@@ -55,6 +54,11 @@ describe('validateProposedTimes', () => {
     expect(validateProposedTimes(six.slice(0, 5), NOW, MATCH_AT)).toBeNull();
   });
 
+  it('rejects a date with a year past four digits', () => {
+    const farFuture = new Date(Date.UTC(10001, 0, 1, 23, 0, 0));
+    expect(validateProposedTimes([sevenPm(2), farFuture], NOW, MATCH_AT)).toMatch(/four-digit year/);
+  });
+
   it('requires every time to start at 7:00 PM ET', () => {
     expect(validateProposedTimes([sevenPm(2), at(100)], NOW, MATCH_AT)).toMatch(/7:00 PM ET/);
     const sevenThirty = parseEastern(`${sevenPm(3).toISOString().slice(0, 10)}T19:30`);
@@ -86,12 +90,6 @@ describe('status helpers', () => {
   it('lets the opponent answer only while waiting for them, and the requester only after a counter-offer', () => {
     expect(RESCHEDULE_STATUSES.filter(canOpponentRespond)).toEqual(['pending_opponent']);
     expect(RESCHEDULE_STATUSES.filter(canRequesterRespond)).toEqual(['pending_requester']);
-  });
-
-  it('lets staff decide only after the opponent agreed', () => {
-    expect(canStaffDecide('pending_staff')).toBe(true);
-    expect(canStaffDecide('pending_opponent')).toBe(false);
-    expect(canStaffDecide('approved')).toBe(false);
   });
 
   it('counts only the pending states as open', () => {

@@ -8,8 +8,12 @@ export type OnboardingRejectionCode =
   | 'discord_already_linked'
   | 'manager_password_required'
   | 'play_games_required'
+  | 'onboarding_form_required'
   | 'content_flagged'
-  | 'field_too_long';
+  | 'field_too_long'
+  | 'school_email_invalid'
+  | 'school_email_already_used'
+  | 'student_id_required';
 
 export class OnboardingRejection extends Error {
   readonly code: OnboardingRejectionCode;
@@ -22,6 +26,21 @@ export class OnboardingRejection extends Error {
     this.code = code;
     this.fields = fields;
   }
+}
+
+/** True when a Postgres error (possibly wrapped by the driver) is a unique violation on the school email index. */
+export function isSchoolEmailUniqueViolation(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cur: any = err;
+  while (cur && typeof cur === 'object' && !seen.has(cur)) {
+    seen.add(cur);
+    const constraint = cur.constraint_name ?? cur.constraint;
+    if (cur.code === '23505' && (constraint === 'members_school_email_lower_idx' || String(cur.message ?? '').includes('members_school_email_lower_idx'))) {
+      return true;
+    }
+    cur = cur.cause;
+  }
+  return false;
 }
 
 /** True when a Postgres error (possibly wrapped by the driver) is a unique violation on the Discord identity index. */

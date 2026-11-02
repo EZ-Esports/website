@@ -7,7 +7,7 @@ import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { Dialog, Heading, Modal, Overlay } from '@/app/components/ui/overlay';
 import { formatNY } from '@/app/lib/dates';
-import { parseMatchReferences } from '@/app/lib/match-results/parse-match-ref';
+import { validateGameLinks } from '@/app/lib/match-results/parse-match-ref';
 import { canSubmitGameResult, type SchoolMatchItem } from '@/app/lib/school-matches';
 import {
   cancelPendingResult,
@@ -17,6 +17,8 @@ import {
   type MatchResultActionResult,
 } from '@/app/lib/onboarding/match-result-actions';
 import type { MatchScoreboard } from '@/app/lib/db/match-results';
+import { TrackerLinkHelp } from './TrackerLinkHelp';
+import { useStaffActing } from './StaffActing';
 
 const BUTTON =
   'min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer';
@@ -53,6 +55,7 @@ function ErrorList({ message, errors }: { message: string | null; errors: string
 /** Runs a result action, refreshes the portal on success and keeps the message and per-game problems. */
 function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) {
   const router = useRouter();
+  const { confirmed } = useStaffActing();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -60,50 +63,77 @@ function useResultAction(onSuccess?: (result: MatchResultActionResult) => void) 
     setMessage(null);
     setErrors([]);
   };
-  const run = (action: () => Promise<MatchResultActionResult>) => {
-    reset();
-    start(async () => {
-      try {
-        const result = await action();
-        if (!result.success) {
-          setMessage(result.error ?? 'Something went wrong.');
-          setErrors(result.errors ?? []);
-          // A pending save changes what the row shows even though the call "failed".
-          if (result.pending) router.refresh();
-          return;
+  // A staff admin confirms "acting as <School>" before the action is sent (spec-055).
+  const run = (action: () => Promise<MatchResultActionResult>) =>
+    confirmed(() => {
+      reset();
+      start(async () => {
+        try {
+          const result = await action();
+          if (!result.success) {
+            setMessage(result.error ?? 'Something went wrong.');
+            setErrors(result.errors ?? []);
+            // A pending save changes what the row shows even though the call "failed".
+            if (result.pending) router.refresh();
+            return;
+          }
+          onSuccess?.(result);
+          router.refresh();
+        } catch {
+          setMessage('Something went wrong. Please try again.');
         }
-        onSuccess?.(result);
-        router.refresh();
-      } catch {
-        setMessage('Something went wrong. Please try again.');
-      }
+      });
     });
-  };
   return { pending, message, errors, reset, run, setMessage, setErrors };
 }
 
+const GAME_FIELDS = [
+  { label: 'Game 1 link', optional: false },
+  { label: 'Game 2 link', optional: false },
+  { label: 'Game 3 link (only if a deciding game was played)', optional: true },
+] as const;
+
 function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: string }) {
   const [open, setOpen] = useState(false);
-  const [input, setInput] = useState('');
-  const { pending, message, errors, reset, run, setMessage, setErrors } = useResultAction(() => {
+  const [links, setLinks] = useState<string[]>(['', '', '']);
+  const [fieldErrors, setFieldErrors] = useState<(string | null)[]>([null, null, null]);
+  const clear = () => {
+    setLinks(['', '', '']);
+    setFieldErrors([null, null, null]);
+  };
+  const { pending, message, errors, reset, run } = useResultAction(() => {
     setOpen(false);
-    setInput('');
+    clear();
   });
+
+  const setLink = (index: number, value: string) => {
+    setLinks((prev) => prev.map((v, i) => (i === index ? value : v)));
+    setFieldErrors((prev) => prev.map((v, i) => (i === index ? null : v)));
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     // Same parser the server uses, so a typo is caught before a network round trip.
-    const parsed = parseMatchReferences(input);
-    if (parsed.errors.length > 0) {
-      setMessage('Check the match IDs.');
-      setErrors(parsed.errors);
+    const checked = validateGameLinks(links);
+    setFieldErrors(checked.fieldErrors);
+    if (!checked.ok) {
+      reset();
       return;
     }
-    run(() => submitMatchResult({ matchId: match.id, schoolId, input }));
+    run(() => submitMatchResult({ matchId: match.id, schoolId, input: checked.input }));
   };
 
   return (
-    <DialogTrigger isOpen={open} onOpenChange={(next) => (setOpen(next), next || reset())}>
+    <DialogTrigger
+      isOpen={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          reset();
+          clear();
+        }
+      }}
+    >
       <Button className={PRIMARY_BUTTON}>Submit result</Button>
       <Overlay isDismissable>
         <Modal className={MODAL_CLASS}>
@@ -114,28 +144,44 @@ function SubmitDialog({ match, schoolId }: { match: SchoolMatchItem; schoolId: s
                 vs {match.opponentName} · {formatNY(new Date(match.scheduledAt), 'date-short')}
               </p>
             </div>
+            <TrackerLinkHelp />
             <ErrorList message={message} errors={errors} />
-            <form onSubmit={submit} className="space-y-4">
-              <div>
-                <label htmlFor={`games-${match.id}`} className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Match IDs or tracker.gg links, one per game
-                </label>
-                <textarea
-                  id={`games-${match.id}`}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  rows={4}
-                  required
-                  spellCheck={false}
-                  placeholder={'https://tracker.gg/valorant/match/…\nhttps://tracker.gg/valorant/match/…'}
-                  className={`${INPUT} font-mono text-xs`}
-                />
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  Best of 3: give at least 2 games, and the 3rd only if it went the distance. Matches are
-                  only kept for a limited time, so submit soon after playing. Both teams must be on the
-                  rosters with their Riot IDs.
-                </p>
-              </div>
+            <form onSubmit={submit} noValidate className="space-y-4">
+              {GAME_FIELDS.map((field, index) => {
+                const id = `game-${index + 1}-${match.id}`;
+                const error = fieldErrors[index];
+                return (
+                  <div key={id}>
+                    <label htmlFor={id} className="block text-xs font-semibold text-zinc-300 mb-1">
+                      {field.label}
+                    </label>
+                    <input
+                      id={id}
+                      type="text"
+                      value={links[index]}
+                      onChange={(e) => setLink(index, e.target.value)}
+                      required={!field.optional}
+                      spellCheck={false}
+                      autoComplete="off"
+                      inputMode="url"
+                      aria-invalid={error ? true : undefined}
+                      aria-describedby={error ? `${id}-error` : undefined}
+                      placeholder="Match ID or https://tracker.gg/valorant/match/…"
+                      className={`${INPUT} min-h-[44px] sm:min-h-0 font-mono text-xs`}
+                    />
+                    {error && (
+                      <p id={`${id}-error`} role="alert" className="mt-1 text-[11px] text-rose-400">
+                        {error}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="text-[11px] text-zinc-500">
+                Best of 3: give games 1 and 2, and game 3 only if it went the distance. Matches are only kept
+                for a limited time, so submit soon after playing. Both teams must be on the rosters with their
+                Riot IDs.
+              </p>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button onPress={() => setOpen(false)} className={QUIET_BUTTON}>
                   Cancel
@@ -156,6 +202,7 @@ function PendingNotice({ match, schoolId, viewOnly }: { match: SchoolMatchItem; 
   const pendingResult = match.pendingResult!;
   const router = useRouter();
   const { pending, message, errors, run } = useResultAction();
+  const { actingNotice } = useStaffActing();
   // Discarding drops the saved IDs, so it asks first (in-app dialog, never a native confirm).
   const discard = useConfirmAction<null>(async () => {
     const result = await cancelPendingResult({ matchId: match.id, schoolId });
@@ -198,7 +245,7 @@ function PendingNotice({ match, schoolId, viewOnly }: { match: SchoolMatchItem; 
         appearance="portal"
         tone="danger"
         title="Discard saved match IDs?"
-        message={`The ${match.pendingResult?.gameCount ?? 0} saved games stay stored, but you will need to paste the match IDs again to submit a result.`}
+        message={`${actingNotice ? `${actingNotice} ` : ''}The ${match.pendingResult?.gameCount ?? 0} saved games stay stored, but you will need to paste the match IDs again to submit a result.`}
         confirmLabel="Discard"
         pendingLabel="Discarding…"
       />

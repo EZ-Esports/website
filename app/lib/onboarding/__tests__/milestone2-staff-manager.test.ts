@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as schema from '@/app/lib/db/schema';
 import { Permissions } from '@/app/lib/roles';
-import {
-  getStudentDemographics,
-  ForbiddenPiiAccessError,
-  buildStudentDemographicsQuery,
-} from '@/app/lib/db/queries';
 
 // --- HOISTED MOCKS FOR SERVER ACTIONS ---
 const mocks = vi.hoisted(() => {
@@ -48,25 +43,6 @@ const mocks = vi.hoisted(() => {
     createdAt: Date;
   }
 
-  interface StudentDemographicsRecord {
-    id: string;
-    memberId: string;
-    legalFirstName: string;
-    legalLastName: string;
-    birthDate: Date;
-    gender: string | null;
-    race: string[] | null;
-    ethnicity: string[] | null;
-    countryOfBirth: string | null;
-    parentsCountryOfBirth: string | null;
-    primaryLanguageAtHome: string | null;
-    isFreeOrReducedLunch: boolean | null;
-    isFirstGenCollege: boolean | null;
-    doePetitionConsent: boolean;
-    surveyDetails: any;
-    createdAt: Date;
-  }
-
   interface MemberRecord {
     id: string;
     firstName: string;
@@ -80,7 +56,6 @@ const mocks = vi.hoisted(() => {
     staffMembersStore: [] as StaffMemberRecord[],
     schoolManagersStore: [] as SchoolManagerRecord[],
     staffAuditLogsStore: [] as StaffAuditLogRecord[],
-    studentDemographicsStore: [] as StudentDemographicsRecord[],
     membersStore: [] as MemberRecord[],
   };
 
@@ -171,14 +146,6 @@ const mocks = vi.hoisted(() => {
         }),
         orderBy: vi.fn(() => builder),
         limit: vi.fn(() => builder),
-        toSQL: vi.fn(() => {
-          const conds = extractConditions(whereClause);
-          const memberCond = conds.find((c) => c.col === 'memberId' || c.col === 'member_id');
-          return {
-            sql: 'select * from "student_demographics" where "student_demographics"."member_id" = $1 limit $2',
-            params: [memberCond?.val ?? 'test-member-uuid', 1],
-          };
-        }),
         then: (resolve: (val: any) => void) => {
           resolve(executeSelect());
         },
@@ -229,10 +196,6 @@ const mocks = vi.hoisted(() => {
             });
           }
           return rows;
-        }
-
-        if (currentTable === schema.studentDemographics) {
-          return state.studentDemographicsStore.filter((d) => conds.every((c) => matchesRow(d, c)));
         }
 
         return [];
@@ -346,130 +309,6 @@ import {
   getRegisteredManagers,
   assignExistingManager,
 } from '@/app/(admin)/admin/schools/manager-actions';
-
-describe('Milestone 2: Demographic Data Querying & Privacy Protection', () => {
-  const memberId = 'member-12345';
-  const sampleDemographics = {
-    id: 'demo-uuid-1',
-    memberId,
-    legalFirstName: 'Alex',
-    legalLastName: 'Chen',
-    birthDate: new Date('2008-05-15'),
-    gender: 'Male',
-    race: ['Asian'],
-    ethnicity: ['East Asian'],
-    countryOfBirth: 'United States',
-    parentsCountryOfBirth: 'China',
-    primaryLanguageAtHome: 'Mandarin',
-    isFreeOrReducedLunch: true,
-    isFirstGenCollege: true,
-    doePetitionConsent: true,
-    surveyDetails: { ping: 25, hoursPerWeek: 12 },
-    createdAt: new Date(),
-  };
-
-  beforeEach(() => {
-    mocks.state.studentDemographicsStore = [sampleDemographics];
-  });
-
-  describe('Permissions Gating (VIEW_STUDENT_DEMOGRAPHICS)', () => {
-    it('throws ForbiddenPiiAccessError when actor has no permissions and is not owner', async () => {
-      const actorPermissions = BigInt(0);
-      const actorIsOwner = false;
-
-      await expect(
-        getStudentDemographics(memberId, actorPermissions, actorIsOwner)
-      ).rejects.toThrow('FORBIDDEN_PII_ACCESS');
-
-      await expect(
-        getStudentDemographics(memberId, actorPermissions, actorIsOwner)
-      ).rejects.toBeInstanceOf(ForbiddenPiiAccessError);
-    });
-
-    it('throws ForbiddenPiiAccessError when actor has general staff permissions but lacks VIEW_STUDENT_DEMOGRAPHICS', async () => {
-      // General staff permissions (e.g. MANAGE_NEWS | MANAGE_SCHOOLS | MANAGE_ROSTERS)
-      const actorPermissions =
-        Permissions.MANAGE_NEWS | Permissions.MANAGE_SCHOOLS | Permissions.MANAGE_ROSTERS;
-      const actorIsOwner = false;
-
-      await expect(
-        getStudentDemographics(memberId, actorPermissions, actorIsOwner)
-      ).rejects.toThrow('FORBIDDEN_PII_ACCESS');
-    });
-
-    it('returns null instead of throwing when throwOnForbidden is false', async () => {
-      const actorPermissions = BigInt(0);
-      const actorIsOwner = false;
-
-      const result = await getStudentDemographics(memberId, actorPermissions, actorIsOwner, {
-        throwOnForbidden: false,
-      });
-
-      expect(result).toBeNull();
-    });
-
-    it('allows access when actor has explicit Permissions.VIEW_STUDENT_DEMOGRAPHICS', async () => {
-      const actorPermissions = Permissions.VIEW_STUDENT_DEMOGRAPHICS;
-      const actorIsOwner = false;
-
-      const result = await getStudentDemographics(memberId, actorPermissions, actorIsOwner);
-      expect(result).not.toBeNull();
-      expect(result?.legalFirstName).toBe('Alex');
-      expect(result?.isFreeOrReducedLunch).toBe(true);
-      expect(result?.countryOfBirth).toBe('United States');
-    });
-
-    it('allows access when actor has Permissions.ADMINISTRATOR', async () => {
-      const actorPermissions = Permissions.ADMINISTRATOR;
-      const actorIsOwner = false;
-
-      const result = await getStudentDemographics(memberId, actorPermissions, actorIsOwner);
-      expect(result).not.toBeNull();
-      expect(result?.legalLastName).toBe('Chen');
-    });
-
-    it('allows access when actor is Owner regardless of permission mask', async () => {
-      const actorPermissions = BigInt(0);
-      const actorIsOwner = true;
-
-      const result = await getStudentDemographics(memberId, actorPermissions, actorIsOwner);
-      expect(result).not.toBeNull();
-      expect(result?.legalFirstName).toBe('Alex');
-    });
-
-    it('returns null when authorized but member has no demographic record', async () => {
-      const nonExistentMemberId = 'member-non-existent';
-      const actorPermissions = Permissions.VIEW_STUDENT_DEMOGRAPHICS;
-      const actorIsOwner = false;
-
-      const result = await getStudentDemographics(
-        nonExistentMemberId,
-        actorPermissions,
-        actorIsOwner
-      );
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('Query Architecture & Zero-PII Cache Invariant', () => {
-    it('generates correct SQL query against student_demographics with single-row limit', () => {
-      const query = buildStudentDemographicsQuery('test-member-uuid');
-      const { sql, params } = query.toSQL();
-
-      expect(sql).toContain('from "student_demographics"');
-      expect(sql).toContain('"student_demographics"."member_id" = $1');
-      expect(sql).toMatch(/limit \$2/i);
-      expect(params[0]).toBe('test-member-uuid');
-      expect(params[1]).toBe(1);
-    });
-
-    it('ensures getStudentDemographics is a direct uncached query function', () => {
-      // Must not be an unstable_cache wrapper (unstable_cache wraps with internal metadata properties)
-      expect((getStudentDemographics as any).$$typeof).toBeUndefined();
-      expect((getStudentDemographics as any).name).toBe('getStudentDemographics');
-    });
-  });
-});
 
 describe('Milestone 2: Staff CMS Manager Provisioning & Scoped Roster Tenancy', () => {
   const schoolId = 'school-stuy-001';

@@ -15,6 +15,7 @@ import type { GameIdentityPort, CommunityPlatformPort } from './ports';
 import { processOnboardingSubmission } from './wizard/submission-pipeline';
 import { OnboardingRejection, type OnboardingRejectionCode } from './rejection';
 import { readVerifiedDiscord } from './discord-session';
+import { findPendingUpload } from '@/app/lib/db/student-ids';
 
 export interface ValidateInviteTokenParams {
   schoolSlug?: string;
@@ -38,6 +39,8 @@ export type ValidateInviteTokenResult =
       gameName: string;
       gameSlug: string;
       submissionDraft: Record<string, any> | null;
+      /** True when a student ID photo is already uploaded for this invite (the file itself never comes back). */
+      studentIdUploaded: boolean;
       expiresAt: Date;
       /** Manager invites only: games the manager can say they also play. */
       playableGames?: OnboardingGameOption[];
@@ -78,7 +81,13 @@ export interface SaveOnboardingDraftParams {
 }
 
 export interface PlayerOnboardingSubmission {
+  /** Personal email (sign-in for managers, notifications for everyone). */
   email: string;
+  /**
+   * The student's nycstudents.net address, typed and checked for format and domain only (NYCPS blocks
+   * Google sign-in, so it is not verified). Must differ from `email`. Staff compare it with the ID photo.
+   */
+  schoolEmail: string;
   legalFirstName: string;
   legalLastName: string;
   graduationYear: number;
@@ -92,23 +101,8 @@ export interface PlayerOnboardingSubmission {
   alsoPlays?: boolean;
   playGameIds?: string[];
   riotId: string;
+  /** Validated and used for the guardian-authorization age check, but not stored anywhere. */
   birthDate: string | Date;
-  gender?: string;
-  race?: string[];
-  ethnicity?: string[];
-  countryOfBirth?: string;
-  primaryLanguageAtHome?: string;
-  isFreeOrReducedLunch?: boolean;
-  isFirstGenCollege?: boolean;
-  doePetitionConsent?: boolean;
-  surveyDetails?: {
-    ping?: string | number;
-    hoursPerWeek?: string | number;
-    internetReliability?: string;
-    careerInterests?: string[];
-    feedback?: string;
-    [key: string]: any;
-  };
   codeOfConductAccepted: boolean;
   /**
    * Fields the person confirmed are genuinely their information after being warned that they look
@@ -157,7 +151,11 @@ export type SubmitPlayerOnboardingOutcome =
   | SubmitPlayerOnboardingResult
   | SubmitPlayerOnboardingFailure;
 
-const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
+/**
+ * Keys a draft never carries. The survey keys are legacy: drafts saved while the demographics
+ * survey existed may still hold them, and they are dropped on read and write rather than trusted.
+ */
+const NEVER_DRAFTED_KEYS = new Set([
   'gender',
   'race',
   'ethnicity',
@@ -169,6 +167,10 @@ const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
   'surveyDetails',
   'birthDate',
   'password',
+  // The student ID photo is held server-side against the invite; a draft never names or carries it.
+  'studentIdUploaded',
+  'studentIdKey',
+  'studentIdFile',
   // Guardian PII and signature are collected at final submit only, never persisted in the draft.
   'consent',
   // Discord identity comes only from the signed OAuth cookie. Drafts saved before OAuth existed may
@@ -181,8 +183,8 @@ const SENSITIVE_DEMOGRAPHIC_KEYS = new Set([
 ]);
 
 /**
- * Sanitizes in-progress onboarding drafts to strictly exclude sensitive FERPA / PII
- * demographics from being read via invite tokens or persisted in unauthenticated draft slots.
+ * Sanitizes in-progress onboarding drafts so personal data (date of birth, password, guardian
+ * details) is never read back via invite tokens or persisted in unauthenticated draft slots.
  */
 function sanitizeDraftData(
   draft: Record<string, any> | null
@@ -193,11 +195,13 @@ function sanitizeDraftData(
     if (key === 'contentOverrides') {
       // Only known fields with bounded string values are kept; never trusted as an override at submit.
       sanitized[key] = parseSavedOverrides(value);
+    } else if (key === 'schoolEmail') {
+      sanitized[key] = typeof value === 'string' ? value.slice(0, 254) : '';
     } else if (key === 'alsoPlays') {
       sanitized[key] = value === true;
     } else if (key === 'playGameIds') {
       sanitized[key] = sanitizeGameIds(value);
-    } else if (!SENSITIVE_DEMOGRAPHIC_KEYS.has(key)) {
+    } else if (!NEVER_DRAFTED_KEYS.has(key)) {
       sanitized[key] = value;
     }
   }
@@ -338,6 +342,7 @@ export async function validateInviteToken(
       gameName: resolvedGameName,
       gameSlug: resolvedGameSlug,
       submissionDraft: sanitizeDraftData(invite.submissionDraft as Record<string, any> | null),
+      studentIdUploaded: Boolean(await findPendingUpload(row.isManager ? 'manager' : 'player', invite.id).catch(() => null)),
       expiresAt: invite.expiresAt,
       ...(isManager
         ? {

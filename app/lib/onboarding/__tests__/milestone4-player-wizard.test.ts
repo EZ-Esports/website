@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'node:crypto';
 import * as schema from '@/app/lib/db/schema';
 import { CONSENT_FORM_VERSION } from '@/app/lib/onboarding/consent';
-import { Permissions } from '@/app/lib/roles';
-import { ForbiddenPiiAccessError } from '@/app/lib/db/queries';
 
 // --- HOISTED MOCKS ---
 const mocks = vi.hoisted(() => {
@@ -16,7 +14,7 @@ const mocks = vi.hoisted(() => {
     managerInvitesStore: [] as any[],
     membersStore: [] as any[],
     playerIdentitiesStore: [] as any[],
-    studentDemographicsStore: [] as any[],
+    formCompletionLinks: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
     schoolManagersStore: [] as any[],
     staffMembersStore: [] as any[],
     onboardingConsentsStore: [] as any[],
@@ -91,7 +89,6 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.managerInvites) return state.managerInvitesStore;
     if (tbl === schema.members) return state.membersStore;
     if (tbl === schema.playerIdentities) return state.playerIdentitiesStore;
-    if (tbl === schema.studentDemographics) return state.studentDemographicsStore;
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.staffMembers) return state.staffMembersStore;
     if (tbl === schema.onboardingConsents) return state.onboardingConsentsStore;
@@ -266,6 +263,39 @@ vi.mock('@/app/lib/onboarding/discord-session', () => ({
   },
 }));
 
+// Onboarding Google Form gate (spec-051): config and completion lookups are stand-ins so these tests
+// exercise only the pipeline's decision, never a database.
+const formGate = vi.hoisted(() => ({ enabled: false, completed: false }));
+vi.mock('@/app/lib/onboarding/google-form/config', () => ({
+  getOnboardingFormConfig: async () => ({ enabled: formGate.enabled, formUrl: null, entryId: null, secretConfigured: formGate.enabled }),
+}));
+vi.mock('@/app/lib/db/onboarding-form', () => ({
+  hasFormCompletion: async () => formGate.completed,
+  linkFormCompletionToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    mocks.state.formCompletionLinks.push({ kind, inviteId, memberId });
+  },
+}));
+
+// Student ID photo (spec-056): the upload is held server-side against the invite. These tests exercise
+// the pipeline's decisions, so the persistence layer and Storage are stand-ins.
+const studentId = vi.hoisted(() => ({
+  pending: true,
+  linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
+  replacedKey: null as string | null,
+  swept: 0,
+}));
+vi.mock('@/app/lib/db/student-ids', () => ({
+  findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
+  linkUploadToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    if (!studentId.pending) return null;
+    studentId.linked.push({ kind, inviteId, memberId });
+    return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
+  },
+}));
+vi.mock('@/app/lib/onboarding/student-id-sweep', () => ({
+  sweepOrphanStudentIds: async () => { studentId.swept += 1; return 0; },
+}));
+
 // Fake Supabase admin client so tests can assert whether an auth user was (not) created.
 const authMock = vi.hoisted(() => ({ createUser: vi.fn(), listUsers: vi.fn() }));
 vi.mock('@/app/lib/supabase/service', () => ({
@@ -290,7 +320,6 @@ import {
   submitPlayerOnboarding,
   type PlayerOnboardingSubmission,
 } from '@/app/lib/onboarding/wizard-actions';
-import { getStudentDemographics } from '@/app/lib/db/queries';
 
 /** Success-path wrapper: expected rejections come back as `{success:false}`; surface them as errors here. */
 async function submitOk(params: Parameters<typeof submitPlayerOnboarding>[0]) {
@@ -345,7 +374,13 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     mocks.state.membersStore = [];
     mocks.state.playerIdentitiesStore = [];
-    mocks.state.studentDemographicsStore = [];
+    mocks.state.formCompletionLinks = [];
+    formGate.enabled = false;
+    formGate.completed = false;
+    studentId.pending = true;
+    studentId.linked = [];
+    studentId.replacedKey = null;
+    studentId.swept = 0;
     mocks.state.schoolManagersStore = [];
     mocks.state.staffMembersStore = [];
     mocks.state.onboardingConsentsStore = [];
@@ -514,6 +549,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
   describe('3. Draft Save & Retrieval', () => {
     it('saves draft data to pending invite and retrieves it upon validation', async () => {
       const draftData = {
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Alexander',
         legalLastName: 'Chen',
         email: 'alex.chen@nycstudents.net',
@@ -607,32 +643,18 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('4. Complete Onboarding Submission Transaction', () => {
     const validSubmission: PlayerOnboardingSubmission = {
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2026,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
-      gender: 'Male',
-      race: ['Asian'],
-      ethnicity: ['East Asian'],
-      countryOfBirth: 'United States',
-      primaryLanguageAtHome: 'English',
-      isFreeOrReducedLunch: true,
-      isFirstGenCollege: false,
-      doePetitionConsent: true,
-      surveyDetails: {
-        ping: '20-40ms',
-        hoursPerWeek: '6-10 hrs',
-        internetReliability: 'Fiber',
-        careerInterests: ['Competitive Esports Player'],
-        feedback: 'Excited for the upcoming season!',
-      },
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     };
 
-    it('atomically creates member, Riot identity, Discord identity, demographics vault, and marks invite submitted', async () => {
+    it('atomically creates member, Riot identity, Discord identity, and marks invite submitted', async () => {
       const result = await submitOk({
         token: rawToken,
         submission: validSubmission,
@@ -672,28 +694,13 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       expect(discordIdentity.providerUsername).toBe('alexchen');
       expect(discordIdentity.inGuild).toBe(true);
 
-      // 4. Verify student demographics vault
-      const demographics = mocks.state.studentDemographicsStore.find(
-        (d) => d.memberId === result.memberId
-      );
-      expect(demographics).toBeDefined();
-      expect(demographics.legalFirstName).toBe('Alex');
-      expect(demographics.legalLastName).toBe('Chen');
-      expect(demographics.birthDate).toEqual(new Date('2008-05-14'));
-      expect(demographics.gender).toBe('Male');
-      expect(demographics.race).toEqual(['Asian']);
-      expect(demographics.isFreeOrReducedLunch).toBe(true);
-      expect(demographics.doePetitionConsent).toBe(true);
-      expect(demographics.surveyDetails?.ping).toBe('20-40ms');
-      expect(demographics.surveyDetails?.careerInterests).toEqual(['Competitive Esports Player']);
-
-      // 5. Verify invite updated to submitted
+      // 4. Verify invite updated to submitted
       const invite = mocks.state.playerInvitesStore.find((inv) => inv.id === 'invite-pending-1');
       expect(invite.status).toBe('submitted');
       expect(invite.memberId).toBe(result.memberId);
       expect(invite.submittedAt).toBeDefined();
 
-      // 6. Verify cache invalidation was triggered
+      // 5. Verify cache invalidation was triggered
       expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('players', 'members');
     });
 
@@ -766,6 +773,16 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
           },
         })
       ).rejects.toThrow('valid date of birth is required');
+    });
+
+    it('rejects a student date of birth outside the 13 to 21 range', async () => {
+      const dob = (years: number) =>
+        new Date(Date.UTC(new Date().getUTCFullYear() - years, 0, 1)).toISOString().slice(0, 10);
+      for (const years of [8, 12, 23, 40]) {
+        await expect(
+          submitOk({ token: rawToken, submission: { ...validSubmission, birthDate: dob(years) } })
+        ).rejects.toThrow('aged 13 to 21');
+      }
     });
 
     describe('consent (Terms of Service and guardian authorization)', () => {
@@ -880,12 +897,13 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('4b. Verified Discord requirement (players)', () => {
     const submission: PlayerOnboardingSubmission = {
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2027,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     };
@@ -1005,64 +1023,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
     });
   });
 
-  describe('5. Zero-PII Invariant & Permissions Protection', () => {
-    it('restricts studentDemographics access to actors with VIEW_STUDENT_DEMOGRAPHICS permission', async () => {
-      const memberId = 'member-demographics-test-id';
-      mocks.state.studentDemographicsStore.push({
-        id: 'demographics-1',
-        memberId,
-        legalFirstName: 'Alex',
-        legalLastName: 'Chen',
-        birthDate: new Date('2008-05-14'),
-        gender: 'Male',
-        race: ['Asian'],
-        countryOfBirth: 'United States',
-        isFreeOrReducedLunch: true,
-      });
-
-      // 1. General staff without VIEW_STUDENT_DEMOGRAPHICS permission -> throws ForbiddenPiiAccessError
-      const generalStaffPerms = Permissions.MANAGE_ROSTERS | Permissions.MANAGE_MATCHES;
-      await expect(
-        getStudentDemographics(memberId, generalStaffPerms, false)
-      ).rejects.toThrow(ForbiddenPiiAccessError);
-
-      // 2. Staff with VIEW_STUDENT_DEMOGRAPHICS permission -> succeeds
-      const compliancePerms = Permissions.VIEW_STUDENT_DEMOGRAPHICS;
-      const demo = await getStudentDemographics(memberId, compliancePerms, false);
-      expect(demo).toBeDefined();
-      expect(demo!.legalFirstName).toBe('Alex');
-      expect(demo!.isFreeOrReducedLunch).toBe(true);
-
-      // 3. Administrator / Owner -> succeeds
-      const adminDemo = await getStudentDemographics(memberId, Permissions.ADMINISTRATOR, false);
-      expect(adminDemo).toBeDefined();
-      expect(adminDemo!.race).toEqual(['Asian']);
-
-      const ownerDemo = await getStudentDemographics(memberId, BigInt(0), true);
-      expect(ownerDemo).toBeDefined();
-    });
-
-    it('ensures manager queries never project or leak demographic fields', () => {
-      // In manager portal queries, only non-PII fields are projected
-      const managerAllowedFields = ['playerName', 'ign', 'discord', 'grade', 'schoolName', 'gameName'];
-      const sensitivePiiFields = [
-        'birthDate',
-        'gender',
-        'race',
-        'ethnicity',
-        'countryOfBirth',
-        'parentsCountryOfBirth',
-        'primaryLanguageAtHome',
-        'isFreeOrReducedLunch',
-        'isFirstGenCollege',
-      ];
-
-      for (const pii of sensitivePiiFields) {
-        expect(managerAllowedFields).not.toContain(pii);
-      }
-    });
-  });
-
   describe('6. Manager Onboarding & Provisioning Flow', () => {
     const managerToken = 'manager_test_token_secret_999';
     const managerTokenHash = crypto.createHash('sha256').update(managerToken).digest('hex');
@@ -1107,6 +1067,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     it('completes manager onboarding, provisions school_managers record, and transitions invite to accepted', async () => {
       const managerSubmission: PlayerOnboardingSubmission = {
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1114,7 +1075,6 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         graduationYear: 2026,
         riotId: 'CoachSam#NA1',
         birthDate: '1988-08-20',
-        gender: 'Male',
         codeOfConductAccepted: true,
         consent: { tosAcknowledged: true },
       };
@@ -1157,6 +1117,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       const result = await submitOk({
         token: managerToken,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'Samuel',
           legalLastName: 'Miller',
           email: 'smiller@stuy.edu',
@@ -1182,6 +1143,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         submitOk({
           token: managerToken,
           submission: {
+            schoolEmail: 'student.school@nycstudents.net',
             legalFirstName: 'Samuel',
             legalLastName: 'Miller',
             email: 'smiller@stuy.edu',
@@ -1202,6 +1164,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         submitOk({
           token: managerToken,
           submission: {
+            schoolEmail: 'student.school@nycstudents.net',
             legalFirstName: 'Samuel',
             legalLastName: 'Miller',
             email: 'smiller@stuy.edu',
@@ -1235,6 +1198,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       });
 
       const managerSubmission: PlayerOnboardingSubmission = {
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1262,24 +1226,26 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         stubSupabaseEnv();
       });
       const managerSub = (extra: Partial<PlayerOnboardingSubmission> = {}): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
         password: 'securePassword123!',
         graduationYear: 2027,
         riotId: 'CoachSam#NA1',
-        birthDate: '1988-08-20',
+        birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // age 19: these managers also play
         codeOfConductAccepted: true,
         consent: { tosAcknowledged: true },
         ...extra,
       });
       const playerSub = (): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
         graduationYear: 2027,
         riotId: 'CoachSam#NA1',
-        birthDate: '1988-08-20',
+        birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
         codeOfConductAccepted: true,
         consent: { tosAcknowledged: true },
       });
@@ -1289,6 +1255,36 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         expect(result.role).toBe('manager');
         expect(mocks.state.playerInvitesStore.filter((i) => i.memberId === result.memberId)).toHaveLength(0);
         expect(mocks.state.schoolManagersStore).toHaveLength(1);
+      });
+
+      describe('student age range for managers', () => {
+        const yearsAgo = (n: number) =>
+          new Date(Date.UTC(new Date().getUTCFullYear() - n, 0, 1)).toISOString().slice(0, 10);
+
+        it('a manager who does not play may be any adult age', async () => {
+          const result = await submitOk({
+            token: managerToken,
+            submission: managerSub({ birthDate: yearsAgo(40), alsoPlays: false }),
+          });
+          expect(result.role).toBe('manager');
+        });
+
+        it('a manager who also plays with an adult date of birth is rejected', async () => {
+          await expect(
+            submitOk({
+              token: managerToken,
+              submission: managerSub({ birthDate: yearsAgo(40), alsoPlays: true, playGameIds: [gameId] }),
+            })
+          ).rejects.toThrow('aged 13 to 21');
+        });
+
+        it('a manager who also plays with an in-range date of birth is accepted', async () => {
+          const result = await submitOk({
+            token: managerToken,
+            submission: managerSub({ birthDate: yearsAgo(19), alsoPlays: true, playGameIds: [gameId] }),
+          });
+          expect(result.role).toBe('manager');
+        });
       });
 
       it('alsoPlays=false ignores any game ids the browser sent', async () => {
@@ -1503,6 +1499,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         stubSupabaseEnv();
       });
       const managerSub = (): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1613,6 +1610,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
     describe('manager password (never kept in the draft, so the server must insist on it)', () => {
       const sub = (password?: string): PlayerOnboardingSubmission => ({
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1726,12 +1724,13 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
   describe('7. Offensive-content screen and staff-review record', () => {
     const baseSubmission = (): PlayerOnboardingSubmission => ({
+      schoolEmail: 'student.school@nycstudents.net',
       legalFirstName: 'Alex',
       legalLastName: 'Chen',
       email: 'alex.chen@nycstudents.net',
       graduationYear: 2027,
       riotId: 'Demon1#LFT1',
-      birthDate: '2008-05-14',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
       codeOfConductAccepted: true,
       consent: { tosAcknowledged: true },
     });
@@ -1763,28 +1762,30 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
       const start = performance.now();
       const result = await submitRaw({
         ...baseSubmission(),
-        surveyDetails: { feedback: 'a'.repeat(100_000) },
+        riotId: 'a'.repeat(100_000),
         legalLastName: 'f '.repeat(50_000),
       });
       expect(performance.now() - start).toBeLessThan(1000);
-      expect(result).toMatchObject({ success: false, code: 'field_too_long', fields: ['legalLastName', 'feedback'] });
+      expect(result).toMatchObject({ success: false, code: 'field_too_long', fields: ['legalLastName', 'riotId'] });
       expect(mocks.state.membersStore).toHaveLength(0);
     });
 
     it('lists every flagged field, across the free-text fields', async () => {
       const result = await submitRaw({
         ...baseSubmission(),
+        schoolEmail: 'student.school@nycstudents.net',
+        legalFirstName: 'Fuckface',
+        legalLastName: 'dumbass',
         riotId: 'ShitLord#NA1',
-        countryOfBirth: 'bullshit',
-        surveyDetails: { feedback: 'this is dumbass' },
       });
       expect(result).toMatchObject({ success: false, code: 'content_flagged' });
-      if (!result.success) expect(result.fields).toEqual(['riotId', 'countryOfBirth', 'feedback']);
+      if (!result.success) expect(result.fields).toEqual(['legalFirstName', 'legalLastName', 'riotId']);
     });
 
     it('rejects when only some flagged fields are overridden', async () => {
       const result = await submitRaw({
         ...baseSubmission(),
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Fuckface',
         riotId: 'ShitLord#NA1',
         contentOverrides: ['legalFirstName'],
@@ -1915,6 +1916,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
 
       const managerSub = (): PlayerOnboardingSubmission => ({
         ...baseSubmission(),
+        schoolEmail: 'student.school@nycstudents.net',
         legalFirstName: 'Samuel',
         legalLastName: 'Miller',
         email: 'smiller@stuy.edu',
@@ -1942,6 +1944,179 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         ).rejects.toThrow(/code of conduct/i);
         expect(mocks.state.membersStore).toHaveLength(0);
       });
+    });
+  });
+
+  describe('8. Onboarding Google Form gate (spec-051)', () => {
+    const submission = (): PlayerOnboardingSubmission => ({
+      schoolEmail: 'student.school@nycstudents.net',
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.chen@nycstudents.net',
+      graduationYear: 2027,
+      riotId: 'Demon1#LFT1',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10), // always age 19
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    });
+
+    it('does not require the form when it is not configured', async () => {
+      formGate.enabled = false;
+      formGate.completed = false;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: submission() });
+      expect(result.success).toBe(true);
+      expect(mocks.state.formCompletionLinks).toEqual([]);
+    });
+
+    it('rejects with onboarding_form_required and writes nothing when configured and not completed', async () => {
+      formGate.enabled = true;
+      formGate.completed = false;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: submission() });
+      expect(result).toMatchObject({ success: false, code: 'onboarding_form_required' });
+      expect(mocks.state.membersStore).toHaveLength(0);
+      expect(mocks.state.onboardingConsentsStore).toHaveLength(0);
+      expect(mocks.state.playerInvitesStore.find((i) => i.id === 'invite-pending-1').status).toBe('pending');
+    });
+
+    it('accepts when configured and completed, and ties the completion to the new member', async () => {
+      formGate.enabled = true;
+      formGate.completed = true;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: submission() });
+      expect(result.success).toBe(true);
+      expect(mocks.state.formCompletionLinks).toEqual([
+        { kind: 'player', inviteId: 'invite-pending-1', memberId: (result as { memberId: string }).memberId },
+      ]);
+    });
+
+    it('applies to managers too, before any account is provisioned', async () => {
+      const managerToken = 'manager_form_gate_token';
+      mocks.state.managerInvitesStore.push({
+        id: 'manager-invite-form',
+        schoolId,
+        tokenHash: crypto.createHash('sha256').update(managerToken).digest('hex'),
+        intendedFirstName: 'Sam',
+        intendedLastName: 'Miller',
+        invitedByUserId: 'staff-admin-id',
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        submissionDraft: { email: 'smiller@stuy.edu', academicYear: '2026-27', managedGames: null, isPrimaryContact: true },
+        memberId: null,
+      });
+      formGate.enabled = true;
+      formGate.completed = false;
+      const result = await submitPlayerOnboarding({
+        token: managerToken,
+        submission: { ...submission(), email: 'smiller@stuy.edu', password: 'securePassword123!', birthDate: '1988-08-20' },
+      });
+      expect(result).toMatchObject({ success: false, code: 'onboarding_form_required' });
+      expect(authMock.createUser).not.toHaveBeenCalled();
+      expect(mocks.state.membersStore).toHaveLength(0);
+    });
+  });
+
+
+  describe('school email and student ID (spec-056)', () => {
+    const base = (): PlayerOnboardingSubmission => ({
+      schoolEmail: 'achen@nycstudents.net',
+      legalFirstName: 'Alex',
+      legalLastName: 'Chen',
+      email: 'alex.personal@gmail.com',
+      graduationYear: 2028,
+      riotId: 'Demon1#LFT1',
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 16, 0, 1)).toISOString().slice(0, 10),
+      codeOfConductAccepted: true,
+      consent: { tosAcknowledged: true },
+    });
+    // Under 18 needs guardian fields; use an adult date of birth so only the school-email rules are under test.
+    const adult = (extra: Partial<PlayerOnboardingSubmission> = {}): PlayerOnboardingSubmission => ({
+      ...base(),
+      birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)).toISOString().slice(0, 10),
+      ...extra,
+    });
+
+    it('stores the school email trimmed and lower-cased next to the personal email', async () => {
+      const result = await submitOk({ token: rawToken, submission: adult({ schoolEmail: '  AChen@NYCStudents.NET ' }) });
+      const member = mocks.state.membersStore.find((m) => m.id === result.memberId);
+      expect(member.schoolEmail).toBe('achen@nycstudents.net');
+      expect(member.email).toBe('alex.personal@gmail.com');
+    });
+
+    it.each([
+      ['a look-alike suffix domain', 'x@nycstudents.net.evil.com'],
+      ['a second @ and another domain', 'x@nycstudents.net@evil.com'],
+      ['a prefix domain', 'x@evilnycstudents.net'],
+      ['a subdomain', 'x@mail.nycstudents.net'],
+      ['another school domain', 'x@schools.nyc.gov'],
+      ['an empty value', '   '],
+      ['no local part', '@nycstudents.net'],
+    ])('rejects %s with school_email_invalid and writes nothing', async (_label, value) => {
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult({ schoolEmail: value }) });
+      expect(result).toMatchObject({ success: false, code: 'school_email_invalid' });
+      expect(mocks.state.membersStore).toHaveLength(0);
+      expect(studentId.linked).toHaveLength(0);
+    });
+
+    it('rejects a school email equal to the personal email, ignoring case', async () => {
+      const result = await submitPlayerOnboarding({
+        token: rawToken,
+        submission: adult({ email: 'achen@nycstudents.net', schoolEmail: 'AChen@nycstudents.net' }),
+      });
+      expect(result).toMatchObject({ success: false, code: 'school_email_invalid' });
+      expect((result as { error: string }).error).toMatch(/different/i);
+    });
+
+    it('rejects a missing school email (direct action call without the field)', async () => {
+      const submission = adult();
+      delete (submission as Partial<PlayerOnboardingSubmission>).schoolEmail;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission });
+      expect(result).toMatchObject({ success: false, code: 'school_email_invalid' });
+    });
+
+    it('returns school_email_already_used when another member holds the address', async () => {
+      mocks.state.membersStore.push({ id: 'other-member', email: 'someone.else@gmail.com', schoolEmail: 'achen@nycstudents.net' });
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult() });
+      expect(result).toMatchObject({ success: false, code: 'school_email_already_used' });
+      expect(mocks.state.membersStore).toHaveLength(1);
+    });
+
+    it('returns school_email_already_used when the unique index decides a race', async () => {
+      const dup = Object.assign(new Error('duplicate key'), { code: '23505', constraint_name: 'members_school_email_lower_idx' });
+      const spy = vi.spyOn(mocks.mockDb, 'transaction').mockRejectedValueOnce(dup);
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult() });
+      spy.mockRestore();
+      expect(result).toMatchObject({ success: false, code: 'school_email_already_used' });
+    });
+
+    it('requires an uploaded student ID before any write', async () => {
+      studentId.pending = false;
+      const result = await submitPlayerOnboarding({ token: rawToken, submission: adult() });
+      expect(result).toMatchObject({ success: false, code: 'student_id_required' });
+      expect(mocks.state.membersStore).toHaveLength(0);
+    });
+
+    it('links the pending upload of the invite to the member and sweeps a replaced older photo after commit', async () => {
+      studentId.replacedKey = 'old.jpg';
+      const result = await submitOk({ token: rawToken, submission: adult() });
+      expect(studentId.linked).toEqual([{ kind: 'player', inviteId: 'invite-pending-1', memberId: result.memberId }]);
+      expect(studentId.swept).toBe(1);
+    });
+
+    it('ignores a client-supplied storage key: the submission type has no field for it and extras are never read', async () => {
+      const result = await submitOk({
+        token: rawToken,
+        submission: { ...adult(), studentIdKey: '../../etc/passwd', studentIdStorageKey: 'other.jpg' } as PlayerOnboardingSubmission,
+      });
+      expect(studentId.linked).toHaveLength(1);
+      expect(JSON.stringify(mocks.state.membersStore.find((m) => m.id === result.memberId))).not.toMatch(/passwd|other\.jpg/);
+    });
+
+    it('never keeps a student ID reference or the school email contents of a draft beyond the typed string', async () => {
+      await saveOnboardingDraft({
+        token: rawToken,
+        draftData: { schoolEmail: 'achen@nycstudents.net', studentIdUploaded: true, studentIdKey: 'k.jpg', legalFirstName: 'Alex' },
+      });
+      const stored = mocks.state.playerInvitesStore[0].submissionDraft;
+      expect(stored).toEqual({ schoolEmail: 'achen@nycstudents.net', legalFirstName: 'Alex' });
     });
   });
 

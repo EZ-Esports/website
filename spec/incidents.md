@@ -212,6 +212,16 @@ Migration 0052 (consents) was merged and deployed before it was applied, and onb
 
 ---
 
+## 22. Review of the lost Google Form attempt: nine failure modes (spec-051, Oct 2026)
+
+An earlier attempt at the Google Form step (never pushed, unrecoverable) was reviewed and nine defects listed on issue #322. They are now design rules in [spec-051](spec-051-google-form-onboarding.md): retry 408/429/5xx in the Apps Script and charge the rate limiter only after failed auth (Google's script comes from a shared address pool, and a 429 silently dropped a completion); the generic `MANAGE_CONTENT` editor must never write rows that belong to a `MANAGE_LEAGUE` page (`ONBOARDING_FORM_KEYS` refused in save and restore); a retired permission bit must be masked in `canGrantPermissions`, otherwise stored roles become un-assignable with no visible reason; an expired token must be explained to the student, not just rejected; only links that honour prefill (`/viewform`, `/d/e/`) are accepted; the bearer credential and the HMAC root must be different derived keys; every completion row needs a cleanup path (member cascade, roster removal, invite delete, purge); the form's setup steps must say what the verification question's description is; a `manual` source is reserved, not built. Also: deploying code before its migration (pattern 21) applies in reverse here, since `0057` drops a table the old code writes, so code goes first.
+
+---
+
+## 23. `vercel link --yes` created a new project (Oct 2026)
+
+Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find the existing `ezesports` project; it created an empty project named `website` in the personal scope and linked to it. The wrong link was visible only because that project had no environment variables. It had no deployments and was deleted with `vercel project rm website`; the checkout was relinked with `vercel link --project ezesports --yes`. Rule: before setting any variable, check the linked project's name in `.vercel/project.json` and that `vercel env ls production` shows `DATABASE_URL`; link with an explicit `--project ezesports`. The same session also showed the webhook bearer is the derived key, not the raw secret (see spec-051).
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
@@ -222,3 +232,4 @@ Migration 0052 (consents) was merged and deployed before it was applied, and onb
 - **`CLAUDE.md` vs gold:** header still says both seeds wipe. Gold does not, post-`9219ef5`. Hazard file is operator contract; `db/seed-gold.ts` is the mechanism.
 - **PR #146:** Applied `assertSeedTargetAllowed()` across `migrate.ts`, `drizzle.config.ts`, `seed-owner.ts`, `backfill-leadership.ts`, and `seed-phase2.ts` to prevent accidental non-loopback database mutations.
 - **Stale members after roster removal (spec-042, 28 Oct 2026):** removing a player deleted only the `players` row, so the member, consents, identities and spent invite lingered and collided with later onboarding (unique Discord/Riot ids, email lookups finding old data). Fix: shared orphan cleanup in the same transaction, fail-closed (keep on any doubt), with the staff and portal confirmations stating what is deleted. A misleading string ("They stay in the school's member list") was removed, and the manager portal's one-click removal gained a confirmation.
+- **Student ID photos of minors (spec-056, 2 Nov 2026) - standing risk, no incident.** The photos are PII of minors in a public repo's product. Rules that must not regress: the bucket stays private with no policies; no `getPublicUrl`, no signed URL inside any cached data, page, action result or CSV; staff open it only via the audited 120 s route; keys never come from the browser; any new code path that deletes a member or invite must call `sweepOrphanStudentIds()` after commit. `student_id_uploads.member_id` is SET NULL on purpose; do not change it to CASCADE or the object loses its only pointer.

@@ -9,5 +9,4 @@ export * from './applications';
 export * from './leadership';
 export * from './content';
 export * from './staff';
-export * from './demographics';
 export * from './careers';

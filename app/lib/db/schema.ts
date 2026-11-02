@@ -53,6 +53,10 @@ export const members = pgTable('members', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   email: text('email').unique(),
+  // The nycstudents.net address typed in onboarding (spec-056). Held in lower case; the unique index is on
+  // lower() as well so a row written by any other path cannot collide on case alone. Nullable because
+  // archive members and admin-created members never went through onboarding.
+  schoolEmail: text('school_email'),
   discord: text('discord'),
   graduationYear: integer('graduation_year'),
   schoolId: uuid('school_id')
@@ -77,6 +81,7 @@ export const members = pgTable('members', {
 }, (table) => [
   index('members_school_id_idx').on(table.schoolId),
   uniqueIndex('members_member_key_unique_idx').on(table.memberKey),
+  uniqueIndex('members_school_email_lower_idx').on(sql`lower(${table.schoolEmail})`),
 ]).enableRLS();
 
 // Seasons config
@@ -246,7 +251,8 @@ export const matches = pgTable('matches', {
 ]).enableRLS();
 
 // A school manager's request to move a scheduled match (rules page 4.3). It only ever proposes:
-// the match keeps its time until staff approve. See spec-032 for the status flow.
+// the match moves when the other school accepts a time (spec-054; earlier requests waited in
+// 'pending_staff', which is kept valid but never entered now). See spec-032 for the status flow.
 export const matchRescheduleRequests = pgTable('match_reschedule_requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   matchId: uuid('match_id')
@@ -1004,26 +1010,50 @@ export const playerIdentities = pgTable('player_identities', {
   index('player_identities_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
-// 4. Student Demographics & Survey Vault (Strict RLS)
-export const studentDemographics = pgTable('student_demographics', {
+// 4. Onboarding form completions. One row per invite whose person finished the staff-configured
+// Google Form (verified by the Apps Script webhook, see spec-051). Holds only ids and a timestamp:
+// no answers and no personal data. `member_id` stays null until the onboarding submission creates
+// the member; the cascade then removes the row with the member.
+export const onboardingFormCompletions = pgTable('onboarding_form_completions', {
   id: uuid('id').defaultRandom().primaryKey(),
-  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull().unique(),
-  legalFirstName: text('legal_first_name').notNull(),
-  legalLastName: text('legal_last_name').notNull(),
-  birthDate: timestamp('birth_date').notNull(),
-  gender: text('gender'),
-  race: text('race').array(),
-  ethnicity: text('ethnicity').array(),
-  countryOfBirth: text('country_of_birth'),
-  parentsCountryOfBirth: text('parents_country_of_birth'),
-  primaryLanguageAtHome: text('primary_language_at_home'),
-  isFreeOrReducedLunch: boolean('is_free_or_reduced_lunch'),
-  isFirstGenCollege: boolean('is_first_gen_college'),
-  doePetitionConsent: boolean('doe_petition_consent').default(false).notNull(),
-  surveyDetails: jsonb('survey_details'), // gaming sentiment, ping, hours, career interests
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }),
+  // 'google_form' is the verified webhook. 'manual' is reserved for a future staff override and is
+  // never written today.
+  source: text('source').notNull().default('google_form'),
+  completedAt: timestamp('completed_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('onboarding_form_completions_invite_idx').on(t.inviteKind, t.inviteId),
+  index('onboarding_form_completions_member_id_idx').on(t.memberId),
+  check('onboarding_form_completions_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
+  check('onboarding_form_completions_source_check', sql`${t.source} in ('google_form', 'manual')`),
+]).enableRLS();
+
+// Student ID photo uploaded during onboarding (spec-056). The image lives in the PRIVATE `student-ids`
+// bucket; this table holds only the object key, never a URL. A row is created by the upload route bound
+// to the invite (so the browser can never name a key), and `member_id` is set when the submission
+// succeeds. A row is live while its member exists or its invite is still pending; anything else is an
+// orphan that the sweep deletes together with its object. Kept apart from `members` so the key is never carried by a members `select()` that ends up
+// in a cache or a page. RLS on, no policies: service role only.
+export const studentIdUploads = pgTable('student_id_uploads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  // SET NULL, not CASCADE: deleting a member must not silently drop the only pointer to the stored
+  // photo. The row stays as an orphan until `sweepOrphanStudentIds` has removed the object and the row.
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  storageKey: text('storage_key').notNull(),
+  contentType: text('content_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
-  index('student_demographics_member_id_idx').on(t.memberId),
+  uniqueIndex('student_id_uploads_invite_idx').on(t.inviteKind, t.inviteId),
+  uniqueIndex('student_id_uploads_member_idx').on(t.memberId),
+  uniqueIndex('student_id_uploads_storage_key_idx').on(t.storageKey),
+  check('student_id_uploads_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
 ]).enableRLS();
 
 // 5. Onboarding Consent Records (append-only audit trail of the Terms of Service
@@ -1098,8 +1128,6 @@ export type ManagerInvite = typeof managerInvites.$inferSelect;
 export type NewManagerInvite = typeof managerInvites.$inferInsert;
 export type PlayerIdentity = typeof playerIdentities.$inferSelect;
 export type NewPlayerIdentity = typeof playerIdentities.$inferInsert;
-export type StudentDemographics = typeof studentDemographics.$inferSelect;
-export type NewStudentDemographics = typeof studentDemographics.$inferInsert;
 export type OnboardingConsent = typeof onboardingConsents.$inferSelect;
 export type NewOnboardingConsent = typeof onboardingConsents.$inferInsert;
 export type OnboardingContentFlag = typeof onboardingContentFlags.$inferSelect;

@@ -16,8 +16,8 @@ describe('findFlaggedFields', () => {
       legalFirstName: 'Alex',
       legalLastName: 'Fucker',
       riotId: '  ',
-      countryOfBirth: undefined,
-      feedback: 'no complaints',
+      discordUsername: undefined,
+      guardianRelationship: 'parent',
     });
     expect(flagged.map((f) => f.field)).toEqual(['legalLastName']);
     expect(flagged[0]).toMatchObject({ label: 'legal last name', value: 'Fucker' });
@@ -25,8 +25,8 @@ describe('findFlaggedFields', () => {
   });
 
   it('keeps fields in a stable order regardless of input order', () => {
-    const flagged = findFlaggedFields({ feedback: 'shit', legalFirstName: 'bitch' });
-    expect(flagged.map((f) => f.field)).toEqual(['legalFirstName', 'feedback']);
+    const flagged = findFlaggedFields({ guardianFullName: 'shit', legalFirstName: 'bitch' });
+    expect(flagged.map((f) => f.field)).toEqual(['legalFirstName', 'guardianFullName']);
   });
 });
 
@@ -34,14 +34,14 @@ describe('length limits', () => {
   it('flags values over a field limit and does not scan more than the limit', () => {
     const huge = 'a'.repeat(100_000);
     expect(findTooLongFields({ legalFirstName: huge, riotId: 'ok#NA1' })).toEqual(['legalFirstName']);
-    expect(findTooLongFields({ feedback: 'x'.repeat(1000) })).toEqual([]);
+    expect(findTooLongFields({ guardianFullName: 'x'.repeat(200) })).toEqual([]);
     const start = performance.now();
-    findFlaggedFields({ legalFirstName: huge, feedback: 's$'.repeat(50_000), riotId: 'f '.repeat(50_000) });
+    findFlaggedFields({ legalFirstName: huge, guardianFullName: 's$'.repeat(50_000), riotId: 'f '.repeat(50_000) });
     expect(performance.now() - start).toBeLessThan(1000);
   });
 
   it('parses saved overrides defensively', () => {
-    expect(parseSavedOverrides({ riotId: 'x', bogus: 'y', feedback: 7, legalFirstName: 'a'.repeat(500) })).toEqual({ riotId: 'x' });
+    expect(parseSavedOverrides({ riotId: 'x', bogus: 'y', guardianFullName: 7, legalFirstName: 'a'.repeat(500) })).toEqual({ riotId: 'x' });
     expect(parseSavedOverrides(null)).toEqual({});
     expect(parseSavedOverrides(['riotId'])).toEqual({});
   });
@@ -54,9 +54,6 @@ describe('collectContentValues', () => {
         legalFirstName: 'A',
         legalLastName: 'B',
         riotId: 'C#NA1',
-        countryOfBirth: 'D',
-        primaryLanguageAtHome: 'E',
-        surveyDetails: { feedback: 'F' },
         consent: { participantLegalName: 'Other Name', guardianFullName: 'G', guardianRelationship: 'H', guardianSignature: 'I' },
       },
       'disc'
@@ -103,7 +100,7 @@ describe('evaluateContent', () => {
 
 describe('step mapping', () => {
   it('opens the earliest step holding a flagged field', () => {
-    expect(stepForContentFields(['feedback', 'legalFirstName'])).toBe(1);
+    expect(stepForContentFields(['guardianSignature', 'legalFirstName'])).toBe(1);
     expect(stepForContentFields(['riotId'])).toBe(3);
     expect(stepForContentFields(['guardianSignature'])).toBe(5);
     expect(stepForContentFields(['discordUsername'])).toBe(2);
@@ -111,9 +108,13 @@ describe('step mapping', () => {
   });
 
   it('sends a content_flagged rejection to that step and leaves the other codes alone', () => {
-    expect(stepForRejection('content_flagged', ['countryOfBirth'])).toBe(4);
-    expect(stepForRejection('field_too_long', ['feedback'])).toBe(4);
+    expect(stepForRejection('content_flagged', ['riotId'])).toBe(3);
+    expect(stepForRejection('field_too_long', ['guardianFullName'])).toBe(5);
     expect(stepForRejection('manager_password_required')).toBe(1);
     expect(stepForRejection('discord_required')).toBe(2);
+  });
+
+  it('sends onboarding_form_required to the Google Form step', () => {
+    expect(stepForRejection('onboarding_form_required')).toBe(6);
   });
 });

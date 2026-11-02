@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {
   ensurePlayerSubmission,
   findDiscordIdentityOwner,
+  findSchoolEmailOwner,
   listOnboardingGames,
   findInviteForSubmission,
   findStaffUserIdByEmail,
@@ -12,10 +13,11 @@ import {
   upsertMemberRecord,
   upsertPlayerIdentities,
   upsertSchoolManager,
-  upsertStudentDemographics,
   type OnboardingTx,
 } from '@/app/lib/db/onboarding';
 import { db } from '@/app/lib/db';
+import { hasFormCompletion, linkFormCompletionToMember } from '@/app/lib/db/onboarding-form';
+import { getOnboardingFormConfig } from '../google-form/config';
 import { insertContentFlag } from '@/app/lib/db/content-flags';
 import {
   CONTENT_FLAGGED_MESSAGE,
@@ -29,11 +31,21 @@ import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import {
   calculateAge,
   isPlausibleBirthDate,
+  isStudentAgeInRange,
+  STUDENT_AGE_RANGE_MESSAGE,
   validateConsent,
   type NormalizedConsent,
 } from '../consent';
 import { isValidSeasonName, DEFAULT_MANAGER_SEASON } from '@/app/lib/season-name';
-import { OnboardingRejection, isDiscordIdentityUniqueViolation } from '../rejection';
+import {
+  OnboardingRejection,
+  isDiscordIdentityUniqueViolation,
+  isSchoolEmailUniqueViolation,
+} from '../rejection';
+import { SCHOOL_EMAIL_ALREADY_USED_MESSAGE, checkSchoolEmail, normalizeEmail } from '../school-email';
+import { STUDENT_ID_REQUIRED_MESSAGE } from '../student-id';
+import { findPendingUpload, linkUploadToMember } from '@/app/lib/db/student-ids';
+import { sweepOrphanStudentIds } from '../student-id-sweep';
 import type { VerifiedDiscord } from '../discord-verification';
 import { filterGamesByManaged, sanitizeGameIds } from '../play-games';
 import type {
@@ -47,9 +59,11 @@ import type {
  */
 export function validateSubmissionInputs(
   submission: PlayerOnboardingSubmission,
-  now: Date = new Date()
+  now: Date = new Date(),
+  options: { enforceStudentAge?: boolean } = {}
 ): {
   email: string;
+  schoolEmail: string;
   legalFirstName: string;
   legalLastName: string;
   gradYear: number;
@@ -57,9 +71,15 @@ export function validateSubmissionInputs(
   consent: NormalizedConsent;
 } {
   const email = (submission.email || '').trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || email.length > 254 || !/^[^\s@\p{Cc}]+@[^\s@\p{Cc}]+\.[^\s@\p{Cc}]+$/u.test(email)) {
     throw new Error('A valid email address is required.');
   }
+
+  // The school email is checked here, server-side, so calling the action directly cannot skip it.
+  // Returned as a rejection (not a thrown Error) so the message survives production error masking.
+  const schoolEmailProblem = checkSchoolEmail(submission.schoolEmail, email);
+  if (schoolEmailProblem) throw new OnboardingRejection('school_email_invalid', schoolEmailProblem);
+  const schoolEmail = normalizeEmail(submission.schoolEmail);
 
   const legalFirstName = (submission.legalFirstName || '').trim();
   const legalLastName = (submission.legalLastName || '').trim();
@@ -81,15 +101,21 @@ export function validateSubmissionInputs(
     throw new Error('A valid date of birth is required.');
   }
 
+  // Age comes from the submitted date of birth, never from a client-supplied age.
+  const age = calculateAge(birthDateObj, now);
+  if (options.enforceStudentAge && !isStudentAgeInRange(age)) {
+    throw new Error(STUDENT_AGE_RANGE_MESSAGE);
+  }
+
   // Consent is enforced here, server-side, so it cannot be skipped by calling the action directly.
-  // Age comes from the stored date of birth, never from a client-supplied age.
   const consent = validateConsent(submission.consent, {
-    age: calculateAge(birthDateObj, now),
+    age,
     fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
   });
 
   return {
     email,
+    schoolEmail,
     legalFirstName,
     legalLastName,
     gradYear,
@@ -122,6 +148,9 @@ async function findExistingAuthUserId(email: string): Promise<string | null> {
     return null;
   }
 }
+
+export const ONBOARDING_FORM_REQUIRED_MESSAGE =
+  'We have not received your onboarding form yet. Open the form from the last step, submit it, and wait for the green confirmation. If you opened the link more than 6 hours ago, use "Open the form again" to get a fresh one.';
 
 const DISCORD_ALREADY_LINKED_MESSAGE =
   'This Discord account is already linked to another EZ Esports member. Please reconnect with a different Discord account, or contact EZ Esports if you think this is a mistake.';
@@ -159,37 +188,6 @@ export function resolveDiscordIdentity(params: {
     discordUsername: verifiedDiscord.discordUsername,
     inGuild: true,
   };
-}
-
-/**
- * Pipeline step: Upserts sensitive demographic survey in the FERPA / NY § 2-D encrypted vault.
- */
-export async function upsertDemographicsVault(
-  tx: OnboardingTx,
-  memberId: string,
-  params: {
-    legalFirstName: string;
-    legalLastName: string;
-    birthDateObj: Date;
-    submission: PlayerOnboardingSubmission;
-  }
-): Promise<void> {
-  const { legalFirstName, legalLastName, birthDateObj, submission } = params;
-
-  await upsertStudentDemographics(tx, memberId, {
-    legalFirstName,
-    legalLastName,
-    birthDate: birthDateObj,
-    gender: submission.gender || null,
-    race: submission.race || null,
-    ethnicity: submission.ethnicity || null,
-    countryOfBirth: submission.countryOfBirth || null,
-    primaryLanguageAtHome: submission.primaryLanguageAtHome || null,
-    isFreeOrReducedLunch: submission.isFreeOrReducedLunch ?? null,
-    isFirstGenCollege: submission.isFirstGenCollege ?? null,
-    doePetitionConsent: Boolean(submission.doePetitionConsent),
-    surveyDetails: submission.surveyDetails || null,
-  });
 }
 
 /**
@@ -316,11 +314,29 @@ export async function processOnboardingSubmission(
   }
 
   // Step 1: Validate inputs
-  const validated = validateSubmissionInputs(submission);
+  const validated = validateSubmissionInputs(submission, new Date(), {
+    enforceStudentAge: !isManager || submission.alsoPlays === true,
+  });
   const discord = resolveDiscordIdentity({
     verifiedDiscord:
       verifiedDiscord && verifiedDiscord.inviteHash === tokenHash ? verifiedDiscord : null,
   });
+
+  const inviteKind = isManager ? 'manager' : 'player';
+
+  // Student ID photo (spec-056). Looked up by invite, never by anything the browser sends, so the
+  // submission cannot name an arbitrary storage object. Checked before any write.
+  if (!(await findPendingUpload(inviteKind, invite.id))) {
+    throw new OnboardingRejection('student_id_required', STUDENT_ID_REQUIRED_MESSAGE);
+  }
+
+  // Onboarding Google Form (spec-051). When staff have configured it, the webhook must have recorded
+  // this invite's completion; the browser's say-so is never enough. With no usable configuration the
+  // requirement does not exist, so an unconfigured or half-configured form can never block anyone.
+  const formRequired = (await getOnboardingFormConfig()).enabled;
+  if (formRequired && !(await hasFormCompletion(inviteKind, invite.id))) {
+    throw new OnboardingRejection('onboarding_form_required', ONBOARDING_FORM_REQUIRED_MESSAGE);
+  }
 
   // Offensive-content screen. The server recomputes what is flagged from the submitted values and
   // honors an override only for a field that is flagged, so the browser cannot skip the check.
@@ -385,9 +401,15 @@ export async function processOnboardingSubmission(
   // Step 3: Atomic database transaction
   try {
     await runOnboardingTransaction(async (tx) => {
-      // 3a. Member
+      // 3a. Member. Another member holding this school email is a readable rejection; the unique index
+      // below it still decides a race.
+      const schoolEmailOwner = await findSchoolEmailOwner(tx, validated.schoolEmail);
+      if (schoolEmailOwner && (schoolEmailOwner.email ?? '').toLowerCase() !== validated.email) {
+        throw new OnboardingRejection('school_email_already_used', SCHOOL_EMAIL_ALREADY_USED_MESSAGE);
+      }
       createdOrUpdatedMemberId = await upsertMemberRecord(tx, {
         email: validated.email,
+        schoolEmail: validated.schoolEmail,
         legalFirstName: validated.legalFirstName,
         legalLastName: validated.legalLastName,
         discordUsername: discord.discordUsername,
@@ -407,15 +429,17 @@ export async function processOnboardingSubmission(
         inGuild: discord.inGuild,
       });
 
-      // 3c. Demographics Vault (FERPA / NY § 2-D)
-      await upsertDemographicsVault(tx, createdOrUpdatedMemberId, {
-        legalFirstName: validated.legalFirstName,
-        legalLastName: validated.legalLastName,
-        birthDateObj: validated.birthDateObj,
-        submission,
-      });
+      // Tie the form completion to the member so removing the member removes it too.
+      if (formRequired) {
+        await linkFormCompletionToMember(tx, inviteKind, invite.id, createdOrUpdatedMemberId);
+      }
 
-      // 3d. Consent record (ToS acknowledgment + guardian authorization for under-18s).
+      // 3b2. Attach the invite's student ID photo to the member. Inside the transaction, so a rejected
+      // or failed submission leaves the upload pending and the person can simply retry.
+      const linked = await linkUploadToMember(tx, inviteKind, invite.id, createdOrUpdatedMemberId);
+      if (!linked) throw new OnboardingRejection('student_id_required', STUDENT_ID_REQUIRED_MESSAGE);
+
+      // 3c. Consent record (ToS acknowledgment + guardian authorization for under-18s).
       // signedAt is stamped here on the server, never accepted from the client.
       await insertOnboardingConsent(tx, {
         memberId: createdOrUpdatedMemberId,
@@ -426,7 +450,7 @@ export async function processOnboardingSubmission(
         signedAt: new Date(),
       });
 
-      // 3e. Staff review record for any warning the person overrode. A missing table (migration not
+      // 3d. Staff review record for any warning the person overrode. A missing table (migration not
       // applied yet) skips only this record; it never fails the onboarding.
       if (contentCheck.overridden.length > 0) {
         await insertContentFlag(tx, {
@@ -438,7 +462,7 @@ export async function processOnboardingSubmission(
         });
       }
 
-      // 3f. Role-specific finalization
+      // 3e. Role-specific finalization
       if (isManager) {
         await provisionManagerAccount(tx, {
           email: validated.email,
@@ -449,7 +473,7 @@ export async function processOnboardingSubmission(
           submissionDraft: invite.submissionDraft as Record<string, any> | null,
         });
 
-        // 3g. Manager who also plays: the SAME member (matched by email above, one Discord identity)
+        // 3f. Manager who also plays: the SAME member (matched by email above, one Discord identity)
         // also gets a submitted player application per chosen game (reviewed like any student's), so they never need a second invite.
         for (const game of playGames) {
           const created = await ensurePlayerSubmission(tx, {
@@ -474,8 +498,15 @@ export async function processOnboardingSubmission(
     if (isDiscordIdentityUniqueViolation(err)) {
       throw new OnboardingRejection('discord_already_linked', DISCORD_ALREADY_LINKED_MESSAGE);
     }
+    if (isSchoolEmailUniqueViolation(err)) {
+      throw new OnboardingRejection('school_email_already_used', SCHOOL_EMAIL_ALREADY_USED_MESSAGE);
+    }
     throw err;
   }
+
+  // Committed: an older photo this member had was demoted to an orphan row. Sweep removes its object,
+  // and keeps the row for a retry if Storage refuses. Never throws.
+  await sweepOrphanStudentIds();
 
   // Step 4: Invalidate cache tags
   if (isManager) {

@@ -29,7 +29,6 @@ const mocks = vi.hoisted(() => {
     playerInvitesStore: [] as any[],
     managerInvitesStore: [] as any[],
     playerIdentitiesStore: [] as any[],
-    studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
     staffAuditLogsStore: [] as any[],
     rolesStore: [] as any[],
@@ -173,9 +172,6 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.playerIdentities) {
           return state.playerIdentitiesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
-        if (currentTable === schema.studentDemographics) {
-          return state.studentDemographicsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
-        }
 
         if (currentTable === schema.schoolManagers) {
           const rows = state.schoolManagersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
@@ -278,10 +274,6 @@ const mocks = vi.hoisted(() => {
           state.playerIdentitiesStore.push(record);
           return [record];
         }
-        if (tbl === schema.studentDemographics) {
-          state.studentDemographicsStore.push(record);
-          return [record];
-        }
         if (tbl === schema.players) {
           state.playersStore.push(record);
           return [record];
@@ -375,6 +367,27 @@ vi.mock('@/app/lib/onboarding/discord-session', () => ({
       inviteHash: createHash('sha256').update(token.trim()).digest('hex'),
     };
   },
+}));
+
+// Student ID photo (spec-056): the upload is held server-side against the invite. These tests exercise
+// the pipeline's decisions, so the persistence layer and Storage are stand-ins.
+const studentId = vi.hoisted(() => ({
+  pending: true,
+  linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
+  replacedKey: null as string | null,
+  swept: 0,
+}));
+vi.mock('@/app/lib/db/student-ids', () => ({
+  findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
+  listMembersWithStudentId: async () => new Set<string>(),
+  linkUploadToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    if (!studentId.pending) return null;
+    studentId.linked.push({ kind, inviteId, memberId });
+    return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
+  },
+}));
+vi.mock('@/app/lib/onboarding/student-id-sweep', () => ({
+  sweepOrphanStudentIds: async () => { studentId.swept += 1; return 0; },
 }));
 
 vi.mock('@/app/lib/auth', () => ({
@@ -522,7 +535,6 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
     mocks.state.playerInvitesStore = [];
     mocks.state.managerInvitesStore = [];
     mocks.state.playerIdentitiesStore = [];
-    mocks.state.studentDemographicsStore = [];
     mocks.state.staffMembersStore = [
       {
         userId: staffSuperAdmin.id,
@@ -616,6 +628,7 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       const subRes = await submitOk({
         token,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'Alex',
           legalLastName: 'Chen',
           email: 'alex.chen@stuy.edu',
@@ -742,12 +755,13 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       const submitPlayerRes = await submitOk({
         token: playerToken,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'David',
           legalLastName: 'Kim',
           email: 'david.kim@nycstudents.net',
           graduationYear: 2027,
           riotId: 'DavidK#NA1',
-          birthDate: new Date('2008-03-21'),
+          birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)), // always age 19
           codeOfConductAccepted: true,
           consent: { tosAcknowledged: true },
         },

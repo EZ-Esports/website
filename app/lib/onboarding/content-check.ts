@@ -13,9 +13,6 @@ export const CONTENT_FIELDS = {
   legalLastName: { label: 'legal last name', step: 1, max: 100 },
   discordUsername: { label: 'Discord username', step: 2, max: 100 },
   riotId: { label: 'Riot ID', step: 3, max: 60 },
-  countryOfBirth: { label: 'country of birth', step: 4, max: 100 },
-  primaryLanguageAtHome: { label: 'primary language at home', step: 4, max: 100 },
-  feedback: { label: 'notes for staff', step: 4, max: 1000 },
   participantLegalName: { label: 'participant legal name', step: 5, max: 200 },
   guardianFullName: { label: 'guardian full name', step: 5, max: 200 },
   guardianRelationship: { label: 'guardian relationship', step: 5, max: 100 },
@@ -91,9 +88,6 @@ interface SubmissionTextShape {
   legalFirstName?: string;
   legalLastName?: string;
   riotId?: string;
-  countryOfBirth?: string;
-  primaryLanguageAtHome?: string;
-  surveyDetails?: { feedback?: string } | null;
   consent?: {
     participantLegalName?: string | null;
     guardianFullName?: string | null;
@@ -121,9 +115,6 @@ export function collectContentValues(
     legalLastName: submission.legalLastName,
     discordUsername,
     riotId: submission.riotId,
-    countryOfBirth: submission.countryOfBirth,
-    primaryLanguageAtHome: submission.primaryLanguageAtHome,
-    feedback: submission.surveyDetails?.feedback,
     participantLegalName: participant.toLowerCase() === fullName ? undefined : participant,
     guardianFullName: consent.guardianFullName,
     guardianRelationship: consent.guardianRelationship,

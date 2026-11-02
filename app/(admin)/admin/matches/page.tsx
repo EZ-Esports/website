@@ -6,9 +6,6 @@ import { defaultMatchTab, matchesBackLink, parseMatchFilterParams } from '@/app/
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
-import RescheduleQueue from '@/app/components/admin/RescheduleQueue';
-import { getStaffRescheduleQueue } from '@/app/lib/db/reschedules';
-import type { StaffRescheduleItem } from '@/app/lib/reschedule-rules';
 
 export default async function AdminMatchesPage({
   searchParams,
@@ -29,7 +26,6 @@ export default async function AdminMatchesPage({
   let initialPage: MatchPageResponse = { items: [], nextCursor: null };
   let initialCounts: MatchTabCounts | null = null;
   let initialFilters = { gameId: '', seasonId: '' };
-  let rescheduleQueue: StaffRescheduleItem[] = [];
   let dbError = false;
   // One clock for the first page, the totals and the first render, so the three agree on what is overdue.
   const now = new Date();
@@ -42,7 +38,7 @@ export default async function AdminMatchesPage({
       gameId: initialFilters.gameId || undefined,
       seasonId: initialFilters.seasonId || undefined,
     };
-    const [firstPage, counts, teamsRes, rostersRes, activeSeasonsRes, schoolsRes, queueRes] = await Promise.all([
+    const [firstPage, counts, teamsRes, rostersRes, activeSeasonsRes, schoolsRes] = await Promise.all([
       // Raw staff read (spec-022): never the redacting public query.
       getMatchesPage({ ...facets, tab: initialTab, now, sort: defaultSortForTab(initialTab), limit: 25 }),
       getMatchTabCounts({ ...facets, now }),
@@ -50,13 +46,7 @@ export default async function AdminMatchesPage({
       getCachedRosters(),
       getCachedSeasons(),
       getCachedSchools(),
-      // Fail soft: a problem with the queue must not take the results page down with it.
-      getStaffRescheduleQueue().catch((error) => {
-        console.error('Failed to load reschedule requests', error);
-        return [] as StaffRescheduleItem[];
-      }),
     ]);
-    rescheduleQueue = queueRes;
     schools = schoolsRes;
     initialPage = toMatchesPageDto(firstPage);
     initialCounts = counts;
@@ -96,8 +86,6 @@ export default async function AdminMatchesPage({
         teams,
         games,
       }}
-    >
-      <RescheduleQueue items={rescheduleQueue} />
-    </AdminMatchExplorer>
+    />
   );
 }

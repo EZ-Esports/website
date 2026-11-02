@@ -67,7 +67,7 @@ const mocks = vi.hoisted(() => ({
    * app/lib/db/__tests__/roster-removal.test.ts; here we prove the staff actions call it inside
    * their transaction, with the school-scoped player's roster.
    */
-  removal: { removed: true, memberId: 'member-ok', studentRecord: 'deleted', deleted: { consents: 0, demographics: 0, identities: 0, invites: 0 } } as Record<string, unknown>,
+  removal: { removed: true, memberId: 'member-ok', studentRecord: 'deleted', deleted: { consents: 0, formCompletions: 0, identities: 0, invites: 0 } } as Record<string, unknown>,
   removePlayerFromRosterTx: vi.fn(),
   cleanupOrphanMember: vi.fn(async (_tx: unknown, _input: unknown) => ({ studentRecord: 'kept', keptReason: 'other_roster' })),
 }));
@@ -497,7 +497,7 @@ describe('removing a player runs the shared orphan cleanup (spec-042)', () => {
     mocks.matchCount = 0;
     mocks.rosterPlayers = [];
     mocks.requirePermission.mockImplementation(async () => ({}));
-    mocks.removal = { removed: true, memberId: 'member-ok', studentRecord: 'deleted', deleted: { consents: 0, demographics: 0, identities: 0, invites: 0 } };
+    mocks.removal = { removed: true, memberId: 'member-ok', studentRecord: 'deleted', deleted: { consents: 0, formCompletions: 0, identities: 0, invites: 0 } };
   });
 
   it('deleteRosterMember calls the helper inside a transaction with the school-scoped player and roster', async () => {

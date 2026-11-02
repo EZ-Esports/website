@@ -40,12 +40,10 @@ export async function resolveSeries(params: {
   leagueMatchId: string;
   matchIds: string[];
   rosters: RosterRiotIds;
-  /** The match's current scheduled start; a game that began over an hour before it is refused. */
-  scheduledAt?: Date;
   port: MatchDataPort;
   repo: GameRepository;
 }): Promise<ResolveOutcome> {
-  const { leagueMatchId, matchIds, rosters, scheduledAt, port, repo } = params;
+  const { leagueMatchId, matchIds, rosters, port, repo } = params;
 
   const attachments = await repo.findAttachments(matchIds);
   const taken = matchIds.filter((id) => {
@@ -92,7 +90,7 @@ export async function resolveSeries(params: {
   }
 
   const ordered = matchIds.map((id) => games.get(id)!);
-  const outcome = scoreSeries(ordered, rosters, scheduledAt);
+  const outcome = scoreSeries(ordered, rosters);
   if (!outcome.ok) return { status: 'invalid', errors: outcome.errors, definitive: true };
   return { status: 'ok', series: outcome.series, games: ordered };
 }

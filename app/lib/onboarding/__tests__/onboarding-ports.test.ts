@@ -1,21 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { Permissions, hasPermission } from '@/app/lib/roles';
-import { schoolManagers, playerInvites, managerInvites, playerIdentities, studentDemographics } from '@/app/lib/db/schema';
+import { Permissions, RETIRED_PERMISSION_BITS, hasPermission } from '@/app/lib/roles';
+import { schoolManagers, playerInvites, managerInvites, playerIdentities, onboardingFormCompletions } from '@/app/lib/db/schema';
 import { ManualRiotIdAdapter, deriveTrackerUrl, RIOT_ID_REGEX } from '../adapters/riot-manual';
 
 describe('Milestone 1: Permissions & Schema', () => {
-  it('defines VIEW_STUDENT_DEMOGRAPHICS permission bitmask', () => {
-    expect(Permissions.VIEW_STUDENT_DEMOGRAPHICS).toBe(BigInt(1) << BigInt(12));
+  it('keeps bit 12 retired: no permission uses it and it is reserved, never reused', () => {
+    expect(RETIRED_PERMISSION_BITS).toBe(BigInt(1) << BigInt(12));
+    expect((Permissions as Record<string, bigint>).VIEW_STUDENT_DEMOGRAPHICS).toBeUndefined();
+    for (const bit of Object.values(Permissions)) expect(bit & RETIRED_PERMISSION_BITS).toBe(BigInt(0));
   });
 
-  it('correctly checks VIEW_STUDENT_DEMOGRAPHICS permission and administrator override', () => {
-    const demogPerm = Permissions.VIEW_STUDENT_DEMOGRAPHICS;
-    const generalPerm = Permissions.MANAGE_NEWS;
-
-    expect(hasPermission(demogPerm, false, Permissions.VIEW_STUDENT_DEMOGRAPHICS)).toBe(true);
-    expect(hasPermission(generalPerm, false, Permissions.VIEW_STUDENT_DEMOGRAPHICS)).toBe(false);
-    expect(hasPermission(Permissions.ADMINISTRATOR, false, Permissions.VIEW_STUDENT_DEMOGRAPHICS)).toBe(true);
-    expect(hasPermission(BigInt(0), true, Permissions.VIEW_STUDENT_DEMOGRAPHICS)).toBe(true);
+  it('a retired bit alone grants nothing, even to an administrator-less actor', () => {
+    for (const required of Object.values(Permissions)) {
+      expect(hasPermission(RETIRED_PERMISSION_BITS, false, required)).toBe(false);
+    }
   });
 
   it('defines schoolManagers schema columns correctly', () => {
@@ -69,23 +67,11 @@ describe('Milestone 1: Permissions & Schema', () => {
     expect(playerIdentities.createdAt).toBeDefined();
   });
 
-  it('defines studentDemographics schema columns correctly', () => {
-    expect(studentDemographics.id).toBeDefined();
-    expect(studentDemographics.memberId).toBeDefined();
-    expect(studentDemographics.legalFirstName).toBeDefined();
-    expect(studentDemographics.legalLastName).toBeDefined();
-    expect(studentDemographics.birthDate).toBeDefined();
-    expect(studentDemographics.gender).toBeDefined();
-    expect(studentDemographics.race).toBeDefined();
-    expect(studentDemographics.ethnicity).toBeDefined();
-    expect(studentDemographics.countryOfBirth).toBeDefined();
-    expect(studentDemographics.parentsCountryOfBirth).toBeDefined();
-    expect(studentDemographics.primaryLanguageAtHome).toBeDefined();
-    expect(studentDemographics.isFreeOrReducedLunch).toBeDefined();
-    expect(studentDemographics.isFirstGenCollege).toBeDefined();
-    expect(studentDemographics.doePetitionConsent).toBeDefined();
-    expect(studentDemographics.surveyDetails).toBeDefined();
-    expect(studentDemographics.createdAt).toBeDefined();
+  it('defines onboardingFormCompletions as ids and a timestamp only', () => {
+    expect(Object.keys(onboardingFormCompletions).sort()).toEqual(
+      expect.arrayContaining(['completedAt', 'id', 'inviteId', 'inviteKind', 'memberId', 'source'])
+    );
+    expect((onboardingFormCompletions as Record<string, unknown>).answers).toBeUndefined();
   });
 });
 

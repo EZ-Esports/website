@@ -102,6 +102,21 @@ export function ActiveManagersTab({
                       ))
                     )}
                   </div>
+                  {(m.schoolEmail || m.hasStudentId) && (
+                    <div className="text-xs text-foreground-secondary flex items-center gap-x-3 gap-y-1 flex-wrap">
+                      {m.schoolEmail && <span>School email: {m.schoolEmail}</span>}
+                      {m.hasStudentId && m.memberId && (
+                        <a
+                          href={`/admin/schools/student-id/${m.memberId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-accent underline underline-offset-2"
+                        >
+                          View student ID<span className="sr-only"> for {displayName || displayEmail} (opens in a new tab)</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
                   {m.memberId &&
                     (contentFlags[m.memberId] ?? []).map((flag) => (
                       <ContentFlagBadge key={flag.id} flag={flag} who={displayName || displayEmail} />

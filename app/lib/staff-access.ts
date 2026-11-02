@@ -13,7 +13,7 @@ export const ADMIN_SECTION_PERMISSIONS = {
   '/admin/applications': Permissions.MANAGE_APPLICATIONS,
   '/admin/content': Permissions.MANAGE_CONTENT,
   '/admin/team': Permissions.MANAGE_ROLES,
-  '/admin/demographics': Permissions.VIEW_STUDENT_DEMOGRAPHICS,
+  '/admin/onboarding-form': Permissions.MANAGE_LEAGUE,
 } as const;
 
 /**

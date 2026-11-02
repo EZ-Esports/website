@@ -66,3 +66,37 @@ export function parseMatchReferences(input: string): ParsedMatchReferences {
   }
   return { ids, errors };
 }
+
+export interface GameLinkValidation {
+  /** One entry per game field: an error message, or null when the field is fine (or optional and empty). */
+  fieldErrors: (string | null)[];
+  /** The non-empty fields joined with newlines: the `input` the server action takes. */
+  input: string;
+  ok: boolean;
+}
+
+/**
+ * Validates the per-game fields of the submit form (game 1 and 2 required, game 3 optional).
+ * Each field holds exactly one bare UUID or tracker.gg link; repeats across fields are flagged on
+ * the later field. The joined `input` still goes through the server's `parseMatchReferences`.
+ */
+export function validateGameLinks(values: string[]): GameLinkValidation {
+  const seen: string[] = [];
+  const fieldErrors = values.map((raw, index) => {
+    const text = raw.trim();
+    if (!text) {
+      return index < MIN_SERIES_GAMES ? `Game ${index + 1} is required.` : null;
+    }
+    if (/[\s,;]/.test(text)) return `Game ${index + 1} takes a single match ID or link.`;
+    const id = parseMatchReference(text);
+    if (!id) return `Game ${index + 1} is not a match ID or a tracker.gg match link.`;
+    if (seen.includes(id)) return `Game ${index + 1} repeats a match that is already listed.`;
+    seen.push(id);
+    return null;
+  });
+  return {
+    fieldErrors,
+    input: values.map((v) => v.trim()).filter(Boolean).join('\n'),
+    ok: fieldErrors.every((e) => e === null),
+  };
+}

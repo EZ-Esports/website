@@ -35,6 +35,7 @@ const managerInvite = (draft: Record<string, any> | null = null): InviteData => 
   gameName: 'School Manager',
   gameSlug: 'manager',
   submissionDraft: draft,
+  studentIdUploaded: true,
   expiresAt: new Date(),
   playableGames: GAMES,
 });
@@ -55,7 +56,8 @@ beforeEach(() => {
 });
 
 function fillStepOne() {
-  fireEvent.change(screen.getByLabelText(/manager email/i), { target: { value: 'sam@school.edu' } });
+  fireEvent.change(screen.getByLabelText(/personal email/i), { target: { value: 'sam@school.edu' } });
+  fireEvent.change(screen.getByLabelText(/school email/i), { target: { value: 'sam@nycstudents.net' } });
   fireEvent.change(screen.getByLabelText(/portal account password/i), { target: { value: 'longenough1' } });
   fireEvent.change(screen.getByLabelText(/graduation year/i), { target: { value: '2027' } });
 }
