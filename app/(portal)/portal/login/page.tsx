@@ -18,10 +18,10 @@ export default async function PortalLoginPage({ searchParams }: PortalLoginPageP
   const { message, email } = await searchParams;
 
   return (
-    <div className="min-h-screen bg-surface text-foreground flex flex-col">
+    <div className="bg-surface text-foreground">
       <Header />
-      {/* Header is fixed, so offset the body by the same amount MainContentWrapper uses. */}
-      <main className="flex-1 flex items-center justify-center px-4 pt-[88px] pb-12">
+      {/* Fills the viewport below the fixed header so the card is centered in what is visible. The footer sits below the fold and shows on scroll. */}
+      <main className="min-h-screen flex items-center justify-center px-4 pt-[88px]">
         <Card padding="lg" className="w-full max-w-md space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
