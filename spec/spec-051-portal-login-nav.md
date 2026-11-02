@@ -3,20 +3,17 @@
 Status: implemented, unmerged. No migration.
 
 ## What changed
-`/portal/login` (School Manager login) had a bare centered card with no navigation. It now renders a top bar that matches the manager portal header in `PortalShell`:
+`/portal/login` (School Manager login) had a bare centered card with no navigation. It now renders the same site-wide `Header` (`app/components/layout/Header.tsx`) that the marketing pages use, so the login page has the regular public-site nav (Competition, About, Get Involved, Submit Interest).
 
-- Sticky `<header>` with the same surface, blur and border tokens as the portal shell.
-- "EZ ESPORTS" logo link to `/` (public site) and the "Manager Portal" pill in `#f4cccc`.
-- A compact `<nav aria-label="Portal login">` with one link to the Staff Portal login at `/login`.
-- No school selector, user badge or sign-out, because the visitor is logged out.
-
-The card's own footer link to Staff Portal Login stays.
+- The page renders `<Header />` above its body. `Header` is fixed, so the `<main>` takes `pt-[88px]`, matching `MainContentWrapper`.
+- The school selector, user badge and sign-out from `PortalShell` are not shown, because the visitor is logged out.
+- The card's own footer link to Staff Portal Login stays.
 
 ## Layout
-The outer element is now a `div` (`min-h-screen flex flex-col`) holding the header and a `<main>` with `flex-1 flex items-center justify-center px-4 py-12`. The card is centered horizontally and vertically in the area below the bar and keeps its size (`w-full max-w-md`). The form and its contents are unchanged.
+The outer element is a `div` (`min-h-screen flex flex-col`) holding the header and a `<main>` with `flex-1 flex items-center justify-center px-4 pt-[88px] pb-12`. The card is centered horizontally and vertically in the area below the fixed header and keeps its size (`w-full max-w-md`). The form and its contents are unchanged.
 
 ## Why
-Logged-out managers landed on a page with no way back to the public site. The header matches the portal's look so the login and the portal read as one product.
+Logged-out managers landed on a page with no way back to the public site. Using the shared `Header` keeps the login page's navigation identical to every other public page, rather than a second, portal-specific bar that would drift from it.
 
 ## Files
 - `app/(portal)/portal/login/page.tsx`
