@@ -245,6 +245,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - No explicit "acted as staff" flag is stored; a staff action is identifiable only by its user id (the reschedule and result rows hold the staff user, the school columns the viewed school). Add a column if reports ever need to filter on it.
 - The confirm dialog stacking on top of the reschedule and result modals has been tested in jsdom only; check it in a real browser as a staff admin.
 
+## Public Valorant Handbook (spec-058)
+
+- **Proposed, not built.** The 2026-27 Student Handbook says approved club leaders receive the Valorant Handbook by email (27 Oct–3 Nov 2026). That document is not in the repo. Do not write map veto, series length, pause limits, or roster-lock rules onto a page until that email, doc, or PDF is the source. Spec-021's "per-game handbooks stay in email" non-goal still holds until spec-058 is implemented.
+
 ## School email and student ID (spec-056)
 
 - **DEPLOY ORDER: apply migration `0058` BEFORE deploying; the code does not degrade without it.** Before production: apply migration `0058` first, confirm the `student-ids` bucket exists and is private (the migration creates it only if the migration role can write the `storage` schema; otherwise create it by hand: Public off, 5 MB, image/jpeg, image/png, image/webp), then deploy. Never applied or tested against production by the implementer.
