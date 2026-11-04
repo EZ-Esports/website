@@ -122,20 +122,20 @@ export function ActiveManagersTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   // Toggle to refocus once the editor closes. A save reloads the list (the toggle briefly
   // unmounts), so the focus is applied in an effect once the button exists again.
-  const [refocusId, setRefocusId] = useState<string | null>(null);
+  const refocusId = useRef<string | null>(null);
   const toggleRefs = useRef(new Map<string, HTMLButtonElement>());
   const closeEditor = (id: string) => {
+    refocusId.current = id;
     setEditingId(null);
-    setRefocusId(id);
   };
   useEffect(() => {
-    if (!refocusId || editingId !== null) return;
-    const el = toggleRefs.current.get(refocusId);
+    if (!refocusId.current || editingId !== null) return;
+    const el = toggleRefs.current.get(refocusId.current);
     if (el) {
       el.focus();
-      setRefocusId(null);
+      refocusId.current = null;
     }
-  }, [refocusId, editingId, managers, loading]);
+  }, [editingId, managers, loading]);
   const removal = useConfirmAction<{ id: string; name: string }>(async ({ id }) => {
     const res = await onRemoveManager(id);
     if (!res?.success && res?.error) onError(res.error);
