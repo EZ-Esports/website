@@ -51,6 +51,8 @@ export interface SchoolManagersModalProps {
    * academic year, which names the season they work on) and the choice is not offered.
    */
   seasonName?: string;
+  /** Tab shown when the dialog opens. */
+  initialTab?: 'invites' | 'active' | 'existing';
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }

@@ -11,6 +11,7 @@ import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } fro
 import { chip, chipButton, focusRing, input, listStack, primaryBtn } from '@/app/components/admin/styles';
 import { cx } from '@/app/lib/cx';
 import { isValidSeasonName } from '@/app/lib/season-name';
+import { planSchoolRosters, rosterNamesPhrase } from '@/app/lib/season-schools';
 import type { SeasonSetupData, SeasonSetupRoster, SeasonSetupSchool } from '@/app/lib/db/season-setup';
 import { lockSeasonRosters, unlockSeasonRosters, publishSeasonOutcomes, hideSeasonOutcomes } from '../actions';
 import { addSchoolToSeason } from '../season-schools-actions';
@@ -80,12 +81,12 @@ export default function SeasonSetupClient({
         return;
       }
       setPickedSchool('');
-      const created = res.rostersCreated.length ? ` with ${res.rostersCreated.join(' and ')} rosters` : '';
+      const phrase = rosterNamesPhrase(res.rostersCreated);
       showToast(
         res.teamCreated
-          ? `${res.schoolName} added${created}.`
+          ? `${res.schoolName} added to ${season.gameName} ${season.name}${res.rostersCreated.length ? ` with ${phrase}` : ''}.`
           : res.rostersCreated.length
-            ? `${res.schoolName}: created ${res.rostersCreated.join(' and ')} roster.`
+            ? `${res.schoolName}: created the ${phrase}.`
             : `${res.schoolName} is already in this season.`,
       );
     });
@@ -183,7 +184,7 @@ export default function SeasonSetupClient({
         id="schools"
         variant="flush"
         title={<>Schools<AdminCount>{schools.length}</AdminCount></>}
-        description="Adding a school registers its team for this season and creates its Varsity and JV rosters, so managers find them ready."
+        description={`Adding a school registers its ${season.gameName} team for ${season.name} and creates the rosters this game fields (${rosterNamesPhrase(planSchoolRosters(season.gameSlug, []).map((r) => r.name))}), so managers find them ready. Other games and seasons are not touched.`}
         actions={
           <Link href={matchesHref} className={chipButton('ghost')} title="Open Matches filtered to this season">
             <FiList aria-hidden className="h-3.5 w-3.5" />
@@ -232,8 +233,7 @@ export default function SeasonSetupClient({
                 school={school}
                 gameSlug={season.gameSlug}
                 isPending={isPending}
-                canInvite={canInvite && inviteable}
-                inviteNote={canInvite && !inviteable ? 'Invites need a season named YYYY-YY.' : undefined}
+                canManage={canInvite}
                 canEditRosters={canEditRosters}
                 onInvite={() => setInviteSchool(school)}
                 onCreateMissing={() => addSchool(school.schoolId)}
@@ -277,7 +277,7 @@ export default function SeasonSetupClient({
         <SchoolManagersModal
           school={{ id: inviteSchool.schoolId, name: inviteSchool.schoolName }}
           games={games}
-          seasonName={season.name}
+          seasonName={inviteable ? season.name : undefined}
           isOpen
           onOpenChange={(open) => {
             if (!open) setInviteSchool(null);
@@ -296,8 +296,7 @@ function SchoolItem({
   school,
   gameSlug,
   isPending,
-  canInvite,
-  inviteNote,
+  canManage,
   canEditRosters,
   onInvite,
   onCreateMissing,
@@ -305,8 +304,8 @@ function SchoolItem({
   school: SeasonSetupSchool;
   gameSlug: string;
   isPending: boolean;
-  canInvite: boolean;
-  inviteNote?: string;
+  /** MANAGE_SCHOOLS: invite links and editing manager access. */
+  canManage: boolean;
   canEditRosters: boolean;
   onInvite: () => void;
   onCreateMissing: () => void;
@@ -349,19 +348,18 @@ function SchoolItem({
                     Create missing rosters
                   </button>
                 )}
-                {canInvite && (
+                {canManage && (
                   <button
                     type="button"
                     onClick={onInvite}
                     className={chipButton('ghost')}
-                    aria-label={`Manager invite links for ${school.schoolName}`}
-                    title="Create or review manager invite links for this season"
+                    aria-label={`Managers and invite links for ${school.schoolName}`}
+                    title="Create manager invite links, and edit which games each manager can manage"
                   >
                     <FiLink aria-hidden className="h-3.5 w-3.5" />
-                    Manager invites
+                    Managers
                   </button>
                 )}
-                {inviteNote && <span className="text-xs text-foreground-secondary">{inviteNote}</span>}
                 {canEditRosters && (
                   <Link
                     href={`/admin/schools/${school.schoolId}/rosters?game=${encodeURIComponent(gameSlug)}`}

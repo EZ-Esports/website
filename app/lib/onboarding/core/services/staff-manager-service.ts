@@ -92,6 +92,48 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
     };
   }
 
+  /**
+   * Changes which games an existing, active manager may manage (null = all games) and whether
+   * they are the primary contact. Reuses the assignment upsert, which keys on school + user +
+   * academic year, so nothing else about the row changes. A removed manager is refused: the
+   * upsert would otherwise switch their access back on.
+   */
+  async updateSchoolManagerAccess(
+    actor: { id: string; email: string },
+    params: { managerId: string; managedGames: string[] | null; isPrimaryContact: boolean }
+  ) {
+    if (!params.managerId) return { success: false, error: 'Manager ID is required.' };
+
+    const existing = await this.repo.findManagerById(params.managerId);
+    if (!existing) return { success: false, error: 'School manager not found.' };
+    if (!existing.isActive) return { success: false, error: 'This manager was removed. Assign them again instead.' };
+
+    const manager = await this.repo.createOrUpdateSchoolManager({
+      schoolId: existing.schoolId,
+      userId: existing.userId,
+      memberId: existing.memberId,
+      academicYear: existing.academicYear,
+      managedGames: params.managedGames,
+      isPrimaryContact: params.isPrimaryContact,
+    });
+
+    await this.repo.writeStaffAuditLog({
+      event: 'update_school_manager_access',
+      userId: actor.id,
+      email: actor.email,
+      details: {
+        managerId: existing.id,
+        schoolId: existing.schoolId,
+        userId: existing.userId,
+        academicYear: existing.academicYear,
+        before: { managedGames: existing.managedGames, isPrimaryContact: existing.isPrimaryContact },
+        after: { managedGames: params.managedGames, isPrimaryContact: params.isPrimaryContact },
+      },
+    });
+
+    return { success: true, manager, message: 'Manager access updated.' };
+  }
+
   async getSchoolManagers(schoolId: string) {
     if (!schoolId) return [];
     return this.repo.findSchoolManagers(schoolId);

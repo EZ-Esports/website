@@ -38,6 +38,13 @@ export function planSchoolRosters(gameSlug: string, existing: ExistingRosterRef[
   return toCreate;
 }
 
+/** "Varsity roster", "Varsity and JV rosters": the count decides singular or plural. */
+export function rosterNamesPhrase(names: string[]): string {
+  if (names.length === 0) return 'no rosters';
+  if (names.length === 1) return `${names[0]} roster`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} rosters`;
+}
+
 /** Divisions the game fields that this team has no roster for yet (drives the "missing roster" hint). */
 export function missingDivisions(gameSlug: string, existing: ExistingRosterRef[]): CanonicalDivision[] {
   return planSchoolRosters(gameSlug, existing).map((r) => r.canonical);

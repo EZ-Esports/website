@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { missingDivisions, planSchoolRosters } from '../season-schools';
+import { missingDivisions, planSchoolRosters, rosterNamesPhrase } from '../season-schools';
+import { parseRosterFilters } from '../school-roster-view';
+
+describe('rosterNamesPhrase', () => {
+  it('uses singular for one roster and plural for several', () => {
+    expect(rosterNamesPhrase(['Varsity'])).toBe('Varsity roster');
+    expect(rosterNamesPhrase(['Varsity', 'JV'])).toBe('Varsity and JV rosters');
+  });
+});
+
+describe('Edit rosters link (?game=)', () => {
+  it('is honored by the roster editor when the school has a team in that game, and ignored otherwise', () => {
+    expect(parseRosterFilters({ game: 'valorant' }, ['valorant', 'osu']).game).toBe('valorant');
+    expect(parseRosterFilters({ game: 'valorant' }, ['osu']).game).toBe('');
+  });
+});
 
 describe('planSchoolRosters', () => {
   it('creates Varsity (A) and JV (B) for a game with a JV split', () => {

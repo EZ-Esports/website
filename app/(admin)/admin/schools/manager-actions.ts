@@ -8,6 +8,8 @@ import { DrizzleOnboardingRepository } from '@/app/lib/onboarding/adapters/db/dr
 import { StaffManagerService } from '@/app/lib/onboarding/core/services/staff-manager-service';
 import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
 import type * as schema from '@/app/lib/db/schema';
+import { db } from '@/app/lib/db';
+import { games as gamesTable } from '@/app/lib/db/schema';
 
 const repo = new DrizzleOnboardingRepository();
 const staffManagerService = new StaffManagerService(repo);
@@ -75,6 +77,43 @@ export async function removeSchoolManager(
       revalidateAll();
     }
     return result;
+  } catch (error) {
+    return { success: false, error: sanitizeDbError(error) };
+  }
+}
+
+export interface UpdateSchoolManagerAccessParams {
+  managerId: string;
+  /** Game slugs the manager may manage; null = all games. An empty list is rejected. */
+  managedGames: string[] | null;
+  isPrimaryContact: boolean;
+}
+
+export async function updateSchoolManagerAccess(
+  params: UpdateSchoolManagerAccessParams
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  const actor = await requireSchoolsPermission();
+  try {
+    let managedGames: string[] | null = null;
+    if (params.managedGames !== null) {
+      managedGames = [...new Set((params.managedGames ?? []).filter((s) => typeof s === 'string' && s.trim()))];
+      if (managedGames.length === 0) return { success: false, error: 'Choose at least one game, or allow all games.' };
+      const known = new Set(
+        (await db.select({ slug: gamesTable.slug }).from(gamesTable)).map((g) => g.slug)
+      );
+      if (managedGames.some((slug) => !known.has(slug))) return { success: false, error: 'Unknown game.' };
+    }
+    const result = await staffManagerService.updateSchoolManagerAccess(actor, {
+      managerId: params.managerId,
+      managedGames,
+      isPrimaryContact: Boolean(params.isPrimaryContact),
+    });
+    if (result.success) {
+      revalidateAll();
+      // The manager portal reads access live; this just refreshes any cached view of it.
+      revalidatePath('/portal');
+    }
+    return { success: result.success, error: 'error' in result ? result.error : undefined, message: 'message' in result ? result.message : undefined };
   } catch (error) {
     return { success: false, error: sanitizeDbError(error) };
   }

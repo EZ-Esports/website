@@ -99,7 +99,7 @@ describe('Season page', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'sc2');
     await user.click(screen.getByRole('button', { name: 'Add school' }));
     await waitFor(() => expect(actions.addSchoolToSeason).toHaveBeenCalledWith({ seasonId: 's1', schoolId: 'sc2' }));
-    expect(await screen.findByText('Bronx Science added with Varsity and JV rosters.')).toBeInTheDocument();
+    expect(await screen.findByText('Bronx Science added to Valorant 2026-27 with Varsity and JV rosters.')).toBeInTheDocument();
   });
 
   it('flags a school with a missing roster and repairs it with the same action', async () => {
@@ -130,12 +130,25 @@ describe('Season page', () => {
     await waitFor(() => expect(actions.publishSeasonOutcomes).toHaveBeenCalledWith('s1'));
   });
 
-  it('opens manager invites scoped to this season, and hides them without permission', async () => {
+  it('opens managers and invites scoped to this season, and hides them without permission', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<SeasonSetupClient {...baseProps} />);
-    await user.click(screen.getByRole('button', { name: 'Manager invite links for Stuyvesant' }));
+    await user.click(screen.getByRole('button', { name: 'Managers and invite links for Stuyvesant' }));
     expect(screen.getByRole('dialog', { name: 'manager modal' })).toHaveTextContent('Stuyvesant for 2026-27');
     rerender(<SeasonSetupClient {...baseProps} canInvite={false} />);
-    expect(screen.queryByRole('button', { name: /Manager invite links/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Managers and invite links/ })).toBeNull();
+  });
+
+  it('game-aware copy: description and toasts name only this game\'s rosters', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<SeasonSetupClient {...baseProps} />);
+    expect(screen.getByText(/Valorant team for 2026-27 and creates the rosters this game fields \(Varsity and JV rosters\)/)).toBeInTheDocument();
+    rerender(<SeasonSetupClient {...baseProps} season={{ ...season, gameName: 'Minecraft', gameSlug: 'minecraft' }} />);
+    expect(screen.getByText(/\(Varsity roster\)/)).toBeInTheDocument();
+
+    actions.addSchoolToSeason.mockResolvedValue({ success: true, schoolName: 'Bronx Science', teamCreated: true, rostersCreated: ['Varsity'] });
+    await user.selectOptions(screen.getByRole('combobox'), 'sc2');
+    await user.click(screen.getByRole('button', { name: 'Add school' }));
+    expect(await screen.findByText('Bronx Science added to Minecraft 2026-27 with Varsity roster.')).toBeInTheDocument();
   });
 });
