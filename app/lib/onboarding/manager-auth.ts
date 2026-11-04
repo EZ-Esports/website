@@ -502,10 +502,6 @@ export async function assertManagerForRoster(
     { allowInactive: true }
   );
   if (!context.isStaffAdmin) {
-    // Staff took this school out of the season (teams.removed_at): its rosters are no longer the manager's to change.
-    if (row.team.removedAt) {
-      throw new Error('Forbidden: This school was removed from this season, so its rosters cannot be changed from the portal');
-    }
     if (!season || row.team.seasonId !== season.id) {
       throw new Error(
         'Forbidden: This roster belongs to a different season than your manager affiliation and cannot be changed from the portal'

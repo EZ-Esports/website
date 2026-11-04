@@ -2,7 +2,6 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { schoolNotRemovedFromSeason } from './season-membership';
 import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import {
   canonicalDivision,
@@ -71,17 +70,12 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
     db
       .selectDistinct({ division: schema.seasonStandings.division })
       .from(schema.seasonStandings)
-      .where(
-        and(
-          eq(schema.seasonStandings.seasonId, seasonId),
-          schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
-        ),
-      ),
+      .where(eq(schema.seasonStandings.seasonId, seasonId)),
     db
       .selectDistinct({ division: schema.rosters.division })
       .from(schema.rosters)
       .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-      .where(and(eq(schema.teams.seasonId, seasonId), isNull(schema.teams.removedAt))),
+      .where(eq(schema.teams.seasonId, seasonId)),
     // Folded into the same round trip rather than awaited first: the division
     // lists are needed either way, and the format only decides whether they get
     // collapsed.
@@ -121,7 +115,6 @@ export function buildSeasonStandingsSnapshotQuery(opts: {
     .where(
       and(
         eq(schema.seasonStandings.seasonId, opts.seasonId),
-        schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
         ...(opts.combined
           ? []
           : [eq(canonicalDivisionSql(schema.seasonStandings.division), opts.division)])
@@ -150,7 +143,6 @@ export function buildSeasonStandingsComputedQuery(opts: {
     .where(
       and(
         eq(schema.teams.seasonId, opts.seasonId),
-        isNull(schema.teams.removedAt),
         ...(opts.combined
           ? []
           : [eq(canonicalDivisionSql(schema.rosterStandings.division), opts.division)]),
@@ -314,13 +306,7 @@ export async function getTeamStandingsRecords(
 
 export const getCachedRosters = unstable_cache(
   async () => {
-    // Rosters of teams staff removed from their season are not offered (schedule form, tiles).
-    return db
-      .select()
-      .from(schema.rosterStandings)
-      .where(
-        sql`not exists (select 1 from ${schema.teams} where ${schema.teams.id} = ${schema.rosterStandings.teamId} and ${schema.teams.removedAt} is not null)`,
-      );
+    return db.select().from(schema.rosterStandings);
   },
   ['rosters-list'],
   { tags: ['rosters'] }
@@ -342,12 +328,7 @@ export async function getGameSeasonSummary(seasonId: string) {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-      .where(
-        and(
-          eq(schema.seasonStandings.seasonId, seasonId),
-          schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
-        ),
-      )
+      .where(eq(schema.seasonStandings.seasonId, seasonId))
       .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name)),
     readSeasonStandingsMeta(seasonId),
   ]);

@@ -92,22 +92,6 @@ describe('submitMatchResult', () => {
     expect(result.error).toBe('This match is not in your season.');
   });
 
-  it('refuses a manager when either school was removed from the season, but not a staff admin (spec-058)', async () => {
-    const REMOVED = 'This match involves a school that was removed from the season, so it cannot be changed here.';
-    for (const side of ['homeRemovedAt', 'awayRemovedAt']) {
-      mocks.loadRows.mockResolvedValue([matchRow({ [side]: new Date() })]);
-      const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
-      expect(result.error).toBe(REMOVED);
-    }
-    expect(mocks.resolveSeries).not.toHaveBeenCalled();
-
-    mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
-    mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
-    mocks.saveSeriesResult.mockResolvedValue(true);
-    mocks.loadRows.mockResolvedValue([matchRow({ homeRemovedAt: new Date() })]);
-    expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).success).toBe(true);
-  });
-
   it('lets a staff admin submit as the viewed school, attributing the attempt to the staff user (spec-055)', async () => {
     mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
     mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });

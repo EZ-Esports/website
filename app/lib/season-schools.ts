@@ -1,5 +1,5 @@
 /**
- * Pure planning for "Add school to season" (spec-058): which rosters a school's team needs so
+ * Pure planning for "Add school to season" (spec-059): which rosters a school's team needs so
  * that it fields every division its game allows. League Setup writes them when staff add the
  * school, so school managers never have to create Varsity / JV themselves.
  *

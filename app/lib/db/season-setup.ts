@@ -48,8 +48,7 @@ export interface SeasonSetupData {
   };
   schools: SeasonSetupSchool[];
   /** Live schools with no team in this season yet, for the add picker. */
-  /** `removed`: taken out of this season earlier; adding it back restores its existing rosters. */
-  availableSchools: Array<{ id: string; name: string; removed: boolean }>;
+  availableSchools: Array<{ id: string; name: string }>;
 }
 
 const DIVISION_ORDER: Record<CanonicalDivision, number> = { Varsity: 0, JV: 1, All: 2 };
@@ -73,11 +72,10 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
     .limit(1);
   if (!season) return null;
 
-  const [allTeams, allSchools] = await Promise.all([
+  const [teams, allSchools] = await Promise.all([
     db
       .select({
         teamId: schema.teams.id,
-        removedAt: schema.teams.removedAt,
         schoolId: schema.schools.id,
         schoolName: schema.schools.name,
         logoUrl: schema.schools.logoUrl,
@@ -93,9 +91,6 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
       .orderBy(asc(schema.schools.name)),
   ]);
 
-  // A removed team keeps its row (and rosters, players, matches) but is not a school of the season.
-  const teams = allTeams.filter((t) => !t.removedAt);
-  const removedSchoolIds = new Set(allTeams.filter((t) => t.removedAt).map((t) => t.schoolId));
   const teamIds = teams.map((t) => t.teamId);
   const rosterRows = teamIds.length
     ? await db
@@ -161,8 +156,6 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
       standingsFormat: season.standingsFormat,
     },
     schools,
-    availableSchools: allSchools
-      .filter((s) => !inSeason.has(s.id))
-      .map((s) => ({ ...s, removed: removedSchoolIds.has(s.id) })),
+    availableSchools: allSchools.filter((s) => !inSeason.has(s.id)),
   };
 }

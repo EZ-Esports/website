@@ -62,9 +62,6 @@ async function loadMatch(matchId: string) {
       homeSchoolId: homeTeam.schoolId,
       homeSchoolName: homeSchool.name,
       awaySchoolId: awayTeam.schoolId,
-      // Set when staff removed either school from the season (spec-058); managers are then refused.
-      homeRemovedAt: homeTeam.removedAt,
-      awayRemovedAt: awayTeam.removedAt,
       awaySchoolName: awaySchool.name,
     })
     .from(schema.matches)
@@ -103,9 +100,6 @@ async function authorizeForMatch(
     throw new ActionError(error instanceof Error ? error.message : 'You cannot do this.');
   }
   const { context, season } = authorized;
-  if (!context.isStaffAdmin && (match.homeRemovedAt || match.awayRemovedAt)) {
-    throw new ActionError('This match involves a school that was removed from the season, so it cannot be changed here.');
-  }
   if (!context.isStaffAdmin && (!season || season.id !== match.seasonId)) {
     throw new ActionError('This match is not in your season.');
   }

@@ -149,10 +149,6 @@ export const teams = pgTable('teams', {
   seasonId: uuid('season_id')
     .references(() => seasons.id, { onDelete: 'cascade' })
     .notNull(),
-  // Null = the school is in this game's season. Set when staff remove the school from the season
-  // (League Setup): the team, its rosters, players and history stay, but every public and manager
-  // surface skips it. Adding the school back clears it, which restores the existing rosters.
-  removedAt: timestamp('removed_at'),
   ...auditColumns,
 }, (table) => [
   index('teams_school_id_idx').on(table.schoolId),

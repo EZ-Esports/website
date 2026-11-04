@@ -2065,12 +2065,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(assertManagerForRoster(rosterId, { allowLocked: true })).resolves.toMatchObject({ roster: { id: rosterId } });
     });
 
-    it('assertManagerForRoster refuses a manager once staff removed the school from the season, reads included (spec-058)', async () => {
-      for (const t of mocks.state.teamsStore) if (t.schoolId === schoolId) t.removedAt = new Date();
-      await expect(assertManagerForRoster(rosterId)).rejects.toThrow(/removed from this season/);
-      await expect(assertManagerForRoster(rosterId, { allowLocked: true, allowInactive: true })).rejects.toThrow(/removed from this season/);
-    });
-
     describe('invite approval', () => {
       beforeEach(() => {
         mocks.state.playerInvitesStore = [

@@ -1,4 +1,4 @@
-# spec-058: League Setup season hub (per-game tabs, season page)
+# spec-059: League Setup season hub (per-game tabs, season page)
 
 - **Status:** Implemented on branch `worktree-agent-a1034cb896548c04e`; no migration; not run against any database; not viewed in a browser.
 - **Date:** 2026-11-04
@@ -29,27 +29,9 @@ League moderation was spread over League Setup (lock / publish buttons on every 
 - **Cache.** Tags `teams`, `rosters` are updated, plus `revalidatePath` for the season page, `/admin/schools` (layout), `/admin/matches`, `/portal`, `/`. Nothing is refreshed when nothing was created.
 - **Consolidation.** Nothing was removed. League Setup's nav description names the new scope; Schools & Rosters keeps school CRUD, crests, and the all-seasons roster editor (linked from each school here); Matches keeps scheduling, results and Generate season (linked via "View matches"); Onboarding Form and Standings Archive are untouched.
 
-## Tests
+## Remove a school from a season: deferred
 
-## Remove a school from a season (migration 0059, NOT applied)
-
-**Why a column.** `teams` and `rosters` have no hidden/deleted/active flag, and `schools.is_active` / `deleted_at` are school-wide, not per game and season. Deleting the team row is not an option: `rosters.team_id` and `players.roster_id` are `ON DELETE CASCADE`, so it would destroy the rosters and players, and matches hang off rosters. Encoding it in roster names or another table was rejected as a hack that every query would still have to learn. So `teams.removed_at timestamp NULL` (`db/migrations/0059_team_removed_at.sql`, journal idx 59, additive, no backfill). Roster editing, parity and the emails need no migration.
-
-**What removal does.** `removeSchoolFromSeason` (`MANAGE_LEAGUE`, confirm dialog, audit `remove_school_from_season`) sets `removed_at` under the same per-school advisory lock; it is idempotent. The team row, its rosters, players and every match stay in the database untouched. Staff views (Schools & Rosters, Matches, the staff match list) still see everything.
-
-**What disappears.** Season page school list and the "already added" set (the school returns to the Add school picker, labelled as removed earlier); public team directory, school team page, team list cache, computed standings rows, the schedule form's roster list; and every public match read that already hid fixtures of a soft-deleted school now also skips a removed team (public match list and counts, season calendar, school fixtures, recent results, hub next/last and form guide), so fixtures and results involving a removed school are hidden from the public. The school's manager no longer sees its rosters, and manager roster creation refuses it. Generate season and staff Schedule match refuse a removed school until it is added back.
-
-**Restore.** Add school on a removed school clears `removed_at` on the same team: its existing rosters, players and matches come back; only a missing division gets a new roster; no second team is created.
-
-**Snapshot reads (review fix).** Reads keyed on `season_standings` alone have no team to join, so they use `schoolNotRemovedFromSeason` (`app/lib/db/season-membership.ts`): "no removed team for this school and season". It is the negative form on purpose, so an archived school with a snapshot row and no team row keeps showing. Applied to the public standings snapshot, season divisions, hub season summary and the archive champion; the archive match count skips fixtures of a removed team (`matchHasNoRemovedTeam`). Tournament brackets are not team-based (spec-010) and are unaffected. A PGlite test runs these against real SQL.
-
-**Manager writes (review fix).** `assertManagerForRoster` refuses a manager (reads included) once the team is removed; the match-result and reschedule actions refuse a manager when either side of the match is a removed team. Staff admins are exempt. Restoring writes an audit entry (`restore_school_to_season`), like removal.
-
-**Deploy gate.** Migration `0059_team_removed_at` must be applied to production BEFORE this branch's code is deployed: the new code filters on `teams.removed_at` in public, portal and staff queries, so each fails until the column exists. Not applied from this branch.
-
-**Known limits.** Derived (non-snapshot) standings for the removed school's opponents still count their results against it, because they come from the `roster_standings` view over matches; changing that needs a view migration, not done. Public pages cached with `revalidatePath`/tags are refreshed on removal and restore.
-
-**Spec numbering.** Another branch also uses spec number 058; whichever merges second renames its file and its entries in `spec/README.md`, `spec/timeline.md` and the code comments that cite "spec-058".
+An earlier revision of this branch removed a school from a season by setting a new `teams.removed_at` column (migration 0059) and filtering every public, portal and staff read on it. That was dropped before merge so this PR needs **no migration**: there is no Remove button, no `removeSchoolFromSeason` action and no restore path, and `addSchoolToSeason` keeps working on the current `teams` model (find-or-create team, add missing division rosters). Removal returns in a later PR on the school-owned, season-scoped roster model (a membership row only; rosters, players and matches are never touched). Spec numbering: this file is spec-059 because spec-058 is `spec-058-public-schools-scoped-to-season-teams.md` on another branch.
 
 ## Tests
 

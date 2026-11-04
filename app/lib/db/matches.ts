@@ -2,7 +2,6 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { schoolNotRemovedFromSeason } from './season-membership';
 import {
   and,
   asc,
@@ -120,11 +119,7 @@ function facetConditions(params: MatchesPageParams, publicOnly = false): SQL[] {
   const conditions: SQL[] = [];
   // Public reads see only published seasons' matches; an unpublished season's schedule is as
   // hidden as its scores. `seasons` is joined by every query that passes this flag.
-  if (publicOnly) {
-    conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
-    // A team staff removed from the season (teams.removed_at) is hidden publicly, with its matches; the rows stay for staff.
-    conditions.push(isNull(homeTeam.removedAt), isNull(awayTeam.removedAt));
-  }
+  if (publicOnly) conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
   if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
   if (params.division && params.division !== COMBINED_DIVISION) {
@@ -276,10 +271,8 @@ export async function getPublicMatchesPage(params: MatchesPageParams): Promise<M
   return getMatchesPage(params, true);
 }
 
-export function buildSeasonMatchesQuery(seasonId: string, division?: string, publicOnly = false) {
-  const conditions: SQL[] = [eq(schema.matches.seasonId, seasonId)];
-  // Public callers do not see fixtures of a team staff removed from the season; the rows stay for staff.
-  if (publicOnly) conditions.push(isNull(homeTeam.removedAt), isNull(awayTeam.removedAt));
+export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
+  const conditions = [eq(schema.matches.seasonId, seasonId)];
   if (division && division !== COMBINED_DIVISION) {
     const targetDiv = canonicalDivision(division);
     conditions.push(
@@ -318,15 +311,15 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string, pub
  * All matches of a season (optionally one division) with names joined in,
  * oldest first. Used by the calendar view, which needs the whole season.
  */
-export async function getSeasonMatches(seasonId: string, division?: string, publicOnly = false) {
-  return buildSeasonMatchesQuery(seasonId, division, publicOnly);
+export async function getSeasonMatches(seasonId: string, division?: string) {
+  return buildSeasonMatchesQuery(seasonId, division);
 }
 
 /** Public counterpart of `getSeasonMatches`: an unpublished (or unknown) season yields no matches. */
 export async function getPublicSeasonMatches(seasonId: string, division?: string) {
   const publicIds = await getOutcomesPublicSeasonIds();
   if (!publicIds.has(seasonId)) return [];
-  return getSeasonMatches(seasonId, division, true);
+  return getSeasonMatches(seasonId, division);
 }
 
 /**
@@ -345,8 +338,6 @@ export async function getSchoolMatchRows(params: {
     // keep seeing a match against it.
     isNull(homeSchool.deletedAt),
     isNull(awaySchool.deletedAt),
-    isNull(homeTeam.removedAt),
-    isNull(awayTeam.removedAt),
   ];
   if (params.seasonIds) conditions.push(inArray(schema.matches.seasonId, params.seasonIds));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
@@ -444,9 +435,7 @@ export const getCachedRecentResults = unstable_cache(
           eq(homeSchool.isActive, true),
           eq(awaySchool.isActive, true),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt),
-          isNull(homeTeam.removedAt),
-          isNull(awayTeam.removedAt)
+          isNull(awaySchool.deletedAt)
         )
       )
       .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
@@ -519,19 +508,12 @@ export function pickChampionsBySeason(
   return bySeason;
 }
 
-/** True unless either side of the match belongs to a team staff removed from its season (teams.removed_at). */
-export function matchHasNoRemovedTeam(): SQL {
-  return sql`not exists (select 1 from ${schema.rosters} where ${schema.rosters.id} in (${schema.matches.homeRosterId}, ${schema.matches.awayRosterId}) and exists (select 1 from ${schema.teams} where ${schema.teams.id} = ${schema.rosters.teamId} and ${schema.teams.removedAt} is not null))`;
-}
-
 export async function getArchiveIndex() {
   const [seasons, counts, champions] = await Promise.all([
     getSeasonsWithGames(),
     db
       .select({ seasonId: schema.matches.seasonId, matchCount: count() })
       .from(schema.matches)
-      // Fixtures of a team staff removed from the season are hidden publicly, so they are not counted either.
-      .where(matchHasNoRemovedTeam())
       .groupBy(schema.matches.seasonId),
     db
       .select({
@@ -542,12 +524,7 @@ export async function getArchiveIndex() {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-      .where(
-        and(
-          eq(schema.seasonStandings.rank, 1),
-          schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
-        ),
-      ),
+      .where(eq(schema.seasonStandings.rank, 1)),
   ]);
 
   const countBySeason = new Map(counts.map((c) => [c.seasonId, c.matchCount]));
@@ -602,8 +579,6 @@ export function buildHubMatchQuery(opts: {
         ),
         isNull(homeSchool.deletedAt),
         isNull(awaySchool.deletedAt),
-        isNull(homeTeam.removedAt),
-        isNull(awayTeam.removedAt),
         ...opts.conditions
       )
     )
@@ -646,9 +621,7 @@ export function buildFormGuideQuery(opts: {
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt),
-          isNull(homeTeam.removedAt),
-          isNull(awayTeam.removedAt)
+          isNull(awaySchool.deletedAt)
         )
       );
   };

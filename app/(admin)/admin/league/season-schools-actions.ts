@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { and, count, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
@@ -16,94 +16,8 @@ const inputSchema = z.object({
 });
 
 export type AddSchoolToSeasonResult =
-  | { success: true; schoolName: string; teamCreated: boolean; restored: boolean; rostersCreated: string[] }
+  | { success: true; schoolName: string; teamCreated: boolean; rostersCreated: string[] }
   | { success: false; error: string };
-
-/**
- * Caches and pages that show a season's schools. `public` also refreshes the public pages a
- * removal or restore changes (team lists, schedule, standings, hub, archive, homepage).
- */
-function refreshSeasonSchools(seasonId: string, publicPages: boolean) {
-  updateTag('teams');
-  updateTag('rosters');
-  revalidatePath(`/admin/league/${seasonId}`, 'layout');
-  revalidatePath('/admin/schools', 'layout');
-  revalidatePath('/admin/matches');
-  revalidatePath('/portal');
-  revalidatePath('/');
-  if (publicPages) {
-    updateTag('matches');
-    for (const path of [
-      '/[game]/varsity',
-      '/[game]/junior-varsity',
-      '/[game]/standings',
-      '/[game]/schedule',
-      '/[game]/teams',
-      '/[game]/teams/[school]',
-    ]) {
-      revalidatePath(path, 'page');
-    }
-    revalidatePath('/archives');
-  }
-}
-
-export type RemoveSchoolFromSeasonResult =
-  | { success: true; schoolName: string; alreadyRemoved: boolean; hiddenMatches: number }
-  | { success: false; error: string };
-
-/**
- * Takes a school out of one game's season WITHOUT deleting anything. A hard delete of the team
- * would cascade to its rosters and players (and fail or orphan matches, which hang off rosters),
- * so the team row stays and `teams.removed_at` is set. Every public and manager surface skips a
- * removed team and hides its matches; staff views still see them. Repeating it is a no-op, and
- * `addSchoolToSeason` clears the marker (restoring the same rosters, players and matches).
- */
-export async function removeSchoolFromSeason(input: { seasonId: string; schoolId: string }): Promise<RemoveSchoolFromSeasonResult> {
-  const actor = await requirePermission(Permissions.MANAGE_LEAGUE);
-
-  const parsed = inputSchema.safeParse(input);
-  if (!parsed.success) return { success: false, error: 'Choose a school to remove.' };
-  const { seasonId, schoolId } = parsed.data;
-
-  try {
-    const result = await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`season-school:${seasonId}:${schoolId}`}))`);
-
-      const [row] = await tx
-        .select({ teamId: schema.teams.id, removedAt: schema.teams.removedAt, schoolName: schema.schools.name })
-        .from(schema.teams)
-        .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-        .where(and(eq(schema.teams.schoolId, schoolId), eq(schema.teams.seasonId, seasonId)))
-        .limit(1);
-      if (!row) return { success: false as const, error: 'That school is not in this season.' };
-
-      const [{ value: hiddenMatches }] = await tx
-        .select({ value: count() })
-        .from(schema.matches)
-        .innerJoin(schema.rosters, or(eq(schema.matches.homeRosterId, schema.rosters.id), eq(schema.matches.awayRosterId, schema.rosters.id)))
-        .where(eq(schema.rosters.teamId, row.teamId));
-
-      if (row.removedAt) {
-        return { success: true as const, schoolName: row.schoolName, alreadyRemoved: true, hiddenMatches };
-      }
-
-      await tx.update(schema.teams).set({ removedAt: new Date() }).where(eq(schema.teams.id, row.teamId));
-      await tx.insert(schema.staffAuditLogs).values({
-        event: 'remove_school_from_season',
-        userId: actor.id,
-        email: actor.email,
-        details: JSON.stringify({ seasonId, schoolId, teamId: row.teamId, schoolName: row.schoolName, hiddenMatches }),
-      });
-      return { success: true as const, schoolName: row.schoolName, alreadyRemoved: false, hiddenMatches };
-    });
-
-    if (result.success && !result.alreadyRemoved) refreshSeasonSchools(seasonId, true);
-    return result;
-  } catch (error) {
-    console.error(error);
-    return { success: false, error: 'Could not remove the school from this season.' };
-  }
-}
 
 /**
  * Registers a school for a season: finds or creates its team (unique on school + game + season)
@@ -113,7 +27,7 @@ export async function removeSchoolFromSeason(input: { seasonId: string; schoolId
  * roster lock does not apply (spec-020), which is why a locked season can still be populated.
  */
 export async function addSchoolToSeason(input: { seasonId: string; schoolId: string }): Promise<AddSchoolToSeasonResult> {
-  const actor = await requirePermission(Permissions.MANAGE_LEAGUE);
+  await requirePermission(Permissions.MANAGE_LEAGUE);
 
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: 'Choose a school to add.' };
@@ -140,7 +54,7 @@ export async function addSchoolToSeason(input: { seasonId: string; schoolId: str
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`season-school:${seasonId}:${schoolId}`}))`);
 
       const [existingTeam] = await tx
-        .select({ id: schema.teams.id, removedAt: schema.teams.removedAt })
+        .select({ id: schema.teams.id })
         .from(schema.teams)
         .where(
           and(
@@ -153,19 +67,6 @@ export async function addSchoolToSeason(input: { seasonId: string; schoolId: str
 
       let teamId = existingTeam?.id;
       let teamCreated = false;
-      let restored = false;
-      if (existingTeam?.removedAt) {
-        // Adding a removed school back: the same team row (and so its rosters, players and matches)
-        // comes back; nothing new is created for it unless a division has no roster.
-        await tx.update(schema.teams).set({ removedAt: null }).where(eq(schema.teams.id, existingTeam.id));
-        await tx.insert(schema.staffAuditLogs).values({
-          event: 'restore_school_to_season',
-          userId: actor.id,
-          email: actor.email,
-          details: JSON.stringify({ seasonId, schoolId, teamId: existingTeam.id, schoolName: school.name }),
-        });
-        restored = true;
-      }
       if (!teamId) {
         const [created] = await tx
           .insert(schema.teams)
@@ -193,13 +94,18 @@ export async function addSchoolToSeason(input: { seasonId: string; schoolId: str
         success: true as const,
         schoolName: school.name,
         teamCreated,
-        restored,
         rostersCreated: toCreate.map((r) => r.name),
       };
     });
 
-    if (result.success && (result.teamCreated || result.restored || result.rostersCreated.length > 0)) {
-      refreshSeasonSchools(seasonId, result.restored);
+    if (result.success && (result.teamCreated || result.rostersCreated.length > 0)) {
+      updateTag('teams');
+      updateTag('rosters');
+      revalidatePath(`/admin/league/${seasonId}`);
+      revalidatePath('/admin/schools', 'layout');
+      revalidatePath('/admin/matches');
+      revalidatePath('/portal');
+      revalidatePath('/');
     }
     return result;
   } catch (error) {

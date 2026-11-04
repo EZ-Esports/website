@@ -144,23 +144,6 @@ describe('requestReschedule', () => {
     expect(mocks.assertManagerForSchoolGame).toHaveBeenCalledWith('school-a', 'game-1');
   });
 
-  it('refuses a manager when either school was removed from the season, and writes nothing (spec-058)', async () => {
-    for (const side of ['homeRemovedAt', 'awayRemovedAt']) {
-      mocks.queue.push([match({ [side]: new Date() })]);
-      expect(await requestReschedule(params)).toEqual({
-        success: false,
-        error: 'This match involves a school that was removed from the season, so it cannot be changed here.',
-      });
-    }
-    expect(mocks.inserted).toEqual([]);
-  });
-
-  it('lets a staff admin act even when a school was removed', async () => {
-    asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
-    mocks.queue.push([match({ homeRemovedAt: new Date() })], [], [{ used: 0 }], [{ id: 'req-1' }], []);
-    expect(await requestReschedule(params)).toEqual({ success: true });
-  });
-
   it('returns an authorization failure with its message (thrown messages are redacted in production)', async () => {
     mocks.queue.push([match()]);
     mocks.assertManagerForSchoolGame.mockRejectedValue(

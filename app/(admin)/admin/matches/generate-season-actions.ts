@@ -127,16 +127,9 @@ async function loadPlan(exec: Pick<typeof db, 'select'>, raw: z.infer<typeof inp
   }
 
   const teams = await exec
-    .select({ id: schema.teams.id, schoolId: schema.teams.schoolId, removedAt: schema.teams.removedAt })
+    .select({ id: schema.teams.id, schoolId: schema.teams.schoolId })
     .from(schema.teams)
     .where(and(eq(schema.teams.seasonId, season.id), eq(schema.teams.gameId, season.gameId), inArray(schema.teams.schoolId, unique)));
-  // A school staff removed from this season keeps its team row (the unique index would reject a second
-  // one), so it cannot be scheduled until League Setup adds it back.
-  const removed = teams.filter((t) => t.removedAt);
-  if (removed.length > 0) {
-    const names = schools.filter((s) => removed.some((t) => t.schoolId === s.id)).map((s) => s.name);
-    throw new GenerateError(`${names.join(', ')} ${names.length === 1 ? 'was' : 'were'} removed from this season. Add ${names.length === 1 ? 'it' : 'them'} back in League Setup first.`);
-  }
   const rosters = teams.length
     ? await exec
         .select({ id: schema.rosters.id, teamId: schema.rosters.teamId, name: schema.rosters.name, division: schema.rosters.division })

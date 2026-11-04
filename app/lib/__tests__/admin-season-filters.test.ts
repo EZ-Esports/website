@@ -130,7 +130,7 @@ describe('matchFilterQuery', () => {
   });
 });
 
-describe('League Setup per-game tabs (spec-058)', () => {
+describe('League Setup per-game tabs (spec-059)', () => {
   const tabs = [{ slug: 'valorant' }, { slug: 'league-of-legends' }];
 
   it('builds links with the game and omits the default status', () => {

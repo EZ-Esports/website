@@ -33,7 +33,7 @@ export function countSeasonsByStatus(seasons: { isActive: boolean }[]): Record<S
 }
 
 /**
- * League Setup link. League Setup has one tab per game (`?game=<slug>`, spec-058) plus a
+ * League Setup link. League Setup has one tab per game (`?game=<slug>`, spec-059) plus a
  * "Manage games" view (`?view=games`); inside a game, the seasons list filters by `?status=`.
  * Active is the default status and carries no param.
  */
