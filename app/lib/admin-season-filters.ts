@@ -32,9 +32,47 @@ export function countSeasonsByStatus(seasons: { isActive: boolean }[]): Record<S
   return { active, inactive: seasons.length - active, all: seasons.length };
 }
 
-/** League Setup tab link. Active is the default, so it carries no param. */
-export function leagueStatusHref(status: SeasonStatusFilter): string {
-  return status === 'active' ? '/admin/league' : `/admin/league?status=${status}`;
+/**
+ * League Setup link. League Setup has one tab per game (`?game=<slug>`, spec-058) plus a
+ * "Manage games" view (`?view=games`); inside a game, the seasons list filters by `?status=`.
+ * Active is the default status and carries no param.
+ */
+export function leagueHref(opts: { game?: string | null; status?: SeasonStatusFilter; view?: 'games' } = {}): string {
+  const params = new URLSearchParams();
+  if (opts.view === 'games') params.set('view', 'games');
+  else if (opts.game) params.set('game', opts.game);
+  if (opts.status && opts.status !== 'active') params.set('status', opts.status);
+  const qs = params.toString();
+  return qs ? `/admin/league?${qs}` : '/admin/league';
+}
+
+/** League Setup status-tab link, optionally inside one game's tab. */
+export function leagueStatusHref(status: SeasonStatusFilter, gameSlug?: string | null): string {
+  return leagueHref({ game: gameSlug, status });
+}
+
+/** The staff page for one season: schools, rosters, manager invites, lock and publish. */
+export function seasonDetailHref(seasonId: string): string {
+  return `/admin/league/${seasonId}`;
+}
+
+export type LeagueView = { kind: 'game'; slug: string } | { kind: 'games' } | { kind: 'empty' };
+
+/**
+ * Which League Setup tab the URL selects. An unknown or missing game falls back to the first
+ * game; `view=games` selects "Manage games"; with no games at all the page can only manage games.
+ */
+export function resolveLeagueView(
+  gameParam: string | string[] | undefined,
+  viewParam: string | string[] | undefined,
+  games: { slug: string }[],
+): LeagueView {
+  if (games.length === 0) return { kind: 'empty' };
+  const view = Array.isArray(viewParam) ? viewParam[0] : viewParam;
+  if (view === 'games') return { kind: 'games' };
+  const wanted = Array.isArray(gameParam) ? gameParam[0] : gameParam;
+  const match = games.find((g) => g.slug === wanted);
+  return { kind: 'game', slug: (match ?? games[0]).slug };
 }
 
 /** "View matches" link on a League Setup season row. */
@@ -59,10 +97,11 @@ export const MATCHES_ORIGIN_PARAM = 'from';
 export function matchesBackLink(
   from: string | string[] | undefined,
   season?: { isActive: boolean } | null,
+  gameSlug?: string | null,
 ): { href: string; label: string } | null {
   const value = Array.isArray(from) ? from[0] : from;
   if (value !== MATCHES_ORIGIN_VALUE) return null;
-  return { href: leagueStatusHref(season ? seasonTab(season.isActive) : 'active'), label: 'League Setup' };
+  return { href: leagueStatusHref(season ? seasonTab(season.isActive) : 'active', gameSlug), label: 'League Setup' };
 }
 
 export interface MatchFilterGame { id: string; slug: string }
@@ -132,11 +171,11 @@ export interface SeasonMovedHint {
  * After a season is created or edited, the hint to show when it no longer
  * appears on the tab staff are looking at; null when it still does.
  */
-export function seasonMovedHint(isActive: boolean, current: SeasonStatusFilter): SeasonMovedHint | null {
+export function seasonMovedHint(isActive: boolean, current: SeasonStatusFilter, gameSlug?: string | null): SeasonMovedHint | null {
   if (seasonMatchesTab(isActive, current)) return null;
   const tab = seasonTab(isActive);
   const name = tab === 'active' ? 'Active' : 'Inactive';
-  return { tab, text: `It is now under the ${name} tab.`, actionLabel: `Show ${name}`, href: leagueStatusHref(tab) };
+  return { tab, text: `It is now under the ${name} tab.`, actionLabel: `Show ${name}`, href: leagueStatusHref(tab, gameSlug) };
 }
 
 /**

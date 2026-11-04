@@ -32,14 +32,14 @@ afterEach(() => {
 const games = [{ id: 'g1', displayName: 'Valorant', shortName: 'VAL', slug: 'valorant', imageUrl: null }];
 const seasons = [{ id: 's1', gameId: 'g1', name: 'Fall 2026', isActive: true }];
 
-function setup() {
-  render(<LeagueSetupClient games={games} seasons={seasons} />);
+function setup(view: React.ComponentProps<typeof LeagueSetupClient>['view'] = { kind: 'game', slug: 'valorant' }) {
+  render(<LeagueSetupClient games={games} seasons={seasons} view={view} />);
 }
 
 describe('LeagueSetupClient: delete game', () => {
   it('cancelling does not call deleteGame and returns focus to the trigger', async () => {
     const user = userEvent.setup();
-    setup();
+    setup({ kind: 'games' });
     await user.click(screen.getByRole('button', { name: 'Delete game Valorant' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveTextContent(
@@ -56,7 +56,7 @@ describe('LeagueSetupClient: delete game', () => {
     const user = userEvent.setup();
     let release!: (v: { success: boolean }) => void;
     actions.deleteGame.mockReturnValue(new Promise((r) => (release = r)));
-    setup();
+    setup({ kind: 'games' });
     await user.click(screen.getByRole('button', { name: 'Delete game Valorant' }));
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     const busy = await screen.findByRole('button', { name: /Deleting/ });
@@ -72,7 +72,7 @@ describe('LeagueSetupClient: delete game', () => {
   it('shows a failed deletion in the dialog', async () => {
     const user = userEvent.setup();
     actions.deleteGame.mockResolvedValue({ success: false, error: 'Game still has matches.' });
-    setup();
+    setup({ kind: 'games' });
     await user.click(screen.getByRole('button', { name: 'Delete game Valorant' }));
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Game still has matches.');

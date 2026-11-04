@@ -68,6 +68,8 @@ export default async function AdminMatchesPage({
     );
   }
 
+  const backSeason = allSeasons.find((s) => s.id === initialFilters.seasonId);
+
   return (
     <AdminMatchExplorer
       seasons={allSeasons}
@@ -77,7 +79,13 @@ export default async function AdminMatchesPage({
       initialTab={initialTab}
       initialCounts={initialCounts}
       serverNow={now.toISOString()}
-      back={matchesBackLink(rawParams.from, allSeasons.find((s) => s.id === initialFilters.seasonId)) ?? undefined}
+      back={
+        matchesBackLink(
+          rawParams.from,
+          backSeason,
+          games.find((g) => g.id === backSeason?.gameId)?.slug,
+        ) ?? undefined
+      }
       generateSchools={schools.map((s) => ({ id: s.id, name: s.name }))}
       scheduleForm={{
         seasons: activeSeasons,

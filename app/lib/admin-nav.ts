@@ -98,7 +98,7 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         label: 'League Setup',
         href: '/admin/league',
         icon: HiOutlineCog6Tooth,
-        description: 'Games and seasons everything else depends on.',
+        description: 'Games and seasons, with each season’s schools, rosters, manager invites, roster lock and publishing.',
       },
       {
         label: 'Matches',
@@ -110,7 +110,7 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         label: 'Schools & Rosters',
         href: '/admin/schools',
         icon: HiOutlineAcademicCap,
-        description: 'Member schools, their crests, and their rosters.',
+        description: 'Member schools, their crests, and their rosters across every season.',
       },
       {
         label: 'Onboarding Form',
@@ -208,7 +208,7 @@ export function findActiveAdminNav(
  * Routes of the pages nested below a section (the article editors under News, a school's rosters under Schools).
  * Keep in step with `NESTED_PAGE_TITLES`.
  */
-export type AdminNestedRoute = `/admin/news/${string}` | `/admin/schools/${string}`;
+export type AdminNestedRoute = `/admin/news/${string}` | `/admin/schools/${string}` | `/admin/league/${string}`;
 
 /** Every route an `AdminPageHeader` may be given: a gated section or a nested page below one. */
 export type AdminPageRoute = AdminSectionHref | AdminNestedRoute;
@@ -218,6 +218,7 @@ const NESTED_PAGE_TITLES: ReadonlyArray<{ matches: (pathname: string) => boolean
   { matches: (pathname) => pathname === '/admin/news/new', title: 'New Article' },
   { matches: (pathname) => /^\/admin\/schools\/[^/]+\/rosters$/.test(pathname), title: 'School Rosters' },
   { matches: (pathname) => pathname.startsWith('/admin/news/'), title: 'Edit Article' },
+  { matches: (pathname) => /^\/admin\/league\/[^/]+$/.test(pathname), title: 'Season' },
 ];
 
 /**

@@ -20,6 +20,7 @@ import { AssignExistingManagerTab } from './school-managers/AssignExistingManage
 export default function SchoolManagersModal({
   school,
   games = [],
+  seasonName,
   isOpen,
   onOpenChange,
 }: SchoolManagersModalProps) {
@@ -105,6 +106,7 @@ export default function SchoolManagersModal({
                 <ProvisionInviteTab
                   schoolId={school.id}
                   games={games}
+                  seasonName={seasonName}
                   invites={invites}
                   isRevokingId={isRevokingId}
                   onRevokeInvite={handleRevokeInvite}
