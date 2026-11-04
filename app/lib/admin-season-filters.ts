@@ -58,6 +58,20 @@ export function seasonDetailHref(seasonId: string): string {
 
 export type LeagueView = { kind: 'game'; slug: string } | { kind: 'games' } | { kind: 'empty' };
 
+const LEAGUE_TAB_ORDER = ['valorant', 'league', 'tft', 'tetr', 'minecraft'];
+
+function leagueTabRank(slug: string): number {
+  const s = slug.toLowerCase();
+  const key = s.includes('team-fight') ? 'tft' : s;
+  const idx = LEAGUE_TAB_ORDER.findIndex((k) => key.includes(k));
+  return idx === -1 ? LEAGUE_TAB_ORDER.length : idx;
+}
+
+/** Game tab order on League Setup: Valorant, League, TFT, Tetris, Minecraft, then any other game. */
+export function sortGamesForLeagueTabs<T extends { slug: string }>(games: T[]): T[] {
+  return [...games].sort((a, b) => leagueTabRank(a.slug) - leagueTabRank(b.slug));
+}
+
 /**
  * Which League Setup tab the URL selects. An unknown or missing game falls back to the first
  * game; `view=games` selects "Manage games"; with no games at all the page can only manage games.

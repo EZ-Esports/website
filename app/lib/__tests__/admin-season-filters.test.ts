@@ -161,3 +161,18 @@ describe('League Setup per-game tabs (spec-058)', () => {
     expect(matchesBackLink('league', { isActive: true }, 'valorant')?.href).toBe('/admin/league?game=valorant');
   });
 });
+
+describe('sortGamesForLeagueTabs', () => {
+  it('orders Valorant, League, TFT, Tetris, Minecraft, then others', async () => {
+    const { sortGamesForLeagueTabs } = await import('../admin-season-filters');
+    const slugs = ['minecraft', 'osu', 'tetris', 'team-fight-tactics', 'league-of-legends', 'valorant'].map((slug) => ({ slug }));
+    expect(sortGamesForLeagueTabs(slugs).map((g) => g.slug)).toEqual([
+      'valorant',
+      'league-of-legends',
+      'team-fight-tactics',
+      'tetris',
+      'minecraft',
+      'osu',
+    ]);
+  });
+});

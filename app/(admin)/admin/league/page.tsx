@@ -2,7 +2,7 @@ import LeagueSetupClient from './LeagueSetupClient';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
-import { parseSeasonStatus, resolveLeagueView } from '@/app/lib/admin-season-filters';
+import { parseSeasonStatus, resolveLeagueView, sortGamesForLeagueTabs } from '@/app/lib/admin-season-filters';
 import { getLeagueAdminData } from '@/app/lib/db/queries';
 import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
@@ -23,7 +23,7 @@ export default async function LeagueSetupPage({
   try {
     if (process.env.DATABASE_URL) {
       const res = await getLeagueAdminData();
-      games = res.games;
+      games = sortGamesForLeagueTabs(res.games);
       seasons = res.seasons;
     } else {
       dbError = true;
