@@ -94,7 +94,7 @@ describe('Season page', () => {
   it('shows each school as a tile with a summary, a crest fallback and a link to its season page', () => {
     render(<SeasonSetupClient {...baseProps} />);
     const link = screen.getByRole('link', { name: 'Stuyvesant' });
-    expect(link).toHaveAttribute('href', '/admin/league/s1/schools/sc1?game=valorant');
+    expect(link).toHaveAttribute('href', '/admin/league/s1/schools/sc1');
     expect(screen.getByText('1 roster · 1 player')).toBeInTheDocument();
     expect(screen.getByText('Varsity · 1 player')).toBeInTheDocument();
     expect(screen.getByText('No JV roster')).toBeInTheDocument();

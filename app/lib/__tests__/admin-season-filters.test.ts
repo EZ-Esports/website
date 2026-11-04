@@ -145,7 +145,6 @@ describe('League Setup per-game tabs (spec-058)', () => {
 
   it('links a season to its own page', () => {
     expect(seasonDetailHref(S1)).toBe(`/admin/league/${S1}`);
-    expect(seasonSchoolHref(S1, S2, 'valorant')).toBe(`/admin/league/${S1}/schools/${S2}?game=valorant`);
     expect(seasonSchoolHref(S1, S2)).toBe(`/admin/league/${S1}/schools/${S2}`);
   });
 

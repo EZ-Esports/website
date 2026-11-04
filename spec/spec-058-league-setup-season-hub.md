@@ -41,7 +41,15 @@ League moderation was spread over League Setup (lock / publish buttons on every 
 
 **Restore.** Add school on a removed school clears `removed_at` on the same team: its existing rosters, players and matches come back; only a missing division gets a new roster; no second team is created.
 
-**Known limits.** Derived (non-snapshot) standings for the removed school's opponents still count their results against it, because they come from the `roster_standings` view over matches; changing that needs a view migration, not done. The archive's per-season match count still counts all matches. Public pages cached with `revalidatePath`/tags are refreshed on removal and restore.
+**Snapshot reads (review fix).** Reads keyed on `season_standings` alone have no team to join, so they use `schoolNotRemovedFromSeason` (`app/lib/db/season-membership.ts`): "no removed team for this school and season". It is the negative form on purpose, so an archived school with a snapshot row and no team row keeps showing. Applied to the public standings snapshot, season divisions, hub season summary and the archive champion; the archive match count skips fixtures of a removed team (`matchHasNoRemovedTeam`). Tournament brackets are not team-based (spec-010) and are unaffected. A PGlite test runs these against real SQL.
+
+**Manager writes (review fix).** `assertManagerForRoster` refuses a manager (reads included) once the team is removed; the match-result and reschedule actions refuse a manager when either side of the match is a removed team. Staff admins are exempt. Restoring writes an audit entry (`restore_school_to_season`), like removal.
+
+**Deploy gate.** Migration `0059_team_removed_at` must be applied to production BEFORE this branch's code is deployed: the new code filters on `teams.removed_at` in public, portal and staff queries, so each fails until the column exists. Not applied from this branch.
+
+**Known limits.** Derived (non-snapshot) standings for the removed school's opponents still count their results against it, because they come from the `roster_standings` view over matches; changing that needs a view migration, not done. Public pages cached with `revalidatePath`/tags are refreshed on removal and restore.
+
+**Spec numbering.** Another branch also uses spec number 058; whichever merges second renames its file and its entries in `spec/README.md`, `spec/timeline.md` and the code comments that cite "spec-058".
 
 ## Tests
 

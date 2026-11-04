@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { schoolNotRemovedFromSeason } from './season-membership';
 import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import {
   canonicalDivision,
@@ -70,7 +71,12 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
     db
       .selectDistinct({ division: schema.seasonStandings.division })
       .from(schema.seasonStandings)
-      .where(eq(schema.seasonStandings.seasonId, seasonId)),
+      .where(
+        and(
+          eq(schema.seasonStandings.seasonId, seasonId),
+          schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
+        ),
+      ),
     db
       .selectDistinct({ division: schema.rosters.division })
       .from(schema.rosters)
@@ -115,6 +121,7 @@ export function buildSeasonStandingsSnapshotQuery(opts: {
     .where(
       and(
         eq(schema.seasonStandings.seasonId, opts.seasonId),
+        schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
         ...(opts.combined
           ? []
           : [eq(canonicalDivisionSql(schema.seasonStandings.division), opts.division)])
@@ -335,7 +342,12 @@ export async function getGameSeasonSummary(seasonId: string) {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-      .where(eq(schema.seasonStandings.seasonId, seasonId))
+      .where(
+        and(
+          eq(schema.seasonStandings.seasonId, seasonId),
+          schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
+        ),
+      )
       .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name)),
     readSeasonStandingsMeta(seasonId),
   ]);

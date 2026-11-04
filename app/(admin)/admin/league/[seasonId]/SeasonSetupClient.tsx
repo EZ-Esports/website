@@ -346,7 +346,7 @@ function SchoolCard({
         <SchoolCrest name={school.schoolName} logoUrl={school.logoUrl} size="lg" />
         <div className="min-w-0">
           <Link
-            href={seasonSchoolHref(season.id, school.schoolId, season.gameSlug)}
+            href={seasonSchoolHref(season.id, school.schoolId)}
             className={cx(
               'block truncate text-base font-semibold text-foreground after:absolute after:inset-0 after:rounded-2xl after:content-[""] hover:text-accent',
               focusRing,

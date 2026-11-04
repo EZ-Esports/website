@@ -113,7 +113,7 @@ export async function removeSchoolFromSeason(input: { seasonId: string; schoolId
  * roster lock does not apply (spec-020), which is why a locked season can still be populated.
  */
 export async function addSchoolToSeason(input: { seasonId: string; schoolId: string }): Promise<AddSchoolToSeasonResult> {
-  await requirePermission(Permissions.MANAGE_LEAGUE);
+  const actor = await requirePermission(Permissions.MANAGE_LEAGUE);
 
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: 'Choose a school to add.' };
@@ -158,6 +158,12 @@ export async function addSchoolToSeason(input: { seasonId: string; schoolId: str
         // Adding a removed school back: the same team row (and so its rosters, players and matches)
         // comes back; nothing new is created for it unless a division has no roster.
         await tx.update(schema.teams).set({ removedAt: null }).where(eq(schema.teams.id, existingTeam.id));
+        await tx.insert(schema.staffAuditLogs).values({
+          event: 'restore_school_to_season',
+          userId: actor.id,
+          email: actor.email,
+          details: JSON.stringify({ seasonId, schoolId, teamId: existingTeam.id, schoolName: school.name }),
+        });
         restored = true;
       }
       if (!teamId) {

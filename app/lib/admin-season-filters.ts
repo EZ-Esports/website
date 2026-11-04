@@ -56,10 +56,9 @@ export function seasonDetailHref(seasonId: string): string {
   return `/admin/league/${seasonId}`;
 }
 
-/** One school's page inside a season; the game slug rides along so Back and Edit rosters keep it. */
-export function seasonSchoolHref(seasonId: string, schoolId: string, gameSlug?: string | null): string {
-  const base = `/admin/league/${seasonId}/schools/${schoolId}`;
-  return gameSlug ? `${base}?game=${encodeURIComponent(gameSlug)}` : base;
+/** One school's page inside a season. The season already decides the game, so there is no game param. */
+export function seasonSchoolHref(seasonId: string, schoolId: string): string {
+  return `/admin/league/${seasonId}/schools/${schoolId}`;
 }
 
 export type LeagueView = { kind: 'game'; slug: string } | { kind: 'games' } | { kind: 'empty' };

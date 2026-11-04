@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { schoolNotRemovedFromSeason } from './season-membership';
 import {
   and,
   asc,
@@ -518,12 +519,19 @@ export function pickChampionsBySeason(
   return bySeason;
 }
 
+/** True unless either side of the match belongs to a team staff removed from its season (teams.removed_at). */
+export function matchHasNoRemovedTeam(): SQL {
+  return sql`not exists (select 1 from ${schema.rosters} where ${schema.rosters.id} in (${schema.matches.homeRosterId}, ${schema.matches.awayRosterId}) and exists (select 1 from ${schema.teams} where ${schema.teams.id} = ${schema.rosters.teamId} and ${schema.teams.removedAt} is not null))`;
+}
+
 export async function getArchiveIndex() {
   const [seasons, counts, champions] = await Promise.all([
     getSeasonsWithGames(),
     db
       .select({ seasonId: schema.matches.seasonId, matchCount: count() })
       .from(schema.matches)
+      // Fixtures of a team staff removed from the season are hidden publicly, so they are not counted either.
+      .where(matchHasNoRemovedTeam())
       .groupBy(schema.matches.seasonId),
     db
       .select({
@@ -534,7 +542,12 @@ export async function getArchiveIndex() {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-      .where(eq(schema.seasonStandings.rank, 1)),
+      .where(
+        and(
+          eq(schema.seasonStandings.rank, 1),
+          schoolNotRemovedFromSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
+        ),
+      ),
   ]);
 
   const countBySeason = new Map(counts.map((c) => [c.seasonId, c.matchCount]));

@@ -160,6 +160,10 @@ describe('addSchoolToSeason', () => {
 });
 
 describe('adding a removed school back', () => {
+  beforeEach(() => {
+    mocks.requirePermission.mockResolvedValue({ id: 'staff1', email: 'staff@example.com' });
+  });
+
   it('clears the removal marker and reuses the existing rosters instead of creating new ones', async () => {
     mocks.queue.push([season()], [school], [{ id: TEAM, removedAt: new Date() }], [
       { name: 'Varsity', division: 'A' },
@@ -169,7 +173,9 @@ describe('adding a removed school back', () => {
 
     expect(res).toEqual({ success: true, schoolName: 'Stuyvesant', teamCreated: false, restored: true, rostersCreated: [] });
     expect(mocks.updates).toEqual([{ table: schema.teams, set: { removedAt: null } }]);
-    expect(mocks.inserts).toHaveLength(0); // no second team, no duplicate rosters
+    // No second team and no duplicate rosters: the only insert is the audit entry for the restore.
+    expect(mocks.inserts.map((i) => i.table)).toEqual([schema.staffAuditLogs]);
+    expect(mocks.inserts[0].values).toMatchObject({ event: 'restore_school_to_season', userId: 'staff1' });
     for (const tag of ['teams', 'rosters', 'matches']) expect(updateTag).toHaveBeenCalledWith(tag);
   });
 
@@ -177,8 +183,7 @@ describe('adding a removed school back', () => {
     mocks.queue.push([season()], [school], [{ id: TEAM, removedAt: new Date() }], [{ name: 'Varsity', division: 'A' }]);
     const res = await addSchoolToSeason(input);
     expect(res).toMatchObject({ success: true, restored: true, rostersCreated: ['JV'] });
-    expect(mocks.inserts).toHaveLength(1);
-    expect(mocks.inserts[0].table).toBe(schema.rosters);
+    expect(mocks.inserts.map((i) => i.table)).toEqual([schema.staffAuditLogs, schema.rosters]);
   });
 });
 
