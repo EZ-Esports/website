@@ -98,7 +98,7 @@ export default function SeasonSetupClient({
             ? `School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${season.isActive ? '' : ' This season is inactive; managers whose affiliation names it are still locked out.'}`
             : 'School managers will be able to change rosters again.',
           confirmLabel: confirm.locking ? 'Lock rosters' : 'Unlock rosters',
-          pendingLabel: confirm.locking ? 'Locking' : 'Unlocking',
+          pendingLabel: confirm.locking ? 'Locking…' : 'Unlocking…',
           icon: confirm.locking ? <FiLock className="h-5 w-5" /> : <FiUnlock className="h-5 w-5" />,
         }
       : confirm?.kind === 'publish'
@@ -108,7 +108,7 @@ export default function SeasonSetupClient({
               ? 'The schedule, match results, standings, team records and champions for this season will become visible on the public site, the homepage and the archive. Publish once the season schedule and results are ready for the public.'
               : 'The schedule, match results, standings, team records and champions for this season will be removed from the public site. Team lists stay. Staff views are not affected.',
             confirmLabel: confirm.publishing ? 'Publish season' : 'Unpublish season',
-            pendingLabel: confirm.publishing ? 'Publishing' : 'Unpublishing',
+            pendingLabel: confirm.publishing ? 'Publishing…' : 'Unpublishing…',
             icon: confirm.publishing ? <FiEye className="h-5 w-5" /> : <FiEyeOff className="h-5 w-5" />,
           }
         : null;
@@ -205,7 +205,7 @@ export default function SeasonSetupClient({
               disabled={availableSchools.length === 0}
               className={input}
             >
-              <option value="">Select a school</option>
+              <option value="">Select a school…</option>
               {availableSchools.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
