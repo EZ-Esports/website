@@ -291,6 +291,10 @@ export async function getSchoolGameTeamsPageData(
     )
     .orderBy(desc(schema.seasons.name));
 
+  // A school with no team in this game is not part of the game at all: 404 rather
+  // than an empty page under the game's name.
+  if (teamsList.length === 0) return null;
+
   const teamIds = teamsList.map((t) => t.teamId);
   const rostersList =
     teamIds.length > 0

@@ -44,6 +44,7 @@ import {
   getGameSeasonSummary,
   getOutcomesPublicSeasonIds,
   hubDivisionSql,
+  schoolHasTeamInSeason,
 } from './standings';
 import type { SchoolMatchRow } from '../school-matches';
 import { canonicalGameSlug, dbGameSlug } from '../constants';
@@ -524,7 +525,13 @@ export async function getArchiveIndex() {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-      .where(eq(schema.seasonStandings.rank, 1)),
+      .where(
+        and(
+          eq(schema.seasonStandings.rank, 1),
+          schoolHasTeamInSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
+          isNull(schema.schools.deletedAt)
+        )
+      ),
   ]);
 
   const countBySeason = new Map(counts.map((c) => [c.seasonId, c.matchCount]));

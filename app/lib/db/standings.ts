@@ -31,6 +31,16 @@ export const hubDivisionSql = (column: SQLWrapper) =>
   sql<HubDivision>`case when ${column} in ('JV', 'B') then 'JV' else 'Varsity' end`;
 
 /**
+ * A school belongs to a game's season only through a `teams` row (school x game x
+ * season). Archived standings snapshots are keyed by school and season alone, so
+ * every public read of them must also prove the team exists, or a school that
+ * never fielded a team that season would be listed beside the ones that did.
+ * `teams.season_id` already pins the game (a season belongs to one game).
+ */
+export const schoolHasTeamInSeason = (schoolId: SQLWrapper, seasonId: SQLWrapper) =>
+  sql`exists (select 1 from ${schema.teams} where ${schema.teams.schoolId} = ${schoolId} and ${schema.teams.seasonId} = ${seasonId})`;
+
+/**
  * One season's declared standings format and whether its outcomes are public.
  * An unknown season is reported as hidden (see `areOutcomesPublic`).
  */
@@ -115,6 +125,8 @@ export function buildSeasonStandingsSnapshotQuery(opts: {
     .where(
       and(
         eq(schema.seasonStandings.seasonId, opts.seasonId),
+        schoolHasTeamInSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
+        isNull(schema.schools.deletedAt),
         ...(opts.combined
           ? []
           : [eq(canonicalDivisionSql(schema.seasonStandings.division), opts.division)])
@@ -312,24 +324,35 @@ export const getCachedRosters = unstable_cache(
   { tags: ['rosters'] }
 );
 
+/** The archived snapshot rows behind a season's hub summary, limited to schools with a team that season. */
+export function buildSeasonSummarySnapshotQuery(seasonId: string) {
+  return db
+    .select({
+      schoolName: schema.schools.name,
+      schoolSlug: schema.schools.slug,
+      division: schema.seasonStandings.division,
+      rank: schema.seasonStandings.rank,
+      wins: schema.seasonStandings.wins,
+      losses: schema.seasonStandings.losses,
+      winPct: schema.seasonStandings.winPct,
+      playerName: schema.seasonStandings.playerName,
+      notes: schema.seasonStandings.notes,
+    })
+    .from(schema.seasonStandings)
+    .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+    .where(
+      and(
+        eq(schema.seasonStandings.seasonId, seasonId),
+        schoolHasTeamInSeason(schema.seasonStandings.schoolId, schema.seasonStandings.seasonId),
+        isNull(schema.schools.deletedAt)
+      )
+    )
+    .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name));
+}
+
 export async function getGameSeasonSummary(seasonId: string) {
   const [snapshotRaw, { standingsFormat, outcomesPublic }] = await Promise.all([
-    db
-      .select({
-        schoolName: schema.schools.name,
-        schoolSlug: schema.schools.slug,
-        division: schema.seasonStandings.division,
-        rank: schema.seasonStandings.rank,
-        wins: schema.seasonStandings.wins,
-        losses: schema.seasonStandings.losses,
-        winPct: schema.seasonStandings.winPct,
-        playerName: schema.seasonStandings.playerName,
-        notes: schema.seasonStandings.notes,
-      })
-      .from(schema.seasonStandings)
-      .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
-      .where(eq(schema.seasonStandings.seasonId, seasonId))
-      .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name)),
+    buildSeasonSummarySnapshotQuery(seasonId),
     readSeasonStandingsMeta(seasonId),
   ]);
   // Neutral (alphabetical, stat-free) rows while outcomes are hidden. This also
