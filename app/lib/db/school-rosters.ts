@@ -19,7 +19,7 @@ import {
  * (admin reads are raw so an edit shows immediately) and limited to the
  * columns the admin roster views already show. Callers must have already checked MANAGE_ROSTERS.
  */
-export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlock[]> {
+export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?: string } = {}): Promise<SeasonBlock[]> {
   const teams = await db
     .select({
       teamId: schema.teams.id,
@@ -34,7 +34,13 @@ export async function getSchoolRosterBlocks(schoolId: string): Promise<SeasonBlo
     .from(schema.teams)
     .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
     .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
-    .where(eq(schema.teams.schoolId, schoolId));
+    // With a season, only that season's team is read at all (a season belongs to one game), so no
+    // other game's team, roster or player is ever loaded for the caller (the season-scoped school page).
+    .where(
+      opts.seasonId
+        ? and(eq(schema.teams.schoolId, schoolId), eq(schema.teams.seasonId, opts.seasonId))
+        : eq(schema.teams.schoolId, schoolId),
+    );
 
   if (teams.length === 0) return [];
 

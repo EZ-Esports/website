@@ -33,7 +33,23 @@ vi.mock('next/navigation', () => ({
 
 import SeasonSchoolPage from '../[seasonId]/schools/[schoolId]/page';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
+import SchoolRostersView from '@/app/components/admin/SchoolRostersView';
 import { buildSeasonBlocks } from '@/app/lib/school-roster-view';
+
+/** Depth-first search of a React element tree for the first element of `type`. */
+function findByType(node: unknown, type: unknown): { props: any } | null {
+  if (!node || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findByType(child, type);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  const el = node as { type?: unknown; props?: { children?: unknown } };
+  if (el.type === type) return el as { props: any };
+  return findByType(el.props?.children, type);
+}
 
 const params = (seasonId = SEASON, schoolId = SCHOOL) => ({ params: Promise.resolve({ seasonId, schoolId }) });
 
@@ -92,7 +108,30 @@ describe('season school page', () => {
 
     mocks.staff = { permissions: Permissions.MANAGE_LEAGUE | Permissions.MANAGE_ROSTERS, isOwner: false };
     await SeasonSchoolPage(params());
-    expect(mocks.getSchoolRosterBlocks).toHaveBeenCalledWith(SCHOOL);
-    expect(mocks.getRosterEditOptions).toHaveBeenCalledWith(SCHOOL);
+    // Season-scoped at the query, and the school-wide editor options (all games/seasons/members) are never loaded.
+    expect(mocks.getSchoolRosterBlocks).toHaveBeenCalledWith(SCHOOL, { seasonId: SEASON });
+    expect(mocks.getRosterEditOptions).not.toHaveBeenCalled();
+  });
+
+  it('passes the client view only this season\'s block, read-only scope and empty editor options, even if the loader returned other games', async () => {
+    mocks.staff = { permissions: Permissions.MANAGE_LEAGUE | Permissions.MANAGE_ROSTERS, isOwner: false };
+    const otherGame = buildSeasonBlocks([{
+      teamId: 't9', gameId: 'g2', gameSlug: 'league-of-legends', gameName: 'League of Legends', seasonId: 'other-season',
+      seasonName: '2026-27', seasonIsActive: true, rostersLockedAt: null,
+      rosters: [{ id: 'r9', name: 'LoL Varsity', division: 'A', players: [
+        { id: 'p9', memberId: 'm9', firstName: 'Zed', lastName: 'Other', name: 'Zed Other', ign: null, discord: null, graduationYear: null, role: 'player' },
+      ] }],
+    }]);
+    mocks.getSchoolRosterBlocks.mockResolvedValue([...blocks, ...otherGame]);
+
+    const el = await SeasonSchoolPage({ ...params(), searchParams: Promise.resolve({ game: 'league-of-legends' }) } as never);
+    const view = findByType(el, SchoolRostersView);
+    expect(view).toBeTruthy();
+    expect(view!.props.scope).toBe('season');
+    expect(view!.props.blocks).toHaveLength(1);
+    expect(view!.props.blocks[0].gameSlug).toBe('valorant');
+    expect(view!.props.options).toEqual({ members: [], games: [], seasons: [] });
+    expect(view!.props.initialFilters.game).toBe('');
+    expect(JSON.stringify(view!.props)).not.toMatch(/league-of-legends|Zed Other/);
   });
 });

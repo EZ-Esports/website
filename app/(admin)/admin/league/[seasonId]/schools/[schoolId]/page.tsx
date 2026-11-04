@@ -11,18 +11,22 @@ import { getStaffForAdminSection } from '@/app/lib/auth';
 import { hasPermission, Permissions } from '@/app/lib/roles';
 import { ADMIN_ROSTER_VIEW_PERMISSION } from '@/app/lib/staff-access';
 import { getSeasonSetupData, type SeasonSetupData } from '@/app/lib/db/season-setup';
-import { getRosterEditOptions, getSchoolRosterBlocks } from '@/app/lib/db/school-rosters';
+import { getSchoolRosterBlocks } from '@/app/lib/db/school-rosters';
 import type { RosterEditOptions, SeasonBlock } from '@/app/lib/school-roster-view';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NO_OPTIONS: RosterEditOptions = { members: [], games: [], seasons: [] };
+
+const UUID =/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * One school's rosters for one season of one game, reached from a school tile on the season page.
  * Gated on MANAGE_LEAGUE like the season page. The roster data (player names, Discord, class year,
  * school email, student ID links, content-flag badges) is the same Schools & Rosters shows, so it is
  * loaded and drawn only for staff holding MANAGE_ROSTERS, the permission that page requires; it is
- * the same `SchoolRostersView` (with its edit controls and their server-side checks), narrowed to
- * this season's block. Everyone else gets the names-and-roles list the season page already offers.
+ * the same `SchoolRostersView` in its read-only `season` scope: one block, no game filter, season
+ * header, register-team panel or edit controls (editing stays in the Edit rosters link). Only this
+ * season's team is ever queried, so no other game's data reaches the client. Everyone else gets the
+ * names-and-roles list the season page already offers.
  */
 export default async function SeasonSchoolPage({ params }: { params: Promise<{ seasonId: string; schoolId: string }> }) {
   const staff = await getStaffForAdminSection('/admin/league');
@@ -36,15 +40,17 @@ export default async function SeasonSchoolPage({ params }: { params: Promise<{ s
 
   let data: SeasonSetupData | null = null;
   let block: SeasonBlock | null = null;
-  let options: RosterEditOptions = { members: [], games: [], seasons: [] };
   let dbError = false;
   try {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
     data = await getSeasonSetupData(seasonId);
     if (data?.schools.some((s) => s.schoolId === schoolId) && canViewRosterData) {
-      const [blocks, editOptions] = await Promise.all([getSchoolRosterBlocks(schoolId), getRosterEditOptions(schoolId)]);
-      block = blocks.find((b) => b.seasonId === seasonId) ?? null;
-      options = editOptions;
+      // Season-scoped at the query: only this season's team (hence only this game's) is read. The
+      // URL's ?game= is never consulted; the season decides the game. A block that still did not
+      // belong to this season and game would be dropped rather than shown.
+      const gameSlug = data.season.gameSlug;
+      const blocks = await getSchoolRosterBlocks(schoolId, { seasonId });
+      block = blocks.find((b) => b.seasonId === seasonId && b.gameSlug === gameSlug) ?? null;
     }
   } catch (error) {
     console.error('Error loading season school:', error);
@@ -105,7 +111,10 @@ export default async function SeasonSchoolPage({ params }: { params: Promise<{ s
               schoolId={school.schoolId}
               schoolName={school.schoolName}
               blocks={[block]}
-              options={options}
+              // Read-only and season-scoped: the editor's school-wide options (every game, season and
+              // member) are never loaded or sent here.
+              options={NO_OPTIONS}
+              scope="season"
               initialFilters={{ game: '', division: 'both', phone: 'Varsity' }}
             />
           </AdminSection>
