@@ -11,6 +11,7 @@ import { cx } from '@/app/lib/cx';
 import { updateSchool, toggleSchoolActive, deleteSchool } from '@/app/(admin)/admin/schools/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import SchoolManagersModal from '@/app/components/admin/SchoolManagersModal';
+import SchoolCrest from '@/app/components/admin/SchoolCrest';
 
 interface School {
   id: string;
@@ -115,18 +116,7 @@ export default function SchoolRow({ school, games, canViewRosters = false }: Sch
     <tr className={tr}>
       <td className={td}>
         <div className="flex items-center gap-3">
-          {school.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={school.logoUrl}
-              alt={`${school.name} logo`}
-              className="w-8 h-8 object-contain rounded-md bg-surface-raised"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-md bg-surface-raised flex items-center justify-center text-foreground-secondary text-xs font-semibold">
-              {school.name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
+          <SchoolCrest name={school.name} logoUrl={school.logoUrl} />
           <span className="font-medium text-foreground">{school.name}</span>
         </div>
       </td>

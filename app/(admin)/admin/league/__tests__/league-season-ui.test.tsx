@@ -82,14 +82,31 @@ describe('Season page', () => {
   };
   const schools = [
     {
-      schoolId: 'sc1', schoolName: 'Stuyvesant', teamId: 't1', missing: ['JV' as const],
+      schoolId: 'sc1', schoolName: 'Stuyvesant', logoUrl: null as string | null, teamId: 't1', missing: ['JV' as const],
       rosters: [{ id: 'r1', name: 'Varsity', division: 'Varsity' as const, players: [{ id: 'p1', name: 'Ada Lovelace', role: 'captain' }] }],
     },
   ];
   const baseProps = {
     season, schools, availableSchools: [{ id: 'sc2', name: 'Bronx Science' }], games: [{ id: 'g1', displayName: 'Valorant', slug: 'valorant' }],
-    canInvite: true, canEditRosters: true, matchesHref: '/admin/matches?season=s1',
+    canInvite: true, matchesHref: '/admin/matches?season=s1',
   };
+
+  it('shows each school as a tile with a summary, a crest fallback and a link to its season page', () => {
+    render(<SeasonSetupClient {...baseProps} />);
+    const link = screen.getByRole('link', { name: 'Stuyvesant' });
+    expect(link).toHaveAttribute('href', '/admin/league/s1/schools/sc1?game=valorant');
+    expect(screen.getByText('1 roster · 1 player')).toBeInTheDocument();
+    expect(screen.getByText('Varsity · 1 player')).toBeInTheDocument();
+    expect(screen.getByText('No JV roster')).toBeInTheDocument();
+    expect(screen.getByText('ST')).toBeInTheDocument(); // crest fallback initials
+    // Players are on the school page, not on the tile.
+    expect(screen.queryByText('Ada Lovelace')).toBeNull();
+  });
+
+  it('renders the uploaded crest when the school has one', () => {
+    render(<SeasonSetupClient {...baseProps} schools={[{ ...schools[0], logoUrl: 'https://cdn.example/stuy.png' }]} />);
+    expect(screen.getByRole('img', { name: 'Stuyvesant logo' })).toHaveAttribute('src', 'https://cdn.example/stuy.png');
+  });
 
   it('adds the chosen school through the idempotent action', async () => {
     const user = userEvent.setup();

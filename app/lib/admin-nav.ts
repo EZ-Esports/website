@@ -219,6 +219,7 @@ const NESTED_PAGE_TITLES: ReadonlyArray<{ matches: (pathname: string) => boolean
   { matches: (pathname) => /^\/admin\/schools\/[^/]+\/rosters$/.test(pathname), title: 'School Rosters' },
   { matches: (pathname) => pathname.startsWith('/admin/news/'), title: 'Edit Article' },
   { matches: (pathname) => /^\/admin\/league\/[^/]+$/.test(pathname), title: 'Season' },
+  { matches: (pathname) => /^\/admin\/league\/[^/]+\/schools\/[^/]+$/.test(pathname), title: 'School in Season' },
 ];
 
 /**

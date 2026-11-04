@@ -79,7 +79,6 @@ export default async function SeasonSetupPage({ params }: { params: Promise<{ se
         availableSchools={data.availableSchools}
         games={games}
         canInvite={hasPermission(staff.permissions, staff.isOwner, Permissions.MANAGE_SCHOOLS)}
-        canEditRosters={hasPermission(staff.permissions, staff.isOwner, Permissions.MANAGE_ROSTERS)}
         matchesHref={seasonMatchesHref(season.id, season.gameSlug)}
       />
     </AdminPage>

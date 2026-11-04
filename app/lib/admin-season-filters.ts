@@ -56,6 +56,12 @@ export function seasonDetailHref(seasonId: string): string {
   return `/admin/league/${seasonId}`;
 }
 
+/** One school's page inside a season; the game slug rides along so Back and Edit rosters keep it. */
+export function seasonSchoolHref(seasonId: string, schoolId: string, gameSlug?: string | null): string {
+  const base = `/admin/league/${seasonId}/schools/${schoolId}`;
+  return gameSlug ? `${base}?game=${encodeURIComponent(gameSlug)}` : base;
+}
+
 export type LeagueView = { kind: 'game'; slug: string } | { kind: 'games' } | { kind: 'empty' };
 
 const LEAGUE_TAB_ORDER = ['valorant', 'league', 'tft', 'tetr', 'minecraft'];

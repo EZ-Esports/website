@@ -1,14 +1,15 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Button as AriaButton, Disclosure, DisclosurePanel } from 'react-aria-components';
-import { FiEye, FiEyeOff, FiLink, FiList, FiLock, FiPlus, FiUnlock, FiUsers } from 'react-icons/fi';
-import { HiChevronDown, HiOutlineAcademicCap } from 'react-icons/hi2';
+import { FiEye, FiEyeOff, FiLink, FiList, FiLock, FiPlus, FiUnlock } from 'react-icons/fi';
+import { HiOutlineAcademicCap } from 'react-icons/hi2';
+import SchoolCrest from '@/app/components/admin/SchoolCrest';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import SchoolManagersModal from '@/app/components/admin/SchoolManagersModal';
 import { AdminCount, AdminEmptyState, AdminField, AdminSection, AdminToast } from '@/app/components/admin/AdminUI';
-import { chip, chipButton, focusRing, input, listStack, primaryBtn } from '@/app/components/admin/styles';
+import { chip, chipButton, focusRing, input, primaryBtn } from '@/app/components/admin/styles';
+import { seasonSchoolHref } from '@/app/lib/admin-season-filters';
 import { cx } from '@/app/lib/cx';
 import { isValidSeasonName } from '@/app/lib/season-name';
 import { planSchoolRosters, rosterNamesPhrase } from '@/app/lib/season-schools';
@@ -32,8 +33,6 @@ interface Props {
   games: Array<{ id: string; displayName: string; slug: string }>;
   /** MANAGE_SCHOOLS: manager invites are written by the Schools actions, which check it again. */
   canInvite: boolean;
-  /** MANAGE_ROSTERS: the roster editor page is gated on it. */
-  canEditRosters: boolean;
   /** Matches page filtered to this season. */
   matchesHref: string;
 }
@@ -44,7 +43,6 @@ export default function SeasonSetupClient({
   availableSchools,
   games,
   canInvite,
-  canEditRosters,
   matchesHref,
 }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -100,7 +98,7 @@ export default function SeasonSetupClient({
             ? `School managers will not be able to create, delete or change rosters (including emergency swaps) or approve players onto them until you unlock. Staff admins can still edit.${season.isActive ? '' : ' This season is inactive; managers whose affiliation names it are still locked out.'}`
             : 'School managers will be able to change rosters again.',
           confirmLabel: confirm.locking ? 'Lock rosters' : 'Unlock rosters',
-          pendingLabel: confirm.locking ? 'Locking…' : 'Unlocking…',
+          pendingLabel: confirm.locking ? 'Lockingâ€¦' : 'Unlockingâ€¦',
           icon: confirm.locking ? <FiLock className="h-5 w-5" /> : <FiUnlock className="h-5 w-5" />,
         }
       : confirm?.kind === 'publish'
@@ -110,7 +108,7 @@ export default function SeasonSetupClient({
               ? 'The schedule, match results, standings, team records and champions for this season will become visible on the public site, the homepage and the archive. Publish once the season schedule and results are ready for the public.'
               : 'The schedule, match results, standings, team records and champions for this season will be removed from the public site. Team lists stay. Staff views are not affected.',
             confirmLabel: confirm.publishing ? 'Publish season' : 'Unpublish season',
-            pendingLabel: confirm.publishing ? 'Publishing…' : 'Unpublishing…',
+            pendingLabel: confirm.publishing ? 'Publishingâ€¦' : 'Unpublishingâ€¦',
             icon: confirm.publishing ? <FiEye className="h-5 w-5" /> : <FiEyeOff className="h-5 w-5" />,
           }
         : null;
@@ -207,7 +205,7 @@ export default function SeasonSetupClient({
               disabled={availableSchools.length === 0}
               className={input}
             >
-              <option value="">Select a school…</option>
+              <option value="">Select a schoolâ€¦</option>
               {availableSchools.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -226,15 +224,14 @@ export default function SeasonSetupClient({
             description="Add the first school above."
           />
         ) : (
-          <ul className={listStack}>
+          <ul className="admin-stagger grid grid-cols-1 gap-4 px-5 pb-5 pt-5 sm:grid-cols-2 xl:grid-cols-3">
             {schools.map((school) => (
-              <SchoolItem
+              <SchoolCard
                 key={school.teamId}
+                season={season}
                 school={school}
-                gameSlug={season.gameSlug}
                 isPending={isPending}
                 canManage={canInvite}
-                canEditRosters={canEditRosters}
                 onInvite={() => setInviteSchool(school)}
                 onCreateMissing={() => addSchool(school.schoolId)}
               />
@@ -292,117 +289,78 @@ function rosterSummary(r: SeasonSetupRoster): string {
   return `${r.name} · ${r.players.length} ${r.players.length === 1 ? 'player' : 'players'}`;
 }
 
-function SchoolItem({
+/**
+ * One school of the season as a tile. The school name is the card's link (stretched over the whole
+ * tile with an overlay, so the card is one big target and the name is the accessible name); the
+ * action buttons sit above that overlay so they stay separately clickable.
+ */
+function SchoolCard({
+  season,
   school,
-  gameSlug,
   isPending,
   canManage,
-  canEditRosters,
   onInvite,
   onCreateMissing,
 }: {
+  season: Props['season'];
   school: SeasonSetupSchool;
-  gameSlug: string;
   isPending: boolean;
   /** MANAGE_SCHOOLS: invite links and editing manager access. */
   canManage: boolean;
-  canEditRosters: boolean;
   onInvite: () => void;
   onCreateMissing: () => void;
 }) {
   const playerTotal = school.rosters.reduce((n, r) => n + r.players.length, 0);
+  const rosterCount = school.rosters.length;
 
   return (
-    <li className="px-5 py-3">
-      <Disclosure>
-        {({ isExpanded }) => (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <AriaButton
-                slot="trigger"
-                className={({ isFocusVisible }) =>
-                  cx(
-                    'flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none',
-                    isFocusVisible && 'ring-2 ring-accent/60',
-                  )
-                }
-              >
-                <HiChevronDown
-                  aria-hidden
-                  className={cx('h-4 w-4 shrink-0 transition-[rotate] duration-200 motion-reduce:transition-none', isExpanded ? 'rotate-180 text-accent' : '-rotate-90 text-foreground-muted')}
-                />
-                <span className="truncate text-sm font-medium text-foreground">{school.schoolName}</span>
-                <span className="hidden flex-wrap items-center gap-1.5 sm:flex">
-                  {school.rosters.map((r) => (
-                    <span key={r.id} className={chip('neutral')}>{rosterSummary(r)}</span>
-                  ))}
-                  {school.missing.map((d) => (
-                    <span key={d} className={chip('warning')}>No {d} roster</span>
-                  ))}
-                </span>
-                <span className="sr-only">{playerTotal} players across {school.rosters.length} rosters</span>
-              </AriaButton>
-              <div className="flex flex-wrap items-center gap-2">
-                {school.missing.length > 0 && (
-                  <button type="button" onClick={onCreateMissing} disabled={isPending} className={chipButton('warning')}>
-                    Create missing rosters
-                  </button>
-                )}
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={onInvite}
-                    className={chipButton('ghost')}
-                    aria-label={`Managers and invite links for ${school.schoolName}`}
-                    title="Create manager invite links, and edit which games each manager can manage"
-                  >
-                    <FiLink aria-hidden className="h-3.5 w-3.5" />
-                    Managers
-                  </button>
-                )}
-                {canEditRosters && (
-                  <Link
-                    href={`/admin/schools/${school.schoolId}/rosters?game=${encodeURIComponent(gameSlug)}`}
-                    className={cx(chipButton('ghost'), focusRing)}
-                    aria-label={`Edit rosters for ${school.schoolName}`}
-                    title="Add, move and remove players in the roster editor"
-                  >
-                    <FiUsers aria-hidden className="h-3.5 w-3.5" />
-                    Edit rosters
-                  </Link>
-                )}
-              </div>
-            </div>
-            <DisclosurePanel>
-              <div className="grid grid-cols-1 gap-4 pb-2 pl-6 pt-2 md:grid-cols-2">
-                {school.rosters.length === 0 && (
-                  <p className="text-sm text-foreground-secondary">No rosters yet.</p>
-                )}
-                {school.rosters.map((r) => (
-                  <section key={r.id} aria-label={`${school.schoolName} ${r.name} roster`} className="rounded-lg bg-surface-sunken/60 p-3">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-foreground-secondary">
-                      {r.name}
-                      <span className="ml-1.5 font-normal normal-case tracking-normal tabular-nums">{r.players.length}</span>
-                    </h4>
-                    {r.players.length === 0 ? (
-                      <p className="mt-2 text-sm text-foreground-secondary">No players yet.</p>
-                    ) : (
-                      <ul className="mt-2 space-y-1 text-sm text-foreground">
-                        {r.players.map((p) => (
-                          <li key={p.id} className="flex items-center justify-between gap-2">
-                            <span className="truncate">{p.name}</span>
-                            {p.role !== 'player' && <span className={`${chip('neutral')} capitalize`}>{p.role}</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                ))}
-              </div>
-            </DisclosurePanel>
-          </>
-        )}
-      </Disclosure>
+    <li className="group relative flex flex-col gap-4 rounded-2xl bg-surface-sunken/60 p-4 ring-1 ring-transparent transition-[background-color,box-shadow] duration-150 hover:bg-surface-raised/60 hover:ring-accent/40 focus-within:ring-accent/40 motion-reduce:transition-none">
+      <div className="flex items-center gap-3">
+        <SchoolCrest name={school.schoolName} logoUrl={school.logoUrl} size="lg" />
+        <div className="min-w-0">
+          <Link
+            href={seasonSchoolHref(season.id, school.schoolId, season.gameSlug)}
+            className={cx(
+              'block truncate text-base font-semibold text-foreground after:absolute after:inset-0 after:rounded-2xl after:content-[""] hover:text-accent',
+              focusRing,
+            )}
+          >
+            {school.schoolName}
+          </Link>
+          <p className="text-sm text-foreground-secondary">
+            {rosterCount} {rosterCount === 1 ? 'roster' : 'rosters'} · {playerTotal} {playerTotal === 1 ? 'player' : 'players'}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {school.rosters.map((r) => (
+          <span key={r.id} className={chip('neutral')}>{rosterSummary(r)}</span>
+        ))}
+        {school.missing.map((d) => (
+          <span key={d} className={chip('warning')}>No {d} roster</span>
+        ))}
+      </div>
+      {(school.missing.length > 0 || canManage) && (
+        <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2">
+          {school.missing.length > 0 && (
+            <button type="button" onClick={onCreateMissing} disabled={isPending} className={chipButton('warning')}>
+              Create missing rosters
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={onInvite}
+              className={chipButton('ghost')}
+              aria-label={`Managers and invite links for ${school.schoolName}`}
+              title="Create manager invite links, and edit which games each manager can manage"
+            >
+              <FiLink aria-hidden className="h-3.5 w-3.5" />
+              Managers
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }

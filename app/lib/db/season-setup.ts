@@ -27,6 +27,7 @@ export interface SeasonSetupRoster {
 export interface SeasonSetupSchool {
   schoolId: string;
   schoolName: string;
+  logoUrl: string | null;
   teamId: string;
   rosters: SeasonSetupRoster[];
   /** Divisions the game fields that this school has no roster for (a repair is one "Add school" away). */
@@ -77,6 +78,7 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
         teamId: schema.teams.id,
         schoolId: schema.schools.id,
         schoolName: schema.schools.name,
+        logoUrl: schema.schools.logoUrl,
       })
       .from(schema.teams)
       .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
@@ -140,6 +142,7 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
     return {
       schoolId: t.schoolId,
       schoolName: t.schoolName,
+      logoUrl: t.logoUrl,
       teamId: t.teamId,
       rosters,
       missing: missingDivisions(season.gameSlug, rosters),
