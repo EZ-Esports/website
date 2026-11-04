@@ -75,7 +75,7 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
       .selectDistinct({ division: schema.rosters.division })
       .from(schema.rosters)
       .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-      .where(eq(schema.teams.seasonId, seasonId)),
+      .where(and(eq(schema.teams.seasonId, seasonId), isNull(schema.teams.removedAt))),
     // Folded into the same round trip rather than awaited first: the division
     // lists are needed either way, and the format only decides whether they get
     // collapsed.
@@ -143,6 +143,7 @@ export function buildSeasonStandingsComputedQuery(opts: {
     .where(
       and(
         eq(schema.teams.seasonId, opts.seasonId),
+        isNull(schema.teams.removedAt),
         ...(opts.combined
           ? []
           : [eq(canonicalDivisionSql(schema.rosterStandings.division), opts.division)]),
@@ -306,7 +307,13 @@ export async function getTeamStandingsRecords(
 
 export const getCachedRosters = unstable_cache(
   async () => {
-    return db.select().from(schema.rosterStandings);
+    // Rosters of teams staff removed from their season are not offered (schedule form, tiles).
+    return db
+      .select()
+      .from(schema.rosterStandings)
+      .where(
+        sql`not exists (select 1 from ${schema.teams} where ${schema.teams.id} = ${schema.rosterStandings.teamId} and ${schema.teams.removedAt} is not null)`,
+      );
   },
   ['rosters-list'],
   { tags: ['rosters'] }

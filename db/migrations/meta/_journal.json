@@ -414,6 +414,13 @@
       "when": 1790882000013,
       "tag": "0058_school_email_student_id",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790882000014,
+      "tag": "0059_team_removed_at",
+      "breakpoints": true
     }
   ]
 }

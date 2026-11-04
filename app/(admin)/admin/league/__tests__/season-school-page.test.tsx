@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   staff: null as null | { permissions: bigint; isOwner: boolean },
   getSeasonSetupData: vi.fn(),
   getSchoolRosterBlocks: vi.fn(),
-  getRosterEditOptions: vi.fn(async () => ({ members: [], games: [], seasons: [] })),
+  getRosterEditOptions: vi.fn(async (..._args: unknown[]) => ({ members: [], games: [], seasons: [] })),
 }));
 
 vi.mock('@/app/lib/auth', () => ({
@@ -108,12 +108,12 @@ describe('season school page', () => {
 
     mocks.staff = { permissions: Permissions.MANAGE_LEAGUE | Permissions.MANAGE_ROSTERS, isOwner: false };
     await SeasonSchoolPage(params());
-    // Season-scoped at the query, and the school-wide editor options (all games/seasons/members) are never loaded.
+    // Both the roster blocks and the editor options are read for this season only.
     expect(mocks.getSchoolRosterBlocks).toHaveBeenCalledWith(SCHOOL, { seasonId: SEASON });
-    expect(mocks.getRosterEditOptions).not.toHaveBeenCalled();
+    expect(mocks.getRosterEditOptions).toHaveBeenCalledWith(SCHOOL, { seasonId: SEASON });
   });
 
-  it('passes the client view only this season\'s block, read-only scope and empty editor options, even if the loader returned other games', async () => {
+  it('passes the client view only this season\'s block and season-scoped editor options, even if the loader returned other games', async () => {
     mocks.staff = { permissions: Permissions.MANAGE_LEAGUE | Permissions.MANAGE_ROSTERS, isOwner: false };
     const otherGame = buildSeasonBlocks([{
       teamId: 't9', gameId: 'g2', gameSlug: 'league-of-legends', gameName: 'League of Legends', seasonId: 'other-season',
@@ -123,6 +123,12 @@ describe('season school page', () => {
       ] }],
     }]);
     mocks.getSchoolRosterBlocks.mockResolvedValue([...blocks, ...otherGame]);
+    const scopedOptions = {
+      members: [{ id: 'm1', firstName: 'Ada', lastName: 'Lovelace', discord: null, graduationYear: null }],
+      games: [{ id: 'g1', slug: 'valorant', name: 'Valorant' }],
+      seasons: [{ id: SEASON, gameId: 'g1', name: '2026-27', isActive: true }],
+    };
+    mocks.getRosterEditOptions.mockResolvedValue(scopedOptions as never);
 
     const el = await SeasonSchoolPage({ ...params(), searchParams: Promise.resolve({ game: 'league-of-legends' }) } as never);
     const view = findByType(el, SchoolRostersView);
@@ -130,7 +136,8 @@ describe('season school page', () => {
     expect(view!.props.scope).toBe('season');
     expect(view!.props.blocks).toHaveLength(1);
     expect(view!.props.blocks[0].gameSlug).toBe('valorant');
-    expect(view!.props.options).toEqual({ members: [], games: [], seasons: [] });
+    // The editor options are exactly what the season-scoped loader returned (one game, one season).
+    expect(view!.props.options).toEqual(scopedOptions);
     expect(view!.props.initialFilters.game).toBe('');
     expect(JSON.stringify(view!.props)).not.toMatch(/league-of-legends|Zed Other/);
   });

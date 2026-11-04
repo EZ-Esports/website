@@ -42,7 +42,8 @@ export const getCachedTeams = unstable_cache(
       })
       .from(schema.teams)
       .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-      .where(isNull(schema.schools.deletedAt));
+      // Teams staff removed from a season (teams.removed_at) are not teams of that season any more.
+      .where(and(isNull(schema.schools.deletedAt), isNull(schema.teams.removedAt)));
   },
   ['teams-list'],
   { tags: ['teams'] }
@@ -65,6 +66,7 @@ export const countTeamsWithoutRoster = async (): Promise<number> => {
     .where(
       and(
         isNull(schema.schools.deletedAt),
+        isNull(schema.teams.removedAt),
         notExists(
           db
             .select({ one: schema.rosters.id })
@@ -158,7 +160,7 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
     .from(schema.teams)
     .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
     .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
-    .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)))
+    .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt), isNull(schema.teams.removedAt)))
     .orderBy(schema.schools.name, desc(schema.seasons.name));
 
   const teamIds = teamsList.map((t) => t.teamId);
@@ -286,7 +288,8 @@ export async function getSchoolGameTeamsPageData(
     .where(
       and(
         eq(schema.teams.schoolId, matchedSchoolRow.id),
-        eq(schema.teams.gameId, gameRow[0].id)
+        eq(schema.teams.gameId, gameRow[0].id),
+        isNull(schema.teams.removedAt)
       )
     )
     .orderBy(desc(schema.seasons.name));

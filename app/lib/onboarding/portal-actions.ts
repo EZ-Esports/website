@@ -5,7 +5,7 @@ import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { db } from '@/app/lib/db';
 import { deleteFormCompletionsForInvites } from '@/app/lib/db/onboarding-form';
 import * as schema from '@/app/lib/db/schema';
-import { eq, and, or, desc, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, or, desc, inArray, isNull, type SQL } from 'drizzle-orm';
 import {
   assertManagerForSchool,
   assertManagerForSchoolGame,
@@ -1018,7 +1018,8 @@ export async function getSchoolRosters(
   const { scopes } = await resolveManagerScope(schoolId, gameId);
   if (scopes && scopes.length === 0) return [];
 
-  const whereConditions = [eq(schema.teams.schoolId, schoolId)];
+  // A team staff removed from its season is no longer part of it: its rosters leave the manager portal.
+  const whereConditions = [eq(schema.teams.schoolId, schoolId), isNull(schema.teams.removedAt)];
   if (gameId) {
     whereConditions.push(eq(schema.teams.gameId, gameId));
   }
@@ -1204,6 +1205,11 @@ export async function createSchoolRoster(
       )
     )
     .limit(1);
+
+  if (team?.removedAt) {
+    // Staff took this school out of the season; only staff adding it back (League Setup) restores it.
+    throw new Error('This school is not part of this season. Ask league staff to add it back.');
+  }
 
   if (!team) {
     const [newTeam] = await db

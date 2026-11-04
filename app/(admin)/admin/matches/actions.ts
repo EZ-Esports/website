@@ -43,6 +43,7 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
         seasonId: schema.teams.seasonId,
         gameId: schema.teams.gameId,
         division: schema.rosters.division,
+        removedAt: schema.teams.removedAt,
       })
       .from(schema.rosters)
       .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
@@ -50,6 +51,9 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
 
     if (rosterTeams.length !== 2) {
       return { success: false, error: 'Both rosters must exist and belong to a registered team.' };
+    }
+    if (rosterTeams.some((r) => r.removedAt)) {
+      return { success: false, error: 'A selected school was removed from this season. Add it back in League Setup first.' };
     }
     if (!rosterTeams.every((r) => r.seasonId === seasonId)) {
       return { success: false, error: 'Both rosters must belong to teams in the selected season.' };

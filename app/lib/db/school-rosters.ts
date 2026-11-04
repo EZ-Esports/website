@@ -68,6 +68,8 @@ export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?:
           discord: schema.members.discord,
           graduationYear: schema.members.graduationYear,
           schoolEmail: schema.members.schoolEmail,
+          // `members.email` is the personal address typed in onboarding (the school one is separate).
+          email: schema.members.email,
         })
         .from(schema.players)
         .innerJoin(schema.members, eq(schema.players.memberId, schema.members.id))
@@ -90,6 +92,7 @@ export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?:
       discord: p.discord,
       graduationYear: p.graduationYear,
       schoolEmail: p.schoolEmail,
+      email: p.email,
       hasStudentId: withStudentId.has(p.memberId),
       role: p.role,
       contentFlags: contentFlags.get(p.memberId),
@@ -135,7 +138,7 @@ export async function getSchoolForRosterView(schoolId: string) {
 }
 
 /** What the staff editing controls need beyond the rosters themselves. Display fields only. */
-export async function getRosterEditOptions(schoolId: string): Promise<RosterEditOptions> {
+export async function getRosterEditOptions(schoolId: string, opts: { seasonId?: string } = {}): Promise<RosterEditOptions> {
   const [members, games, seasons] = await Promise.all([
     db
       .select({
@@ -148,10 +151,17 @@ export async function getRosterEditOptions(schoolId: string): Promise<RosterEdit
       .from(schema.members)
       .where(eq(schema.members.schoolId, schoolId))
       .orderBy(asc(schema.members.firstName), asc(schema.members.lastName)),
-    db
-      .select({ id: schema.games.id, slug: schema.games.slug, name: schema.games.displayName })
-      .from(schema.games)
-      .orderBy(asc(schema.games.displayName)),
+    // With a season, only that season and its one game are read (the season-scoped school page).
+    opts.seasonId
+      ? db
+          .select({ id: schema.games.id, slug: schema.games.slug, name: schema.games.displayName })
+          .from(schema.games)
+          .innerJoin(schema.seasons, eq(schema.seasons.gameId, schema.games.id))
+          .where(eq(schema.seasons.id, opts.seasonId))
+      : db
+          .select({ id: schema.games.id, slug: schema.games.slug, name: schema.games.displayName })
+          .from(schema.games)
+          .orderBy(asc(schema.games.displayName)),
     db
       .select({
         id: schema.seasons.id,
@@ -159,7 +169,8 @@ export async function getRosterEditOptions(schoolId: string): Promise<RosterEdit
         name: schema.seasons.name,
         isActive: schema.seasons.isActive,
       })
-      .from(schema.seasons),
+      .from(schema.seasons)
+      .where(opts.seasonId ? eq(schema.seasons.id, opts.seasonId) : undefined),
   ]);
   return { members, games, seasons };
 }

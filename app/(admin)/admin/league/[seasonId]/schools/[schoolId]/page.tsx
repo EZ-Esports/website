@@ -1,17 +1,15 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { FiUsers } from 'react-icons/fi';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import SchoolCrest from '@/app/components/admin/SchoolCrest';
 import SchoolRostersView from '@/app/components/admin/SchoolRostersView';
 import { AdminNotice, AdminPage, AdminPageHeader, AdminSection } from '@/app/components/admin/AdminUI';
-import { chip, chipButton } from '@/app/components/admin/styles';
+import { chip } from '@/app/components/admin/styles';
 import { getStaffForAdminSection } from '@/app/lib/auth';
 import { hasPermission, Permissions } from '@/app/lib/roles';
 import { ADMIN_ROSTER_VIEW_PERMISSION } from '@/app/lib/staff-access';
 import { getSeasonSetupData, type SeasonSetupData } from '@/app/lib/db/season-setup';
-import { getSchoolRosterBlocks } from '@/app/lib/db/school-rosters';
+import { getRosterEditOptions, getSchoolRosterBlocks } from '@/app/lib/db/school-rosters';
 import type { RosterEditOptions, SeasonBlock } from '@/app/lib/school-roster-view';
 
 const NO_OPTIONS: RosterEditOptions = { members: [], games: [], seasons: [] };
@@ -23,8 +21,8 @@ const UUID =/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * Gated on MANAGE_LEAGUE like the season page. The roster data (player names, Discord, class year,
  * school email, student ID links, content-flag badges) is the same Schools & Rosters shows, so it is
  * loaded and drawn only for staff holding MANAGE_ROSTERS, the permission that page requires; it is
- * the same `SchoolRostersView` in its read-only `season` scope: one block, no game filter, season
- * header, register-team panel or edit controls (editing stays in the Edit rosters link). Only this
+ * the same `SchoolRostersView` in its `season` scope: one block, no game filter, season
+ * header or register-team panel, but all roster and player controls. Only this
  * season's team is ever queried, so no other game's data reaches the client. Everyone else gets the
  * names-and-roles list the season page already offers.
  */
@@ -40,6 +38,7 @@ export default async function SeasonSchoolPage({ params }: { params: Promise<{ s
 
   let data: SeasonSetupData | null = null;
   let block: SeasonBlock | null = null;
+  let options: RosterEditOptions = NO_OPTIONS;
   let dbError = false;
   try {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
@@ -49,7 +48,11 @@ export default async function SeasonSchoolPage({ params }: { params: Promise<{ s
       // URL's ?game= is never consulted; the season decides the game. A block that still did not
       // belong to this season and game would be dropped rather than shown.
       const gameSlug = data.season.gameSlug;
-      const blocks = await getSchoolRosterBlocks(schoolId, { seasonId });
+      const [blocks, editOptions] = await Promise.all([
+        getSchoolRosterBlocks(schoolId, { seasonId }),
+        getRosterEditOptions(schoolId, { seasonId }),
+      ]);
+      options = editOptions;
       block = blocks.find((b) => b.seasonId === seasonId && b.gameSlug === gameSlug) ?? null;
     }
   } catch (error) {
@@ -90,18 +93,6 @@ export default async function SeasonSchoolPage({ params }: { params: Promise<{ s
             {season.rostersLockedAt && <span className={chip('warning')}>Rosters locked</span>}
           </>
         }
-        actions={
-          canViewRosterData ? (
-            <Link
-              href={`/admin/schools/${school.schoolId}/rosters?game=${encodeURIComponent(season.gameSlug)}`}
-              className={chipButton('ghost')}
-              title="Open this school's full roster editor across every season"
-            >
-              <FiUsers aria-hidden className="h-3.5 w-3.5" />
-              Edit rosters
-            </Link>
-          ) : undefined
-        }
       />
 
       {canViewRosterData ? (
@@ -111,9 +102,9 @@ export default async function SeasonSchoolPage({ params }: { params: Promise<{ s
               schoolId={school.schoolId}
               schoolName={school.schoolName}
               blocks={[block]}
-              // Read-only and season-scoped: the editor's school-wide options (every game, season and
-              // member) are never loaded or sent here.
-              options={NO_OPTIONS}
+              // Season-scoped editor options: this season, its one game and the school's members. No
+              // other game or season is read or sent.
+              options={options}
               scope="season"
               initialFilters={{ game: '', division: 'both', phone: 'Varsity' }}
             />

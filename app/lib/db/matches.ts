@@ -119,7 +119,11 @@ function facetConditions(params: MatchesPageParams, publicOnly = false): SQL[] {
   const conditions: SQL[] = [];
   // Public reads see only published seasons' matches; an unpublished season's schedule is as
   // hidden as its scores. `seasons` is joined by every query that passes this flag.
-  if (publicOnly) conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
+  if (publicOnly) {
+    conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
+    // A team staff removed from the season (teams.removed_at) is hidden publicly, with its matches; the rows stay for staff.
+    conditions.push(isNull(homeTeam.removedAt), isNull(awayTeam.removedAt));
+  }
   if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
   if (params.division && params.division !== COMBINED_DIVISION) {
@@ -271,8 +275,10 @@ export async function getPublicMatchesPage(params: MatchesPageParams): Promise<M
   return getMatchesPage(params, true);
 }
 
-export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
-  const conditions = [eq(schema.matches.seasonId, seasonId)];
+export function buildSeasonMatchesQuery(seasonId: string, division?: string, publicOnly = false) {
+  const conditions: SQL[] = [eq(schema.matches.seasonId, seasonId)];
+  // Public callers do not see fixtures of a team staff removed from the season; the rows stay for staff.
+  if (publicOnly) conditions.push(isNull(homeTeam.removedAt), isNull(awayTeam.removedAt));
   if (division && division !== COMBINED_DIVISION) {
     const targetDiv = canonicalDivision(division);
     conditions.push(
@@ -311,15 +317,15 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
  * All matches of a season (optionally one division) with names joined in,
  * oldest first. Used by the calendar view, which needs the whole season.
  */
-export async function getSeasonMatches(seasonId: string, division?: string) {
-  return buildSeasonMatchesQuery(seasonId, division);
+export async function getSeasonMatches(seasonId: string, division?: string, publicOnly = false) {
+  return buildSeasonMatchesQuery(seasonId, division, publicOnly);
 }
 
 /** Public counterpart of `getSeasonMatches`: an unpublished (or unknown) season yields no matches. */
 export async function getPublicSeasonMatches(seasonId: string, division?: string) {
   const publicIds = await getOutcomesPublicSeasonIds();
   if (!publicIds.has(seasonId)) return [];
-  return getSeasonMatches(seasonId, division);
+  return getSeasonMatches(seasonId, division, true);
 }
 
 /**
@@ -338,6 +344,8 @@ export async function getSchoolMatchRows(params: {
     // keep seeing a match against it.
     isNull(homeSchool.deletedAt),
     isNull(awaySchool.deletedAt),
+    isNull(homeTeam.removedAt),
+    isNull(awayTeam.removedAt),
   ];
   if (params.seasonIds) conditions.push(inArray(schema.matches.seasonId, params.seasonIds));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
@@ -435,7 +443,9 @@ export const getCachedRecentResults = unstable_cache(
           eq(homeSchool.isActive, true),
           eq(awaySchool.isActive, true),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt)
+          isNull(awaySchool.deletedAt),
+          isNull(homeTeam.removedAt),
+          isNull(awayTeam.removedAt)
         )
       )
       .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
@@ -579,6 +589,8 @@ export function buildHubMatchQuery(opts: {
         ),
         isNull(homeSchool.deletedAt),
         isNull(awaySchool.deletedAt),
+        isNull(homeTeam.removedAt),
+        isNull(awayTeam.removedAt),
         ...opts.conditions
       )
     )
@@ -621,7 +633,9 @@ export function buildFormGuideQuery(opts: {
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt)
+          isNull(awaySchool.deletedAt),
+          isNull(homeTeam.removedAt),
+          isNull(awayTeam.removedAt)
         )
       );
   };

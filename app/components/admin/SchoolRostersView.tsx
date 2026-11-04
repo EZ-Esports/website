@@ -41,9 +41,10 @@ interface SchoolRostersViewProps {
   /** Filters parsed and validated server-side from the URL. */
   initialFilters: RosterViewFilters;
   /**
-   * `season`: the caller passes exactly one season block and wants it read-only and on its own: no
-   * game filter, no season header, no register-team panel and no edit controls. Used by the League
-   * Setup school page, which must never offer another game's rosters.
+   * `season`: the caller passes exactly one season block and wants it on its own: no game filter,
+   * no season accordion header and no register-team panel (the cross-game, cross-season chrome).
+   * Every roster and player control, badge and field is unchanged. Used by the League Setup school
+   * page, which must never offer another game's rosters.
    */
   scope?: 'all' | 'season';
 }
@@ -186,7 +187,7 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
         <div className="space-y-4">
           {visible.map((block) =>
             seasonScope ? (
-              <SeasonBody key={block.key} block={block} division={division} phoneDivision={phoneDivision} readOnly />
+              <SeasonBody key={block.key} block={block} division={division} phoneDivision={phoneDivision} />
             ) : (
               <SeasonBlockView
                 key={block.key}
@@ -441,9 +442,11 @@ function RosterCard({ roster, block, showDivision = false, readOnly = false }: {
                       .filter(Boolean)
                       .join(' · ') || 'No further details'}
                   </p>
-                  {(p.schoolEmail || p.hasStudentId) && (
+                  {(p.schoolEmail || p.email || p.hasStudentId) && (
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 break-words text-xs text-foreground-secondary">
-                      {p.schoolEmail && <span>School email: {p.schoolEmail}</span>}
+                      {/* Both addresses are shown whenever either exists, so a missing one reads as missing rather than hidden. */}
+                      <span>School email: {p.schoolEmail || 'not on file'}</span>
+                      <span>Personal email: {p.email || 'not on file'}</span>
                       {p.hasStudentId && (
                         <a
                           href={`/admin/schools/student-id/${p.memberId}`}
