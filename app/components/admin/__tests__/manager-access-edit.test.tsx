@@ -51,7 +51,7 @@ describe('editing a manager\'s access', () => {
     expect(onUpdateManager).not.toHaveBeenCalled();
   });
 
-  it('toggle exposes expanded state and controls the editor; focus moves in and returns on cancel', async () => {
+  it('the trigger is a RAC disclosure: expanded state and panel are exposed, and Cancel / Save close it', async () => {
     const user = userEvent.setup();
     setup();
     const toggle = screen.getByRole('button', { name: 'Edit access for Ada Lovelace' });
@@ -60,18 +60,13 @@ describe('editing a manager\'s access', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const panel = screen.getByRole('group', { name: 'Edit access for Ada Lovelace' });
     expect(toggle.getAttribute('aria-controls')).toBe(panel.id);
-    expect(screen.getByRole('radio', { name: 'All games' })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('group', { name: 'Edit access for Ada Lovelace' })).toBeNull();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit access for Ada Lovelace' })).toHaveFocus());
-  });
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'false'));
+    expect(screen.queryByRole('radio', { name: 'All games' })).toBeNull();
 
-  it('returns focus to the toggle after a successful save', async () => {
-    const user = userEvent.setup();
-    setup();
-    await user.click(screen.getByRole('button', { name: 'Edit access for Ada Lovelace' }));
+    await user.click(toggle);
     await user.click(screen.getByRole('button', { name: 'Save access' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit access for Ada Lovelace' })).toHaveFocus());
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'false'));
   });
 
   it('dialog banners are live regions (status for success, alert for errors)', () => {
