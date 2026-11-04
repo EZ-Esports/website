@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ActiveManagersTab } from '../school-managers/ActiveManagersTab';
+import { AdminNotice } from '../AdminUI';
 
 afterEach(cleanup);
 
@@ -48,6 +49,40 @@ describe('editing a manager\'s access', () => {
     await user.click(screen.getByRole('button', { name: 'Save access' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Choose at least one game');
     expect(onUpdateManager).not.toHaveBeenCalled();
+  });
+
+  it('toggle exposes expanded state and controls the editor; focus moves in and returns on cancel', async () => {
+    const user = userEvent.setup();
+    setup();
+    const toggle = screen.getByRole('button', { name: 'Edit access for Ada Lovelace' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = screen.getByRole('group', { name: 'Edit access for Ada Lovelace' });
+    expect(toggle.getAttribute('aria-controls')).toBe(panel.id);
+    expect(screen.getByRole('radio', { name: 'All games' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('group', { name: 'Edit access for Ada Lovelace' })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit access for Ada Lovelace' })).toHaveFocus());
+  });
+
+  it('returns focus to the toggle after a successful save', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Edit access for Ada Lovelace' }));
+    await user.click(screen.getByRole('button', { name: 'Save access' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit access for Ada Lovelace' })).toHaveFocus());
+  });
+
+  it('dialog banners are live regions (status for success, alert for errors)', () => {
+    render(
+      <>
+        <AdminNotice tone="success">Saved</AdminNotice>
+        <AdminNotice tone="danger">Failed</AdminNotice>
+      </>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed');
   });
 
   it('shows the server error and stays open', async () => {

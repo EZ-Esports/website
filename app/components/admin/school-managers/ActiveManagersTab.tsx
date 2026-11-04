@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FiStar, FiTrash2 } from 'react-icons/fi';
 import ConfirmActionDialog from '../ConfirmActionDialog';
 import { useConfirmAction } from '../useConfirmAction';
@@ -15,11 +15,16 @@ type SaveResult = { success: boolean; error?: string };
 /** Inline editor for one manager's game scope and primary-contact flag. */
 function ManagerAccessEditor({
   manager,
+  panelId,
+  managerName,
   games,
   onSave,
   onCancel,
 }: {
   manager: ManagerItem;
+  /** Id the toggle's aria-controls points at. */
+  panelId: string;
+  managerName: string;
   games: GameItem[];
   onSave: (managedGames: string[] | null, isPrimaryContact: boolean) => Promise<SaveResult>;
   onCancel: () => void;
@@ -29,6 +34,12 @@ function ManagerAccessEditor({
   const [primary, setPrimary] = useState(manager.isPrimaryContact);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const firstControlRef = useRef<HTMLInputElement>(null);
+
+  // Opening the editor moves focus into it, so keyboard and screen reader users land on the form.
+  useEffect(() => {
+    firstControlRef.current?.focus();
+  }, []);
 
   const toggle = (slug: string) =>
     setSelected((prev) => (prev.includes(slug) ? prev.filter((g) => g !== slug) : [...prev, slug]));
@@ -47,11 +58,11 @@ function ManagerAccessEditor({
   };
 
   return (
-    <div className="mt-2 space-y-3 rounded-lg bg-surface-raised/60 p-3">
+    <div id={panelId} role="group" aria-label={`Edit access for ${managerName}`} className="mt-2 space-y-3 rounded-lg bg-surface-raised/60 p-3">
       <fieldset className="space-y-2">
         <legend className="mb-1 text-xs font-medium text-foreground-secondary">Games this manager can manage</legend>
         <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
-          <input type="radio" name={`scope-${manager.id}`} checked={allGames} onChange={() => setAllGames(true)} className="h-4 w-4 accent-accent" />
+          <input ref={firstControlRef} type="radio" name={`scope-${manager.id}`} checked={allGames} onChange={() => setAllGames(true)} className="h-4 w-4 accent-accent" />
           All games
         </label>
         <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
@@ -109,6 +120,22 @@ export function ActiveManagersTab({
   onError,
 }: ActiveManagersTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Toggle to refocus once the editor closes. A save reloads the list (the toggle briefly
+  // unmounts), so the focus is applied in an effect once the button exists again.
+  const [refocusId, setRefocusId] = useState<string | null>(null);
+  const toggleRefs = useRef(new Map<string, HTMLButtonElement>());
+  const closeEditor = (id: string) => {
+    setEditingId(null);
+    setRefocusId(id);
+  };
+  useEffect(() => {
+    if (!refocusId || editingId !== null) return;
+    const el = toggleRefs.current.get(refocusId);
+    if (el) {
+      el.focus();
+      setRefocusId(null);
+    }
+  }, [refocusId, editingId, managers, loading]);
   const removal = useConfirmAction<{ id: string; name: string }>(async ({ id }) => {
     const res = await onRemoveManager(id);
     if (!res?.success && res?.error) onError(res.error);
@@ -207,7 +234,13 @@ export function ActiveManagersTab({
                   {onUpdateManager && (
                     <RowIconButton
                       kind="edit"
-                      onClick={() => setEditingId(editingId === m.id ? null : m.id)}
+                      ref={(el) => {
+                        if (el) toggleRefs.current.set(m.id, el);
+                        else toggleRefs.current.delete(m.id);
+                      }}
+                      onClick={() => (editingId === m.id ? closeEditor(m.id) : setEditingId(m.id))}
+                      aria-expanded={editingId === m.id}
+                      aria-controls={`manager-access-${m.id}`}
                       label={`Edit access for ${displayName || displayEmail}`}
                     />
                   )}
@@ -226,8 +259,10 @@ export function ActiveManagersTab({
                 {onUpdateManager && editingId === m.id && (
                   <ManagerAccessEditor
                     manager={m}
+                    panelId={`manager-access-${m.id}`}
+                    managerName={displayName || displayEmail}
                     games={games}
-                    onCancel={() => setEditingId(null)}
+                    onCancel={() => closeEditor(m.id)}
                     onSave={async (g, p) => {
                       const res = await onUpdateManager(m.id, g, p);
                       if (res.success) onSuccess?.(`Access updated for ${displayName || displayEmail}.`);

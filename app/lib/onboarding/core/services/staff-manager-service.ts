@@ -94,9 +94,8 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
 
   /**
    * Changes which games an existing, active manager may manage (null = all games) and whether
-   * they are the primary contact. Reuses the assignment upsert, which keys on school + user +
-   * academic year, so nothing else about the row changes. A removed manager is refused: the
-   * upsert would otherwise switch their access back on.
+   * they are the primary contact. A removed manager is refused, both up front and inside the
+   * write itself (the assignment upsert is not used: it forces is_active back on).
    */
   async updateSchoolManagerAccess(
     actor: { id: string; email: string },
@@ -108,14 +107,12 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
     if (!existing) return { success: false, error: 'School manager not found.' };
     if (!existing.isActive) return { success: false, error: 'This manager was removed. Assign them again instead.' };
 
-    const manager = await this.repo.createOrUpdateSchoolManager({
-      schoolId: existing.schoolId,
-      userId: existing.userId,
-      memberId: existing.memberId,
-      academicYear: existing.academicYear,
+    // Conditional on is_active inside the write, so a removal racing this call is never undone.
+    const manager = await this.repo.updateActiveSchoolManagerAccess(existing.id, {
       managedGames: params.managedGames,
       isPrimaryContact: params.isPrimaryContact,
     });
+    if (!manager) return { success: false, error: 'This manager was removed. Assign them again instead.' };
 
     await this.repo.writeStaffAuditLog({
       event: 'update_school_manager_access',
