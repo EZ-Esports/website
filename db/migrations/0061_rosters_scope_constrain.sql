@@ -13,11 +13,19 @@
 -- 1. Pick up anything an old-code insert wrote since 0060 (the trigger already fills these; this is the safety net),
 --    then make the scope columns mandatory. SET NOT NULL fails loudly, and rolls the whole migration back, if any
 --    roster is still unscoped.
-UPDATE "rosters" r
-SET "school_id" = t."school_id", "game_id" = t."game_id", "season_id" = t."season_id"
-FROM "teams" t
-WHERE t."id" = r."team_id"
-  AND (r."school_id" IS NULL OR r."game_id" IS NULL OR r."season_id" IS NULL);--> statement-breakpoint
+DO $$
+BEGIN
+  -- Only while team_id still exists (it is gone after 0062, and then every roster is already scoped).
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'rosters' AND column_name = 'team_id') THEN
+    EXECUTE $u$
+      UPDATE public.rosters r
+      SET school_id = t.school_id, game_id = t.game_id, season_id = t.season_id
+      FROM public.teams t
+      WHERE t.id = r.team_id
+        AND (r.school_id IS NULL OR r.game_id IS NULL OR r.season_id IS NULL)
+    $u$;
+  END IF;
+END $$;--> statement-breakpoint
 ALTER TABLE "rosters" ALTER COLUMN "school_id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "rosters" ALTER COLUMN "game_id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "rosters" ALTER COLUMN "season_id" SET NOT NULL;--> statement-breakpoint
