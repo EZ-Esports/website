@@ -17,6 +17,14 @@ export type ManagerInviteRow = typeof schema.managerInvites.$inferSelect;
  * their own table and carry no game, so they are only consulted when the hash
  * is not a player invite.
  */
+/**
+ * False when a player invite names a season the school is no longer a member of (staff removed it). Invites
+ * without a season (legacy rows) are not affected. Used when an invite is validated and again when it is submitted.
+ */
+function schoolInInviteSeason() {
+    return sql<boolean>`(${schema.playerInvites.seasonId} is null or exists (select 1 from ${schema.seasonSchools} where ${schema.seasonSchools.schoolId} = ${schema.playerInvites.schoolId} and ${schema.seasonSchools.gameId} = ${schema.playerInvites.gameId} and ${schema.seasonSchools.seasonId} = ${schema.playerInvites.seasonId}))`;
+}
+
 export async function findInviteForValidation(tokenHash: string) {
   const [playerRow] = await db
     .select({
@@ -29,7 +37,7 @@ export async function findInviteForValidation(tokenHash: string) {
       gameSlug: schema.games.slug,
       // False when the invite names a season the school is no longer a member of (staff removed it):
       // the link then stops working. Invites without a season (legacy rows) are not affected.
-      schoolInSeason: sql<boolean>`(${schema.playerInvites.seasonId} is null or exists (select 1 from ${schema.seasonSchools} where ${schema.seasonSchools.schoolId} = ${schema.playerInvites.schoolId} and ${schema.seasonSchools.gameId} = ${schema.playerInvites.gameId} and ${schema.seasonSchools.seasonId} = ${schema.playerInvites.seasonId}))`,
+      schoolInSeason: schoolInInviteSeason(),
     })
     .from(schema.playerInvites)
     .innerJoin(schema.schools, eq(schema.playerInvites.schoolId, schema.schools.id))
@@ -83,7 +91,7 @@ export async function findInviteByTokenHash(
  * their game slug; manager invites carry no game.
  */
 export async function findInviteForSubmission(tokenHash: string): Promise<
-  | { isManager: false; invite: PlayerInviteRow; gameSlug: string | null }
+  | { isManager: false; invite: PlayerInviteRow; gameSlug: string | null; schoolInSeason: boolean }
   | { isManager: true; invite: ManagerInviteRow; gameSlug: null }
   | undefined
 > {
@@ -91,6 +99,7 @@ export async function findInviteForSubmission(tokenHash: string): Promise<
     .select({
       invite: schema.playerInvites,
       gameSlug: schema.games.slug,
+      schoolInSeason: schoolInInviteSeason(),
     })
     .from(schema.playerInvites)
     .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
@@ -98,7 +107,7 @@ export async function findInviteForSubmission(tokenHash: string): Promise<
     .limit(1);
 
   if (playerRow) {
-    return { isManager: false, invite: playerRow.invite, gameSlug: playerRow.gameSlug ?? null };
+    return { isManager: false, invite: playerRow.invite, gameSlug: playerRow.gameSlug ?? null, schoolInSeason: playerRow.schoolInSeason };
   }
 
   const [managerInvite] = await db

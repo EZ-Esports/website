@@ -222,16 +222,83 @@ describe('the final schema after 0062', () => {
     expect((await getMatchesPage({}, true)).items).toHaveLength(1);
   });
 
+  it('archived memberships without rosters do not appear in the public directory, the dashboard count or the season hub', async () => {
+    const { getGameTeamsPageData, countTeamsWithoutRoster } = await import('../teams');
+    const { getSeasonSetupData } = await import('../season-setup');
+    const archived = (await one(client, `insert into seasons (game_id, name, is_active) values ($1, '2020-21', false) returning id`, [game])).id;
+    const emptySchool = (await one(client, `insert into schools (name, slug) values ('Snapshot Only HS', 'snapshot-only') returning id`)).id;
+    const before = await countTeamsWithoutRoster();
+    // The membership 0060 backfills for an archived standings snapshot: no rosters at all.
+    await client.query(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3)`, [emptySchool, game, archived]);
+    // A school that really played the archived season (rosters, no JV).
+    await client.query(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3)`, [schoolA, game, archived]);
+    await client.query(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'Varsity', 'A')`, [schoolA, game, archived]);
+
+    expect(await countTeamsWithoutRoster()).toBe(before); // archived seasons are not work to do
+
+    const directory = await getGameTeamsPageData('valorant');
+    expect(JSON.stringify(directory)).not.toContain('Snapshot Only HS');
+    const alpha = directory!.find((s) => s.schoolName === 'Alpha HS')!;
+    expect(alpha.seasons.map((s) => s.seasonName).sort()).toEqual(['2020-21', '2026-27']);
+
+    const hub = await getSeasonSetupData(archived);
+    expect(hub!.schools.map((s) => s.schoolName)).toEqual(['Alpha HS']); // the empty snapshot membership is hidden
+    expect(hub!.schools[0].missing).toEqual([]); // and an archived season never asks for missing rosters
+    expect(hub!.availableSchools.map((s) => s.name)).not.toContain('Snapshot Only HS'); // still a member, so not offered
+
+    // An active season keeps asking: Beta HS has Varsity + JV, so give a school only Varsity.
+    const only = (await one(client, `insert into schools (name, slug) values ('Varsity Only HS', 'varsity-only') returning id`)).id;
+    await client.query(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3)`, [only, game, season]);
+    await client.query(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'Varsity', 'A')`, [only, game, season]);
+    const live = await getSeasonSetupData(season);
+    expect(live!.schools.find((s) => s.schoolName === 'Varsity Only HS')!.missing).toEqual(['JV']);
+    expect(await countTeamsWithoutRoster()).toBe(before); // it has a roster, so still not counted
+  });
+
+  it('a player invite stops validating and submitting once its school is no longer in the invite season', async () => {
+    const { findInviteForValidation, findInviteForSubmission } = await import('../onboarding');
+    const invite = (hash: string, withSeason: boolean) =>
+      client.query(
+        `insert into player_invites (school_id, game_id, season_id, token_hash, intended_first_name, intended_last_name, invited_by_user_id, expires_at)
+         values ($1, $2, $3, $4, 'A', 'B', '00000000-0000-4000-8000-0000000000aa', now() + interval '7 days')`,
+        [schoolA, game, withSeason ? season : null, hash],
+      );
+    await invite('seasoned', true);
+    await invite('legacy', false);
+
+    expect((await findInviteForValidation('seasoned') as any).schoolInSeason).toBe(true);
+    expect((await findInviteForSubmission('seasoned') as any).schoolInSeason).toBe(true);
+
+    await client.query(`delete from season_schools where school_id = $1 and season_id = $2`, [schoolA, season]);
+    expect((await findInviteForValidation('seasoned') as any).schoolInSeason).toBe(false);
+    expect((await findInviteForSubmission('seasoned') as any).schoolInSeason).toBe(false);
+    // Legacy invites without a season are not affected.
+    expect((await findInviteForValidation('legacy') as any).schoolInSeason).toBe(true);
+
+    await client.query(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3)`, [schoolA, game, season]);
+    expect((await findInviteForSubmission('seasoned') as any).schoolInSeason).toBe(true);
+  });
+
+  it('deleting a game with matches throws a recognisable refusal and removes nothing', async () => {
+    const { deleteGameInDb } = await import('../league');
+    const err = await deleteGameInDb(game).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('DeleteRefusedError');
+    expect(err.message).toMatch(/existing matches/);
+    expect(await count(client, `select 1 from games where id = '${game}'`)).toBe(1);
+  });
+
   it('deleting a season with matches is refused and removes nothing; without matches it removes rosters and players', async () => {
     const { deleteSeasonInDb } = await import('../league');
     await expect(deleteSeasonInDb(season)).rejects.toThrow(/existing matches/);
-    expect(await count(client, `select 1 from rosters`)).toBe(4);
+    expect(await count(client, `select 1 from rosters where season_id = '${season}'`)).toBeGreaterThanOrEqual(4);
 
     await client.query(`delete from matches`);
     const member = (await one(client, `insert into members (first_name, last_name, school_id) values ('A', 'B', $1) returning id`, [schoolA])).id;
     await client.query(`insert into players (roster_id, member_id) values ($1, $2)`, [rosterA, member]);
     await deleteSeasonInDb(season);
-    expect(await count(client, `select 1 from rosters`)).toBe(0);
+    expect(await count(client, `select 1 from rosters where season_id = '${season}'`)).toBe(0);
+    expect(await count(client, `select 1 from rosters`)).toBe(1); // the archived season's roster is untouched
     expect(await count(client, `select 1 from players`)).toBe(0);
     expect(await count(client, `select 1 from members where id = '${member}'`)).toBe(1);
   });

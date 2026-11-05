@@ -313,6 +313,11 @@ export async function processOnboardingSubmission(
     throw new Error('Invite link has expired.');
   }
 
+  // Staff may have taken the school out of the invite's season after the link was opened (spec-060).
+  if (!isManager && (found as { schoolInSeason?: boolean }).schoolInSeason === false) {
+    throw new Error('Your school is not part of this season right now. Ask your school manager or league staff.');
+  }
+
   // Step 1: Validate inputs
   const validated = validateSubmissionInputs(submission, new Date(), {
     enforceStudentAge: !isManager || submission.alsoPlays === true,

@@ -1272,6 +1272,16 @@ export async function deleteSchoolRoster(
     throw new Error('Cannot delete a roster with enrolled players. Remove all players first.');
   }
 
+  // matches -> rosters is RESTRICT: a roster with matches can never be deleted, so say so plainly.
+  const matchRows = await db
+    .select({ id: schema.matches.id })
+    .from(schema.matches)
+    .where(or(eq(schema.matches.homeRosterId, rosterId), eq(schema.matches.awayRosterId, rosterId)))
+    .limit(1);
+  if (matchRows.length > 0) {
+    throw new Error('Cannot delete a roster that has matches. Ask league staff if it must be removed.');
+  }
+
   await db.delete(schema.rosters).where(eq(schema.rosters.id, rosterId));
 
   updateCacheTags(CACHE_TAGS.ROSTERS, CACHE_TAGS.TEAMS);

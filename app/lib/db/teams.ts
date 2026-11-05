@@ -70,15 +70,20 @@ async function rostersOfMembers(memberIds: string[]) {
   return rows.map((r) => ({ ...r.roster, teamId: r.teamId }));
 }
 
-/** Count teams that do not yet have a single roster created. */
+/**
+ * Count teams that do not yet have a single roster created, in ACTIVE seasons only: archived seasons
+ * carry empty memberships backfilled for their standings snapshots, which are not work to do.
+ */
 export const countTeamsWithoutRoster = async (): Promise<number> => {
   const [row] = await db
     .select({ value: count() })
     .from(schema.seasonSchools)
     .innerJoin(schema.schools, eq(schema.seasonSchools.schoolId, schema.schools.id))
+    .innerJoin(schema.seasons, eq(schema.seasonSchools.seasonId, schema.seasons.id))
     .where(
       and(
         isNull(schema.schools.deletedAt),
+        eq(schema.seasons.isActive, true),
         notExists(
           db
             .select({ one: schema.rosters.id })
@@ -246,6 +251,8 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
       schoolsMap.set(t.schoolId, school);
     }
     const rosters = rostersByTeam.get(t.teamId) || [];
+    // A membership with no rosters (e.g. one backfilled for an archived standings snapshot) is not a season entry.
+    if (rosters.length === 0) return;
     school.seasons.push({
       seasonId: t.seasonId,
       seasonName: t.seasonName,

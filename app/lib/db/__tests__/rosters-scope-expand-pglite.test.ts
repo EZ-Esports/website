@@ -134,7 +134,7 @@ describe('backfill and idempotent re-run', () => {
     expect(await count(`select 1 from rosters where school_id is null`)).toBe(0);
   });
 
-  it('creates membership rows for archived standings and tournament appearances, once', async () => {
+  it('creates membership rows for archived standings, once, and none for tournament appearances', async () => {
     const archived = await school('Archive HS');
     const bracket = await school('Bracket HS');
     await client.query(`insert into season_standings (season_id, school_id, division, rank) values ($1, $2, 'Varsity', 1)`, [seasonId, archived]);
@@ -146,8 +146,10 @@ describe('backfill and idempotent re-run', () => {
     expect(await count(`select 1 from teams where school_id in ('${archived}', '${bracket}')`)).toBe(0);
 
     await rerunMigration();
-    expect(await count(`select 1 from teams where school_id in ('${archived}', '${bracket}') and season_id = '${seasonId}'`)).toBe(2);
+    expect(await count(`select 1 from teams where school_id = '${archived}' and season_id = '${seasonId}'`)).toBe(1);
+    // Tournament games do not need membership for brackets, so a bracket-only school gets no row.
+    expect(await count(`select 1 from teams where school_id = '${bracket}'`)).toBe(0);
     await rerunMigration();
-    expect(await count(`select 1 from teams where school_id in ('${archived}', '${bracket}')`)).toBe(2);
+    expect(await count(`select 1 from teams where school_id in ('${archived}', '${bracket}')`)).toBe(1);
   });
 });

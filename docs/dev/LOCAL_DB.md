@@ -47,6 +47,15 @@ League Operations > League Setup > Valorant > 2026-27 (the season page):
   a removed school and every match it is in disappear; adding it back restores them.
 - The school page (click a tile): edit rosters and players, with the flag badges and both emails.
 
+## Read this first: Supabase is still the real one
+
+Only Postgres is local. `npm run dev:local` still loads the rest of `.env`, so the **real, production
+Supabase project** is used for **sign-in, invite emails, and student ID photo storage**. Anything you do
+there (signing in, creating an invite that emails someone, uploading a student ID) happens on production
+Supabase. Use only test addresses and fake data in those flows, and do not run onboarding with a real
+student or manager. League Setup, rosters, matches and the public pages (everything this sample data is for)
+touch only the local database.
+
 ## Safety
 
 - The local scripts read only `LOCAL_DATABASE_URL` (default `postgres://postgres:postgres@127.0.0.1:54329/postgres`),

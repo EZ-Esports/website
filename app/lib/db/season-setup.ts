@@ -135,7 +135,7 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
     rostersBySchool.set(r.schoolId, list);
   }
 
-  const schools = teams.map<SeasonSetupSchool>((t) => {
+  const all = teams.map<SeasonSetupSchool>((t) => {
     const rosters = (rostersBySchool.get(t.schoolId) ?? []).sort(
       (a, b) => DIVISION_ORDER[a.division] - DIVISION_ORDER[b.division] || a.name.localeCompare(b.name),
     );
@@ -145,11 +145,15 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
       logoUrl: t.logoUrl,
       teamId: t.teamId,
       rosters,
-      missing: missingDivisions(season.gameSlug, rosters),
+      // An archived season is not set up any more, so it never asks for missing rosters.
+      missing: season.isActive ? missingDivisions(season.gameSlug, rosters) : [],
     };
   });
+  // Archived seasons carry memberships backfilled only for their standings snapshots; a school with no
+  // rosters there (and so no matches) is not shown as a tile, though it still counts as a member.
+  const schools = season.isActive ? all : all.filter((s) => s.rosters.length > 0);
 
-  const inSeason = new Set(schools.map((s) => s.schoolId));
+  const inSeason = new Set(all.map((s) => s.schoolId));
   return {
     season: {
       ...season,

@@ -60,7 +60,7 @@ CREATE TRIGGER "rosters_fill_scope_trg" BEFORE INSERT ON "rosters"
 FOR EACH ROW EXECUTE FUNCTION "rosters_fill_scope"();--> statement-breakpoint
 
 -- 5. Membership rows. `teams` becomes the (school, game, season) membership table, so every scope that already
---    has a roster, a standings snapshot or a tournament appearance needs one. ON CONFLICT DO NOTHING on the
+--    has a roster or a standings snapshot needs one. ON CONFLICT DO NOTHING on the
 --    existing unique (school_id, game_id, season_id) index.
 --    (a) scopes that rosters already carry (no-op today; keeps the invariant if a roster ever outlives its team).
 INSERT INTO "teams" ("school_id", "game_id", "season_id")
@@ -73,12 +73,5 @@ INSERT INTO "teams" ("school_id", "game_id", "season_id")
 SELECT DISTINCT ss."school_id", s."game_id", ss."season_id"
 FROM "season_standings" ss
 JOIN "seasons" s ON s."id" = ss."season_id"
-ON CONFLICT ("school_id", "game_id", "season_id") DO NOTHING;--> statement-breakpoint
---    (c) tournament appearances (either side), for tournaments tied to a season.
-INSERT INTO "teams" ("school_id", "game_id", "season_id")
-SELECT DISTINCT x."school_id", t."game_id", t."season_id"
-FROM "tournament_matches" tm
-JOIN "tournaments" t ON t."id" = tm."tournament_id" AND t."season_id" IS NOT NULL
-CROSS JOIN LATERAL (VALUES (tm."home_school_id"), (tm."away_school_id")) AS x("school_id")
-WHERE x."school_id" IS NOT NULL
 ON CONFLICT ("school_id", "game_id", "season_id") DO NOTHING;
+--    (c) deliberately absent: tournament games (TFT, osu!, TETR.IO) do not need membership for their brackets.

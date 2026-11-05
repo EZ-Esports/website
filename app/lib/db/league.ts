@@ -99,6 +99,17 @@ export async function updateGameInDb(
   return res[0];
 }
 
+/**
+ * A delete refused on purpose (the game or season has matches). Its message is written for staff and is
+ * shown as is; the action layer recognises it by `name`, not by class, so test mocks of this module stay valid.
+ */
+export class DeleteRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DeleteRefusedError';
+  }
+}
+
 export async function deleteGameInDb(id: string) {
   await db.transaction(async (tx) => {
     // Refused, never cascaded: a game with matches keeps its rosters, players and scores until the
@@ -109,7 +120,7 @@ export async function deleteGameInDb(id: string) {
       .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
       .where(eq(schema.seasons.gameId, id));
     if ((matchCount?.count ?? 0) > 0) {
-      throw new Error('Cannot delete a game with existing matches. Please delete its matches first.');
+      throw new DeleteRefusedError('Cannot delete a game with existing matches. Please delete its matches first.');
     }
     // Rosters belong to the school, game and season themselves, so nothing reaches them through a
     // membership row any more: delete them (and their players) explicitly, then the game.
@@ -206,7 +217,7 @@ export async function deleteSeasonInDb(id: string) {
       .where(eq(schema.matches.seasonId, id));
 
     if ((matchCount[0]?.count ?? 0) > 0) {
-      throw new Error('Cannot delete season with existing matches. Please reassign or delete matches first.');
+      throw new DeleteRefusedError('Cannot delete season with existing matches. Please reassign or delete matches first.');
     }
 
     // Explicit, not cascaded through a membership row (spec-060): the season's rosters and their

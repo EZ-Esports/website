@@ -39,7 +39,7 @@ export interface VerifyReport {
   migrationApplied: boolean;
   scopes: ScopeRow[];
   /** Membership rows the migration's step 5 would still insert, by source. */
-  missingMembership: { standings: number; tournaments: number };
+  missingMembership: { standings: number };
 }
 
 export function parseArgs(argv: string[]): { dryRun: true } {
@@ -55,7 +55,7 @@ export async function loadReport(query: RowQuery): Promise<VerifyReport> {
   const cols = await query(
     `select column_name from information_schema.columns where table_name = 'rosters' and column_name in ('school_id','game_id','season_id')`,
   );
-  if (cols.length < 3) return { migrationApplied: false, scopes: [], missingMembership: { standings: 0, tournaments: 0 } };
+  if (cols.length < 3) return { migrationApplied: false, scopes: [], missingMembership: { standings: 0 } };
 
   const scopes = await query(`
     select g.slug as game, s.name as season,
@@ -78,15 +78,6 @@ export async function loadReport(query: RowQuery): Promise<VerifyReport> {
       select distinct ss.school_id, s.game_id, ss.season_id
       from season_standings ss join seasons s on s.id = ss.season_id
     ) x where not exists (select 1 from teams m where m.school_id = x.school_id and m.game_id = x.game_id and m.season_id = x.season_id)`);
-  const tournaments = await query(`
-    select count(*)::int as n from (
-      select distinct v.school_id, t.game_id, t.season_id
-      from tournament_matches tm
-      join tournaments t on t.id = tm.tournament_id and t.season_id is not null
-      cross join lateral (values (tm.home_school_id), (tm.away_school_id)) as v(school_id)
-      where v.school_id is not null
-    ) x where not exists (select 1 from teams m where m.school_id = x.school_id and m.game_id = x.game_id and m.season_id = x.season_id)`);
-
   return {
     migrationApplied: true,
     scopes: scopes.map((r) => ({
@@ -98,7 +89,7 @@ export async function loadReport(query: RowQuery): Promise<VerifyReport> {
       noTeam: num(r.no_team),
       noMembership: num(r.no_membership),
     })),
-    missingMembership: { standings: num(standings[0]?.n), tournaments: num(tournaments[0]?.n) },
+    missingMembership: { standings: num(standings[0]?.n) },
   };
 }
 
@@ -119,7 +110,7 @@ export function formatReport(report: VerifyReport): string {
   const total = (pick: (s: ScopeRow) => number) => report.scopes.reduce((n, s) => n + pick(s), 0);
   lines.push(
     `TOTAL | | ${total((s) => s.rosters)} | ${total((s) => s.unscoped)} | ${total((s) => s.mismatched)} | ${total((s) => s.noTeam)} | ${total((s) => s.noMembership)}`,
-    `Membership rows step 5 of 0060 would still add: ${report.missingMembership.standings} from season_standings, ${report.missingMembership.tournaments} from tournament_matches`,
+    `Membership rows step 5 of 0060 would still add: ${report.missingMembership.standings} from season_standings`,
     isHealthy(report) ? 'OK: every roster is scoped and agrees with its team.' : 'PROBLEM: some rosters are unscoped or disagree with their team.',
   );
   return lines.join('\n');

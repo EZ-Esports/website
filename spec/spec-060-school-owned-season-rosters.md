@@ -22,7 +22,7 @@ Hand-written like 0043 onward (the drizzle-kit snapshot chain stops at 0042). Ea
 
 | File | Phase | Does |
 |---|---|---|
-| `0060_rosters_scope_expand` | expand | Adds nullable `rosters.school_id/game_id/season_id` + indexes, backfills them from `teams`, **drops the `rosters.team_id -> teams` FK** and makes `team_id` nullable (so a membership row can never cascade-delete rosters), adds a `BEFORE INSERT` trigger that fills the scope for old-code inserts, and backfills membership rows for archived standings and season-linked tournament appearances. |
+| `0060_rosters_scope_expand` | expand | Adds nullable `rosters.school_id/game_id/season_id` + indexes, backfills them from `teams`, **drops the `rosters.team_id -> teams` FK** and makes `team_id` nullable (so a membership row can never cascade-delete rosters), adds a `BEFORE INSERT` trigger that fills the scope for old-code inserts, and backfills membership rows for schools with an archived standings snapshot (not for tournament appearances: tournament games do not need membership for brackets). |
 | `0061_rosters_scope_constrain` | constrain | Scope columns `NOT NULL`, unique `(school, game, season, name)`, `matches -> rosters` FKs `RESTRICT`, creates the **compatibility view `season_schools`** (simple, auto-updatable, over `teams`) so the new name works before the rename, and widens `roster_standings` with `school_id/game_id/season_id`. |
 | `0062_rosters_scope_contract` | contract | Drops the view and renames `teams` to `season_schools` (and its indexes), rewrites the anon/authenticated RLS policies on rosters, players and matches that named `team_id`, drops the trigger and `rosters.team_id` (+ its indexes), and rebuilds `roster_standings` without `team_id`. |
 
@@ -38,8 +38,9 @@ The code never touches `rosters.team_id`, and uses the name `season_schools`, wh
 
 ### Deviations to know about
 
-- Steps 5(b)/(c) of 0060 add `season_schools` rows (with no rosters) for schools that only appear in archived standings or tournaments. They exist so snapshot-based public reads can require membership; they can make those schools appear in the public team directory for those seasons. `db/verify-roster-backfill.ts` prints how many it would add before anything is applied.
-- Anything that lists schools by `teams` for a season sees these rows.
+- Step 5(b) of 0060 adds `season_schools` rows (with no rosters) for schools that have an archived standings snapshot, so snapshot-based public reads can require membership. Those empty memberships are kept out of the product: the public team directory skips a season with no rosters, the admin "teams without a roster" count looks at active seasons only, and the season hub hides an archived season's school tile that has no rosters and never asks for missing rosters there (the school still counts as a member, so it is not offered in the Add school picker). `db/verify-roster-backfill.ts` prints how many rows step 5(b) would add.
+- Tournament appearances get no membership row; tournament brackets do not read membership.
+- **Journal ordering:** the `when` values of 0060 to 0062 (1790882000030 to 1790882000032) are deliberately above every earlier entry, and above any other branch's pending migration. The migrator applies only entries newer than the last one applied, so any LATER migration (including another branch's, e.g. a 0059 or 0063) must carry a `when` higher than 1790882000032, or it will be skipped silently once these have run.
 
 ## Behaviour
 
@@ -49,7 +50,7 @@ The code never touches `rosters.team_id`, and uses the name `season_schools`, wh
 - **Manager portal**: `assertManagerForRoster` reads the roster's own scope and requires membership for non-staff; match-result and reschedule actions refuse a manager when either side is not a member (staff exempt); manager roster creation requires membership (it no longer creates one); a player's join link stops working when the school is no longer in the invite's season.
 - **Sibling rule and locks** key on the scope (`scopeKey`: school, game, season) instead of the team id.
 - **Scheduling**: Schedule match and Generate season refuse a school that is not a member; Generate reads rosters by school/season.
-- **League deletes**: `deleteSeasonInDb` / `deleteGameInDb` refuse when matches exist and otherwise delete players, rosters, then the season/game, explicitly.
+- **League deletes**: `deleteSeasonInDb` / `deleteGameInDb` refuse when matches exist (a `DeleteRefusedError`, whose message League Setup now shows as written) and otherwise delete players, rosters, then the season/game, explicitly. A manager deleting a roster that has matches gets a clear refusal too. The player's final submit re-checks that the school is still in the invite's season, as validation does.
 - **seed-gold** keys rosters by (school, game, season, name); the purge script reads `rosters.season_id` and `season_schools`.
 
 ## Verification
