@@ -1222,6 +1222,9 @@ export async function createSchoolRoster(
     .insert(schema.rosters)
     .values({
       teamId: team.id,
+      schoolId: team.schoolId,
+      gameId: team.gameId,
+      seasonId: team.seasonId,
       name,
       division,
     })

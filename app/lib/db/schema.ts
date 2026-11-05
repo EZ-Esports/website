@@ -160,15 +160,24 @@ export const teams = pgTable('teams', {
 // Specific rosters under a team (e.g. "Varsity", "JV")
 export const rosters = pgTable('rosters', {
   id: uuid('id').defaultRandom().primaryKey(),
-  teamId: uuid('team_id')
-    .references(() => teams.id, { onDelete: 'cascade' })
-    .notNull(),
+  // EXPAND phase (spec-060, migration 0060): the database no longer enforces a foreign key from here
+  // to `teams` and the column is nullable there, so removing a team (the future season_schools
+  // membership row) can never delete rosters. Kept `notNull` in this type until the switch PR so
+  // every current reader and writer is unchanged; the BEFORE INSERT trigger fills the three
+  // columns below for any writer that only knows `team_id`.
+  teamId: uuid('team_id').notNull(),
+  // A roster belongs to a school, a game and a season on its own (backfilled from its team).
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
+  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }),
+  seasonId: uuid('season_id').references(() => seasons.id, { onDelete: 'cascade' }),
   name: text('name').notNull(), // e.g. "Varsity", "JV"
   division: text('division').notNull(), // "A" | "B" (aligned with docs)
   ...auditColumns,
 }, (table) => [
   index('rosters_team_id_idx').on(table.teamId),
   uniqueIndex('rosters_team_name_unique_idx').on(table.teamId, table.name),
+  index('rosters_school_game_season_idx').on(table.schoolId, table.gameId, table.seasonId),
+  index('rosters_season_id_idx').on(table.seasonId),
 ]).enableRLS();
 
 // Mapping members to specific rosters

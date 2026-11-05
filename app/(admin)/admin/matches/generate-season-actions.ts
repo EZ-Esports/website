@@ -241,6 +241,9 @@ export async function commitGenerateSeason(input: unknown, fingerprint: unknown)
           .values(
             plan.rostersToCreate.map((s) => ({
               teamId: teamIdBySchool.get(s.id)!,
+              schoolId: s.id,
+              gameId: loaded.gameId,
+              seasonId: parsed.data.seasonId,
               name: s.rosterName,
               division: plan.rosterDivision,
             }))

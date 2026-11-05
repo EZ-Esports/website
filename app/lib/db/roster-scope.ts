@@ -18,7 +18,7 @@ export type DbOrTx = typeof db | TransactionExecutor;
 
 export async function teamInSchool(teamId: string, schoolId: string, executor: DbOrTx = db) {
   const [row] = await executor
-    .select({ id: schema.teams.id, gameSlug: schema.games.slug })
+    .select({ id: schema.teams.id, gameId: schema.teams.gameId, seasonId: schema.teams.seasonId, gameSlug: schema.games.slug })
     .from(schema.teams)
     .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
     .where(and(eq(schema.teams.id, teamId), eq(schema.teams.schoolId, schoolId)))

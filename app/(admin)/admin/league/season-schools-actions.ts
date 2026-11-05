@@ -87,7 +87,16 @@ export async function addSchoolToSeason(input: { seasonId: string; schoolId: str
       if (toCreate.length > 0) {
         await tx
           .insert(schema.rosters)
-          .values(toCreate.map((r) => ({ teamId: teamId as string, name: r.name, division: r.division })));
+          .values(
+            toCreate.map((r) => ({
+              teamId: teamId as string,
+              schoolId,
+              gameId: season.gameId,
+              seasonId,
+              name: r.name,
+              division: r.division,
+            })),
+          );
       }
 
       return {

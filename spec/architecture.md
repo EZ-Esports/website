@@ -160,6 +160,10 @@ Completion of the staff-configured Google Form is verified server-side, as Disco
 
 `addSchoolToSeason` (`app/(admin)/admin/league/season-schools-actions.ts`) is the staff path that registers a school: one transaction under a per-(season, school) `pg_advisory_xact_lock`, find-or-create the `teams` row, then insert only the rosters `planSchoolRosters` (`app/lib/season-schools.ts`, pure) reports missing. A division counts as present under any roster name or stored spelling (`A` / `Varsity`), so it never duplicates a manager-built roster; a taken name gets a numeric suffix. Any other code that creates a team for a school and season should follow the same find-or-create so the `(school, game, season)` unique index is never the control flow. Season pages read through `app/lib/db/season-setup.ts` (raw, uncached, display fields only).
 
+## Rosters are school-owned and season-scoped (spec-060, in progress)
+
+`rosters` carries its own `school_id`, `game_id`, `season_id` (migration 0060, backfilled from `teams`); `rosters.team_id` no longer has a foreign key, so deleting a `teams` row can never delete rosters or players. `teams` is becoming the membership table `season_schools` (one row per school, game and season). Until the switch PR, readers still go through `team_id`, and every roster writer must set the three columns (a `BEFORE INSERT` trigger fills them for any writer that does not). Planned end state: `matches -> rosters` is `RESTRICT`, `league.ts` season and game deletes delete rosters and players explicitly and refuse when matches exist, removing a school deletes only its membership row, and tournament brackets do not need membership. Phases and deploy order are in spec-060.
+
 ## CI / agent tooling
 
 `f5563e7` (#70): GitHub Actions on push/PR to `main` — `npm ci` → lint → Vitest → `tsc --noEmit` → build (dummy env). `.githooks/pre-push` mirrors the three local checks; `prepare` sets `core.hooksPath`. No `.github/dependabot.yml`; alerts handled as manual PRs (`02011df`, `27909e4`, `9d40278`, `0463b43`, `ae86069`).

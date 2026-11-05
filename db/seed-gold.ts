@@ -716,11 +716,18 @@ async function main() {
   //    (site convention).
   const rosters = await db
     .insert(schema.rosters)
-    .values(rosterRows.map((r) => ({
-      teamId: teamByKey.get(`${r.season}|${r.game_slug}|${r.school_slug}`)!.id,
-      name: r.division,
-      division: r.division,
-    })))
+    .values(rosterRows.map((r) => {
+      const team = teamByKey.get(`${r.season}|${r.game_slug}|${r.school_slug}`)!;
+      return {
+        teamId: team.id,
+        // A roster carries its own school, game and season (spec-060): the same three as its team.
+        schoolId: team.schoolId,
+        gameId: team.gameId,
+        seasonId: team.seasonId,
+        name: r.division,
+        division: r.division,
+      };
+    }))
     .onConflictDoUpdate({
       target: [schema.rosters.teamId, schema.rosters.name],
       set: { division: sql`excluded.division` },

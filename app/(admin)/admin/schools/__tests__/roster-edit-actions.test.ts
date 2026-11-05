@@ -34,8 +34,8 @@ const mocks = vi.hoisted(() => ({
   rolledBack: 0,
   seasonRow: [{ gameId: 'g1' }] as Array<{ gameId: string }>,
   matchCount: 0,
-  teamInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; gameSlug: string } | null> =>
-    id === 'team-ok' ? { id, gameSlug: 'valorant' } : id === 'team-mc' ? { id, gameSlug: 'minecraft' } : null),
+  teamInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; gameId: string; seasonId: string; gameSlug: string } | null> =>
+    id === 'team-ok' ? { id, gameId: 'g1', seasonId: 's1', gameSlug: 'valorant' } : id === 'team-mc' ? { id, gameId: 'g2', seasonId: 's2', gameSlug: 'minecraft' } : null),
   rosterInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown): Promise<{ id: string; teamId: string; name: string; division: string; gameSlug: string } | null> =>
     id === 'roster-ok' ? { id, teamId: 'team-ok', name: 'Varsity', division: 'A', gameSlug: 'valorant' }
       : id === 'roster-jv' ? { id, teamId: 'team-ok', name: 'JV', division: 'B', gameSlug: 'valorant' }
@@ -279,6 +279,12 @@ describe('school roster edit actions: school scoping', () => {
     expect(res).toMatchObject({ success: false });
     expect(mocks.writes).toHaveLength(0);
     mocks.seasonRow = [{ gameId: 'g1' }];
+  });
+
+  it('writes the roster with its own school, game and season (spec-060)', async () => {
+    await createRoster(SCHOOL, form({ teamId: 'team-ok', name: 'Varsity', division: 'Varsity' }));
+    const insert = mocks.writes.find((w) => w.op === 'insert' && w.table === schema.rosters);
+    expect(insert?.values).toMatchObject({ teamId: 'team-ok', schoolId: SCHOOL, gameId: 'g1', seasonId: 's1', name: 'Varsity' });
   });
 
   it('rejects JV on a game with no JV split, in both create and update', async () => {

@@ -135,7 +135,14 @@ export async function createRoster(schoolId: string, formData: FormData) {
       return { success: false, error: `${division} is not a division for this game.` };
     }
 
-    await db.insert(schema.rosters).values({ teamId, name, division: storedDivision(division) });
+    await db.insert(schema.rosters).values({
+      teamId,
+      schoolId,
+      gameId: team.gameId,
+      seasonId: team.seasonId,
+      name,
+      division: storedDivision(division),
+    });
 
     updateTag('rosters');
     updateTag('teams');

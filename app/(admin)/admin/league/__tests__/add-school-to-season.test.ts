@@ -98,8 +98,8 @@ describe('addSchoolToSeason', () => {
     expect(mocks.inserts[0]).toMatchObject({ table: schema.teams, values: { schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON } });
     expect(mocks.inserts[1].table).toBe(schema.rosters);
     expect(mocks.inserts[1].values).toEqual([
-      { teamId: TEAM, name: 'Varsity', division: 'A' },
-      { teamId: TEAM, name: 'JV', division: 'B' },
+      { teamId: TEAM, schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON, name: 'Varsity', division: 'A' },
+      { teamId: TEAM, schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON, name: 'JV', division: 'B' },
     ]);
     for (const tag of ['teams', 'rosters']) expect(updateTag).toHaveBeenCalledWith(tag);
   });
@@ -123,7 +123,7 @@ describe('addSchoolToSeason', () => {
     expect(res).toMatchObject({ success: true, teamCreated: false, rostersCreated: ['JV'] });
     expect(mocks.inserts).toHaveLength(1);
     expect(mocks.inserts[0].table).toBe(schema.rosters);
-    expect(mocks.inserts[0].values).toEqual([{ teamId: TEAM, name: 'JV', division: 'B' }]);
+    expect(mocks.inserts[0].values).toEqual([{ teamId: TEAM, schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON, name: 'JV', division: 'B' }]);
   });
 
   it('creates only Varsity for a game without a JV split', async () => {
