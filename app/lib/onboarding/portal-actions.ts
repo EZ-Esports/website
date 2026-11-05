@@ -20,6 +20,7 @@ import { hasAcceptedApplicationForSeason, notOnboardedForSeasonError, type Enrol
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } from './invite-expiry';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
+import { inScope } from '@/app/lib/db/season-membership';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
 import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
@@ -1018,26 +1019,26 @@ export async function getSchoolRosters(
   const { scopes } = await resolveManagerScope(schoolId, gameId);
   if (scopes && scopes.length === 0) return [];
 
-  const whereConditions = [eq(schema.teams.schoolId, schoolId)];
+  const whereConditions = [eq(schema.seasonSchools.schoolId, schoolId)];
   if (gameId) {
-    whereConditions.push(eq(schema.teams.gameId, gameId));
+    whereConditions.push(eq(schema.seasonSchools.gameId, gameId));
   }
   // A manager sees only the rosters of each managed game's resolved season (matched by name); staff admins see all.
   if (scopes) {
-    whereConditions.push(inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId)));
+    whereConditions.push(inArray(schema.seasonSchools.seasonId, scopes.map((g) => g.seasonId)));
   }
 
   const schoolTeams = await db
     .select({
-      id: schema.teams.id,
-      schoolId: schema.teams.schoolId,
-      gameId: schema.teams.gameId,
-      seasonId: schema.teams.seasonId,
+      id: schema.seasonSchools.id,
+      schoolId: schema.seasonSchools.schoolId,
+      gameId: schema.seasonSchools.gameId,
+      seasonId: schema.seasonSchools.seasonId,
       gameName: schema.games.displayName,
       gameSlug: schema.games.slug,
     })
-    .from(schema.teams)
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
+    .from(schema.seasonSchools)
+    .innerJoin(schema.games, eq(schema.seasonSchools.gameId, schema.games.id))
     .where(and(...whereConditions));
 
   if (schoolTeams.length === 0) {
@@ -1052,10 +1053,15 @@ export async function getSchoolRosters(
   const seasonNames = new Map(seasonRows.map((r) => [r.id, r.name]));
 
   const teamIds = schoolTeams.map((t) => t.id);
-  const teamRosters = await db
-    .select()
-    .from(schema.rosters)
-    .where(inArray(schema.rosters.teamId, teamIds));
+  // Rosters of the school's member seasons only; `teamId` is the membership row's id, which the portal
+  // view uses to group rosters of one game and season.
+  const teamRosters = (
+    await db
+      .select({ roster: schema.rosters, teamId: schema.seasonSchools.id })
+      .from(schema.rosters)
+      .innerJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
+      .where(inArray(schema.seasonSchools.id, teamIds))
+  ).map((r) => ({ ...r.roster, teamId: r.teamId }));
 
   if (teamRosters.length === 0) {
     return [];
@@ -1192,36 +1198,28 @@ export async function createSchoolRoster(
   }
   assertSeasonRostersUnlocked(createContext, season);
 
-  // 4. Find or create the Team for (schoolId, gameId, season.id)
-  let [team] = await db
+  // 4. The school must be a member of this game's season (staff add it in League Setup, which also
+  //    creates its Varsity / JV rosters). Membership is never created from the portal.
+  const [team] = await db
     .select()
-    .from(schema.teams)
+    .from(schema.seasonSchools)
     .where(
       and(
-        eq(schema.teams.schoolId, schoolId),
-        eq(schema.teams.gameId, gameId),
-        eq(schema.teams.seasonId, season.id)
+        eq(schema.seasonSchools.schoolId, schoolId),
+        eq(schema.seasonSchools.gameId, gameId),
+        eq(schema.seasonSchools.seasonId, season.id)
       )
     )
     .limit(1);
 
   if (!team) {
-    const [newTeam] = await db
-      .insert(schema.teams)
-      .values({
-        schoolId,
-        gameId,
-        seasonId: season.id,
-      })
-      .returning();
-    team = newTeam;
+    throw new Error('This school is not part of this season. Ask league staff to add it.');
   }
 
   // 5. Create Roster
   const [roster] = await db
     .insert(schema.rosters)
     .values({
-      teamId: team.id,
       schoolId: team.schoolId,
       gameId: team.gameId,
       seasonId: team.seasonId,
@@ -1352,18 +1350,17 @@ export async function getSchoolPlayerPool(
       isCaptain: schema.players.isCaptain,
       rosterName: schema.rosters.name,
       gameName: schema.games.displayName,
-      gameId: schema.teams.gameId,
-      seasonId: schema.teams.seasonId,
+      gameId: schema.rosters.gameId,
+      seasonId: schema.rosters.seasonId,
     })
     .from(schema.players)
     .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
+    .innerJoin(schema.games, eq(schema.rosters.gameId, schema.games.id))
     .where(
       scopes
         ? and(
             inArray(schema.players.memberId, memberIds),
-            inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId))
+            inArray(schema.rosters.seasonId, scopes.map((g) => g.seasonId))
           )
         : inArray(schema.players.memberId, memberIds)
     );

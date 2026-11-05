@@ -103,7 +103,7 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.userRoles) return state.userRolesStore;
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.playerInvites) return state.playerInvitesStore;
-    if (tbl === schema.teams) return state.teamsStore;
+    if (tbl === schema.seasonSchools) return state.teamsStore;
     if (tbl === schema.seasons) return state.seasonsStore;
     if (tbl === schema.rosters) return state.rostersStore;
     if (tbl === schema.players) return state.playersStore;
@@ -198,7 +198,7 @@ const mocks = vi.hoisted(() => {
 
         // 3. Rosters join Teams
         if (currentTable === schema.rosters) {
-          if (joins.length > 0 && joins[0].table === schema.teams) {
+          if (joins.length > 0 && joins[0].table === schema.seasonSchools) {
             const matchingRosters = store.filter((r) => conds.every((c) => matchesRow(r, c)));
             return matchingRosters.map((r) => {
               const team = state.teamsStore.find((t) => t.id === r.teamId);

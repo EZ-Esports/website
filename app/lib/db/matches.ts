@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { bothMembers, inScope, snapshotMember } from './season-membership';
 import {
   and,
   asc,
@@ -70,8 +71,8 @@ export const getStaffMatches = () =>
 
 const homeRoster = alias(schema.rosters, 'home_roster');
 const awayRoster = alias(schema.rosters, 'away_roster');
-const homeTeam = alias(schema.teams, 'home_team');
-const awayTeam = alias(schema.teams, 'away_team');
+const homeTeam = alias(schema.seasonSchools, 'home_team');
+const awayTeam = alias(schema.seasonSchools, 'away_team');
 const homeSchool = alias(schema.schools, 'home_school');
 const awaySchool = alias(schema.schools, 'away_school');
 
@@ -119,7 +120,11 @@ function facetConditions(params: MatchesPageParams, publicOnly = false): SQL[] {
   const conditions: SQL[] = [];
   // Public reads see only published seasons' matches; an unpublished season's schedule is as
   // hidden as its scores. `seasons` is joined by every query that passes this flag.
-  if (publicOnly) conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
+  if (publicOnly) {
+    conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
+    // Both schools must be members of the season (spec-060); a removed school's fixtures stay in the database for staff.
+    conditions.push(bothMembers(homeTeam, awayTeam));
+  }
   if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
   if (params.division && params.division !== COMBINED_DIVISION) {
@@ -196,11 +201,11 @@ export function buildMatchesPageQuery(params: MatchesPageParams, publicOnly = fa
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(...matchListOrder(direction))
     .limit(limit + 1);
@@ -247,11 +252,11 @@ export async function getMatchTabCounts(
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(conditions.length ? and(...conditions) : undefined);
   return {
     'needs-results': row?.needsResults ?? 0,
@@ -271,8 +276,9 @@ export async function getPublicMatchesPage(params: MatchesPageParams): Promise<M
   return getMatchesPage(params, true);
 }
 
-export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
-  const conditions = [eq(schema.matches.seasonId, seasonId)];
+export function buildSeasonMatchesQuery(seasonId: string, division?: string, publicOnly = false) {
+  const conditions: SQL[] = [eq(schema.matches.seasonId, seasonId)];
+  if (publicOnly) conditions.push(bothMembers(homeTeam, awayTeam));
   if (division && division !== COMBINED_DIVISION) {
     const targetDiv = canonicalDivision(division);
     conditions.push(
@@ -298,11 +304,11 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(and(...conditions))
     .orderBy(...matchListOrder(asc));
 }
@@ -311,15 +317,15 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
  * All matches of a season (optionally one division) with names joined in,
  * oldest first. Used by the calendar view, which needs the whole season.
  */
-export async function getSeasonMatches(seasonId: string, division?: string) {
-  return buildSeasonMatchesQuery(seasonId, division);
+export async function getSeasonMatches(seasonId: string, division?: string, publicOnly = false) {
+  return buildSeasonMatchesQuery(seasonId, division, publicOnly);
 }
 
 /** Public counterpart of `getSeasonMatches`: an unpublished (or unknown) season yields no matches. */
 export async function getPublicSeasonMatches(seasonId: string, division?: string) {
   const publicIds = await getOutcomesPublicSeasonIds();
   if (!publicIds.has(seasonId)) return [];
-  return getSeasonMatches(seasonId, division);
+  return getSeasonMatches(seasonId, division, true);
 }
 
 /**
@@ -333,11 +339,12 @@ export async function getSchoolMatchRows(params: {
   gameId?: string;
 }): Promise<SchoolMatchRow[]> {
   const conditions: SQL[] = [
-    or(eq(homeTeam.schoolId, params.schoolId), eq(awayTeam.schoolId, params.schoolId))!,
+    or(eq(homeRoster.schoolId, params.schoolId), eq(awayRoster.schoolId, params.schoolId))!,
     // A removed school's fixtures are hidden everywhere else, so the opponent's manager must not
     // keep seeing a match against it.
     isNull(homeSchool.deletedAt),
     isNull(awaySchool.deletedAt),
+    bothMembers(homeTeam, awayTeam),
   ];
   if (params.seasonIds) conditions.push(inArray(schema.matches.seasonId, params.seasonIds));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
@@ -364,11 +371,11 @@ export async function getSchoolMatchRows(params: {
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
     .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(and(...conditions))
     .orderBy(...matchListOrder(asc));
 }
@@ -420,11 +427,11 @@ export const getCachedRecentResults = unstable_cache(
       .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
       .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
       .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-      .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-      .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+      .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+      .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
       .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-      .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-      .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+      .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+      .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
       .where(
         and(
           // Seasons whose outcomes staff have not published contribute nothing.
@@ -435,7 +442,8 @@ export const getCachedRecentResults = unstable_cache(
           eq(homeSchool.isActive, true),
           eq(awaySchool.isActive, true),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt)
+          isNull(awaySchool.deletedAt),
+          bothMembers(homeTeam, awayTeam)
         )
       )
       .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
@@ -514,6 +522,12 @@ export async function getArchiveIndex() {
     db
       .select({ seasonId: schema.matches.seasonId, matchCount: count() })
       .from(schema.matches)
+      .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+      .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+      .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+      .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+      // Only fixtures between two members of the season are public, so only they are counted.
+      .where(bothMembers(homeTeam, awayTeam))
       .groupBy(schema.matches.seasonId),
     db
       .select({
@@ -524,6 +538,7 @@ export async function getArchiveIndex() {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+      .innerJoin(schema.seasonSchools, snapshotMember(schema.seasonStandings))
       .where(eq(schema.seasonStandings.rank, 1)),
   ]);
 
@@ -565,11 +580,11 @@ export function buildHubMatchQuery(opts: {
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(
       and(
         eq(schema.matches.seasonId, opts.seasonId),
@@ -579,6 +594,7 @@ export function buildHubMatchQuery(opts: {
         ),
         isNull(homeSchool.deletedAt),
         isNull(awaySchool.deletedAt),
+        bothMembers(homeTeam, awayTeam),
         ...opts.conditions
       )
     )
@@ -607,11 +623,11 @@ export function buildFormGuideQuery(opts: {
       })
       .from(schema.matches)
       .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-      .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-      .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+      .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+      .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
       .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-      .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-      .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+      .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+      .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
       .where(
         and(
           eq(schema.matches.seasonId, opts.seasonId),
@@ -621,7 +637,8 @@ export function buildFormGuideQuery(opts: {
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt)
+          isNull(awaySchool.deletedAt),
+          bothMembers(homeTeam, awayTeam)
         )
       );
   };

@@ -48,7 +48,8 @@ export interface SeasonSetupData {
   };
   schools: SeasonSetupSchool[];
   /** Live schools with no team in this season yet, for the add picker. */
-  availableSchools: Array<{ id: string; name: string }>;
+  /** `existingRosters`: rosters the school already has this season (a removed school); adding it back restores them. */
+  availableSchools: Array<{ id: string; name: string; existingRosters: number }>;
 }
 
 const DIVISION_ORDER: Record<CanonicalDivision, number> = { Varsity: 0, JV: 1, All: 2 };
@@ -75,14 +76,14 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
   const [teams, allSchools] = await Promise.all([
     db
       .select({
-        teamId: schema.teams.id,
+        teamId: schema.seasonSchools.id,
         schoolId: schema.schools.id,
         schoolName: schema.schools.name,
         logoUrl: schema.schools.logoUrl,
       })
-      .from(schema.teams)
-      .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-      .where(and(eq(schema.teams.seasonId, seasonId), isNull(schema.schools.deletedAt)))
+      .from(schema.seasonSchools)
+      .innerJoin(schema.schools, eq(schema.seasonSchools.schoolId, schema.schools.id))
+      .where(and(eq(schema.seasonSchools.seasonId, seasonId), isNull(schema.schools.deletedAt)))
       .orderBy(asc(schema.schools.name)),
     db
       .select({ id: schema.schools.id, name: schema.schools.name })
@@ -91,18 +92,17 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
       .orderBy(asc(schema.schools.name)),
   ]);
 
-  const teamIds = teams.map((t) => t.teamId);
-  const rosterRows = teamIds.length
-    ? await db
-        .select({
-          id: schema.rosters.id,
-          teamId: schema.rosters.teamId,
-          name: schema.rosters.name,
-          division: schema.rosters.division,
-        })
-        .from(schema.rosters)
-        .where(inArray(schema.rosters.teamId, teamIds))
-    : [];
+  // Every roster of the season, by school: rosters belong to the school and season themselves, so a
+  // school that is not a member (removed) still has its rosters here, ready to be restored by Add school.
+  const rosterRows = await db
+    .select({
+      id: schema.rosters.id,
+      schoolId: schema.rosters.schoolId,
+      name: schema.rosters.name,
+      division: schema.rosters.division,
+    })
+    .from(schema.rosters)
+    .where(eq(schema.rosters.seasonId, seasonId));
 
   const playerRows = rosterRows.length
     ? await db
@@ -128,15 +128,15 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
     list.sort((a, b) => Number(b.role === 'captain') - Number(a.role === 'captain') || a.name.localeCompare(b.name));
   }
 
-  const rostersByTeam = new Map<string, SeasonSetupRoster[]>();
+  const rostersBySchool = new Map<string, SeasonSetupRoster[]>();
   for (const r of rosterRows) {
-    const list = rostersByTeam.get(r.teamId) ?? [];
+    const list = rostersBySchool.get(r.schoolId) ?? [];
     list.push({ id: r.id, name: r.name, division: canonicalDivision(r.division), players: playersByRoster.get(r.id) ?? [] });
-    rostersByTeam.set(r.teamId, list);
+    rostersBySchool.set(r.schoolId, list);
   }
 
   const schools = teams.map<SeasonSetupSchool>((t) => {
-    const rosters = (rostersByTeam.get(t.teamId) ?? []).sort(
+    const rosters = (rostersBySchool.get(t.schoolId) ?? []).sort(
       (a, b) => DIVISION_ORDER[a.division] - DIVISION_ORDER[b.division] || a.name.localeCompare(b.name),
     );
     return {
@@ -156,6 +156,8 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
       standingsFormat: season.standingsFormat,
     },
     schools,
-    availableSchools: allSchools.filter((s) => !inSeason.has(s.id)),
+    availableSchools: allSchools
+      .filter((s) => !inSeason.has(s.id))
+      .map((s) => ({ ...s, existingRosters: rostersBySchool.get(s.id)?.length ?? 0 })),
   };
 }

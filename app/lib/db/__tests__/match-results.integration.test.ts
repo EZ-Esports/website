@@ -43,12 +43,12 @@ describe.skipIf(!enabled)('match results against a real Postgres', () => {
       ])
       .returning({ id: schema.schools.id });
     const teams = await db
-      .insert(schema.teams)
+      .insert(schema.seasonSchools)
       .values([
         { schoolId: home.id, gameId, seasonId },
         { schoolId: away.id, gameId, seasonId },
       ])
-      .returning({ id: schema.teams.id });
+      .returning({ id: schema.seasonSchools.id });
     const rosters = await db
       .insert(schema.rosters)
       .values([

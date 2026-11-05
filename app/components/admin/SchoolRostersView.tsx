@@ -255,6 +255,7 @@ function SeasonBlockView({
                 Active season
               </span>
             )}
+            {block.notInSeason && <span className={chip('warning')}>Not in this season</span>}
             {block.rostersLocked ? (
               <span className={chip('warning')}>
                 <HiOutlineLockClosed aria-hidden className="h-3.5 w-3.5" />
@@ -318,7 +319,7 @@ function SeasonColumns({
   if (block.layout === 'tournament') {
     return (
       <div className="space-y-3">
-        {!readOnly && <AddRosterControl block={block} division="All" />}
+        {!readOnly && !block.notInSeason && <AddRosterControl block={block} division="All" />}
         {block.rosters.length === 0 ? (
           <Placeholder>No rosters entered this season.</Placeholder>
         ) : (
@@ -355,7 +356,7 @@ function ColumnView({ column, block, className, readOnly = false }: { column: Di
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-foreground">{column.division}</h4>
         {/* No JV split for this game: never offer JV creation, even if a legacy JV roster exists (server refuses it). */}
-        {!readOnly && column.supported && (column.division === 'Varsity' || block.jvSupported) && <AddRosterControl block={block} division={column.division} />}
+        {!readOnly && !block.notInSeason && column.supported && (column.division === 'Varsity' || block.jvSupported) && <AddRosterControl block={block} division={column.division} />}
       </div>
       {column.missing ? (
         <Placeholder>{column.supported ? `No ${column.division} team this season` : 'No JV for this season'}</Placeholder>

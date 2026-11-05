@@ -95,7 +95,7 @@ describe('addSchoolToSeason', () => {
 
     expect(res).toEqual({ success: true, schoolName: 'Stuyvesant', teamCreated: true, rostersCreated: ['Varsity', 'JV'] });
     expect(mocks.state.locked).toBe(1);
-    expect(mocks.inserts[0]).toMatchObject({ table: schema.teams, values: { schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON } });
+    expect(mocks.inserts[0]).toMatchObject({ table: schema.seasonSchools, values: { schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON } });
     expect(mocks.inserts[1].table).toBe(schema.rosters);
     expect(mocks.inserts[1].values).toEqual([
       { teamId: TEAM, schoolId: SCHOOL, gameId: uuid(9), seasonId: SEASON, name: 'Varsity', division: 'A' },

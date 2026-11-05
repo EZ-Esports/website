@@ -127,9 +127,9 @@ async function loadPlan(exec: Pick<typeof db, 'select'>, raw: z.infer<typeof inp
   }
 
   const teams = await exec
-    .select({ id: schema.teams.id, schoolId: schema.teams.schoolId })
-    .from(schema.teams)
-    .where(and(eq(schema.teams.seasonId, season.id), eq(schema.teams.gameId, season.gameId), inArray(schema.teams.schoolId, unique)));
+    .select({ id: schema.seasonSchools.id, schoolId: schema.seasonSchools.schoolId })
+    .from(schema.seasonSchools)
+    .where(and(eq(schema.seasonSchools.seasonId, season.id), eq(schema.seasonSchools.gameId, season.gameId), inArray(schema.seasonSchools.schoolId, unique)));
   const rosters = teams.length
     ? await exec
         .select({ id: schema.rosters.id, teamId: schema.rosters.teamId, name: schema.rosters.name, division: schema.rosters.division })
@@ -222,9 +222,9 @@ export async function commitGenerateSeason(input: unknown, fingerprint: unknown)
       const teamIdBySchool = new Map(loaded.teams.map((t) => [t.schoolId, t.id]));
       if (plan.teamsToCreate.length) {
         const created = await tx
-          .insert(schema.teams)
+          .insert(schema.seasonSchools)
           .values(plan.teamsToCreate.map((s) => ({ schoolId: s.id, gameId: loaded.gameId, seasonId: parsed.data.seasonId })))
-          .returning({ id: schema.teams.id, schoolId: schema.teams.schoolId });
+          .returning({ id: schema.seasonSchools.id, schoolId: schema.seasonSchools.schoolId });
         for (const t of created) teamIdBySchool.set(t.schoolId, t.id);
       }
 

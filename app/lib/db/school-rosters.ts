@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from './index';
 import * as schema from './schema';
 import { getContentFlagsByMember, type ContentFlagView } from './content-flags';
@@ -22,7 +22,7 @@ import {
 export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?: string } = {}): Promise<SeasonBlock[]> {
   const teams = await db
     .select({
-      teamId: schema.teams.id,
+      teamId: schema.seasonSchools.id,
       gameId: schema.games.id,
       gameSlug: schema.games.slug,
       gameName: schema.games.displayName,
@@ -31,29 +31,56 @@ export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?:
       seasonIsActive: schema.seasons.isActive,
       rostersLockedAt: schema.seasons.rostersLockedAt,
     })
-    .from(schema.teams)
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
-    .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
+    .from(schema.seasonSchools)
+    .innerJoin(schema.games, eq(schema.seasonSchools.gameId, schema.games.id))
+    .innerJoin(schema.seasons, eq(schema.seasonSchools.seasonId, schema.seasons.id))
     // With a season, only that season's team is read at all (a season belongs to one game), so no
     // other game's team, roster or player is ever loaded for the caller (the season-scoped school page).
     .where(
       opts.seasonId
-        ? and(eq(schema.teams.schoolId, schoolId), eq(schema.teams.seasonId, opts.seasonId))
-        : eq(schema.teams.schoolId, schoolId),
+        ? and(eq(schema.seasonSchools.schoolId, schoolId), eq(schema.seasonSchools.seasonId, opts.seasonId))
+        : eq(schema.seasonSchools.schoolId, schoolId),
     );
 
-  if (teams.length === 0) return [];
-
+  // Rosters belong to the school, game and season themselves (spec-060), so they are read by school and
+  // never through the membership rows: a school staff removed from a season keeps its rosters here.
   const rosterRows = await db
     .select({
       id: schema.rosters.id,
-      teamId: schema.rosters.teamId,
+      gameId: schema.rosters.gameId,
+      seasonId: schema.rosters.seasonId,
       name: schema.rosters.name,
       division: schema.rosters.division,
     })
     .from(schema.rosters)
-    .where(inArray(schema.rosters.teamId, teams.map((t) => t.teamId)))
+    .where(
+      opts.seasonId
+        ? and(eq(schema.rosters.schoolId, schoolId), eq(schema.rosters.seasonId, opts.seasonId))
+        : eq(schema.rosters.schoolId, schoolId),
+    )
     .orderBy(asc(schema.rosters.name));
+
+  // Seasons that have rosters but no membership row (the school was removed): still shown, flagged.
+  const memberScopes = new Set(teams.map((t) => `${t.gameId}|${t.seasonId}`));
+  const orphanSeasonIds = [...new Set(rosterRows.filter((r) => !memberScopes.has(`${r.gameId}|${r.seasonId}`)).map((r) => r.seasonId))];
+  const orphanTeams = orphanSeasonIds.length
+    ? await db
+        .select({
+          teamId: sql<string>`''`,
+          gameId: schema.games.id,
+          gameSlug: schema.games.slug,
+          gameName: schema.games.displayName,
+          seasonId: schema.seasons.id,
+          seasonName: schema.seasons.name,
+          seasonIsActive: schema.seasons.isActive,
+          rostersLockedAt: schema.seasons.rostersLockedAt,
+        })
+        .from(schema.seasons)
+        .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+        .where(inArray(schema.seasons.id, orphanSeasonIds))
+    : [];
+  const allTeams = [...teams.map((t) => ({ ...t, notInSeason: false })), ...orphanTeams.map((t) => ({ ...t, notInSeason: true }))];
+  if (allTeams.length === 0) return [];
 
   const playerRows = rosterRows.length
     ? await db
@@ -100,16 +127,17 @@ export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?:
     playersByRoster.set(p.rosterId, list);
   }
 
-  const rostersByTeam = new Map<string, RosterViewRoster[]>();
+  const rostersByScope = new Map<string, RosterViewRoster[]>();
   for (const r of rosterRows) {
-    const list = rostersByTeam.get(r.teamId) ?? [];
+    const key = `${r.gameId}|${r.seasonId}`;
+    const list = rostersByScope.get(key) ?? [];
     list.push({ id: r.id, name: r.name, division: r.division, players: playersByRoster.get(r.id) ?? [] });
-    rostersByTeam.set(r.teamId, list);
+    rostersByScope.set(key, list);
   }
 
-  const input: SchoolRosterTeamInput[] = teams.map((t) => ({
+  const input: SchoolRosterTeamInput[] = allTeams.map((t) => ({
     ...t,
-    rosters: rostersByTeam.get(t.teamId) ?? [],
+    rosters: rostersByScope.get(`${t.gameId}|${t.seasonId}`) ?? [],
   }));
   return buildSeasonBlocks(input);
 }

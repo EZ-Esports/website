@@ -216,11 +216,11 @@ export async function calculateGoldDiff(
   const rosterRows = gold('gold_rosters.csv');
   const teamKeys = [...new Set(rosterRows.map((r) => `${r.season}|${r.game_slug}|${r.school_slug}`))];
   const existingTeams = await db.select({
-    id: schema.teams.id,
-    schoolId: schema.teams.schoolId,
-    gameId: schema.teams.gameId,
-    seasonId: schema.teams.seasonId,
-  }).from(schema.teams);
+    id: schema.seasonSchools.id,
+    schoolId: schema.seasonSchools.schoolId,
+    gameId: schema.seasonSchools.gameId,
+    seasonId: schema.seasonSchools.seasonId,
+  }).from(schema.seasonSchools);
   const teamIdByKey = new Map(
     existingTeams.map((t) => [`${t.schoolId}|${t.gameId}|${t.seasonId}`, t.id])
   );
@@ -689,7 +689,7 @@ async function main() {
   const rosterRows = gold('gold_rosters.csv');
   const teamKeys = [...new Set(rosterRows.map((r) => `${r.season}|${r.game_slug}|${r.school_slug}`))];
   const teams = await db
-    .insert(schema.teams)
+    .insert(schema.seasonSchools)
     .values(teamKeys.map((key) => {
       const [season, gameSlug, schoolSlug] = key.split('|');
       return {
@@ -699,7 +699,7 @@ async function main() {
       };
     }))
     .onConflictDoUpdate({
-      target: [schema.teams.schoolId, schema.teams.gameId, schema.teams.seasonId],
+      target: [schema.seasonSchools.schoolId, schema.seasonSchools.gameId, schema.seasonSchools.seasonId],
       set: { schoolId: sql`excluded.school_id` },
     })
     .returning();

@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { inScope } from './season-membership';
 import { and, asc, count, desc, eq, inArray, isNull, notExists, or } from 'drizzle-orm';
 import { canonicalDivision } from './match-page';
 import { slugify } from '@/app/lib/text-utils';
@@ -32,16 +33,16 @@ export const getCachedTeams = unstable_cache(
   async () => {
     return db
       .select({
-        id: schema.teams.id,
-        schoolId: schema.teams.schoolId,
-        gameId: schema.teams.gameId,
-        seasonId: schema.teams.seasonId,
-        createdAt: schema.teams.createdAt,
-        updatedAt: schema.teams.updatedAt,
+        id: schema.seasonSchools.id,
+        schoolId: schema.seasonSchools.schoolId,
+        gameId: schema.seasonSchools.gameId,
+        seasonId: schema.seasonSchools.seasonId,
+        createdAt: schema.seasonSchools.createdAt,
+        updatedAt: schema.seasonSchools.updatedAt,
         name: schema.schools.name,
       })
-      .from(schema.teams)
-      .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+      .from(schema.seasonSchools)
+      .innerJoin(schema.schools, eq(schema.seasonSchools.schoolId, schema.schools.id))
       .where(isNull(schema.schools.deletedAt));
   },
   ['teams-list'],
@@ -56,12 +57,25 @@ export const getCachedPlayers = unstable_cache(
   { tags: ['players'] }
 );
 
+/**
+ * Rosters of the given membership rows (`season_schools` ids). Each roster carries `teamId`, the id of the
+ * membership row it belongs to by school, game and season, which the public team views group by.
+ */
+async function rostersOfMembers(memberIds: string[]) {
+  const rows = await db
+    .select({ roster: schema.rosters, teamId: schema.seasonSchools.id })
+    .from(schema.rosters)
+    .innerJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
+    .where(inArray(schema.seasonSchools.id, memberIds));
+  return rows.map((r) => ({ ...r.roster, teamId: r.teamId }));
+}
+
 /** Count teams that do not yet have a single roster created. */
 export const countTeamsWithoutRoster = async (): Promise<number> => {
   const [row] = await db
     .select({ value: count() })
-    .from(schema.teams)
-    .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+    .from(schema.seasonSchools)
+    .innerJoin(schema.schools, eq(schema.seasonSchools.schoolId, schema.schools.id))
     .where(
       and(
         isNull(schema.schools.deletedAt),
@@ -69,7 +83,7 @@ export const countTeamsWithoutRoster = async (): Promise<number> => {
           db
             .select({ one: schema.rosters.id })
             .from(schema.rosters)
-            .where(eq(schema.rosters.teamId, schema.teams.id))
+            .where(inScope(schema.rosters, schema.seasonSchools))
         )
       )
     );
@@ -144,10 +158,10 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
 
   const teamsList = await db
     .select({
-      teamId: schema.teams.id,
-      schoolId: schema.teams.schoolId,
-      gameId: schema.teams.gameId,
-      seasonId: schema.teams.seasonId,
+      teamId: schema.seasonSchools.id,
+      schoolId: schema.seasonSchools.schoolId,
+      gameId: schema.seasonSchools.gameId,
+      seasonId: schema.seasonSchools.seasonId,
       schoolName: schema.schools.name,
       schoolSlug: schema.schools.slug,
       logoUrl: schema.schools.logoUrl,
@@ -155,19 +169,16 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
       seasonName: schema.seasons.name,
       isSeasonActive: schema.seasons.isActive,
     })
-    .from(schema.teams)
-    .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
-    .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
-    .where(and(eq(schema.teams.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)))
+    .from(schema.seasonSchools)
+    .innerJoin(schema.schools, eq(schema.seasonSchools.schoolId, schema.schools.id))
+    .innerJoin(schema.seasons, eq(schema.seasonSchools.seasonId, schema.seasons.id))
+    .where(and(eq(schema.seasonSchools.gameId, gameRow[0].id), isNull(schema.schools.deletedAt)))
     .orderBy(schema.schools.name, desc(schema.seasons.name));
 
   const teamIds = teamsList.map((t) => t.teamId);
   if (teamIds.length === 0) return [];
 
-  const rostersList = await db
-    .select()
-    .from(schema.rosters)
-    .where(inArray(schema.rosters.teamId, teamIds));
+  const rostersList = await rostersOfMembers(teamIds);
 
   const rosterIds = rostersList.map((r) => r.id);
   const playersList =
@@ -274,31 +285,25 @@ export async function getSchoolGameTeamsPageData(
 
   const teamsList = await db
     .select({
-      teamId: schema.teams.id,
-      schoolId: schema.teams.schoolId,
-      gameId: schema.teams.gameId,
-      seasonId: schema.teams.seasonId,
+      teamId: schema.seasonSchools.id,
+      schoolId: schema.seasonSchools.schoolId,
+      gameId: schema.seasonSchools.gameId,
+      seasonId: schema.seasonSchools.seasonId,
       seasonName: schema.seasons.name,
       isSeasonActive: schema.seasons.isActive,
     })
-    .from(schema.teams)
-    .innerJoin(schema.seasons, eq(schema.teams.seasonId, schema.seasons.id))
+    .from(schema.seasonSchools)
+    .innerJoin(schema.seasons, eq(schema.seasonSchools.seasonId, schema.seasons.id))
     .where(
       and(
-        eq(schema.teams.schoolId, matchedSchoolRow.id),
-        eq(schema.teams.gameId, gameRow[0].id)
+        eq(schema.seasonSchools.schoolId, matchedSchoolRow.id),
+        eq(schema.seasonSchools.gameId, gameRow[0].id)
       )
     )
     .orderBy(desc(schema.seasons.name));
 
   const teamIds = teamsList.map((t) => t.teamId);
-  const rostersList =
-    teamIds.length > 0
-      ? await db
-          .select()
-          .from(schema.rosters)
-          .where(inArray(schema.rosters.teamId, teamIds))
-      : [];
+  const rostersList = teamIds.length > 0 ? await rostersOfMembers(teamIds) : [];
 
   const rosterIds = rostersList.map((r) => r.id);
   const playersList =

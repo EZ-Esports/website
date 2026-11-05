@@ -213,7 +213,7 @@ describe('commitGenerateSeason', () => {
     const res = await commitGenerateSeason(input(), fp);
     expect(res).toEqual({ success: true, teamsCreated: 8, matchesCreated: 28 });
     expect(mocks.state.txRan).toBe(true);
-    expect(mocks.inserts.map((i) => i.table)).toEqual([schema.teams, schema.rosters, schema.matches]);
+    expect(mocks.inserts.map((i) => i.table)).toEqual([schema.seasonSchools, schema.rosters, schema.matches]);
     const matchRows = mocks.inserts[2].values as Array<{ homeRosterId: string; awayRosterId: string; status: string }>;
     expect(matchRows).toHaveLength(28);
     const per = new Map<string, number>();

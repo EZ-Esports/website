@@ -40,12 +40,12 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
     const rosterTeams = await db
       .select({
         rosterId: schema.rosters.id,
-        seasonId: schema.teams.seasonId,
-        gameId: schema.teams.gameId,
+        seasonId: schema.seasonSchools.seasonId,
+        gameId: schema.seasonSchools.gameId,
         division: schema.rosters.division,
       })
       .from(schema.rosters)
-      .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
+      .innerJoin(schema.seasonSchools, eq(schema.rosters.teamId, schema.seasonSchools.id))
       .where(inArray(schema.rosters.id, [homeRosterId, awayRosterId]));
 
     if (rosterTeams.length !== 2) {

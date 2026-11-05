@@ -137,8 +137,12 @@ export const seasons = pgTable('seasons', {
 
 // --- TEAMS & ROSTERS ---
 
-// A school's presence in a specific game/season
-export const teams = pgTable('teams', {
+// A school's membership in a specific game/season (spec-060). One row per (school, game, season) and
+// nothing hangs off it: rosters, players and matches belong to the school and season on their own, so
+// deleting a membership row (staff "Remove school") never touches them. The physical table is renamed
+// from `teams` by migration 0062; between migration 0061 and 0062 `season_schools` is a simple
+// auto-updatable view over `teams` (created by 0061), so this one definition works against both.
+export const seasonSchools = pgTable('season_schools', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id')
     .references(() => schools.id, { onDelete: 'cascade' })
@@ -151,33 +155,32 @@ export const teams = pgTable('teams', {
     .notNull(),
   ...auditColumns,
 }, (table) => [
-  index('teams_school_id_idx').on(table.schoolId),
-  index('teams_game_id_idx').on(table.gameId),
-  index('teams_season_id_idx').on(table.seasonId),
-  uniqueIndex('teams_school_game_season_unique_idx').on(table.schoolId, table.gameId, table.seasonId),
+  index('season_schools_school_id_idx').on(table.schoolId),
+  index('season_schools_game_id_idx').on(table.gameId),
+  index('season_schools_season_id_idx').on(table.seasonId),
+  uniqueIndex('season_schools_school_game_season_unique_idx').on(table.schoolId, table.gameId, table.seasonId),
 ]).enableRLS();
 
-// Specific rosters under a team (e.g. "Varsity", "JV")
+// A school's roster for one game and season (e.g. "Varsity", "JV"). It belongs to the school, game and
+// season directly, not to a membership row (spec-060), and is only ever deleted explicitly.
 export const rosters = pgTable('rosters', {
   id: uuid('id').defaultRandom().primaryKey(),
-  // EXPAND phase (spec-060, migration 0060): the database no longer enforces a foreign key from here
-  // to `teams` and the column is nullable there, so removing a team (the future season_schools
-  // membership row) can never delete rosters. Kept `notNull` in this type until the switch PR so
-  // every current reader and writer is unchanged; the BEFORE INSERT trigger fills the three
-  // columns below for any writer that only knows `team_id`.
-  teamId: uuid('team_id').notNull(),
-  // A roster belongs to a school, a game and a season on its own (backfilled from its team).
-  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }),
-  gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }),
-  seasonId: uuid('season_id').references(() => seasons.id, { onDelete: 'cascade' }),
+  schoolId: uuid('school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
+    .notNull(),
+  gameId: uuid('game_id')
+    .references(() => games.id, { onDelete: 'cascade' })
+    .notNull(),
+  seasonId: uuid('season_id')
+    .references(() => seasons.id, { onDelete: 'cascade' })
+    .notNull(),
   name: text('name').notNull(), // e.g. "Varsity", "JV"
   division: text('division').notNull(), // "A" | "B" (aligned with docs)
   ...auditColumns,
 }, (table) => [
-  index('rosters_team_id_idx').on(table.teamId),
-  uniqueIndex('rosters_team_name_unique_idx').on(table.teamId, table.name),
   index('rosters_school_game_season_idx').on(table.schoolId, table.gameId, table.seasonId),
   index('rosters_season_id_idx').on(table.seasonId),
+  uniqueIndex('rosters_scope_name_unique_idx').on(table.schoolId, table.gameId, table.seasonId, table.name),
 ]).enableRLS();
 
 // Mapping members to specific rosters
@@ -219,10 +222,10 @@ export const matches = pgTable('matches', {
     .references(() => seasons.id, { onDelete: 'restrict' })
     .notNull(),
   homeRosterId: uuid('home_roster_id')
-    .references(() => rosters.id, { onDelete: 'cascade' })
+    .references(() => rosters.id, { onDelete: 'restrict' })
     .notNull(),
   awayRosterId: uuid('away_roster_id')
-    .references(() => rosters.id, { onDelete: 'cascade' })
+    .references(() => rosters.id, { onDelete: 'restrict' })
     .notNull(),
   scheduledAt: timestamp('scheduled_at').notNull(),
   homeScore: integer('home_score'),
@@ -603,7 +606,9 @@ export const leadershipTerms = pgTable('leadership_terms', {
 // View for rosters with dynamically computed standings (wins and losses)
 export const rosterStandings = pgView('roster_standings', {
   id: uuid('id'),
-  teamId: uuid('team_id'),
+  schoolId: uuid('school_id'),
+  gameId: uuid('game_id'),
+  seasonId: uuid('season_id'),
   name: text('name'),
   division: text('division'),
   createdAt: timestamp('created_at'),
@@ -612,7 +617,7 @@ export const rosterStandings = pgView('roster_standings', {
   losses: integer('losses'),
 }).with({ securityInvoker: true }).as(sql`
   SELECT
-    r.id, r.team_id, r.name, r.division, r.created_at, r.updated_at,
+    r.id, r.school_id, r.game_id, r.season_id, r.name, r.division, r.created_at, r.updated_at,
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score > m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score > m.home_score AND m.status IN ('completed', 'forfeit')))::int as wins,
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit')))::int as losses
   FROM rosters r
