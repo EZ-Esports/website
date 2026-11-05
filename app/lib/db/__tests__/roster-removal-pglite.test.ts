@@ -303,7 +303,7 @@ describe('failure isolation', () => {
     const [school] = await q(`insert into schools (name, slug) values ('A', 'a') returning id`);
     const [game] = await q(`insert into games (slug, display_name, short_name) values ('v', 'V', 'V') returning id`);
     const [season] = await q(`insert into seasons (game_id, name, is_active) values ($1, '2026-27', true) returning id`, [game.id]);
-    const [team] = await q(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
+    await q(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
     const [roster] = await q(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'V', 'A') returning id`, [school.id, game.id, season.id]);
     const [member] = await q(`insert into members (first_name, last_name, email, school_id) values ('Q', 'R', 'q@r.org', $1) returning id`, [school.id]);
     const [player] = await q(`insert into players (roster_id, member_id, ign) values ($1, $2, 'Zed#1') returning id`, [roster.id, member.id]);
@@ -329,7 +329,7 @@ describe('failure isolation', () => {
     const [school] = await q(`insert into schools (name, slug) values ('A', 'a') returning id`);
     const [game] = await q(`insert into games (slug, display_name, short_name) values ('v', 'V', 'V') returning id`);
     const [season] = await q(`insert into seasons (game_id, name, is_active) values ($1, '2026-27', true) returning id`, [game.id]);
-    const [team] = await q(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
+    await q(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
     const [roster] = await q(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'V', 'A') returning id`, [school.id, game.id, season.id]);
     const [member] = await q(`insert into members (first_name, last_name, school_id) values ('Q', 'R', $1) returning id`, [school.id]);
     const [player] = await q(`insert into players (roster_id, member_id) values ($1, $2) returning id`, [roster.id, member.id]);
