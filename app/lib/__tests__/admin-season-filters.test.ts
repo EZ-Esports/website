@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   countSeasonsByStatus,
   filterSeasonsByStatus,
+  leagueHref,
   leagueStatusHref,
+  resolveLeagueView,
+  seasonDetailHref,
+  seasonSchoolHref,
+  seasonMovedHint,
   matchFilterQuery,
   parseMatchFilterParams,
   parseSeasonStatus,
@@ -122,5 +127,54 @@ describe('matchFilterQuery', () => {
     expect(matchFilterQuery(undefined, '')).toBe('');
     const q = new URLSearchParams(matchFilterQuery('valorant', ''));
     expect(parseMatchFilterParams({ season: q.get('season')!, game: q.get('game')! }, games, seasons)).toEqual({ gameId: 'g-val', seasonId: '' });
+  });
+});
+
+describe('League Setup per-game tabs (spec-059)', () => {
+  const tabs = [{ slug: 'valorant' }, { slug: 'league-of-legends' }];
+
+  it('builds links with the game and omits the default status', () => {
+    expect(leagueHref()).toBe('/admin/league');
+    expect(leagueHref({ game: 'valorant' })).toBe('/admin/league?game=valorant');
+    expect(leagueHref({ game: 'valorant', status: 'inactive' })).toBe('/admin/league?game=valorant&status=inactive');
+    expect(leagueHref({ game: 'valorant', status: 'active' })).toBe('/admin/league?game=valorant');
+    expect(leagueHref({ view: 'games' })).toBe('/admin/league?view=games');
+    expect(leagueStatusHref('all', 'valorant')).toBe('/admin/league?game=valorant&status=all');
+    expect(leagueStatusHref('inactive')).toBe('/admin/league?status=inactive');
+  });
+
+  it('links a season to its own page', () => {
+    expect(seasonDetailHref(S1)).toBe(`/admin/league/${S1}`);
+    expect(seasonSchoolHref(S1, S2)).toBe(`/admin/league/${S1}/schools/${S2}`);
+  });
+
+  it('resolves the selected tab, falling back to the first game', () => {
+    expect(resolveLeagueView(undefined, undefined, tabs)).toEqual({ kind: 'game', slug: 'valorant' });
+    expect(resolveLeagueView('league-of-legends', undefined, tabs)).toEqual({ kind: 'game', slug: 'league-of-legends' });
+    expect(resolveLeagueView('nope', undefined, tabs)).toEqual({ kind: 'game', slug: 'valorant' });
+    expect(resolveLeagueView(['league-of-legends', 'x'], undefined, tabs)).toEqual({ kind: 'game', slug: 'league-of-legends' });
+    expect(resolveLeagueView('league-of-legends', 'games', tabs)).toEqual({ kind: 'games' });
+    expect(resolveLeagueView(undefined, undefined, [])).toEqual({ kind: 'empty' });
+    expect(resolveLeagueView(undefined, 'games', [])).toEqual({ kind: 'empty' });
+  });
+
+  it('keeps the game on the moved-season hint and the Matches back link', () => {
+    expect(seasonMovedHint(false, 'active', 'valorant')?.href).toBe('/admin/league?game=valorant&status=inactive');
+    expect(matchesBackLink('league', { isActive: true }, 'valorant')?.href).toBe('/admin/league?game=valorant');
+  });
+});
+
+describe('sortGamesForLeagueTabs', () => {
+  it('orders Valorant, League, TFT, Tetris, Minecraft, then others', async () => {
+    const { sortGamesForLeagueTabs } = await import('../admin-season-filters');
+    const slugs = ['minecraft', 'osu', 'tetris', 'team-fight-tactics', 'league-of-legends', 'valorant'].map((slug) => ({ slug }));
+    expect(sortGamesForLeagueTabs(slugs).map((g) => g.slug)).toEqual([
+      'valorant',
+      'league-of-legends',
+      'team-fight-tactics',
+      'tetris',
+      'minecraft',
+      'osu',
+    ]);
   });
 });

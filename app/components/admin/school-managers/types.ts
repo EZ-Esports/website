@@ -46,6 +46,13 @@ export interface SchoolManagersModalProps {
     slug?: string;
   };
   games?: GameItem[];
+  /**
+   * Opened from a season page: new invite links are issued for this season (the manager's
+   * academic year, which names the season they work on) and the choice is not offered.
+   */
+  seasonName?: string;
+  /** Tab shown when the dialog opens. */
+  initialTab?: 'invites' | 'active' | 'existing';
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }

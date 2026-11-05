@@ -30,7 +30,9 @@ function revalidateLeague() {
   updateTag('games');
   updateTag('seasons');
   updateTag('teams');
-  revalidatePath('/admin/league');
+  // 'layout' also covers the per-season pages (/admin/league/[seasonId]), whose header chips and
+  // lock / publish state must follow a change made on them.
+  revalidatePath('/admin/league', 'layout');
   revalidatePath('/admin/matches');
   // The per-school roster pages (/admin/schools/[schoolId]/rosters) show seasons and games.
   revalidatePath('/admin/schools', 'layout');

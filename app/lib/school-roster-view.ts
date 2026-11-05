@@ -20,6 +20,8 @@ export interface RosterViewPlayer {
   graduationYear: number | null;
   /** nycstudents.net address the player typed in onboarding; null for members who never onboarded. */
   schoolEmail?: string | null;
+  /** Personal email typed in onboarding (`members.email`); null for archive and admin-created members. Staff with MANAGE_ROSTERS only, like every field here. */
+  email?: string | null;
   /** A student ID photo is on file. Only the flag travels here; staff open it through the signed-URL route. */
   hasStudentId?: boolean;
   role: 'captain' | 'player' | 'coach' | 'sub';

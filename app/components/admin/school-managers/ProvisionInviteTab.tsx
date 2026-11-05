@@ -19,6 +19,8 @@ import { useConfirmAction } from '../useConfirmAction';
 interface ProvisionInviteTabProps {
   schoolId: string;
   games: GameItem[];
+  /** When set, invites are issued for this season and the academic year is not editable. */
+  seasonName?: string;
   invites: ManagerInviteItem[];
   isRevokingId: string | null;
   onRevokeInvite: (id: string) => Promise<{ success: boolean; error?: string }>;
@@ -30,6 +32,7 @@ interface ProvisionInviteTabProps {
 export function ProvisionInviteTab({
   schoolId,
   games,
+  seasonName,
   invites,
   isRevokingId,
   onRevokeInvite,
@@ -40,7 +43,8 @@ export function ProvisionInviteTab({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [academicYear, setAcademicYear] = useState<string>(DEFAULT_MANAGER_SEASON);
+  const [pickedYear, setAcademicYear] = useState<string>(DEFAULT_MANAGER_SEASON);
+  const academicYear = seasonName ?? pickedYear;
   const [allGames, setAllGames] = useState(true);
   const [selectedGames, setSelectedGames] = useState<string[]>([]);
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
@@ -224,8 +228,18 @@ export function ProvisionInviteTab({
               >
                 Academic Year
               </label>
-              <select id="invite-year" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} required className={input}>
-                {SEASON_NAME_OPTIONS.map((season) => (<option key={season} value={season}>{season}</option>))}
+              <select
+                id="invite-year"
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value)}
+                required
+                disabled={seasonName !== undefined}
+                className={input}
+              >
+                {(seasonName !== undefined && !SEASON_NAME_OPTIONS.includes(seasonName)
+                  ? [seasonName, ...SEASON_NAME_OPTIONS]
+                  : SEASON_NAME_OPTIONS
+                ).map((season) => (<option key={season} value={season}>{season}</option>))}
               </select>
             </div>
           </div>

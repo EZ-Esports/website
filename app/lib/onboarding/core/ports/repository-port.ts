@@ -100,6 +100,11 @@ export interface OnboardingRepositoryPort {
     isPrimaryContact: boolean;
   }): Promise<SchoolManagerRecord>;
   removeSchoolManager(managerId: string): Promise<SchoolManagerRecord | null>;
+  /** Updates scope and primary flag only while the manager is active; null when they are not (or were just removed). */
+  updateActiveSchoolManagerAccess(
+    managerId: string,
+    params: { managedGames: string[] | null; isPrimaryContact: boolean }
+  ): Promise<SchoolManagerRecord | null>;
   findManagerById(managerId: string): Promise<SchoolManagerRecord | null>;
   resolveStaffUserId(email: string): Promise<string | null>;
 

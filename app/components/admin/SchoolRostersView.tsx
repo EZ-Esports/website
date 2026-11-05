@@ -40,6 +40,13 @@ interface SchoolRostersViewProps {
   options: RosterEditOptions;
   /** Filters parsed and validated server-side from the URL. */
   initialFilters: RosterViewFilters;
+  /**
+   * `season`: the caller passes exactly one season block and wants it on its own: no game filter,
+   * no season accordion header and no register-team panel (the cross-game, cross-season chrome).
+   * Every roster and player control, badge and field is unchanged. Used by the League Setup school
+   * page, which must never offer another game's rosters.
+   */
+  scope?: 'all' | 'season';
 }
 
 const DIVISION_OPTIONS: { value: DivisionFilter; label: string }[] = [
@@ -54,7 +61,8 @@ const DIVISION_OPTIONS: { value: DivisionFilter; label: string }[] = [
  * staff. Filters live in the URL (`?game=&division=&phone=`) so a reload or a
  * copied link restores the view.
  */
-export default function SchoolRostersView({ schoolId, schoolName, blocks, options, initialFilters }: SchoolRostersViewProps) {
+export default function SchoolRostersView({ schoolId, schoolName, blocks, options, initialFilters, scope = 'all' }: SchoolRostersViewProps) {
+  const seasonScope = scope === 'season';
   const [gameSlug, setGameSlug] = useState<string>(initialFilters.game);
   const [division, setDivision] = useState<DivisionFilter>(initialFilters.division);
   // Phones never lay Varsity and JV side by side; this picks the one shown when the filter is "Both".
@@ -100,7 +108,7 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
             title={`${schoolName} has no teams yet.`}
             description="Register a team to enter this school in a game and season."
           />
-          <RegisterTeamPanel />
+          {!seasonScope && <RegisterTeamPanel />}
           <AdminToast toast={toast} onDismiss={() => setToast(null)} />
         </div>
       </RosterEditProvider>
@@ -111,8 +119,9 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
     <RosterEditProvider value={editCtx}>
     <div className="space-y-5">
       <AdminToast toast={toast} onDismiss={() => setToast(null)} />
-      <RegisterTeamPanel />
+      {!seasonScope && <RegisterTeamPanel />}
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        {!seasonScope && (
         <div>
           <label htmlFor="roster-game-filter" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
             Game
@@ -129,6 +138,7 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
             ))}
           </select>
         </div>
+        )}
 
         <div>
           <span id="roster-division-label" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
@@ -175,16 +185,20 @@ export default function SchoolRostersView({ schoolId, schoolName, blocks, option
         <AdminEmptyState compact icon={<HiOutlineUsers />} title="No teams for this game." />
       ) : (
         <div className="space-y-4">
-          {visible.map((block) => (
-            <SeasonBlockView
-              key={block.key}
-              block={block}
-              division={division}
-              phoneDivision={phoneDivision}
-              open={expanded.has(block.key)}
-              onToggle={() => toggle(block.key)}
-            />
-          ))}
+          {visible.map((block) =>
+            seasonScope ? (
+              <SeasonBody key={block.key} block={block} division={division} phoneDivision={phoneDivision} />
+            ) : (
+              <SeasonBlockView
+                key={block.key}
+                block={block}
+                division={division}
+                phoneDivision={phoneDivision}
+                open={expanded.has(block.key)}
+                onToggle={() => toggle(block.key)}
+              />
+            ),
+          )}
         </div>
       )}
     </div>
@@ -269,17 +283,21 @@ function SeasonBody({
   block,
   division,
   phoneDivision,
+  readOnly = false,
 }: {
   block: SeasonBlock;
   division: DivisionFilter;
   phoneDivision: PhoneDivision;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-4">
       {block.rostersLocked && (
-        <p className="text-xs text-foreground-secondary">Locked for managers. Staff edits here still go through.</p>
+        <p className="text-xs text-foreground-secondary">
+          {readOnly ? 'Locked for managers.' : 'Locked for managers. Staff edits here still go through.'}
+        </p>
       )}
-      <SeasonColumns block={block} division={division} phoneDivision={phoneDivision} />
+      <SeasonColumns block={block} division={division} phoneDivision={phoneDivision} readOnly={readOnly} />
     </div>
   );
 }
@@ -288,23 +306,25 @@ function SeasonColumns({
   block,
   division,
   phoneDivision,
+  readOnly = false,
 }: {
   block: SeasonBlock;
   division: DivisionFilter;
   phoneDivision: PhoneDivision;
+  readOnly?: boolean;
 }) {
   // Tournament-model games keep their original shape: a plain list of the team's rosters,
   // never forced into Varsity/JV columns, so the division filter does not apply to them.
   if (block.layout === 'tournament') {
     return (
       <div className="space-y-3">
-        <AddRosterControl block={block} division="All" />
+        {!readOnly && <AddRosterControl block={block} division="All" />}
         {block.rosters.length === 0 ? (
           <Placeholder>No rosters entered this season.</Placeholder>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             {block.rosters.map((r) => (
-              <RosterCard key={r.id} roster={r} block={block} showDivision />
+              <RosterCard key={r.id} roster={r} block={block} showDivision readOnly={readOnly} />
             ))}
           </div>
         )}
@@ -321,6 +341,7 @@ function SeasonColumns({
           key={c.division}
           column={c}
           block={block}
+          readOnly={readOnly}
           className={division === 'both' && c.division !== phoneDivision ? 'max-md:hidden' : undefined}
         />
       ))}
@@ -328,18 +349,18 @@ function SeasonColumns({
   );
 }
 
-function ColumnView({ column, block, className }: { column: DivisionColumn; block: SeasonBlock; className?: string }) {
+function ColumnView({ column, block, className, readOnly = false }: { column: DivisionColumn; block: SeasonBlock; className?: string; readOnly?: boolean }) {
   return (
     <div className={cx('min-w-0 space-y-3', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-foreground">{column.division}</h4>
         {/* No JV split for this game: never offer JV creation, even if a legacy JV roster exists (server refuses it). */}
-        {column.supported && (column.division === 'Varsity' || block.jvSupported) && <AddRosterControl block={block} division={column.division} />}
+        {!readOnly && column.supported && (column.division === 'Varsity' || block.jvSupported) && <AddRosterControl block={block} division={column.division} />}
       </div>
       {column.missing ? (
         <Placeholder>{column.supported ? `No ${column.division} team this season` : 'No JV for this season'}</Placeholder>
       ) : (
-        column.rosters.map((r) => <RosterCard key={r.id} roster={r} block={block} />)
+        column.rosters.map((r) => <RosterCard key={r.id} roster={r} block={block} readOnly={readOnly} />)
       )}
     </div>
   );
@@ -355,7 +376,7 @@ function Placeholder({ children }: { children: React.ReactNode }) {
 
 const ROLE_LABEL: Record<string, string> = { captain: 'Captain', player: 'Player', coach: 'Coach', sub: 'Sub' };
 
-function RosterCard({ roster, block, showDivision = false }: { roster: RosterViewRoster; block: SeasonBlock; showDivision?: boolean }) {
+function RosterCard({ roster, block, showDivision = false, readOnly = false }: { roster: RosterViewRoster; block: SeasonBlock; showDivision?: boolean; readOnly?: boolean }) {
   const [panel, setPanel] = useState<'edit' | 'add' | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
   // Rosters of the same team: a player can be moved between them but never across games or seasons.
@@ -373,21 +394,23 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
         <span className="text-xs text-foreground-secondary">
           {roster.players.length}/{MAX_ROSTER_PLAYERS} {roster.players.length === 1 ? 'player' : 'players'}
         </span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <AddPlayerButton
-            open={panel === 'add'}
-            full={roster.players.length >= MAX_ROSTER_PLAYERS}
-            playerCount={roster.players.length}
-            onClick={() => setPanel(panel === 'add' ? null : 'add')}
-          />
-          <RowIconButton
-            kind="edit"
-            label={`Edit roster ${roster.name}`}
-            aria-expanded={panel === 'edit'}
-            onClick={() => setPanel(panel === 'edit' ? null : 'edit')}
-          />
-          <DeleteRosterButton roster={roster} />
-        </div>
+        {!readOnly && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <AddPlayerButton
+              open={panel === 'add'}
+              full={roster.players.length >= MAX_ROSTER_PLAYERS}
+              playerCount={roster.players.length}
+              onClick={() => setPanel(panel === 'add' ? null : 'add')}
+            />
+            <RowIconButton
+              kind="edit"
+              label={`Edit roster ${roster.name}`}
+              aria-expanded={panel === 'edit'}
+              onClick={() => setPanel(panel === 'edit' ? null : 'edit')}
+            />
+            <DeleteRosterButton roster={roster} />
+          </div>
+        )}
       </div>
       {panel === 'edit' && <RosterEditForm roster={roster} block={block} onClose={() => setPanel(null)} />}
       {panel === 'add' && <AddPlayerPanel roster={roster} onClose={() => setPanel(null)} />}
@@ -405,7 +428,9 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                     <span className="min-w-0 truncate text-sm font-medium text-foreground">{p.ign || p.name}</span>
                     <span className="flex shrink-0 items-center gap-2">
                       <span className={chip(p.role === 'captain' ? 'accent' : 'neutral', 'sm')}>{ROLE_LABEL[p.role] ?? p.role}</span>
-                      <PlayerRowActions player={p} rosterName={roster.name} siblings={siblings} onEdit={() => setEditingPlayer(p.id)} />
+                      {!readOnly && (
+                        <PlayerRowActions player={p} rosterName={roster.name} siblings={siblings} onEdit={() => setEditingPlayer(p.id)} />
+                      )}
                     </span>
                   </div>
                   <p className="mt-0.5 break-words text-xs text-foreground-secondary">
@@ -417,9 +442,11 @@ function RosterCard({ roster, block, showDivision = false }: { roster: RosterVie
                       .filter(Boolean)
                       .join(' · ') || 'No further details'}
                   </p>
-                  {(p.schoolEmail || p.hasStudentId) && (
+                  {(p.schoolEmail || p.email || p.hasStudentId) && (
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 break-words text-xs text-foreground-secondary">
-                      {p.schoolEmail && <span>School email: {p.schoolEmail}</span>}
+                      {/* Both addresses are shown whenever either exists, so a missing one reads as missing rather than hidden. */}
+                      <span>School email: {p.schoolEmail || 'not on file'}</span>
+                      <span>Personal email: {p.email || 'not on file'}</span>
                       {p.hasStudentId && (
                         <a
                           href={`/admin/schools/student-id/${p.memberId}`}

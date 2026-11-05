@@ -42,6 +42,8 @@ const BAD_SCHOOL = { success: false as const, error: 'Invalid school.' };
 function refreshSchoolRosters(schoolId: string) {
   revalidatePath(`/admin/schools/${schoolId}/rosters`);
   revalidatePath('/admin/schools');
+  // The season pages (/admin/league/[seasonId] and its school detail) show the same rosters.
+  revalidatePath('/admin/league', 'layout');
 }
 
 /**

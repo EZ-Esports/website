@@ -276,6 +276,59 @@ export async function upsertSchoolManagerAssignment(params: {
   }
 }
 
+/**
+ * Changes game scope and primary-contact flag of one manager, only while that manager is still
+ * active. The guard is part of the UPDATE itself, so a removal that lands first wins and this
+ * returns null instead of switching access back on (unlike the assignment upsert, which forces
+ * `is_active = true`). Promoting to primary demotes the other managers of the same school and
+ * academic year in the same transaction, after the target is confirmed active, so a lost race
+ * leaves them untouched.
+ */
+export async function updateActiveSchoolManagerAccess(
+  managerId: string,
+  params: { managedGames: string[] | null; isPrimaryContact: boolean }
+) {
+  return db.transaction(async (tx) => {
+    const [target] = await tx
+      .select({ schoolId: schema.schoolManagers.schoolId, academicYear: schema.schoolManagers.academicYear })
+      .from(schema.schoolManagers)
+      .where(and(eq(schema.schoolManagers.id, managerId), eq(schema.schoolManagers.isActive, true)))
+      .limit(1);
+    if (!target) return null;
+
+    if (params.isPrimaryContact) {
+      await tx
+        .update(schema.schoolManagers)
+        .set({ isPrimaryContact: false })
+        .where(
+          and(
+            eq(schema.schoolManagers.schoolId, target.schoolId),
+            eq(schema.schoolManagers.academicYear, target.academicYear),
+            sql`${schema.schoolManagers.id} <> ${managerId}`
+          )
+        );
+    }
+
+    const [updated] = await tx
+      .update(schema.schoolManagers)
+      .set({
+        managedGames: params.managedGames,
+        isPrimaryContact: params.isPrimaryContact,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(schema.schoolManagers.id, managerId), eq(schema.schoolManagers.isActive, true)))
+      .returning();
+    // Removed between the check and the write: throwing rolls back the demotion above.
+    if (!updated) throw new ManagerInactiveError();
+    return updated;
+  }).catch((error) => {
+    if (error instanceof ManagerInactiveError) return null;
+    throw error;
+  });
+}
+
+class ManagerInactiveError extends Error {}
+
 export async function deactivateSchoolManager(managerId: string) {
   const [updated] = await db
     .update(schema.schoolManagers)

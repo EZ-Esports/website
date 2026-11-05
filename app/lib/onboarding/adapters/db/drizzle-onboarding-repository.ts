@@ -159,6 +159,13 @@ export class DrizzleOnboardingRepository implements OnboardingRepositoryPort {
     return (await dal.upsertSchoolManagerAssignment(params)) as SchoolManagerRecord;
   }
 
+  async updateActiveSchoolManagerAccess(
+    managerId: string,
+    params: { managedGames: string[] | null; isPrimaryContact: boolean }
+  ): Promise<SchoolManagerRecord | null> {
+    return (await dal.updateActiveSchoolManagerAccess(managerId, params)) as SchoolManagerRecord | null;
+  }
+
   async removeSchoolManager(managerId: string): Promise<SchoolManagerRecord | null> {
     return (await dal.deactivateSchoolManager(managerId)) as SchoolManagerRecord | null;
   }

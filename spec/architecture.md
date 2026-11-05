@@ -156,6 +156,10 @@ Completion of the staff-configured Google Form is verified server-side, as Disco
 
 `members.school_email` (unique on `lower(...)`) is validated by `app/lib/onboarding/school-email.ts` on both client and server. The student ID image is in the private `student-ids` bucket, reachable only through `app/lib/onboarding/student-id-storage.ts` (service role, no public URL). `student_id_uploads` holds the object key (never a URL) and is bound to the invite by the upload route, so the submission pipeline finds it by invite and the browser never names a key. Keys, signed URLs and the image never enter `unstable_cache`, pages or CSVs; staff read it only via `/admin/schools/student-id/[memberId]` (permission-checked, `no-store`, 120 s signed URL, audit-logged). `member_id` is ON DELETE SET NULL so `sweepOrphanStudentIds()` (objects first, rows after) can always find what to delete; any new flow that deletes members or invites must call it after commit.
 
+## Adding a school to a season is find-or-create (spec-059)
+
+`addSchoolToSeason` (`app/(admin)/admin/league/season-schools-actions.ts`) is the staff path that registers a school: one transaction under a per-(season, school) `pg_advisory_xact_lock`, find-or-create the `teams` row, then insert only the rosters `planSchoolRosters` (`app/lib/season-schools.ts`, pure) reports missing. A division counts as present under any roster name or stored spelling (`A` / `Varsity`), so it never duplicates a manager-built roster; a taken name gets a numeric suffix. Any other code that creates a team for a school and season should follow the same find-or-create so the `(school, game, season)` unique index is never the control flow. Season pages read through `app/lib/db/season-setup.ts` (raw, uncached, display fields only).
+
 ## CI / agent tooling
 
 `f5563e7` (#70): GitHub Actions on push/PR to `main` — `npm ci` → lint → Vitest → `tsc --noEmit` → build (dummy env). `.githooks/pre-push` mirrors the three local checks; `prepare` sets `core.hooksPath`. No `.github/dependabot.yml`; alerts handled as manual PRs (`02011df`, `27909e4`, `9d40278`, `0463b43`, `ae86069`).

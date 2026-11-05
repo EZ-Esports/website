@@ -2,18 +2,19 @@ import LeagueSetupClient from './LeagueSetupClient';
 import DbErrorNotice from '@/app/components/admin/DbErrorNotice';
 import PermissionDenied from '@/app/components/admin/PermissionDenied';
 import { getStaffForAdminSection } from '@/app/lib/auth';
-import { parseSeasonStatus } from '@/app/lib/admin-season-filters';
+import { parseSeasonStatus, resolveLeagueView, sortGamesForLeagueTabs } from '@/app/lib/admin-season-filters';
 import { getLeagueAdminData } from '@/app/lib/db/queries';
 import { AdminPage, AdminPageHeader } from '@/app/components/admin/AdminUI';
 
 export default async function LeagueSetupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string | string[] }>;
+  searchParams: Promise<{ status?: string | string[]; game?: string | string[]; view?: string | string[] }>;
 }) {
   if (!(await getStaffForAdminSection('/admin/league'))) return <PermissionDenied />;
 
-  const status = parseSeasonStatus((await searchParams).status);
+  const params = await searchParams;
+  const status = parseSeasonStatus(params.status);
 
   let games: Awaited<ReturnType<typeof getLeagueAdminData>>['games'] = [];
   let seasons: Awaited<ReturnType<typeof getLeagueAdminData>>['seasons'] = [];
@@ -22,7 +23,7 @@ export default async function LeagueSetupPage({
   try {
     if (process.env.DATABASE_URL) {
       const res = await getLeagueAdminData();
-      games = res.games;
+      games = sortGamesForLeagueTabs(res.games);
       seasons = res.seasons;
     } else {
       dbError = true;
@@ -31,16 +32,18 @@ export default async function LeagueSetupPage({
     dbError = true;
   }
 
+  const view = resolveLeagueView(params.game, params.view, games);
+
   return (
     <AdminPage>
       <AdminPageHeader
         route="/admin/league"
-        description="Create games and seasons before scheduling matches or registering teams. Every match and team registration depends on at least one game and one active season."
+        description="Run each game's seasons in one place. Pick a game, open a season, and add its schools, check rosters, invite managers, lock rosters and publish results there."
       />
 
       {dbError && <DbErrorNotice variant="not-configured" />}
 
-      {!dbError && <LeagueSetupClient games={games} seasons={seasons} seasonStatus={status} />}
+      {!dbError && <LeagueSetupClient games={games} seasons={seasons} view={view} seasonStatus={status} />}
     </AdminPage>
   );
 }

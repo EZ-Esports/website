@@ -6,6 +6,7 @@ import {
   getSchoolManagerInvites,
   getRegisteredManagers,
   removeSchoolManager,
+  updateSchoolManagerAccess,
   revokeManagerInvite,
   type RegisteredManagerAccount,
 } from '@/app/(admin)/admin/schools/manager-actions';
@@ -73,6 +74,17 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     }
   };
 
+  const handleUpdateManager = async (managerId: string, managedGames: string[] | null, isPrimaryContact: boolean) => {
+    try {
+      const res = await updateSchoolManagerAccess({ managerId, managedGames, isPrimaryContact });
+      if (!res.success) return { success: false, error: res.error || 'Failed to update manager.' };
+      await loadData();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update manager.' };
+    }
+  };
+
   const handleRevokeInvite = async (inviteId: string) => {
     setIsRevokingId(inviteId);
     try {
@@ -101,6 +113,7 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     isRemovingId,
     isRevokingId,
     handleRemoveManager,
+    handleUpdateManager,
     handleRevokeInvite,
   };
 }
