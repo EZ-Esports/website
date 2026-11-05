@@ -61,7 +61,7 @@ const input = (over: Record<string, unknown> = {}) => ({
 const seasonRow = { id: SEASON, name: 'Fall 2026', gameId: uuid(800), gameName: 'Valorant', gameSlug: 'valorant' };
 const schoolRows = schoolIds.map((id, i) => ({ id, name: `School ${i}` }));
 
-/** Queue the reads loadPlan makes: season, match count, schools, teams, (rosters when teams exist). */
+/** Queue the reads loadPlan makes: season, match count, schools, memberships, rosters. */
 function queueLoad({
   matchCount = 0,
   matchDivision = 'A',
@@ -69,8 +69,8 @@ function queueLoad({
   rosters = [] as any[],
 } = {}) {
   const seasonMatches = Array.from({ length: matchCount }, () => ({ homeDivision: matchDivision, awayDivision: matchDivision }));
-  mocks.queue.push([seasonRow], seasonMatches, schoolRows, teams);
-  if (teams.length) mocks.queue.push(rosters);
+  // season, match count, schools, memberships, then the schools' rosters (always read: rosters belong to the school, not the membership).
+  mocks.queue.push([seasonRow], seasonMatches, schoolRows, teams, rosters);
 }
 
 beforeEach(() => {
@@ -135,8 +135,8 @@ describe('previewGenerateSeason', () => {
 
 describe('Varsity and JV are generated independently', () => {
   const varsityTeams = () => schoolIds.map((id, i) => ({ id: uuid(100 + i), schoolId: id }));
-  const varsityRosters = () => varsityTeams().map((t, i) => ({ id: uuid(200 + i), teamId: t.id, name: 'Varsity', division: 'A' }));
-  const jvRosters = () => varsityTeams().map((t, i) => ({ id: uuid(300 + i), teamId: t.id, name: 'JV', division: 'B' }));
+  const varsityRosters = () => varsityTeams().map((t, i) => ({ id: uuid(200 + i), schoolId: t.schoolId, name: 'Varsity', division: 'A' }));
+  const jvRosters = () => varsityTeams().map((t, i) => ({ id: uuid(300 + i), schoolId: t.schoolId, name: 'JV', division: 'B' }));
 
   it('JV can be generated after Varsity: the teams are reused and only JV rosters are created', async () => {
     queueLoad({ matchCount: 28, matchDivision: 'A', teams: varsityTeams(), rosters: varsityRosters() });
@@ -185,7 +185,7 @@ describe('Varsity and JV are generated independently', () => {
     const pre = await previewGenerateSeason(input({ division: 'JV' }));
     mocks.queue.push([{ id: SEASON }]);
     queueLoad({ matchCount: 28, matchDivision: 'A', teams: varsityTeams(), rosters: varsityRosters() });
-    mocks.insertResults.push(schoolIds.map((_, i) => ({ id: uuid(300 + i), teamId: uuid(100 + i) })));
+    mocks.insertResults.push(schoolIds.map((_, i) => ({ id: uuid(300 + i), schoolId: schoolIds[i] })));
     const res = await commitGenerateSeason(input({ division: 'JV' }), (pre as any).preview.fingerprint);
     expect(res).toEqual({ success: true, teamsCreated: 0, matchesCreated: 28 });
     expect(mocks.inserts.map((i) => i.table)).toEqual([schema.rosters, schema.matches]);
@@ -207,7 +207,7 @@ describe('commitGenerateSeason', () => {
     queueLoad();
     mocks.insertResults.push(
       schoolIds.map((id, i) => ({ id: uuid(100 + i), schoolId: id })),
-      schoolIds.map((_, i) => ({ id: uuid(200 + i), teamId: uuid(100 + i) }))
+      schoolIds.map((_, i) => ({ id: uuid(200 + i), schoolId: schoolIds[i] }))
     );
 
     const res = await commitGenerateSeason(input(), fp);
@@ -232,7 +232,7 @@ describe('commitGenerateSeason', () => {
     const preview = await previewGenerateSeason(input());
     // Same inputs, but now every school already has a team and a Varsity roster.
     const teams = schoolIds.map((id, i) => ({ id: uuid(100 + i), schoolId: id }));
-    const rosters = teams.map((t, i) => ({ id: uuid(200 + i), teamId: t.id, name: 'Varsity', division: 'A' }));
+    const rosters = teams.map((t, i) => ({ id: uuid(200 + i), schoolId: t.schoolId, name: 'Varsity', division: 'A' }));
     mocks.queue.push([{ id: SEASON }]);
     queueLoad({ teams, rosters });
     const fp = (preview as any).preview.fingerprint as string;
@@ -270,10 +270,10 @@ describe('commitGenerateSeason', () => {
       teams,
       rosters: [
         // school 0: two Varsity rosters -> reused, no error
-        { id: uuid(200), teamId: uuid(100), name: 'Alpha', division: 'A' },
-        { id: uuid(201), teamId: uuid(100), name: 'Beta', division: 'A' },
+        { id: uuid(200), schoolId: schoolIds[0], name: 'Alpha', division: 'A' },
+        { id: uuid(201), schoolId: schoolIds[0], name: 'Beta', division: 'A' },
         // school 1: name collision, stored in JV -> new roster gets a different name
-        { id: uuid(202), teamId: uuid(101), name: 'Varsity', division: 'B' },
+        { id: uuid(202), schoolId: schoolIds[1], name: 'Varsity', division: 'B' },
         // school 2: nothing in Varsity -> roster only
       ],
     });
@@ -291,7 +291,7 @@ describe('commitGenerateSeason', () => {
     queueLoad();
     const preview = await previewGenerateSeason(input());
     const teams = [{ id: uuid(101), schoolId: schoolIds[1] }];
-    const rosters = [{ id: uuid(202), teamId: uuid(101), name: 'Varsity', division: 'B' }];
+    const rosters = [{ id: uuid(202), schoolId: schoolIds[1], name: 'Varsity', division: 'B' }];
     // Re-plan with the existing team to get its fingerprint, then commit with the same data.
     queueLoad({ teams, rosters });
     const re = await previewGenerateSeason(input());
@@ -301,7 +301,7 @@ describe('commitGenerateSeason', () => {
     queueLoad({ teams, rosters });
     mocks.insertResults.push(
       schoolIds.filter((_, i) => i !== 1).map((id, i) => ({ id: uuid(300 + i), schoolId: id })),
-      schoolIds.map((_, i) => ({ id: uuid(400 + i), teamId: i === 1 ? uuid(101) : uuid(300 + (i > 1 ? i - 1 : i)) }))
+      schoolIds.map((_, i) => ({ id: uuid(400 + i), schoolId: schoolIds[i] }))
     );
     const res = await commitGenerateSeason(input(), fp);
     expect(res).toEqual({ success: true, teamsCreated: 7, matchesCreated: 28 });

@@ -326,6 +326,15 @@ export async function validateInviteToken(
     };
   }
 
+  // The school was taken out of the invite's season: the join link no longer applies (spec-060).
+  if (!isManager && (row as { schoolInSeason?: boolean }).schoolInSeason === false) {
+    return {
+      valid: false,
+      status: 'invalid',
+      message: 'Your school is not part of this season right now. Ask your school manager or league staff.',
+    };
+  }
+
   if (invite.status === 'pending') {
     return {
       valid: true,

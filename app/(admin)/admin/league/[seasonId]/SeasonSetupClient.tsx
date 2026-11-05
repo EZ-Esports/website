@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { FiEye, FiEyeOff, FiLink, FiList, FiLock, FiPlus, FiUnlock } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiLink, FiList, FiLock, FiPlus, FiTrash2, FiUnlock } from 'react-icons/fi';
 import { HiOutlineAcademicCap } from 'react-icons/hi2';
 import SchoolCrest from '@/app/components/admin/SchoolCrest';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
@@ -15,7 +15,8 @@ import { isValidSeasonName } from '@/app/lib/season-name';
 import { planSchoolRosters, rosterNamesPhrase } from '@/app/lib/season-schools';
 import type { SeasonSetupData, SeasonSetupRoster, SeasonSetupSchool } from '@/app/lib/db/season-setup';
 import { lockSeasonRosters, unlockSeasonRosters, publishSeasonOutcomes, hideSeasonOutcomes } from '../actions';
-import { addSchoolToSeason } from '../season-schools-actions';
+import { addSchoolToSeason, removeSchoolFromSeason } from '../season-schools-actions';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 
 type ActionResult = { success: boolean; error?: string };
 type ConfirmTarget =
@@ -29,7 +30,7 @@ interface Props {
     outcomesFinalizedAt: string | null;
   };
   schools: SeasonSetupSchool[];
-  availableSchools: Array<{ id: string; name: string }>;
+  availableSchools: Array<{ id: string; name: string; existingRosters?: number }>;
   games: Array<{ id: string; displayName: string; slug: string }>;
   /** MANAGE_SCHOOLS: manager invites are written by the Schools actions, which check it again. */
   canInvite: boolean;
@@ -70,6 +71,18 @@ export default function SeasonSetupClient({
       });
     });
 
+  // Removal only runs from the confirm dialog; a failure stays in the dialog so it can be read.
+  const removal = useConfirmAction<{ schoolId: string; schoolName: string }>(async ({ schoolId, schoolName }) => {
+    const res = await removeSchoolFromSeason({ seasonId: season.id, schoolId });
+    if (!res.success) return res;
+    showToast(
+      res.alreadyRemoved
+        ? `${schoolName} was already removed.`
+        : `${schoolName} removed from ${label}. Nothing was deleted${res.hiddenMatches ? `; ${res.hiddenMatches} ${res.hiddenMatches === 1 ? 'match is' : 'matches are'} now hidden from the public` : ''}.`,
+    );
+    return res;
+  }, 'Could not remove the school.');
+
   const addSchool = (schoolId: string) => {
     if (!schoolId) return;
     startTransition(async () => {
@@ -81,7 +94,9 @@ export default function SeasonSetupClient({
       setPickedSchool('');
       const phrase = rosterNamesPhrase(res.rostersCreated);
       showToast(
-        res.teamCreated
+        res.restored
+          ? `${res.schoolName} is back in ${season.gameName} ${season.name} with its existing rosters${res.rostersCreated.length ? `, plus a new ${phrase}` : ''}.`
+          : res.teamCreated
           ? `${res.schoolName} added to ${season.gameName} ${season.name}${res.rostersCreated.length ? ` with ${phrase}` : ''}.`
           : res.rostersCreated.length
             ? `${res.schoolName}: created the ${phrase}.`
@@ -207,7 +222,7 @@ export default function SeasonSetupClient({
             >
               <option value="">Select a school</option>
               {availableSchools.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{s.existingRosters ? `${s.name} (keeps its ${s.existingRosters} ${s.existingRosters === 1 ? 'roster' : 'rosters'})` : s.name}</option>
               ))}
             </select>
           </AdminField>
@@ -234,11 +249,21 @@ export default function SeasonSetupClient({
                 canManage={canInvite}
                 onInvite={() => setInviteSchool(school)}
                 onCreateMissing={() => addSchool(school.schoolId)}
+                onRemove={() => removal.request({ schoolId: school.schoolId, schoolName: school.schoolName })}
               />
             ))}
           </ul>
         )}
       </AdminSection>
+
+      <ConfirmActionDialog
+        {...removal.dialogProps}
+        tone="danger"
+        title={`Remove ${removal.target?.schoolName ?? 'school'} from ${label}?`}
+        message={`This only removes the school from the ${label} season: it leaves this season's school list and is hidden from the public website for it (team lists, schedule, standings, school team page), and its manager no longer sees these rosters. Nothing is deleted: its rosters, players and any matches stay in the database and still show to staff. Add the school back from the picker to restore everything.`}
+        confirmLabel="Remove from season"
+        pendingLabel="Removing"
+      />
 
       {confirmCopy && (
         <ConfirmActionDialog
@@ -301,6 +326,7 @@ function SchoolCard({
   canManage,
   onInvite,
   onCreateMissing,
+  onRemove,
 }: {
   season: Props['season'];
   school: SeasonSetupSchool;
@@ -309,6 +335,7 @@ function SchoolCard({
   canManage: boolean;
   onInvite: () => void;
   onCreateMissing: () => void;
+  onRemove: () => void;
 }) {
   const playerTotal = school.rosters.reduce((n, r) => n + r.players.length, 0);
   const rosterCount = school.rosters.length;
@@ -340,7 +367,7 @@ function SchoolCard({
           <span key={d} className={chip('warning')}>No {d} roster</span>
         ))}
       </div>
-      {(school.missing.length > 0 || canManage) && (
+      {(
         <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2">
           {school.missing.length > 0 && (
             <button type="button" onClick={onCreateMissing} disabled={isPending} className={chipButton('warning')}>
@@ -359,6 +386,17 @@ function SchoolCard({
               Managers
             </button>
           )}
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={isPending}
+            className={chipButton('ghost')}
+            aria-label={`Remove ${school.schoolName} from this season`}
+            title="Take the school out of this season without deleting anything"
+          >
+            <FiTrash2 aria-hidden className="h-3.5 w-3.5" />
+            Remove
+          </button>
         </div>
       )}
     </li>

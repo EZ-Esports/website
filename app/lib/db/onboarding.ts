@@ -27,6 +27,9 @@ export async function findInviteForValidation(tokenHash: string) {
       gameId: schema.games.id,
       gameName: schema.games.displayName,
       gameSlug: schema.games.slug,
+      // False when the invite names a season the school is no longer a member of (staff removed it):
+      // the link then stops working. Invites without a season (legacy rows) are not affected.
+      schoolInSeason: sql<boolean>`(${schema.playerInvites.seasonId} is null or exists (select 1 from ${schema.seasonSchools} where ${schema.seasonSchools.schoolId} = ${schema.playerInvites.schoolId} and ${schema.seasonSchools.gameId} = ${schema.playerInvites.gameId} and ${schema.seasonSchools.seasonId} = ${schema.playerInvites.seasonId}))`,
     })
     .from(schema.playerInvites)
     .innerJoin(schema.schools, eq(schema.playerInvites.schoolId, schema.schools.id))

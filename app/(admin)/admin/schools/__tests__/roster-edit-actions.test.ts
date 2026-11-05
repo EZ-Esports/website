@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
     mocks.order.push('count');
     return mocks.rosterRoles;
   }),
-  lockRosterMember: vi.fn(async (_tx: unknown, _team: string, _member: string) => {
+  lockRosterMember: vi.fn(async (_tx: unknown, _scope: unknown, _member: string) => {
     mocks.order.push('lock');
   }),
   /** Makes the matching write throw, to prove the surrounding transaction rolls back. */
@@ -34,13 +34,13 @@ const mocks = vi.hoisted(() => ({
   rolledBack: 0,
   seasonRow: [{ gameId: 'g1' }] as Array<{ gameId: string }>,
   matchCount: 0,
-  teamInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; gameId: string; seasonId: string; gameSlug: string } | null> =>
+  seasonSchoolInSchool: vi.fn(async (id: string, _s: string): Promise<{ id: string; gameId: string; seasonId: string; gameSlug: string } | null> =>
     id === 'team-ok' ? { id, gameId: 'g1', seasonId: 's1', gameSlug: 'valorant' } : id === 'team-mc' ? { id, gameId: 'g2', seasonId: 's2', gameSlug: 'minecraft' } : null),
-  rosterInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown): Promise<{ id: string; teamId: string; name: string; division: string; gameSlug: string } | null> =>
-    id === 'roster-ok' ? { id, teamId: 'team-ok', name: 'Varsity', division: 'A', gameSlug: 'valorant' }
-      : id === 'roster-jv' ? { id, teamId: 'team-ok', name: 'JV', division: 'B', gameSlug: 'valorant' }
-      : id === 'roster-lol' ? { id, teamId: 'team-lol', name: 'Varsity', division: 'A', gameSlug: 'league-of-legends' }
-      : id === 'roster-mc' ? { id, teamId: 'team-mc', name: 'Minecraft', division: 'All', gameSlug: 'minecraft' } : null),
+  rosterInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown): Promise<{ id: string; schoolId: string; gameId: string; seasonId: string; name: string; division: string; gameSlug: string } | null> =>
+    id === 'roster-ok' ? { id, schoolId: 'school-x', gameId: 'g1', seasonId: 's1', name: 'Varsity', division: 'A', gameSlug: 'valorant' }
+      : id === 'roster-jv' ? { id, schoolId: 'school-x', gameId: 'g1', seasonId: 's1', name: 'JV', division: 'B', gameSlug: 'valorant' }
+      : id === 'roster-lol' ? { id, schoolId: 'school-x', gameId: 'g3', seasonId: 's3', name: 'Varsity', division: 'A', gameSlug: 'league-of-legends' }
+      : id === 'roster-mc' ? { id, schoolId: 'school-x', gameId: 'g2', seasonId: 's2', name: 'Minecraft', division: 'All', gameSlug: 'minecraft' } : null),
   playerInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown) =>
     id === 'player-ok' ? { id, rosterId: 'roster-ok', memberId: 'member-ok', role: 'sub', isCaptain: false }
       : id === 'player-captain' ? { id, rosterId: 'roster-ok', memberId: 'member-captain', role: 'captain', isCaptain: true }
@@ -48,7 +48,7 @@ const mocks = vi.hoisted(() => ({
   memberInSchool: vi.fn(async (id: string, _s: string, _tx?: unknown) => id === 'member-ok'),
   /** Sibling roster the member is already on, per test; null = on none. */
   sibling: null as null | { playerId: string; rosterId: string; rosterName: string },
-  siblingEnrollment: vi.fn(async (_t: string, _m: string, _r: string, _tx?: unknown) => {
+  siblingEnrollment: vi.fn(async (_scope: unknown, _m: string, _r: string, _tx?: unknown) => {
     mocks.order.push('sibling');
     return mocks.sibling;
   }),
@@ -80,7 +80,8 @@ vi.mock('@/app/lib/db/roster-removal', async (importOriginal) => ({
 vi.mock('@/app/lib/auth', () => ({ requirePermission: mocks.requirePermission }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath, updateTag: mocks.updateTag }));
 vi.mock('@/app/lib/db/roster-scope', () => ({
-  teamInSchool: mocks.teamInSchool,
+  seasonSchoolInSchool: mocks.seasonSchoolInSchool,
+  scopeKey: (s: { schoolId: string; gameId: string; seasonId: string }) => `${s.schoolId}:${s.gameId}:${s.seasonId}`,
   rosterInSchool: mocks.rosterInSchool,
   playerInSchool: mocks.playerInSchool,
   memberInSchool: mocks.memberInSchool,
@@ -202,7 +203,7 @@ describe('school roster edit actions: authorization', () => {
     await expect(calls[name]()).rejects.toThrow('Forbidden');
     expect(mocks.requirePermission).toHaveBeenCalledWith(Permissions.MANAGE_ROSTERS);
     expect(mocks.writes).toHaveLength(0);
-    expect(mocks.teamInSchool).not.toHaveBeenCalled();
+    expect(mocks.seasonSchoolInSchool).not.toHaveBeenCalled();
     expect(mocks.rosterInSchool).not.toHaveBeenCalled();
     expect(mocks.playerInSchool).not.toHaveBeenCalled();
     expect(mocks.memberInSchool).not.toHaveBeenCalled();
@@ -284,7 +285,7 @@ describe('school roster edit actions: school scoping', () => {
   it('writes the roster with its own school, game and season (spec-060)', async () => {
     await createRoster(SCHOOL, form({ teamId: 'team-ok', name: 'Varsity', division: 'Varsity' }));
     const insert = mocks.writes.find((w) => w.op === 'insert' && w.table === schema.rosters);
-    expect(insert?.values).toMatchObject({ teamId: 'team-ok', schoolId: SCHOOL, gameId: 'g1', seasonId: 's1', name: 'Varsity' });
+    expect(insert?.values).toMatchObject({ schoolId: SCHOOL, gameId: 'g1', seasonId: 's1', name: 'Varsity' });
   });
 
   it('rejects JV on a game with no JV split, in both create and update', async () => {
@@ -552,8 +553,8 @@ describe('removing a player runs the shared orphan cleanup (spec-042)', () => {
     mocks.rosterPlayers = [{ memberId: 'm1' }, { memberId: 'm2' }, { memberId: 'm1' }];
     await deleteRoster(SCHOOL, 'roster-ok');
     expect(mocks.cleanupOrphanMember).toHaveBeenCalledTimes(2);
-    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm1', rosterId: 'roster-ok', teamId: 'team-ok', ign: null });
-    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm2', rosterId: 'roster-ok', teamId: 'team-ok', ign: null });
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm1', rosterId: 'roster-ok', scope: expect.objectContaining({ gameId: 'g1', seasonId: 's1' }), ign: null });
+    expect(mocks.cleanupOrphanMember).toHaveBeenCalledWith(expect.anything(), { memberId: 'm2', rosterId: 'roster-ok', scope: expect.objectContaining({ gameId: 'g1', seasonId: 's1' }), ign: null });
     expect(mocks.updateTag).toHaveBeenCalledWith('members');
   });
 
@@ -639,7 +640,7 @@ describe('staff roster moves and the sibling-roster rule', () => {
       success: false,
       error: 'Ada Lovelace is already on Varsity. Use Move to put them on JV. Nothing was saved.',
     });
-    expect(mocks.siblingEnrollment).toHaveBeenCalledWith('team-ok', 'member-ok', 'roster-jv', expect.anything());
+    expect(mocks.siblingEnrollment).toHaveBeenCalledWith(expect.objectContaining({ gameId: 'g1', seasonId: 's1' }), 'member-ok', 'roster-jv', expect.anything());
     expect(mocks.writes).toHaveLength(0);
     expect(mocks.notify).not.toHaveBeenCalled();
   });
@@ -654,13 +655,13 @@ describe('staff roster moves and the sibling-roster rule', () => {
   describe('concurrency: advisory lock and guarded update', () => {
     it('createPlayer takes the (team, member) lock before the sibling check', async () => {
       await createPlayer(SCHOOL, form({ rosterId: 'roster-jv', memberId: 'member-ok', role: 'player' }));
-      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), 'team-ok', 'member-ok');
+      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ gameId: 'g1', seasonId: 's1' }), 'member-ok');
       expect(mocks.order).toEqual(['lock', 'sibling', 'lockRoster', 'count']);
     });
 
     it('moveRosterMember takes the (team, member) lock before checking the target roster', async () => {
       await moveRosterMember(SCHOOL, 'player-ok', 'roster-jv');
-      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), 'team-ok', 'member-ok');
+      expect(mocks.lockRosterMember).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ gameId: 'g1', seasonId: 's1' }), 'member-ok');
       expect(mocks.order).toEqual(['lock', 'lockRoster', 'onTarget', 'count']);
     });
 

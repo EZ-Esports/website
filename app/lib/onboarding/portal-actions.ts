@@ -20,7 +20,6 @@ import { hasAcceptedApplicationForSeason, notOnboardedForSeasonError, type Enrol
 import { updateCacheTags, CACHE_TAGS } from '@/app/lib/cache';
 import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS, isInviteExpiryDays } from './invite-expiry';
 import { lockRoster, lockRosterMember, rosterPlayerRoles, siblingEnrollment } from '@/app/lib/db/roster-scope';
-import { inScope } from '@/app/lib/db/season-membership';
 import { occupancyOf, rosterCapacityError } from './roster-limits';
 import { notifyRosterMembershipChanged } from './roster-membership-events';
 import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
@@ -1052,16 +1051,17 @@ export async function getSchoolRosters(
     .where(inArray(schema.seasons.id, seasonIds));
   const seasonNames = new Map(seasonRows.map((r) => [r.id, r.name]));
 
-  const teamIds = schoolTeams.map((t) => t.id);
   // Rosters of the school's member seasons only; `teamId` is the membership row's id, which the portal
   // view uses to group rosters of one game and season.
-  const teamRosters = (
-    await db
-      .select({ roster: schema.rosters, teamId: schema.seasonSchools.id })
-      .from(schema.rosters)
-      .innerJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
-      .where(inArray(schema.seasonSchools.id, teamIds))
-  ).map((r) => ({ ...r.roster, teamId: r.teamId }));
+  const schoolRosters = await db
+    .select()
+    .from(schema.rosters)
+    .where(and(eq(schema.rosters.schoolId, schoolId), inArray(schema.rosters.seasonId, seasonIds)));
+  // Only rosters of seasons the school is a member of (positive membership), tagged with that row's id.
+  const teamRosters = schoolRosters.flatMap((r) => {
+    const team = schoolTeams.find((t) => t.gameId === r.gameId && t.seasonId === r.seasonId);
+    return team ? [{ ...r, teamId: team.id }] : [];
+  });
 
   if (teamRosters.length === 0) {
     return [];
