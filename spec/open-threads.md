@@ -257,3 +257,13 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - A chunked upload skips the early `Content-Length` 413 (the 4 MB check after reading still applies).
 - Not exercised against real Supabase Storage or in a browser.
 - Dev-only local student ID storage (`STUDENT_ID_STORAGE=local`, `STUDENT_ID_LOCAL_DIR`) exists for local testing only; it is guarded against production and a non-loopback database (spec-056). Files in that directory are never cleaned by anything except the same sweep paths, so delete the directory by hand when done.
+
+## School-owned rosters and season membership (spec-060)
+
+- **DEPLOY ORDER: apply migrations `0060` and `0061` BEFORE deploying; apply `0062` AFTER the code is live.** Deploying first breaks every roster, team, standings and match read (the new queries select columns and a table that do not exist). Nothing has been applied anywhere.
+- Rehearse 0060 to 0062 on a restored backup first: PGlite is not Supabase (RLS policies are only loaded; the `season_schools` view grants and the rewritten policies are untested there).
+- 0060 step 5(b)/(c) adds empty membership rows for archived-standings and tournament-only schools; check `npm run db:verify:roster-backfill` for the count and decide whether those schools should show in the public team directory.
+- `db/verify-roster-backfill.ts` is for the state after 0060/0061 (it reads `teams` and `rosters.team_id`); it is not meant for after 0062.
+- Opponents' derived standings (the `roster_standings` view) keep counting played matches against a removed school by design.
+- The local dev server (`npm run dev:local`) runs the app on one database connection; a transaction that waits on a second connection would hang there (PGlite limit, not production).
+

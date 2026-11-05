@@ -1,57 +1,63 @@
-# spec-060: School-owned, season-scoped rosters (phase 1 of 4: expand)
+# spec-060: School-owned, season-scoped rosters; season membership
 
-- **Status:** Phase 1 (EXPAND) implemented on branch `rosters-expand-0060`, stacked on `worktree-agent-a1034cb896548c04e` (PR #332). Migration `0060_rosters_scope_expand` is written, NOT applied, and nothing was run against any database. No behaviour change.
-- **Date:** 2026-11-04
-- **Scope:** `db/migrations/0060_rosters_scope_expand.sql` (+ journal), `app/lib/db/schema.ts` (`rosters`), the roster writers (`season-schools-actions.ts`, `generate-season-actions.ts`, `schools/[schoolId]/rosters/actions.ts`, `roster-scope.ts`, `portal-actions.ts`, `db/seed-gold.ts`), `db/verify-roster-backfill.ts`, tests.
+- **Status:** Implemented on branch `rosters-expand-0060` (one PR: expand, constrain, switch, contract), stacked on main after #332. Migrations `0060`, `0061`, `0062` are written and NOT applied anywhere; nothing was run against any production database.
+- **Date:** 2026-11-05
+- **Scope:** `db/migrations/0060..0062` (+ journal), `app/lib/db/schema.ts`, `app/lib/db/season-membership.ts` (new), every roster/team reader and writer (matches, standings, teams, school-rosters, season-setup, roster-scope, roster-removal, portal, manager-auth, staff roster actions, generate season, scheduling, league deletes, seed-gold, purge script), League Setup (Add school, Remove school, school pages), `db/verify-roster-backfill.ts`, local-dev tooling (`db/local/*`, [docs/dev/LOCAL_DB.md](../docs/dev/LOCAL_DB.md)).
 
 ## Why
 
-Today a roster belongs to a `teams` row (school + game + season) through `rosters.team_id ON DELETE CASCADE`. That makes the team row load-bearing: deleting it deletes the rosters and, through them, the players. It also makes "this school is in this season" and "these are the school's rosters" the same fact, so a school cannot be taken out of a season without touching its data.
+A roster belonged to a `teams` row (school + game + season) through `rosters.team_id ON DELETE CASCADE`. That made the team row load-bearing: deleting it deleted rosters and players, and "this school is in this season" and "these are its rosters" were one fact, so a school could not be taken out of a season without touching its data.
 
-Target model (approved by the user):
+## Model (approved by the user)
 
-- A **roster** belongs to a school, a game and a season by itself (`rosters.school_id`, `game_id`, `season_id`).
-- **`teams` becomes the membership table** `season_schools`: one row per (school, game, season), nothing else hangs off it. Removing a school from a season deletes only that row; rosters, players and matches are untouched.
-- `matches -> rosters` becomes `RESTRICT`. `league.ts` season and game deletes must explicitly delete the rosters and players and REFUSE when matches exist.
-- Re-adding a school adds only the missing divisions.
-- Opponents' derived standings keep counting already-played matches against a removed school (no view change).
-- Tournament games (TFT, osu!, TETR.IO) do not require membership for their brackets.
+- A **roster** belongs to a school, a game and a season by itself: `rosters.school_id`, `game_id`, `season_id` (NOT NULL), unique `(school_id, game_id, season_id, name)`.
+- **`teams` becomes the membership table `season_schools`**: one row per (school, game, season), nothing hangs off it. In TypeScript it is `seasonSchools` (`pgTable('season_schools')`). Removing a school from a season deletes only that row.
+- `matches -> rosters` is `RESTRICT`. `league.ts` season and game deletes delete the rosters and players explicitly and REFUSE when matches exist.
+- Re-adding a school adds only the missing divisions (it never recreates what exists).
+- Public reads need a positive membership join. Derived (view) standings keep counting already-played matches against a removed school (no view change). Tournament games (TFT, osu!, TETR.IO) do not need membership for brackets.
 
-## Phases and deploy order
+## Migrations (hand-written, idempotent, separate files)
 
-Each phase is its own PR. Migrations are written as files only; the user says when to run them, after the PR merges.
+Hand-written like 0043 onward (the drizzle-kit snapshot chain stops at 0042). Each can be re-run safely (guards, `IF [NOT] EXISTS`, `ON CONFLICT DO NOTHING`).
 
-1. **Expand (this spec, migration 0060).** Additive only. **Apply 0060 BEFORE deploying this code**: the new code writes `rosters.school_id/game_id/season_id`, which do not exist until the migration runs. The reverse is safe: old code keeps working on a migrated database because a trigger fills the new columns for any insert that only knows `team_id`.
-2. **Constrain (0061).** After `db/verify-roster-backfill.ts` reports every roster scoped and consistent: `NOT NULL` on the three columns, unique (school, game, season, name), `matches -> rosters` to `RESTRICT`, and the explicit-delete rule in `league.ts`.
-3. **Switch (PR2).** Readers and writers move from `team_id` to the scope columns; public/portal queries stop joining `teams` for rosters and use membership only to decide who is in the season; Remove/Add school becomes a membership operation.
-4. **Contract (PR3).** Drop `rosters.team_id`, rename `teams` to `season_schools`, drop the trigger and the compatibility code.
+| File | Phase | Does |
+|---|---|---|
+| `0060_rosters_scope_expand` | expand | Adds nullable `rosters.school_id/game_id/season_id` + indexes, backfills them from `teams`, **drops the `rosters.team_id -> teams` FK** and makes `team_id` nullable (so a membership row can never cascade-delete rosters), adds a `BEFORE INSERT` trigger that fills the scope for old-code inserts, and backfills membership rows for archived standings and season-linked tournament appearances. |
+| `0061_rosters_scope_constrain` | constrain | Scope columns `NOT NULL`, unique `(school, game, season, name)`, `matches -> rosters` FKs `RESTRICT`, creates the **compatibility view `season_schools`** (simple, auto-updatable, over `teams`) so the new name works before the rename, and widens `roster_standings` with `school_id/game_id/season_id`. |
+| `0062_rosters_scope_contract` | contract | Drops the view and renames `teams` to `season_schools` (and its indexes), rewrites the anon/authenticated RLS policies on rosters, players and matches that named `team_id`, drops the trigger and `rosters.team_id` (+ its indexes), and rebuilds `roster_standings` without `team_id`. |
 
-## Migration 0060 (idempotent, hand-written)
+The code never touches `rosters.team_id`, and uses the name `season_schools`, which is the view after 0061 and the real table after 0062. So the same build works on both schemas, and 0062 can be applied after the code is live.
 
-Hand-written like 0043 onward (the drizzle-kit snapshot chain stops at 0042). Every statement is safe to re-run.
+### Deploy order and the window
 
-1. Add nullable `rosters.school_id`, `game_id`, `season_id` (FKs `ON DELETE CASCADE`, so deleting a school, game or season still removes its rosters exactly as before) and indexes `(school_id, game_id, season_id)` and `(season_id)`.
-2. Backfill from each roster's team, guarded: only rows still missing a value are updated.
-3. **Critical:** drop the `rosters.team_id -> teams` foreign key (looked up by what it references, not by name) and make `team_id` nullable, so deleting a team / membership row can never cascade-delete rosters. The unique `(team_id, name)` index stays until 0061.
-4. A `BEFORE INSERT` trigger (`rosters_fill_scope`, `SECURITY DEFINER`, pinned `search_path`) fills the three columns from `team_id` when a writer omits them.
-5. Membership backfill with `ON CONFLICT (school_id, game_id, season_id) DO NOTHING`: scopes already on rosters (a no-op today), schools with an archived `season_standings` row (game from the season), and schools appearing in `tournament_matches` of a season-linked tournament.
+1. Apply **0060 then 0061 BEFORE deploying** this code. Both are backward compatible: the old code keeps working against them (it still reads `teams` and `rosters.team_id`; the trigger fills the scope columns; deleting a team no longer cascades, which only makes it safer).
+2. Deploy the code.
+3. Apply **0062 AFTER the new code is live.** (Applied before, the old code would break: it needs `teams` and `team_id`.)
 
-**Visible effect to decide on before applying.** Step 5(b)/(c) adds `teams` rows (with no rosters) for archived-standings and tournament-only schools. Those rows exist today only implicitly; once added, anything that lists `teams` (the public team directory, the admin "teams without a roster" count) can show them. Run `db/verify-roster-backfill.ts` first: it prints how many rows steps (b) and (c) would add. If that is unwanted, delete those two statements from 0060 before applying; nothing else depends on them in this phase.
+**What breaks if the code is deployed before 0060/0061:** every page that reads rosters, teams, standings or matches fails (the new queries select `rosters.school_id/game_id/season_id` and read `season_schools`, which do not exist): the public team directory, school team pages, standings, schedule, hub, archive, home results, the manager portal, and the whole staff portal's roster/season/match screens. Vercel deploys on merge, so either apply 0060/0061 immediately before merging, or hold the deploy. Between merging and migrating there is no partial mode.
 
-`roster_standings` is deliberately not widened in this phase (it selects explicit columns, so adding columns to `rosters` does not change it).
+### Deviations to know about
 
-## Code in this phase
+- Steps 5(b)/(c) of 0060 add `season_schools` rows (with no rosters) for schools that only appear in archived standings or tournaments. They exist so snapshot-based public reads can require membership; they can make those schools appear in the public team directory for those seasons. `db/verify-roster-backfill.ts` prints how many it would add before anything is applied.
+- Anything that lists schools by `teams` for a season sees these rows.
 
-`schema.ts` declares the three columns with FKs and indexes; `teamId` stays `notNull` in the TypeScript type only so every reader and writer is unchanged (the database column is nullable). Every roster writer now sets the three columns explicitly (add-school, generate-season, the staff roster editor, the manager portal, the gold seed); the trigger is the safety net for anything that does not.
+## Behaviour
+
+- **Add school** (`addSchoolToSeason`): per-(season, school) advisory lock; find-or-create the membership row; create only the rosters the game fields that the school does not already have for that season; audit `restore_school_to_season` when it brings back existing rosters.
+- **Remove school** (`removeSchoolFromSeason`): deletes the membership row only, audited (`remove_school_from_season`), idempotent, refreshes public caches. Rosters, players and every match are untouched. League Setup shows a confirm dialog and the tile action; the school page of a removed school disappears from the season, while Schools & Rosters still lists its rosters flagged "Not in this season".
+- **Public visibility**: team directory, school team page and computed standings join `season_schools`; snapshot standings (divisions, hub summary, archive champion) join it through `snapshotMember`; every public match query LEFT JOINs the membership of each side and requires both (`bothMembers`); staff match lists omit that requirement. The archive match count counts only fixtures between two members.
+- **Manager portal**: `assertManagerForRoster` reads the roster's own scope and requires membership for non-staff; match-result and reschedule actions refuse a manager when either side is not a member (staff exempt); manager roster creation requires membership (it no longer creates one); a player's join link stops working when the school is no longer in the invite's season.
+- **Sibling rule and locks** key on the scope (`scopeKey`: school, game, season) instead of the team id.
+- **Scheduling**: Schedule match and Generate season refuse a school that is not a member; Generate reads rosters by school/season.
+- **League deletes**: `deleteSeasonInDb` / `deleteGameInDb` refuse when matches exist and otherwise delete players, rosters, then the season/game, explicitly.
+- **seed-gold** keys rosters by (school, game, season, name); the purge script reads `rosters.season_id` and `season_schools`.
 
 ## Verification
 
-`db/verify-roster-backfill.ts` (`npm run db:verify:roster-backfill`) is read-only (SELECTs only, `--dry-run` is the default and only mode), goes through `assertSeedTargetAllowed()`, and prints counts per game and season: rosters, unscoped, scope-vs-team mismatches, no-team, no-membership, plus the membership rows step 5 would still add. No names, emails or ids. Exit code 1 if the migration is missing or any roster is unscoped or inconsistent. **It has not been run.**
-
-## Tests
-
-`app/lib/db/__tests__/rosters-scope-expand-pglite.test.ts` applies every migration to an in-memory PGlite and checks: the columns and indexes, the dropped FK and nullable `team_id`, that deleting a team keeps its roster and player, that deleting a season still removes its rosters, the trigger (fills old-style inserts, leaves explicit values alone), the backfill of a legacy unscoped roster, membership backfill from standings and tournaments, and that re-running the file changes nothing. `db/__tests__/verify-roster-backfill.test.ts` covers the report. `roster-edit-actions.test.ts` and `add-school-to-season.test.ts` assert the writers set the new columns.
+- PGlite tests apply the real migrations: `rosters-scope-expand-pglite` (0060 backfill, FK drop, trigger, idempotent re-runs), `rosters-contract-pglite` (the gap schema end to end through the new code: add/remove/restore via the view, a public read; the final schema; re-running 0061 and 0062; public match list hiding a removed school; restore; explicit season deletes), plus the existing roster-removal, purge and student-ID suites on the final schema.
+- `db/verify-roster-backfill.ts` (`npm run db:verify:roster-backfill`) is read-only and gated by `assertSeedTargetAllowed()`; it is for the state after 0060/0061 and has not been run against anything.
+- Local run: [docs/dev/LOCAL_DB.md](../docs/dev/LOCAL_DB.md) (`npm run db:local:start`, `db:local:seed`, `dev:local`). The seed is tested against both schema stages.
 
 ## Not verified
 
-Nothing here ran against a real database; PGlite is not Supabase (the `auth` schema and roles are stand-ins, RLS policies are not exercised). The trigger's `SECURITY DEFINER` behaviour under Supabase roles and the real constraint name dropped in step 3 are worth a look on a restored backup before production.
+No migration has run on Supabase; PGlite is not Supabase (the `auth` schema and roles are stand-ins, and RLS policies are only loaded, not exercised). The 0062 policy rewrite and the `season_schools` view grants should be rehearsed on a restored backup. The local app was started against the local database and served public pages, but the single-connection fix (`DATABASE_POOL_MAX=1`) was not re-verified after it was added. Browser verification of the new screens was not done.
