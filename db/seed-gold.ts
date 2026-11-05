@@ -27,8 +27,8 @@
  *
  * Keys come from migration 0026 (members.member_key, matches.source_key,
  * season_standings.source_key) and the unique indexes already on games.slug,
- * schools.slug, seasons(game_id,name), teams(school_id,game_id,season_id),
- * rosters(team_id,name) and players(roster_id,member_id). db/gold-keys.ts is the
+ * schools.slug, seasons(game_id,name), season_schools(school_id,game_id,season_id),
+ * rosters(school_id,game_id,season_id,name) and players(roster_id,member_id). db/gold-keys.ts is the
  * single definition of the three archive keys — the migration's backfill and
  * these upserts have to derive the identical string or nothing matches.
  *
@@ -248,28 +248,28 @@ export async function calculateGoldDiff(
   });
 
   // 5. Rosters
+  // A roster is keyed by the school, game and season it belongs to plus its name (spec-060).
   const existingRosters = await db.select({
     id: schema.rosters.id,
-    teamId: schema.rosters.teamId,
+    schoolId: schema.rosters.schoolId,
+    gameId: schema.rosters.gameId,
+    seasonId: schema.rosters.seasonId,
     name: schema.rosters.name,
     division: schema.rosters.division,
   }).from(schema.rosters);
   const existingRostersByKey = new Map(
-    existingRosters.map((r) => [`${r.teamId}|${r.name}`, r])
+    existingRosters.map((r) => [`${r.schoolId}|${r.gameId}|${r.seasonId}|${r.name}`, r])
   );
   let rostersInsert = 0, rostersUpdate = 0, rostersUnchanged = 0;
   for (const r of rosterRows) {
     const school = existingSchoolsBySlug.get(r.school_slug);
     const game = existingGamesBySlug.get(r.game_slug);
     const seasonObj = game ? existingSeasonsByKey.get(`${game.id}|${r.season}`) : undefined;
-    const teamId = (school && game && seasonObj)
-      ? teamIdByKey.get(`${school.id}|${game.id}|${seasonObj.id}`)
-      : undefined;
-    if (!teamId) {
+    if (!(school && game && seasonObj)) {
       rostersInsert++;
       continue;
     }
-    const ext = existingRostersByKey.get(`${teamId}|${r.division}`);
+    const ext = existingRostersByKey.get(`${school.id}|${game.id}|${seasonObj.id}|${r.division}`);
     if (!ext) {
       rostersInsert++;
     } else if (ext.division !== r.division) {
@@ -349,10 +349,9 @@ export async function calculateGoldDiff(
     const school = existingSchoolsBySlug.get(p.school_slug);
     const game = existingGamesBySlug.get(p.game_slug);
     const seasonObj = game ? existingSeasonsByKey.get(`${game.id}|${p.season}`) : undefined;
-    const teamId = (school && game && seasonObj)
-      ? teamIdByKey.get(`${school.id}|${game.id}|${seasonObj.id}`)
+    const roster = (school && game && seasonObj)
+      ? existingRostersByKey.get(`${school.id}|${game.id}|${seasonObj.id}|${p.division}`)
       : undefined;
-    const roster = teamId ? existingRostersByKey.get(`${teamId}|${p.division}`) : undefined;
     if (!roster) {
       playersInsert++;
       continue;
@@ -709,7 +708,6 @@ async function main() {
       return [`${season}|${gameSlugById.get(t.gameId)}|${schoolSlugById.get(t.schoolId)}`, t];
     })
   );
-  const teamKeyById = new Map([...teamByKey].map(([key, t]) => [t.id, key]));
   console.log(`  teams:            ${teams.length}`);
 
   // 6. Rosters — keyed (team_id, name); name doubles as the division label
@@ -729,16 +727,15 @@ async function main() {
       };
     }))
     .onConflictDoUpdate({
-      target: [schema.rosters.teamId, schema.rosters.name],
+      target: [schema.rosters.schoolId, schema.rosters.gameId, schema.rosters.seasonId, schema.rosters.name],
       set: { division: sql`excluded.division` },
     })
     .returning();
   const rosterByKey = new Map(
     rosters.map((r) => {
-      // teamKey is `${season}|${gameSlug}|${schoolSlug}`; rosterKey wants those
-      // three plus the division, in a different order.
-      const [season, gameSlug, schoolSlug] = teamKeyById.get(r.teamId)!.split('|');
-      return [rosterKey(season, gameSlug, schoolSlug, r.name), r];
+      // rosterKey wants the season name, game slug and school slug plus the division.
+      const season = seasonKeyById.get(r.seasonId)!.split('|')[1];
+      return [rosterKey(season, gameSlugById.get(r.gameId)!, schoolSlugById.get(r.schoolId)!, r.name), r];
     })
   );
   console.log(`  rosters:          ${rosters.length}`);

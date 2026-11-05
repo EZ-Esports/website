@@ -25,8 +25,7 @@ function snap(over: Partial<Snapshot> = {}): Snapshot {
   return {
     members: [],
     players: [],
-    rosters: [{ id: 'r-act', teamId: 't-act' }, { id: 'r-past', teamId: 't-past' }],
-    teams: [{ id: 't-act', seasonId: 's-act' }, { id: 't-past', seasonId: 's-past' }],
+    rosters: [{ id: 'r-act', seasonId: 's-act' }, { id: 'r-past', seasonId: 's-past' }],
     seasons: [{ id: 's-act', name: '2026-27', isActive: true }, { id: 's-past', name: '2025-26', isActive: false }],
     rescheduleRequests: [],
     rescheduleOptions: [],

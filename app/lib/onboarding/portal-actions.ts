@@ -1488,7 +1488,7 @@ export async function enrollPlayerToRoster(
     .where(and(eq(schema.players.rosterId, rosterId), eq(schema.players.memberId, memberId)))
     .limit(1);
   const alreadyOnTeam =
-    Boolean(alreadyOnThisRoster) || Boolean(await siblingEnrollment(team.id, memberId, rosterId));
+    Boolean(alreadyOnThisRoster) || Boolean(await siblingEnrollment(team, memberId, rosterId));
   if (!managerContext.isStaffAdmin && !alreadyOnTeam) {
     const applications = await db
       .select({
@@ -1551,7 +1551,7 @@ export async function enrollPlayerToRoster(
   const conflict = await db.transaction(async (tx) => {
     // Serialize enrolls and moves of this member within the team so the sibling check below
     // cannot race another write.
-    await lockRosterMember(tx, team.id, memberId);
+    await lockRosterMember(tx, team, memberId);
     // Then the roster lock (always in this order) so the size count below cannot race another add.
     await lockRoster(tx, rosterId);
 
@@ -1569,7 +1569,7 @@ export async function enrollPlayerToRoster(
     // League rule: one tier per game. A member already on a sibling roster is moved, not
     // double-enrolled. A row already on THIS roster is a role/IGN edit and stays allowed.
     if (!existingPlayer) {
-      const sibling = await siblingEnrollment(team.id, memberId, rosterId, tx);
+      const sibling = await siblingEnrollment(team, memberId, rosterId, tx);
       if (sibling) {
         return siblingConflictMessage(`${member.firstName} ${member.lastName}`, sibling.rosterName, roster.name);
       }
@@ -1794,7 +1794,7 @@ export async function movePlayerToRoster(
   }
 
   const outcome = await db.transaction(async (tx) => {
-    await lockRosterMember(tx, from.team.id, lockMemberId!);
+    await lockRosterMember(tx, from.team, lockMemberId!);
     // Count the TARGET roster under its own lock (after the member lock, same order as enroll).
     await lockRoster(tx, toRosterId);
 

@@ -13,7 +13,7 @@ const one = async <T = { id: string }>(text: string, params: unknown[] = []) => 
 
 beforeAll(async () => {
   client = new PGlite();
-  await applyMigrations(client);
+  await applyMigrations(client, { through: '0060_rosters_scope_expand' });
 });
 afterAll(async () => {
   await client.close();

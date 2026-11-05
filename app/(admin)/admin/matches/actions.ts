@@ -4,6 +4,7 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { inScope } from '@/app/lib/db/season-membership';
 import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { parseEastern } from '@/app/lib/dates';
@@ -35,21 +36,26 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
   }
 
   try {
-    // Both rosters must belong to teams registered in the selected season (and the
+    // Both rosters must belong to the selected season (and the
     // same game) — guard against stale/crafted submits that would corrupt standings.
     const rosterTeams = await db
       .select({
         rosterId: schema.rosters.id,
-        seasonId: schema.seasonSchools.seasonId,
-        gameId: schema.seasonSchools.gameId,
+        seasonId: schema.rosters.seasonId,
+        gameId: schema.rosters.gameId,
         division: schema.rosters.division,
+        memberId: schema.seasonSchools.id,
       })
       .from(schema.rosters)
-      .innerJoin(schema.seasonSchools, eq(schema.rosters.teamId, schema.seasonSchools.id))
+      .leftJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
       .where(inArray(schema.rosters.id, [homeRosterId, awayRosterId]));
 
     if (rosterTeams.length !== 2) {
-      return { success: false, error: 'Both rosters must exist and belong to a registered team.' };
+      return { success: false, error: 'Both rosters must exist.' };
+    }
+    // Both schools must be members of the season: a school staff removed from it cannot be scheduled.
+    if (rosterTeams.some((r) => !r.memberId)) {
+      return { success: false, error: 'A selected school is not part of this season. Add it in League Setup first.' };
     }
     if (!rosterTeams.every((r) => r.seasonId === seasonId)) {
       return { success: false, error: 'Both rosters must belong to teams in the selected season.' };

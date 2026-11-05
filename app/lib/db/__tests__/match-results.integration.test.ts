@@ -52,8 +52,8 @@ describe.skipIf(!enabled)('match results against a real Postgres', () => {
     const rosters = await db
       .insert(schema.rosters)
       .values([
-        { teamId: teams[0].id, name: 'Varsity', division: 'A' },
-        { teamId: teams[1].id, name: 'Varsity', division: 'A' },
+        { schoolId: home.id, gameId, seasonId, name: 'Varsity', division: 'A' },
+        { schoolId: away.id, gameId, seasonId, name: 'Varsity', division: 'A' },
       ])
       .returning({ id: schema.rosters.id });
     const [match] = await db

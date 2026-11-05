@@ -421,6 +421,20 @@
       "when": 1790882000016,
       "tag": "0060_rosters_scope_expand",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790882000017,
+      "tag": "0061_rosters_scope_constrain",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1790882000018,
+      "tag": "0062_rosters_scope_contract",
+      "breakpoints": true
     }
   ]
 }

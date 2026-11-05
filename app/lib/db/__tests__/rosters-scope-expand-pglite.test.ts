@@ -39,7 +39,7 @@ const team = async (schoolId: string, season = seasonId) =>
 
 beforeAll(async () => {
   client = new PGlite();
-  const report = await applyMigrations(client);
+  const report = await applyMigrations(client, { through: '0060_rosters_scope_expand' });
   expect(report.skipped.filter((s) => s.file === '0060_rosters_scope_expand')).toEqual([]);
   gameId = (await one(`insert into games (slug, display_name, short_name) values ('valorant', 'Valorant', 'VAL') returning id`)).id;
   seasonId = (await one(`insert into seasons (game_id, name) values ($1, '2026-27') returning id`, [gameId])).id;

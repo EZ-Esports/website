@@ -106,8 +106,8 @@ describe('buildSeasonPlan', () => {
         { id: 't1', schoolId: 'school-01' },
       ],
       existingRosters: [
-        { id: 'r0', teamId: 't0', name: 'Varsity', division: 'A' },
-        { id: 'r1', teamId: 't1', name: 'JV', division: 'B' },
+        { id: 'r0', schoolId: 'school-00', name: 'Varsity', division: 'A' },
+        { id: 'r1', schoolId: 'school-01', name: 'JV', division: 'B' },
       ],
     });
     expect(plan.teamsToCreate.map((s) => s.id)).not.toContain('school-00');
@@ -144,12 +144,12 @@ describe('buildSeasonPlan', () => {
   });
 
   describe('existing teams and rosters never error and are left untouched', () => {
-    const plan = (rosters: Array<{ id: string; teamId: string; name: string; division: string }>, teams = [{ id: 't0', schoolId: 'school-00' }]) =>
+    const plan = (rosters: Array<{ id: string; schoolId: string; name: string; division: string }>, teams = [{ id: 't0', schoolId: 'school-00' }]) =>
       buildSeasonPlan({ ...base, existingTeams: teams, existingRosters: rosters });
     const created = (p: ReturnType<typeof plan>) => p.rostersToCreate.find((s) => s.id === 'school-00');
 
     it('(a) reuses a team with a roster in the division', () => {
-      const p = plan([{ id: 'r0', teamId: 't0', name: 'Main', division: 'A' }]);
+      const p = plan([{ id: 'r0', schoolId: 'school-00', name: 'Main', division: 'A' }]);
       expect(p.reusedRosters).toEqual([{ id: 'school-00', name: 'Name school-00', rosterName: 'Main' }]);
       expect(created(p)).toBeUndefined();
       expect(p.teamsToCreate.map((s) => s.id)).not.toContain('school-00');
@@ -157,15 +157,15 @@ describe('buildSeasonPlan', () => {
 
     it('(a) with several rosters in the division, deterministically uses the first by name', () => {
       const p = plan([
-        { id: 'r1', teamId: 't0', name: 'Beta', division: 'A' },
-        { id: 'r0', teamId: 't0', name: 'Alpha', division: 'Varsity' },
+        { id: 'r1', schoolId: 'school-00', name: 'Beta', division: 'A' },
+        { id: 'r0', schoolId: 'school-00', name: 'Alpha', division: 'Varsity' },
       ]);
       expect(p.reusedRosters[0].rosterName).toBe('Alpha');
       expect(created(p)).toBeUndefined();
     });
 
     it('(b) creates only the roster when the team has none in the division', () => {
-      const p = plan([{ id: 'r0', teamId: 't0', name: 'JV', division: 'B' }]);
+      const p = plan([{ id: 'r0', schoolId: 'school-00', name: 'JV', division: 'B' }]);
       expect(created(p)?.rosterName).toBe('Varsity');
       expect(p.teamsToCreate.map((s) => s.id)).not.toContain('school-00');
     });
@@ -179,8 +179,8 @@ describe('buildSeasonPlan', () => {
 
     it('(d) picks a non-colliding name when the division name is taken by another division', () => {
       const p = plan([
-        { id: 'r0', teamId: 't0', name: 'Varsity', division: 'B' },
-        { id: 'r1', teamId: 't0', name: 'Varsity 2', division: 'B' },
+        { id: 'r0', schoolId: 'school-00', name: 'Varsity', division: 'B' },
+        { id: 'r1', schoolId: 'school-00', name: 'Varsity 2', division: 'B' },
       ]);
       expect(created(p)?.rosterName).toBe('Varsity 3');
     });

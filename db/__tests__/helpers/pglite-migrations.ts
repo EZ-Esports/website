@@ -14,8 +14,14 @@ export interface MigrationReport {
  * cannot run (extensions, policies that name the Supabase `auth` schema, roles) is skipped and
  * reported; tables, constraints, FKs and ON DELETE behaviour are applied as written.
  */
-export async function applyMigrations(db: PGlite): Promise<MigrationReport> {
+export async function applyMigrations(db: PGlite, opts: { through?: string } = {}): Promise<MigrationReport> {
   const journal = JSON.parse(readFileSync(resolve(DIR, 'meta/_journal.json'), 'utf8')) as { entries: { tag: string }[] };
+  // `through`: stop after this migration tag (inclusive), to test the schema as it stands at an earlier phase.
+  if (opts.through) {
+    const last = journal.entries.findIndex((e) => e.tag === opts.through);
+    if (last < 0) throw new Error(`Unknown migration tag ${opts.through}`);
+    journal.entries = journal.entries.slice(0, last + 1);
+  }
   // Stand-ins for what Supabase provides, so policies and grants load instead of being skipped.
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
