@@ -140,8 +140,8 @@ export const seasons = pgTable('seasons', {
 // A school's membership in a specific game/season (spec-060). One row per (school, game, season) and
 // nothing hangs off it: rosters, players and matches belong to the school and season on their own, so
 // deleting a membership row (staff "Remove school") never touches them. The physical table is renamed
-// from `teams` by migration 0062; between migration 0061 and 0062 `season_schools` is a simple
-// auto-updatable view over `teams` (created by 0061), so this one definition works against both.
+// from `teams` by migration 0061; between migration 0060 and 0061 `season_schools` is a simple
+// auto-updatable view over `teams` (created by 0060), so this one definition works against both.
 export const seasonSchools = pgTable('season_schools', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id')

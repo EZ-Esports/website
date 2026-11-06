@@ -1,7 +1,7 @@
 # Running the site against a local database
 
 `.env` points at the production database, and production does not have the roster-redesign schema
-(migrations 0060 to 0062, [spec-060](../../spec/spec-060-school-owned-season-rosters.md)) until someone
+(migrations 0060 and 0061, [spec-060](../../spec/spec-060-school-owned-season-rosters.md)) until someone
 applies it. So the app cannot run on `.env` as it is. This is a safe local alternative: a throwaway Postgres
 (PGlite served over a loopback socket) with every migration applied and invented sample data. It never reads
 `.env`, never connects to a remote host, and keeps its data in the git-ignored `.local-db/` folder.
@@ -12,7 +12,7 @@ Open two terminals in the repo root (run `npm install` once first: it adds `@ele
 
 ```bash
 # Terminal 1: the database. Leave it running. Ctrl+C stops it.
-npm run db:local:start -- --fresh        # builds the schema through migration 0061 and listens on 127.0.0.1:54329
+npm run db:local:start -- --fresh        # builds the schema through migration 0060 (the deploy gap) and listens on 127.0.0.1:54329
 
 # Terminal 2:
 npm run db:local:seed                    # invented schools, rosters, players, matches, standings
@@ -29,8 +29,8 @@ npm run db:local:grant-owner -- you@example.com
 and refresh `/admin`. Sign-in itself goes to the Supabase project in `.env` (only Postgres is local); the
 sample seed has no Supabase users.
 
-Options for the first command: `--through 0062` builds the final schema instead of the deploy gap (the state
-between "0060 and 0061 applied, new code live" and "0062 applied"; both must work, default is 0061),
+Options for the first command: `--through 0061` builds the final schema instead of the deploy gap (the state
+between "0060 applied, new code live" and "0061 applied"; both must work, default is 0060),
 `--fresh` deletes `.local-db` first (needed to change `--through` or reseed), `--port N` changes the port
 (set `LOCAL_DATABASE_URL` for the other commands if you do).
 
@@ -55,6 +55,10 @@ there (signing in, creating an invite that emails someone, uploading a student I
 Supabase. Use only test addresses and fake data in those flows, and do not run onboarding with a real
 student or manager. League Setup, rosters, matches and the public pages (everything this sample data is for)
 touch only the local database.
+
+## Before running the real migrations
+
+There are two: `0060` (expand + backfill + constrain, applied BEFORE the deploy) and `0061` (contract, applied AFTER). `0060` runs in one transaction, so if a constraint fails the whole backfill rolls back and nothing is left half-done. Because that failure only shows at the end, rehearse on a restored backup of production first (a throwaway Postgres loaded from a `pg_dump`, never production itself), and run the read-only `npm run db:verify:roster-backfill` before (a preview of the backfill) and after (a confirmation). That script, like the migrations, is only ever pointed at a database the owner names.
 
 ## Safety
 

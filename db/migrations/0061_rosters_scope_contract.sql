@@ -1,14 +1,14 @@
--- spec-060, phase 3 of 3 (CONTRACT): drop rosters.team_id and finish the rename `teams` -> `season_schools`.
+-- spec-060, migration 2 of 2 (CONTRACT): drop rosters.team_id and finish the rename `teams` -> `season_schools`.
 --
 -- Hand-written like 0043 onward. Idempotent: guarded, so re-running it changes nothing.
 --
--- DEPLOY ORDER: apply this AFTER the code that goes with 0060/0061 is live. Until then the old code (and the
--- compatibility view from 0061) still read `teams` and `rosters.team_id`. The new code never touches either, and it
--- uses the name `season_schools` that exists both as 0061's view and as this file's renamed table, so it keeps
+-- DEPLOY ORDER: apply this AFTER the code that goes with 0060 is live. Until then the old code (and the
+-- compatibility view from 0060) still read `teams` and `rosters.team_id`. The new code never touches either, and it
+-- uses the name `season_schools` that exists both as 0060's view and as this file's renamed table, so it keeps
 -- working across this migration. Nothing here deletes a row of data. The migrator runs the whole file in one
 -- transaction, so the view/table swap is atomic.
 
--- 1. The membership table takes its final name: drop 0061's compatibility view, rename the table, rename its indexes.
+-- 1. The membership table takes its final name: drop 0060's compatibility view, rename the table, rename its indexes.
 DO $$
 BEGIN
   IF (SELECT relkind FROM pg_class WHERE oid = to_regclass('public.season_schools')) = 'v' THEN

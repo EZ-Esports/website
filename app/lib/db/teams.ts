@@ -71,8 +71,8 @@ async function rostersOfMembers(memberIds: string[]) {
 }
 
 /**
- * Count teams that do not yet have a single roster created, in ACTIVE seasons only: archived seasons
- * carry empty memberships backfilled for their standings snapshots, which are not work to do.
+ * Count teams that do not yet have a single roster created, in ACTIVE seasons only: this is a to-do list for
+ * staff, and an archived season is no longer work to do. (Public pages do not use it: they list every member.)
  */
 export const countTeamsWithoutRoster = async (): Promise<number> => {
   const [row] = await db
@@ -251,8 +251,7 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
       schoolsMap.set(t.schoolId, school);
     }
     const rosters = rostersByTeam.get(t.teamId) || [];
-    // A membership with no rosters (e.g. one backfilled for an archived standings snapshot) is not a season entry.
-    if (rosters.length === 0) return;
+    // Public visibility is season membership only (spec-060): a member school with no rosters yet is still listed.
     school.seasons.push({
       seasonId: t.seasonId,
       seasonName: t.seasonName,
@@ -261,9 +260,7 @@ export async function getGameTeamsPageData(gameSlug: string): Promise<PublicScho
     });
   });
 
-  return Array.from(schoolsMap.values()).filter(
-    (s) => s.seasons.some((season) => season.rosters.length > 0)
-  );
+  return Array.from(schoolsMap.values());
 }
 
 export async function getSchoolGameTeamsPageData(
@@ -365,14 +362,13 @@ export async function getSchoolGameTeamsPageData(
     rostersByTeam.set(r.teamId, arr);
   });
 
-  const seasonsList: PublicSeasonTeamSnapshot[] = teamsList
-    .map((t) => ({
-      seasonId: t.seasonId,
-      seasonName: t.seasonName,
-      isSeasonActive: t.isSeasonActive,
-      rosters: rostersByTeam.get(t.teamId) || [],
-    }))
-    .filter((s) => s.rosters.length > 0);
+  // Every season the school is a member of is listed, even one with no rosters yet.
+  const seasonsList: PublicSeasonTeamSnapshot[] = teamsList.map((t) => ({
+    seasonId: t.seasonId,
+    seasonName: t.seasonName,
+    isSeasonActive: t.isSeasonActive,
+    rosters: rostersByTeam.get(t.teamId) || [],
+  }));
 
   return {
     schoolId: matchedSchoolRow.id,

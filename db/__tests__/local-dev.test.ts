@@ -22,14 +22,14 @@ describe('local-dev target guard', () => {
   });
 
   it('parses server flags and rejects unknown ones', () => {
-    expect(parseServerArgs([])).toEqual({ through: '0061', fresh: false, port: 54329 });
-    expect(parseServerArgs(['--through', '0062', '--fresh', '--port', '54400'])).toEqual({ through: '0062', fresh: true, port: 54400 });
+    expect(parseServerArgs([])).toEqual({ through: '0060', fresh: false, port: 54329 });
+    expect(parseServerArgs(['--through', '0061', '--fresh', '--port', '54400'])).toEqual({ through: '0061', fresh: true, port: 54400 });
     expect(() => parseServerArgs(['--through', '0099'])).toThrow();
     expect(() => parseServerArgs(['--nope'])).toThrow(/Unknown/);
   });
 });
 
-describe.each([['0061'], ['0062']] as const)('sample data over the socket server (schema through %s)', (through) => {
+describe.each([['0060'], ['0061']] as const)('sample data over the socket server (schema through %s)', (through) => {
   let pg: PGlite;
   let server: PGLiteSocketServer;
   let sql: postgres.Sql;

@@ -1,7 +1,7 @@
 /**
- * Migrations 0061 and 0062 (spec-060) and the new membership model, against an in-memory PGlite built from
- * db/migrations/*.sql. Nothing else is touched. Two schemas are exercised: the gap after 0061 (where
- * `season_schools` is a view over `teams`, so the new code works before the rename) and the final schema after 0062.
+ * Migrations 0060 and 0061 (spec-060) and the new membership model, against an in-memory PGlite built from
+ * db/migrations/*.sql. Nothing else is touched. Two schemas are exercised: the gap after 0060 (where
+ * `season_schools` is a view over `teams`, so the new code works before the rename) and the final schema after 0061.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'fs';
@@ -37,7 +37,7 @@ async function count(client: PGlite, text: string, params: unknown[] = []) {
   return Number((await one<{ c: string }>(client, `select count(*)::int as c from (${text}) q`, params)).c);
 }
 
-describe('the gap after 0061: season_schools is a view over teams', () => {
+describe('the gap after 0060: season_schools is a view over teams', () => {
   let client: PGlite;
   let game: string;
   let season: string;
@@ -46,7 +46,7 @@ describe('the gap after 0061: season_schools is a view over teams', () => {
 
   beforeAll(async () => {
     client = new PGlite();
-    const report = await applyMigrations(client, { through: '0061_rosters_scope_constrain' });
+    const report = await applyMigrations(client, { through: '0060_rosters_scope_expand_constrain' });
     expect(report.skipped.filter((s) => /0060|0061/.test(s.file))).toEqual([]);
     game = (await one(client, `insert into games (slug, display_name, short_name) values ('valorant', 'Valorant', 'VAL') returning id`)).id;
     season = (await one(client, `insert into seasons (game_id, name) values ($1, '2026-27') returning id`, [game])).id;
@@ -122,13 +122,13 @@ describe('the gap after 0061: season_schools is a view over teams', () => {
     expect(rows.map((r) => r.schoolName)).toContain('Gamma HS');
   });
 
-  it('0061 is idempotent: running it again changes nothing and errors on nothing', async () => {
-    await rerun(client, '0061_rosters_scope_constrain');
+  it('0060 is idempotent: running it again changes nothing and errors on nothing', async () => {
+    await rerun(client, '0060_rosters_scope_expand_constrain');
     expect((await one<{ relkind: string }>(client, `select relkind from pg_class where relname = 'season_schools'`)).relkind).toBe('v');
   });
 });
 
-describe('the final schema after 0062', () => {
+describe('the final schema after 0061', () => {
   let client: PGlite;
   let db: ReturnType<typeof drizzle>;
   let game: string;
@@ -175,10 +175,9 @@ describe('the final schema after 0062', () => {
     expect(await count(client, `select 1 from pg_class where relname = 'teams' and relkind in ('r','v')`)).toBe(0);
   });
 
-  it('0061 and 0062 can both be re-run on the final schema without error or change', async () => {
+  it('0061 can be re-run on the final schema without error or change', async () => {
     const before = [await count(client, `select 1 from rosters`), await count(client, `select 1 from season_schools`)];
-    await rerun(client, '0061_rosters_scope_constrain');
-    await rerun(client, '0062_rosters_scope_contract');
+    await rerun(client, '0061_rosters_scope_contract');
     expect([await count(client, `select 1 from rosters`), await count(client, `select 1 from season_schools`)]).toEqual(before);
   });
 
@@ -222,7 +221,7 @@ describe('the final schema after 0062', () => {
     expect((await getMatchesPage({}, true)).items).toHaveLength(1);
   });
 
-  it('archived memberships without rosters do not appear in the public directory, the dashboard count or the season hub', async () => {
+  it('every member school is visible, rosters or not; the dashboard count only looks at active seasons', async () => {
     const { getGameTeamsPageData, countTeamsWithoutRoster } = await import('../teams');
     const { getSeasonSetupData } = await import('../season-setup');
     const archived = (await one(client, `insert into seasons (game_id, name, is_active) values ($1, '2020-21', false) returning id`, [game])).id;
@@ -237,13 +236,18 @@ describe('the final schema after 0062', () => {
     expect(await countTeamsWithoutRoster()).toBe(before); // archived seasons are not work to do
 
     const directory = await getGameTeamsPageData('valorant');
-    expect(JSON.stringify(directory)).not.toContain('Snapshot Only HS');
+    // Visibility is season membership only: a member with no rosters is listed, with an empty season.
+    const snapshotOnly = directory!.find((s) => s.schoolName === 'Snapshot Only HS')!;
+    expect(snapshotOnly.seasons).toEqual([expect.objectContaining({ seasonName: '2020-21', rosters: [] })]);
+    const { getSchoolGameTeamsPageData } = await import('../teams');
+    const detail = await getSchoolGameTeamsPageData('valorant', 'snapshot-only');
+    expect(detail!.seasons).toEqual([expect.objectContaining({ seasonName: '2020-21', rosters: [] })]);
     const alpha = directory!.find((s) => s.schoolName === 'Alpha HS')!;
     expect(alpha.seasons.map((s) => s.seasonName).sort()).toEqual(['2020-21', '2026-27']);
 
     const hub = await getSeasonSetupData(archived);
-    expect(hub!.schools.map((s) => s.schoolName)).toEqual(['Alpha HS']); // the empty snapshot membership is hidden
-    expect(hub!.schools[0].missing).toEqual([]); // and an archived season never asks for missing rosters
+    expect(hub!.schools.map((s) => s.schoolName).sort()).toEqual(['Alpha HS', 'Snapshot Only HS']); // members are listed
+    expect(hub!.schools.every((s) => s.missing.length === 0)).toBe(true); // but an archived season never asks for missing rosters
     expect(hub!.availableSchools.map((s) => s.name)).not.toContain('Snapshot Only HS'); // still a member, so not offered
 
     // An active season keeps asking: Beta HS has Varsity + JV, so give a school only Varsity.

@@ -140,6 +140,9 @@ export default function TeamsFilterClient({
   // Perform in-memory filtering
   const filteredSchools = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    // Membership alone makes a school visible (spec-060): a roster with no players, or a season with no rosters, is only
+    // dropped while a filter is narrowing the list to something it cannot match.
+    const pruneEmpty = q !== '' || selectedRole !== 'all' || captainsOnly || selectedDivision !== 'all';
 
     return normalizedSchoolGroups
       .map((school) => {
@@ -188,14 +191,14 @@ export default function TeamsFilterClient({
                   players: filteredPlayers,
                 };
               })
-              .filter((roster) => roster.players.length > 0);
+              .filter((roster) => !pruneEmpty || roster.players.length > 0);
 
             return {
               ...season,
               rosters: filteredRosters,
             };
           })
-          .filter((season) => season.rosters.length > 0);
+          .filter((season) => !pruneEmpty || season.rosters.length > 0);
 
         return {
           ...school,
@@ -447,6 +450,9 @@ export default function TeamsFilterClient({
 
                     {/* Divisions & Badges (Varsity 1st, Junior Varsity 2nd) */}
                     <div className="flex flex-wrap gap-1.5 pt-1">
+                      {divisions.length === 0 && (
+                        <span className="text-xs italic text-foreground-muted">No rosters registered yet.</span>
+                      )}
                       {divisions.map((divName) => (
                         <Badge key={divName} size="sm" variant="neutral">
                           {divName}

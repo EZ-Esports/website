@@ -3,12 +3,12 @@
  * over a loopback TCP socket, with every migration applied and its data kept in `.local-db/` (git-ignored).
  *
  * Why this exists: `.env` points at the production database, which does not have the roster-redesign schema
- * (migrations 0060 to 0062) yet, so the app cannot run against it. Nothing here reads `.env` or any remote URL;
+ * (migrations 0060 and 0061) yet, so the app cannot run against it. Nothing here reads `.env` or any remote URL;
  * the server only ever binds 127.0.0.1.
  *
  * Usage (see docs/dev/LOCAL_DB.md):
- *   npm run db:local:start                  migrate through 0061 (the deploy gap) and listen on 127.0.0.1:54329
- *   npm run db:local:start -- --through 0062   the final schema instead
+ *   npm run db:local:start                  migrate through 0060 (the deploy gap) and listen on 127.0.0.1:54329
+ *   npm run db:local:start -- --through 0061   the final schema instead
  *   npm run db:local:start -- --fresh       delete .local-db first (needed to change --through)
  *   npm run db:local:start -- --port 54400
  *
@@ -24,11 +24,10 @@ export const LOCAL_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 54329;
 export const LOCAL_DB_DIR = resolve(process.cwd(), '.local-db', 'pgdata');
 
-/** Migration tags a local database can stop at. 0061 is the schema between "migrations applied" and "contract applied". */
+/** Migration tags a local database can stop at. 0060 is the schema between "first migration applied" and "contract applied". */
 export const THROUGH_CHOICES = {
-  '0060': '0060_rosters_scope_expand',
-  '0061': '0061_rosters_scope_constrain',
-  '0062': '0062_rosters_scope_contract',
+  '0060': '0060_rosters_scope_expand_constrain',
+  '0061': '0061_rosters_scope_contract',
 } as const;
 export type ThroughChoice = keyof typeof THROUGH_CHOICES;
 
@@ -43,7 +42,7 @@ export interface ServerArgs {
 }
 
 export function parseServerArgs(argv: string[]): ServerArgs {
-  const args: ServerArgs = { through: '0061', fresh: false, port: DEFAULT_PORT };
+  const args: ServerArgs = { through: '0060', fresh: false, port: DEFAULT_PORT };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--fresh') args.fresh = true;

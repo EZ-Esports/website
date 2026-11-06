@@ -27,7 +27,7 @@ async function addInvite(id: string, school: string, game: string, status: strin
 describe('player_invites.season_id migration (0056)', () => {
   beforeAll(async () => {
     db = new PGlite();
-    const report = await applyMigrations(db, { through: '0060_rosters_scope_expand' });
+    const report = await applyMigrations(db, { through: '0060_rosters_scope_expand_constrain' });
     // The column and FK come from 0056 itself; nothing in it may be skipped.
     expect(report.skipped.filter((s) => s.file === '0056_player_invites_season')).toEqual([]);
 

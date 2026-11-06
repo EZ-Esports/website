@@ -260,10 +260,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## School-owned rosters and season membership (spec-060)
 
-- **DEPLOY ORDER: apply migrations `0060` and `0061` BEFORE deploying; apply `0062` AFTER the code is live.** Deploying first breaks every roster, team, standings and match read (the new queries select columns and a table that do not exist). Nothing has been applied anywhere.
-- Rehearse 0060 to 0062 on a restored backup first: PGlite is not Supabase (RLS policies are only loaded; the `season_schools` view grants and the rewritten policies are untested there).
-- 0060 step 5(b) adds empty membership rows for schools with an archived standings snapshot (kept out of the public directory, the dashboard count and the season hub); check `npm run db:verify:roster-backfill` for the count. Later migrations must have a journal `when` above 1790882000032.
-- `db/verify-roster-backfill.ts` is for the state after 0060/0061 (it reads `teams` and `rosters.team_id`); it is not meant for after 0062.
+- **DEPLOY ORDER: apply migration `0060` BEFORE deploying; apply `0061` AFTER the code is live.** Deploying first breaks every roster, team, standings and match read (the new queries select columns and a table that do not exist). Nothing has been applied anywhere.
+- 0060 runs in ONE transaction (expand, backfill and constraints together): a failed constraint rolls the whole backfill back. Rehearse 0060 and 0061 on a restored backup first: PGlite is not Supabase (RLS policies are only loaded; the `season_schools` view grants and the rewritten policies are untested there).
+- 0060 step 5(b) adds membership rows for schools with an archived standings snapshot and step 6 gives every membership its missing rosters (archived seasons included, empty rosters; the user accepts that these schools now appear in the public directory). The admin dashboard "teams without a roster" warning counts active seasons only. Check `npm run db:verify:roster-backfill` for the count. Later migrations must have a journal `when` above 1790882000031.
+- `db/verify-roster-backfill.ts` is for around 0060 (it reads `teams`): run it BEFORE 0060 for a read-only preview of the backfill, and AFTER 0060 to confirm; it is not meant for after 0061 (`teams` is gone).
 - Opponents' derived standings (the `roster_standings` view) keep counting played matches against a removed school by design.
 - The local dev server (`npm run dev:local`) runs the app on one database connection; a transaction that waits on a second connection would hang there (PGlite limit, not production).
 

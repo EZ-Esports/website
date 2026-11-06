@@ -13,10 +13,39 @@ const one = async <T = { id: string }>(text: string, params: unknown[] = []) => 
 
 beforeAll(async () => {
   client = new PGlite();
-  await applyMigrations(client, { through: '0060_rosters_scope_expand' });
+  await applyMigrations(client, { through: '0060_rosters_scope_expand_constrain' });
 });
 afterAll(async () => {
   await client.close();
+});
+
+describe('before the migration (preview)', () => {
+  it('previews the backfill and flags a roster that has no team to backfill from', async () => {
+    const pre = new PGlite();
+    await applyMigrations(pre, { through: '0058_school_email_student_id' });
+    const q: RowQuery = async (text) => (await pre.query(text)).rows as Record<string, unknown>[];
+    const o = async <T = { id: string }>(text: string, params: unknown[] = []) => (await pre.query(text, params)).rows[0] as T;
+    const game = (await o(`insert into games (slug, display_name, short_name) values ('valorant', 'Valorant', 'VAL') returning id`)).id;
+    const season = (await o(`insert into seasons (game_id, name) values ($1, '2026-27') returning id`, [game])).id;
+    const school = (await o(`insert into schools (name, slug) values ('Alpha HS', 'alpha') returning id`)).id;
+    const team = (await o(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school, game, season])).id;
+    await pre.query(`insert into rosters (team_id, name, division) values ($1, 'Varsity', 'A')`, [team]);
+    await pre.query(`insert into season_standings (season_id, school_id, division, rank) values ($1, $2, 'Varsity', 1)`, [season, (await o(`insert into schools (name, slug) values ('Beta HS', 'beta') returning id`)).id]);
+
+    const report = await loadReport(q);
+    expect(report.migrationApplied).toBe(false);
+    expect(report.preview?.scopes).toEqual([{ game: 'valorant', season: '2026-27', rosters: 1, noTeam: 0 }]);
+    expect(report.missingMembership.standings).toBe(1);
+    // Alpha has a Varsity roster only, so JV is the one roster step 6 will add; the archived Beta membership is not a membership yet.
+    expect(report.rostersToAdd).toEqual([{ game: 'valorant', season: '2026-27', count: 1 }]);
+    expect(isHealthy(report)).toBe(true);
+    const text = formatReport(report);
+    expect(text).toContain('PREVIEW');
+    expect(text).toContain('ONE transaction');
+    expect(text).toContain('Rosters it will add');
+    expect(text).not.toMatch(/alpha|beta|@/i);
+    await pre.close();
+  });
 });
 
 describe('verify-roster-backfill', () => {
@@ -42,24 +71,24 @@ describe('verify-roster-backfill', () => {
     const report = await loadReport(query);
     expect(report.migrationApplied).toBe(true);
     expect(report.scopes).toEqual([{ game: 'valorant', season: '2026-27', rosters: 1, unscoped: 0, mismatched: 0, noTeam: 0, noMembership: 0 }]);
+    expect(report.rostersToAdd).toEqual([{ game: 'valorant', season: '2026-27', count: 1 }]); // JV is still missing
     expect(isHealthy(report)).toBe(true);
     expect(formatReport(report)).toContain('OK: every roster is scoped');
   });
 
-  it('flags an unscoped roster and a roster that disagrees with its team, with counts only', async () => {
+  it('flags a roster that disagrees with its team, with counts only', async () => {
     const game = (await one<{ id: string }>(`select id from games where slug = 'valorant'`)).id;
     const season = (await one<{ id: string }>(`select id from seasons where name = '2026-27'`)).id;
     const other = (await one(`insert into schools (name, slug) values ('Beta HS', 'beta') returning id`)).id;
     const team = (await one<{ id: string }>(`select id from teams limit 1`)).id;
     await client.exec(`alter table rosters disable trigger rosters_fill_scope_trg`);
-    await client.query(`insert into rosters (team_id, name, division) values ($1, 'Legacy', 'A')`, [team]); // unscoped
     await client.query(`insert into rosters (team_id, school_id, game_id, season_id, name, division) values ($1, $2, $3, $4, 'Wrong', 'A')`, [team, other, game, season]); // mismatched
     await client.exec(`alter table rosters enable trigger rosters_fill_scope_trg`);
 
     const report = await loadReport(query);
     expect(isHealthy(report)).toBe(false);
     const row = report.scopes.find((s) => s.game === 'valorant' && s.season === '2026-27')!;
-    expect(row.unscoped).toBeGreaterThanOrEqual(1);
+    expect(row.unscoped).toBe(0); // the migration made the scope columns NOT NULL
     expect(row.mismatched).toBeGreaterThanOrEqual(1);
     const text = formatReport(report);
     expect(text).toContain('PROBLEM');

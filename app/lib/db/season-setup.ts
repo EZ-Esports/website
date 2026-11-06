@@ -149,9 +149,8 @@ export async function getSeasonSetupData(seasonId: string): Promise<SeasonSetupD
       missing: season.isActive ? missingDivisions(season.gameSlug, rosters) : [],
     };
   });
-  // Archived seasons carry memberships backfilled only for their standings snapshots; a school with no
-  // rosters there (and so no matches) is not shown as a tile, though it still counts as a member.
-  const schools = season.isActive ? all : all.filter((s) => s.rosters.length > 0);
+  // Every member is listed (spec-060): season membership alone decides who is in a season, rosters or not.
+  const schools = all;
 
   const inSeason = new Set(all.map((s) => s.schoolId));
   return {
