@@ -2,7 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { canonicalGameSlug } from '../constants';
 import { areOutcomesPublic } from '../season-outcomes';
 
@@ -99,8 +99,44 @@ export async function updateGameInDb(
   return res[0];
 }
 
+/**
+ * A delete refused on purpose (the game or season has matches). Its message is written for staff and is
+ * shown as is; the action layer recognises it by `name`, not by class, so test mocks of this module stay valid.
+ */
+export class DeleteRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DeleteRefusedError';
+  }
+}
+
 export async function deleteGameInDb(id: string) {
-  await db.delete(schema.games).where(eq(schema.games.id, id));
+  await db.transaction(async (tx) => {
+    // Refused, never cascaded: a game with matches keeps its rosters, players and scores until the
+    // matches are removed on purpose (matches -> rosters is RESTRICT, spec-060).
+    const [matchCount] = await tx
+      .select({ count: count() })
+      .from(schema.matches)
+      .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+      .where(eq(schema.seasons.gameId, id));
+    if ((matchCount?.count ?? 0) > 0) {
+      throw new DeleteRefusedError('Cannot delete a game with existing matches. Please delete its matches first.');
+    }
+    // Rosters belong to the school, game and season themselves, so nothing reaches them through a
+    // membership row any more: delete them (and their players) explicitly, then the game.
+    await deleteRostersWhere(tx, eq(schema.rosters.gameId, id));
+    await tx.delete(schema.games).where(eq(schema.games.id, id));
+  });
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Deletes the players of the matching rosters, then the rosters. Callers have already refused when matches exist. */
+async function deleteRostersWhere(tx: Tx, where: ReturnType<typeof eq>) {
+  const ids = (await tx.select({ id: schema.rosters.id }).from(schema.rosters).where(where)).map((r) => r.id);
+  if (ids.length === 0) return;
+  await tx.delete(schema.players).where(inArray(schema.players.rosterId, ids));
+  await tx.delete(schema.rosters).where(inArray(schema.rosters.id, ids));
 }
 
 export async function createSeasonInDb(values: {
@@ -174,14 +210,19 @@ export async function updateSeasonInDb(
 }
 
 export async function deleteSeasonInDb(id: string) {
-  const matchCount = await db
-    .select({ count: count() })
-    .from(schema.matches)
-    .where(eq(schema.matches.seasonId, id));
+  await db.transaction(async (tx) => {
+    const matchCount = await tx
+      .select({ count: count() })
+      .from(schema.matches)
+      .where(eq(schema.matches.seasonId, id));
 
-  if ((matchCount[0]?.count ?? 0) > 0) {
-    throw new Error('Cannot delete season with existing matches. Please reassign or delete matches first.');
-  }
+    if ((matchCount[0]?.count ?? 0) > 0) {
+      throw new DeleteRefusedError('Cannot delete season with existing matches. Please reassign or delete matches first.');
+    }
 
-  await db.delete(schema.seasons).where(eq(schema.seasons.id, id));
+    // Explicit, not cascaded through a membership row (spec-060): the season's rosters and their
+    // players, then the season (which removes its memberships and standings).
+    await deleteRostersWhere(tx, eq(schema.rosters.seasonId, id));
+    await tx.delete(schema.seasons).where(eq(schema.seasons.id, id));
+  });
 }

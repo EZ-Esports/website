@@ -22,6 +22,11 @@
     "db:backfill:leadership": "npx tsx --env-file-if-exists=.env db/backfill-leadership.ts",
     "db:backfill:gallery-thumbnails": "npx tsx --conditions=react-server --env-file-if-exists=.env db/backfill-gallery-thumbnails.ts",
     "db:purge:onboarding-test-data": "npx tsx --conditions=react-server --env-file-if-exists=.env db/purge-onboarding-test-data.ts",
+    "db:verify:roster-backfill": "npx tsx --env-file-if-exists=.env db/verify-roster-backfill.ts",
+    "db:local:start": "npx tsx db/local/server.ts",
+    "db:local:seed": "npx tsx db/local/seed-sample.ts",
+    "db:local:grant-owner": "npx tsx db/local/grant-owner.ts",
+    "dev:local": "npx tsx db/local/dev.ts",
     "db:backup:clean": "npx tsx db/backup-clean.ts",
     "db:storage:clean": "npx tsx --env-file-if-exists=.env db/storage-clean.ts",
     "prepare": "node scripts/prepare-hooks.mjs || true"
@@ -50,6 +55,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.12",
+    "@electric-sql/pglite-socket": "^0.2.18",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",

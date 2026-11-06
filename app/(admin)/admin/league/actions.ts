@@ -26,6 +26,14 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * The staff-facing reason when a delete was refused on purpose (matches exist, `DeleteRefusedError`),
+ * so it is shown instead of a generic message; null for any other failure.
+ */
+function refusalMessage(error: unknown): string | null {
+  return error instanceof Error && error.name === 'DeleteRefusedError' ? error.message : null;
+}
+
 function revalidateLeague() {
   updateTag('games');
   updateTag('seasons');
@@ -92,7 +100,7 @@ export async function deleteGame(id: string) {
     return { success: true };
   } catch (error) {
     console.error(error);
-    return { success: false, error: 'Cannot delete game — it may have active seasons or teams linked to it.' };
+    return { success: false, error: refusalMessage(error) ?? 'Cannot delete game — it may have active seasons or teams linked to it.' };
   }
 }
 
@@ -166,7 +174,7 @@ export async function deleteSeason(id: string) {
     return { success: true };
   } catch (error) {
     console.error(error);
-    return { success: false, error: sanitizeDbError(error) };
+    return { success: false, error: refusalMessage(error) ?? sanitizeDbError(error) };
   }
 }
 

@@ -414,6 +414,20 @@
       "when": 1790882000013,
       "tag": "0058_school_email_student_id",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790882000030,
+      "tag": "0060_rosters_scope_expand_constrain",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790882000031,
+      "tag": "0061_rosters_scope_contract",
+      "breakpoints": true
     }
   ]
 }

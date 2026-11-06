@@ -16,12 +16,14 @@ interface Season {
 
 interface Roster {
   id: string;
-  teamId: string;
+  schoolId: string;
+  seasonId: string;
   division: string;
 }
 
 interface Team {
   id: string;
+  schoolId: string;
   name: string;
   gameId: string;
   seasonId?: string;
@@ -79,7 +81,8 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
     });
   };
 
-  const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
+  // Rosters belong to a school and season (spec-060); the team list is the season's member schools.
+  const teamMap = useMemo(() => new Map(teams.map(t => [`${t.schoolId}|${t.seasonId}`, t])), [teams]);
   const gameMap = useMemo(() => new Map(games.map(g => [g.id, g])), [games]);
 
   // Rosters of the selected season, then of the chosen division. The division
@@ -88,7 +91,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
   const seasonRosters = useMemo(() => {
     if (!selectedSeasonId) return rosters;
     return rosters.filter(r => {
-      const team = teamMap.get(r.teamId);
+      const team = teamMap.get(`${r.schoolId}|${r.seasonId}`);
       return team?.seasonId === selectedSeasonId;
     });
   }, [rosters, selectedSeasonId, teamMap]);
@@ -170,7 +173,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
           >
             <option value="">Select Team</option>
             {filteredRosters.map((r) => {
-              const team = teamMap.get(r.teamId);
+              const team = teamMap.get(`${r.schoolId}|${r.seasonId}`);
               return (
                 <option key={r.id} value={r.id}>
                   {team?.name} ({r.division})
@@ -194,7 +197,7 @@ export default function MatchScheduleForm({ seasons, rosters, teams, games, onSu
           >
             <option value="">Select Team</option>
             {filteredRosters.map((r) => {
-              const team = teamMap.get(r.teamId);
+              const team = teamMap.get(`${r.schoolId}|${r.seasonId}`);
               return (
                 <option key={r.id} value={r.id}>
                   {team?.name} ({r.division})

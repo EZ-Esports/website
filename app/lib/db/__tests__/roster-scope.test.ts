@@ -31,13 +31,17 @@ function fakeExecutor(answers: unknown[][]) {
   return { executor: executor as never, queries, executed };
 }
 
-describe('siblingEnrollment', () => {
-  it('scopes the roster lookup to the team and the player lookup to the member', async () => {
-    const { executor, queries } = fakeExecutor([[{ id: 'r-jv', name: 'JV' }], []]);
-    await siblingEnrollment('team-1', 'member-1', 'r-varsity', executor);
+const SCOPE = { schoolId: 'school-1', gameId: 'game-1', seasonId: 'season-1' };
 
-    expect(queries[0].sql).toContain('"team_id" = $1');
-    expect(queries[0].params).toEqual(['team-1']);
+describe('siblingEnrollment', () => {
+  it('scopes the roster lookup to the school, game and season and the player lookup to the member', async () => {
+    const { executor, queries } = fakeExecutor([[{ id: 'r-jv', name: 'JV' }], []]);
+    await siblingEnrollment(SCOPE, 'member-1', 'r-varsity', executor);
+
+    expect(queries[0].sql).toContain('"school_id" = $1');
+    expect(queries[0].sql).toContain('"game_id" = $2');
+    expect(queries[0].sql).toContain('"season_id" = $3');
+    expect(queries[0].params).toEqual(['school-1', 'game-1', 'season-1']);
     expect(queries[1].sql).toContain('"member_id" = $1');
     expect(queries[1].params).toEqual(['member-1']);
   });
@@ -50,7 +54,7 @@ describe('siblingEnrollment', () => {
       ],
       [{ id: 'p1', rosterId: 'r-jv' }],
     ]);
-    await expect(siblingEnrollment('team-1', 'member-1', 'r-varsity', executor)).resolves.toEqual({
+    await expect(siblingEnrollment(SCOPE, 'member-1', 'r-varsity', executor)).resolves.toEqual({
       playerId: 'p1',
       rosterId: 'r-jv',
       rosterName: 'JV',
@@ -65,7 +69,7 @@ describe('siblingEnrollment', () => {
       ],
       [{ id: 'p1', rosterId: 'r-varsity' }],
     ]);
-    await expect(siblingEnrollment('team-1', 'member-1', 'r-varsity', executor)).resolves.toBeNull();
+    await expect(siblingEnrollment(SCOPE, 'member-1', 'r-varsity', executor)).resolves.toBeNull();
   });
 
   it('ignores rows on rosters of other teams (a different game is allowed)', async () => {
@@ -76,12 +80,12 @@ describe('siblingEnrollment', () => {
       ],
       [{ id: 'p-other-game', rosterId: 'r-lol-varsity' }],
     ]);
-    await expect(siblingEnrollment('team-1', 'member-1', 'r-varsity', executor)).resolves.toBeNull();
+    await expect(siblingEnrollment(SCOPE, 'member-1', 'r-varsity', executor)).resolves.toBeNull();
   });
 
   it('skips the player lookup when the team has no other roster', async () => {
     const { executor, queries } = fakeExecutor([[{ id: 'r-varsity', name: 'Varsity' }]]);
-    await expect(siblingEnrollment('team-1', 'member-1', 'r-varsity', executor)).resolves.toBeNull();
+    await expect(siblingEnrollment(SCOPE, 'member-1', 'r-varsity', executor)).resolves.toBeNull();
     expect(queries).toHaveLength(1);
   });
 });
@@ -102,19 +106,19 @@ describe('memberOnRoster', () => {
 });
 
 describe('lockRosterMember', () => {
-  it('takes a transaction-scoped advisory lock keyed on the team and the member', async () => {
+  it('takes a transaction-scoped advisory lock keyed on the school/game/season scope and the member', async () => {
     const { executor, executed } = fakeExecutor([]);
-    await lockRosterMember(executor, 'team-1', 'member-1');
+    await lockRosterMember(executor, SCOPE, 'member-1');
 
     expect(executed).toHaveLength(1);
     expect(executed[0].sql).toContain('pg_advisory_xact_lock');
-    expect(executed[0].params).toEqual(['roster-member:team-1:member-1']);
+    expect(executed[0].params).toEqual(['roster-member:school-1:game-1:season-1:member-1']);
   });
 
   it('uses different keys for different members of one team', async () => {
     const { executor, executed } = fakeExecutor([]);
-    await lockRosterMember(executor, 'team-1', 'member-1');
-    await lockRosterMember(executor, 'team-1', 'member-2');
+    await lockRosterMember(executor, SCOPE, 'member-1');
+    await lockRosterMember(executor, SCOPE, 'member-2');
     expect(executed[0].params).not.toEqual(executed[1].params);
   });
 });
@@ -123,7 +127,7 @@ describe('lockRoster and rosterPlayerRoles', () => {
   it('lockRoster takes an advisory lock keyed on the roster, distinct from the member lock key', async () => {
     const { executor, executed } = fakeExecutor([]);
     await lockRoster(executor, 'roster-1');
-    await lockRosterMember(executor, 'team-1', 'member-1');
+    await lockRosterMember(executor, SCOPE, 'member-1');
     expect(executed[0].sql).toContain('pg_advisory_xact_lock');
     expect(executed[0].params).toEqual(['roster:roster-1']);
     expect(executed[0].params).not.toEqual(executed[1].params);

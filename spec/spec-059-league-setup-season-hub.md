@@ -31,7 +31,7 @@ League moderation was spread over League Setup (lock / publish buttons on every 
 
 ## Remove a school from a season: deferred
 
-An earlier revision of this branch removed a school from a season by setting a new `teams.removed_at` column (migration 0059) and filtering every public, portal and staff read on it. That was dropped before merge so this PR needs **no migration**: there is no Remove button, no `removeSchoolFromSeason` action and no restore path, and `addSchoolToSeason` keeps working on the current `teams` model (find-or-create team, add missing division rosters). Removal returns in a later PR on the school-owned, season-scoped roster model (a membership row only; rosters, players and matches are never touched). Spec numbering: this file is spec-059 because spec-058 is `spec-058-public-schools-scoped-to-season-teams.md` on another branch.
+An earlier revision of this branch removed a school from a season by setting a new `teams.removed_at` column (migration 0059) and filtering every public, portal and staff read on it. That was dropped before merge so this PR needs **no migration**: there is no Remove button, no `removeSchoolFromSeason` action and no restore path, and `addSchoolToSeason` keeps working on the current `teams` model (find-or-create team, add missing division rosters). Removal returns in [spec-060](spec-060-school-owned-season-rosters.md) on the school-owned, season-scoped roster model (a membership row only; rosters, players and matches are never touched). Spec numbering: this file is spec-059 because spec-058 is `spec-058-public-schools-scoped-to-season-teams.md` on another branch.
 
 ## Tests
 

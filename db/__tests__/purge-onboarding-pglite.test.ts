@@ -49,9 +49,9 @@ async function seed(db: PGlite) {
   const active = await id(`insert into seasons (game_id, name, is_active) values ($1, '2026-27', true) returning id`, [game]);
   const past = await id(`insert into seasons (game_id, name, is_active) values ($1, '2025-26', false) returning id`, [game]);
   const team = async (sch: string, season: string) =>
-    id(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [sch, game, season]);
+    id(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [sch, game, season]);
   const roster = async (t: string, name = 'Varsity') =>
-    id(`insert into rosters (team_id, name, division) values ($1, $2, 'A') returning id`, [t, name]);
+    id(`insert into rosters (school_id, game_id, season_id, name, division) select school_id, game_id, season_id, $2, 'A' from season_schools where id = $1 returning id`, [t, name]);
   const rActive = await roster(await team(school, active));
   const rPast = await roster(await team(school, past));
   const rOther = await roster(await team(school2, active));

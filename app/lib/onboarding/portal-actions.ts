@@ -1018,26 +1018,26 @@ export async function getSchoolRosters(
   const { scopes } = await resolveManagerScope(schoolId, gameId);
   if (scopes && scopes.length === 0) return [];
 
-  const whereConditions = [eq(schema.teams.schoolId, schoolId)];
+  const whereConditions = [eq(schema.seasonSchools.schoolId, schoolId)];
   if (gameId) {
-    whereConditions.push(eq(schema.teams.gameId, gameId));
+    whereConditions.push(eq(schema.seasonSchools.gameId, gameId));
   }
   // A manager sees only the rosters of each managed game's resolved season (matched by name); staff admins see all.
   if (scopes) {
-    whereConditions.push(inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId)));
+    whereConditions.push(inArray(schema.seasonSchools.seasonId, scopes.map((g) => g.seasonId)));
   }
 
   const schoolTeams = await db
     .select({
-      id: schema.teams.id,
-      schoolId: schema.teams.schoolId,
-      gameId: schema.teams.gameId,
-      seasonId: schema.teams.seasonId,
+      id: schema.seasonSchools.id,
+      schoolId: schema.seasonSchools.schoolId,
+      gameId: schema.seasonSchools.gameId,
+      seasonId: schema.seasonSchools.seasonId,
       gameName: schema.games.displayName,
       gameSlug: schema.games.slug,
     })
-    .from(schema.teams)
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
+    .from(schema.seasonSchools)
+    .innerJoin(schema.games, eq(schema.seasonSchools.gameId, schema.games.id))
     .where(and(...whereConditions));
 
   if (schoolTeams.length === 0) {
@@ -1051,11 +1051,17 @@ export async function getSchoolRosters(
     .where(inArray(schema.seasons.id, seasonIds));
   const seasonNames = new Map(seasonRows.map((r) => [r.id, r.name]));
 
-  const teamIds = schoolTeams.map((t) => t.id);
-  const teamRosters = await db
+  // Rosters of the school's member seasons only; `teamId` is the membership row's id, which the portal
+  // view uses to group rosters of one game and season.
+  const schoolRosters = await db
     .select()
     .from(schema.rosters)
-    .where(inArray(schema.rosters.teamId, teamIds));
+    .where(and(eq(schema.rosters.schoolId, schoolId), inArray(schema.rosters.seasonId, seasonIds)));
+  // Only rosters of seasons the school is a member of (positive membership), tagged with that row's id.
+  const teamRosters = schoolRosters.flatMap((r) => {
+    const team = schoolTeams.find((t) => t.gameId === r.gameId && t.seasonId === r.seasonId);
+    return team ? [{ ...r, teamId: team.id }] : [];
+  });
 
   if (teamRosters.length === 0) {
     return [];
@@ -1192,36 +1198,31 @@ export async function createSchoolRoster(
   }
   assertSeasonRostersUnlocked(createContext, season);
 
-  // 4. Find or create the Team for (schoolId, gameId, season.id)
-  let [team] = await db
+  // 4. The school must be a member of this game's season (staff add it in League Setup, which also
+  //    creates its Varsity / JV rosters). Membership is never created from the portal.
+  const [team] = await db
     .select()
-    .from(schema.teams)
+    .from(schema.seasonSchools)
     .where(
       and(
-        eq(schema.teams.schoolId, schoolId),
-        eq(schema.teams.gameId, gameId),
-        eq(schema.teams.seasonId, season.id)
+        eq(schema.seasonSchools.schoolId, schoolId),
+        eq(schema.seasonSchools.gameId, gameId),
+        eq(schema.seasonSchools.seasonId, season.id)
       )
     )
     .limit(1);
 
   if (!team) {
-    const [newTeam] = await db
-      .insert(schema.teams)
-      .values({
-        schoolId,
-        gameId,
-        seasonId: season.id,
-      })
-      .returning();
-    team = newTeam;
+    throw new Error('This school is not part of this season. Ask league staff to add it.');
   }
 
   // 5. Create Roster
   const [roster] = await db
     .insert(schema.rosters)
     .values({
-      teamId: team.id,
+      schoolId: team.schoolId,
+      gameId: team.gameId,
+      seasonId: team.seasonId,
       name,
       division,
     })
@@ -1269,6 +1270,16 @@ export async function deleteSchoolRoster(
 
   if (playerRows.length > 0) {
     throw new Error('Cannot delete a roster with enrolled players. Remove all players first.');
+  }
+
+  // matches -> rosters is RESTRICT: a roster with matches can never be deleted, so say so plainly.
+  const matchRows = await db
+    .select({ id: schema.matches.id })
+    .from(schema.matches)
+    .where(or(eq(schema.matches.homeRosterId, rosterId), eq(schema.matches.awayRosterId, rosterId)))
+    .limit(1);
+  if (matchRows.length > 0) {
+    throw new Error('Cannot delete a roster that has matches. Ask league staff if it must be removed.');
   }
 
   await db.delete(schema.rosters).where(eq(schema.rosters.id, rosterId));
@@ -1349,18 +1360,17 @@ export async function getSchoolPlayerPool(
       isCaptain: schema.players.isCaptain,
       rosterName: schema.rosters.name,
       gameName: schema.games.displayName,
-      gameId: schema.teams.gameId,
-      seasonId: schema.teams.seasonId,
+      gameId: schema.rosters.gameId,
+      seasonId: schema.rosters.seasonId,
     })
     .from(schema.players)
     .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
+    .innerJoin(schema.games, eq(schema.rosters.gameId, schema.games.id))
     .where(
       scopes
         ? and(
             inArray(schema.players.memberId, memberIds),
-            inArray(schema.teams.seasonId, scopes.map((g) => g.seasonId))
+            inArray(schema.rosters.seasonId, scopes.map((g) => g.seasonId))
           )
         : inArray(schema.players.memberId, memberIds)
     );
@@ -1488,7 +1498,7 @@ export async function enrollPlayerToRoster(
     .where(and(eq(schema.players.rosterId, rosterId), eq(schema.players.memberId, memberId)))
     .limit(1);
   const alreadyOnTeam =
-    Boolean(alreadyOnThisRoster) || Boolean(await siblingEnrollment(team.id, memberId, rosterId));
+    Boolean(alreadyOnThisRoster) || Boolean(await siblingEnrollment(team, memberId, rosterId));
   if (!managerContext.isStaffAdmin && !alreadyOnTeam) {
     const applications = await db
       .select({
@@ -1551,7 +1561,7 @@ export async function enrollPlayerToRoster(
   const conflict = await db.transaction(async (tx) => {
     // Serialize enrolls and moves of this member within the team so the sibling check below
     // cannot race another write.
-    await lockRosterMember(tx, team.id, memberId);
+    await lockRosterMember(tx, team, memberId);
     // Then the roster lock (always in this order) so the size count below cannot race another add.
     await lockRoster(tx, rosterId);
 
@@ -1569,7 +1579,7 @@ export async function enrollPlayerToRoster(
     // League rule: one tier per game. A member already on a sibling roster is moved, not
     // double-enrolled. A row already on THIS roster is a role/IGN edit and stays allowed.
     if (!existingPlayer) {
-      const sibling = await siblingEnrollment(team.id, memberId, rosterId, tx);
+      const sibling = await siblingEnrollment(team, memberId, rosterId, tx);
       if (sibling) {
         return siblingConflictMessage(`${member.firstName} ${member.lastName}`, sibling.rosterName, roster.name);
       }
@@ -1794,7 +1804,7 @@ export async function movePlayerToRoster(
   }
 
   const outcome = await db.transaction(async (tx) => {
-    await lockRosterMember(tx, from.team.id, lockMemberId!);
+    await lockRosterMember(tx, from.team, lockMemberId!);
     // Count the TARGET roster under its own lock (after the member lock, same order as enroll).
     await lockRoster(tx, toRosterId);
 

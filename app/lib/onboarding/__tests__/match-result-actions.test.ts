@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 // A thenable chain standing in for the drizzle select in loadMatch.
 vi.mock('@/app/lib/db', () => {
   const chain: Record<string, unknown> = {};
-  for (const name of ['from', 'innerJoin', 'where']) chain[name] = () => chain;
+  for (const name of ['from', 'innerJoin', 'leftJoin', 'where']) chain[name] = () => chain;
   chain.limit = () => mocks.loadRows();
   return { db: { select: () => chain } };
 });
@@ -57,6 +57,8 @@ const matchRow = (over: Record<string, unknown> = {}) => ({
   homeSchoolName: 'A',
   awaySchoolId: 'school-b',
   awaySchoolName: 'B',
+  homeMemberId: 'member-a',
+  awayMemberId: 'member-b',
   ...over,
 });
 
@@ -90,6 +92,22 @@ describe('submitMatchResult', () => {
     mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'u1', isStaffAdmin: false }, season: { id: 'other' } });
     const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
     expect(result.error).toBe('This match is not in your season.');
+  });
+
+  it('refuses a manager when either school is not a member of the season, but not a staff admin (spec-060)', async () => {
+    const REFUSED = 'This match involves a school that is not part of the season, so it cannot be changed here.';
+    for (const side of ['homeMemberId', 'awayMemberId']) {
+      mocks.loadRows.mockResolvedValue([matchRow({ [side]: null })]);
+      const result = await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` });
+      expect(result.error).toBe(REFUSED);
+    }
+    expect(mocks.resolveSeries).not.toHaveBeenCalled();
+
+    mocks.assertManagerForSchoolGame.mockResolvedValue({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.resolveSeries.mockResolvedValue({ status: 'ok', series: { homeWins: 2, awayWins: 0, winner: 'home', games: [] }, games: [] });
+    mocks.saveSeriesResult.mockResolvedValue(true);
+    mocks.loadRows.mockResolvedValue([matchRow({ homeMemberId: null })]);
+    expect((await submitMatchResult({ matchId: 'm1', schoolId: 'school-a', input: `${ID_1} ${ID_2}` })).success).toBe(true);
   });
 
   it('lets a staff admin submit as the viewed school, attributing the attempt to the staff user (spec-055)', async () => {

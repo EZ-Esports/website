@@ -16,12 +16,25 @@ export type DbOrTx = typeof db | TransactionExecutor;
  * multi-write action can resolve ids inside its own transaction.
  */
 
-export async function teamInSchool(teamId: string, schoolId: string, executor: DbOrTx = db) {
+/** The school, game and season a roster belongs to (spec-060): its identity for sibling rules and locks. */
+export interface RosterScope {
+  schoolId: string;
+  gameId: string;
+  seasonId: string;
+}
+
+/** One string per scope, for advisory-lock keys and "same team?" comparisons. */
+export function scopeKey(scope: RosterScope): string {
+  return `${scope.schoolId}:${scope.gameId}:${scope.seasonId}`;
+}
+
+/** A membership row (the school is in this game's season) that belongs to `schoolId`; null otherwise. */
+export async function seasonSchoolInSchool(seasonSchoolId: string, schoolId: string, executor: DbOrTx = db) {
   const [row] = await executor
-    .select({ id: schema.teams.id, gameSlug: schema.games.slug })
-    .from(schema.teams)
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
-    .where(and(eq(schema.teams.id, teamId), eq(schema.teams.schoolId, schoolId)))
+    .select({ id: schema.seasonSchools.id, schoolId: schema.seasonSchools.schoolId, gameId: schema.seasonSchools.gameId, seasonId: schema.seasonSchools.seasonId, gameSlug: schema.games.slug })
+    .from(schema.seasonSchools)
+    .innerJoin(schema.games, eq(schema.seasonSchools.gameId, schema.games.id))
+    .where(and(eq(schema.seasonSchools.id, seasonSchoolId), eq(schema.seasonSchools.schoolId, schoolId)))
     .limit(1);
   return row ?? null;
 }
@@ -30,15 +43,16 @@ export async function rosterInSchool(rosterId: string, schoolId: string, executo
   const [row] = await executor
     .select({
       id: schema.rosters.id,
-      teamId: schema.rosters.teamId,
+      schoolId: schema.rosters.schoolId,
+      gameId: schema.rosters.gameId,
+      seasonId: schema.rosters.seasonId,
       name: schema.rosters.name,
       division: schema.rosters.division,
       gameSlug: schema.games.slug,
     })
     .from(schema.rosters)
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
-    .where(and(eq(schema.rosters.id, rosterId), eq(schema.teams.schoolId, schoolId)))
+    .innerJoin(schema.games, eq(schema.rosters.gameId, schema.games.id))
+    .where(and(eq(schema.rosters.id, rosterId), eq(schema.rosters.schoolId, schoolId)))
     .limit(1);
   return row ?? null;
 }
@@ -54,8 +68,7 @@ export async function playerInSchool(playerId: string, schoolId: string, executo
     })
     .from(schema.players)
     .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-    .where(and(eq(schema.players.id, playerId), eq(schema.teams.schoolId, schoolId)))
+    .where(and(eq(schema.players.id, playerId), eq(schema.rosters.schoolId, schoolId)))
     .limit(1);
   return row ?? null;
 }
@@ -80,13 +93,13 @@ export async function memberOnRoster(memberId: string, rosterId: string, executo
 }
 
 /**
- * League rule: a student plays a game for one tier at a time. Rosters of one team (one school,
+ * League rule: a student plays a game for one tier at a time. Rosters of one scope (one school,
  * one game, one season) are siblings, so a member may be on at most one of them. Returns the
  * sibling roster the member is already on (other than `exceptRosterId`), or null. Different
- * games are different teams, so Varsity in one game and JV in another is allowed.
+ * games are different scopes, so Varsity in one game and JV in another is allowed.
  */
 export async function siblingEnrollment(
-  teamId: string,
+  scope: RosterScope,
   memberId: string,
   exceptRosterId: string,
   executor: DbOrTx = db,
@@ -94,7 +107,13 @@ export async function siblingEnrollment(
   const teamRosters = await executor
     .select({ id: schema.rosters.id, name: schema.rosters.name })
     .from(schema.rosters)
-    .where(eq(schema.rosters.teamId, teamId));
+    .where(
+      and(
+        eq(schema.rosters.schoolId, scope.schoolId),
+        eq(schema.rosters.gameId, scope.gameId),
+        eq(schema.rosters.seasonId, scope.seasonId),
+      ),
+    );
   const siblings = teamRosters.filter((r) => r.id !== exceptRosterId);
   if (siblings.length === 0) return null;
 
@@ -119,14 +138,14 @@ export async function memberDisplayName(memberId: string, executor: DbOrTx = db)
 }
 
 /**
- * Serializes writes that could put one member on two rosters of the same team. Take it first in
+ * Serializes writes that could put one member on two rosters of the same scope. Take it first in
  * every transaction that enrolls, approves or moves a member, before the sibling check: the
  * one-tier rule is enforced in code, not by a constraint, so without a lock two concurrent
  * enrolls could each see "no sibling" and both insert. Transaction-scoped (released at commit),
  * which also works through Supabase's transaction pooler; same pattern as the gallery lock.
  */
-export async function lockRosterMember(tx: TransactionExecutor, teamId: string, memberId: string): Promise<void> {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`roster-member:${teamId}:${memberId}`}))`);
+export async function lockRosterMember(tx: TransactionExecutor, scope: RosterScope, memberId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`roster-member:${scopeKey(scope)}:${memberId}`}))`);
 }
 
 /**

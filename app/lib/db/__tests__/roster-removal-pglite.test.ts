@@ -38,12 +38,13 @@ beforeAll(async () => {
   const school = await id(`insert into schools (name, slug) values ('Alpha HS', 'alpha') returning id`);
   const game = await id(`insert into games (slug, display_name, short_name) values ('val', 'Valorant', 'VAL') returning id`);
   const season = await id(`insert into seasons (game_id, name, is_active) values ($1, '2026-27', true) returning id`, [game]);
-  const team = await id(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school, game, season]);
-  const varsity = await id(`insert into rosters (team_id, name, division) values ($1, 'Varsity', 'A') returning id`, [team]);
-  const jv = await id(`insert into rosters (team_id, name, division) values ($1, 'JV', 'B') returning id`, [team]);
+  const team = await id(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school, game, season]);
+  const varsity = await id(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'Varsity', 'A') returning id`, [school, game, season]);
+  const jv = await id(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'JV', 'B') returning id`, [school, game, season]);
   const school2 = await id(`insert into schools (name, slug) values ('Beta HS', 'beta') returning id`);
-  const otherTeam = await id(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school2, game, season]);
-  const other = await id(`insert into rosters (team_id, name, division) values ($1, 'Other', 'A') returning id`, [otherTeam]);
+  const otherTeam = await id(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school2, game, season]);
+  void otherTeam;
+  const other = await id(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'Other', 'A') returning id`, [school2, game, season]);
   world = { school, game, season, team, varsity, jv, other };
 });
 afterAll(async () => {
@@ -302,8 +303,8 @@ describe('failure isolation', () => {
     const [school] = await q(`insert into schools (name, slug) values ('A', 'a') returning id`);
     const [game] = await q(`insert into games (slug, display_name, short_name) values ('v', 'V', 'V') returning id`);
     const [season] = await q(`insert into seasons (game_id, name, is_active) values ($1, '2026-27', true) returning id`, [game.id]);
-    const [team] = await q(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
-    const [roster] = await q(`insert into rosters (team_id, name, division) values ($1, 'V', 'A') returning id`, [team.id]);
+    await q(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
+    const [roster] = await q(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'V', 'A') returning id`, [school.id, game.id, season.id]);
     const [member] = await q(`insert into members (first_name, last_name, email, school_id) values ('Q', 'R', 'q@r.org', $1) returning id`, [school.id]);
     const [player] = await q(`insert into players (roster_id, member_id, ign) values ($1, $2, 'Zed#1') returning id`, [roster.id, member.id]);
     await c2.exec(`drop table valorant_game_players`);
@@ -328,8 +329,8 @@ describe('failure isolation', () => {
     const [school] = await q(`insert into schools (name, slug) values ('A', 'a') returning id`);
     const [game] = await q(`insert into games (slug, display_name, short_name) values ('v', 'V', 'V') returning id`);
     const [season] = await q(`insert into seasons (game_id, name, is_active) values ($1, '2026-27', true) returning id`, [game.id]);
-    const [team] = await q(`insert into teams (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
-    const [roster] = await q(`insert into rosters (team_id, name, division) values ($1, 'V', 'A') returning id`, [team.id]);
+    await q(`insert into season_schools (school_id, game_id, season_id) values ($1, $2, $3) returning id`, [school.id, game.id, season.id]);
+    const [roster] = await q(`insert into rosters (school_id, game_id, season_id, name, division) values ($1, $2, $3, 'V', 'A') returning id`, [school.id, game.id, season.id]);
     const [member] = await q(`insert into members (first_name, last_name, school_id) values ('Q', 'R', $1) returning id`, [school.id]);
     const [player] = await q(`insert into players (roster_id, member_id) values ($1, $2) returning id`, [roster.id, member.id]);
     await c2.exec(`drop table manager_invites`);
@@ -344,15 +345,15 @@ describe('failure isolation', () => {
 });
 
 describe('cleanupOrphanMember directly (roster delete path)', () => {
-  it('deletes an orphan whose roster is already gone, and uses the passed team for siblings', async () => {
+  it('deletes an orphan whose roster is already gone, and uses the passed scope for siblings', async () => {
     const s = await student({ roster: world.jv });
     await client.query(`delete from matches`);
     await client.query(`delete from players where id = $1`, [s.playerId]);
     const out = await db.transaction((tx) =>
-      cleanupOrphanMember(tx as never, { memberId: s.memberId, rosterId: world.jv, teamId: world.team }));
+      cleanupOrphanMember(tx as never, { memberId: s.memberId, rosterId: world.jv, scope: { schoolId: world.school, gameId: world.game, seasonId: world.season } }));
     expect(out.studentRecord).toBe('deleted');
 
-    // With a scored match on the sibling roster and the roster id gone, the passed team finds it.
+    // With a scored match on the sibling roster and the roster id gone, the passed scope finds it.
     const t = await student({ roster: world.varsity });
     await client.query(
       `insert into matches (season_id, home_roster_id, away_roster_id, scheduled_at, home_score, away_score, status) values ($1, $2, $3, now(), 3, 0, 'completed')`,
@@ -360,7 +361,7 @@ describe('cleanupOrphanMember directly (roster delete path)', () => {
     );
     await client.query(`delete from players where id = $1`, [t.playerId]);
     const kept = await db.transaction((tx) =>
-      cleanupOrphanMember(tx as never, { memberId: t.memberId, rosterId: world.jv, teamId: world.team }));
+      cleanupOrphanMember(tx as never, { memberId: t.memberId, rosterId: world.jv, scope: { schoolId: world.school, gameId: world.game, seasonId: world.season } }));
     expect(kept).toEqual({ studentRecord: 'kept', keptReason: 'match_history' });
     await client.query(`delete from matches`);
   });

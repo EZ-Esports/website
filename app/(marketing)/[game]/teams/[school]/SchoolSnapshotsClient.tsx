@@ -212,6 +212,11 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName, hiddenS
 
                 {/* Division Rosters (Varsity on top, Junior Varsity on bottom) */}
                 <div className="space-y-8">
+                  {sortedRosters.length === 0 && (
+                    <p className="text-xs text-foreground-muted italic pl-2">
+                      No rosters have been registered for this season yet.
+                    </p>
+                  )}
                   {sortedRosters.map((roster) => (
                     <div key={roster.id} className="space-y-4">
                       <div className="flex items-center justify-between border-b border-line/30 pb-2">

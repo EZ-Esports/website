@@ -91,6 +91,8 @@ const match = (over: Record<string, unknown> = {}) => ({
   scheduledAt: MATCH_AT,
   homeSchoolId: 'school-a',
   awaySchoolId: 'school-b',
+  homeMemberId: 'member-a',
+  awayMemberId: 'member-b',
   ...over,
 });
 
@@ -142,6 +144,23 @@ describe('requestReschedule', () => {
     mocks.queue.push([match()], [{ id: 'req-1' }], []);
     await requestReschedule(params);
     expect(mocks.assertManagerForSchoolGame).toHaveBeenCalledWith('school-a', 'game-1');
+  });
+
+  it('refuses a manager when either school is not a member of the season, and writes nothing (spec-060)', async () => {
+    for (const side of ['homeMemberId', 'awayMemberId']) {
+      mocks.queue.push([match({ [side]: null })]);
+      expect(await requestReschedule(params)).toEqual({
+        success: false,
+        error: 'This match involves a school that is not part of the season, so it cannot be changed here.',
+      });
+    }
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it('lets a staff admin act even when a school is not a member', async () => {
+    asManager({ context: { userId: 'staff-1', isStaffAdmin: true }, season: null });
+    mocks.queue.push([match({ homeMemberId: null })], [], [{ used: 0 }], [{ id: 'req-1' }], []);
+    expect(await requestReschedule(params)).toEqual({ success: true });
   });
 
   it('returns an authorization failure with its message (thrown messages are redacted in production)', async () => {

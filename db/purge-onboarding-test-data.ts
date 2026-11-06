@@ -77,8 +77,7 @@ export const CACHE_TAGS_TO_REFRESH = ['members', 'players', 'rosters', 'teams', 
 export interface Snapshot {
   members: { id: string; firstName: string; lastName: string; email: string | null; memberKey: string | null; schoolName: string }[];
   players: { id: string; memberId: string; rosterId: string }[];
-  rosters: { id: string; teamId: string }[];
-  teams: { id: string; seasonId: string }[];
+  rosters: { id: string; seasonId: string }[];
   seasons: { id: string; name: string; isActive: boolean }[];
   playerIdentities: { id: string; memberId: string; provider: string }[];
   /** Id-only rows (spec-051). `memberId` is null until the submission creates the member. */
@@ -332,8 +331,8 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
   for (const x of s.playerIdentities) linked.add(x.memberId);
 
   // --- roster history: which season is each players row on? -------------------
-  const rosterTeam = new Map(s.rosters.map((r) => [r.id, r.teamId]));
-  const teamSeason = new Map(s.teams.map((t) => [t.id, t.seasonId]));
+  // A roster carries its own season (spec-060), so no team lookup is needed.
+  const rosterSeason = new Map(s.rosters.map((r) => [r.id, r.seasonId]));
   const seasonById = new Map(s.seasons.map((x) => [x.id, x]));
   const playersByMember = new Map<string, Snapshot['players']>();
   for (const p of s.players) {
@@ -342,8 +341,7 @@ export function buildPurgePlan(s: Snapshot, extras: PlanExtras = {}): PurgePlan 
   }
   /** 'active' | 'past' | 'unknown', plus a label for the report. */
   const seasonOf = (rosterId: string): { status: 'active' | 'past' | 'unknown'; label: string } => {
-    const teamId = rosterTeam.get(rosterId);
-    const seasonId = teamId ? teamSeason.get(teamId) : undefined;
+    const seasonId = rosterSeason.get(rosterId);
     const season = seasonId ? seasonById.get(seasonId) : undefined;
     if (!season) return { status: 'unknown', label: 'unknown season' };
     return season.isActive
@@ -976,12 +974,11 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
     for (const run of thunks) out.push(await run());
     return out;
   };
-  const [members, players, rosters, teams, seasons, identities, formCompletions, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead] =
+  const [members, players, rosters, seasons, identities, formCompletions, consents, pInv, mInv, mgrs, reqs, opts, staff, roles, sInv, revs, audit, accepted, people, lead] =
     await runOneAtATime([
       q('select m.id, m.first_name, m.last_name, m.email, m.member_key, coalesce(s.name, \'\') as school_name from members m left join schools s on s.id = m.school_id'),
       q('select id, member_id, roster_id from players'),
-      q('select id, team_id from rosters'),
-      q('select id, season_id from teams'),
+      q('select id, season_id from rosters'),
       q('select id, name, is_active from seasons'),
       q('select id, member_id, provider from player_identities'),
       q('select id, member_id, invite_kind, invite_id from onboarding_form_completions'),
@@ -1007,8 +1004,7 @@ export async function loadSnapshotFrom(sql: SqlLike): Promise<Snapshot> {
   return {
     members: members.map((r) => ({ id: String(r.id), firstName: String(r.first_name), lastName: String(r.last_name), email: str(r.email), memberKey: str(r.member_key), schoolName: String(r.school_name) })),
     players: players.map((r) => ({ id: String(r.id), memberId: String(r.member_id), rosterId: String(r.roster_id) })),
-    rosters: rosters.map((r) => ({ id: String(r.id), teamId: String(r.team_id) })),
-    teams: teams.map((r) => ({ id: String(r.id), seasonId: String(r.season_id) })),
+    rosters: rosters.map((r) => ({ id: String(r.id), seasonId: String(r.season_id) })),
     seasons: seasons.map((r) => ({ id: String(r.id), name: String(r.name), isActive: r.is_active === true })),
     playerIdentities: identities.map((r) => ({ id: String(r.id), memberId: String(r.member_id), provider: String(r.provider) })),
     onboardingFormCompletions: formCompletions.map((r) => ({ id: String(r.id), memberId: str(r.member_id), inviteKind: String(r.invite_kind), inviteId: String(r.invite_id) })),
@@ -1060,7 +1056,7 @@ export function makeTxHandle(tx: SqlLike): TxHandle {
            (select count(*) from people)::int as people,
            (select count(*) from people where member_id is not null)::int as people_member,
            (select count(*) from schools)::int as schools,
-           (select count(*) from teams)::int as teams,
+           (select count(*) from season_schools)::int as teams,
            (select count(*) from rosters)::int as rosters,
            (select count(*) from matches)::int as matches,
            (select count(*) from players)::int as players`

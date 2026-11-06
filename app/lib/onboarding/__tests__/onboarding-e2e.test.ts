@@ -138,18 +138,18 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.seasons) {
           return state.seasonsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
-        if (currentTable === schema.teams) {
+        if (currentTable === schema.seasonSchools) {
           return state.teamsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
         if (currentTable === schema.rosters) {
-          if (joins.length > 0 && joins[0].table === schema.teams) {
+          if (joins.length > 0 && joins[0].table === schema.seasonSchools) {
             const matchingRosters = state.rostersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
             return matchingRosters.map((r) => {
-              const team = state.teamsStore.find((t) => t.id === r.teamId);
-              return {
-                roster: r,
-                team,
-              };
+              // Membership is matched by the roster's own school, game and season (spec-060).
+              const team = state.teamsStore.find(
+                (t) => t.schoolId === r.schoolId && t.gameId === r.gameId && t.seasonId === r.seasonId,
+              );
+              return { roster: r, memberId: team?.id, team };
             });
           }
           return state.rostersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
@@ -507,7 +507,9 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
 
   const stuyRoster = {
     id: 'roster-stuy-varsity-uuid',
-    teamId: stuyTeam.id,
+    schoolId: stuyTeam.schoolId,
+    gameId: stuyTeam.gameId,
+    seasonId: stuyTeam.seasonId,
     name: 'Varsity',
   };
 

@@ -96,6 +96,13 @@ const mocks = vi.hoisted(() => {
     return true;
   }
 
+  /** A roster row with its school/game/season: its own when present, else its fixture team's (spec-060). */
+  function withScope(r: any): any {
+    if (r.schoolId) return r;
+    const t = state.teamsStore.find((x) => x.id === r.teamId);
+    return { ...r, schoolId: t?.schoolId, gameId: t?.gameId, seasonId: t?.seasonId };
+  }
+
   function getStore(tbl: any): any[] | null {
     if (tbl === schema.schools) return state.schoolsStore;
     if (tbl === schema.games) return state.gamesStore;
@@ -103,7 +110,7 @@ const mocks = vi.hoisted(() => {
     if (tbl === schema.userRoles) return state.userRolesStore;
     if (tbl === schema.schoolManagers) return state.schoolManagersStore;
     if (tbl === schema.playerInvites) return state.playerInvitesStore;
-    if (tbl === schema.teams) return state.teamsStore;
+    if (tbl === schema.seasonSchools) return state.teamsStore;
     if (tbl === schema.seasons) return state.seasonsStore;
     if (tbl === schema.rosters) return state.rostersStore;
     if (tbl === schema.players) return state.playersStore;
@@ -196,19 +203,18 @@ const mocks = vi.hoisted(() => {
           });
         }
 
-        // 3. Rosters join Teams
+        // 3. Rosters (optionally left-joined to their membership row by school/game/season)
         if (currentTable === schema.rosters) {
-          if (joins.length > 0 && joins[0].table === schema.teams) {
-            const matchingRosters = store.filter((r) => conds.every((c) => matchesRow(r, c)));
+          if (joins.length > 0 && joins[0].table === schema.seasonSchools) {
+            const matchingRosters = store.map(withScope).filter((r) => conds.every((c) => matchesRow(r, c)));
             return matchingRosters.map((r) => {
-              const team = state.teamsStore.find((t) => t.id === r.teamId);
-              return {
-                roster: r,
-                team,
-              };
+              const team = state.teamsStore.find(
+                (t) => t.schoolId === r.schoolId && t.gameId === r.gameId && t.seasonId === r.seasonId,
+              );
+              return { roster: r, memberId: team?.id, team };
             });
           }
-          const rows = store.filter((r) => conds.every((c) => matchesRow(r, c)));
+          const rows = store.map(withScope).filter((r) => conds.every((c) => matchesRow(r, c)));
           // orderBy(createdAt, id): oldest first, id as the tie-break.
           return ordered
             ? [...rows].sort((x, y) => (x.createdAt?.getTime?.() ?? 0) - (y.createdAt?.getTime?.() ?? 0) || String(x.id).localeCompare(String(y.id)))
@@ -219,17 +225,15 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.players) {
           // Joined columns (teams.season_id) are matched against the player's roster -> team.
           const withTeamColumns = (p: any) => {
-            const roster = state.rostersStore.find((r) => r.id === p.rosterId);
-            const team = state.teamsStore.find((t) => t.id === roster?.teamId);
-            return { ...p, seasonId: team?.seasonId };
+            const roster = state.rostersStore.map(withScope).find((r) => r.id === p.rosterId);
+            return { ...p, seasonId: roster?.seasonId };
           };
           const matchingPlayers = store.filter((p) => conds.every((c) => matchesRow(withTeamColumns(p), c)));
           if (joins.length > 0) {
             return matchingPlayers.map((p) => {
               const member = state.membersStore.find((m) => m.id === p.memberId);
-              const roster = state.rostersStore.find((r) => r.id === p.rosterId);
-              const team = state.teamsStore.find((t) => t.id === roster?.teamId);
-              const game = state.gamesStore.find((g) => g.id === team?.gameId);
+              const roster = state.rostersStore.map(withScope).find((r) => r.id === p.rosterId);
+              const game = state.gamesStore.find((g) => g.id === roster?.gameId);
               return {
                 id: p.id,
                 rosterId: p.rosterId,
@@ -242,8 +246,8 @@ const mocks = vi.hoisted(() => {
                 discord: member?.discord ?? '',
                 rosterName: roster?.name ?? '',
                 gameName: game?.displayName ?? '',
-                gameId: team?.gameId,
-                seasonId: team?.seasonId,
+                gameId: roster?.gameId,
+                seasonId: roster?.seasonId,
               };
             });
           }
@@ -439,6 +443,8 @@ import {
 
 describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
   const schoolId = 'school-stuy-uuid';
+  /** Sibling-rule lock key: school, game and season of the Stuyvesant Valorant 2026-27 roster scope (spec-060). */
+  const STUY_VAL_SCOPE = 'school-stuy-uuid:game-val-uuid:season-val-now';
   const otherSchoolId = 'school-bxsci-uuid';
   const valGameId = 'game-val-uuid';
   const lolGameId = 'game-lol-uuid';
@@ -1486,22 +1492,15 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(mocks.mockUpdateCacheTags).toHaveBeenCalledWith('rosters', 'teams');
     });
 
-    it('creates team and roster atomically when team does not exist for the school', async () => {
-      // Clear teams for lol
+    it('refuses to create a roster when the school is not a member of the season, and creates no membership (spec-060)', async () => {
+      // No membership row for lol: staff add the school in League Setup first.
       mocks.state.teamsStore = mocks.state.teamsStore.filter((t) => t.gameId !== lolGameId);
 
-      const res = await createSchoolRoster({
-        schoolId,
-        gameId: lolGameId,
-        name: 'LoL Varsity',
-        division: 'A',
-      });
+      await expect(
+        createSchoolRoster({ schoolId, gameId: lolGameId, name: 'LoL Varsity', division: 'A' })
+      ).rejects.toThrow(/not part of this season/);
 
-      expect(res.success).toBe(true);
-      expect(res.roster.name).toBe('LoL Varsity');
-
-      const teamCreated = mocks.state.teamsStore.find((t) => t.schoolId === schoolId && t.gameId === lolGameId);
-      expect(teamCreated).toBeDefined();
+      expect(mocks.state.teamsStore.some((t) => t.schoolId === schoolId && t.gameId === lolGameId)).toBe(false);
     });
 
     it('refuses to create a roster when the game has no season named like the affiliation (no auto-provisioning)', async () => {
@@ -1748,11 +1747,11 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('createSchoolRoster creates in the resolved (active) season of the manager, never another one', async () => {
-      mocks.state.teamsStore = [];
       const res = await createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alumni' });
       expect(res.success).toBe(true);
-      const team = mocks.state.teamsStore.find((t) => t.schoolId === schoolId && t.gameId === valGameId);
-      expect(team?.seasonId).toBe('season-val-now');
+      expect(res.roster.seasonId).toBe('season-val-now');
+      const created = mocks.state.rostersStore.find((r) => r.name === 'Alumni');
+      expect(created).toMatchObject({ schoolId, gameId: valGameId, seasonId: 'season-val-now' });
     });
 
     it('invite approval accepts the student without rostering them; they are then enrolled in the resolved (active) season', async () => {
@@ -2469,12 +2468,12 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
 
       it('enroll takes the (team, member) lock before the sibling check reads anything', async () => {
         await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' });
-        expectLockedBeforeFirstQuery(`roster-member:${val}:m-new`);
+        expectLockedBeforeFirstQuery(`roster-member:${STUY_VAL_SCOPE}:m-new`);
       });
 
       it('move takes the (team, member) lock before the in-transaction reads', async () => {
         await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-sub' });
-        expectLockedBeforeFirstQuery(`roster-member:${val}:m-sub`);
+        expectLockedBeforeFirstQuery(`roster-member:${STUY_VAL_SCOPE}:m-sub`);
       });
 
       it('a row moved by someone else between the read and the update is not overwritten', async () => {
@@ -2721,7 +2720,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         await enrollPlayerToRoster({ rosterId: varsity, memberId: 'm-new' });
         const locks = mocks.mockDb.execute.mock.calls.map((c: any[]) => JSON.stringify(c[0]));
         expect(locks).toHaveLength(2);
-        expect(locks[0]).toContain(`roster-member:${val}:m-new`);
+        expect(locks[0]).toContain(`roster-member:${STUY_VAL_SCOPE}:m-new`);
         expect(locks[1]).toContain(`roster:${varsity}`);
         const rosterLock = mocks.mockDb.execute.mock.invocationCallOrder[1];
         const countCall = mocks.mockDb.select.mock.calls.findIndex(
@@ -2781,7 +2780,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
         mocks.mockDb.execute.mockClear();
         await movePlayerToRoster({ fromRosterId: varsity, toRosterId: jv, playerId: 'pl-mover' });
         const locks = mocks.mockDb.execute.mock.calls.map((c: any[]) => JSON.stringify(c[0]));
-        expect(locks[0]).toContain(`roster-member:${val}:m-mover`);
+        expect(locks[0]).toContain(`roster-member:${STUY_VAL_SCOPE}:m-mover`);
         expect(locks[1]).toContain(`roster:${jv}`);
         const rosterLock = mocks.mockDb.execute.mock.invocationCallOrder[1];
         const countCall = mocks.mockDb.select.mock.calls.findIndex(

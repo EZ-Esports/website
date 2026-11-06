@@ -33,7 +33,8 @@ export interface PlanTeam {
 
 export interface PlanRoster {
   id: string;
-  teamId: string;
+  /** Rosters belong to the school (for the game and season being planned), not to a membership row. */
+  schoolId: string;
   name: string;
   division: string;
 }
@@ -79,8 +80,7 @@ export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
   const reusedRosters: PlanReuse[] = [];
   const rostersToCreate: PlanRosterCreate[] = [];
   for (const s of schools) {
-    const team = teamBySchool.get(s.id);
-    const mine = team ? existingRosters.filter((r) => r.teamId === team.id) : [];
+    const mine = existingRosters.filter((r) => r.schoolId === s.id);
     // Several rosters in the division: the first by name plays, deterministically, and the rest are left alone.
     const inDivision = mine
       .filter((r) => canonicalDivision(r.division) === division)
@@ -89,7 +89,7 @@ export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
       reusedRosters.push({ ...s, rosterName: inDivision[0].name });
       continue;
     }
-    // (team, name) is unique, so a same-named roster stored under another division must not be hit.
+    // (school, game, season, name) is unique, so a same-named roster stored under another division must not be hit.
     const taken = new Set(mine.map((r) => r.name));
     let name: string = division;
     for (let n = 2; taken.has(name); n++) name = `${division} ${n}`;

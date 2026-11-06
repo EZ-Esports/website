@@ -2,6 +2,8 @@ import 'server-only';
 import { createClient } from '@/app/lib/supabase/server';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { inScope } from '@/app/lib/db/season-membership';
+import { scopeKey, type RosterScope } from '@/app/lib/db/roster-scope';
 import { Permissions, hasPermission, calculateEffectiveStaffAccess } from '@/app/lib/roles';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { inactiveSeasonViewOnlyError } from '@/app/lib/season-name';
@@ -465,13 +467,16 @@ export async function assertManagerForSchoolGame(
 }
 
 /**
- * Traces a roster -> team -> schoolId and asserts school manager authorization.
- * A manager may only touch rosters whose team belongs to their resolved season for the game
+ * Reads a roster's own school, game and season (spec-060) and asserts school manager authorization.
+ * A manager may only touch rosters of a school that is a member of that game's season (a
+ * `season_schools` row exists; staff removing a school ends its managers' access to those rosters)
+ * and whose season is their resolved season for the game
  * (matched by name, active or not); any other season's roster is refused. Staff admins may touch
  * any roster.
  * Locked seasons and inactive (view-only, spec-028) seasons refuse managers by default (this guard is
  * the mutation guard); read-only callers pass `{ allowLocked: true, allowInactive: true }`.
- * Returns the resolved context, roster, and team records.
+ * Returns the resolved context, the roster, and its scope as `team` (`id` is the scope key, shared by
+ * sibling rosters of one school, game and season).
  */
 export async function assertManagerForRoster(
   rosterId: string,
@@ -479,30 +484,36 @@ export async function assertManagerForRoster(
 ): Promise<{
   context: SchoolManagerContext;
   roster: typeof schema.rosters.$inferSelect;
-  team: typeof schema.teams.$inferSelect;
+  team: RosterScope & { id: string };
 }> {
   const [row] = await db
     .select({
       roster: schema.rosters,
-      team: schema.teams,
+      memberId: schema.seasonSchools.id,
     })
     .from(schema.rosters)
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
+    .leftJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
     .where(eq(schema.rosters.id, rosterId))
     .limit(1);
 
   if (!row) {
     throw new Error(`Roster not found: ${rosterId}`);
   }
+  const scope: RosterScope = { schoolId: row.roster.schoolId, gameId: row.roster.gameId, seasonId: row.roster.seasonId };
+  const team = { id: scopeKey(scope), ...scope };
 
   // allowInactive here only so the different-season error keeps precedence; the inactive check follows.
   const { context, season } = await assertManagerForSchoolWithSeason(
-    row.team.schoolId,
-    row.team.gameId,
+    scope.schoolId,
+    scope.gameId,
     { allowInactive: true }
   );
   if (!context.isStaffAdmin) {
-    if (!season || row.team.seasonId !== season.id) {
+    // Staff took this school out of the season: its rosters are no longer the manager's to read or change.
+    if (!row.memberId) {
+      throw new Error('Forbidden: This school is not part of this season, so its rosters cannot be changed from the portal');
+    }
+    if (!season || scope.seasonId !== season.id) {
       throw new Error(
         'Forbidden: This roster belongs to a different season than your manager affiliation and cannot be changed from the portal'
       );
@@ -517,7 +528,7 @@ export async function assertManagerForRoster(
   return {
     context,
     roster: row.roster,
-    team: row.team,
+    team,
   };
 }
 

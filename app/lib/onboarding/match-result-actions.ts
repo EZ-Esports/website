@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { revalidatePath, updateTag } from 'next/cache';
 import { db } from '@/app/lib/db';
+import { inScope } from '@/app/lib/db/season-membership';
 import * as schema from '@/app/lib/db/schema';
 import {
   cancelPendingSubmission,
@@ -42,8 +43,8 @@ class ActionError extends Error {}
 
 const homeRoster = alias(schema.rosters, 'home_roster');
 const awayRoster = alias(schema.rosters, 'away_roster');
-const homeTeam = alias(schema.teams, 'home_team');
-const awayTeam = alias(schema.teams, 'away_team');
+const homeTeam = alias(schema.seasonSchools, 'home_team');
+const awayTeam = alias(schema.seasonSchools, 'away_team');
 const homeSchool = alias(schema.schools, 'home_school');
 const awaySchool = alias(schema.schools, 'away_school');
 
@@ -59,20 +60,23 @@ async function loadMatch(matchId: string) {
       homeScore: schema.matches.homeScore,
       homeRosterId: schema.matches.homeRosterId,
       awayRosterId: schema.matches.awayRosterId,
-      homeSchoolId: homeTeam.schoolId,
+      homeSchoolId: homeRoster.schoolId,
       homeSchoolName: homeSchool.name,
-      awaySchoolId: awayTeam.schoolId,
+      awaySchoolId: awayRoster.schoolId,
+      // Null when staff removed that school from the season (spec-060); managers are then refused.
+      homeMemberId: homeTeam.id,
+      awayMemberId: awayTeam.id,
       awaySchoolName: awaySchool.name,
     })
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
     .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(eq(schema.matches.id, matchId))
     .limit(1);
   return match ?? null;
@@ -100,6 +104,9 @@ async function authorizeForMatch(
     throw new ActionError(error instanceof Error ? error.message : 'You cannot do this.');
   }
   const { context, season } = authorized;
+  if (!context.isStaffAdmin && (!match.homeMemberId || !match.awayMemberId)) {
+    throw new ActionError('This match involves a school that is not part of the season, so it cannot be changed here.');
+  }
   if (!context.isStaffAdmin && (!season || season.id !== match.seasonId)) {
     throw new ActionError('This match is not in your season.');
   }

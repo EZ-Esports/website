@@ -4,6 +4,7 @@ import { and, eq, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { revalidatePath, updateTag } from 'next/cache';
 import { db } from '@/app/lib/db';
+import { inScope } from '@/app/lib/db/season-membership';
 import * as schema from '@/app/lib/db/schema';
 import { parseEastern } from '@/app/lib/dates';
 import {
@@ -43,8 +44,8 @@ async function withActionErrors(
 
 const homeRoster = alias(schema.rosters, 'home_roster');
 const awayRoster = alias(schema.rosters, 'away_roster');
-const homeTeam = alias(schema.teams, 'home_team');
-const awayTeam = alias(schema.teams, 'away_team');
+const homeTeam = alias(schema.seasonSchools, 'home_team');
+const awayTeam = alias(schema.seasonSchools, 'away_team');
 
 /** The match facts every reschedule action needs, in one read. */
 async function loadMatch(matchId: string) {
@@ -55,15 +56,18 @@ async function loadMatch(matchId: string) {
       gameId: schema.seasons.gameId,
       status: schema.matches.status,
       scheduledAt: schema.matches.scheduledAt,
-      homeSchoolId: homeTeam.schoolId,
-      awaySchoolId: awayTeam.schoolId,
+      homeSchoolId: homeRoster.schoolId,
+      awaySchoolId: awayRoster.schoolId,
+      // Null when staff removed that school from the season (spec-060); managers are then refused.
+      homeMemberId: homeTeam.id,
+      awayMemberId: awayTeam.id,
     })
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
     .where(eq(schema.matches.id, matchId))
     .limit(1);
   return match ?? null;
@@ -92,6 +96,9 @@ async function authorizeForMatch(
     throw new ActionError(error instanceof Error ? error.message : 'You cannot do this.');
   }
   const { context, season } = authorized;
+  if (!context.isStaffAdmin && (!match.homeMemberId || !match.awayMemberId)) {
+    throw new ActionError('This match involves a school that is not part of the season, so it cannot be changed here.');
+  }
   if (!context.isStaffAdmin && (!season || season.id !== match.seasonId)) {
     throw new ActionError('This match is not in your season.');
   }

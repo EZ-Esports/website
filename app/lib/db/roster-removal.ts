@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import * as schema from './schema';
-import type { DbOrTx } from './roster-scope';
+import type { DbOrTx, RosterScope } from './roster-scope';
 import { dbErrorChain } from '../text-utils';
 
 /**
@@ -152,17 +152,27 @@ async function lockMember(tx: DbOrTx, memberId: string): Promise<MemberRow | nul
  */
 async function findHistory(
   tx: DbOrTx,
-  input: { rosterId: string; teamId: string | null; member: MemberRow; ign: string | null; riotIds: string[] },
+  input: { rosterId: string; scope: RosterScope | null; member: MemberRow; ign: string | null; riotIds: string[] },
 ): Promise<boolean> {
-  const { rosterId, teamId, member, ign, riotIds } = input;
+  const { rosterId, scope, member, ign, riotIds } = input;
 
   // Required table: if rosters cannot be read the member is kept (the error propagates).
   const siblings = await tx
     .select({ id: schema.rosters.id })
     .from(schema.rosters)
-    .where(teamId
-      ? or(eq(schema.rosters.id, rosterId), eq(schema.rosters.teamId, teamId))
-      : or(eq(schema.rosters.id, rosterId), sql`${schema.rosters.teamId} = (select team_id from rosters where id = ${rosterId})`));
+    .where(scope
+      ? or(
+          eq(schema.rosters.id, rosterId),
+          and(
+            eq(schema.rosters.schoolId, scope.schoolId),
+            eq(schema.rosters.gameId, scope.gameId),
+            eq(schema.rosters.seasonId, scope.seasonId),
+          ),
+        )
+      : or(
+          eq(schema.rosters.id, rosterId),
+          sql`(${schema.rosters.schoolId}, ${schema.rosters.gameId}, ${schema.rosters.seasonId}) = (select school_id, game_id, season_id from rosters where id = ${rosterId})`,
+        ));
   const rosterIds = [...new Set([rosterId, ...siblings.map((r) => r.id)])];
   const onRosters = or(inArray(schema.matches.homeRosterId, rosterIds), inArray(schema.matches.awayRosterId, rosterIds));
 
@@ -243,7 +253,7 @@ async function findHistory(
  */
 async function keepReason(
   tx: DbOrTx,
-  input: { memberId: string; rosterId: string; teamId: string | null; ign: string | null; member: MemberRow },
+  input: { memberId: string; rosterId: string; scope: RosterScope | null; ign: string | null; member: MemberRow },
 ): Promise<KeepReason | null> {
   const { memberId, member } = input;
   const email = member.email ? norm(member.email) : null;
@@ -279,7 +289,7 @@ async function keepReason(
     .from(schema.playerIdentities)
     .where(and(eq(schema.playerIdentities.memberId, memberId), eq(schema.playerIdentities.provider, 'riot')));
   if (await findHistory(tx, {
-    rosterId: input.rosterId, teamId: input.teamId, member, ign: input.ign, riotIds: riotRows.map((r) => r.id),
+    rosterId: input.rosterId, scope: input.scope, member, ign: input.ign, riotIds: riotRows.map((r) => r.id),
   })) {
     return 'match_history';
   }
@@ -331,14 +341,14 @@ type CleanupOutcome =
  */
 export async function cleanupOrphanMember(
   tx: DbOrTx,
-  input: { memberId: string; rosterId: string; ign?: string | null; teamId?: string | null },
+  input: { memberId: string; rosterId: string; ign?: string | null; scope?: RosterScope | null },
 ): Promise<CleanupOutcome> {
   try {
     return await tx.transaction(async (sp): Promise<CleanupOutcome> => {
       const s = sp as DbOrTx;
       const member = await lockMember(s, input.memberId);
       if (!member) return { studentRecord: 'kept', keptReason: 'member_missing' };
-      const reason = await keepReason(s, { ...input, ign: input.ign ?? null, teamId: input.teamId ?? null, member });
+      const reason = await keepReason(s, { ...input, ign: input.ign ?? null, scope: input.scope ?? null, member });
       if (reason) return { studentRecord: 'kept', keptReason: reason };
       return { studentRecord: 'deleted', deleted: await deleteMember(s, input.memberId) };
     });

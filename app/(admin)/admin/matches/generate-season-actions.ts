@@ -66,7 +66,7 @@ interface Loaded {
   seasonName: string;
   gameName: string;
   teams: Array<{ id: string; schoolId: string }>;
-  rosters: Array<{ id: string; teamId: string; name: string; division: string }>;
+  rosters: Array<{ id: string; schoolId: string; name: string; division: string }>;
   gameId: string;
 }
 
@@ -127,15 +127,14 @@ async function loadPlan(exec: Pick<typeof db, 'select'>, raw: z.infer<typeof inp
   }
 
   const teams = await exec
-    .select({ id: schema.teams.id, schoolId: schema.teams.schoolId })
-    .from(schema.teams)
-    .where(and(eq(schema.teams.seasonId, season.id), eq(schema.teams.gameId, season.gameId), inArray(schema.teams.schoolId, unique)));
-  const rosters = teams.length
-    ? await exec
-        .select({ id: schema.rosters.id, teamId: schema.rosters.teamId, name: schema.rosters.name, division: schema.rosters.division })
-        .from(schema.rosters)
-        .where(inArray(schema.rosters.teamId, teams.map((t) => t.id)))
-    : [];
+    .select({ id: schema.seasonSchools.id, schoolId: schema.seasonSchools.schoolId })
+    .from(schema.seasonSchools)
+    .where(and(eq(schema.seasonSchools.seasonId, season.id), eq(schema.seasonSchools.gameId, season.gameId), inArray(schema.seasonSchools.schoolId, unique)));
+  // Rosters belong to the school and season themselves (spec-060): read them by scope, members or not.
+  const rosters = await exec
+    .select({ id: schema.rosters.id, schoolId: schema.rosters.schoolId, name: schema.rosters.name, division: schema.rosters.division })
+    .from(schema.rosters)
+    .where(and(eq(schema.rosters.seasonId, season.id), eq(schema.rosters.gameId, season.gameId), inArray(schema.rosters.schoolId, unique)));
 
   const plan = buildSeasonPlan({
     seasonId: season.id,
@@ -219,19 +218,16 @@ export async function commitGenerateSeason(input: unknown, fingerprint: unknown)
         throw new GenerateError('The schedule changed since you previewed it. Preview it again before confirming.');
       }
 
-      const teamIdBySchool = new Map(loaded.teams.map((t) => [t.schoolId, t.id]));
       if (plan.teamsToCreate.length) {
-        const created = await tx
-          .insert(schema.teams)
-          .values(plan.teamsToCreate.map((s) => ({ schoolId: s.id, gameId: loaded.gameId, seasonId: parsed.data.seasonId })))
-          .returning({ id: schema.teams.id, schoolId: schema.teams.schoolId });
-        for (const t of created) teamIdBySchool.set(t.schoolId, t.id);
+        await tx
+          .insert(schema.seasonSchools)
+          .values(plan.teamsToCreate.map((s) => ({ schoolId: s.id, gameId: loaded.gameId, seasonId: parsed.data.seasonId })));
       }
 
       const rosterIdBySchool = new Map<string, string>();
-      for (const [schoolId, teamId] of teamIdBySchool) {
+      for (const schoolId of new Set(loaded.rosters.map((r) => r.schoolId))) {
         const found = loaded.rosters
-          .filter((r) => r.teamId === teamId && canonicalDivision(r.division) === parsed.data.division)
+          .filter((r) => r.schoolId === schoolId && canonicalDivision(r.division) === parsed.data.division)
           .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))[0];
         if (found) rosterIdBySchool.set(schoolId, found.id);
       }
@@ -240,14 +236,15 @@ export async function commitGenerateSeason(input: unknown, fingerprint: unknown)
           .insert(schema.rosters)
           .values(
             plan.rostersToCreate.map((s) => ({
-              teamId: teamIdBySchool.get(s.id)!,
+              schoolId: s.id,
+              gameId: loaded.gameId,
+              seasonId: parsed.data.seasonId,
               name: s.rosterName,
               division: plan.rosterDivision,
             }))
           )
-          .returning({ id: schema.rosters.id, teamId: schema.rosters.teamId });
-        const schoolByTeam = new Map([...teamIdBySchool].map(([schoolId, teamId]) => [teamId, schoolId]));
-        for (const r of created) rosterIdBySchool.set(schoolByTeam.get(r.teamId)!, r.id);
+          .returning({ id: schema.rosters.id, schoolId: schema.rosters.schoolId });
+        for (const r of created) rosterIdBySchool.set(r.schoolId, r.id);
       }
 
       await tx.insert(schema.matches).values(

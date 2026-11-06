@@ -42,18 +42,17 @@ describe.skipIf(!enabled)('match results against a real Postgres', () => {
         { name: `Away ${randomUUID()}`, slug: `away-${randomUUID()}` },
       ])
       .returning({ id: schema.schools.id });
-    const teams = await db
-      .insert(schema.teams)
+    await db
+      .insert(schema.seasonSchools)
       .values([
         { schoolId: home.id, gameId, seasonId },
         { schoolId: away.id, gameId, seasonId },
-      ])
-      .returning({ id: schema.teams.id });
+      ]);
     const rosters = await db
       .insert(schema.rosters)
       .values([
-        { teamId: teams[0].id, name: 'Varsity', division: 'A' },
-        { teamId: teams[1].id, name: 'Varsity', division: 'A' },
+        { schoolId: home.id, gameId, seasonId, name: 'Varsity', division: 'A' },
+        { schoolId: away.id, gameId, seasonId, name: 'Varsity', division: 'A' },
       ])
       .returning({ id: schema.rosters.id });
     const [match] = await db

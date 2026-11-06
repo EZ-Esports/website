@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  rosterRows: [] as Array<{ rosterId: string; seasonId: string; gameId: string; division: string }>,
+  rosterRows: [] as Array<{ rosterId: string; seasonId: string; gameId: string; division: string; memberId: string | null }>,
   inserts: [] as unknown[],
 }));
 
@@ -10,7 +10,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }));
 vi.mock('@/app/lib/db', () => ({
   db: {
     select: () => ({
-      from: () => ({ innerJoin: () => ({ where: async () => mocks.rosterRows }) }),
+      from: () => ({ leftJoin: () => ({ where: async () => mocks.rosterRows }) }),
     }),
     insert: () => ({
       values: async (v: unknown) => {
@@ -27,6 +27,7 @@ const row = (rosterId: string, division: string, over: Partial<(typeof mocks.ros
   rosterId,
   seasonId: SEASON,
   gameId: 'g1',
+  memberId: 'member-1' as string | null,
   division,
   ...over,
 });
@@ -58,6 +59,13 @@ describe('createMatch division rule', () => {
     mocks.rosterRows = [row('r1', 'B'), row('r2', 'JV')];
     expect(await createMatch(form())).toEqual({ success: true });
     expect(mocks.inserts).toHaveLength(2);
+  });
+
+  it('refuses a school that is not a member of the season (removed by staff), writing nothing', async () => {
+    mocks.rosterRows = [row('r1', 'Varsity'), row('r2', 'Varsity', { memberId: null })];
+    const res = await createMatch(form());
+    expect(res).toEqual({ success: false, error: 'A selected school is not part of this season. Add it in League Setup first.' });
+    expect(mocks.inserts).toHaveLength(0);
   });
 
   it('still refuses a mismatched season before looking at divisions', async () => {

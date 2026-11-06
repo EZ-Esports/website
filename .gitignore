@@ -80,3 +80,6 @@ __pycache__/
 
 # Local-only dev tooling and data (throwaway Postgres, scratch scripts); may hold seeded data
 /.dev-local/
+
+# local-dev Postgres (db/local/server.ts)
+/.local-db/

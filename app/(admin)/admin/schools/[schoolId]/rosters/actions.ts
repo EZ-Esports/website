@@ -8,7 +8,7 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { dbErrorChain, sanitizeDbError } from '@/app/lib/text-utils';
 import {
   lockRoster, lockRosterMember, memberDisplayName, memberInSchool, memberOnRoster, playerInSchool, rosterInSchool,
-  rosterPlayerRoles, siblingEnrollment, teamInSchool,
+  rosterPlayerRoles, scopeKey, seasonSchoolInSchool, siblingEnrollment,
 } from '@/app/lib/db/roster-scope';
 import { occupancyOf, rosterCapacityError } from '@/app/lib/onboarding/roster-limits';
 import { sweepOrphanStudentIds } from '@/app/lib/onboarding/student-id-sweep';
@@ -105,7 +105,7 @@ export async function createTeam(schoolId: string, formData: FormData) {
       return { success: false, error: 'That season belongs to a different game. Pick a season for the selected game.' };
     }
 
-    await db.insert(schema.teams).values({ schoolId, gameId, seasonId });
+    await db.insert(schema.seasonSchools).values({ schoolId, gameId, seasonId });
 
     updateTag('teams');
     refreshSchoolRosters(schoolId);
@@ -129,13 +129,20 @@ export async function createRoster(schoolId: string, formData: FormData) {
 
     if (!teamId || !name || !division) return { success: false, error: 'Team, Roster Name, and Division are required.' };
 
-    const team = await teamInSchool(teamId, schoolId);
+    // `teamId` is the id of the school's membership row for the game and season (the roster's scope comes from it).
+    const team = await seasonSchoolInSchool(teamId, schoolId);
     if (!team) return NOT_FOUND;
     if (!allowedRosterDivisions(team.gameSlug).includes(division)) {
       return { success: false, error: `${division} is not a division for this game.` };
     }
 
-    await db.insert(schema.rosters).values({ teamId, name, division: storedDivision(division) });
+    await db.insert(schema.rosters).values({
+      schoolId,
+      gameId: team.gameId,
+      seasonId: team.seasonId,
+      name,
+      division: storedDivision(division),
+    });
 
     updateTag('rosters');
     updateTag('teams');
@@ -191,8 +198,8 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
     const target = await rosterInSchool(rosterId, schoolId);
     if (!target) return NOT_FOUND;
 
-    // matches.home_roster_id / away_roster_id are ON DELETE CASCADE: deleting a roster would
-    // silently delete every match it played (scores, standings). Refuse instead.
+    // Deleting a roster that has matches is refused here (and by the RESTRICT foreign key from matches)
+    // so a played roster can never take its scores and standings with it.
     const [{ n: matchCount }] = await db
       .select({ n: count() })
       .from(schema.matches)
@@ -225,8 +232,8 @@ export async function deleteRoster(schoolId: string, rosterId: string) {
       if (removed.length === 0) return players;
       const ignOf = new Map(players.map((p) => [p.memberId, p.ign ?? null]));
       for (const memberId of new Set(players.map((p) => p.memberId))) {
-        // The roster row is gone, so its team is passed in to let the history check see its siblings.
-        await cleanupOrphanMember(tx, { memberId, rosterId, teamId: target.teamId, ign: ignOf.get(memberId) ?? null });
+        // The roster row is gone, so its scope is passed in to let the history check see its siblings.
+        await cleanupOrphanMember(tx, { memberId, rosterId, scope: target, ign: ignOf.get(memberId) ?? null });
       }
       return players;
     });
@@ -301,8 +308,8 @@ export async function createPlayer(schoolId: string, formData: FormData) {
       // The lock serializes concurrent adds/moves of this member within the team, so two requests
       // cannot both pass the check.
       if (memberId) {
-        await lockRosterMember(tx, roster.teamId, memberId);
-        const sibling = await siblingEnrollment(roster.teamId, memberId, rosterId, tx);
+        await lockRosterMember(tx, roster, memberId);
+        const sibling = await siblingEnrollment(roster, memberId, rosterId, tx);
         if (sibling) {
           const name = await memberDisplayName(memberId, tx);
           return { kind: 'conflict' as const, message: `${name} is already on ${sibling.rosterName}. Use Move to put them on ${roster.name}.` };
@@ -464,11 +471,11 @@ export async function moveRosterMember(schoolId: string, playerId: string, toRos
       const to = await rosterInSchool(toRosterId, schoolId, tx);
       if (!from || !to) return { error: NOT_FOUND.error };
       if (from.id === to.id) return { error: 'Pick a different roster to move the player to.' };
-      if (from.teamId !== to.teamId) {
+      if (scopeKey(from) !== scopeKey(to)) {
         return { error: 'Players can only be moved between rosters of the same team (same school, game and season).' };
       }
       // Serialize with concurrent adds/moves of this member within the team.
-      await lockRosterMember(tx, from.teamId, player.memberId);
+      await lockRosterMember(tx, from, player.memberId);
       await lockRoster(tx, to.id);
       if (await memberOnRoster(player.memberId, to.id, tx)) {
         const name = await memberDisplayName(player.memberId, tx);

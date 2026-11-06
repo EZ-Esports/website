@@ -46,6 +46,8 @@ export interface SchoolRosterTeamInput {
   seasonName: string;
   seasonIsActive: boolean;
   rostersLockedAt: Date | string | null;
+  /** The school has rosters here but no membership row (staff removed it from the season). */
+  notInSeason?: boolean;
   rosters: RosterViewRoster[];
 }
 
@@ -66,7 +68,10 @@ export interface DivisionColumn {
 
 export interface SeasonBlock {
   key: string;
+  /** Id of the school's membership row for this game and season; empty when `notInSeason`. */
   teamId: string;
+  /** True when the school has rosters here but is no longer a member of the season (removed by staff). */
+  notInSeason: boolean;
   /** Whether the game has a JV division at all (false for tournament games and e.g. Minecraft). */
   jvSupported: boolean;
   gameId: string;
@@ -179,7 +184,8 @@ export function buildSeasonBlocks(teams: SchoolRosterTeamInput[]): SeasonBlock[]
 
     const lockedAt = t.rostersLockedAt ? new Date(t.rostersLockedAt).toISOString() : null;
     return {
-      key: t.teamId,
+      key: t.teamId || `scope-${t.seasonId}`,
+      notInSeason: t.notInSeason ?? false,
       teamId: t.teamId,
       jvSupported,
       gameId: t.gameId,
