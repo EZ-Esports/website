@@ -51,7 +51,7 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 A brand-new school has no pending submissions and likely no rosters, so row-level controls do not exist yet.
 
 - Approvals and Rosters steps anchor to the **section containers** (`PendingApprovalsCard`, `RostersSection`), which always render.
-- The roster step is preceded by (or falls back to) the *Create roster* button when the school has no rosters.
+- The roster step is preceded by (or falls back to) the *Create roster* button when the school has no rosters. Since [spec-061](spec-061-manager-no-create-roster.md) that button is staff only, so managers do not get the create-roster step: its anchor is absent and the tour drops it.
 - Steps that live inside a modal (e.g. `EnrollPlayerModal`) either anchor to the modal's trigger button, or declare a prerequisite the tour performs (open the modal, wait for the anchor to mount). Default to the trigger button.
 
 ### Interaction and accessibility
