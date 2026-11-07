@@ -1,6 +1,6 @@
 # spec-060: School-owned, season-scoped rosters; season membership
 
-- **Status:** Implemented on branch `rosters-expand-0060` (one PR: expand, constrain, switch, contract), stacked on main after #332. Migrations `0060` and `0061` are written and NOT applied anywhere; nothing was run against any production database.
+- **Status:** Implemented on branch `rosters-expand-0060` (one PR: expand, constrain, switch, contract), stacked on main after #332. Merged as PR #334 (squash `1bf9038`, closes issue #333). Migrations `0060` and `0061` are APPLIED to production (6 Nov 2026; see "Rollout record" below).
 - **Date:** 2026-11-05
 - **Scope:** `db/migrations/0060`, `0061` (+ journal), `app/lib/db/schema.ts`, `app/lib/db/season-membership.ts` (new), every roster/team reader and writer (matches, standings, teams, school-rosters, season-setup, roster-scope, roster-removal, portal, manager-auth, staff roster actions, generate season, scheduling, league deletes, seed-gold, purge script), League Setup (Add school, Remove school, school pages), `db/verify-roster-backfill.ts`, local-dev tooling (`db/local/*`, [docs/dev/LOCAL_DB.md](../docs/dev/LOCAL_DB.md)).
 
@@ -29,7 +29,7 @@ Hand-written like 0043 onward (the drizzle-kit snapshot chain stops at 0042). Gu
 
 The code never touches `rosters.team_id`, and uses the name `season_schools`, which is the view after 0060 and the real table after 0061. So the same build works on both schemas, and 0061 can be applied after the code is live.
 
-### Deploy order and the window
+### Deploy order and the window (as planned; what happened is in "Rollout record")
 
 1. Apply **0060 BEFORE deploying** this code. It is backward compatible: the old code keeps working against them (it still reads `teams` and `rosters.team_id`; the trigger fills the scope columns; deleting a team no longer cascades, which only makes it safer).
 2. Deploy the code.
@@ -58,9 +58,17 @@ The code never touches `rosters.team_id`, and uses the name `season_schools`, wh
 ## Verification
 
 - PGlite tests apply the real migrations: `rosters-scope-expand-pglite` (the legacy schema before 0060 migrated by the real file: backfill, constraints, FK drop, trigger, idempotent re-run, and a rollback test showing a failure inside the transaction leaves nothing behind), `rosters-contract-pglite` (the gap schema end to end through the new code: add/remove/restore via the view, a public read; the final schema; re-running 0061; public match list hiding a removed school; restore; explicit season deletes), plus the existing roster-removal, purge and student-ID suites on the final schema.
-- `db/verify-roster-backfill.ts` (`npm run db:verify:roster-backfill`) is read-only and gated by `assertSeedTargetAllowed()`; run it BEFORE 0060 for a preview (rosters to backfill, rosters with no team, membership rows to add) and AFTER to confirm; it has not been run against anything.
+- `db/verify-roster-backfill.ts` (`npm run db:verify:roster-backfill`) is read-only and gated by `assertSeedTargetAllowed()`; run it BEFORE 0060 for a preview (rosters to backfill, rosters with no team, membership rows to add) and AFTER to confirm. It was run as the production dry run before 0060 (clean).
 - Local run: [docs/dev/LOCAL_DB.md](../docs/dev/LOCAL_DB.md) (`npm run db:local:start`, `db:local:seed`, `dev:local`). The seed is tested against both schema stages.
 
 ## Not verified
 
-No migration has run on Supabase; PGlite is not Supabase (the `auth` schema and roles are stand-ins, and RLS policies are only loaded, not exercised). The 0061 policy rewrite and the `season_schools` view grants should be rehearsed on a restored backup. The local app was started against the local database and served public pages, but the single-connection fix (`DATABASE_POOL_MAX=1`) was not re-verified after it was added. Browser verification of the new screens was not done.
+PGlite is not Supabase (the `auth` schema and roles are stand-ins, and RLS policies are only loaded, not exercised). Supabase row-level-security equivalence for the anon and authenticated roles after the 0061 policy and view rewrite was reviewed only, not behaviorally verified. The admin and manager portals were not smoke-tested after the rollout (they need sign-in). Browser verification of the new screens was not done in the original PR.
+
+## Rollout record (production, 6 Nov 2026)
+
+All figures verified on production on 2026-11-06.
+
+- **0060 first.** The dry run (`npm run db:verify:roster-backfill`) was clean and a fresh backup was taken. `0060_rosters_scope_expand_constrain` was applied alone while the Vercel build for #334 was still running, so the new code never ran without it. After 0060: 298 rosters (247 existing + 51 provisioned), all scoped (0 unscoped); 1 membership added from archived standings (teams 167 -> 168); players 1,030 and matches 772 unchanged. The deploy then completed and public pages returned 200.
+- **0061 second.** `0061_rosters_scope_contract` was rehearsed on a restored copy of the post-0060 backup, then applied to production with `npm run db:migrate` (its own pre-migration backup taken). After 0061: `teams` renamed to `season_schools` (168 rows); `rosters.team_id` and the insert trigger dropped; RLS policies and the `roster_standings` view rewritten; `matches -> rosters` FKs are RESTRICT; 55 migrations recorded; journal `when` last = 1790882000031. Any later migration needs a `when` above 1790882000031.
+- **Not verified.** RLS equivalence for anon/authenticated (reviewed only) and the admin/manager portals (not smoke-tested; sign-in needed). See `open-threads.md`.

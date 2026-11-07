@@ -1472,6 +1472,9 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('creates a new competition roster when team and active season already exist', async () => {
+      // Creating rosters is staff-only (managers are refused, see the test below).
+      mocks.state.rolesStore.push({ id: 'role-admin', name: 'Admin', permissions: Permissions.ADMINISTRATOR, position: 5, isOwner: false });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
       const res = await createSchoolRoster({
         schoolId,
         gameId: valGameId,
@@ -1493,6 +1496,9 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
     });
 
     it('refuses to create a roster when the school is not a member of the season, and creates no membership (spec-060)', async () => {
+      // Creating rosters is staff-only; the membership check is reached as a staff admin.
+      mocks.state.rolesStore.push({ id: 'role-admin', name: 'Admin', permissions: Permissions.ADMINISTRATOR, position: 5, isOwner: false });
+      mocks.state.userRolesStore = [{ userId: 'manager-user-1', roleId: 'role-admin' }];
       // No membership row for lol: staff add the school in League Setup first.
       mocks.state.teamsStore = mocks.state.teamsStore.filter((t) => t.gameId !== lolGameId);
 
@@ -1746,12 +1752,13 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(mocks.state.playersStore.some((p) => p.id === 'pl-past')).toBe(true);
     });
 
-    it('createSchoolRoster creates in the resolved (active) season of the manager, never another one', async () => {
-      const res = await createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alumni' });
-      expect(res.success).toBe(true);
-      expect(res.roster.seasonId).toBe('season-val-now');
-      const created = mocks.state.rostersStore.find((r) => r.name === 'Alumni');
-      expect(created).toMatchObject({ schoolId, gameId: valGameId, seasonId: 'season-val-now' });
+    it('createSchoolRoster is refused for a manager, even in their resolved (active) season, with no write', async () => {
+      mocks.state.teamsStore = [];
+      const before = JSON.stringify([mocks.state.teamsStore, mocks.state.rostersStore]);
+      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'Alumni' })).rejects.toThrow(
+        /Only EZ Esports staff can create rosters/
+      );
+      expect(JSON.stringify([mocks.state.teamsStore, mocks.state.rostersStore])).toBe(before);
     });
 
     it('invite approval accepts the student without rostering them; they are then enrolled in the resolved (active) season', async () => {
@@ -1990,15 +1997,31 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       ['emergencySwapSub', () => emergencySwapSub({ rosterId, outPlayerId: 'pl-starter', inPlayerId: 'pl-sub' })],
     ];
 
-    it.each(attempts)('%s is refused for a manager while the season is locked, with no write', async (_name, run) => {
+    // createSchoolRoster is staff-only (refused for every manager, see the test below), so it is not
+    // a lock case for managers.
+    const managerAttempts = attempts.filter(([name]) => name !== 'createSchoolRoster');
+
+    it.each(managerAttempts)('%s is refused for a manager while the season is locked, with no write', async (_name, run) => {
       lockSeason('season-val-now');
       const before = JSON.stringify([mocks.state.playersStore, mocks.state.rostersStore]);
       await expect(run()).rejects.toThrow(LOCKED);
       expect(JSON.stringify([mocks.state.playersStore, mocks.state.rostersStore])).toBe(before);
     });
 
-    it.each(attempts)('%s works for a manager while the season is unlocked', async (_name, run) => {
+    it.each(managerAttempts)('%s works for a manager while the season is unlocked', async (_name, run) => {
       await expect(run()).resolves.toMatchObject({ success: true });
+    });
+
+    it('createSchoolRoster is refused for a manager whether or not the season is locked, with no write', async () => {
+      const before = JSON.stringify([mocks.state.teamsStore, mocks.state.rostersStore]);
+      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(
+        /Only EZ Esports staff can create rosters/
+      );
+      lockSeason('season-val-now');
+      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(
+        /Only EZ Esports staff can create rosters/
+      );
+      expect(JSON.stringify([mocks.state.teamsStore, mocks.state.rostersStore])).toBe(before);
     });
 
     it('unlocking restores manager access', async () => {
@@ -2024,8 +2047,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       await expect(
         updateRosterPlayerRole({ rosterId: lolRosterId, playerId: 'pl-lol', role: 'sub' })
       ).resolves.toMatchObject({ success: true });
-      await expect(createSchoolRoster({ schoolId, gameId: lolGameId, name: 'JV' })).resolves.toMatchObject({ success: true });
-      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
     });
 
     it('the lock applies to the resolved (active) season, and only to it', async () => {
@@ -2034,7 +2055,7 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       mocks.state.seasonsStore.push({ id: 'season-val-next', gameId: valGameId, name: '2027-28', isActive: false, rostersLockedAt: null });
       lockSeason('season-val-now'); // the manager's season (2026-27) is locked
       await expect(deleteSchoolRoster(emptyRosterId)).rejects.toThrow(LOCKED);
-      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
+      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(/Only EZ Esports staff can create rosters/);
       await expect(getSchoolRosters(schoolId, valGameId)).resolves.toBeDefined();
       const scopes = await getAuthorizedGameScopes((await getSchoolManagerContext())!, schoolId);
       expect(scopes!.find((s) => s.gameId === valGameId)).toMatchObject({ seasonIsActive: true, rostersLocked: true });
@@ -2216,7 +2237,8 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       expect(snapshot()).toBe(before);
     });
 
-    it.each(writes('now'))('%s still works for a manager on the ACTIVE season', async (_name, run) => {
+    // createSchoolRoster is staff-only; managers are refused for it on every season.
+    it.each(writes('now').filter(([name]) => name !== 'createSchoolRoster'))('%s still works for a manager on the ACTIVE season', async (_name, run) => {
       pointManagerAt('2026-27');
       await expect(run()).resolves.toBeDefined();
     });
@@ -2245,7 +2267,6 @@ describe('Milestone 3: School Manager Portal & Live Eligibility Gates', () => {
       pointManagerAt('2026-27');
       mocks.state.seasonsStore.find((s) => s.id === 'season-val-now').rostersLockedAt = new Date();
       await expect(deleteSchoolRoster('r-now-empty')).rejects.toThrow(LOCKED);
-      await expect(createSchoolRoster({ schoolId, gameId: valGameId, name: 'JV' })).rejects.toThrow(LOCKED);
     });
 
     it('with no active season every season of the game is view-only, newest included', async () => {
