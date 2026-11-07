@@ -260,10 +260,12 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 
 ## School-owned rosters and season membership (spec-060)
 
-- **DEPLOY ORDER: apply migration `0060` BEFORE deploying; apply `0061` AFTER the code is live.** Deploying first breaks every roster, team, standings and match read (the new queries select columns and a table that do not exist). Nothing has been applied anywhere.
-- 0060 runs in ONE transaction (expand, backfill and constraints together): a failed constraint rolls the whole backfill back. Rehearse 0060 and 0061 on a restored backup first: PGlite is not Supabase (RLS policies are only loaded; the `season_schools` view grants and the rewritten policies are untested there).
-- 0060 step 5(b) adds membership rows for schools with an archived standings snapshot and step 6 gives every membership its missing rosters (archived seasons included, empty rosters; the user accepts that these schools now appear in the public directory). The admin dashboard "teams without a roster" warning counts active seasons only. Check `npm run db:verify:roster-backfill` for the count. Later migrations must have a journal `when` above 1790882000031.
-- `db/verify-roster-backfill.ts` is for around 0060 (it reads `teams`): run it BEFORE 0060 for a read-only preview of the backfill, and AFTER 0060 to confirm; it is not meant for after 0061 (`teams` is gone).
+- **Applied to production 6 Nov 2026** (0060 before the deploy, 0061 after; record in spec-060 "Rollout record"). The deploy-order and rehearsal items are resolved. Later migrations must have a journal `when` above 1790882000031.
+- **Open: Supabase RLS behavioral verification.** The 0061 policy and `roster_standings` view rewrite for the anon/authenticated roles was reviewed only; check as anon and as an authenticated user that public reads and manager reads return what they did before.
+- **Open: admin and manager portal smoke test.** Not exercised after the rollout (needs sign-in).
+- **Cleanup:** the backups taken for the rollout live in `db/backups/` and hold student PII (gitignored); delete them once no longer needed.
+- 0060 step 5(b) added membership rows for schools with an archived standings snapshot (one row: teams 167 -> 168) and step 6 gave every membership its missing rosters (archived seasons included, empty rosters; the user accepts that these schools now appear in the public directory). The admin dashboard "teams without a roster" warning counts active seasons only.
+- `db/verify-roster-backfill.ts` reads `teams` and is not meant for use after 0061 (`teams` is gone).
 - Opponents' derived standings (the `roster_standings` view) keep counting played matches against a removed school by design.
 - The local dev server (`npm run dev:local`) runs the app on one database connection; a transaction that waits on a second connection would hang there (PGlite limit, not production).
 

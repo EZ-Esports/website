@@ -1,8 +1,8 @@
 # Running the site against a local database
 
-`.env` points at the production database, and production does not have the roster-redesign schema
-(migrations 0060 and 0061, [spec-060](../../spec/spec-060-school-owned-season-rosters.md)) until someone
-applies it. So the app cannot run on `.env` as it is. This is a safe local alternative: a throwaway Postgres
+`.env` points at the production database, which has the roster-redesign schema (migrations 0060 and 0061,
+[spec-060](../../spec/spec-060-school-owned-season-rosters.md), applied 6 Nov 2026). Running a dev server on
+`.env` would still touch live data. This is a safe local alternative: a throwaway Postgres
 (PGlite served over a loopback socket) with every migration applied and invented sample data. It never reads
 `.env`, never connects to a remote host, and keeps its data in the git-ignored `.local-db/` folder.
 
@@ -58,7 +58,7 @@ touch only the local database.
 
 ## Before running the real migrations
 
-There are two: `0060` (expand + backfill + constrain, applied BEFORE the deploy) and `0061` (contract, applied AFTER). `0060` runs in one transaction, so if a constraint fails the whole backfill rolls back and nothing is left half-done. Because that failure only shows at the end, rehearse on a restored backup of production first (a throwaway Postgres loaded from a `pg_dump`, never production itself), and run the read-only `npm run db:verify:roster-backfill` before (a preview of the backfill) and after (a confirmation). That script, like the migrations, is only ever pointed at a database the owner names.
+The roster-redesign pair (`0060`, expand + backfill + constrain; `0061`, contract) is already applied to production; the same approach applies to any future migration. `0060` ran in one transaction, so if a constraint fails the whole backfill rolls back and nothing is left half-done. Because that failure only shows at the end, rehearse on a restored backup of production first (a throwaway Postgres loaded from a `pg_dump`, never production itself), and run the read-only `npm run db:verify:roster-backfill` before (a preview of the backfill) and after (a confirmation). That script, like the migrations, is only ever pointed at a database the owner names.
 
 ## Safety
 
