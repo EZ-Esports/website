@@ -30,6 +30,8 @@ interface RostersSectionProps {
   allGameIds?: string[];
   eligibilityResults: Record<string, RosterEligibilityResult>;
   evaluatingRosterId: string | null;
+  /** Whether this viewer may create rosters. EZ Esports staff only; school managers cannot. */
+  canCreateRoster?: boolean;
   onOpenCreateRosterModal: () => void;
   onOpenEnrollModal: (roster: SchoolRosterDetails) => void;
   onCheckRosterGate: (rosterId: string) => void;
@@ -56,6 +58,7 @@ export function RostersSection({
   allGameIds = [],
   eligibilityResults,
   evaluatingRosterId,
+  canCreateRoster = false,
   onOpenCreateRosterModal,
   onOpenEnrollModal,
   onCheckRosterGate,
@@ -97,15 +100,17 @@ export function RostersSection({
           <h2 className="text-xl font-bold text-white tracking-tight">Team Rosters & Eligibility Gates</h2>
           <p className="text-xs sm:text-sm text-zinc-400">Check each roster before tournament registration.</p>
         </div>
-        <Button
-          data-tour="create-roster"
-          onPress={onOpenCreateRosterModal}
-          isDisabled={createLocked}
-          className="self-start sm:self-auto min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <HiOutlinePlus className="w-4 h-4" />
-          <span>Create Roster</span>
-        </Button>
+        {canCreateRoster && (
+          <Button
+            data-tour="create-roster"
+            onPress={onOpenCreateRosterModal}
+            isDisabled={createLocked}
+            className="self-start sm:self-auto min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <HiOutlinePlus className="w-4 h-4" />
+            <span>Create Roster</span>
+          </Button>
+        )}
       </div>
 
       {anyViewOnly && (
@@ -158,14 +163,18 @@ export function RostersSection({
       {rosters.length === 0 ? (
         <div className="p-8 text-center rounded-2xl bg-zinc-900/40 border border-zinc-800 text-zinc-400 text-sm space-y-3">
           <p>No active rosters configured for {schoolName}.</p>
-          <Button
-            onPress={onOpenCreateRosterModal}
-            isDisabled={createLocked}
-            className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
-          >
-            <HiOutlinePlus className="w-4 h-4" />
-            <span>Create First Roster</span>
-          </Button>
+          {canCreateRoster ? (
+            <Button
+              onPress={onOpenCreateRosterModal}
+              isDisabled={createLocked}
+              className="disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+            >
+              <HiOutlinePlus className="w-4 h-4" />
+              <span>Create First Roster</span>
+            </Button>
+          ) : (
+            <p className="text-xs">Rosters are set up by EZ Esports staff. Contact an admin to request one.</p>
+          )}
         </div>
       ) : (
         seasonGroups.map(([seasonId, group]) => {

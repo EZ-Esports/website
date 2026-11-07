@@ -82,7 +82,7 @@ export default function SchoolPortalClient(props: SchoolPortalClientProps) {
 }
 
 function SchoolPortalContent({
-  context: _context,
+  context,
   activeSchool,
   games,
   initialInvites,
@@ -603,7 +603,7 @@ function SchoolPortalContent({
         actions={
           <PortalTour
             tourCompleted={tourCompleted}
-            accountId={_context.userId}
+            accountId={context.userId}
             schoolName={activeSchool.schoolName}
           />
         }
@@ -659,6 +659,7 @@ function SchoolPortalContent({
         allGameIds={games.map((g) => g.id)}
         eligibilityResults={eligibilityResults}
         evaluatingRosterId={evaluatingRosterId}
+        canCreateRoster={context.isStaffAdmin}
         onOpenCreateRosterModal={() => {
           setIsCreateRosterOpen(true);
           setCreateRosterError(null);

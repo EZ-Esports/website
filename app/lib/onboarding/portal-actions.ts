@@ -1174,6 +1174,12 @@ export async function createSchoolRoster(
     gameId
   );
 
+  // Creating rosters is staff-only: managers can view and manage players but not create rosters
+  // (the portal hides the button; this enforces it on the server).
+  if (!createContext.isStaffAdmin) {
+    throw new Error('Only EZ Esports staff can create rosters');
+  }
+
   // 2. Fetch game details
   const [game] = await db
     .select({

@@ -269,3 +269,7 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Opponents' derived standings (the `roster_standings` view) keep counting played matches against a removed school by design.
 - The local dev server (`npm run dev:local`) runs the app on one database connection; a transaction that waits on a second connection would hang there (PGlite limit, not production).
 
+
+## Manager create-roster (spec-061)
+
+- Resolved: `createSchoolRoster` now refuses non-staff callers (`Only EZ Esports staff can create rosters`), so the manager Create Roster control is enforced on the server as well as hidden in the UI. Not yet merged or deployed.
