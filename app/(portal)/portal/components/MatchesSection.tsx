@@ -9,6 +9,7 @@ import {
   filterByDivision,
   schoolMatchStatusLabel,
   splitSchoolMatches,
+  type ManagedSeasonItem,
   type SchoolMatchItem,
 } from '@/app/lib/school-matches';
 import { RescheduleCell } from './RescheduleControls';
@@ -17,6 +18,8 @@ import { useStaffActing } from './StaffActing';
 
 interface MatchesSectionProps {
   matches: SchoolMatchItem[];
+  /** The seasons in scope for this view: each gets a reschedule banner, even with no matches. */
+  seasons: ManagedSeasonItem[];
   /** The school whose portal is open: the side that requests, responds or cancels reschedules. */
   schoolId: string;
   /** Games whose season is inactive for this manager: reschedule actions are hidden. */
@@ -161,34 +164,27 @@ function MatchTable({
 }
 
 /** A callout per season showing how many reschedules this school has left (each school gets one). */
-function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) {
+function RescheduleAllowanceNotice({ seasons }: { seasons: ManagedSeasonItem[] }) {
   // Staff are exempt from the allowance (spec-055), so the school's count is not theirs to read.
   const { isStaff } = useStaffActing();
-  const seasons = new Map<string, { name: string; used: boolean }>();
-  for (const match of matches) {
-    const key = `${match.gameId}|${match.seasonName}`;
-    const entry = seasons.get(key) ?? { name: match.seasonName, used: false };
-    if (match.rescheduleAllowanceUsed) entry.used = true;
-    seasons.set(key, entry);
-  }
-  if (isStaff || seasons.size === 0) return null;
+  if (isStaff || seasons.length === 0) return null;
   return (
     <div className="space-y-2">
-      {[...seasons.entries()].map(([key, season]) => (
+      {seasons.map((season) => (
         <div
-          key={key}
+          key={season.id}
           role="status"
           className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm ${
-            season.used
+            season.rescheduleAllowanceUsed
               ? 'border-amber-700/60 bg-amber-950/30 text-amber-200'
               : 'border-emerald-700/60 bg-emerald-950/30 text-emerald-200'
           }`}
         >
           <span className="font-semibold">
-            {season.name}: Reschedules remaining {season.used ? '0' : '1'} of 1
+            {season.name}: Reschedules remaining {season.rescheduleAllowanceUsed ? '0' : '1'} of 1
           </span>
           <span className="text-xs opacity-80">
-            {season.used
+            {season.rescheduleAllowanceUsed
               ? 'Your school has used its one reschedule for this season.'
               : 'Your school can request one reschedule for this season.'}
           </span>
@@ -200,6 +196,7 @@ function RescheduleAllowanceNotice({ matches }: { matches: SchoolMatchItem[] }) 
 
 export function MatchesSection({
   matches,
+  seasons,
   schoolId,
   viewOnlyGameIds,
   nowIso,
@@ -246,7 +243,7 @@ export function MatchesSection({
         </div>
       )}
 
-      <RescheduleAllowanceNotice matches={matches} />
+      <RescheduleAllowanceNotice seasons={seasons} />
 
       <div data-tour="matches-list">
       <Tabs>

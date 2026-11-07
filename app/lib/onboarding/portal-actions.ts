@@ -34,7 +34,7 @@ import {
 import { getGameCounts, getPendingSubmissions as getPendingMatchResults, type PendingSubmissionItem } from '@/app/lib/db/match-results';
 import type { RescheduleRequestItem } from '@/app/lib/reschedule-rules';
 import { redactHiddenMatches } from '@/app/lib/season-outcomes';
-import { toSchoolMatchItem, type SchoolMatchItem } from '@/app/lib/school-matches';
+import { toSchoolMatchItem, type ManagedSeasonItem, type SchoolMatchItem } from '@/app/lib/school-matches';
 
 /**
  * Tells the roster-membership seam about members whose roster changed. Call it only AFTER the
@@ -981,7 +981,11 @@ export async function getSchoolMatches(
       console.error('Failed to load rescheduled matches', error);
       return new Map<string, string>();
     }),
-    getSeasonsWithRescheduleAllowanceUsed(schoolId, [...new Set(visible.map((row) => row.seasonId))]).catch(
+    // Covers every in-scope season, not only those with a visible match, so the banner count agrees.
+    getSeasonsWithRescheduleAllowanceUsed(
+      schoolId,
+      scopes ? scopes.map((s) => s.seasonId) : [...new Set(visible.map((row) => row.seasonId))]
+    ).catch(
       (error) => {
         console.error('Failed to load reschedule allowances', error);
         return new Set<string>();
@@ -1006,6 +1010,34 @@ export async function getSchoolMatches(
     });
     return { ...item, rescheduleAllowanceUsed: allowanceUsed.has(row.seasonId) };
   });
+}
+
+/**
+ * The editable seasons a manager works in at a school (their resolved season per managed game,
+ * view-only seasons excluded since their reschedule controls are hidden), each with whether the
+ * school has used its one reschedule there (spec-039). Empty for a staff admin, who sees no banner.
+ * Fails closed: if the allowance lookup fails, returns [] so no banner shows a wrong count.
+ */
+export async function getSchoolManagedSeasons(schoolId: string): Promise<ManagedSeasonItem[]> {
+  const { scopes } = await resolveManagerScope(schoolId);
+  if (!scopes) return [];
+  const editable = scopes.filter((s) => !s.readOnly);
+  if (editable.length === 0) return [];
+
+  const used = await getSeasonsWithRescheduleAllowanceUsed(
+    schoolId,
+    editable.map((s) => s.seasonId)
+  ).catch((error) => {
+    console.error('Failed to load reschedule allowances', error);
+    return null;
+  });
+  if (!used) return [];
+  return editable.map((s) => ({
+    id: s.seasonId,
+    name: s.seasonName,
+    gameId: s.gameId,
+    rescheduleAllowanceUsed: used.has(s.seasonId),
+  }));
 }
 
 /**
