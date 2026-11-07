@@ -19,7 +19,7 @@ import {
   type SchoolPoolPlayer,
   type RosterEligibilityResult,
 } from '@/app/lib/onboarding/portal-actions';
-import type { SchoolMatchItem } from '@/app/lib/school-matches';
+import type { ManagedSeasonItem, SchoolMatchItem } from '@/app/lib/school-matches';
 import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { rosterRemovalConfirmMessage } from '@/app/lib/roster-removal-copy';
@@ -52,6 +52,8 @@ interface SchoolPortalClientProps {
   /** The school's matches (read-only) and the server clock that splits them into Upcoming/Past. */
   matches: SchoolMatchItem[];
   matchesNowIso: string;
+  /** The manager's in-scope seasons (one per game), for the reschedule banner; empty for staff. */
+  managedSeasons: ManagedSeasonItem[];
   selectedGameId?: string;
   /** Season name(s) the manager is working in (matched by name); undefined for a staff admin. */
   seasonLabel?: string;
@@ -91,6 +93,7 @@ function SchoolPortalContent({
   initialPlayerPool = [],
   matches,
   matchesNowIso,
+  managedSeasons,
   selectedGameId: initialGameId,
   seasonLabel,
   hasInactiveSeason = false,
@@ -161,6 +164,8 @@ function SchoolPortalContent({
 
   const filteredMatches =
     selectedGame === 'all' ? matches : matches.filter((m) => m.gameId === selectedGame);
+  const filteredSeasons =
+    selectedGame === 'all' ? managedSeasons : managedSeasons.filter((s) => s.gameId === selectedGame);
 
   // --- Handlers ---
   // The invite whose fresh link was just copied, and the link itself when the clipboard refused it.
@@ -679,6 +684,7 @@ function SchoolPortalContent({
       {/* Scheduled matches (read-only) */}
       <MatchesSection
         matches={filteredMatches}
+        seasons={filteredSeasons}
         schoolId={activeSchool.schoolId}
         viewOnlyGameIds={viewOnlyGameIds}
         nowIso={matchesNowIso}

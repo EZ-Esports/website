@@ -312,6 +312,20 @@ describe('getSchoolMatches', () => {
     log.mockRestore();
   });
 
+  it('looks up the allowance for every in-scope season, not only those with a match', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([
+      { seasonId: 'season-1', gameId: 'game-1', seasonName: '2026-27' },
+      { seasonId: 'season-2', gameId: 'game-2', seasonName: '2026-27' },
+    ]);
+    mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'm', seasonId: 'season-1' })]);
+    mocks.getSeasonsWithRescheduleAllowanceUsed.mockResolvedValue(new Set(['season-2']));
+
+    const items = await load('stuy');
+
+    expect(mocks.getSeasonsWithRescheduleAllowanceUsed).toHaveBeenCalledWith('stuy', ['season-1', 'season-2']);
+    expect(items[0]).toMatchObject({ rescheduleAllowanceUsed: false });
+  });
+
   it('gives a staff admin every season, unredacted', async () => {
     mocks.getAuthorizedGameScopes.mockResolvedValue(null);
     mocks.getSchoolMatchRows.mockResolvedValue([row({ id: 'raw', status: 'forfeit' })]);
@@ -325,5 +339,74 @@ describe('getSchoolMatches', () => {
     });
     expect(mocks.getOutcomesPublicSeasonIds).not.toHaveBeenCalled();
     expect(items[0]).toMatchObject({ ownScore: 2, opponentScore: 1, status: 'forfeit' });
+  });
+});
+
+describe('getSchoolManagedSeasons', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.assertManagerForSchool.mockResolvedValue({});
+    mocks.getSeasonsWithRescheduleAllowanceUsed.mockResolvedValue(new Set());
+  });
+
+  async function load(schoolId: string) {
+    const { getSchoolManagedSeasons } = await import('@/app/lib/onboarding/portal-actions');
+    return getSchoolManagedSeasons(schoolId);
+  }
+
+  it('lists every in-scope season, including one with no matches, with its allowance state', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([
+      { seasonId: 'season-1', seasonName: '2026-27', gameId: 'game-1' },
+      { seasonId: 'season-2', seasonName: '2026-27', gameId: 'game-2' },
+    ]);
+    mocks.getSeasonsWithRescheduleAllowanceUsed.mockResolvedValue(new Set(['season-2']));
+
+    expect(await load('stuy')).toEqual([
+      { id: 'season-1', name: '2026-27', gameId: 'game-1', rescheduleAllowanceUsed: false },
+      { id: 'season-2', name: '2026-27', gameId: 'game-2', rescheduleAllowanceUsed: true },
+    ]);
+    expect(mocks.getSchoolMatchRows).not.toHaveBeenCalled();
+    expect(mocks.getSeasonsWithRescheduleAllowanceUsed).toHaveBeenCalledWith('stuy', ['season-1', 'season-2']);
+  });
+
+  it('returns nothing when the manager has no managed season', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([]);
+    expect(await load('stuy')).toEqual([]);
+    expect(mocks.getSeasonsWithRescheduleAllowanceUsed).not.toHaveBeenCalled();
+  });
+
+  it('returns nothing for a staff admin, who has no banner', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue(null);
+    expect(await load('stuy')).toEqual([]);
+  });
+
+  it('hides the banner (returns nothing) when the allowance lookup fails, rather than showing an unverified count', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([{ seasonId: 'season-1', seasonName: '2026-27', gameId: 'game-1', readOnly: false }]);
+    mocks.getSeasonsWithRescheduleAllowanceUsed.mockRejectedValue(new Error('relation does not exist'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await load('stuy')).toEqual([]);
+    expect(log).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  it('excludes view-only (inactive) seasons, whose reschedule controls are hidden', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([
+      { seasonId: 'season-1', seasonName: '2026-27', gameId: 'game-1', readOnly: false },
+      { seasonId: 'season-2', seasonName: '2025-26', gameId: 'game-2', readOnly: true },
+    ]);
+
+    expect(await load('stuy')).toEqual([
+      { id: 'season-1', name: '2026-27', gameId: 'game-1', rescheduleAllowanceUsed: false },
+    ]);
+    expect(mocks.getSeasonsWithRescheduleAllowanceUsed).toHaveBeenCalledWith('stuy', ['season-1']);
+  });
+
+  it('returns nothing when every managed season is view-only', async () => {
+    mocks.getAuthorizedGameScopes.mockResolvedValue([
+      { seasonId: 'season-2', seasonName: '2025-26', gameId: 'game-2', readOnly: true },
+    ]);
+    expect(await load('stuy')).toEqual([]);
+    expect(mocks.getSeasonsWithRescheduleAllowanceUsed).not.toHaveBeenCalled();
   });
 });

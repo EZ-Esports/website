@@ -57,6 +57,18 @@ export interface SchoolMatchItem {
   pendingResult: PendingResultItem | null;
 }
 
+/**
+ * A season the manager works in (one per managed game, spec-026). Listed even with no matches, so
+ * its reschedule banner always shows (spec-039).
+ */
+export interface ManagedSeasonItem {
+  id: string;
+  name: string;
+  gameId: string;
+  /** The school has used its reschedule allowance for this season. */
+  rescheduleAllowanceUsed: boolean;
+}
+
 export interface PendingResultItem {
   /** ISO time before which a retry is pointless; null when the service gave none. */
   retryAfter: string | null;
