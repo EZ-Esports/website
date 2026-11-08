@@ -107,7 +107,7 @@ export default async function OnboardingFormPage() {
           <Step n={1} title="Create the Google Form and add the verification question">
             <p>
               In Google Forms, create or open your form and add a <strong className={strong}>Short answer</strong>{' '}
-              question. Title it exactly <code className={code}>Verification code</code> and switch on{' '}
+              question. Start its title with <code className={code}>Verification code</code> (put any instructions in the description, not the title) and switch on{' '}
               <strong className={strong}>Required</strong>.
             </p>
             <p>
@@ -222,7 +222,7 @@ export default async function OnboardingFormPage() {
             <p>
               If it does not, open Apps Script &gt; <strong className={strong}>Executions</strong> and look for an error, and
               confirm the trigger exists and was authorized, the <code className={code}>WEBHOOK_KEY</code> value matches
-              step 6, the question is titled exactly <code className={code}>Verification code</code>, and the form is
+              step 6, the question&apos;s title starts with <code className={code}>Verification code</code>, and the form is
               accepting responses.
             </p>
           </Step>

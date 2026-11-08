@@ -29,6 +29,7 @@ export const FORM_STEP = 6;
 export function stepForRejection(code: string, fields: readonly string[] = []): 1 | 2 | 3 | 4 | 5 | 6 {
   if (code === 'content_flagged' || code === 'field_too_long') return stepForContentFields(fields);
   if (code === 'onboarding_form_required') return FORM_STEP;
+  if (code === 'consent_invalid') return 5;
   if (
     code === 'manager_password_required' ||
     code === 'play_games_required' ||

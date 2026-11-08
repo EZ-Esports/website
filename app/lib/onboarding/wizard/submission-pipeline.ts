@@ -108,10 +108,17 @@ export function validateSubmissionInputs(
   }
 
   // Consent is enforced here, server-side, so it cannot be skipped by calling the action directly.
-  const consent = validateConsent(submission.consent, {
-    age,
-    fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
-  });
+  // A failure is a student-fixable rejection (returned, not thrown, so production does not mask the
+  // message) that sends them back to Step 5. validateConsent's messages never echo submitted values.
+  let consent: ReturnType<typeof validateConsent>;
+  try {
+    consent = validateConsent(submission.consent, {
+      age,
+      fallbackParticipantName: `${legalFirstName} ${legalLastName}`,
+    });
+  } catch (err) {
+    throw new OnboardingRejection('consent_invalid', err instanceof Error ? err.message : 'Please review the consent form.');
+  }
 
   return {
     email,

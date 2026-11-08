@@ -18,7 +18,8 @@ export function googleFormWebhookEndpoint(nodeEnv: string | undefined = process.
  * The Apps Script staff paste into the onboarding Google Form (spec-051). Kept as a function of the
  * endpoint URL so the staff page shows a script that already points at this deployment.
  *
- * It reads the "Verification code" answer and posts it to the website. Delivery rules, matching the
+ * It reads the answer to the question whose title STARTS with "Verification code" (case-insensitive, so a
+ * reworded title such as "Verification code (please leave unchanged)" still works) and posts it to the website. Delivery rules, matching the
  * route's status codes:
  *
  * - 2xx: done.
@@ -45,7 +46,7 @@ function onFormSubmit(e) {
 
   const code = findVerificationCode_(e);
   if (!code) {
-    console.warn('This response has no verification code, so it was not reported.');
+    console.error('This response has no verification code, so it was not reported.');
     return;
   }
   report_(code, key);
@@ -54,7 +55,7 @@ function onFormSubmit(e) {
 function findVerificationCode_(e) {
   const answers = e.response.getItemResponses();
   for (let i = 0; i < answers.length; i++) {
-    if (answers[i].getItem().getTitle().trim().toLowerCase() === QUESTION_TITLE.toLowerCase()) {
+    if (answers[i].getItem().getTitle().trim().toLowerCase().indexOf(QUESTION_TITLE.toLowerCase()) === 0) {
       return String(answers[i].getResponse()).trim();
     }
   }

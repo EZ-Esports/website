@@ -192,17 +192,20 @@ export function ConsentStep({
                   {CONSENT_TEXT.guardianRelationshipLabel}
                   <RequiredMark />
                 </label>
-                <input
+                <select
                   id="consent-guardian-relationship"
-                  {...contentFieldProps('guardianRelationship', contentFlags)}
-                  type="text"
-                  autoComplete="off"
                   value={guardianRelationship}
                   onChange={(e) => setGuardianRelationship(e.target.value)}
                   className={inputClass}
                   required
-                />
-                <ContentFlagNotice field="guardianRelationship" controls={contentFlags} />
+                >
+                  <option value="">{CONSENT_TEXT.guardianRelationshipPlaceholder}</option>
+                  {CONSENT_TEXT.guardianRelationshipOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div>

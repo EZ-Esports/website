@@ -89,4 +89,8 @@ describe('stepForRejection', () => {
       expect(stepForRejection(code)).toBe(2);
     }
   });
+
+  it('sends a consent rejection to step 5', () => {
+    expect(stepForRejection('consent_invalid')).toBe(5);
+  });
 });
