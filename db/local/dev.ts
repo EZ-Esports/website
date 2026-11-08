@@ -14,7 +14,7 @@ import { requireLocalUrl } from './target';
 const url = requireLocalUrl();
 console.log(`Starting next dev with DATABASE_URL=${url} (local, from this script; .env's DATABASE_URL is ignored).`);
 
-const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['next', 'dev'], {
+const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['next', 'dev', '--webpack'], {
   stdio: 'inherit',
   // One connection: the local server is PGlite (a single connection); more would interleave protocol messages.
   env: { ...process.env, DATABASE_URL: url, DATABASE_POOL_MAX: '1' },
