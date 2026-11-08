@@ -2,7 +2,7 @@
 
 - **Spec ID:** spec-062
 - **Title:** Replace the free-text "Relationship to Participant" on the under-18 consent form with a fixed list
-- **Status:** Implemented in the working tree, not yet committed or deployed. No migration.
+- **Status:** Implemented on branch `consent-relationship-dropdown`, unmerged and not deployed. No migration.
 - **Date:** 2026-11-08
 - **Scope:** `app/lib/onboarding/consent.ts`, `components/steps/ConsentStep.tsx`, `consent.test.ts`, `milestone4-player-wizard.test.ts`; plus the two follow-ups below (consent rejection routing, Apps Script title match).
 - **Builds on:** [spec-029](spec-029-onboarding-consent-form.md) (consent form, versioning).
