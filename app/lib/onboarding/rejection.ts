@@ -13,7 +13,8 @@ export type OnboardingRejectionCode =
   | 'field_too_long'
   | 'school_email_invalid'
   | 'school_email_already_used'
-  | 'student_id_required';
+  | 'student_id_required'
+  | 'consent_invalid';
 
 export class OnboardingRejection extends Error {
   readonly code: OnboardingRejectionCode;

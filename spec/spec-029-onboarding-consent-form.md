@@ -23,7 +23,7 @@ Migration `0052_onboarding_consents.sql` (hand-written like `0043`-`0051`; journ
 
 ## Form versioning
 
-`CONSENT_FORM_VERSION` (`2026-10-v1`) is stored on every row. `CONSENT_TEXT` is legal wording; `consent.test.ts` pins a SHA-256 of it, so editing the text fails the test until the version is bumped and the pin updated. The wording itself is not stored per row; the version identifies it.
+`CONSENT_FORM_VERSION` (`2026-11-v1` since [spec-062](spec-062-consent-relationship-dropdown.md); `2026-10-v1` before) is stored on every row. `CONSENT_TEXT` is legal wording; `consent.test.ts` pins a SHA-256 of it, so editing the text fails the test until the version is bumped and the pin updated. The wording itself is not stored per row; the version identifies it.
 
 ## Not done / follow-ups
 

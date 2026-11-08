@@ -53,6 +53,19 @@ describe('buildAppsScript', () => {
     expect(() => new Function(script)).not.toThrow();
   });
 
+  it('matches the question by title prefix, case-insensitively, not by equality', () => {
+    expect(script).toContain('.indexOf(QUESTION_TITLE.toLowerCase()) === 0');
+    expect(script).not.toMatch(/getTitle\(\)\.trim\(\)\.toLowerCase\(\) === /);
+    const find = new Function(
+      `${script}; return findVerificationCode_;`
+    )() as (e: unknown) => string;
+    const answer = (title: string, value: string) => ({ getItem: () => ({ getTitle: () => title }), getResponse: () => value });
+    const event = (items: unknown[]) => ({ response: { getItemResponses: () => items } });
+    expect(find(event([answer('Name', 'x'), answer('  Verification code (please leave unchanged) ', ' abc ')]))).toBe('abc');
+    expect(find(event([answer('VERIFICATION CODE', 'z')]))).toBe('z');
+    expect(find(event([answer('Your verification code', 'z')]))).toBe('');
+  });
+
   it('quotes an endpoint safely', () => {
     expect(() => new Function(buildAppsScript('https://x.test/a";alert(1);//'))).not.toThrow();
   });

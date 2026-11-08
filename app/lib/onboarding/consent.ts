@@ -13,7 +13,7 @@
 
 import { ROUTES } from '@/app/lib/constants';
 
-export const CONSENT_FORM_VERSION = '2026-10-v1';
+export const CONSENT_FORM_VERSION = '2026-11-v1';
 
 /** Where the Terms of Service the signer is asked to review live. */
 export const TERMS_OF_SERVICE_PATH = ROUTES.terms;
@@ -62,6 +62,9 @@ export const CONSENT_TEXT = {
   guardianInfoHeading: '4. Parent or Legal Guardian Information',
   guardianNameLabel: 'Full Legal Name:',
   guardianRelationshipLabel: 'Relationship to Participant:',
+  /** The only accepted answers; the form shows them as a dropdown and the server re-checks them. */
+  guardianRelationshipOptions: ['Mother', 'Father', 'Guardian'],
+  guardianRelationshipPlaceholder: 'Select one',
   guardianEmailLabel: 'Email Address:',
   signatureHeading: '5. Electronic Signature',
   signatureIntro:
@@ -192,6 +195,9 @@ export function validateConsent(
   }
   if (!guardianRelationship) {
     throw new Error('The parent or legal guardian must state their relationship to the participant.');
+  }
+  if (!(CONSENT_TEXT.guardianRelationshipOptions as readonly string[]).includes(guardianRelationship)) {
+    throw new Error('Choose the parent or legal guardian\'s relationship to the participant from the list.');
   }
   if (!guardianEmail || !EMAIL_PATTERN.test(guardianEmail)) {
     throw new Error("A valid parent or legal guardian email address is required.");

@@ -1,17 +1,8 @@
 import type { NextConfig } from "next";
 
-import path from "path";
-
 import { GAME_SLUGS, getGameDivisionRoute } from "./app/lib/constants";
 
-const turbopackRoot = path.resolve(__dirname).includes('.gemini/worktrees')
-  ? path.resolve(__dirname, '../../..')
-  : path.resolve(__dirname);
-
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: turbopackRoot,
-  },
   /**
    * The bare game URL resolves to that game's Varsity hub.
    *

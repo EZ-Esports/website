@@ -790,7 +790,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         tosAcknowledged: true,
         participantLegalName: 'Riley Chen',
         guardianFullName: 'Morgan Chen',
-        guardianRelationship: 'Parent',
+        guardianRelationship: 'Mother',
         guardianEmail: 'Morgan.Chen@example.com',
         guardianSignature: 'MC',
       };
@@ -868,10 +868,23 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
           ageAtSigning: 15,
           participantLegalName: 'Riley Chen',
           guardianFullName: 'Morgan Chen',
-          guardianRelationship: 'Parent',
+          guardianRelationship: 'Mother',
           guardianEmail: 'morgan.chen@example.com',
           guardianSignature: 'MC',
         });
+      });
+
+      it('returns a consent_invalid rejection (not a throw) for a relationship outside the list, without echoing it', async () => {
+        const result = await submitPlayerOnboarding({
+          token: rawToken,
+          submission: { ...minorSubmission(), consent: { ...guardianConsent, guardianRelationship: 'Mom' } },
+        });
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.code).toBe('consent_invalid');
+        expect(result.error).toMatch(/relationship/i);
+        expect(result.error).not.toContain('Mom');
+        expect(mocks.state.onboardingConsentsStore).toHaveLength(0);
       });
 
       it('rejects a date of birth in the future', async () => {
@@ -1848,7 +1861,7 @@ describe('Milestone 4: Player Onboarding Wizard & Server Actions', () => {
         tosAcknowledged: true,
         participantLegalName: 'Riley Chen',
         guardianFullName: 'Morgan Chen',
-        guardianRelationship: 'Parent',
+        guardianRelationship: 'Mother',
         guardianEmail: 'morgan@example.com',
         guardianSignature: 'MC',
       };

@@ -1,16 +1,11 @@
 import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import LoginForm from './LoginForm';
+import { MESSAGE_MAP } from './messages';
 
 interface LoginPageProps {
   searchParams: Promise<{ message?: string; error?: string }>;
 }
-
-// Allowlist of known message keys to fixed display strings — prevents arbitrary
-// text from ?message= being reflected into the page (open redirect / XSS vector).
-export const MESSAGE_MAP: Record<string, string> = {
-  'account-created': 'Account created. Please sign in.',
-};
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { message } = await searchParams;

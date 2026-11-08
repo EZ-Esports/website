@@ -222,6 +222,20 @@ An earlier attempt at the Google Form step (never pushed, unrecoverable) was rev
 
 Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find the existing `ezesports` project; it created an empty project named `website` in the personal scope and linked to it. The wrong link was visible only because that project had no environment variables. It had no deployments and was deleted with `vercel project rm website`; the checkout was relinked with `vercel link --project ezesports --yes`. Rule: before setting any variable, check the linked project's name in `.vercel/project.json` and that `vercel env ls production` shows `DATABASE_URL`; link with an explicit `--project ezesports`. The same session also showed the webhook bearer is the derived key, not the raw secret (see spec-051).
 
+## 24. Reworded verification question silently stopped onboarding (spec-051, spec-062, Nov 2026)
+
+**Symptom.** Students reached Step 6 and stayed on "waiting for your submission". Google showed "You've already responded" on resubmit. `/api/google-form/complete` was never called, and the completion count did not rise.
+
+**Root cause (strongly indicated, not confirmed from the Apps Script Executions log).** The form question had been retitled to "Verification code (please leave unchanged)". The Apps Script matched the title with exact equality, found no code, logged a `console.warn` and returned normally, so Google saw a successful run: no failure email, no retry, no error in Executions.
+
+**Fix.** `findVerificationCode_` now matches a title that STARTS with "Verification code" (trimmed, case-insensitive); the no-code branch logs `console.error` (still returns, so Google does not retry); the staff page says the title must start with "Verification code" and instructions belong in the description. Staff must paste the new script into the form's Apps Script, since the old text lives in Google, not in this repo. Affected students need a fresh form submission only if their response had no code reported. Resubmitting is blocked by Google when "Limit to 1 response" is on; clearing that student's response or turning the limit off should free them, but this has **not been verified against Google Forms**. If it does not work, the fallback is a manual completion row, which is not built (spec-051 pitfall 9). Have them reopen the form from Step 6 for a fresh code.
+
+**What to check next time.** Apps Script > Executions: a run with "This response has no verification code" in the log means the title no longer starts with "Verification code". A missing run means the trigger is missing or unauthorized. Also confirm the form is accepting responses.
+
+**Do not repeat.** A step that can "succeed" without doing its job must be loud (error level) and tolerant of cosmetic edits to Google-side text.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

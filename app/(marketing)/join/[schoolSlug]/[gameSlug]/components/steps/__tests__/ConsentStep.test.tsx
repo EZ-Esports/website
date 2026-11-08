@@ -28,6 +28,14 @@ describe('ConsentStep', () => {
     expect(html).not.toContain('consent-guardian-signature');
   });
 
+  it('offers the relationship as a dropdown of Mother, Father and Guardian', () => {
+    const html = renderToStaticMarkup(<ConsentStep {...baseProps} age={16} isMinor />);
+    const select = /<select[^>]*id="consent-guardian-relationship"[\s\S]*?<\/select>/.exec(html)?.[0] ?? '';
+    expect(select).not.toBe('');
+    for (const label of ['Select one', 'Mother', 'Father', 'Guardian']) expect(select).toContain(`>${label}<`);
+    expect(html).not.toMatch(/<input[^>]*id="consent-guardian-relationship"/);
+  });
+
   it('shows the full guardian authorization with the computed age to under-18s', () => {
     const html = renderToStaticMarkup(<ConsentStep {...baseProps} age={16} isMinor />);
     expect(html).toContain('You have entered your age as 16.');

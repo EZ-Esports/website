@@ -31,8 +31,8 @@ describe('consent form text', () => {
       .digest('hex');
     // If this fails, you changed legal text. Bump CONSENT_FORM_VERSION and update both values together.
     expect({ version: CONSENT_FORM_VERSION, hash }).toEqual({
-      version: '2026-10-v1',
-      hash: '9fa9dd76751185b039c8ebeff7eda67071b49baac8b0b816a83bf2097e2e0350',
+      version: '2026-11-v1',
+      hash: '94b08fb72ab20ab4cd8b1687b3a704cf7f7843df43e27b2aab177d567071334e',
     });
   });
 
@@ -120,6 +120,19 @@ describe('validateConsent', () => {
     expect(() => validateConsent({ ...guardian, [field]: '   ' }, minor)).toThrow(
       new RegExp(message, 'i')
     );
+  });
+
+  it('offers exactly Mother, Father and Guardian for the relationship', () => {
+    expect(CONSENT_TEXT.guardianRelationshipOptions).toEqual(['Mother', 'Father', 'Guardian']);
+    for (const option of CONSENT_TEXT.guardianRelationshipOptions) {
+      expect(validateConsent({ ...guardian, guardianRelationship: option }, minor).guardianRelationship).toBe(option);
+    }
+  });
+
+  it('rejects a relationship that is not one of the listed options', () => {
+    for (const value of ['Parent', 'mother', 'Uncle', 'Mother ;)']) {
+      expect(() => validateConsent({ ...guardian, guardianRelationship: value }, minor)).toThrow(/relationship/i);
+    }
   });
 
   it('rejects a one-character signature and a malformed guardian email', () => {
