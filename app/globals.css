@@ -137,8 +137,11 @@ html {
 }
 
 html.theme-light .hero-photo-scrim {
-  /* Floor of 0.58 white keeps #4a2e3b body text at ≥4.5:1 even over a dark building. */
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 42%, rgba(255, 255, 255, 0.58) 70%, rgba(255, 255, 255, 0.72) 100%);
+  /* Same stops as the dark grade, in white, so the skyline shows through the middle.
+     #4a2e3b over the brightest building pixels at the 0.28 stop is about 12:1, so that
+     stop stays. The subtitle sits lower, near the 0.60 stop, and the darkest pixels
+     under it stay above 4.5:1 without the text shadow. */
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.6) 42%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.62) 100%);
 }
 
 html.theme-light .about-hero-scrim {
@@ -197,7 +200,7 @@ html.theme-light .hero-actions :is(a, button).bg-accent:hover {
 
 @media (prefers-color-scheme: light) {
   html:not(.theme-dark) .hero-photo-scrim {
-    background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.72) 42%, rgba(255, 255, 255, 0.58) 70%, rgba(255, 255, 255, 0.72) 100%);
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.6) 42%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.62) 100%);
   }
 
   html:not(.theme-dark) .about-hero-scrim {
