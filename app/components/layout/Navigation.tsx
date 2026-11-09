@@ -115,7 +115,7 @@ export default function Navigation({ onNavigate }: NavigationProps) {
               <Popover
                 placement="bottom start"
                 offset={8}
-                className="w-[calc(100vw-2rem)] md:w-60 bg-surface-raised/95 backdrop-blur-md rounded-xl shadow-2xl border border-line/80 z-50 p-1 outline-none animate-fade-in"
+                className="theme-dark w-[calc(100vw-2rem)] md:w-60 bg-surface-raised/95 backdrop-blur-md rounded-xl shadow-2xl border border-line/80 z-50 p-1 outline-none animate-fade-in"
               >
                 <Menu className="outline-none py-1 space-y-1">
                   {item.items.map((subItem) => {

@@ -201,16 +201,16 @@ export default function CareerApplyForm({
         <div className="w-16 h-16 rounded-full bg-accent/15 text-accent flex items-center justify-center mx-auto mb-6">
           <HiOutlineCheckCircle className="w-10 h-10" />
         </div>
-        <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">
+        <h2 className="text-2xl sm:text-3xl font-black text-foreground mb-3">
           Application Received!
         </h2>
         <p className="text-foreground-secondary text-sm sm:text-base mb-6 leading-relaxed">
-          Thank you for applying for <span className="text-white font-bold">{roleTitle}</span>! Our team will review your application and resume. We typically reach out via email or Discord within 5–7 business days.
+          Thank you for applying for <span className="text-foreground font-bold">{roleTitle}</span>! Our team will review your application and resume. We typically reach out via email or Discord within 5–7 business days.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/careers"
-            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-accent text-black font-extrabold text-xs uppercase tracking-wider hover:bg-accent/90 transition-all text-center"
+            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-accent text-on-accent font-extrabold text-xs uppercase tracking-wider hover:bg-accent/90 transition-all text-center"
           >
             Explore Other Openings
           </Link>
@@ -218,7 +218,7 @@ export default function CareerApplyForm({
             href="https://discord.com/invite/RajSZqNyvu"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-surface-raised hover:bg-surface border border-line text-white font-bold text-xs uppercase tracking-wider transition-all text-center"
+            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-surface-raised hover:bg-surface border border-line text-foreground font-bold text-xs uppercase tracking-wider transition-all text-center"
           >
             Join League Discord
           </a>
@@ -233,7 +233,7 @@ export default function CareerApplyForm({
         <span className="text-xs font-bold text-accent uppercase tracking-wider">
           Application Form
         </span>
-        <h2 className="text-2xl font-black text-white mt-1">
+        <h2 className="text-2xl font-black text-foreground mt-1">
           Apply for {roleTitle}
         </h2>
         {department && (
@@ -244,7 +244,7 @@ export default function CareerApplyForm({
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs sm:text-sm flex items-start gap-3">
+        <div className="mb-6 p-4 rounded-xl bg-danger/10 border border-danger/30 text-danger-on-tint text-xs sm:text-sm flex items-start gap-3">
           <HiOutlineExclamationCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <p>{error}</p>
         </div>
@@ -253,7 +253,7 @@ export default function CareerApplyForm({
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
         {/* Section 1: Contact Information */}
         <div className="space-y-4">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-accent/20 text-accent text-xs flex items-center justify-center font-bold">
               1
             </span>
@@ -274,7 +274,7 @@ export default function CareerApplyForm({
                 className={fieldErrors.name ? 'border-red-500/60' : ''}
               />
               {fieldErrors.name && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.name}</p>
+                <p className="mt-1 text-xs text-danger">{fieldErrors.name}</p>
               )}
             </div>
 
@@ -305,7 +305,7 @@ export default function CareerApplyForm({
                 className={fieldErrors.email ? 'border-red-500/60' : ''}
               />
               {fieldErrors.email && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p>
+                <p className="mt-1 text-xs text-danger">{fieldErrors.email}</p>
               )}
             </div>
 
@@ -323,7 +323,7 @@ export default function CareerApplyForm({
                 className={fieldErrors.phone ? 'border-red-500/60' : ''}
               />
               {fieldErrors.phone && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.phone}</p>
+                <p className="mt-1 text-xs text-danger">{fieldErrors.phone}</p>
               )}
             </div>
 
@@ -344,7 +344,7 @@ export default function CareerApplyForm({
 
         {/* Section 2: Resume & Links */}
         <div className="space-y-4 pt-6 border-t border-line/60">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-accent/20 text-accent text-xs flex items-center justify-center font-bold">
               2
             </span>
@@ -369,7 +369,7 @@ export default function CareerApplyForm({
                     {resume ? <HiOutlinePaperClip className="w-5 h-5" /> : <HiOutlineDocumentArrowUp className="w-5 h-5" />}
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-white truncate max-w-xs sm:max-w-sm">
+                    <p className="text-xs font-bold text-foreground truncate max-w-xs sm:max-w-sm">
                       {resume ? resume.name : 'Upload your resume'}
                     </p>
                     <p className="text-[11px] text-foreground-muted">
@@ -396,7 +396,7 @@ export default function CareerApplyForm({
                     }
                   }}
                 >
-                  <AriaButton className="px-4 py-2 rounded-lg bg-surface-raised hover:bg-surface border border-line text-white font-bold text-xs uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer">
+                  <AriaButton className="px-4 py-2 rounded-lg bg-surface-raised hover:bg-surface border border-line text-foreground font-bold text-xs uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer">
                     <HiOutlineArrowUpTray className="w-4 h-4 text-accent" />
                     <span>{resume ? 'Change PDF' : 'Select PDF'}</span>
                   </AriaButton>
@@ -404,7 +404,7 @@ export default function CareerApplyForm({
               </div>
             </div>
             {fieldErrors.resume && (
-              <p className="text-xs text-red-400">{fieldErrors.resume}</p>
+              <p className="text-xs text-danger">{fieldErrors.resume}</p>
             )}
           </div>
 
@@ -422,7 +422,7 @@ export default function CareerApplyForm({
                 className={fieldErrors.linkedin ? 'border-red-500/60' : ''}
               />
               {fieldErrors.linkedin && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.linkedin}</p>
+                <p className="mt-1 text-xs text-danger">{fieldErrors.linkedin}</p>
               )}
             </div>
 
@@ -454,7 +454,7 @@ export default function CareerApplyForm({
                 className={fieldErrors.workSamples ? 'border-red-500/60' : ''}
               />
               {fieldErrors.workSamples && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.workSamples}</p>
+                <p className="mt-1 text-xs text-danger">{fieldErrors.workSamples}</p>
               )}
             </div>
 
@@ -471,7 +471,7 @@ export default function CareerApplyForm({
                 className={fieldErrors.referredBy ? 'border-red-500/60' : ''}
               />
               {fieldErrors.referredBy && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.referredBy}</p>
+                <p className="mt-1 text-xs text-danger">{fieldErrors.referredBy}</p>
               )}
             </div>
           </div>
@@ -479,7 +479,7 @@ export default function CareerApplyForm({
 
         {/* Section 3: Why Join */}
         <div className="space-y-4 pt-6 border-t border-line/60">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-accent/20 text-accent text-xs flex items-center justify-center font-bold">
               3
             </span>
@@ -500,7 +500,7 @@ export default function CareerApplyForm({
               className={fieldErrors.message ? 'border-red-500/60' : ''}
             />
             <div className="flex items-center justify-between mt-1 text-[11px] text-foreground-muted">
-              <span>{fieldErrors.message ? <span className="text-red-400">{fieldErrors.message}</span> : 'Up to 1,500 characters.'}</span>
+              <span>{fieldErrors.message ? <span className="text-danger">{fieldErrors.message}</span> : 'Up to 1,500 characters.'}</span>
               <span>{form.message.length} / {WHY_JOIN_MAX_LENGTH}</span>
             </div>
           </div>
@@ -508,7 +508,7 @@ export default function CareerApplyForm({
 
         {/* Section 4: Acknowledgements & Submit */}
         <div className="space-y-4 pt-6 border-t border-line/60">
-          <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-accent/20 text-accent text-xs flex items-center justify-center font-bold">
               4
             </span>
@@ -525,14 +525,14 @@ export default function CareerApplyForm({
               />
               <span className="text-xs text-foreground-secondary leading-relaxed">
                 I agree to the{' '}
-                <Link href="/terms" target="_blank" className="text-accent underline font-semibold hover:text-white">
+                <Link href="/terms" target="_blank" className="text-accent underline font-semibold hover:text-foreground">
                   Terms of Service
                 </Link>
                 . <span className="text-accent">*</span>
               </span>
             </label>
             {fieldErrors.agreedToTerms && (
-              <p className="text-xs text-red-400 pl-6">{fieldErrors.agreedToTerms}</p>
+              <p className="text-xs text-danger pl-6">{fieldErrors.agreedToTerms}</p>
             )}
 
             <label className="flex items-start gap-3 cursor-pointer">
@@ -544,14 +544,14 @@ export default function CareerApplyForm({
               />
               <span className="text-xs text-foreground-secondary leading-relaxed">
                 I agree to the{' '}
-                <Link href="/privacy" target="_blank" className="text-accent underline font-semibold hover:text-white">
+                <Link href="/privacy" target="_blank" className="text-accent underline font-semibold hover:text-foreground">
                   Privacy Policy
                 </Link>
                 . <span className="text-accent">*</span>
               </span>
             </label>
             {fieldErrors.agreedToPrivacy && (
-              <p className="text-xs text-red-400 pl-6">{fieldErrors.agreedToPrivacy}</p>
+              <p className="text-xs text-danger pl-6">{fieldErrors.agreedToPrivacy}</p>
             )}
 
             <label className="flex items-start gap-3 cursor-pointer">
@@ -566,7 +566,7 @@ export default function CareerApplyForm({
               </span>
             </label>
             {fieldErrors.acknowledgedUnpaidVolunteer && (
-              <p className="text-xs text-red-400 pl-6">{fieldErrors.acknowledgedUnpaidVolunteer}</p>
+              <p className="text-xs text-danger pl-6">{fieldErrors.acknowledgedUnpaidVolunteer}</p>
             )}
           </div>
 
