@@ -1,0 +1,181 @@
+import { describe, it, expect } from 'vitest';
+import {
+  LATE_REQUEST_WINDOW_MS,
+  canCancelRequest,
+  canOpponentRespond,
+  canRequesterRespond,
+  MAX_RESCHEDULE_REQUESTS_PER_SEASON,
+  hasUsedRescheduleAllowance,
+  isLateRequest,
+  rescheduleAllowanceMessage,
+  isOpenStatus,
+  rescheduleStatusLabel,
+  validateProposedTimes,
+  RESCHEDULE_STATUSES,
+} from '../reschedule-rules';
+import { canRequestReschedule } from '../school-matches';
+import { parseEastern } from '../dates';
+
+const NOW = new Date('2026-10-25T12:00:00.000Z');
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+const at = (hoursFromNow: number) => new Date(NOW.getTime() + hoursFromNow * HOUR);
+/** 7:00 PM Eastern on the calendar day `days` after NOW: the only start time a proposal may use. */
+const sevenPm = (days: number) => parseEastern(`${new Date(NOW.getTime() + days * DAY).toISOString().slice(0, 10)}T19:00`);
+const MATCH_AT = sevenPm(10);
+
+describe('isLateRequest', () => {
+  it('is on time at exactly 72 hours', () => {
+    expect(isLateRequest(new Date(NOW.getTime() + LATE_REQUEST_WINDOW_MS), NOW)).toBe(false);
+  });
+
+  it('is late one millisecond under 72 hours', () => {
+    expect(isLateRequest(new Date(NOW.getTime() + LATE_REQUEST_WINDOW_MS - 1), NOW)).toBe(true);
+  });
+
+  it('is on time well ahead', () => {
+    expect(isLateRequest(at(24 * 7), NOW)).toBe(false);
+  });
+});
+
+describe('validateProposedTimes', () => {
+  it('accepts two future 7:00 PM ET times on different days', () => {
+    expect(validateProposedTimes([sevenPm(2), sevenPm(3)], NOW, MATCH_AT)).toBeNull();
+  });
+
+  it('requires at least two times', () => {
+    expect(validateProposedTimes([sevenPm(2)], NOW, MATCH_AT)).toMatch(/at least 2/);
+    expect(validateProposedTimes([], NOW, MATCH_AT)).toMatch(/at least 2/);
+  });
+
+  it('allows at most five times', () => {
+    const six = [2, 3, 4, 5, 6, 7].map(sevenPm);
+    expect(validateProposedTimes(six, NOW, MATCH_AT)).toMatch(/no more than 5/);
+    expect(validateProposedTimes(six.slice(0, 5), NOW, MATCH_AT)).toBeNull();
+  });
+
+  it('rejects a date with a year past four digits', () => {
+    const farFuture = new Date(Date.UTC(10001, 0, 1, 23, 0, 0));
+    expect(validateProposedTimes([sevenPm(2), farFuture], NOW, MATCH_AT)).toMatch(/four-digit year/);
+  });
+
+  it('requires every time to start at 7:00 PM ET', () => {
+    expect(validateProposedTimes([sevenPm(2), at(100)], NOW, MATCH_AT)).toMatch(/7:00 PM ET/);
+    const sevenThirty = parseEastern(`${sevenPm(3).toISOString().slice(0, 10)}T19:30`);
+    expect(validateProposedTimes([sevenPm(2), sevenThirty], NOW, MATCH_AT)).toMatch(/7:00 PM ET/);
+  });
+
+  it('rejects duplicate times, which are less than an hour apart', () => {
+    expect(validateProposedTimes([sevenPm(2), sevenPm(2)], NOW, MATCH_AT)).toMatch(/one hour apart/);
+  });
+
+  it('rejects past times and the current match time', () => {
+    expect(validateProposedTimes([sevenPm(-1), sevenPm(3)], NOW, MATCH_AT)).toMatch(/future/);
+    expect(validateProposedTimes([MATCH_AT, sevenPm(3)], NOW, MATCH_AT)).toMatch(/current time/);
+  });
+
+  it('rejects an unparseable time', () => {
+    expect(validateProposedTimes([new Date(NaN), sevenPm(3)], NOW, MATCH_AT)).toMatch(/not a valid/);
+  });
+});
+
+describe('status helpers', () => {
+  it('allows cancelling only until someone has agreed to a time', () => {
+    const cancellable = RESCHEDULE_STATUSES.filter(canCancelRequest);
+    expect(cancellable).toEqual(['pending_opponent', 'pending_requester']);
+    expect(canCancelRequest('pending_staff')).toBe(false);
+    expect(canCancelRequest('approved')).toBe(false);
+  });
+
+  it('lets the opponent answer only while waiting for them, and the requester only after a counter-offer', () => {
+    expect(RESCHEDULE_STATUSES.filter(canOpponentRespond)).toEqual(['pending_opponent']);
+    expect(RESCHEDULE_STATUSES.filter(canRequesterRespond)).toEqual(['pending_requester']);
+  });
+
+  it('counts only the pending states as open', () => {
+    expect(RESCHEDULE_STATUSES.filter(isOpenStatus)).toEqual([
+      'pending_opponent',
+      'pending_requester',
+      'pending_staff',
+    ]);
+  });
+
+  it('labels every status, with every decline reading the same', () => {
+    for (const status of RESCHEDULE_STATUSES) {
+      expect(rescheduleStatusLabel(status)).toBeTruthy();
+    }
+    const declined = (['declined_opponent', 'declined_requester', 'declined_staff'] as const).map(
+      rescheduleStatusLabel
+    );
+    expect(new Set(declined)).toEqual(new Set(['Declined']));
+    expect(rescheduleStatusLabel('approved')).toBe('Rescheduled');
+  });
+});
+
+describe('canRequestReschedule', () => {
+  const base = {
+    status: 'scheduled' as const,
+    scheduledAt: at(24 * 5).toISOString(),
+    sameSchool: false,
+    reschedule: null,
+  };
+  const request = (status: (typeof RESCHEDULE_STATUSES)[number]) => ({
+    id: 'r1',
+    matchId: 'm1',
+    status,
+    isLate: false,
+    reason: 'x',
+    requestedBySchoolId: 's1',
+    requestedBySchoolName: 'S1',
+    originalScheduledAt: base.scheduledAt,
+    options: [],
+    acceptedOptionId: null,
+    staffNote: null,
+    createdAt: NOW.toISOString(),
+  });
+
+  it('offers a future scheduled match with no request', () => {
+    expect(canRequestReschedule(base, NOW)).toBe(true);
+  });
+
+  it('refuses a match that is not scheduled, has started, or is a school against itself', () => {
+    expect(canRequestReschedule({ ...base, status: 'live' }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, status: 'cancelled' }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, scheduledAt: at(-1).toISOString() }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, sameSchool: true }, NOW)).toBe(false);
+  });
+
+  it('refuses while a request is open but allows a new one after it resolved', () => {
+    expect(canRequestReschedule({ ...base, reschedule: request('pending_opponent') }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, reschedule: request('pending_requester') }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, reschedule: request('pending_staff') }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, reschedule: request('declined_staff') }, NOW)).toBe(true);
+    expect(canRequestReschedule({ ...base, reschedule: request('declined_requester') }, NOW)).toBe(true);
+    expect(canRequestReschedule({ ...base, reschedule: request('cancelled') }, NOW)).toBe(true);
+  });
+
+  it('refuses a match that an approved request has already moved, whichever school asked', () => {
+    expect(canRequestReschedule({ ...base, reschedule: request('approved'), rescheduledFrom: at(24 * 4).toISOString() }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...base, rescheduledFrom: at(24 * 4).toISOString() }, NOW)).toBe(false);
+  });
+});
+
+describe('per-season reschedule allowance', () => {
+  it('allows one request per school per season', () => {
+    expect(MAX_RESCHEDULE_REQUESTS_PER_SEASON).toBe(1);
+    expect(hasUsedRescheduleAllowance(0)).toBe(false);
+    expect(hasUsedRescheduleAllowance(MAX_RESCHEDULE_REQUESTS_PER_SEASON - 1)).toBe(false);
+    expect(hasUsedRescheduleAllowance(MAX_RESCHEDULE_REQUESTS_PER_SEASON)).toBe(true);
+    expect(hasUsedRescheduleAllowance(2)).toBe(true);
+  });
+
+  it('explains the limit in plain words', () => {
+    expect(rescheduleAllowanceMessage()).toBe('Your school has already used its one reschedule for this season.');
+  });
+
+  it('hides the request button for a school that has used its allowance', () => {
+    const scheduled = { status: 'scheduled' as const, scheduledAt: at(24 * 5).toISOString(), sameSchool: false, reschedule: null };
+    expect(canRequestReschedule({ ...scheduled, rescheduleAllowanceUsed: true }, NOW)).toBe(false);
+    expect(canRequestReschedule({ ...scheduled, rescheduleAllowanceUsed: false }, NOW)).toBe(true);
+  });
+});

@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useTransition, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { FiUsers } from 'react-icons/fi';
 import ConfirmDeleteButton from '@/app/components/admin/ConfirmDeleteButton';
 import RowIconButton from '@/app/components/admin/RowIconButton';
-import { cancelBtn, chipButton, editIconBtn, chipDot, fieldError, focusRing, input, label as labelClass, saveBtn, td, tdRight, tr, trEditing } from '@/app/components/admin/styles';
+import { cancelBtn, chipButton, editIconBtn, chipDot, fieldError, focusRing, input, label as labelClass, saveBtn, secondaryBtnSm, td, tdRight, tr, trEditing } from '@/app/components/admin/styles';
 import { AdminNotice, PendingLabel, RequiredMark } from '@/app/components/admin/AdminUI';
 import { cx } from '@/app/lib/cx';
 import { updateSchool, toggleSchoolActive, deleteSchool } from '@/app/(admin)/admin/schools/actions';
 import ImageUpload from '@/app/components/admin/ImageUpload';
 import SchoolManagersModal from '@/app/components/admin/SchoolManagersModal';
+import SchoolCrest from '@/app/components/admin/SchoolCrest';
 
 interface School {
   id: string;
@@ -25,10 +27,12 @@ const inputClass = input;
 
 interface SchoolRowProps {
   school: School;
+  /** Only true for staff holding MANAGE_ROSTERS; the target page re-checks it server-side. */
+  canViewRosters?: boolean;
   games?: Array<{ id: string; displayName: string; slug: string; name?: string }>;
 }
 
-export default function SchoolRow({ school, games }: SchoolRowProps) {
+export default function SchoolRow({ school, games, canViewRosters = false }: SchoolRowProps) {
   const [managersModalOpen, setManagersModalOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -112,18 +116,7 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
     <tr className={tr}>
       <td className={td}>
         <div className="flex items-center gap-3">
-          {school.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={school.logoUrl}
-              alt={`${school.name} logo`}
-              className="w-8 h-8 object-contain rounded-md bg-surface-raised"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-md bg-surface-raised flex items-center justify-center text-foreground-secondary text-xs font-semibold">
-              {school.name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
+          <SchoolCrest name={school.name} logoUrl={school.logoUrl} />
           <span className="font-medium text-foreground">{school.name}</span>
         </div>
       </td>
@@ -158,6 +151,15 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
       </td>
       <td className={tdRight}>
         <div className="flex items-center justify-end gap-2">
+          {canViewRosters && (
+            <Link
+              href={`/admin/schools/${school.id}/rosters`}
+              aria-label={`View rosters for ${school.name}`}
+              className={cx(secondaryBtnSm, 'whitespace-nowrap')}
+            >
+              View rosters
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setManagersModalOpen(true)}
@@ -175,7 +177,7 @@ export default function SchoolRow({ school, games }: SchoolRowProps) {
           />
           <ConfirmDeleteButton
             action={() => deleteSchool(school.id)}
-            message={`Delete school "${school.name}"? This cannot be undone.`}
+            message={`Remove school "${school.name}"? It disappears from the site and the admin, and its logo and uploaded images are permanently deleted. Its teams, rosters and students stay in the database but can no longer be reached from here. This cannot be undone.`}
             label={`Delete school ${school.name}`}
           />
         </div>

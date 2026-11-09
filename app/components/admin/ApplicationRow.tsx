@@ -216,7 +216,7 @@ export default function ApplicationRow({ app, activeFilter = "all" }: { app: App
         <td className={cx(tdRight, "whitespace-nowrap")}>
           <ConfirmDeleteButton
             action={handleDelete}
-            message="Are you sure you want to remove this application?"
+            message="Remove this application? It is hidden from the applications list and cannot be restored from the admin."
             label={`Remove application from ${app.schoolName}`}
           />
         </td>

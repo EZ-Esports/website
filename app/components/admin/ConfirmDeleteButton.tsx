@@ -20,6 +20,12 @@ interface ConfirmDeleteButtonProps {
   label: string;
   /** Callback fired when deletion fails. */
   onError?: (error: string) => void;
+  /**
+   * Controlled mode, for a trigger that lives elsewhere (a row's overflow menu):
+   * the caller owns `open`, and the built-in trash button is not rendered.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -32,8 +38,16 @@ export default function ConfirmDeleteButton({
   message,
   label,
   onError,
+  open,
+  onOpenChange,
 }: ConfirmDeleteButtonProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const controlled = open !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = controlled ? open : internalOpen;
+  const setIsOpen = (next: boolean) => {
+    if (!controlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,19 +76,21 @@ export default function ConfirmDeleteButton({
 
   return (
     <div className="inline-flex items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => {
-          setError(null);
-          setIsOpen(true);
-        }}
-        aria-label={label}
-        title={label}
-        disabled={isPending}
-        className={`${deleteIconBtn} ${isPending ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
-      >
-        <FiTrash2 aria-hidden="true" className="h-4 w-4" />
-      </button>
+      {!controlled && (
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setIsOpen(true);
+          }}
+          aria-label={label}
+          title={label}
+          disabled={isPending}
+          className={`${deleteIconBtn} ${isPending ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+        >
+          <FiTrash2 aria-hidden="true" className="h-4 w-4" />
+        </button>
+      )}
 
       {error && (
         <span

@@ -3,7 +3,7 @@
  * (for example `2025-26`): the starting year, a hyphen, and the last two digits of the
  * following year. The archive already uses this shape, and school manager affiliation
  * (`school_managers.academic_year`) is stored in the same shape so the portal can match a
- * manager to a game's active season with plain string equality and no conversion.
+ * manager to a season of the game with plain string equality and no conversion.
  */
 
 const SEASON_NAME_PATTERN = /^(\d{4})-(\d{2})$/;
@@ -40,3 +40,12 @@ export const MANAGER_SEASON_OPTIONS = ['2026-27', '2027-28', '2028-29', '2029-30
 export const DEFAULT_MANAGER_SEASON: string = MANAGER_SEASON_OPTIONS[0];
 
 export const SEASON_NAME_ERROR = 'Season must be in the format YYYY-YY (for example 2026-27).';
+
+/**
+ * Error shown when a manager tries to change data of an inactive (view-only) season (spec-028).
+ * The rule itself is just `season.isActive === false`: there is no name comparison, so a season
+ * older OR newer than the game's active one is equally view-only for managers.
+ */
+export function inactiveSeasonViewOnlyError(seasonName: string): string {
+  return `${seasonName} is an inactive season and is view-only.`;
+}

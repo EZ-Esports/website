@@ -10,6 +10,7 @@ Resolved items are deleted, not struck through: their history lives in [timeline
 
 - **Production is the only environment.** `.env` `DATABASE_URL` is live Supabase. No staging DB, no staging Vercel project. Seed/migrate guards (`assertSeedTargetAllowed`, `requireFreshBackup`) mitigate operator error; they do not create a safe playground. Test against a local Postgres with an explicit URL (`CLAUDE.md`). Gold upserts but still **prunes** archive-keyed matches/standings — operator discipline required.
 - **Off-site / encrypted / scheduled backups are not built, and are not planned.** PR #90 (`b638369`) shipped *local* scoped dumps before seed and migrate, plus `db/RESTORE.md` and prune. Completeness check is a byte floor plus pg_dump’s “dump complete” marker. The original off-site plan (cron, `age`, private bucket, restore drills) was parent issue #89 and children #81–#88; all were closed **not planned** on 2026-09-13. A day with no seed/migrate and a bad admin or `psql` edit has **zero** backup coverage. [`specs/db-backup-automation.md`](../specs/db-backup-automation.md) §5 is the list that was dropped; its header “Ready for Implementation” refers to the local work that already landed. `RESTORE.md` asks for a scratch restore drill; not verified as executed.
+- **`npm audit` advisories without Dependabot alerts (23 Oct): resolved.** `next` -> 16.4.3 and `vitest`/`@vitest/coverage-v8` -> 4.1.12 (pulling `@vitest/mocker` 4.1.12); `npm audit` reports 0 vulnerabilities (incl. a late dev-only `zod` 4.2.1 -> 4.6.7 advisory, GHSA-mrhx-c7xc-m3w5, fixed via `npm audit fix`). Nothing remains open from this item.
 - **No cache-purge tool.** After UUID churn, the documented unblock is `updateTag` or an admin save-with-same-values. No dashboard or script exists.
 
 ---
@@ -68,7 +69,7 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 ## Staff portal follow-ups from spec-013 (need behaviour changes)
 
 - Inline-create pages (Schools, Sponsors, Gallery) could move "Add …" into a header button that opens a dialog, which needs close-on-success wiring in `AddEntityForm`.
-- `LeagueSetupClient`, `RosterExplorer`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
+- `LeagueSetupClient`, `TeamManagerClient`, `StaffRow` and `InviteRow` still use `window.confirm` for destructive actions; they could reuse the `ConfirmDeleteButton` dialog.
 
 ## Dependency drift
 
@@ -92,9 +93,9 @@ Still true after the PR #218 follow-ups ([spec-013](spec-013-staff-portal-ui-ove
 Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issue list` for the current state.
 
 - [#224](https://github.com/EZ-Esports/website/issues/224): move manager invites out of `player_invites`. Shipped in #252 ([spec-018](spec-018-manager-invites-table.md)); migration `0049` was applied to production on 18 Oct 2026 after a full backup. Resolved.
-- [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views. Implemented in [spec-022](spec-022-hide-season-outcomes.md) (PR #261); migration `0051` is applied to production. Staff must press "Publish results" for each active season once its data is complete. Retiring a season (explicitly or by activating a new one) publishes it in the same write. Open: tournament brackets and tournament rows in Latest Results are not gated.
+- [#228](https://github.com/EZ-Esports/website/issues/228): hide incomplete season outcomes on public views. Implemented in [spec-022](spec-022-hide-season-outcomes.md) (PR #261); migration `0051` is applied to production. Staff must press "Publish season" (renamed in [spec-049](spec-049-publish-season-hides-matches.md), which also hides the season's matches) for each active season once its data is complete. Retiring a season (explicitly or by activating a new one) publishes it in the same write. Open: tournament brackets and tournament rows in Latest Results are not gated.
 - [#229](https://github.com/EZ-Esports/website/issues/229): redesign the school manager portal UI to reduce friction (spec-016 shipped a first polish pass).
-- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Addressed in spec-019 (in review); invite scoping is still open, see below.
+- [#230](https://github.com/EZ-Esports/website/issues/230): managers can view previous seasons outside their provisioned season. Resolved for the portal by [spec-019](spec-019-manager-portal-season-scope.md), refined by [spec-026](spec-026-manager-season-by-name.md) (season resolved by name) and [spec-028](spec-028-manager-past-season-view-only.md) (inactive seasons view-only), PR #267. Invite scoping is still open, see "Manager portal season scope" below.
 - [#233](https://github.com/EZ-Esports/website/issues/233): school manager logins should not get a `staff_members` row when they reach `/admin` or `/login`. Fixed in [spec-023](spec-023-manager-no-staff-row.md) (PR #264): no row is created for managers; the staff login rejects them and `/admin` routes them to `/portal`. Open: manager staff rows created before the fix remain and are not cleaned up automatically.
 - [#240](https://github.com/EZ-Esports/website/issues/240): link school names in Season standing and the Standings tab to team pages.
 - [#241](https://github.com/EZ-Esports/website/issues/241): show high school alongside university on leadership cards.
@@ -102,21 +103,22 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - [#243](https://github.com/EZ-Esports/website/issues/243): school roster locking on the manager side.
 - [#244](https://github.com/EZ-Esports/website/issues/244): SEO (canonical domain, metadata, sitemap, structured data, measurement).
 - [#247](https://github.com/EZ-Esports/website/issues/247): Riot Sign-On (OAuth) and consent for student onboarding. On hold until Riot approves the production key.
-- [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key.
-- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and guild membership check in the join wizard (spec-011 designed it; only the honor-system checkbox is built).
+- [#248](https://github.com/EZ-Esports/website/issues/248): ingest Riot match data from consenting students, plus a WebSocket/realtime layer. On hold, depends on #247 and the production key. The interim path is [#290](https://github.com/EZ-Esports/website/issues/290) ([spec-038](spec-038-match-results-from-game-data.md)): HenrikDev (unofficial) behind `MatchDataPort`; #247 and #248 are unchanged and remain open.
+- [#249](https://github.com/EZ-Esports/website/issues/249): Discord OAuth and server join are built for players ([spec-033](spec-033-discord-oauth-onboarding.md), PR #281) and for school managers ([spec-035](spec-035-manager-discord-oauth.md), required for everyone, all self-reported Discord code removed). Still open: role assignment (`syncMemberRoles` is a stub), live guild re-check at roster time, the owner-run purge of pre-OAuth test data (rows with unverified Discord ids), and Discord app/bot setup plus env vars on staging and production.
 - [#250](https://github.com/EZ-Esports/website/issues/250): trim manager and student onboarding form questions (needs Edison's input).
 
 ## Onboarding draft and season defaults (spec-017)
 
-- `saveOnboardingDraft` replaces the invite's whole `submission_draft` with the wizard payload, so a manager clicking "Save Draft" drops the admin-seeded `managedGames` and `isPrimaryContact` (and, before spec-017, `academicYear`). Fix by merging those keys from the existing draft on the server.
+- (fixed in [spec-035](spec-035-manager-discord-oauth.md)) `saveOnboardingDraft` used to replace the invite's whole `submission_draft`, dropping the admin-seeded `managedGames` and `isPrimaryContact`. For manager invites the server now keeps the existing values of those two keys over anything the browser sends, and fills `academicYear` from the seed only when the wizard sent none.
 - (Resolved in spec-019: the hard-coded `'2025-2026'` default is gone; manager seasons are `YYYY-YY` and default to `DEFAULT_MANAGER_SEASON`.) Bump or derive it from today's date in a separate change.
 - The graduation-year and season option lists are static and need a yearly edit in the join `types.ts`.
 
 ## Manager portal season scope (spec-019)
 
-- **Decision needed: invite scoping.** `player_invites` has no season column, so `getSchoolInvites` / `getPendingSubmissions` are limited to games the manager currently manages, not to the active season; past-season invites for a managed game remain visible. A `created_at >= season.created_at` filter was rejected as unsound. Options: add `player_invites.season_id` (migration) or derive it.
+- **Invite scoping: resolved by [spec-047](spec-047-invite-season-scope-and-enrollment-eligibility.md) (#253).** `player_invites.season_id` exists; managers see and review only invites of their season. Still to do: apply migration `0056` to production (backup and owner go-ahead first, before the code deploys). Legacy invites the backfill could not place stay NULL and are hidden from managers.
 - **#233 interplay.** Managers can still hold role-less `staff_members` rows (legacy, or granted deliberately). The portal's staff-admin check is the ADMINISTRATOR permission only, so those rows do not widen access; keep it that way. New manager logins no longer create such rows (spec-023).
-- The hexagonal `findSchoolPlayerPool` (unused by the app) still lists enrollments from every season.
+- Renaming a season in League Setup silently re-maps or orphans managers whose `academic_year` matches the old or new name (spec-026 open item): there is no cross-check or warning.
+- [#266](https://github.com/EZ-Esports/website/issues/266): approving a player invite with an explicit `rosterId` checks the roster's school but not that the roster's game matches the invite's game. It stays inside the manager's school, and the roster's own season and lock are enforced. Tracked separately for the player-invites PR.
 - Existing seasons with free-text names (for example `Spring 2025`) stay editable but never match a manager; rename them to `YYYY-YY` in League Setup for managers to see that season.
 
 ## Season roster lock (spec-020)
@@ -130,3 +132,144 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 - Unverified in production: a real Supabase upload being read by pdf.js (public-bucket CORS) and the `?download=` filename behavior. On any pdf.js failure the page shows the bundled pages plus an Open PDF link.
 - The stored handbook is capped at 4 MB (Vercel body limit). Picks up to 50 MB are shrunk in the browser by recompressing large raster images; a PDF still over 4 MB after two passes (for example mostly vector or CMYK/indexed images, which are skipped) is refused with its size. A signed direct-to-storage upload would lift the cap. Compression was exercised in the dev server on the real file but no upload was made. No "remove PDF" button, only replace.
 - The bundled page images and text (`public/handbook/`, `app/lib/handbook-pages.ts`) are the 2026-27 edition and go stale each season. pdf.js standard-font/CMap data is not bundled.
+
+## Schools roster view (spec-024)
+
+- **Staff roster editing lives in Schools & Rosters ([spec-027](spec-027-schools-roster-editing.md)).** The old gap (no staff UI to create or edit members, teams or rosters) is closed. Still absent by choice: deleting a member, unregistering a team, and editing a member's email or school from the staff UI (the actions were dropped with `RosterExplorer`).
+- **Roster-only roles cannot reach the view.** The page requires `MANAGE_ROSTERS`, but it is reached from Schools, which needs `MANAGE_SCHOOLS`. A role with only `MANAGE_ROSTERS` can open the URL directly but has no nav path.
+
+---
+
+## Onboarding consent (spec-029)
+
+- **Migration `0052` was applied to production on 2026-10-23**, after PR #269 merged and with a fresh pre-migration backup (`members`, `schools`). Verified read-only afterwards: `onboarding_consents` exists with 15 columns and 0 rows. Onboarding submissions were failing on the missing table in the window between the merge and the migration. No real submission has been run end to end against the deployed site yet.
+- **Legal to confirm:** adults currently see only the Terms of Service acknowledgment (the supplied form is a guardian authorization). Confirm that is sufficient, and whether managers or adults need anything else.
+- **No staff view or export of consent records**, no guardian confirmation email, and no re-consent for members onboarded before `0052`.
+- [#274](https://github.com/EZ-Esports/website/issues/274): (closed 25 Oct) manager portal match visibility ([spec-031](spec-031-manager-matches-view.md), PR #275) and reschedule requests ([spec-032](spec-032-match-reschedule-requests.md), PR #276; migration 0053 applied to production 25 Oct, live check passed). Follow-ups: [#277](https://github.com/EZ-Esports/website/issues/277) (friendly duplicate-request message lost) and [#278](https://github.com/EZ-Esports/website/issues/278) (foreign-key name truncated); `seasons` has no end date, so "complete before the end of the regular season" is not checked; nothing records "both teams already agreed to the original date"; the staff approval step may be dropped later (see spec-032). Decisions (24 Oct): no draft state (managers see a match as soon as staff create it); opponent manager confirms in the portal; a requester may cancel until the opponent has agreed; portal-only notifications (Discord bot pings later); all managers of the season may act, one manager per school; rules follow rules page 4.3 (72h, two proposed times at least an hour apart). Rules page 4.2 still says a 15-minute grace period while the official slide says 10 minutes: unresolved.
+
+---
+
+## Roster move (spec-034)
+
+- **One-tier rule is app-level only.** An advisory lock plus a check inside the transaction, no database constraint. Seed scripts and hand-run SQL bypass it, and rows that violated the rule before this change remain. A cleanup query (members with `players` rows on two rosters of one team) has not been run against production.
+- **Thrown manager errors are masked in production (confirmed).** Next.js omits the message of an error thrown from a server action, so the move, enroll and invite-approval rejections are now returned results. The neighbouring manager actions (`removePlayerFromRoster`, `updateRosterPlayerRole`, `emergencySwapSub`, `deleteSchoolRoster`, `createSchoolRoster`) and the authorization / lock / view-only guards still throw, and the client shows `err.message` with `alert`; if a message there matters, convert it the same way.
+- **Not seen in a browser.** The Move control and its notice were verified by unit and render tests only.
+- **Seam has no consumer, and does not see everything.** `notifyRosterMembershipChanged` is a no-op until the Discord role feature lands. Game and season deletes (database cascade), the seed/ingest scripts and manager `deleteSchoolRoster` never call it, so the consumer needs a periodic reconcile.
+- **Roster size limits are app-level and not retroactive.** Now 10 players and 5 subs ([spec-048](spec-048-roster-size-10-and-five-subs.md); was 7 and 2). No database constraint (seeds and hand-run SQL bypass them), and rosters already above 10 players or 5 subs are left alone. A query listing them has not been run against production. Staff are held to the caps with no override; if the owner wants one it should be an explicit, audited action. Games with a different roster shape (for example tournament-model games) share the same constants; confirm with the owner.
+- **Captain rule is ambiguous.** "One captain per team" is enforced per roster today (database index); the owner has not confirmed whether it should also span Varsity and JV. Captain behaviour was deliberately not changed with the caps.
+
+---
+
+## Onboarding test data purge (spec-036)
+
+- **Run on 2026-10-27 (database only).** The owner ran `npm run db:purge:onboarding-test-data -- --execute` after reviewing the dry run; 36 rows deleted, 0 Auth users (see the run record in [spec-036](spec-036-onboarding-test-data-purge.md)). CI never runs it. Follow `docs/dev/PURGE-ONBOARDING-TEST-DATA.md` if it is ever needed again, and set `NODE_OPTIONS=--tls-max-v1.2` on a network where Node 24's TLS 1.3 handshake to supabase.co hangs.
+- **Refresh the Data Cache afterwards** (tags `members`, `players`, `rosters`, `teams`, `schools`, `matches`, `people`, `leadership`): a script cannot call `updateTag`.
+- The run is recorded here and in the timeline. Consider removing the script (`db/purge-onboarding-test-data.ts`, its tests and the PGlite devDependency) now that it has served its purpose; it stays only if a future purge is likely.
+
+---
+
+## In-app confirm dialogs (spec-037)
+
+- **Not seen in a browser.** The dialogs were verified in jsdom only. Check the portal's dark dialog, 44px targets at phone width and the exit animation in a real browser before merge.
+- **`alert()` and `prompt()` remain.** `SchoolPortalClient` still uses `alert()` for remove-player and role-change failures (and other portal and admin forms may); they share the same auto-dismiss problem as `confirm()`. The lint rule bans only `confirm`. Convert them to the roster notice or an `AdminNotice` and widen the rule.
+- **Component test setup is new.** jsdom, Testing Library and jest-dom are dev dependencies, enabled per file with `// @vitest-environment jsdom`; the older render tests still use `renderToStaticMarkup` in node.
+- **Dialog error vs toast on League Setup.** A failed game or season delete now shows its error in the dialog rather than a toast; revisit if staff expect the toast.
+
+## Match results from game data (spec-038, #290)
+
+- **Migration 0054 applied to production (28 Oct 2026).** `npm run db:migrate` with `SEED_ALLOW_REMOTE` set and `PG_DUMP` pointing at a PostgreSQL 18 `pg_dump.exe` (the repo's default candidates did not find it); the five new tables exist with RLS on. Still open: set `VALORANTAPI` in Vercel as well as the local `.env`, and compare the zod schema with one real Henrik match response (never verified, including how surrenders appear).
+- **The Henrik response shape is unverified against a live payload.** The schema follows the published v4 docs; a real match should be fetched once and compared. MVP is derived (top score on winners / losers), not an API field; confirm against tracker.gg.
+- **Roster rule is strict:** every player on each side must be on one school's roster (starters or subs; no fixed team size since spec-052), otherwise the game is refused naming the non-roster Riot IDs. Rosters are assumed locked after finalization; submission does not itself check the season lock. A game rejected by the per-game checks is not cached, so resubmitting it requests it again. There is no scheduled-start check any more (removed in spec-052).
+- **Matching is by Riot `Name#Tag`**, not PUUID; renamed accounts or a roster without Riot IDs will be refused ("The Red team has a player who is not on the roster: ..."). Consider storing PUUIDs.
+- **No browser check yet** of the submit and scoreboard dialogs (desktop and phone width).
+- **No staff-facing UI** for this on `/admin/matches`; no public match page. Henrik retains matches for a limited time, so late submissions fail with not found and fall back to manual entry.
+- **`match_result_attempts` grows by one row per fresh submission or Check again.** Rows older than one hour are deleted opportunistically inside `reserveSubmissionAttempt`, so the table stays small; staff admins are throttled the same as managers (no exemption). A pending submission whose retry is refused as invalid is cancelled, not left waiting.
+
+## Onboarding offensive-content screen (spec-040)
+
+- **Migration `0055_onboarding_content_flags` was applied to production on 2026-10-28** (PR #304 merged first; dry run inside a rolled-back transaction on the production database, which also proved the SQL idempotent; then `npm run db:migrate` with a fresh scoped backup of `members` and `schools`). Verified afterwards: migration count 50, 9 columns, both indexes and RLS present, 0 flag rows, `members` unchanged at 838.
+- **Not verified:** the wizard warning, roster badge and managers dialog have only been seen on local mock pages (not against real onboarding data); savepoint behaviour is covered through the query-builder stand-in and PGlite, not the Supabase pooler; no phone-width check.
+- **Detector limits:** word lists are reasonable coverage, not an audit by native speakers; expect false positives to report (add to `INNOCENT_WORDS` or move the term to `word`) and misses. No profanity check on staff-typed invite names, portal free text, or emails.
+- **No roster filter / cross-school queue** for flagged info; only the per-row badge, the roster header count and the managers dialog badge. The review action records the reviewer's email but there is no un-review.
+- **`drizzle-kit generate` is still blocked** by the duplicate snapshot parent (above), so 0055 is hand-written like 0043-0054.
+
+## Discord second tab (spec-041)
+
+- **Unverified in real conditions:** real Discord OAuth, real browsers' pop-up blockers (Safari/iOS in particular), in-app webviews and embedded browsers (may not support `window.open` or `BroadcastChannel`; they rely on the same-tab fallback, the focus/5 s cookie re-check and the closed-tab poll), and real two-tab messaging. Tests are jsdom and mocks only; the UI was not checked in a browser.
+- `window.close()` from the finished tab only works for tabs the wizard opened; otherwise the person closes it from the on-screen instruction.
+- A callback with an expired or missing flow cookie shows a plain error page in the second tab and sends no message; the wizard tab recovers through Cancel, closing the tab, or the ten-minute cap.
+
+## Roster removal cleanup (spec-042, merged in PR #305)
+
+- **Rehearsed on PGlite only.** The helper's SQL is exercised in memory (`roster-removal-pglite.test.ts`), including the FK-restrict race and a dropped optional table. `FOR UPDATE` and nested savepoints through the Supabase transaction pooler (port 6543) are not verified; nothing ran against any real database.
+- **Implicit removals not covered.** Deleting a game or season cascades teams, rosters and players without the app reading them, so their members are not cleaned and `notifyRosterMembershipChanged` is not called; deleting a school is a soft delete and leaves members. Orphans left by those paths (and any created before spec-042) can be swept by the spec-036 purge script; a generic sweep job was not built. The spec-034 move keeps the `players` row, so it needs no cleanup. Staff roster delete does run the cleanup (it is already refused when the roster has matches).
+- **History detection is heuristic.** Nothing references `players.id`, so "has match history" is inferred from the removed roster's scored/live/completed matches, stored games, and name / in-game name / Riot id matches in standings, MVP text and Valorant scoreboards. A member or PUUID link on `valorant_game_players` would make it exact (see spec-038's PUUID note). Loose name matches keep more records than strictly needed; they never delete one that should stay.
+- **Kept members keep their spent invite.** There is no UI for staff to purge a kept student on request.
+- **`onboarding_content_flags` is covered** (added after #304 merged): counted in the helper's `deleteMember`, named in the confirmation copy, and in the mocked and PGlite tests. The spec-036 purge script still relies on the member FK cascade for it (see the comment on `DELETE_ORDER`).
+- `manager_invites` and `school_managers` have no email column, so the case-insensitive email match applies only to `staff_members` and `people`; managers are matched by member link, and manager invites also by intended name at the member's school.
+
+## Managers who also play (spec-043, #296, merged in PR #308)
+
+- Not verified in a browser or with real Discord/Supabase; component and pipeline tests only.
+- Members are matched by email only. A person who uses a different email on a second invite but the same Discord account is still refused with `discord_already_linked`; matching by Discord was deliberately not added.
+- `upsertMemberRecord` overwrites `members.school_id`, so a person who uses an invite from a second school is moved to it (existing behaviour, now reachable for managers who play).
+- The manager is not auto-rostered: they approve their own application in the portal queue (subject to the roster lock and season scope).
+## Google Form onboarding (spec-051, #322)
+
+- **Owner steps left after the 31 Oct rollout.** Code is deployed, `0057` is applied and `GOOGLE_FORM_WEBHOOK_SECRET` is set in Vercel. Still to do: confirm the form link and entry id on `/admin/onboarding-form`, press Generate script and paste it into the real form's Apps Script, add the `WEBHOOK_KEY` script property (the key shown on that page, derived from the secret) and the `onFormSubmit` trigger.
+- **Never tested against a real Google Form or Apps Script** (only locally, with the webhook called by hand). First real run should add the trigger, submit a test response from a pending invite's prefilled link and watch the completion count.
+- **No manual staff override** for a missing completion. `source = 'manual'` is reserved in the table and unused. Add a staff action if a student's Google trigger ever fails.
+- The webhook's failed-auth rate limiter is the existing in-memory one (`rate-limit.ts`): per serverless instance, reset on cold start, not shared. Best-effort only; valid callers are never counted. Replace with Upstash together with the other limiters.
+- Swapping the Google Form needs the script and `WEBHOOK_KEY` pasted into the new form and its trigger authorized (each form has its own Apps Script); the old form's trigger should be deleted. Documented on the staff page.
+- **Second invite vs "Limit to 1 response".** If the form owner enables Google's "Limit to 1 response" (sign-in required), then because completions are per invite, a person with a second invite (another game or season) cannot submit the same form again and cannot get a second completion. Needs a new form per round, response editing, or the manual override (not built).
+- **Prefill with sign-in required is untested.** If the form owner requires sign-in, whether a pre-filled link still carries the verification code has not been tried against a real form; the checklist's test step is where it would show.
+- The wizard hides the form step when the page-load lookup fails; the server's `onboarding_form_required` rejection reveals it.
+- The wizard step was exercised in a browser locally; the staff page was not looked at.
+- The role editor drops retired bit 12 from a role only when that role is saved; stored masks are not rewritten by the migration.
+- Retiring the bit left `Permissions` with a gap at 12; new permissions start at 13.
+
+## Generate season follow-ups (spec-046)
+
+- The lock, bulk inserts and UI have not been exercised against a real database or in a browser.
+- Week 1 date and the fixed 7 PM ET slot are the only schedule inputs; holidays and per-week skips are not modelled.
+- `createMatch`/`deleteMatch` do not lock the season row, so a hand-scheduled match racing Generate's commit can slip in between its check and insert (spec-046). Left as is; revisit if it ever happens.
+
+## Reschedule without staff approval (spec-054)
+
+- Any `match_reschedule_requests` rows already in `pending_staff` in production are stranded: nothing can approve or decline them any more, and they still block a new request on their match (open-request unique index). They need a manual look (query `status = 'pending_staff'`, then move the match by hand and set the row to `approved`/`declined_staff`, or cancel it). Not checked here, since this work never touched the production database.
+- The spec-032 Known limit (a user managing both schools of a match can request and accept alone) no longer has staff approval as a backstop.
+- Not exercised against a real database or in a browser.
+
+## Staff acting in the portal (spec-055)
+
+- No explicit "acted as staff" flag is stored; a staff action is identifiable only by its user id (the reschedule and result rows hold the staff user, the school columns the viewed school). Add a column if reports ever need to filter on it.
+- The confirm dialog stacking on top of the reschedule and result modals has been tested in jsdom only; check it in a real browser as a staff admin.
+
+## School email and student ID (spec-056)
+
+- **DEPLOY ORDER: apply migration `0058` BEFORE deploying; the code does not degrade without it.** Before production: apply migration `0058` first, confirm the `student-ids` bucket exists and is private (the migration creates it only if the migration role can write the `storage` schema; otherwise create it by hand: Public off, 5 MB, image/jpeg, image/png, image/webp), then deploy. Never applied or tested against production by the implementer.
+- The school email is typed, not verified; staff comparison with the ID is the only check. If NYCPS ever allows Google sign-in, replace it with OAuth.
+- No staff approve/reject step for the ID yet, and no retention rule beyond "deleted with the member or invite" (decide how long to keep ID photos of accepted students).
+- Student ID view audit rows are in `staff_audit_logs` (`student_id_viewed`); there is no UI to read them.
+- Roster pages select `members.school_email` and the ID flag reads `student_id_uploads`, so both fail loudly until `0058` is applied. No graceful degradation is intended.
+- The orphan sweep has no scheduler (a cron route calling `sweepOrphanStudentIds` is a follow-up); photos orphaned by an expired invite wait for the next upload, removal or purge.
+- Plus-addressing is not canonicalised for the school email (`a+1@` and `a@` are different to the unique index).
+- A chunked upload skips the early `Content-Length` 413 (the 4 MB check after reading still applies).
+- Not exercised against real Supabase Storage or in a browser.
+- Dev-only local student ID storage (`STUDENT_ID_STORAGE=local`, `STUDENT_ID_LOCAL_DIR`) exists for local testing only; it is guarded against production and a non-loopback database (spec-056). Files in that directory are never cleaned by anything except the same sweep paths, so delete the directory by hand when done.
+
+## School-owned rosters and season membership (spec-060)
+
+- **Applied to production 6 Nov 2026** (0060 before the deploy, 0061 after; record in spec-060 "Rollout record"). The deploy-order and rehearsal items are resolved. Later migrations must have a journal `when` above 1790882000031.
+- **Open: Supabase RLS behavioral verification.** The 0061 policy and `roster_standings` view rewrite for the anon/authenticated roles was reviewed only; check as anon and as an authenticated user that public reads and manager reads return what they did before.
+- **Open: admin and manager portal smoke test.** Not exercised after the rollout (needs sign-in).
+- **Cleanup:** the backups taken for the rollout live in `db/backups/` and hold student PII (gitignored); delete them once no longer needed.
+- 0060 step 5(b) added membership rows for schools with an archived standings snapshot (one row: teams 167 -> 168) and step 6 gave every membership its missing rosters (archived seasons included, empty rosters; the user accepts that these schools now appear in the public directory). The admin dashboard "teams without a roster" warning counts active seasons only.
+- `db/verify-roster-backfill.ts` reads `teams` and is not meant for use after 0061 (`teams` is gone).
+- Opponents' derived standings (the `roster_standings` view) keep counting played matches against a removed school by design.
+- The local dev server (`npm run dev:local`) runs the app on one database connection; a transaction that waits on a second connection would hang there (PGlite limit, not production).
+
+
+## Manager create-roster (spec-061)
+
+- Resolved: `createSchoolRoster` now refuses non-staff callers (`Only EZ Esports staff can create rosters`), so the manager Create Roster control is enforced on the server as well as hidden in the UI. Not yet merged or deployed.

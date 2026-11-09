@@ -303,7 +303,7 @@ export function AdminNotice({ tone = 'info', title, children, action, onDismiss,
 }
 
 interface AdminToastProps {
-  toast: { message: string; type: 'success' | 'error' } | null;
+  toast: { message: string; type: 'success' | 'error'; action?: { label: string; href: string } } | null;
   onDismiss?: () => void;
 }
 
@@ -324,7 +324,17 @@ export function AdminToast({ toast, onDismiss }: AdminToastProps) {
       className="admin-toast fixed bottom-6 right-6 z-50 flex max-w-sm items-start gap-3 rounded-xl bg-surface-raised px-4 py-3 text-sm shadow-2xl shadow-black/50 ring-1 ring-line/70"
     >
       <Icon aria-hidden className={cx('mt-0.5 h-5 w-5 shrink-0', isError ? 'text-danger-on-tint' : 'text-success')} />
-      <span className="min-w-0 flex-1 leading-6 text-foreground">{toast.message}</span>
+      <span className="min-w-0 flex-1 leading-6 text-foreground">
+        {toast.message}
+        {toast.action && (
+          <>
+            {' '}
+            <Link href={toast.action.href} scroll={false} onClick={onDismiss} className="font-medium text-accent underline underline-offset-2">
+              {toast.action.label}
+            </Link>
+          </>
+        )}
+      </span>
       {onDismiss && (
         <button type="button" onClick={onDismiss} aria-label="Dismiss" className={cx(iconBtnSm, '-my-1 -mr-2')}>
           <HiXMark aria-hidden className="h-4 w-4" />

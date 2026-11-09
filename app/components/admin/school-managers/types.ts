@@ -21,6 +21,10 @@ export interface ManagerItem {
   firstName?: string | null;
   lastName?: string | null;
   email: string | null;
+  /** nycstudents.net address typed in onboarding. */
+  schoolEmail?: string | null;
+  /** A student ID photo is on file (opened through the staff signed-URL route). */
+  hasStudentId?: boolean;
 }
 
 export interface ManagerInviteItem {
@@ -42,6 +46,13 @@ export interface SchoolManagersModalProps {
     slug?: string;
   };
   games?: GameItem[];
+  /**
+   * Opened from a season page: new invite links are issued for this season (the manager's
+   * academic year, which names the season they work on) and the choice is not offered.
+   */
+  seasonName?: string;
+  /** Tab shown when the dialog opens. */
+  initialTab?: 'invites' | 'active' | 'existing';
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }

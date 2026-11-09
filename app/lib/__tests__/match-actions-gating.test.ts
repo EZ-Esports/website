@@ -4,19 +4,22 @@ const mocks = vi.hoisted(() => ({
   getPublicMatchesPage: vi.fn(),
   getMatchesPage: vi.fn(),
   getStaffForAdminSection: vi.fn(),
+  getMatchTabCounts: vi.fn(),
 }));
 
 vi.mock('@/app/lib/db/queries', () => ({
   getPublicMatchesPage: mocks.getPublicMatchesPage,
   getMatchesPage: mocks.getMatchesPage,
+  getMatchTabCounts: mocks.getMatchTabCounts,
 }));
 vi.mock('../db/queries', () => ({
   getPublicMatchesPage: mocks.getPublicMatchesPage,
   getMatchesPage: mocks.getMatchesPage,
+  getMatchTabCounts: mocks.getMatchTabCounts,
 }));
 vi.mock('../auth', () => ({ getStaffForAdminSection: mocks.getStaffForAdminSection }));
 
-import { fetchMatchesPage, fetchStaffMatchesPage } from '../match-actions';
+import { fetchMatchesPage, fetchStaffMatchesPage, fetchStaffMatchTabCounts } from '../match-actions';
 
 const SEASON = '11111111-1111-4111-8111-111111111111';
 const emptyPage = { items: [], nextCursor: null };
@@ -56,5 +59,95 @@ describe('match page server actions', () => {
     expect(mocks.getMatchesPage).toHaveBeenCalledTimes(1);
     expect(mocks.getMatchesPage.mock.calls[0][0].status).toBe('forfeit');
     expect(mocks.getPublicMatchesPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('staff status tabs and counts (spec-030)', () => {
+  const counts = { 'needs-results': 2, upcoming: 3, completed: 4, all: 9 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getPublicMatchesPage.mockResolvedValue(emptyPage);
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+    mocks.getMatchTabCounts.mockResolvedValue(counts);
+  });
+
+  it('the public action drops the tab filter so Completed cannot probe hidden seasons', async () => {
+    await fetchMatchesPage({ seasonId: SEASON, tab: 'completed' });
+    expect(mocks.getPublicMatchesPage.mock.calls[0][0].tab).toBeUndefined();
+  });
+
+  it('the staff page action validates the tab and uses the server clock', async () => {
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    await fetchStaffMatchesPage({ tab: 'needs-results', sort: 'asc' });
+    const params = mocks.getMatchesPage.mock.calls.at(-1)![0];
+    expect(params.tab).toBe('needs-results');
+    expect(params.now).toBeInstanceOf(Date);
+    await fetchStaffMatchesPage({ tab: 'bogus' });
+    expect(mocks.getMatchesPage.mock.calls.at(-1)![0].tab).toBeUndefined();
+  });
+
+  it('the staff counts action is staff-guarded for Matches and only forwards facets', async () => {
+    mocks.getStaffForAdminSection.mockResolvedValue(null);
+    await expect(fetchStaffMatchTabCounts({ seasonId: SEASON })).rejects.toThrow('Forbidden');
+    expect(mocks.getMatchTabCounts).not.toHaveBeenCalled();
+
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    const GAME = '22222222-2222-4222-8222-222222222222';
+    const res = await fetchStaffMatchTabCounts({
+      gameId: GAME, seasonId: SEASON, division: 'JV', search: 'bronx', tab: 'completed', sort: 'asc',
+      cursor: { scheduledAt: '2026-10-01T00:00:00Z', home: 'Bronx Science', division: 'JV', id: SEASON },
+    });
+    expect(res).toEqual(counts);
+    expect(mocks.getStaffForAdminSection).toHaveBeenLastCalledWith('/admin/matches');
+    const params = mocks.getMatchTabCounts.mock.calls.at(-1)![0];
+    expect(params).toMatchObject({ gameId: GAME, seasonId: SEASON, division: 'JV', search: 'bronx' });
+    expect(params).not.toHaveProperty('tab');
+    expect(params).not.toHaveProperty('cursor');
+    expect(params.now).toBeInstanceOf(Date);
+  });
+});
+
+describe('staff match reads stay raw with season and game filters (spec-022, spec-025)', () => {
+  it('passes game and season through the raw query, never the redacting one', async () => {
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    const GAME = '22222222-2222-4222-8222-222222222222';
+    await fetchStaffMatchesPage({ gameId: GAME, seasonId: SEASON, status: 'completed' });
+    const params = mocks.getMatchesPage.mock.calls.at(-1)![0];
+    expect(params).toMatchObject({ gameId: GAME, seasonId: SEASON, status: 'completed' });
+    expect(mocks.getPublicMatchesPage).not.toHaveBeenCalled();
+  });
+
+  it('ignores a malformed game or season id instead of erroring', async () => {
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    await fetchStaffMatchesPage({ gameId: 'nope', seasonId: 'x' });
+    const params = mocks.getMatchesPage.mock.calls.at(-1)![0];
+    expect(params.gameId).toBeUndefined();
+    expect(params.seasonId).toBeUndefined();
+  });
+});
+
+describe('match list cursor validation', () => {
+  const good = { scheduledAt: '2026-11-02T00:00:00.000Z', home: 'Bronx Science', division: 'JV', id: SEASON };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getStaffForAdminSection.mockResolvedValue({ id: 'staff' });
+    mocks.getMatchesPage.mockResolvedValue(emptyPage);
+  });
+
+  it('passes a complete cursor through', async () => {
+    await fetchStaffMatchesPage({ cursor: good });
+    expect(mocks.getMatchesPage.mock.calls[0][0].cursor).toEqual(good);
+  });
+
+  it('drops cursors with a missing home school, an unknown division or a bad id', async () => {
+    for (const bad of [{ ...good, home: undefined }, { ...good, division: 'Bogus' }, { ...good, id: 'x' }]) {
+      mocks.getMatchesPage.mockClear();
+      await fetchStaffMatchesPage({ cursor: bad as never });
+      expect(mocks.getMatchesPage.mock.calls[0][0].cursor).toBeNull();
+    }
   });
 });

@@ -1,17 +1,8 @@
 import type { NextConfig } from "next";
 
-import path from "path";
-
 import { GAME_SLUGS, getGameDivisionRoute } from "./app/lib/constants";
 
-const turbopackRoot = path.resolve(__dirname).includes('.gemini/worktrees')
-  ? path.resolve(__dirname, '../../..')
-  : path.resolve(__dirname);
-
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: turbopackRoot,
-  },
   /**
    * The bare game URL resolves to that game's Varsity hub.
    *
@@ -26,11 +17,16 @@ const nextConfig: NextConfig = {
    * an unknown slug still falls through to the 404 it deserves.
    */
   async redirects() {
-    return GAME_SLUGS.map((slug) => ({
-      source: `/${slug}`,
-      destination: getGameDivisionRoute(slug, 'Varsity'),
-      permanent: true,
-    }));
+    return [
+      ...GAME_SLUGS.map((slug) => ({
+        source: `/${slug}`,
+        destination: getGameDivisionRoute(slug, 'Varsity'),
+        permanent: true,
+      })),
+      // The league-wide Teams & Rosters page was folded into Schools -> View rosters;
+      // keep bookmarks (and the old deep-link query strings) landing somewhere real.
+      { source: '/admin/roster', destination: '/admin/schools', permanent: true },
+    ];
   },
   images: {
     remotePatterns: [

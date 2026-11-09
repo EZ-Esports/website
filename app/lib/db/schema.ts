@@ -53,6 +53,10 @@ export const members = pgTable('members', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   email: text('email').unique(),
+  // The nycstudents.net address typed in onboarding (spec-056). Held in lower case; the unique index is on
+  // lower() as well so a row written by any other path cannot collide on case alone. Nullable because
+  // archive members and admin-created members never went through onboarding.
+  schoolEmail: text('school_email'),
   discord: text('discord'),
   graduationYear: integer('graduation_year'),
   schoolId: uuid('school_id')
@@ -69,7 +73,7 @@ export const members = pgTable('members', {
   // admin-created member collide with the first on a shared NULL.
   //
   // For the same reason, migration 0026 only backfills this where the derived key
-  // is unambiguous: createMember has no duplicate check, so two same-named members
+  // is unambiguous: the admin UI (createPlayer) has no duplicate check, so two same-named members
   // at one school are legal, and stamping both would abort the migration on a
   // duplicate key — as well as claiming an archive origin neither row has.
   memberKey: text('member_key'),
@@ -77,6 +81,7 @@ export const members = pgTable('members', {
 }, (table) => [
   index('members_school_id_idx').on(table.schoolId),
   uniqueIndex('members_member_key_unique_idx').on(table.memberKey),
+  uniqueIndex('members_school_email_lower_idx').on(sql`lower(${table.schoolEmail})`),
 ]).enableRLS();
 
 // Seasons config
@@ -132,8 +137,12 @@ export const seasons = pgTable('seasons', {
 
 // --- TEAMS & ROSTERS ---
 
-// A school's presence in a specific game/season
-export const teams = pgTable('teams', {
+// A school's membership in a specific game/season (spec-060). One row per (school, game, season) and
+// nothing hangs off it: rosters, players and matches belong to the school and season on their own, so
+// deleting a membership row (staff "Remove school") never touches them. The physical table is renamed
+// from `teams` by migration 0061; between migration 0060 and 0061 `season_schools` is a simple
+// auto-updatable view over `teams` (created by 0060), so this one definition works against both.
+export const seasonSchools = pgTable('season_schools', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id')
     .references(() => schools.id, { onDelete: 'cascade' })
@@ -146,24 +155,32 @@ export const teams = pgTable('teams', {
     .notNull(),
   ...auditColumns,
 }, (table) => [
-  index('teams_school_id_idx').on(table.schoolId),
-  index('teams_game_id_idx').on(table.gameId),
-  index('teams_season_id_idx').on(table.seasonId),
-  uniqueIndex('teams_school_game_season_unique_idx').on(table.schoolId, table.gameId, table.seasonId),
+  index('season_schools_school_id_idx').on(table.schoolId),
+  index('season_schools_game_id_idx').on(table.gameId),
+  index('season_schools_season_id_idx').on(table.seasonId),
+  uniqueIndex('season_schools_school_game_season_unique_idx').on(table.schoolId, table.gameId, table.seasonId),
 ]).enableRLS();
 
-// Specific rosters under a team (e.g. "Varsity", "JV")
+// A school's roster for one game and season (e.g. "Varsity", "JV"). It belongs to the school, game and
+// season directly, not to a membership row (spec-060), and is only ever deleted explicitly.
 export const rosters = pgTable('rosters', {
   id: uuid('id').defaultRandom().primaryKey(),
-  teamId: uuid('team_id')
-    .references(() => teams.id, { onDelete: 'cascade' })
+  schoolId: uuid('school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
+    .notNull(),
+  gameId: uuid('game_id')
+    .references(() => games.id, { onDelete: 'cascade' })
+    .notNull(),
+  seasonId: uuid('season_id')
+    .references(() => seasons.id, { onDelete: 'cascade' })
     .notNull(),
   name: text('name').notNull(), // e.g. "Varsity", "JV"
   division: text('division').notNull(), // "A" | "B" (aligned with docs)
   ...auditColumns,
 }, (table) => [
-  index('rosters_team_id_idx').on(table.teamId),
-  uniqueIndex('rosters_team_name_unique_idx').on(table.teamId, table.name),
+  index('rosters_school_game_season_idx').on(table.schoolId, table.gameId, table.seasonId),
+  index('rosters_season_id_idx').on(table.seasonId),
+  uniqueIndex('rosters_scope_name_unique_idx').on(table.schoolId, table.gameId, table.seasonId, table.name),
 ]).enableRLS();
 
 // Mapping members to specific rosters
@@ -205,10 +222,10 @@ export const matches = pgTable('matches', {
     .references(() => seasons.id, { onDelete: 'restrict' })
     .notNull(),
   homeRosterId: uuid('home_roster_id')
-    .references(() => rosters.id, { onDelete: 'cascade' })
+    .references(() => rosters.id, { onDelete: 'restrict' })
     .notNull(),
   awayRosterId: uuid('away_roster_id')
-    .references(() => rosters.id, { onDelete: 'cascade' })
+    .references(() => rosters.id, { onDelete: 'restrict' })
     .notNull(),
   scheduledAt: timestamp('scheduled_at').notNull(),
   homeScore: integer('home_score'),
@@ -243,6 +260,188 @@ export const matches = pgTable('matches', {
   index('matches_home_roster_id_idx').on(table.homeRosterId),
   index('matches_away_roster_id_idx').on(table.awayRosterId),
   uniqueIndex('matches_source_key_unique_idx').on(table.sourceKey),
+]).enableRLS();
+
+// A school manager's request to move a scheduled match (rules page 4.3). It only ever proposes:
+// the match moves when the other school accepts a time (spec-054; earlier requests waited in
+// 'pending_staff', which is kept valid but never entered now). See spec-032 for the status flow.
+export const matchRescheduleRequests = pgTable('match_reschedule_requests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  requestedBySchoolId: uuid('requested_by_school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
+    .notNull(),
+  requestedByUserId: uuid('requested_by_user_id').notNull(), // Supabase auth.users.id
+  reason: text('reason').notNull(),
+  // 'pending_opponent' | 'pending_requester' | 'pending_staff' | 'approved' | 'declined_opponent'
+  // | 'declined_requester' | 'declined_staff' | 'cancelled'; the allowed set is enforced by a
+  // CHECK and mirrored in reschedule-rules.ts.
+  status: text('status').default('pending_opponent').notNull(),
+  // Fixed at creation: less than 72 hours before the match's start, so the opponent may decline
+  // at their discretion. Stored so the answer survives the match later being moved.
+  isLate: boolean('is_late').notNull(),
+  // The match time the request was made against. Approval refuses if the match has moved since.
+  originalScheduledAt: timestamp('original_scheduled_at').notNull(),
+  // Set when the opponent accepts one of the proposed times.
+  acceptedOptionId: uuid('accepted_option_id'),
+  // The opponent's answer to the requester's times: an accept, a decline or a counter-offer.
+  opponentRespondedByUserId: uuid('opponent_responded_by_user_id'),
+  opponentRespondedAt: timestamp('opponent_responded_at'),
+  // The requester's answer to a counter-offer (an accept or a decline).
+  counterRespondedByUserId: uuid('counter_responded_by_user_id'),
+  counterRespondedAt: timestamp('counter_responded_at'),
+  decidedByStaffId: text('decided_by_staff_id'),
+  decidedAt: timestamp('decided_at'),
+  staffNote: text('staff_note'),
+  ...auditColumns,
+}, (t) => [
+  index('match_reschedule_requests_match_id_idx').on(t.matchId),
+  index('match_reschedule_requests_school_id_idx').on(t.requestedBySchoolId),
+  index('match_reschedule_requests_status_idx').on(t.status),
+  // At most one open request per match: a second attempt must wait for the first to resolve.
+  uniqueIndex('match_reschedule_requests_one_open_per_match_idx')
+    .on(t.matchId)
+    .where(sql`status in ('pending_opponent', 'pending_requester', 'pending_staff')`),
+  check(
+    'match_reschedule_requests_status_check',
+    sql`${t.status} in ('pending_opponent', 'pending_requester', 'pending_staff', 'approved', 'declined_opponent', 'declined_requester', 'declined_staff', 'cancelled')`
+  ),
+]).enableRLS();
+
+// The times proposed on a request: the requester's first set (2 to 5, at least an hour apart;
+// enforced in the action) and, if the opponent counters, one more set of their own.
+export const matchRescheduleOptions = pgTable('match_reschedule_options', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requestId: uuid('request_id')
+    .references(() => matchRescheduleRequests.id, { onDelete: 'cascade' })
+    .notNull(),
+  proposedAt: timestamp('proposed_at').notNull(),
+  // Which side proposed it. Only the other side's times can be picked: the opponent picks from
+  // the 'requester' set, and after a counter-offer the requester picks from the 'opponent' set.
+  proposedBy: text('proposed_by').default('requester').notNull(),
+}, (t) => [
+  index('match_reschedule_options_request_id_idx').on(t.requestId),
+  uniqueIndex('match_reschedule_options_request_time_idx').on(t.requestId, t.proposedAt),
+  check('match_reschedule_options_proposed_by_check', sql`${t.proposedBy} in ('requester', 'opponent')`),
+]).enableRLS();
+
+// --- MATCH RESULTS FROM THE GAME'S OWN DATA (spec-038) ---
+
+// One finished Valorant game as the data provider reported it. A finished game never changes, so
+// a row is fetched once and reused: `riot_match_id` is unique and it is the cache key. The raw
+// provider payload is deliberately not kept (it names every participant, rounds, kills and
+// locations); only the fields the scoreboard and series scoring use are stored.
+export const valorantGames = pgTable('valorant_games', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  riotMatchId: text('riot_match_id').notNull(),
+  mapId: text('map_id').notNull(),
+  mapName: text('map_name').notNull(),
+  startedAt: timestamp('started_at').notNull(),
+  gameLengthMs: integer('game_length_ms').notNull(),
+  queueId: text('queue_id').notNull(),
+  gameVersion: text('game_version'),
+  redRounds: integer('red_rounds').notNull(),
+  blueRounds: integer('blue_rounds').notNull(),
+  winningSide: text('winning_side').notNull(), // 'Red' | 'Blue'
+  fetchedAt: timestamp('fetched_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('valorant_games_riot_match_id_idx').on(t.riotMatchId),
+  check('valorant_games_winning_side_check', sql`${t.winningSide} in ('Red', 'Blue')`),
+]).enableRLS();
+
+// One player's line in a stored game.
+export const valorantGamePlayers = pgTable('valorant_game_players', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  gameId: uuid('game_id')
+    .references(() => valorantGames.id, { onDelete: 'cascade' })
+    .notNull(),
+  puuid: text('puuid').notNull(),
+  name: text('name').notNull(),
+  tag: text('tag').notNull(),
+  side: text('side').notNull(), // 'Red' | 'Blue'
+  agent: text('agent').notNull(),
+  tier: text('tier'),
+  score: integer('score').notNull(),
+  kills: integer('kills').notNull(),
+  deaths: integer('deaths').notNull(),
+  assists: integer('assists').notNull(),
+  headshots: integer('headshots').notNull(),
+  bodyshots: integer('bodyshots').notNull(),
+  legshots: integer('legshots').notNull(),
+  damageDealt: integer('damage_dealt').notNull(),
+  damageReceived: integer('damage_received').notNull(),
+  // Derived by us (the provider has no MVP field): see NormalizedPlayer in match-results/types.ts.
+  isMatchMvp: boolean('is_match_mvp').default(false).notNull(),
+  isTeamMvp: boolean('is_team_mvp').default(false).notNull(),
+}, (t) => [
+  index('valorant_game_players_game_id_idx').on(t.gameId),
+  uniqueIndex('valorant_game_players_game_puuid_idx').on(t.gameId, t.puuid),
+  check('valorant_game_players_side_check', sql`${t.side} in ('Red', 'Blue')`),
+]).enableRLS();
+
+// A stored game attached to a league match as one game of its best-of-3. `game_id` is unique so a
+// game can count for only one series; (match_id, game_number) is unique so a series has one game 1,
+// one game 2, one game 3.
+export const matchGames = pgTable('match_games', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  gameId: uuid('game_id')
+    .references(() => valorantGames.id, { onDelete: 'restrict' })
+    .notNull(),
+  gameNumber: integer('game_number').notNull(),
+  // Which in-game side (Red/Blue) the match's home roster played in this game.
+  homeSide: text('home_side').notNull(),
+  homeRounds: integer('home_rounds').notNull(),
+  awayRounds: integer('away_rounds').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('match_games_game_id_idx').on(t.gameId),
+  uniqueIndex('match_games_match_game_number_idx').on(t.matchId, t.gameNumber),
+  check('match_games_home_side_check', sql`${t.homeSide} in ('Red', 'Blue')`),
+  check('match_games_game_number_check', sql`${t.gameNumber} between 1 and 3`),
+]).enableRLS();
+
+// A manager's submitted match IDs that could not be resolved yet because the data service was
+// rate-limited or down. It keeps the IDs so "Check again" does not need them re-pasted, and holds
+// the earliest sensible retry. At most one is open per match.
+export const matchResultSubmissions = pgTable('match_result_submissions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  submittedByUserId: uuid('submitted_by_user_id').notNull(), // Supabase auth.users.id
+  submittedBySchoolId: uuid('submitted_by_school_id')
+    .references(() => schools.id, { onDelete: 'cascade' })
+    .notNull(),
+  riotMatchIds: text('riot_match_ids').array().notNull(),
+  status: text('status').default('pending').notNull(), // 'pending' | 'completed' | 'cancelled'
+  retryAfter: timestamp('retry_after'),
+  lastError: text('last_error'),
+  ...auditColumns,
+}, (t) => [
+  index('match_result_submissions_match_id_idx').on(t.matchId),
+  uniqueIndex('match_result_submissions_one_pending_per_match_idx')
+    .on(t.matchId)
+    .where(sql`status = 'pending'`),
+  check('match_result_submissions_status_check', sql`${t.status} in ('pending', 'completed', 'cancelled')`),
+]).enableRLS();
+
+// One row per FRESH result submission (not "Check again"), kept to throttle submissions across
+// serverless instances: at most one per match every 30 seconds and ten per user per hour.
+export const matchResultAttempts = pgTable('match_result_attempts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  matchId: uuid('match_id')
+    .references(() => matches.id, { onDelete: 'cascade' })
+    .notNull(),
+  userId: uuid('user_id').notNull(), // Supabase auth.users.id
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('match_result_attempts_match_created_idx').on(t.matchId, t.createdAt),
+  index('match_result_attempts_user_created_idx').on(t.userId, t.createdAt),
 ]).enableRLS();
 
 // --- TOURNAMENTS ---
@@ -407,7 +606,9 @@ export const leadershipTerms = pgTable('leadership_terms', {
 // View for rosters with dynamically computed standings (wins and losses)
 export const rosterStandings = pgView('roster_standings', {
   id: uuid('id'),
-  teamId: uuid('team_id'),
+  schoolId: uuid('school_id'),
+  gameId: uuid('game_id'),
+  seasonId: uuid('season_id'),
   name: text('name'),
   division: text('division'),
   createdAt: timestamp('created_at'),
@@ -416,7 +617,7 @@ export const rosterStandings = pgView('roster_standings', {
   losses: integer('losses'),
 }).with({ securityInvoker: true }).as(sql`
   SELECT
-    r.id, r.team_id, r.name, r.division, r.created_at, r.updated_at,
+    r.id, r.school_id, r.game_id, r.season_id, r.name, r.division, r.created_at, r.updated_at,
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score > m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score > m.home_score AND m.status IN ('completed', 'forfeit')))::int as wins,
     (SELECT COUNT(*) FROM matches m WHERE (m.home_roster_id = r.id AND m.home_score < m.away_score AND m.status IN ('completed', 'forfeit')) OR (m.away_roster_id = r.id AND m.away_score < m.home_score AND m.status IN ('completed', 'forfeit')))::int as losses
   FROM rosters r
@@ -763,6 +964,9 @@ export const playerInvites = pgTable('player_invites', {
   id: uuid('id').defaultRandom().primaryKey(),
   schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'cascade' }).notNull(),
   gameId: uuid('game_id').references(() => games.id, { onDelete: 'cascade' }).notNull(),
+  // The season the invite was issued for. Null only for legacy rows whose season could not be
+  // derived; managers never see or review those (spec-047). Set null if the season is deleted.
+  seasonId: uuid('season_id').references(() => seasons.id, { onDelete: 'set null' }),
   tokenHash: text('token_hash').notNull().unique(), // SHA-256
   intendedFirstName: text('intended_first_name').notNull(),
   intendedLastName: text('intended_last_name').notNull(),
@@ -777,6 +981,7 @@ export const playerInvites = pgTable('player_invites', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('player_invites_school_game_idx').on(t.schoolId, t.gameId),
+  index('player_invites_season_id_idx').on(t.seasonId),
   uniqueIndex('player_invites_token_hash_idx').on(t.tokenHash),
   index('player_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();
@@ -819,26 +1024,114 @@ export const playerIdentities = pgTable('player_identities', {
   index('player_identities_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
-// 4. Student Demographics & Survey Vault (Strict RLS)
-export const studentDemographics = pgTable('student_demographics', {
+// 4. Onboarding form completions. One row per invite whose person finished the staff-configured
+// Google Form (verified by the Apps Script webhook, see spec-051). Holds only ids and a timestamp:
+// no answers and no personal data. `member_id` stays null until the onboarding submission creates
+// the member; the cascade then removes the row with the member.
+export const onboardingFormCompletions = pgTable('onboarding_form_completions', {
   id: uuid('id').defaultRandom().primaryKey(),
-  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull().unique(),
-  legalFirstName: text('legal_first_name').notNull(),
-  legalLastName: text('legal_last_name').notNull(),
-  birthDate: timestamp('birth_date').notNull(),
-  gender: text('gender'),
-  race: text('race').array(),
-  ethnicity: text('ethnicity').array(),
-  countryOfBirth: text('country_of_birth'),
-  parentsCountryOfBirth: text('parents_country_of_birth'),
-  primaryLanguageAtHome: text('primary_language_at_home'),
-  isFreeOrReducedLunch: boolean('is_free_or_reduced_lunch'),
-  isFirstGenCollege: boolean('is_first_gen_college'),
-  doePetitionConsent: boolean('doe_petition_consent').default(false).notNull(),
-  surveyDetails: jsonb('survey_details'), // gaming sentiment, ping, hours, career interests
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }),
+  // 'google_form' is the verified webhook. 'manual' is reserved for a future staff override and is
+  // never written today.
+  source: text('source').notNull().default('google_form'),
+  completedAt: timestamp('completed_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('onboarding_form_completions_invite_idx').on(t.inviteKind, t.inviteId),
+  index('onboarding_form_completions_member_id_idx').on(t.memberId),
+  check('onboarding_form_completions_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
+  check('onboarding_form_completions_source_check', sql`${t.source} in ('google_form', 'manual')`),
+]).enableRLS();
+
+// Student ID photo uploaded during onboarding (spec-056). The image lives in the PRIVATE `student-ids`
+// bucket; this table holds only the object key, never a URL. A row is created by the upload route bound
+// to the invite (so the browser can never name a key), and `member_id` is set when the submission
+// succeeds. A row is live while its member exists or its invite is still pending; anything else is an
+// orphan that the sweep deletes together with its object. Kept apart from `members` so the key is never carried by a members `select()` that ends up
+// in a cache or a page. RLS on, no policies: service role only.
+export const studentIdUploads = pgTable('student_id_uploads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  // SET NULL, not CASCADE: deleting a member must not silently drop the only pointer to the stored
+  // photo. The row stays as an orphan until `sweepOrphanStudentIds` has removed the object and the row.
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'set null' }),
+  storageKey: text('storage_key').notNull(),
+  contentType: text('content_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
-  index('student_demographics_member_id_idx').on(t.memberId),
+  uniqueIndex('student_id_uploads_invite_idx').on(t.inviteKind, t.inviteId),
+  uniqueIndex('student_id_uploads_member_idx').on(t.memberId),
+  uniqueIndex('student_id_uploads_storage_key_idx').on(t.storageKey),
+  check('student_id_uploads_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
+]).enableRLS();
+
+// 5. Onboarding Consent Records (append-only audit trail of the Terms of Service
+// acknowledgment and, for participants under 18, the parent/guardian authorization
+// with electronic signature). Holds guardian PII: RLS on, no policies, service role only.
+export const onboardingConsents = pgTable('onboarding_consents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'set null' }),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  formVersion: text('form_version').notNull(),
+  isMinor: boolean('is_minor').notNull(),
+  ageAtSigning: integer('age_at_signing').notNull(),
+  tosAcknowledged: boolean('tos_acknowledged').notNull(),
+  participantLegalName: text('participant_legal_name').notNull(),
+  guardianFullName: text('guardian_full_name'),
+  guardianRelationship: text('guardian_relationship'),
+  guardianEmail: text('guardian_email'),
+  guardianSignature: text('guardian_signature'),
+  // Stamped by the server at submission; never taken from the client.
+  signedAt: timestamp('signed_at').defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('onboarding_consents_invite_idx').on(t.inviteKind, t.inviteId),
+  index('onboarding_consents_member_id_idx').on(t.memberId),
+  check('onboarding_consents_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
+  check('onboarding_consents_tos_check', sql`${t.tosAcknowledged} = true`),
+  check(
+    'onboarding_consents_minor_guardian_check',
+    sql`not ${t.isMinor} or (${t.guardianFullName} is not null and ${t.guardianRelationship} is not null and ${t.guardianEmail} is not null and ${t.guardianSignature} is not null)`
+  ),
+]).enableRLS();
+
+// One row per onboarding submission in which the person overrode an offensive-content warning
+// ("This is actually my real information"). It is a review queue for staff, not a log of every
+// warning: a submission with nothing overridden writes nothing. Kept out of `members` so the
+// roster and member queries never depend on it (it may be absent until its migration is applied).
+export interface StoredFlaggedField {
+  field: string;
+  label: string;
+  value: string;
+  matchedTerms: string[];
+  languages: string[];
+}
+
+export const onboardingContentFlags = pgTable('onboarding_content_flags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // The person who ticked the override: the member created or updated by the submission.
+  memberId: uuid('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  schoolId: uuid('school_id').references(() => schools.id, { onDelete: 'set null' }),
+  // Which invite table `inviteId` points at; no FK because it spans two tables.
+  inviteKind: text('invite_kind').notNull(), // 'player' | 'manager'
+  inviteId: uuid('invite_id').notNull(),
+  flaggedFields: jsonb('flagged_fields').$type<StoredFlaggedField[]>().notNull(),
+  // Stamped by the server at submission.
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at'),
+  // Email (falling back to the user id) of the staff member who marked it reviewed.
+  reviewedBy: text('reviewed_by'),
+}, (t) => [
+  uniqueIndex('onboarding_content_flags_invite_idx').on(t.inviteKind, t.inviteId),
+  index('onboarding_content_flags_member_id_idx').on(t.memberId),
+  check('onboarding_content_flags_invite_kind_check', sql`${t.inviteKind} in ('player', 'manager')`),
 ]).enableRLS();
 
 export type SchoolManager = typeof schoolManagers.$inferSelect;
@@ -849,6 +1142,8 @@ export type ManagerInvite = typeof managerInvites.$inferSelect;
 export type NewManagerInvite = typeof managerInvites.$inferInsert;
 export type PlayerIdentity = typeof playerIdentities.$inferSelect;
 export type NewPlayerIdentity = typeof playerIdentities.$inferInsert;
-export type StudentDemographics = typeof studentDemographics.$inferSelect;
-export type NewStudentDemographics = typeof studentDemographics.$inferInsert;
+export type OnboardingConsent = typeof onboardingConsents.$inferSelect;
+export type NewOnboardingConsent = typeof onboardingConsents.$inferInsert;
+export type OnboardingContentFlag = typeof onboardingContentFlags.$inferSelect;
+export type NewOnboardingContentFlag = typeof onboardingContentFlags.$inferInsert;
 

@@ -20,15 +20,18 @@ import { AssignExistingManagerTab } from './school-managers/AssignExistingManage
 export default function SchoolManagersModal({
   school,
   games = [],
+  seasonName,
+  initialTab = 'invites',
   isOpen,
   onOpenChange,
 }: SchoolManagersModalProps) {
-  const [activeTab, setActiveTab] = useState<'invites' | 'active' | 'existing'>('invites');
+  const [activeTab, setActiveTab] = useState<'invites' | 'active' | 'existing'>(initialTab);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
   const {
     managers,
+    contentFlags,
     invites,
     registeredManagers,
     loading,
@@ -37,6 +40,7 @@ export default function SchoolManagersModal({
     isRemovingId,
     isRevokingId,
     handleRemoveManager,
+    handleUpdateManager,
     handleRevokeInvite,
   } = useSchoolManagersData(school.id, isOpen);
 
@@ -104,6 +108,7 @@ export default function SchoolManagersModal({
                 <ProvisionInviteTab
                   schoolId={school.id}
                   games={games}
+                  seasonName={seasonName}
                   invites={invites}
                   isRevokingId={isRevokingId}
                   onRevokeInvite={handleRevokeInvite}
@@ -116,9 +121,13 @@ export default function SchoolManagersModal({
               <AdminTabPanel id="active">
                 <ActiveManagersTab
                   managers={managers}
+                  contentFlags={contentFlags}
                   loading={loading}
                   isRemovingId={isRemovingId}
                   onRemoveManager={handleRemoveManager}
+                  games={games}
+                  onUpdateManager={handleUpdateManager}
+                  onSuccess={setFormSuccess}
                   onError={setFormError}
                 />
               </AdminTabPanel>

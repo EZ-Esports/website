@@ -199,4 +199,35 @@ one empty/loading/notice/toast vocabulary, and short purposeful motion.
   `backwards` fill and be switched off (not just shortened) for reduced motion,
   or delays keep content invisible.
 
+### Case study 4: /admin/matches — from a form-plus-table to a work queue (2026-10)
+
+**What it was:** a permanent sticky "Schedule a match" column beside a table of 25
+always-open editor rows (score inputs, status select, Save and Delete on every row),
+under six filter controls.
+
+**Why it was bad, from first principles:**
+
+- *Violated rule 1 (user's job):* the common job is "enter the result of what was
+  played". Nothing surfaced which matches needed one; staff scanned 25 editable rows.
+  Scheduling, the rarer job, owned a third of the screen permanently.
+- *Violated rule 4 (screen budget):* the form column and the table's cramped 4-column
+  layout (names truncated to 64px) spent width on things used occasionally.
+- *Violated rule 5 (progressive disclosure):* every row exposed its editor and a
+  delete button, so a stray click on Delete sat beside every Save.
+- *Rule 6:* six controls of equal weight; Division and Sort are rarely touched.
+
+**What we did ([spec-030](../../../spec/spec-030-matches-page-redesign.md)):** a header
+with one primary "Schedule match" that opens a dialog; Game, Season and search visible,
+Division and Sort behind "More filters" with an active dot; status tabs with counts
+("Needs results" first and default) computed on the server so they stay right across
+pagination; read-only rows grouped under Eastern-time day headings; "Enter result" /
+"Edit" expands that one row's editor; Delete lives in an overflow menu and still asks
+for confirmation. A visit that arrives with a season (League Setup's link) opens on
+All, since the queue is not what that visitor came for (rule 2: honor the entry intent).
+
+**Why it's better:** the first screen is the work queue with its size on the tab, each
+row is one line of facts and one obvious action, and destructive or rare actions are
+one step away instead of permanently on screen. Counts are never derived from a partly
+loaded list, so a badge cannot lie.
+
 <!-- Add new case studies above this line as we ship more redesigns. -->

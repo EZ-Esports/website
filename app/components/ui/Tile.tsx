@@ -70,11 +70,11 @@ export default function Tile({
         // — promising a click target across a whole panel whose body does
         // nothing — and keyboard users got no border change at all, so hover
         // and focus disagreed about what the tile was. `has-*` ties both to the
-        // link's own state without restructuring the DOM or swallowing the
-        // standings rows' own row-level interactivity.
+        // header link's own state via `data-tile-link` without restructuring the
+        // DOM or swallowing the standings rows' own row-level interactivity.
         href &&
           tone === 'default' &&
-          'has-[a:hover]:border-foreground-muted has-[a:focus-visible]:border-foreground-muted',
+          'has-[[data-tile-link]:hover]:border-foreground-muted has-[[data-tile-link]:focus-visible]:border-foreground-muted',
         className
       )}
     >
@@ -88,6 +88,7 @@ export default function Tile({
           // a bare `var(--game-accent)` means *no ring at all* — not a default
           // colour — for any Tile rendered outside a themed ancestor.
           <Link
+            data-tile-link
             href={href}
             className="-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-sm text-[11px] font-black uppercase tracking-widest text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--game-accent,var(--accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >

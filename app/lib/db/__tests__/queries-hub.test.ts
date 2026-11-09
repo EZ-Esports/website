@@ -288,6 +288,11 @@ describe('season standings — the division predicate', () => {
     expect(params).toContain('JV');
     expect(params).not.toContain('Varsity');
   });
+
+  it.each(STANDINGS_BRANCHES)('selects schoolSlug from schools (%s)', (_branch, build) => {
+    const { sql } = build({ ...SEASON, combined: false }).toSQL();
+    expect(sql).toContain('"schools"."slug"');
+  });
 });
 
 describe('buildFormGuideQuery — deterministic ordering', () => {

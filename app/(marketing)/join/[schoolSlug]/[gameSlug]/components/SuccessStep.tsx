@@ -6,6 +6,11 @@ import type { InviteData } from '../types';
 
 interface SuccessStepProps {
   isManager?: boolean;
+  /** Manager who also plays: a player application was submitted in the same sign-up. */
+  alsoPlays?: boolean;
+  /** Games that got a new application / games the member already had a live application for. */
+  applicationsCreated?: number;
+  applicationsExisting?: number;
   legalFirstName: string;
   legalLastName: string;
   email: string;
@@ -15,6 +20,9 @@ interface SuccessStepProps {
 
 export function SuccessStep({
   isManager,
+  alsoPlays,
+  applicationsCreated = 0,
+  applicationsExisting = 0,
   legalFirstName,
   legalLastName,
   email,
@@ -69,6 +77,24 @@ export function SuccessStep({
                   Generate player invite links for students at {inviteData.schoolName} and approve student submissions for tournament rosters.
                 </span>
               </li>
+              {alsoPlays && (
+                <li className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                    ✓
+                  </span>
+                  <span>
+                    <strong className="text-foreground">
+                      {applicationsCreated > 0 ? 'Player Application Submitted:' : 'Player Application Already On File:'}
+                    </strong>{' '}
+                    {applicationsCreated > 0
+                      ? 'Your own player application is in the review queue in the portal. Approve it to place yourself on a roster.'
+                      : 'You already had a player application for the game you chose, so no new one was filed. Find it in the portal.'}
+                    {applicationsCreated > 0 && applicationsExisting > 0
+                      ? ` (${applicationsExisting} of your chosen games already had one, so those were not filed again.)`
+                      : ''}
+                  </span>
+                </li>
+              )}
             </ul>
           </div>
 

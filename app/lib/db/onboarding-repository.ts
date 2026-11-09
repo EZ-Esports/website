@@ -1,17 +1,9 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type {
-  CompetitiveRole,
-  PlayerSubmissionDraft,
-} from '@/app/lib/onboarding/core/domain/types';
-
-function toDbPlayerRole(role: CompetitiveRole | string): 'player' | 'sub' | 'captain' {
-  if (role === 'captain') return 'captain';
-  if (role === 'sub') return 'sub';
-  return 'player';
-}
+import { listMembersWithStudentId } from './student-ids';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import type { PlayerSubmissionDraft } from '@/app/lib/onboarding/core/domain/types';
 
 // ----------------------------------------------------------------------------
 // School & game lookups
@@ -72,181 +64,6 @@ export async function findGameRowBySlug(slug: string) {
 }
 
 // ----------------------------------------------------------------------------
-// Roster & player pool reads
-// ----------------------------------------------------------------------------
-
-/** Roster joined to its team, or null when the roster does not exist. */
-export async function findRosterWithTeam(rosterId: string) {
-  const [row] = await db
-    .select({
-      roster: schema.rosters,
-      team: schema.teams,
-    })
-    .from(schema.rosters)
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-    .where(eq(schema.rosters.id, rosterId))
-    .limit(1);
-  return row ?? null;
-}
-
-/**
- * Active and roster-lock state of a season. A missing season is reported as inactive and
- * unlocked.
- */
-export async function getSeasonRosterState(
-  seasonId: string
-): Promise<{ isActive: boolean; isLocked: boolean }> {
-  const [season] = await db
-    .select({
-      isActive: schema.seasons.isActive,
-      rostersLockedAt: schema.seasons.rostersLockedAt,
-    })
-    .from(schema.seasons)
-    .where(eq(schema.seasons.id, seasonId))
-    .limit(1);
-  return {
-    isActive: season?.isActive ?? false,
-    isLocked: !!season?.rostersLockedAt,
-  };
-}
-
-/** Whether the game's active season has its rosters locked (false when none is active). */
-export async function isActiveSeasonRostersLocked(gameId: string): Promise<boolean> {
-  const [season] = await db
-    .select({ rostersLockedAt: schema.seasons.rostersLockedAt })
-    .from(schema.seasons)
-    .where(and(eq(schema.seasons.gameId, gameId), eq(schema.seasons.isActive, true)))
-    .limit(1);
-  return !!season?.rostersLockedAt;
-}
-
-/**
- * Loads the teams, rosters, players and identities behind a school's rosters.
- * Returns null when the school has no teams or no rosters (or, with
- * `activeSeasonOnly`, when no season is active).
- */
-export async function loadSchoolRosterData(
-  schoolId: string,
-  gameIds?: string[] | null,
-  options?: { activeSeasonOnly?: boolean }
-) {
-  const whereConditions = [eq(schema.teams.schoolId, schoolId)];
-  if (gameIds && gameIds.length > 0) {
-    whereConditions.push(inArray(schema.teams.gameId, gameIds));
-  }
-  if (options?.activeSeasonOnly) {
-    // Managers only ever see the game's active season; past seasons stay admin-only.
-    const activeSeasons = await db
-      .select({ id: schema.seasons.id })
-      .from(schema.seasons)
-      .where(eq(schema.seasons.isActive, true));
-    if (activeSeasons.length === 0) return null;
-    whereConditions.push(
-      inArray(
-        schema.teams.seasonId,
-        activeSeasons.map((s) => s.id)
-      )
-    );
-  }
-
-  const schoolTeams = await db
-    .select({
-      id: schema.teams.id,
-      schoolId: schema.teams.schoolId,
-      gameId: schema.teams.gameId,
-      gameName: schema.games.displayName,
-      gameSlug: schema.games.slug,
-    })
-    .from(schema.teams)
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
-    .where(and(...whereConditions));
-
-  if (schoolTeams.length === 0) return null;
-
-  const teamIds = schoolTeams.map((t) => t.id);
-  const teamRosters = await db
-    .select()
-    .from(schema.rosters)
-    .where(inArray(schema.rosters.teamId, teamIds));
-
-  if (teamRosters.length === 0) return null;
-
-  const rosterIds = teamRosters.map((r) => r.id);
-  const playersList = await db
-    .select({
-      id: schema.players.id,
-      rosterId: schema.players.rosterId,
-      memberId: schema.players.memberId,
-      role: schema.players.role,
-      isCaptain: schema.players.isCaptain,
-      ign: schema.players.ign,
-      createdAt: schema.players.createdAt,
-      firstName: schema.members.firstName,
-      lastName: schema.members.lastName,
-      discord: schema.members.discord,
-    })
-    .from(schema.players)
-    .innerJoin(schema.members, eq(schema.players.memberId, schema.members.id))
-    .where(inArray(schema.players.rosterId, rosterIds));
-
-  const memberIds = [...new Set(playersList.map((p) => p.memberId))];
-  const identities =
-    memberIds.length > 0
-      ? await db
-          .select()
-          .from(schema.playerIdentities)
-          .where(inArray(schema.playerIdentities.memberId, memberIds))
-      : [];
-
-  return { schoolTeams, teamRosters, playersList, identities };
-}
-
-/**
- * Loads a school's members with their identities and roster enrolments.
- * Returns null when the school has no members.
- */
-export async function loadSchoolPlayerPoolData(schoolId: string) {
-  const schoolMembers = await db
-    .select({
-      id: schema.members.id,
-      firstName: schema.members.firstName,
-      lastName: schema.members.lastName,
-      discord: schema.members.discord,
-    })
-    .from(schema.members)
-    .where(eq(schema.members.schoolId, schoolId))
-    .orderBy(desc(schema.members.createdAt));
-
-  if (schoolMembers.length === 0) return null;
-
-  const memberIds = schoolMembers.map((m) => m.id);
-
-  const identities = await db
-    .select()
-    .from(schema.playerIdentities)
-    .where(inArray(schema.playerIdentities.memberId, memberIds));
-
-  const playerRows = await db
-    .select({
-      playerId: schema.players.id,
-      memberId: schema.players.memberId,
-      rosterId: schema.players.rosterId,
-      role: schema.players.role,
-      isCaptain: schema.players.isCaptain,
-      rosterName: schema.rosters.name,
-      gameId: schema.teams.gameId,
-      gameName: schema.games.displayName,
-    })
-    .from(schema.players)
-    .innerJoin(schema.rosters, eq(schema.players.rosterId, schema.rosters.id))
-    .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-    .innerJoin(schema.games, eq(schema.teams.gameId, schema.games.id))
-    .where(inArray(schema.players.memberId, memberIds));
-
-  return { schoolMembers, identities, playerRows };
-}
-
-// ----------------------------------------------------------------------------
 // Player invite operations
 // ----------------------------------------------------------------------------
 
@@ -281,40 +98,6 @@ export async function findPlayerInviteByTokenHash(tokenHash: string) {
   return row.invite || row;
 }
 
-export async function findPlayerInviteById(inviteId: string) {
-  const [row] = await db
-    .select()
-    .from(schema.playerInvites)
-    .where(eq(schema.playerInvites.id, inviteId))
-    .limit(1);
-  return row ?? null;
-}
-
-export async function insertPlayerInvite(params: {
-  schoolId: string;
-  gameId: string;
-  tokenHash: string;
-  intendedFirstName: string;
-  intendedLastName: string;
-  invitedByUserId: string;
-  expiresAt: Date;
-}) {
-  const [inserted] = await db
-    .insert(schema.playerInvites)
-    .values({
-      schoolId: params.schoolId,
-      gameId: params.gameId,
-      tokenHash: params.tokenHash,
-      intendedFirstName: params.intendedFirstName,
-      intendedLastName: params.intendedLastName,
-      invitedByUserId: params.invitedByUserId,
-      status: 'pending',
-      expiresAt: params.expiresAt,
-    })
-    .returning();
-  return inserted;
-}
-
 export async function setPlayerInviteDraft(
   inviteId: string,
   draft: Partial<PlayerSubmissionDraft>
@@ -341,369 +124,6 @@ export async function markPlayerInviteFinalSubmitted(
     .where(eq(schema.playerInvites.id, inviteId));
 }
 
-export async function listPendingPlayerInvites(schoolId: string, gameId?: string) {
-  const conditions = [
-    eq(schema.playerInvites.schoolId, schoolId),
-    eq(schema.playerInvites.status, 'pending'),
-  ];
-  if (gameId) {
-    conditions.push(eq(schema.playerInvites.gameId, gameId));
-  }
-
-  return db
-    .select()
-    .from(schema.playerInvites)
-    .where(and(...conditions))
-    .orderBy(desc(schema.playerInvites.createdAt));
-}
-
-export async function listSubmittedPlayerInvites(schoolId: string, gameId?: string) {
-  const conditions = [
-    eq(schema.playerInvites.schoolId, schoolId),
-    eq(schema.playerInvites.status, 'submitted'),
-  ];
-  if (gameId) {
-    conditions.push(eq(schema.playerInvites.gameId, gameId));
-  }
-
-  return db
-    .select()
-    .from(schema.playerInvites)
-    .where(and(...conditions))
-    .orderBy(desc(schema.playerInvites.submittedAt));
-}
-
-export async function markPlayerInviteRevoked(inviteId: string): Promise<void> {
-  await db
-    .update(schema.playerInvites)
-    .set({
-      status: 'rejected',
-      rejectionReason: 'Revoked by school manager',
-      reviewedAt: new Date(),
-    })
-    .where(eq(schema.playerInvites.id, inviteId));
-}
-
-// ----------------------------------------------------------------------------
-// Approval & roster mutations
-// ----------------------------------------------------------------------------
-
-/** Upserts the member, demographics, identities and roster slot for an approved invite, then marks it accepted. */
-export async function approveInviteAndEnrollTx(params: {
-  inviteId: string;
-  schoolId: string;
-  gameId: string;
-  draft: PlayerSubmissionDraft;
-  targetRosterId?: string | null;
-  competitiveRole: CompetitiveRole;
-}) {
-  const { inviteId, schoolId, draft, targetRosterId, competitiveRole } = params;
-
-  return await db.transaction(async (tx) => {
-    // 1. Upsert member
-    const email = draft.email?.trim().toLowerCase() || `player_${Date.now()}@student.local`;
-    const [existingMember] = await tx
-      .select()
-      .from(schema.members)
-      .where(eq(schema.members.email, email))
-      .limit(1);
-
-    let memberId: string;
-    if (existingMember) {
-      memberId = existingMember.id;
-      await tx
-        .update(schema.members)
-        .set({
-          firstName: draft.firstName || existingMember.firstName,
-          lastName: draft.lastName || existingMember.lastName,
-          schoolId,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.members.id, memberId));
-    } else {
-      const [insertedMember] = await tx
-        .insert(schema.members)
-        .values({
-          schoolId,
-          firstName: draft.firstName || 'Student',
-          lastName: draft.lastName || 'Player',
-          email,
-        })
-        .returning();
-      memberId = insertedMember.id;
-    }
-
-    // 2. Insert demographics if available
-    let demographicsId = '';
-    if (draft.demographics) {
-      const [demo] = await tx
-        .insert(schema.studentDemographics)
-        .values({
-          memberId,
-          legalFirstName: draft.demographics.legalFirstName,
-          legalLastName: draft.demographics.legalLastName,
-          birthDate: new Date(draft.demographics.birthDate),
-          gender: draft.demographics.gender,
-          race: Array.isArray(draft.demographics.race) ? draft.demographics.race : [draft.demographics.race],
-          ethnicity: draft.demographics.ethnicity
-            ? (Array.isArray(draft.demographics.ethnicity) ? draft.demographics.ethnicity : [draft.demographics.ethnicity])
-            : null,
-          countryOfBirth: draft.demographics.countryOfBirth,
-          parentsCountryOfBirth: draft.demographics.parentsCountryOfBirth,
-          primaryLanguageAtHome: draft.demographics.primaryLanguageAtHome,
-          isFreeOrReducedLunch: draft.demographics.isFreeOrReducedLunch,
-          isFirstGenCollege: draft.demographics.isFirstGenCollege,
-          doePetitionConsent: draft.demographics.doePetitionConsent ?? false,
-          surveyDetails: draft.demographics.surveyDetails,
-        })
-        .returning();
-      demographicsId = demo.id;
-    }
-
-    // 3. Upsert identities
-    let identityId: string | undefined;
-    if (draft.identities) {
-      for (const ident of Object.values(draft.identities)) {
-        const [idRow] = await tx
-          .insert(schema.playerIdentities)
-          .values({
-            memberId,
-            provider: ident.provider,
-            providerUserId: ident.providerUserId,
-            providerUsername: ident.providerUsername,
-            inGuild: ident.inGuild ?? false,
-          })
-          .returning();
-        identityId = idRow.id;
-      }
-    }
-
-    // 4. Enroll on roster if target specified
-    let playerId: string | undefined;
-    if (targetRosterId) {
-      const isCaptain = competitiveRole === 'captain';
-      if (isCaptain) {
-        // Demote any existing captain on this roster
-        await tx
-          .update(schema.players)
-          .set({ role: 'player', isCaptain: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(schema.players.rosterId, targetRosterId),
-              eq(schema.players.isCaptain, true)
-            )
-          );
-      }
-
-      const [existingP] = await tx
-        .select()
-        .from(schema.players)
-        .where(
-          and(
-            eq(schema.players.rosterId, targetRosterId),
-            eq(schema.players.memberId, memberId)
-          )
-        )
-        .limit(1);
-
-      if (existingP) {
-        const [updated] = await tx
-          .update(schema.players)
-          .set({
-            role: toDbPlayerRole(competitiveRole),
-            isCaptain,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.players.id, existingP.id))
-          .returning();
-        playerId = updated.id;
-      } else {
-        const [insertedP] = await tx
-          .insert(schema.players)
-          .values({
-            rosterId: targetRosterId,
-            memberId,
-            role: toDbPlayerRole(competitiveRole),
-            isCaptain,
-            ign: draft.firstName ? `${draft.firstName} ${draft.lastName}` : null,
-          })
-          .returning();
-        playerId = insertedP.id;
-      }
-    }
-
-    // 5. Update invite record
-    await tx
-      .update(schema.playerInvites)
-      .set({
-        status: 'accepted',
-        memberId,
-        reviewedAt: new Date(),
-      })
-      .where(eq(schema.playerInvites.id, inviteId));
-
-    return {
-      memberId,
-      playerId,
-      demographicsId,
-      identityId,
-    };
-  });
-}
-
-export async function enrollPlayerToRosterTx(params: {
-  rosterId: string;
-  memberId: string;
-  ign?: string | null;
-  role: CompetitiveRole;
-}) {
-  const { rosterId, memberId, ign, role } = params;
-  const isCaptain = role === 'captain';
-
-  return await db.transaction(async (tx) => {
-    if (isCaptain) {
-      // Demote existing captain on this roster
-      await tx
-        .update(schema.players)
-        .set({ role: 'player', isCaptain: false, updatedAt: new Date() })
-        .where(
-          and(
-            eq(schema.players.rosterId, rosterId),
-            eq(schema.players.isCaptain, true)
-          )
-        );
-    }
-
-    const [existingPlayer] = await tx
-      .select()
-      .from(schema.players)
-      .where(
-        and(
-          eq(schema.players.rosterId, rosterId),
-          eq(schema.players.memberId, memberId)
-        )
-      )
-      .limit(1);
-
-    let playerId: string;
-    if (existingPlayer) {
-      playerId = existingPlayer.id;
-      await tx
-        .update(schema.players)
-        .set({
-          role: toDbPlayerRole(role),
-          isCaptain,
-          ign: ign || existingPlayer.ign,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.players.id, existingPlayer.id));
-    } else {
-      const [inserted] = await tx
-        .insert(schema.players)
-        .values({
-          rosterId,
-          memberId,
-          role: toDbPlayerRole(role),
-          ign: ign || null,
-          isCaptain,
-        })
-        .returning();
-      playerId = inserted.id;
-    }
-
-    return {
-      playerId,
-      rosterId,
-      memberId,
-      role,
-      isCaptain,
-    };
-  });
-}
-
-export async function updateRosterPlayerRoleTx(params: {
-  rosterId: string;
-  playerId: string;
-  role: CompetitiveRole;
-}): Promise<void> {
-  const { rosterId, playerId, role } = params;
-  const isCaptain = role === 'captain';
-
-  await db.transaction(async (tx) => {
-    if (isCaptain) {
-      // Demote existing captains
-      await tx
-        .update(schema.players)
-        .set({ role: 'player', isCaptain: false, updatedAt: new Date() })
-        .where(
-          and(
-            eq(schema.players.rosterId, rosterId),
-            eq(schema.players.isCaptain, true)
-          )
-        );
-    }
-
-    await tx
-      .update(schema.players)
-      .set({
-        role: toDbPlayerRole(role),
-        isCaptain,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.players.id, playerId));
-  });
-}
-
-export async function deletePlayerFromRoster(params: {
-  rosterId: string;
-  playerId: string;
-}): Promise<void> {
-  await db
-    .delete(schema.players)
-    .where(
-      and(
-        eq(schema.players.id, params.playerId),
-        eq(schema.players.rosterId, params.rosterId)
-      )
-    );
-}
-
-export async function swapStarterAndSubTx(params: {
-  rosterId: string;
-  currentStarterId: string;
-  substitutePlayerId: string;
-}): Promise<void> {
-  const { rosterId, currentStarterId, substitutePlayerId } = params;
-
-  await db.transaction(async (tx) => {
-    const [starter] = await tx
-      .select()
-      .from(schema.players)
-      .where(and(eq(schema.players.id, currentStarterId), eq(schema.players.rosterId, rosterId)))
-      .limit(1);
-
-    const [sub] = await tx
-      .select()
-      .from(schema.players)
-      .where(and(eq(schema.players.id, substitutePlayerId), eq(schema.players.rosterId, rosterId)))
-      .limit(1);
-
-    if (!starter || !sub) {
-      throw new Error('Both starter and substitute players must be present on roster');
-    }
-
-    await tx
-      .update(schema.players)
-      .set({ role: 'sub', isCaptain: false, updatedAt: new Date() })
-      .where(eq(schema.players.id, starter.id));
-
-    await tx
-      .update(schema.players)
-      .set({ role: 'player', isCaptain: starter.isCaptain, updatedAt: new Date() })
-      .where(eq(schema.players.id, sub.id));
-  });
-}
-
 // ----------------------------------------------------------------------------
 // School manager provisioning & tenancy
 // ----------------------------------------------------------------------------
@@ -718,7 +138,7 @@ export async function findStaffUserIdByNormalizedEmail(email: string): Promise<s
 }
 
 export async function listActiveSchoolManagers(schoolId: string) {
-  return db
+  const rows = await db
     .select({
       id: schema.schoolManagers.id,
       schoolId: schema.schoolManagers.schoolId,
@@ -733,6 +153,7 @@ export async function listActiveSchoolManagers(schoolId: string) {
       firstName: schema.members.firstName,
       lastName: schema.members.lastName,
       email: sql<string | null>`coalesce(${schema.members.email}, ${schema.staffMembers.email})`,
+      schoolEmail: schema.members.schoolEmail,
     })
     .from(schema.schoolManagers)
     .leftJoin(schema.members, eq(schema.schoolManagers.memberId, schema.members.id))
@@ -744,6 +165,11 @@ export async function listActiveSchoolManagers(schoolId: string) {
       )
     )
     .orderBy(desc(schema.schoolManagers.isPrimaryContact), asc(schema.schoolManagers.createdAt));
+  // Only a flag: staff open the photo through the permission-checked signed-URL route.
+  const withStudentId = await listMembersWithStudentId(
+    rows.map((r) => r.memberId).filter((id): id is string => Boolean(id))
+  );
+  return rows.map((r) => ({ ...r, hasStudentId: Boolean(r.memberId && withStudentId.has(r.memberId)) }));
 }
 
 /** Raw manager and member rows behind the registered-manager account list. */
@@ -849,6 +275,59 @@ export async function upsertSchoolManagerAssignment(params: {
     return inserted;
   }
 }
+
+/**
+ * Changes game scope and primary-contact flag of one manager, only while that manager is still
+ * active. The guard is part of the UPDATE itself, so a removal that lands first wins and this
+ * returns null instead of switching access back on (unlike the assignment upsert, which forces
+ * `is_active = true`). Promoting to primary demotes the other managers of the same school and
+ * academic year in the same transaction, after the target is confirmed active, so a lost race
+ * leaves them untouched.
+ */
+export async function updateActiveSchoolManagerAccess(
+  managerId: string,
+  params: { managedGames: string[] | null; isPrimaryContact: boolean }
+) {
+  return db.transaction(async (tx) => {
+    const [target] = await tx
+      .select({ schoolId: schema.schoolManagers.schoolId, academicYear: schema.schoolManagers.academicYear })
+      .from(schema.schoolManagers)
+      .where(and(eq(schema.schoolManagers.id, managerId), eq(schema.schoolManagers.isActive, true)))
+      .limit(1);
+    if (!target) return null;
+
+    if (params.isPrimaryContact) {
+      await tx
+        .update(schema.schoolManagers)
+        .set({ isPrimaryContact: false })
+        .where(
+          and(
+            eq(schema.schoolManagers.schoolId, target.schoolId),
+            eq(schema.schoolManagers.academicYear, target.academicYear),
+            sql`${schema.schoolManagers.id} <> ${managerId}`
+          )
+        );
+    }
+
+    const [updated] = await tx
+      .update(schema.schoolManagers)
+      .set({
+        managedGames: params.managedGames,
+        isPrimaryContact: params.isPrimaryContact,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(schema.schoolManagers.id, managerId), eq(schema.schoolManagers.isActive, true)))
+      .returning();
+    // Removed between the check and the write: throwing rolls back the demotion above.
+    if (!updated) throw new ManagerInactiveError();
+    return updated;
+  }).catch((error) => {
+    if (error instanceof ManagerInactiveError) return null;
+    throw error;
+  });
+}
+
+class ManagerInactiveError extends Error {}
 
 export async function deactivateSchoolManager(managerId: string) {
   const [updated] = await db

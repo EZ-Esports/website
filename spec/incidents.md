@@ -206,6 +206,36 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 
 ---
 
+## 21. Code deployed before its migration (pattern; spec-040, Oct 2026)
+
+Migration 0052 (consents) was merged and deployed before it was applied, and onboarding submissions failed on the missing table for the gap. Spec-040 adds `onboarding_content_flags` (0055) on the same risk, so no hard dependency on it: guarded reads and writes (`isMissingContentFlagsError`, savepoint inside the onboarding transaction, separate roster query) make onboarding and the staff pages work with or without the migration, with a warning in the logs. **Do not repeat.** A feature that adds a table or column must not make an existing, previously working path depend on it; tests must cover the missing-relation path.
+
+---
+
+## 22. Review of the lost Google Form attempt: nine failure modes (spec-051, Oct 2026)
+
+An earlier attempt at the Google Form step (never pushed, unrecoverable) was reviewed and nine defects listed on issue #322. They are now design rules in [spec-051](spec-051-google-form-onboarding.md): retry 408/429/5xx in the Apps Script and charge the rate limiter only after failed auth (Google's script comes from a shared address pool, and a 429 silently dropped a completion); the generic `MANAGE_CONTENT` editor must never write rows that belong to a `MANAGE_LEAGUE` page (`ONBOARDING_FORM_KEYS` refused in save and restore); a retired permission bit must be masked in `canGrantPermissions`, otherwise stored roles become un-assignable with no visible reason; an expired token must be explained to the student, not just rejected; only links that honour prefill (`/viewform`, `/d/e/`) are accepted; the bearer credential and the HMAC root must be different derived keys; every completion row needs a cleanup path (member cascade, roster removal, invite delete, purge); the form's setup steps must say what the verification question's description is; a `manual` source is reserved, not built. Also: deploying code before its migration (pattern 21) applies in reverse here, since `0057` drops a table the old code writes, so code goes first.
+
+---
+
+## 23. `vercel link --yes` created a new project (Oct 2026)
+
+Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find the existing `ezesports` project; it created an empty project named `website` in the personal scope and linked to it. The wrong link was visible only because that project had no environment variables. It had no deployments and was deleted with `vercel project rm website`; the checkout was relinked with `vercel link --project ezesports --yes`. Rule: before setting any variable, check the linked project's name in `.vercel/project.json` and that `vercel env ls production` shows `DATABASE_URL`; link with an explicit `--project ezesports`. The same session also showed the webhook bearer is the derived key, not the raw secret (see spec-051).
+
+## 24. Reworded verification question silently stopped onboarding (spec-051, spec-062, Nov 2026)
+
+**Symptom.** Students reached Step 6 and stayed on "waiting for your submission". Google showed "You've already responded" on resubmit. `/api/google-form/complete` was never called, and the completion count did not rise.
+
+**Root cause (strongly indicated, not confirmed from the Apps Script Executions log).** The form question had been retitled to "Verification code (please leave unchanged)". The Apps Script matched the title with exact equality, found no code, logged a `console.warn` and returned normally, so Google saw a successful run: no failure email, no retry, no error in Executions.
+
+**Fix.** `findVerificationCode_` now matches a title that STARTS with "Verification code" (trimmed, case-insensitive); the no-code branch logs `console.error` (still returns, so Google does not retry); the staff page says the title must start with "Verification code" and instructions belong in the description. Staff must paste the new script into the form's Apps Script, since the old text lives in Google, not in this repo. Affected students need a fresh form submission only if their response had no code reported. Resubmitting is blocked by Google when "Limit to 1 response" is on; clearing that student's response or turning the limit off should free them, but this has **not been verified against Google Forms**. If it does not work, the fallback is a manual completion row, which is not built (spec-051 pitfall 9). Have them reopen the form from Step 6 for a fresh code.
+
+**What to check next time.** Apps Script > Executions: a run with "This response has no verification code" in the log means the title no longer starts with "Verification code". A missing run means the trigger is missing or unauthorized. Also confirm the form is accepting responses.
+
+**Do not repeat.** A step that can "succeed" without doing its job must be loud (error level) and tolerant of cosmetic edits to Google-side text.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.
@@ -215,3 +245,5 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 - **`c35fc61`:** RAC SeasonSelect slugify broke filtering; reverted.
 - **`CLAUDE.md` vs gold:** header still says both seeds wipe. Gold does not, post-`9219ef5`. Hazard file is operator contract; `db/seed-gold.ts` is the mechanism.
 - **PR #146:** Applied `assertSeedTargetAllowed()` across `migrate.ts`, `drizzle.config.ts`, `seed-owner.ts`, `backfill-leadership.ts`, and `seed-phase2.ts` to prevent accidental non-loopback database mutations.
+- **Stale members after roster removal (spec-042, 28 Oct 2026):** removing a player deleted only the `players` row, so the member, consents, identities and spent invite lingered and collided with later onboarding (unique Discord/Riot ids, email lookups finding old data). Fix: shared orphan cleanup in the same transaction, fail-closed (keep on any doubt), with the staff and portal confirmations stating what is deleted. A misleading string ("They stay in the school's member list") was removed, and the manager portal's one-click removal gained a confirmation.
+- **Student ID photos of minors (spec-056, 2 Nov 2026) - standing risk, no incident.** The photos are PII of minors in a public repo's product. Rules that must not regress: the bucket stays private with no policies; no `getPublicUrl`, no signed URL inside any cached data, page, action result or CSV; staff open it only via the audited 120 s route; keys never come from the browser; any new code path that deletes a member or invite must call `sweepOrphanStudentIds()` after commit. `student_id_uploads.member_id` is SET NULL on purpose; do not change it to CASCADE or the object loses its only pointer.

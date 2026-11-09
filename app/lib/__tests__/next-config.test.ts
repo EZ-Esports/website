@@ -9,14 +9,22 @@ describe('Next.js development configuration', () => {
   });
 });
 
+describe('retired Teams & Rosters page', () => {
+  it('redirects the old admin route to Schools so bookmarks do not 404', async () => {
+    const redirects = await nextConfig.redirects!();
+    expect(redirects).toContainEqual({ source: '/admin/roster', destination: '/admin/schools', permanent: true });
+  });
+});
+
 describe('game hub division redirects', () => {
   it('sends every bare game URL to that game\'s Varsity hub, permanently', async () => {
     const redirects = await nextConfig.redirects!();
 
-    expect(redirects.map((r) => r.source).sort()).toEqual(
+    const gameRedirects = redirects.filter((r) => r.source !== '/admin/roster');
+    expect(gameRedirects.map((r) => r.source).sort()).toEqual(
       GAME_SLUGS.map((slug) => `/${slug}`).sort()
     );
-    for (const redirect of redirects) {
+    for (const redirect of gameRedirects) {
       expect(redirect.destination).toBe(`${redirect.source}/varsity`);
       expect(redirect.permanent).toBe(true);
     }

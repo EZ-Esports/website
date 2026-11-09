@@ -18,7 +18,7 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 ### Audience and shape
 
 - **Audience:** school managers only.
-- **One tour definition, split into named sections.** The tour is a single ordered list of steps grouped into sections (working names: *Pick a game*, *Invite players*, *Approvals*, *Rosters*). The first-run tour, the full replay and the per-feature replay all use this same definition and the same popover component. Copy lives next to the definition in code. No CMS, no markdown docs.
+- **One tour definition, split into named sections.** The tour is a single ordered list of steps grouped into sections (working names: *Pick a game*, *Invite players*, *Approvals*, *Rosters*; a *Matches* section was added later, see spec-032). The first-run tour, the full replay and the per-feature replay all use this same definition and the same popover component. Copy lives next to the definition in code. No CMS, no markdown docs.
 - **First run:** a school manager entering the portal for the first time gets the full tour automatically.
 - **Tutorial button (always present afterwards):** opens a small menu with *Full tour* plus one entry per section. Choosing a section plays only that section's slice, starting at its first step and ending at its last, then closes.
 
@@ -27,6 +27,7 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 - Each step shows Back and Next. Skip is a **quiet secondary action**, visually weaker than Next.
 - Skip (and Esc) opens a confirmation: it says the tutorial can be replayed any time from the Tutorial button, with *Keep going* and *Skip tour* choices.
 - Skipping counts as dismissal. The first-run tour does not return.
+- **The tour is view only.** While a step shows, the rest of the page is `inert` (`tour/inert.ts`): no clicks, no Tab or keyboard activation, and screen readers stay on the tour card. The card and spotlight are portalled to `<body>` so every other child of `<body>` can be locked around them (scripts and custom elements such as dev overlays are skipped, and anything already inert is left as it was); the lock is released when the step ends, on skip and on unmount. When the lock engages and focus is not already in the card (starting from the Tutorial menu, whose focus restore can leave it on `<body>`), focus is moved to the card. The page can still be scrolled, which the tour itself relies on. This stops a manager sending, accepting or cancelling something mid-tutorial (the Matches steps sit next to live Request, Respond and Cancel controls).
 
 ### Dismissal storage (database flag)
 
@@ -50,7 +51,7 @@ Issue #225 asks for in-product onboarding instead of written docs: a short seque
 A brand-new school has no pending submissions and likely no rosters, so row-level controls do not exist yet.
 
 - Approvals and Rosters steps anchor to the **section containers** (`PendingApprovalsCard`, `RostersSection`), which always render.
-- The roster step is preceded by (or falls back to) the *Create roster* button when the school has no rosters.
+- The roster step is preceded by (or falls back to) the *Create roster* button when the school has no rosters. Since [spec-061](spec-061-manager-no-create-roster.md) that button is staff only, so managers do not get the create-roster step: its anchor is absent and the tour drops it.
 - Steps that live inside a modal (e.g. `EnrollPlayerModal`) either anchor to the modal's trigger button, or declare a prerequisite the tour performs (open the modal, wait for the anchor to mount). Default to the trigger button.
 
 ### Interaction and accessibility

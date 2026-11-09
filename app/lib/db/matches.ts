@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { bothMembers, inScope, snapshotMember } from './season-membership';
 import {
   and,
   asc,
@@ -23,12 +24,17 @@ import {
 import { alias, unionAll } from 'drizzle-orm/pg-core';
 import {
   COMBINED_DIVISION,
+  cursorFor,
+  matchOrderKey,
+  FINISHED_MATCH_STATUSES,
   canonicalDivision,
   clampPageLimit,
   normalizeSort,
   type CanonicalDivision,
   type HubDivision,
   type MatchesPage,
+  type MatchTab,
+  type MatchTabCounts,
   type MatchesPageParams,
   type StandingsFormat,
 } from './match-page';
@@ -40,7 +46,7 @@ import {
   getOutcomesPublicSeasonIds,
   hubDivisionSql,
 } from './standings';
-import { redactHiddenMatches } from '../season-outcomes';
+import type { SchoolMatchRow } from '../school-matches';
 import { canonicalGameSlug, dbGameSlug } from '../constants';
 
 /** Default page size for public-facing paginated lists. */
@@ -65,22 +71,60 @@ export const getStaffMatches = () =>
 
 const homeRoster = alias(schema.rosters, 'home_roster');
 const awayRoster = alias(schema.rosters, 'away_roster');
-const homeTeam = alias(schema.teams, 'home_team');
-const awayTeam = alias(schema.teams, 'away_team');
+const homeTeam = alias(schema.seasonSchools, 'home_team');
+const awayTeam = alias(schema.seasonSchools, 'away_team');
 const homeSchool = alias(schema.schools, 'home_school');
 const awaySchool = alias(schema.schools, 'away_school');
 
-/**
- * Keyset-paginated match list with division + school names joined in.
- * Sorted by (scheduledAt, id); `cursor` is the sort key of the last row of
- * the previous page. Fetches one extra row to detect whether more remain.
- * Uncached: filter permutations are unbounded and admin edits must be fresh.
- */
-export function buildMatchesPageQuery(params: MatchesPageParams) {
-  const sort = normalizeSort(params.sort);
-  const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
+/** The SQL mirror of `matchTabOf` (match-page.ts); keep the two in step. */
+export function matchTabCondition(tab: MatchTab, now: Date): SQL | undefined {
+  switch (tab) {
+    case 'needs-results':
+      return and(eq(schema.matches.status, 'scheduled'), lt(schema.matches.scheduledAt, now));
+    case 'upcoming':
+      return or(
+        eq(schema.matches.status, 'live'),
+        and(eq(schema.matches.status, 'scheduled'), gte(schema.matches.scheduledAt, now))
+      );
+    case 'completed':
+      return inArray(schema.matches.status, [...FINISHED_MATCH_STATUSES]);
+    default:
+      return undefined;
+  }
+}
 
-  const conditions = [];
+/** Eastern calendar day of the kickoff as YYYY-MM-DD; `scheduled_at` stores a UTC instant. */
+const matchDayEtSql = () =>
+  sql`to_char((${schema.matches.scheduledAt} at time zone 'UTC') at time zone 'America/New_York', 'YYYY-MM-DD')`;
+
+/** Varsity 0, JV 1, All 2 (see DIVISION_RANK). */
+const divisionRankSql = () =>
+  sql`(case ${canonicalDivisionSql(homeRoster.division)} when 'Varsity' then 0 when 'JV' then 1 else 2 end)`;
+
+/**
+ * The staff/public list order: date, then one block per division, then time, home school, id.
+ * Used with one direction for every key so a reversed list is the exact mirror image.
+ */
+function matchListOrder(direction: typeof asc | typeof desc) {
+  return [
+    direction(matchDayEtSql()),
+    direction(divisionRankSql()),
+    direction(schema.matches.scheduledAt),
+    direction(homeSchool.name),
+    direction(schema.matches.id),
+  ];
+}
+
+/** Every facet except the tab, sort and cursor: shared by the page query and the tab counts. */
+function facetConditions(params: MatchesPageParams, publicOnly = false): SQL[] {
+  const conditions: SQL[] = [];
+  // Public reads see only published seasons' matches; an unpublished season's schedule is as
+  // hidden as its scores. `seasons` is joined by every query that passes this flag.
+  if (publicOnly) {
+    conditions.push(isNotNull(schema.seasons.outcomesFinalizedAt));
+    // Both schools must be members of the season (spec-060); a removed school's fixtures stay in the database for staff.
+    conditions.push(bothMembers(homeTeam, awayTeam));
+  }
   if (params.seasonId) conditions.push(eq(schema.matches.seasonId, params.seasonId));
   if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
   if (params.division && params.division !== COMBINED_DIVISION) {
@@ -89,7 +133,7 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
       or(
         eq(canonicalDivisionSql(homeRoster.division), targetDiv),
         eq(canonicalDivisionSql(awayRoster.division), targetDiv)
-      )
+      )!
     );
   }
   if (params.status) conditions.push(eq(schema.matches.status, params.status));
@@ -97,22 +141,46 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
   if (params.to) conditions.push(lte(schema.matches.scheduledAt, params.to));
   if (params.search) {
     const pattern = `%${params.search.replace(/[%_\\]/g, '\\$&')}%`;
-    conditions.push(or(ilike(homeSchool.name, pattern), ilike(awaySchool.name, pattern)));
+    conditions.push(or(ilike(homeSchool.name, pattern), ilike(awaySchool.name, pattern))!);
+  }
+  return conditions;
+}
+
+/**
+ * Keyset-paginated match list with division + school names joined in.
+ * Sorted by (Eastern day, division rank, scheduledAt, home school name, id); `cursor` is the sort key of the last row of
+ * the previous page. Fetches one extra row to detect whether more remain.
+ * Uncached: filter permutations are unbounded and admin edits must be fresh.
+ */
+export function buildMatchesPageQuery(params: MatchesPageParams, publicOnly = false) {
+  const sort = normalizeSort(params.sort);
+  const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
+
+  const conditions: SQL[] = facetConditions(params, publicOnly);
+  if (params.tab) {
+    const tabCondition = matchTabCondition(params.tab, params.now ?? new Date());
+    if (tabCondition) conditions.push(tabCondition);
   }
   if (params.cursor) {
-    const ts = new Date(params.cursor.scheduledAt);
-    const { id } = params.cursor;
-    conditions.push(
-      sort === 'desc'
-        ? or(
-            lt(schema.matches.scheduledAt, ts),
-            and(eq(schema.matches.scheduledAt, ts), lt(schema.matches.id, id))
-          )
-        : or(
-            gt(schema.matches.scheduledAt, ts),
-            and(eq(schema.matches.scheduledAt, ts), gt(schema.matches.id, id))
-          )
+    // Lexicographic keyset over the same five keys as the ORDER BY below, all in one direction.
+    const cmp = sort === 'desc' ? lt : gt;
+    const [day, rank, at, home, id] = matchOrderKey({
+      scheduledAt: params.cursor.scheduledAt,
+      division: params.cursor.division,
+      home: params.cursor.home,
+      id: params.cursor.id,
+    });
+    const keys = [
+      { col: matchDayEtSql(), value: day as unknown },
+      { col: divisionRankSql(), value: rank as unknown },
+      { col: sql`${schema.matches.scheduledAt}`, value: at as unknown },
+      { col: sql`${homeSchool.name}`, value: home as unknown },
+      { col: sql`${schema.matches.id}`, value: id as unknown },
+    ];
+    const branches = keys.map((k, i) =>
+      and(...keys.slice(0, i).map((e) => eq(e.col, e.value)), cmp(k.col, k.value))!
     );
+    conditions.push(or(...branches)!);
   }
 
   const direction = sort === 'desc' ? desc : asc;
@@ -133,19 +201,22 @@ export function buildMatchesPageQuery(params: MatchesPageParams) {
     .from(schema.matches)
     .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(direction(schema.matches.scheduledAt), direction(schema.matches.id))
+    .orderBy(...matchListOrder(direction))
     .limit(limit + 1);
 }
 
-export async function getMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+export async function getMatchesPage(
+  params: MatchesPageParams,
+  publicOnly = false
+): Promise<MatchesPage> {
   const limit = clampPageLimit(params.limit, DEFAULT_PAGE_SIZE);
-  const rows = await buildMatchesPageQuery({ ...params, limit });
+  const rows = await buildMatchesPageQuery({ ...params, limit }, publicOnly);
 
   const items = rows.slice(0, limit);
   const last = items[items.length - 1];
@@ -153,24 +224,61 @@ export async function getMatchesPage(params: MatchesPageParams): Promise<Matches
     items,
     nextCursor:
       rows.length > limit && last
-        ? { scheduledAt: last.scheduledAt.toISOString(), id: last.id }
+        ? cursorFor(last)
         : null,
   };
 }
 
 /**
- * Public schedule page: same rows, but a season whose outcomes are not
- * published has its scores, MVP, notes and forfeit flag stripped here. Public
- * code must use this (and `getPublicSeasonMatches`), not the raw
- * `getMatchesPage`, which is for staff views.
+ * Per-tab totals for the staff Matches page, over the same facets (game, season,
+ * division, search) as the list and one consistent `now`, so a tab's badge equals
+ * the number of rows paging through that tab will deliver. Staff only: raw
+ * (unredacted) statuses, like `getMatchesPage`.
  */
-export async function getPublicMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
-  const [page, publicIds] = await Promise.all([getMatchesPage(params), getOutcomesPublicSeasonIds()]);
-  return { ...page, items: redactHiddenMatches(page.items, publicIds) };
+export async function getMatchTabCounts(
+  params: Omit<MatchesPageParams, 'tab' | 'cursor' | 'sort' | 'limit'>
+): Promise<MatchTabCounts> {
+  const now = params.now ?? new Date();
+  const conditions = facetConditions(params);
+  const tally = (tab: Exclude<MatchTab, 'all'>) =>
+    sql<number>`count(*) filter (where ${matchTabCondition(tab, now)})`.mapWith(Number);
+  const [row] = await db
+    .select({
+      all: sql<number>`count(*)`.mapWith(Number),
+      needsResults: tally('needs-results'),
+      upcoming: tally('upcoming'),
+      completed: tally('completed'),
+    })
+    .from(schema.matches)
+    .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
+    .where(conditions.length ? and(...conditions) : undefined);
+  return {
+    'needs-results': row?.needsResults ?? 0,
+    upcoming: row?.upcoming ?? 0,
+    completed: row?.completed ?? 0,
+    all: row?.all ?? 0,
+  };
 }
 
-export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
-  const conditions = [eq(schema.matches.seasonId, seasonId)];
+/**
+ * Public schedule page: same rows, but only for seasons staff have published.
+ * Matches of an unpublished season (scheduled or played) are filtered in SQL so
+ * keyset paging stays exact. Public code must use this (and
+ * `getPublicSeasonMatches`), not the raw `getMatchesPage`, which is for staff views.
+ */
+export async function getPublicMatchesPage(params: MatchesPageParams): Promise<MatchesPage> {
+  return getMatchesPage(params, true);
+}
+
+export function buildSeasonMatchesQuery(seasonId: string, division?: string, publicOnly = false) {
+  const conditions: SQL[] = [eq(schema.matches.seasonId, seasonId)];
+  if (publicOnly) conditions.push(bothMembers(homeTeam, awayTeam));
   if (division && division !== COMBINED_DIVISION) {
     const targetDiv = canonicalDivision(division);
     conditions.push(
@@ -196,30 +304,80 @@ export function buildSeasonMatchesQuery(seasonId: string, division?: string) {
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(and(...conditions))
-    .orderBy(asc(schema.matches.scheduledAt), asc(schema.matches.id));
+    .orderBy(...matchListOrder(asc));
 }
 
 /**
  * All matches of a season (optionally one division) with names joined in,
  * oldest first. Used by the calendar view, which needs the whole season.
  */
-export async function getSeasonMatches(seasonId: string, division?: string) {
-  return buildSeasonMatchesQuery(seasonId, division);
+export async function getSeasonMatches(seasonId: string, division?: string, publicOnly = false) {
+  return buildSeasonMatchesQuery(seasonId, division, publicOnly);
 }
 
-/** Public counterpart of `getSeasonMatches`; see `getPublicMatchesPage`. */
+/** Public counterpart of `getSeasonMatches`: an unpublished (or unknown) season yields no matches. */
 export async function getPublicSeasonMatches(seasonId: string, division?: string) {
-  const [matches, publicIds] = await Promise.all([
-    getSeasonMatches(seasonId, division),
-    getOutcomesPublicSeasonIds(),
-  ]);
-  return redactHiddenMatches(matches, publicIds);
+  const publicIds = await getOutcomesPublicSeasonIds();
+  if (!publicIds.has(seasonId)) return [];
+  return getSeasonMatches(seasonId, division, true);
+}
+
+/**
+ * Every match a school plays in (either side), oldest first, with raw outcomes. `seasonIds`
+ * restricts to those seasons (a manager's resolved seasons); omit it for a staff admin. Callers
+ * that are not staff must redact unpublished outcomes themselves (`redactHiddenMatches`).
+ */
+export async function getSchoolMatchRows(params: {
+  schoolId: string;
+  seasonIds?: string[];
+  gameId?: string;
+}): Promise<SchoolMatchRow[]> {
+  const conditions: SQL[] = [
+    or(eq(homeRoster.schoolId, params.schoolId), eq(awayRoster.schoolId, params.schoolId))!,
+    // A removed school's fixtures are hidden everywhere else, so the opponent's manager must not
+    // keep seeing a match against it.
+    isNull(homeSchool.deletedAt),
+    isNull(awaySchool.deletedAt),
+    bothMembers(homeTeam, awayTeam),
+  ];
+  if (params.seasonIds) conditions.push(inArray(schema.matches.seasonId, params.seasonIds));
+  if (params.gameId) conditions.push(eq(schema.seasons.gameId, params.gameId));
+
+  return db
+    .select({
+      id: schema.matches.id,
+      seasonId: schema.matches.seasonId,
+      seasonName: schema.seasons.name,
+      gameId: schema.games.id,
+      gameName: schema.games.displayName,
+      gameSlug: schema.games.slug,
+      scheduledAt: schema.matches.scheduledAt,
+      status: schema.matches.status,
+      homeScore: schema.matches.homeScore,
+      awayScore: schema.matches.awayScore,
+      division: canonicalDivisionSql(homeRoster.division),
+      homeSchoolId: homeSchool.id,
+      homeSchoolName: homeSchool.name,
+      awaySchoolId: awaySchool.id,
+      awaySchoolName: awaySchool.name,
+    })
+    .from(schema.matches)
+    .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
+    .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+    .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
+    .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
+    .where(and(...conditions))
+    .orderBy(...matchListOrder(asc));
 }
 
 /** Count of all scheduled matches (for dashboard). */
@@ -269,11 +427,11 @@ export const getCachedRecentResults = unstable_cache(
       .innerJoin(schema.seasons, eq(schema.matches.seasonId, schema.seasons.id))
       .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
       .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-      .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-      .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+      .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+      .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
       .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-      .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-      .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+      .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+      .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
       .where(
         and(
           // Seasons whose outcomes staff have not published contribute nothing.
@@ -284,7 +442,8 @@ export const getCachedRecentResults = unstable_cache(
           eq(homeSchool.isActive, true),
           eq(awaySchool.isActive, true),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt)
+          isNull(awaySchool.deletedAt),
+          bothMembers(homeTeam, awayTeam)
         )
       )
       .orderBy(desc(schema.matches.scheduledAt), desc(schema.matches.id))
@@ -363,6 +522,12 @@ export async function getArchiveIndex() {
     db
       .select({ seasonId: schema.matches.seasonId, matchCount: count() })
       .from(schema.matches)
+      .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
+      .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
+      .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+      .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+      // Only fixtures between two members of the season are public, so only they are counted.
+      .where(bothMembers(homeTeam, awayTeam))
       .groupBy(schema.matches.seasonId),
     db
       .select({
@@ -373,6 +538,7 @@ export async function getArchiveIndex() {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+      .innerJoin(schema.seasonSchools, snapshotMember(schema.seasonStandings))
       .where(eq(schema.seasonStandings.rank, 1)),
   ]);
 
@@ -384,7 +550,8 @@ export async function getArchiveIndex() {
     const c = s.outcomesPublic ? championBySeason.get(s.id) : undefined;
     return {
       ...s,
-      matchCount: countBySeason.get(s.id) ?? 0,
+      // An unpublished season's match count would reveal its schedule size.
+      matchCount: s.outcomesPublic ? (countBySeason.get(s.id) ?? 0) : 0,
       champion: c?.champion ?? null,
       championSchool: c?.championSchool ?? null,
     };
@@ -413,11 +580,11 @@ export function buildHubMatchQuery(opts: {
     })
     .from(schema.matches)
     .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-    .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-    .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+    .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+    .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
     .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-    .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-    .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+    .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+    .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
     .where(
       and(
         eq(schema.matches.seasonId, opts.seasonId),
@@ -427,6 +594,7 @@ export function buildHubMatchQuery(opts: {
         ),
         isNull(homeSchool.deletedAt),
         isNull(awaySchool.deletedAt),
+        bothMembers(homeTeam, awayTeam),
         ...opts.conditions
       )
     )
@@ -455,11 +623,11 @@ export function buildFormGuideQuery(opts: {
       })
       .from(schema.matches)
       .innerJoin(homeRoster, eq(schema.matches.homeRosterId, homeRoster.id))
-      .innerJoin(homeTeam, eq(homeRoster.teamId, homeTeam.id))
-      .innerJoin(homeSchool, eq(homeTeam.schoolId, homeSchool.id))
+      .leftJoin(homeTeam, inScope(homeRoster, homeTeam))
+      .innerJoin(homeSchool, eq(homeRoster.schoolId, homeSchool.id))
       .innerJoin(awayRoster, eq(schema.matches.awayRosterId, awayRoster.id))
-      .innerJoin(awayTeam, eq(awayRoster.teamId, awayTeam.id))
-      .innerJoin(awaySchool, eq(awayTeam.schoolId, awaySchool.id))
+      .leftJoin(awayTeam, inScope(awayRoster, awayTeam))
+      .innerJoin(awaySchool, eq(awayRoster.schoolId, awaySchool.id))
       .where(
         and(
           eq(schema.matches.seasonId, opts.seasonId),
@@ -469,7 +637,8 @@ export function buildFormGuideQuery(opts: {
           isNotNull(schema.matches.homeScore),
           isNotNull(schema.matches.awayScore),
           isNull(homeSchool.deletedAt),
-          isNull(awaySchool.deletedAt)
+          isNull(awaySchool.deletedAt),
+          bothMembers(homeTeam, awayTeam)
         )
       );
   };
@@ -516,6 +685,7 @@ export interface GameHubData {
     rank: number | null;
     team: string;
     teamLabel: string;
+    schoolSlug: string;
     division: CanonicalDivision;
     wins: number | null;
     losses: number | null;
@@ -610,7 +780,8 @@ export async function getGameHubData(
         form: formGuides.get(entry.team) ?? [],
       }));
 
-      if (scheduledRows[0]) {
+      // An unpublished season's next fixture is hidden along with the rest of its schedule.
+      if (outcomesPublic && scheduledRows[0]) {
         nextMatch = {
           date: scheduledRows[0].scheduledAt.toLocaleDateString('en-US', {
             timeZone: 'America/New_York',

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Permissions, hasPermission, canActOnMember, canManageRole, nextRolePosition, filterAssignableRoles, canGrantPermissions, calculateEffectiveStaffAccess } from '../roles';
+import { Permissions, hasPermission, canActOnMember, canManageRole, nextRolePosition, filterAssignableRoles, canGrantPermissions, calculateEffectiveStaffAccess, RETIRED_PERMISSION_BITS, withoutRetiredPermissionBits } from '../roles';
 import { getAllowedAdminHrefs, hasAnyManagementPermission } from '../staff-access';
 import { buildStaffInviteRoleRows } from '../staff-invites';
 
@@ -202,5 +202,32 @@ describe('canGrantPermissions', () => {
     const actorPerms = Permissions.MANAGE_NEWS | Permissions.MANAGE_MATCHES;
     expect(canGrantPermissions(actorPerms, false, Permissions.MANAGE_LEAGUE)).toBe(false);
     expect(canGrantPermissions(actorPerms, false, actorPerms | Permissions.MANAGE_LEAGUE)).toBe(false);
+  });
+
+  describe('retired permission bits', () => {
+    it('reserves bit 12 and strips it from a mask', () => {
+      expect(RETIRED_PERMISSION_BITS).toBe(BigInt(1) << BigInt(12));
+      expect(withoutRetiredPermissionBits(RETIRED_PERMISSION_BITS | Permissions.MANAGE_NEWS)).toBe(Permissions.MANAGE_NEWS);
+    });
+
+    it('lets a non-owner grant a stored role that still carries the retired bit, since the bit grants nothing', () => {
+      const actorPerms = Permissions.MANAGE_NEWS;
+      const stored = Permissions.MANAGE_NEWS | RETIRED_PERMISSION_BITS;
+      expect(canGrantPermissions(actorPerms, false, stored)).toBe(true);
+      expect(canGrantPermissions(actorPerms, false, RETIRED_PERMISSION_BITS)).toBe(true);
+    });
+
+    it('still refuses real permissions the actor lacks, retired bit or not', () => {
+      const stored = Permissions.MANAGE_LEAGUE | RETIRED_PERMISSION_BITS;
+      expect(canGrantPermissions(Permissions.MANAGE_NEWS, false, stored)).toBe(false);
+    });
+
+    it('keeps such a role in the assignable list for a non-owner who holds its real permissions', () => {
+      const roles = [
+        { name: 'Legacy', position: 1, isOwner: false, permissions: (Permissions.MANAGE_NEWS | RETIRED_PERMISSION_BITS).toString() },
+      ];
+      const actor = { permissions: Permissions.MANAGE_NEWS, isOwner: false, highestRolePosition: 5 };
+      expect(filterAssignableRoles(roles, actor)).toHaveLength(1);
+    });
   });
 });

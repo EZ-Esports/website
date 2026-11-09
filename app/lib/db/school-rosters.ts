@@ -1,0 +1,204 @@
+import 'server-only';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { db } from './index';
+import * as schema from './schema';
+import { getContentFlagsByMember, type ContentFlagView } from './content-flags';
+import { listMembersWithStudentId } from './student-ids';
+import {
+  buildSeasonBlocks,
+  type RosterEditOptions,
+  type RosterViewPlayer,
+  type RosterViewRoster,
+  type SchoolRosterTeamInput,
+  type SeasonBlock,
+} from '@/app/lib/school-roster-view';
+
+/**
+ * Roster data for one school, across every game and season, for the staff
+ * Schools & Rosters page (where staff also edit it). Deliberately uncached
+ * (admin reads are raw so an edit shows immediately) and limited to the
+ * columns the admin roster views already show. Callers must have already checked MANAGE_ROSTERS.
+ */
+export async function getSchoolRosterBlocks(schoolId: string, opts: { seasonId?: string } = {}): Promise<SeasonBlock[]> {
+  const teams = await db
+    .select({
+      teamId: schema.seasonSchools.id,
+      gameId: schema.games.id,
+      gameSlug: schema.games.slug,
+      gameName: schema.games.displayName,
+      seasonId: schema.seasons.id,
+      seasonName: schema.seasons.name,
+      seasonIsActive: schema.seasons.isActive,
+      rostersLockedAt: schema.seasons.rostersLockedAt,
+    })
+    .from(schema.seasonSchools)
+    .innerJoin(schema.games, eq(schema.seasonSchools.gameId, schema.games.id))
+    .innerJoin(schema.seasons, eq(schema.seasonSchools.seasonId, schema.seasons.id))
+    // With a season, only that season's team is read at all (a season belongs to one game), so no
+    // other game's team, roster or player is ever loaded for the caller (the season-scoped school page).
+    .where(
+      opts.seasonId
+        ? and(eq(schema.seasonSchools.schoolId, schoolId), eq(schema.seasonSchools.seasonId, opts.seasonId))
+        : eq(schema.seasonSchools.schoolId, schoolId),
+    );
+
+  // Rosters belong to the school, game and season themselves (spec-060), so they are read by school and
+  // never through the membership rows: a school staff removed from a season keeps its rosters here.
+  const rosterRows = await db
+    .select({
+      id: schema.rosters.id,
+      gameId: schema.rosters.gameId,
+      seasonId: schema.rosters.seasonId,
+      name: schema.rosters.name,
+      division: schema.rosters.division,
+    })
+    .from(schema.rosters)
+    .where(
+      opts.seasonId
+        ? and(eq(schema.rosters.schoolId, schoolId), eq(schema.rosters.seasonId, opts.seasonId))
+        : eq(schema.rosters.schoolId, schoolId),
+    )
+    .orderBy(asc(schema.rosters.name));
+
+  // Seasons that have rosters but no membership row (the school was removed): still shown, flagged.
+  const memberScopes = new Set(teams.map((t) => `${t.gameId}|${t.seasonId}`));
+  const orphanSeasonIds = [...new Set(rosterRows.filter((r) => !memberScopes.has(`${r.gameId}|${r.seasonId}`)).map((r) => r.seasonId))];
+  const orphanTeams = orphanSeasonIds.length
+    ? await db
+        .select({
+          teamId: sql<string>`''`,
+          gameId: schema.games.id,
+          gameSlug: schema.games.slug,
+          gameName: schema.games.displayName,
+          seasonId: schema.seasons.id,
+          seasonName: schema.seasons.name,
+          seasonIsActive: schema.seasons.isActive,
+          rostersLockedAt: schema.seasons.rostersLockedAt,
+        })
+        .from(schema.seasons)
+        .innerJoin(schema.games, eq(schema.seasons.gameId, schema.games.id))
+        .where(inArray(schema.seasons.id, orphanSeasonIds))
+    : [];
+  const allTeams = [...teams.map((t) => ({ ...t, notInSeason: false })), ...orphanTeams.map((t) => ({ ...t, notInSeason: true }))];
+  if (allTeams.length === 0) return [];
+
+  const playerRows = rosterRows.length
+    ? await db
+        .select({
+          id: schema.players.id,
+          memberId: schema.players.memberId,
+          rosterId: schema.players.rosterId,
+          role: schema.players.role,
+          ign: schema.players.ign,
+          firstName: schema.members.firstName,
+          lastName: schema.members.lastName,
+          discord: schema.members.discord,
+          graduationYear: schema.members.graduationYear,
+          schoolEmail: schema.members.schoolEmail,
+          // `members.email` is the personal address typed in onboarding (the school one is separate).
+          email: schema.members.email,
+        })
+        .from(schema.players)
+        .innerJoin(schema.members, eq(schema.players.memberId, schema.members.id))
+        .where(inArray(schema.players.rosterId, rosterRows.map((r) => r.id)))
+    : [];
+
+  const contentFlags = await loadContentFlags(playerRows.map((p) => p.memberId));
+  const withStudentId = await listMembersWithStudentId([...new Set(playerRows.map((p) => p.memberId))]);
+
+  const playersByRoster = new Map<string, RosterViewPlayer[]>();
+  for (const p of playerRows) {
+    const list = playersByRoster.get(p.rosterId) ?? [];
+    list.push({
+      id: p.id,
+      memberId: p.memberId,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      name: `${p.firstName} ${p.lastName}`.trim(),
+      ign: p.ign,
+      discord: p.discord,
+      graduationYear: p.graduationYear,
+      schoolEmail: p.schoolEmail,
+      email: p.email,
+      hasStudentId: withStudentId.has(p.memberId),
+      role: p.role,
+      contentFlags: contentFlags.get(p.memberId),
+    });
+    playersByRoster.set(p.rosterId, list);
+  }
+
+  const rostersByScope = new Map<string, RosterViewRoster[]>();
+  for (const r of rosterRows) {
+    const key = `${r.gameId}|${r.seasonId}`;
+    const list = rostersByScope.get(key) ?? [];
+    list.push({ id: r.id, name: r.name, division: r.division, players: playersByRoster.get(r.id) ?? [] });
+    rostersByScope.set(key, list);
+  }
+
+  const input: SchoolRosterTeamInput[] = allTeams.map((t) => ({
+    ...t,
+    rosters: rostersByScope.get(`${t.gameId}|${t.seasonId}`) ?? [],
+  }));
+  return buildSeasonBlocks(input);
+}
+
+/**
+ * Override records for the badge. Read apart from the roster queries and never allowed to fail the
+ * page: if the table is not migrated yet, or the read errors, the rosters render without badges.
+ */
+async function loadContentFlags(memberIds: string[]): Promise<Map<string, ContentFlagView[]>> {
+  try {
+    return await getContentFlagsByMember([...new Set(memberIds)]);
+  } catch (error) {
+    console.error('Could not load onboarding content flags for the roster view:', error);
+    return new Map();
+  }
+}
+
+/** School name for the page header; null when the id matches no live school. */
+export async function getSchoolForRosterView(schoolId: string) {
+  const [school] = await db
+    .select({ id: schema.schools.id, name: schema.schools.name })
+    .from(schema.schools)
+    .where(and(eq(schema.schools.id, schoolId), isNull(schema.schools.deletedAt)))
+    .limit(1);
+  return school ?? null;
+}
+
+/** What the staff editing controls need beyond the rosters themselves. Display fields only. */
+export async function getRosterEditOptions(schoolId: string, opts: { seasonId?: string } = {}): Promise<RosterEditOptions> {
+  const [members, games, seasons] = await Promise.all([
+    db
+      .select({
+        id: schema.members.id,
+        firstName: schema.members.firstName,
+        lastName: schema.members.lastName,
+        discord: schema.members.discord,
+        graduationYear: schema.members.graduationYear,
+      })
+      .from(schema.members)
+      .where(eq(schema.members.schoolId, schoolId))
+      .orderBy(asc(schema.members.firstName), asc(schema.members.lastName)),
+    // With a season, only that season and its one game are read (the season-scoped school page).
+    opts.seasonId
+      ? db
+          .select({ id: schema.games.id, slug: schema.games.slug, name: schema.games.displayName })
+          .from(schema.games)
+          .innerJoin(schema.seasons, eq(schema.seasons.gameId, schema.games.id))
+          .where(eq(schema.seasons.id, opts.seasonId))
+      : db
+          .select({ id: schema.games.id, slug: schema.games.slug, name: schema.games.displayName })
+          .from(schema.games)
+          .orderBy(asc(schema.games.displayName)),
+    db
+      .select({
+        id: schema.seasons.id,
+        gameId: schema.seasons.gameId,
+        name: schema.seasons.name,
+        isActive: schema.seasons.isActive,
+      })
+      .from(schema.seasons)
+      .where(opts.seasonId ? eq(schema.seasons.id, opts.seasonId) : undefined),
+  ]);
+  return { members, games, seasons };
+}

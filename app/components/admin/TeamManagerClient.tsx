@@ -21,6 +21,8 @@ import { cx } from '@/app/lib/cx';
 import { buildRoleRequest, seedRoleDraft, type RoleDraft } from '@/app/components/admin/role-form';
 import InviteStaffForm from '@/app/components/admin/InviteStaffForm';
 import { canActOnMember, canManageRole, filterAssignableRoles, Permissions, parseHexColor, hasPermission } from '@/app/lib/roles';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import StaffRow from '@/app/components/admin/StaffRow';
 import InviteRow from '@/app/components/admin/InviteRow';
 import {
@@ -131,17 +133,6 @@ const PERMISSION_GROUPS = [
       { bit: Permissions.MANAGE_CONTENT, name: 'Manage CMS Content', desc: 'Modify editable text blocks across public pages.' },
     ],
   },
-  {
-    title: 'Student Data & Privacy Vault',
-    permissions: [
-      {
-        bit: Permissions.VIEW_STUDENT_DEMOGRAPHICS,
-        name: 'View Student Demographics',
-        desc: 'Access sensitive student demographic, Title I equity, and survey records. Restricted strictly to Superadmins.',
-        superadminOnly: true,
-      },
-    ],
-  },
 ];
 
 const PERMISSION_LABELS = PERMISSION_GROUPS.flatMap((g) => g.permissions);
@@ -233,22 +224,16 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
     });
   }
 
-  // Handle Delete Role
-  function handleDeleteRole(roleId: string) {
-    if (!window.confirm('Are you sure you want to delete this role? This action cannot be undone and will strip the role from all users.')) {
-      return;
-    }
+  // Handle Delete Role. Only runs from the confirm dialog, never on the first press.
+  const roleDeletion = useConfirmAction<string>(async (roleId) => {
     setError(null);
-    startTransition(async () => {
-      const result = await deleteRole(roleId);
-      if (!result.success) {
-        setError(result.error ?? 'Could not delete role.');
-        return;
-      }
+    const result = await deleteRole(roleId);
+    if (result.success) {
       setActiveRoleId(null);
       setIsCreatingRole(false);
-    });
-  }
+    }
+    return result;
+  }, 'Could not delete role.');
 
   // Handle Reorder Roles
   function handleMoveRole(roleIndex: number, direction: 'up' | 'down') {
@@ -294,6 +279,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
   );
 
   return (
+    <>
     <AdminTabs
       selectedKey={activeTab}
       onSelectionChange={(key) => {
@@ -591,7 +577,7 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
                       {!isCreatingRole && activeRole && !activeRole.isSystem && (
                         <button
                           type="button"
-                          onClick={() => handleDeleteRole(activeRole.id)}
+                          onClick={() => roleDeletion.request(activeRole.id)}
                           aria-label={`Delete role ${activeRole.name}`}
                           title={`Delete role ${activeRole.name}`}
                           className={deleteIconBtn}
@@ -774,5 +760,15 @@ export default function TeamManagerClient({ current, staffMembers, invites, role
         </div>
       </AdminTabPanel>
     </AdminTabs>
+
+    <ConfirmActionDialog
+      {...roleDeletion.dialogProps}
+      tone="danger"
+      title="Delete role?"
+      message="Are you sure you want to delete this role? This action cannot be undone and will strip the role from all users."
+      confirmLabel="Delete role"
+      pendingLabel="Deleting…"
+    />
+    </>
   );
 }

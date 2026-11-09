@@ -5,10 +5,10 @@ import {
   HiOutlineCalendarDays,
   HiOutlineChartBar,
   HiOutlineClipboardDocument,
+  HiOutlineClipboardDocumentCheck,
   HiOutlineCog6Tooth,
   HiOutlineComputerDesktop,
   HiOutlineCurrencyDollar,
-  HiOutlineFingerPrint,
   HiOutlineIdentification,
   HiOutlineNewspaper,
   HiOutlinePencilSquare,
@@ -17,7 +17,6 @@ import {
   HiOutlineSquares2X2,
   HiOutlineTrophy,
   HiOutlineUserGroup,
-  HiOutlineUsers,
 } from 'react-icons/hi2';
 import type { AdminSectionHref } from '@/app/lib/staff-access';
 
@@ -99,37 +98,31 @@ export const ADMIN_NAV_CATEGORIES: readonly AdminNavCategory[] = [
         label: 'League Setup',
         href: '/admin/league',
         icon: HiOutlineCog6Tooth,
-        description: 'Games and seasons everything else depends on.',
+        description: 'Games and seasons, with each season’s schools, rosters, manager invites, roster lock and publishing.',
       },
       {
-        label: 'Matches & Standings',
+        label: 'Matches',
         href: '/admin/matches',
         icon: HiOutlineCalendarDays,
-        description: 'Schedule fixtures and enter results.',
+        description: 'Enter results for played matches and schedule what is next.',
+      },
+      {
+        label: 'Schools & Rosters',
+        href: '/admin/schools',
+        icon: HiOutlineAcademicCap,
+        description: 'Member schools, their crests, and their rosters across every season.',
+      },
+      {
+        label: 'Onboarding Form',
+        href: '/admin/onboarding-form',
+        icon: HiOutlineClipboardDocumentCheck,
+        description: 'The Google Form students and managers complete when they join.',
       },
       {
         label: 'Standings Archive',
         href: '/admin/standings',
         icon: HiOutlineChartBar,
         description: 'Snapshotted standings for past seasons.',
-      },
-      {
-        label: 'Teams & Rosters',
-        href: '/admin/roster',
-        icon: HiOutlineUsers,
-        description: 'Teams, rosters, and players by school.',
-      },
-      {
-        label: 'Schools',
-        href: '/admin/schools',
-        icon: HiOutlineAcademicCap,
-        description: 'Member schools and their crests.',
-      },
-      {
-        label: 'Student Demographics',
-        href: '/admin/demographics',
-        icon: HiOutlineFingerPrint,
-        description: 'Restricted equity and survey data for enrolled students.',
       },
     ],
   },
@@ -212,10 +205,10 @@ export function findActiveAdminNav(
 }
 
 /**
- * Routes of the pages nested below a section (the article editors under News).
+ * Routes of the pages nested below a section (the article editors under News, a school's rosters under Schools).
  * Keep in step with `NESTED_PAGE_TITLES`.
  */
-export type AdminNestedRoute = `/admin/news/${string}`;
+export type AdminNestedRoute = `/admin/news/${string}` | `/admin/schools/${string}` | `/admin/league/${string}`;
 
 /** Every route an `AdminPageHeader` may be given: a gated section or a nested page below one. */
 export type AdminPageRoute = AdminSectionHref | AdminNestedRoute;
@@ -223,7 +216,10 @@ export type AdminPageRoute = AdminSectionHref | AdminNestedRoute;
 /** Pages below a section that get their own title instead of the section's. */
 const NESTED_PAGE_TITLES: ReadonlyArray<{ matches: (pathname: string) => boolean; title: string }> = [
   { matches: (pathname) => pathname === '/admin/news/new', title: 'New Article' },
+  { matches: (pathname) => /^\/admin\/schools\/[^/]+\/rosters$/.test(pathname), title: 'School Rosters' },
   { matches: (pathname) => pathname.startsWith('/admin/news/'), title: 'Edit Article' },
+  { matches: (pathname) => /^\/admin\/league\/[^/]+$/.test(pathname), title: 'Season' },
+  { matches: (pathname) => /^\/admin\/league\/[^/]+\/schools\/[^/]+$/.test(pathname), title: 'School in Season' },
 ];
 
 /**

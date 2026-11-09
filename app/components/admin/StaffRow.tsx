@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { MenuTrigger, Popover, Menu, MenuItem, Button } from 'react-aria-components';
 import type { Selection } from 'react-aria-components';
 import { revokeStaff, updateUserRoles } from '@/app/(admin)/admin/team/actions';
+import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
+import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { parseHexColor } from '@/app/lib/roles';
 import { cx } from '@/app/lib/cx';
 import {
@@ -39,27 +41,24 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   // Controlled so a cancelled confirm keeps the menu open (RAC otherwise closes
   // the menu unconditionally after onAction runs).
   const [actionsOpen, setActionsOpen] = useState(false);
 
+  const revocation = useConfirmAction<string>(async (userId) => {
+    const result = await revokeStaff(userId);
+    if (result.success) setRemoved(true);
+    return result;
+  }, 'Could not revoke staff access.');
+  const isBusy = isPending || revocation.dialogProps.isPending;
+
   if (removed) return null;
 
-  // Revoke member access
+  // Revoke member access, once confirmed in the dialog.
   function handleRevoke() {
-    if (!window.confirm(`Revoke staff access for ${member.email}? Their portal identity will be removed.`)) {
-      return;
-    }
     setActionsOpen(false);
-    setError(null);
-    startTransition(async () => {
-      const result = await revokeStaff(member.userId);
-      if (!result.success) {
-        setError(result.error ?? 'Could not revoke staff access.');
-        return;
-      }
-      setRemoved(true);
-    });
+    revocation.request(member.userId);
   }
 
   // Sync role assignment from the menu's full selection (RAC reports the resulting
@@ -97,10 +96,10 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
 
   return (
     <li
-      aria-busy={isPending}
+      aria-busy={isBusy}
       className={cx(
         'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-5 py-3.5 transition-[background-color,opacity] duration-150 hover:bg-surface-raised/50',
-        isPending && 'opacity-60',
+        isBusy && 'opacity-60',
       )}
     >
       {/* Left Column: Avatar & Name */}
@@ -212,6 +211,7 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
         ) : (
           <MenuTrigger isOpen={actionsOpen} onOpenChange={setActionsOpen}>
             <Button
+              ref={menuButtonRef}
               className={({ isFocusVisible }) =>
                 cx(
                   'inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground-secondary hover:text-foreground hover:bg-surface-raised data-[pressed]:bg-surface-raised transition-colors duration-150 cursor-pointer outline-none',
@@ -241,6 +241,16 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
           </MenuTrigger>
         )}
       </div>
+
+      <ConfirmActionDialog
+        {...revocation.dialogProps}
+        tone="danger"
+        restoreFocusRef={menuButtonRef}
+        title="Revoke staff access?"
+        message={`Revoke staff access for ${member.email}? Their portal identity will be removed.`}
+        confirmLabel="Revoke access"
+        pendingLabel="Revoking…"
+      />
     </li>
   );
 }

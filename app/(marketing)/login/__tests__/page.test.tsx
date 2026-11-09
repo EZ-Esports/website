@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import LoginPage, { MESSAGE_MAP } from '../page';
+import LoginPage from '../page';
+import { MESSAGE_MAP } from '../messages';
 
 describe('LoginPage (/login)', () => {
   describe('lookup tables', () => {

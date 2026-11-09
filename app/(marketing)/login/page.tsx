@@ -1,22 +1,19 @@
+import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import LoginForm from './LoginForm';
+import { MESSAGE_MAP } from './messages';
 
 interface LoginPageProps {
   searchParams: Promise<{ message?: string; error?: string }>;
 }
-
-// Allowlist of known message keys to fixed display strings — prevents arbitrary
-// text from ?message= being reflected into the page (open redirect / XSS vector).
-export const MESSAGE_MAP: Record<string, string> = {
-  'account-created': 'Account created. Please sign in.',
-};
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { message } = await searchParams;
   const displayMessage = message ? (MESSAGE_MAP[message] ?? null) : null;
 
   return (
-    <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
+    // The marketing layout already offsets content by the fixed header (88px), so fill only the rest of the viewport.
+    <main className="min-h-[calc(100vh-88px)] bg-surface flex flex-col justify-center items-center px-4 py-12">
       <Card padding="lg" className="w-full max-w-md space-y-6">
 
         {/* Header */}
@@ -38,6 +35,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
         {/* Login Form (renders action errors via useActionState) */}
         <LoginForm />
+
+        {/* Footer Links */}
+        <div className="pt-2 text-center border-t border-border/60">
+          <p className="text-xs text-foreground-muted">
+            Are you a school manager?{' '}
+            <Link href="/portal/login" className="text-accent hover:underline font-medium">
+              Manager Portal Login &rarr;
+            </Link>
+          </p>
+        </div>
 
       </Card>
     </main>

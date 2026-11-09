@@ -26,13 +26,24 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * The staff-facing reason when a delete was refused on purpose (matches exist, `DeleteRefusedError`),
+ * so it is shown instead of a generic message; null for any other failure.
+ */
+function refusalMessage(error: unknown): string | null {
+  return error instanceof Error && error.name === 'DeleteRefusedError' ? error.message : null;
+}
+
 function revalidateLeague() {
   updateTag('games');
   updateTag('seasons');
   updateTag('teams');
-  revalidatePath('/admin/league');
+  // 'layout' also covers the per-season pages (/admin/league/[seasonId]), whose header chips and
+  // lock / publish state must follow a change made on them.
+  revalidatePath('/admin/league', 'layout');
   revalidatePath('/admin/matches');
-  revalidatePath('/admin/roster');
+  // The per-school roster pages (/admin/schools/[schoolId]/rosters) show seasons and games.
+  revalidatePath('/admin/schools', 'layout');
   revalidatePath('/');
 }
 
@@ -89,7 +100,7 @@ export async function deleteGame(id: string) {
     return { success: true };
   } catch (error) {
     console.error(error);
-    return { success: false, error: 'Cannot delete game — it may have active seasons or teams linked to it.' };
+    return { success: false, error: refusalMessage(error) ?? 'Cannot delete game — it may have active seasons or teams linked to it.' };
   }
 }
 
@@ -163,7 +174,7 @@ export async function deleteSeason(id: string) {
     return { success: true };
   } catch (error) {
     console.error(error);
-    return { success: false, error: sanitizeDbError(error) };
+    return { success: false, error: refusalMessage(error) ?? sanitizeDbError(error) };
   }
 }
 
@@ -221,7 +232,7 @@ export async function unlockSeasonRosters(seasonId: string) {
 
 /**
  * Sets or clears `seasons.outcomes_finalized_at`, which gates every public view of
- * the season's scores, results, standings and records (see `areOutcomesPublic`).
+ * the season's matches, scores, results, standings and records (see `areOutcomesPublic`).
  * Public reads sit behind the `seasons`, `matches`, `teams` and `rosters` tags and
  * several per-route pages, so all of them are refreshed here.
  */
@@ -252,6 +263,8 @@ async function setSeasonOutcomesFinalized(seasonId: string, finalized: boolean) 
       }
     }
     revalidateLeague();
+    // `matches` backs the cached homepage results; `seasons` (via revalidateLeague, which also
+    // refreshes `/`) backs the public season list that carries the published flag.
     updateTag('matches');
     updateTag('rosters');
     for (const path of [

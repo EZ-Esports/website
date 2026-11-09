@@ -365,6 +365,69 @@
       "when": 1790882000006,
       "tag": "0051_season_outcomes_finalized",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1790882000007,
+      "tag": "0052_onboarding_consents",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1790882000008,
+      "tag": "0053_match_reschedule_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1790882000009,
+      "tag": "0054_match_games_from_game_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1790882000010,
+      "tag": "0055_onboarding_content_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790882000011,
+      "tag": "0056_player_invites_season",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1790882000012,
+      "tag": "0057_onboarding_form_completions",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790882000013,
+      "tag": "0058_school_email_student_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790882000030,
+      "tag": "0060_rosters_scope_expand_constrain",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790882000031,
+      "tag": "0061_rosters_scope_contract",
+      "breakpoints": true
     }
   ]
 }
