@@ -71,6 +71,34 @@ export function getTeamRosterUrl(
 }
 
 /**
+ * Filters schools based on search query matching school name or division badges.
+ */
+export function filterSchoolsByQuery<T extends SchoolGroup>(
+  schools: T[],
+  query: string
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return schools;
+
+  const isVarsityQuery = q === 'varsity';
+  const isJvQuery = q === 'jv' || q.includes('jv');
+
+  return schools.filter((school) => {
+    const nameMatch = school.schoolName.toLowerCase().includes(q);
+    const badges = getSchoolDivisionBadges(school);
+    const badgeMatch = badges.some((b) => {
+      const lower = b.toLowerCase();
+      if (isVarsityQuery) {
+        return lower === 'varsity';
+      }
+      return lower.includes(q);
+    });
+    const jvMatch = isJvQuery && badges.includes('Junior Varsity');
+    return nameMatch || badgeMatch || jvMatch;
+  });
+}
+
+/**
  * Determines the division badge labels for a school.
  * If a team fields both Varsity and Junior Varsity, returns both ['Varsity', 'Junior Varsity'].
  * If only Varsity, returns ['Varsity'].
@@ -107,11 +135,10 @@ export function getSchoolDivisionBadges(
     );
 
     const validRosters = rosters.filter((r) => {
-      if (hasAnyStandings) {
-        return r.record && r.record !== 'Unpublished';
-      }
-      if (hasAnyPlayers) {
-        return r.players && r.players.length > 0;
+      const hasStanding = Boolean(r.record && r.record !== 'Unpublished' && r.record !== '0-0');
+      const hasPlayers = Boolean(r.players && r.players.length > 0);
+      if (hasAnyStandings || hasAnyPlayers) {
+        return hasStanding || hasPlayers;
       }
       return true;
     });
@@ -211,16 +238,7 @@ export default function TeamsFilterClient({
 
   // Search filter
   const filteredSchools = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return sortedSchools;
-
-    return sortedSchools.filter((school) => {
-      const nameMatch = school.schoolName.toLowerCase().includes(q);
-      const badges = getSchoolDivisionBadges(school);
-      const badgeMatch = badges.some((b) => b.toLowerCase().includes(q));
-      const jvMatch = (q === 'jv' || q.includes('jv')) && badges.includes('Junior Varsity');
-      return nameMatch || badgeMatch || jvMatch;
-    });
+    return filterSchoolsByQuery(sortedSchools, searchQuery);
   }, [sortedSchools, searchQuery]);
 
   if (sortedSchools.length === 0) {
@@ -266,7 +284,7 @@ export default function TeamsFilterClient({
           <button
             type="button"
             onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-2.5 text-foreground-muted hover:text-foreground text-xs p-1"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-foreground-muted hover:text-foreground text-sm cursor-pointer"
             aria-label="Clear search"
           >
             ✕
@@ -275,7 +293,7 @@ export default function TeamsFilterClient({
       </div>
 
       {/* Team count header */}
-      <div className="flex items-center justify-between text-xs text-foreground-muted px-1">
+      <div role="status" aria-live="polite" className="flex items-center justify-between text-xs text-foreground-muted px-1">
         <span>
           Showing <strong className="text-foreground font-bold">{filteredSchools.length}</strong>{' '}
           {searchQuery ? `matching team${filteredSchools.length === 1 ? '' : 's'}` : `team${sortedSchools.length === 1 ? '' : 's'}`}
@@ -319,6 +337,8 @@ export default function TeamsFilterClient({
                       <img
                         src={school.logoUrl}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-contain p-1"
                       />
                     ) : (
@@ -351,7 +371,8 @@ export default function TeamsFilterClient({
 
                   <Link
                     href={rosterHref}
-                    aria-label={`View ${school.schoolName} roster`}
+                    tabIndex={-1}
+                    aria-hidden="true"
                     className="text-foreground-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all p-1"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

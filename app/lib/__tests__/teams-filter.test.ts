@@ -3,6 +3,7 @@ import {
   sortSchoolsAlphabetically,
   getSchoolDivisionBadges,
   getTeamRosterUrl,
+  filterSchoolsByQuery,
   type SchoolGroup,
   type TeamRosterGroup,
 } from '@/app/(marketing)/[game]/teams/TeamsFilterClient';
@@ -296,9 +297,79 @@ describe('Teams & Rosters Dedicated School Route Architecture', () => {
       expect(getSchoolDivisionBadges(schoolWithEmptyJvPlaceholder)).toEqual(['Varsity']);
     });
 
+    it('keeps unplayed rosters with registered players even when another roster has published standings', () => {
+      const schoolWithUnplayedJvWithPlayers: SchoolGroup = {
+        schoolId: 'school-active-both',
+        schoolName: 'Bayside High School',
+        seasons: [
+          {
+            seasonId: 'season-current',
+            seasonName: '2026-27',
+            isSeasonActive: true,
+            rosters: [
+              {
+                id: 'r-varsity',
+                name: 'Varsity',
+                division: 'A',
+                record: '3-0',
+                players: [{ name: 'Player 1', role: 'Player', bio: 'Bio' }],
+              },
+              {
+                id: 'r-jv',
+                name: 'JV',
+                division: 'B',
+                record: 'Unpublished',
+                players: [{ name: 'Player 2', role: 'Player', bio: 'Bio' }],
+              },
+            ],
+          },
+        ],
+      };
+      expect(getSchoolDivisionBadges(schoolWithUnplayedJvWithPlayers)).toEqual(['Varsity', 'Junior Varsity']);
+    });
+
     it('generates the correct roster URL for each school', () => {
       expect(getTeamRosterUrl('valorant', schoolBoth)).toBe('/valorant/teams/stuyvesant-high-school');
       expect(getTeamRosterUrl('rocket-league', schoolBronx)).toBe('/rocket-league/teams/bronx-science');
+    });
+
+    describe('Search Query Filtering', () => {
+      const list = [schoolBoth, schoolVarsity, schoolJv, schoolBronx];
+
+      it('returns all schools when query is empty or whitespace', () => {
+        expect(filterSchoolsByQuery(list, '')).toEqual(list);
+        expect(filterSchoolsByQuery(list, '   ')).toEqual(list);
+      });
+
+      it('filters schools by partial school name (case-insensitive)', () => {
+        const results = filterSchoolsByQuery(list, 'tech');
+        expect(results.map((s) => s.schoolName)).toEqual(['Brooklyn Technical High School']);
+
+        const resultsStuy = filterSchoolsByQuery(list, 'STUY');
+        expect(resultsStuy.map((s) => s.schoolName)).toEqual(['Stuyvesant High School']);
+      });
+
+      it('filters schools by division name ("varsity")', () => {
+        const results = filterSchoolsByQuery(list, 'varsity');
+        // schoolBoth (Varsity & JV), schoolVarsity (Varsity) have Varsity badges
+        expect(results.map((s) => s.schoolName)).toEqual([
+          'Stuyvesant High School',
+          'Midwood High School',
+        ]);
+      });
+
+      it('filters schools by "jv" keyword alias to Junior Varsity', () => {
+        const results = filterSchoolsByQuery(list, 'jv');
+        // schoolBoth and schoolJv have Junior Varsity
+        expect(results.map((s) => s.schoolName)).toEqual([
+          'Stuyvesant High School',
+          'Brooklyn Technical High School',
+        ]);
+      });
+
+      it('returns empty array when query matches nothing', () => {
+        expect(filterSchoolsByQuery(list, 'nonexistent high school xyz')).toEqual([]);
+      });
     });
   });
 });
