@@ -156,7 +156,7 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName, hiddenS
                 key={seasonName}
                 type="button"
                 onClick={() => setSelectedSeason(seasonName)}
-                className={`px-4 py-2 min-h-[40px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
+                className={`px-4 py-2 min-h-[44px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
                   isActive
                     ? 'border-accent bg-surface-raised text-foreground shadow-sm'
                     : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
@@ -169,7 +169,7 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName, hiddenS
           <button
             type="button"
             onClick={() => setSelectedSeason('all')}
-            className={`px-4 py-2 min-h-[40px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
+            className={`px-4 py-2 min-h-[44px] text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap snap-start shrink-0 ${
               selectedSeason === 'all'
                 ? 'border-accent bg-surface-raised text-foreground shadow-sm'
                 : 'bg-surface-sunken border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40'
