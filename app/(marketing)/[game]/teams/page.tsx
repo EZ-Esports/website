@@ -4,7 +4,7 @@ import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { SectionHeader } from '@/app/components/ui/SectionHeader';
-import { getGameTeamsPageData } from '@/app/lib/db/queries';
+import { getGameTeamsPageData, getGameHubData } from '@/app/lib/db/queries';
 import TeamsFilterClient from './TeamsFilterClient';
 
 interface TeamsPageProps {
@@ -29,13 +29,46 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
   }
 
   const gameConfig = GAMES[game as GameSlug];
-  const schoolGroups = await getGameTeamsPageData(game);
+  const isTournament = gameConfig.competitionModel === 'tournament';
+
+  const [schoolGroups, varsityHub, jvHub] = await Promise.all([
+    getGameTeamsPageData(game),
+    getGameHubData(game, 'Varsity'),
+    getGameHubData(game, 'JV'),
+  ]);
 
   if (schoolGroups === null) {
     notFound();
   }
 
-  const isTournament = gameConfig.competitionModel === 'tournament';
+  const vTeams = new Set(varsityHub.topTeams.map((t) => t.team.toLowerCase()));
+  const jvTeams = new Set(jvHub.topTeams.map((t) => t.team.toLowerCase()));
+  const hasActiveSeason = Boolean(varsityHub.seasonName && (vTeams.size > 0 || jvTeams.size > 0));
+
+  // Align displayed teams and division badges with the current competition season overview
+  let displayedSchools = schoolGroups;
+  if (hasActiveSeason) {
+    displayedSchools = schoolGroups
+      .filter((school) => {
+        const key = school.schoolName.toLowerCase();
+        return vTeams.has(key) || jvTeams.has(key);
+      })
+      .map((school) => {
+        const key = school.schoolName.toLowerCase();
+        const badges: string[] = [];
+        if (isTournament) {
+          badges.push('Open');
+        } else {
+          if (vTeams.has(key)) badges.push('Varsity');
+          if (jvTeams.has(key)) badges.push('Junior Varsity');
+        }
+        return {
+          ...school,
+          divisionBadges: badges.length > 0 ? badges : ['Registered'],
+        };
+      });
+  }
+
   const pageTitle = isTournament
     ? `${gameConfig.displayName} Participants & Rosters`
     : `${gameConfig.displayName} School Teams & Rosters`;
@@ -53,7 +86,7 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
         />
 
         <TeamsFilterClient
-          schoolGroups={schoolGroups}
+          schoolGroups={displayedSchools}
           gameDisplayName={gameConfig.displayName}
           gameSlug={game}
         />

@@ -21,7 +21,7 @@ html {
   /* Accents */
   --accent: #f4cccc; /* Light pink — use on dark surfaces only */
   --accent-secondary: #4f46e5;
-  --on-accent: #1c1c1c;
+  --on-accent: #000000;
 
   /* Status */
   --success: #34d399;
