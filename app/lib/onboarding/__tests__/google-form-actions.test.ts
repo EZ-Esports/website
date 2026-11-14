@@ -84,8 +84,36 @@ describe('issueOnboardingFormLink', () => {
     expect(url.searchParams.get('usp')).toBe('pp_url');
     const code = url.searchParams.get('entry.987654321')!;
     expect(verifyFormToken(code)).toMatchObject({ status: 'ok', kind: 'player', inviteId: INVITE });
+    // Default invite in beforeEach expires in 24 hours; the code expires with it (whole seconds).
+    expect(result.expiresAt).toBeGreaterThan(Date.now() + 23 * 3600_000);
+    expect(result.expiresAt).toBeLessThanOrEqual(Date.now() + 24 * 3600_000);
+  });
+
+  it('expires the code exactly when the invite does, and it still verifies after 7 hours', async () => {
+    const inviteExp = new Date(Math.floor(Date.now() / 1000) * 1000 + 3 * 86_400_000);
+    findInviteByTokenHash.mockResolvedValue({ kind: 'player', invite: { id: INVITE, status: 'pending', expiresAt: inviteExp } });
+    const result = await issueOnboardingFormLink(TOKEN);
+    if (!result.ok) throw new Error('expected a link');
+    expect(result.expiresAt).toBe(inviteExp.getTime());
+    const code = new URL(result.url).searchParams.get('entry.987654321')!;
+    const inviteExpSec = inviteExp.getTime() / 1000;
+    expect(verifyFormToken(code, Math.floor(Date.now() / 1000) + 7 * 3600).status).toBe('ok');
+    expect(verifyFormToken(code, inviteExpSec - 1).status).toBe('ok');
+    expect(verifyFormToken(code, inviteExpSec).status).toBe('expired');
+  });
+
+  it('falls back to six hours for an invite with no expiry', async () => {
+    findInviteByTokenHash.mockResolvedValue({ kind: 'player', invite: { id: INVITE, status: 'pending', expiresAt: null } });
+    const result = await issueOnboardingFormLink(TOKEN);
+    if (!result.ok) throw new Error('expected a link');
     expect(result.expiresAt).toBeGreaterThan(Date.now() + 5 * 3600_000);
     expect(result.expiresAt).toBeLessThanOrEqual(Date.now() + 6 * 3600_000 + 1000);
+  });
+
+  it('issues no link when the invite has already expired', async () => {
+    findInviteByTokenHash.mockResolvedValue({ kind: 'player', invite: { id: INVITE, status: 'pending', expiresAt: new Date(Math.floor(Date.now() / 1000) * 1000) } });
+    const result = await issueOnboardingFormLink(TOKEN);
+    expect(result.ok).toBe(false);
   });
 
   it('follows a swap of the form: the next link uses the new form and entry id, for the same invite', async () => {

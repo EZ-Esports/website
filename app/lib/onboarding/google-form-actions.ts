@@ -33,7 +33,11 @@ async function findLivePendingInvite(token: string) {
   const found = await findInviteByTokenHash(tokenHash);
   if (!found || found.invite.status !== 'pending') return null;
   if (found.invite.expiresAt && new Date(found.invite.expiresAt).getTime() < Date.now()) return null;
-  return { kind: found.kind, inviteId: found.invite.id };
+  return {
+    kind: found.kind,
+    inviteId: found.invite.id,
+    expiresAt: found.invite.expiresAt ? new Date(found.invite.expiresAt) : null,
+  };
 }
 
 /** Whether the form is required for this invite and whether the webhook has confirmed it. */
@@ -65,6 +69,16 @@ export async function issueOnboardingFormLink(token: string): Promise<Onboarding
   if (!config.enabled || !config.formUrl || !config.entryId) {
     return { ok: false, error: 'The onboarding form is not available right now.' };
   }
-  const { token: code, expiresAt } = signFormToken({ kind: invite.kind, inviteId: invite.inviteId });
+  // The code lives exactly as long as the invite, so a late form submission is still accepted.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const inviteExpirySec = invite.expiresAt ? Math.floor(invite.expiresAt.getTime() / 1000) : null;
+  if (inviteExpirySec !== null && inviteExpirySec <= nowSec) {
+    return { ok: false, error: 'This invite link is no longer valid. Ask your coach for a new one.' };
+  }
+  const { token: code, expiresAt } = signFormToken(
+    { kind: invite.kind, inviteId: invite.inviteId },
+    nowSec,
+    inviteExpirySec
+  );
   return { ok: true, url: buildPrefillUrl(config.formUrl, config.entryId, code), expiresAt: expiresAt * 1000 };
 }

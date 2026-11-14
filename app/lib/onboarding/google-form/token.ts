@@ -18,6 +18,11 @@ import crypto from 'node:crypto';
 
 export type InviteKind = 'player' | 'manager';
 
+/**
+ * Fallback lifetime, used only when the invite has no expiry of its own. Normally the token is
+ * issued to expire exactly when its invite does (see `signFormToken`), so a student who submits
+ * the Google Form late is never rejected while the invite is still usable.
+ */
 export const FORM_TOKEN_TTL_SECONDS = 6 * 60 * 60;
 /** A secret shorter than this is treated as not configured, so a placeholder never silently "works". */
 export const MIN_SECRET_LENGTH = 16;
@@ -64,11 +69,19 @@ interface TokenPayload {
   exp: number;
 }
 
+/**
+ * `expiresAtSec` (epoch seconds) is the bound invite's expiry. When absent or not a finite number
+ * the 6-hour fallback applies, so a token never lacks an expiry. An expiry at or before `now` is
+ * refused: the caller must not issue a link for an invite that is already dead.
+ */
 export function signFormToken(
   input: { kind: InviteKind; inviteId: string },
-  now = nowSec()
+  now = nowSec(),
+  expiresAtSec?: number | null
 ): { token: string; expiresAt: number } {
-  const exp = now + FORM_TOKEN_TTL_SECONDS;
+  const hasExpiry = typeof expiresAtSec === 'number' && Number.isFinite(expiresAtSec);
+  const exp = hasExpiry ? Math.floor(expiresAtSec) : now + FORM_TOKEN_TTL_SECONDS;
+  if (exp <= now) throw new Error('Cannot sign a form token that is already expired.');
   const payload: TokenPayload = { t: 'gform', k: input.kind, iid: input.inviteId, exp };
   const body = b64(JSON.stringify(payload));
   const mac = crypto.createHmac('sha256', derive(TOKEN_LABEL)).update(body).digest();
