@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Button as AriaButton, Disclosure, DisclosurePanel } from 'react-aria-components';
-import { FiEdit2, FiStar, FiTrash2 } from 'react-icons/fi';
+import { FiEdit2, FiKey, FiStar, FiTrash2 } from 'react-icons/fi';
+import PasswordResetDialog from '../PasswordResetDialog';
 import ConfirmActionDialog from '../ConfirmActionDialog';
 import { useConfirmAction } from '../useConfirmAction';
 import ContentFlagBadge from '../ContentFlagBadge';
@@ -109,6 +110,7 @@ export function ActiveManagersTab({
   onError,
 }: ActiveManagersTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ userId: string; name: string } | null>(null);
   const removal = useConfirmAction<{ id: string; name: string }>(async ({ id }) => {
     const res = await onRemoveManager(id);
     if (!res?.success && res?.error) onError(res.error);
@@ -209,6 +211,15 @@ export function ActiveManagersTab({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetTarget({ userId: m.userId, name: displayName || displayEmail })}
+                    className={editIconBtn}
+                    title="Password reset link"
+                    aria-label={`Password reset link for ${displayName || displayEmail}`}
+                  >
+                    <FiKey aria-hidden="true" className="h-4 w-4" />
+                  </button>
                   {onUpdateManager && (
                     <AriaButton
                       slot="trigger"
@@ -251,6 +262,18 @@ export function ActiveManagersTab({
             );
           })}
         </div>
+      )}
+
+      {resetTarget && (
+        <PasswordResetDialog
+          isOpen
+          onOpenChange={(open) => {
+            if (!open) setResetTarget(null);
+          }}
+          userId={resetTarget.userId}
+          kind="manager"
+          subject={resetTarget.name}
+        />
       )}
 
       <ConfirmActionDialog

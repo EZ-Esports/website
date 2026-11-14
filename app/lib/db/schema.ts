@@ -1009,6 +1009,29 @@ export const managerInvites = pgTable('manager_invites', {
   index('manager_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
+// 2c. Staff-issued one-time password reset links (spec-063). Audit trail and
+// credential in one: only the SHA-256 of the token is stored, never the token.
+// user_id is a Supabase auth user id (a manager or a staff account), so it has
+// no foreign key. A user has at most one outstanding link at a time.
+export const passwordResetLinks = pgTable('password_reset_links', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull(),
+  targetKind: text('target_kind').notNull(), // 'manager' | 'staff'
+  tokenHash: text('token_hash').notNull().unique(), // SHA-256
+  issuedByUserId: uuid('issued_by_user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  revokedAt: timestamp('revoked_at'),
+  revokedBy: uuid('revoked_by'),
+}, (t) => [
+  check('password_reset_links_target_kind_check', sql`${t.targetKind} in ('manager', 'staff')`),
+  index('password_reset_links_user_idx').on(t.userId, t.createdAt),
+  uniqueIndex('password_reset_links_one_outstanding_idx')
+    .on(t.userId)
+    .where(sql`used_at is null and revoked_at is null`),
+]).enableRLS();
+
 // 3. Player Game & Community Identities
 export const playerIdentities = pgTable('player_identities', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -1140,6 +1163,7 @@ export type PlayerInvite = typeof playerInvites.$inferSelect;
 export type NewPlayerInvite = typeof playerInvites.$inferInsert;
 export type ManagerInvite = typeof managerInvites.$inferSelect;
 export type NewManagerInvite = typeof managerInvites.$inferInsert;
+export type PasswordResetLink = typeof passwordResetLinks.$inferSelect;
 export type PlayerIdentity = typeof playerIdentities.$inferSelect;
 export type NewPlayerIdentity = typeof playerIdentities.$inferInsert;
 export type OnboardingConsent = typeof onboardingConsents.$inferSelect;

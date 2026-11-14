@@ -3,4 +3,5 @@
 // Lives outside page.tsx because Next.js only allows a fixed set of exports from a page file.
 export const MESSAGE_MAP: Record<string, string> = {
   'account-created': 'Account created. Please sign in.',
+  'password-reset': 'Your password has been changed. Please sign in with your new password.',
 };

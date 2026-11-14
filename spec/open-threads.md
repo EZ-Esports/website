@@ -273,3 +273,10 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 ## Manager create-roster (spec-061)
 
 - Resolved: `createSchoolRoster` now refuses non-staff callers (`Only EZ Esports staff can create rosters`), so the manager Create Roster control is enforced on the server as well as hidden in the UI. Not yet merged or deployed.
+
+## Password reset links (spec-063)
+
+- **Open: migration `0062_password_reset_links.sql` is NOT applied to production.** It is a new-table-only migration (no existing data touched) but still needs a fresh backup (`PG_DUMP` set to the PostgreSQL 18 bin, `SEED_ALLOW_REMOTE` set) and the owner's explicit go-ahead. Apply it before deploying the code: until the table exists, the staff reset dialog errors and `/reset-password` shows the invalid-link page.
+- **Open: not exercised against a live Supabase project.** Unverified there: `auth.admin.updateUserById` with a password, and that the pooled database role may `delete from auth.sessions` (if not, the reset still works but old sessions are not ended; the failure is logged as "could not revoke existing sessions"). Access tokens already issued live until their normal expiry.
+- Not checked: a Supabase-level ban (`banned_until`) on the target. The in-process rate limiter resets on cold start; a persistent store would be the upgrade (same note as the login limiter).
+- The admin dialog was type-checked and unit-tested but not viewed in a browser (needs sign-in and the migrated table).

@@ -8,8 +8,10 @@ import ConfirmActionDialog from '@/app/components/admin/ConfirmActionDialog';
 import { useConfirmAction } from '@/app/components/admin/useConfirmAction';
 import { parseHexColor } from '@/app/lib/roles';
 import { cx } from '@/app/lib/cx';
+import PasswordResetDialog from '@/app/components/admin/PasswordResetDialog';
 import {
   HiCheck,
+  HiOutlineKey,
   HiOutlinePlus,
   HiOutlineTrash,
   HiOutlineEllipsisVertical,
@@ -45,6 +47,7 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
   // Controlled so a cancelled confirm keeps the menu open (RAC otherwise closes
   // the menu unconditionally after onAction runs).
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
 
   const revocation = useConfirmAction<string>(async (userId) => {
     const result = await revokeStaff(userId);
@@ -226,6 +229,18 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
             <Popover className="admin-popover w-48">
               <Menu className="rounded-xl bg-surface-raised p-1 shadow-2xl shadow-black/60 ring-1 ring-line/70 outline-none">
                 <MenuItem
+                  id="reset-password"
+                  textValue="Password reset link"
+                  onAction={() => {
+                    setActionsOpen(false);
+                    setResetOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-foreground-secondary hover:text-foreground hover:bg-line/60 data-[focused]:text-foreground data-[focused]:bg-line/60 transition-colors cursor-pointer outline-none"
+                >
+                  <HiOutlineKey aria-hidden className="w-4 h-4" />
+                  <span>Password reset link</span>
+                </MenuItem>
+                <MenuItem
                   id="remove"
                   textValue="Remove Access"
                   isDisabled={isPending}
@@ -241,6 +256,16 @@ export default function StaffRow({ member, isSelf, canRevoke, assignableRoles }:
           </MenuTrigger>
         )}
       </div>
+
+      {canRevoke && !isSelf && (
+        <PasswordResetDialog
+          isOpen={resetOpen}
+          onOpenChange={setResetOpen}
+          userId={member.userId}
+          kind="staff"
+          subject={member.email}
+        />
+      )}
 
       <ConfirmActionDialog
         {...revocation.dialogProps}
