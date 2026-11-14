@@ -89,7 +89,15 @@ export default function Navigation({ onNavigate }: NavigationProps) {
   ];
 
   return (
-    <nav className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4 lg:gap-6 w-full">
+    <>
+      {activeDropdown && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          onClick={() => setActiveDropdown(null)}
+          aria-hidden="true"
+        />
+      )}
+      <nav className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4 lg:gap-6 w-full">
       {leagueNavItems.map((item) => {
         const isOpen = activeDropdown === item.id;
         const isActive = isDropdownActive(item.items);
@@ -115,7 +123,8 @@ export default function Navigation({ onNavigate }: NavigationProps) {
               <Popover
                 placement="bottom start"
                 offset={8}
-                className="w-[calc(100vw-2rem)] md:w-60 bg-surface-raised/95 backdrop-blur-md rounded-xl shadow-2xl border border-line/80 z-50 p-1 outline-none animate-fade-in"
+                isNonModal
+                className="w-[calc(100%-2rem)] max-w-[calc(100vw-2rem)] md:w-60 bg-surface-raised/95 backdrop-blur-md rounded-xl shadow-2xl border border-line/80 z-50 p-1 outline-none animate-fade-in"
               >
                 <Menu className="outline-none py-1 space-y-1">
                   {item.items.map((subItem) => {
@@ -144,5 +153,6 @@ export default function Navigation({ onNavigate }: NavigationProps) {
         );
       })}
     </nav>
+    </>
   );
 }

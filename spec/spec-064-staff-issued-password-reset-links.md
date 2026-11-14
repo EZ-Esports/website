@@ -1,4 +1,4 @@
-# spec-063: Staff-issued one-time password reset links
+# spec-064: Staff-issued one-time password reset links
 
 - **Status:** Implemented on branch `worktree-agent-ab14843f5de9b677e` (unmerged). **Migration `0062` is written but NOT applied to production.**
 - **Date:** 2026-11-13

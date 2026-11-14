@@ -1,4 +1,4 @@
--- Staff-issued one-time password reset links (spec-063). Additive only: one new table, no data touched.
+-- Staff-issued one-time password reset links (spec-064). Additive only: one new table, no data touched.
 -- RLS is enabled with no policies, like player_invites and manager_invites; the app uses the service role.
 
 CREATE TABLE "password_reset_links" (

@@ -5,7 +5,7 @@ import { rateLimit } from '@/app/lib/rate-limit';
 import { passwordResetService } from '@/app/lib/password-reset/server';
 import type { IssuedLinkView } from '@/app/lib/password-reset/core';
 
-// Manager accounts only. Staff resets are deliberately not offered (spec-063), and the
+// Manager accounts only. Staff resets are deliberately not offered (spec-064), and the
 // service is wired with enabledKinds: ['manager'] as well, so a crafted call cannot
 // reach them. The service checks MANAGE_SCHOOLS and the staff-hierarchy rule.
 

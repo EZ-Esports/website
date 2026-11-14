@@ -189,7 +189,7 @@ export const supabaseResetAuth: ResetAuthAdmin = {
 export const passwordResetService = createPasswordResetService({
   store: drizzleResetStore,
   auth: supabaseResetAuth,
-  // Staff resets are out of scope for now (spec-063): staff are reset in the Supabase dashboard.
+  // Staff resets are out of scope for now (spec-064): staff are reset in the Supabase dashboard.
   enabledKinds: ['manager'],
   onSessionRevocationFailed: (userId, error) =>
     console.error('Password reset: could not revoke existing sessions', { userId, error }),

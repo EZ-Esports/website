@@ -1009,7 +1009,7 @@ export const managerInvites = pgTable('manager_invites', {
   index('manager_invites_member_id_idx').on(t.memberId),
 ]).enableRLS();
 
-// 2c. Staff-issued one-time password reset links (spec-063). Audit trail and
+// 2c. Staff-issued one-time password reset links (spec-064). Audit trail and
 // credential in one: only the SHA-256 of the token is stored, never the token.
 // user_id is a Supabase auth user id (a manager or a staff account), so it has
 // no foreign key. A user has at most one outstanding link at a time.

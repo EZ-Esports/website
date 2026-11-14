@@ -169,7 +169,7 @@ export interface ResetServiceDeps {
   onSessionRevocationFailed?: (userId: string, error: unknown) => void;
   /**
    * Account kinds this deployment may issue, list and revoke links for. Staff resets are
-   * deliberately switched off for now (spec-063); the table and checks still support them.
+   * deliberately switched off for now (spec-064); the table and checks still support them.
    */
   enabledKinds?: readonly ResetTargetKind[];
 }
