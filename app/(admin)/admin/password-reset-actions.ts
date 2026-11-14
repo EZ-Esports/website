@@ -3,10 +3,11 @@
 import { requireStaff } from '@/app/lib/auth';
 import { rateLimit } from '@/app/lib/rate-limit';
 import { passwordResetService } from '@/app/lib/password-reset/server';
-import { isResetTargetKind, type IssuedLinkView } from '@/app/lib/password-reset/core';
+import type { IssuedLinkView } from '@/app/lib/password-reset/core';
 
-// Authorization is per account kind (the kind comes from the client), so these use
-// requireStaff() and let the service check MANAGE_SCHOOLS / MANAGE_ROLES and the hierarchy.
+// Manager accounts only. Staff resets are deliberately not offered (spec-063), and the
+// service is wired with enabledKinds: ['manager'] as well, so a crafted call cannot
+// reach them. The service checks MANAGE_SCHOOLS and the staff-hierarchy rule.
 
 const ISSUE_RATE_LIMIT = 20;
 const ISSUE_RATE_WINDOW_MS = 60_000;
@@ -20,20 +21,15 @@ export interface IssueResetLinkResult {
   expiresAt?: string;
 }
 
-export async function issuePasswordResetLink(params: {
-  userId: string;
-  kind: string;
-}): Promise<IssueResetLinkResult> {
+export async function issuePasswordResetLink(params: { userId: string }): Promise<IssueResetLinkResult> {
   const staff = await requireStaff();
-  if (!isResetTargetKind(params.kind) || typeof params.userId !== 'string' || !params.userId) {
-    return { success: false, error: NOT_ALLOWED };
-  }
+  if (typeof params?.userId !== 'string' || !params.userId) return { success: false, error: NOT_ALLOWED };
   const limited = rateLimit(`password-reset-issue:${staff.id}`, ISSUE_RATE_LIMIT, ISSUE_RATE_WINDOW_MS);
   if (!limited.allowed) {
     return { success: false, error: 'Too many reset links issued. Please slow down and try again shortly.' };
   }
   try {
-    const result = await passwordResetService.issue(staff, { userId: params.userId, kind: params.kind });
+    const result = await passwordResetService.issue(staff, { userId: params.userId, kind: 'manager' });
     if (!result.success) return { success: false, error: result.error };
     return {
       success: true,
@@ -58,14 +54,11 @@ export async function revokePasswordResetLink(linkId: string): Promise<{ success
   }
 }
 
-export async function listPasswordResetLinks(params: {
-  userId: string;
-  kind: string;
-}): Promise<IssuedLinkView[]> {
+export async function listPasswordResetLinks(params: { userId: string }): Promise<IssuedLinkView[]> {
   const staff = await requireStaff();
-  if (!isResetTargetKind(params.kind) || typeof params.userId !== 'string' || !params.userId) return [];
+  if (typeof params?.userId !== 'string' || !params.userId) return [];
   try {
-    return await passwordResetService.list(staff, { userId: params.userId, kind: params.kind });
+    return await passwordResetService.list(staff, { userId: params.userId, kind: 'manager' });
   } catch (error) {
     console.error('Failed to list password reset links', error);
     return [];

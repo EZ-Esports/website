@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { passwordResetService } from '@/app/lib/password-reset/server';
-import { checkResetAttemptAllowed } from '@/app/lib/password-reset/rate-limit';
+import { isResetBlocked, recordFailedResetAttempt } from '@/app/lib/password-reset/rate-limit';
 import {
   INVALID_RESET_LINK_MESSAGE,
   RESET_PASSWORD_MIN_LENGTH,
@@ -19,7 +19,7 @@ export async function resetPassword(formData: FormData): Promise<{ error: string
   const password = String(formData.get('password') ?? '');
   const confirm = String(formData.get('confirm') ?? '');
 
-  if (!(await checkResetAttemptAllowed())) {
+  if (await isResetBlocked()) {
     return { error: 'Too many attempts. Please try again in 15 minutes.' };
   }
   if (password.length < RESET_PASSWORD_MIN_LENGTH) {
@@ -32,9 +32,14 @@ export async function resetPassword(formData: FormData): Promise<{ error: string
   let loginPath: string;
   try {
     const result = await passwordResetService.redeem(token, password);
-    if (!result.ok) return { error: result.error };
+    if (!result.ok) {
+      // Only a dead or unknown link counts toward the throttle; typos in the password do not.
+      if (!result.retryable) await recordFailedResetAttempt();
+      return { error: result.error };
+    }
     loginPath = loginPathForKind(result.kind);
   } catch (error) {
+    await recordFailedResetAttempt();
     console.error('Password reset failed', error instanceof Error ? error.message : error);
     return { error: INVALID_RESET_LINK_MESSAGE };
   }

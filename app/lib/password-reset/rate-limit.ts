@@ -1,17 +1,25 @@
 import 'server-only';
 import { headers } from 'next/headers';
-import { rateLimit } from '@/app/lib/rate-limit';
+import { isRateLimited, rateLimit } from '@/app/lib/rate-limit';
 
 const RESET_WINDOW_MS = 15 * 60_000;
-const RESET_IP_LIMIT = 20;
+const RESET_FAILURE_LIMIT = 20;
+
+async function clientIp(): Promise<string> {
+  const list = await headers();
+  return list.get('x-forwarded-for')?.split(',')[0]?.trim() || list.get('x-real-ip') || 'unknown';
+}
 
 /**
- * Per-IP throttle for the public reset page and its submit action, using the same
- * in-memory limiter as the login forms (per process, so a best-effort brake only).
- * The real protection is the token itself: 256 random bits that cannot be guessed.
+ * Per-IP brake on failed submissions only, using the same in-memory limiter as the
+ * login forms (per process, so best-effort). Page views and successful resets are
+ * not counted, so a school behind one NAT cannot lock out its own managers by
+ * opening links. The real protection is the token: 256 random bits cannot be guessed.
  */
-export async function checkResetAttemptAllowed(): Promise<boolean> {
-  const list = await headers();
-  const ip = list.get('x-forwarded-for')?.split(',')[0]?.trim() || list.get('x-real-ip') || 'unknown';
-  return rateLimit(`password-reset:ip:${ip}`, RESET_IP_LIMIT, RESET_WINDOW_MS).allowed;
+export async function isResetBlocked(): Promise<boolean> {
+  return isRateLimited(`password-reset:fail:${await clientIp()}`, RESET_FAILURE_LIMIT, RESET_WINDOW_MS);
+}
+
+export async function recordFailedResetAttempt(): Promise<void> {
+  rateLimit(`password-reset:fail:${await clientIp()}`, RESET_FAILURE_LIMIT, RESET_WINDOW_MS);
 }

@@ -7,7 +7,7 @@ import {
   listPasswordResetLinks,
   revokePasswordResetLink,
 } from '@/app/(admin)/admin/password-reset-actions';
-import type { IssuedLinkView, ResetLinkStatus, ResetTargetKind } from '@/app/lib/password-reset/core';
+import type { IssuedLinkView, ResetLinkStatus } from '@/app/lib/password-reset/core';
 import { Overlay, Modal, Dialog, Heading } from '@/app/components/ui/overlay';
 import { PendingLabel } from '@/app/components/admin/AdminUI';
 import { chip, ghostBtn, ghostBtnSm, inputSm, primaryBtn, primaryBtnSm, type ChipTone } from '@/app/components/admin/styles';
@@ -16,7 +16,6 @@ interface PasswordResetDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   userId: string;
-  kind: ResetTargetKind;
   /** Name or email shown in the title so staff can tell whose link this is. */
   subject: string;
 }
@@ -50,11 +49,12 @@ function formatWhen(iso: string) {
  * is never stored server-side, so closing the dialog discards it and the next link
  * has to be issued again (which revokes the previous one).
  */
-export default function PasswordResetDialog({ isOpen, onOpenChange, userId, kind, subject }: PasswordResetDialogProps) {
+export default function PasswordResetDialog({ isOpen, onOpenChange, userId, subject }: PasswordResetDialogProps) {
   const [links, setLinks] = useState<IssuedLinkView[]>([]);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState<{ url: string; expiresAt: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isIssuing, startIssuing] = useTransition();
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -63,18 +63,19 @@ export default function PasswordResetDialog({ isOpen, onOpenChange, userId, kind
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setLinks(await listPasswordResetLinks({ userId, kind }));
+      setLinks(await listPasswordResetLinks({ userId }));
     } catch {
       setLinks([]);
     } finally {
       setLoading(false);
     }
-  }, [userId, kind]);
+  }, [userId]);
 
   useEffect(() => {
     if (!isOpen) {
       setGenerated(null);
       setCopied(false);
+      setCopyFailed(false);
       setError(null);
       return;
     }
@@ -85,18 +86,40 @@ export default function PasswordResetDialog({ isOpen, onOpenChange, userId, kind
     if (copyTimer.current) clearTimeout(copyTimer.current);
   }, []);
 
+  async function writeToClipboard(text: string): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setCopyFailed(false);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2500);
+      return true;
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+      return false;
+    }
+  }
+
   function handleIssue() {
+    // aria-disabled does not stop clicks, so a double click must be refused here.
+    if (isIssuing) return;
     setError(null);
     setGenerated(null);
     setCopied(false);
+    setCopyFailed(false);
     startIssuing(async () => {
       try {
-        const res = await issuePasswordResetLink({ userId, kind });
+        const res = await issuePasswordResetLink({ userId });
         if (!res.success || !res.resetPath || !res.expiresAt) {
           setError(res.error ?? 'Could not issue a reset link.');
           return;
         }
-        setGenerated({ url: `${window.location.origin}${res.resetPath}`, expiresAt: res.expiresAt });
+        const url = `${window.location.origin}${res.resetPath}`;
+        setGenerated({ url, expiresAt: res.expiresAt });
+        // Copy straight away, like the manager invite link: the raw link exists only now, so
+        // it is already on the clipboard even if the dialog is dismissed right after.
+        await writeToClipboard(url);
         await refresh();
       } catch {
         setError('Could not issue a reset link. Please try again.');
@@ -105,15 +128,7 @@ export default function PasswordResetDialog({ isOpen, onOpenChange, userId, kind
   }
 
   async function handleCopy() {
-    if (!generated) return;
-    try {
-      await navigator.clipboard.writeText(generated.url);
-      setCopied(true);
-      if (copyTimer.current) clearTimeout(copyTimer.current);
-      copyTimer.current = setTimeout(() => setCopied(false), 2500);
-    } catch {
-      setError('Could not copy automatically. Select the link and copy it manually.');
-    }
+    if (generated) await writeToClipboard(generated.url);
   }
 
   async function handleRevoke(id: string) {
@@ -163,7 +178,14 @@ export default function PasswordResetDialog({ isOpen, onOpenChange, userId, kind
               {generated && (
                 <div className="admin-fade-in space-y-2 rounded-xl bg-accent/10 p-4 ring-1 ring-accent/30">
                   <p className="text-sm font-medium text-accent">
-                    Link ready. It is shown only now; copy it before closing this window.
+                    Link ready. It is shown only now.
+                  </p>
+                  <p className={copyFailed ? 'text-xs font-medium text-danger-on-tint' : 'text-xs text-foreground-secondary'}>
+                    {copyFailed
+                      ? 'Could not copy automatically. Press Copy, or select the link and copy it manually, before closing this window.'
+                      : copied
+                        ? 'Copied to clipboard.'
+                        : 'It was copied to your clipboard when generated.'}
                   </p>
                   <div className="flex items-center gap-2">
                     <input
@@ -193,7 +215,7 @@ export default function PasswordResetDialog({ isOpen, onOpenChange, userId, kind
                   </div>
                   <p className="text-xs text-foreground-secondary">Expires {formatWhen(generated.expiresAt)}.</p>
                   <span role="status" aria-live="polite" className="sr-only">
-                    {copied ? 'Link copied to clipboard' : ''}
+                    {copied ? 'Link copied to clipboard' : copyFailed ? 'Could not copy the link automatically' : ''}
                   </span>
                 </div>
               )}

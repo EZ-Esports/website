@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { passwordResetService } from '@/app/lib/password-reset/server';
-import { checkResetAttemptAllowed } from '@/app/lib/password-reset/rate-limit';
 import { INVALID_RESET_LINK_MESSAGE } from '@/app/lib/password-reset/core';
 import ResetPasswordForm from './ResetPasswordForm';
 
@@ -20,8 +19,7 @@ export default async function ResetPasswordPage({
   searchParams: Promise<{ token?: string }>;
 }) {
   const { token } = await searchParams;
-  const allowed = await checkResetAttemptAllowed();
-  const valid = allowed && token ? await passwordResetService.peek(token).catch(() => false) : false;
+  const valid = token ? await passwordResetService.peek(token).catch(() => false) : false;
 
   return (
     <main className="min-h-screen bg-surface flex flex-col justify-center items-center px-4 py-12">
@@ -30,7 +28,7 @@ export default async function ResetPasswordPage({
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Reset link not valid</h1>
             <p className="text-sm text-foreground-secondary">
-              {allowed ? INVALID_RESET_LINK_MESSAGE : 'Too many attempts. Please try again in 15 minutes.'}
+              {INVALID_RESET_LINK_MESSAGE}
             </p>
             <Link href="/portal/login" className="inline-block text-sm text-accent hover:underline">
               Go to sign in

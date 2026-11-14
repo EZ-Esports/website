@@ -203,56 +203,55 @@ describe('issuing', () => {
   });
 
   it('refuses issuing for yourself', async () => {
-    const { service } = setup({ actor: staffAccount(1) });
-    const res = await service.issue(rolesAdmin, { userId: 'actor', kind: 'staff' });
-    expect(res).toMatchObject({ success: false });
+    const { service } = setup({ actor: manager });
+    expect(await service.issue(schoolsAdmin, { userId: 'actor', kind: 'manager' })).toMatchObject({ success: false });
   });
 });
 
 describe('permission and escalation guards', () => {
-  it('manager links need MANAGE_SCHOOLS, staff links need MANAGE_ROLES', async () => {
-    const { service } = setup({ 'mgr-1': manager, 'staff-1': staffAccount(1) });
+  const asStaffToo = (position: number, isOwner = false) => staffAccount(position, isOwner);
+
+  it('manager links need MANAGE_SCHOOLS', async () => {
+    const { service } = setup({ 'mgr-1': manager });
     expect(await service.issue(rolesAdmin, { userId: 'mgr-1', kind: 'manager' })).toMatchObject({ success: false });
-    expect(await service.issue(schoolsAdmin, { userId: 'staff-1', kind: 'staff' })).toMatchObject({ success: false });
     expect(await service.issue(schoolsAdmin, { userId: 'mgr-1', kind: 'manager' })).toMatchObject({ success: true });
-    expect(await service.issue(rolesAdmin, { userId: 'staff-1', kind: 'staff' })).toMatchObject({ success: true });
   });
 
-  it('requires a strictly higher role than the target staff member', async () => {
-    const equal = checkIssueAuthorization(rolesAdmin, {
-      userId: 't', kind: 'staff', active: true, isStaff: true, isOwner: false, highestRolePosition: 5,
-    });
-    const higher = checkIssueAuthorization(rolesAdmin, {
-      userId: 't', kind: 'staff', active: true, isStaff: true, isOwner: false, highestRolePosition: 6,
-    });
-    const lower = checkIssueAuthorization(rolesAdmin, {
-      userId: 't', kind: 'staff', active: true, isStaff: true, isOwner: false, highestRolePosition: 4,
-    });
-    expect(equal.ok).toBe(false);
-    expect(higher.ok).toBe(false);
-    expect(lower.ok).toBe(true);
+  it('refuses staff links entirely when only managers are enabled', async () => {
+    const ctx = setup({ 'staff-1': staffAccount(1) });
+    const managersOnly = createPasswordResetService({ store: ctx.store, auth: ctx.auth, enabledKinds: ['manager'] });
+    expect(await managersOnly.issue(owner, { userId: 'staff-1', kind: 'staff' })).toMatchObject({ success: false });
+    expect(await managersOnly.list(owner, { userId: 'staff-1', kind: 'staff' })).toEqual([]);
+    expect(ctx.rows).toHaveLength(0);
+    // A stored staff link cannot be revoked through a managers-only service either.
+    const issued = await ctx.service.issue(owner, { userId: 'staff-1', kind: 'staff' });
+    if (!issued.success) throw new Error('expected success');
+    expect(await managersOnly.revoke(owner, ctx.rows[0].id)).toMatchObject({ success: false });
   });
 
-  it('only an owner can reset an owner', async () => {
-    const { service } = setup({ 'staff-1': staffAccount(100, true) });
-    const highRank: ResetActor = { ...rolesAdmin, highestRolePosition: 999 };
-    expect(await service.issue(highRank, { userId: 'staff-1', kind: 'staff' })).toMatchObject({ success: false });
-    expect(await service.issue(owner, { userId: 'staff-1', kind: 'staff' })).toMatchObject({ success: true });
+  it('requires a strictly higher role than a manager who is also staff', () => {
+    const target = (highestRolePosition: number) => ({
+      userId: 't', kind: 'manager' as const, active: true, isStaff: true, isOwner: false, highestRolePosition,
+    });
+    expect(checkIssueAuthorization(schoolsAdmin, target(5)).ok).toBe(false);
+    expect(checkIssueAuthorization(schoolsAdmin, target(6)).ok).toBe(false);
+    expect(checkIssueAuthorization(schoolsAdmin, target(4)).ok).toBe(true);
   });
 
-  it('applies the staff hierarchy to a manager account that is also staff', async () => {
-    const { service } = setup({ 'mgr-1': { ...staffAccount(100, true), active: true } });
-    const res = await service.issue(schoolsAdmin, { userId: 'mgr-1', kind: 'manager' });
-    expect(res).toMatchObject({ success: false });
+  it('only an owner can reset an owner who also manages a school', async () => {
+    const { service } = setup({ 'mgr-1': asStaffToo(100, true) });
+    const highRank: ResetActor = { ...schoolsAdmin, highestRolePosition: 999 };
+    expect(await service.issue(highRank, { userId: 'mgr-1', kind: 'manager' })).toMatchObject({ success: false });
+    expect(await service.issue(owner, { userId: 'mgr-1', kind: 'manager' })).toMatchObject({ success: true });
   });
 
   it('applies the hierarchy when revoking', async () => {
-    const { service, rows, accounts } = setup({ 'staff-1': staffAccount(1) });
-    const issued = await service.issue(owner, { userId: 'staff-1', kind: 'staff' });
+    const { service, rows, accounts } = setup({ 'mgr-1': manager });
+    const issued = await service.issue(owner, { userId: 'mgr-1', kind: 'manager' });
     if (!issued.success) throw new Error('expected success');
     // The target has since become an owner: a lower-ranked actor can no longer touch the link.
-    accounts['staff-1'] = staffAccount(100, true);
-    expect(await service.revoke({ ...rolesAdmin, highestRolePosition: 99 }, rows[0].id)).toMatchObject({ success: false });
+    accounts['mgr-1'] = asStaffToo(100, true);
+    expect(await service.revoke({ ...schoolsAdmin, highestRolePosition: 99 }, rows[0].id)).toMatchObject({ success: false });
     expect(rows[0].revokedAt).toBeNull();
     expect(await service.revoke(owner, rows[0].id)).toEqual({ success: true });
     expect(rows[0].revokedBy).toBe('owner');
@@ -263,6 +262,17 @@ describe('permission and escalation guards', () => {
     await service.issue(schoolsAdmin, { userId: 'mgr-1', kind: 'manager' });
     expect(await service.list(rolesAdmin, { userId: 'mgr-1', kind: 'manager' })).toEqual([]);
     expect(await service.list(schoolsAdmin, { userId: 'mgr-1', kind: 'manager' })).toHaveLength(1);
+  });
+
+  it('does not list history for accounts the actor may not act on, or that are not real managers', async () => {
+    const { service, accounts } = setup({ 'mgr-1': manager });
+    await service.issue(owner, { userId: 'mgr-1', kind: 'manager' });
+    accounts['mgr-1'] = asStaffToo(100, true);
+    expect(await service.list(schoolsAdmin, { userId: 'mgr-1', kind: 'manager' })).toEqual([]);
+    expect(await service.list(owner, { userId: 'mgr-1', kind: 'manager' })).toHaveLength(1);
+    accounts['mgr-1'] = { ...manager, active: false };
+    expect(await service.list(owner, { userId: 'mgr-1', kind: 'manager' })).toEqual([]);
+    expect(await service.list(owner, { userId: 'unknown', kind: 'manager' })).toEqual([]);
   });
 });
 
@@ -371,13 +381,6 @@ describe('redeeming', () => {
     ]);
     expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
     expect(auth.setPassword).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports the kind so the caller can pick the login page', async () => {
-    const ctx = setup({ 'staff-1': staffAccount(1) });
-    const res = await ctx.service.issue(rolesAdmin, { userId: 'staff-1', kind: 'staff' });
-    if (!res.success) throw new Error('expected success');
-    expect(await ctx.service.redeem(res.token, 'a-new-password')).toEqual({ ok: true, kind: 'staff' });
   });
 });
 

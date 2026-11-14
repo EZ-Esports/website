@@ -167,6 +167,11 @@ export interface ResetServiceDeps {
   now?: () => Date;
   generateToken?: () => string;
   onSessionRevocationFailed?: (userId: string, error: unknown) => void;
+  /**
+   * Account kinds this deployment may issue, list and revoke links for. Staff resets are
+   * deliberately switched off for now (spec-063); the table and checks still support them.
+   */
+  enabledKinds?: readonly ResetTargetKind[];
 }
 
 export interface IssuedLinkView {
@@ -192,6 +197,8 @@ export function createPasswordResetService(deps: ResetServiceDeps) {
   const { store, auth } = deps;
   const clock = deps.now ?? (() => new Date());
   const newToken = deps.generateToken ?? generateResetToken;
+  const enabled = (kind: ResetTargetKind) => (deps.enabledKinds ?? ['manager', 'staff']).includes(kind);
+  const DISABLED = 'Password reset links are not available for this account type.';
 
   function toView(row: ResetLinkRow, now: Date): IssuedLinkView {
     return {
@@ -209,6 +216,7 @@ export function createPasswordResetService(deps: ResetServiceDeps) {
   return {
     /** Issue a link; any outstanding link for the same user is revoked in the same transaction. */
     async issue(actor: ResetActor, params: { userId: string; kind: ResetTargetKind }): Promise<IssueResult> {
+      if (!enabled(params.kind)) return { success: false, error: DISABLED };
       const permission = checkKindPermission(actor, params.kind);
       if (!permission.ok) return { success: false, error: permission.error };
       const target = await store.getTarget(params.userId, params.kind);
@@ -232,7 +240,7 @@ export function createPasswordResetService(deps: ResetServiceDeps) {
 
     async revoke(actor: ResetActor, linkId: string): Promise<{ success: boolean; error?: string }> {
       const link = await store.getById(linkId);
-      if (!link) return { success: false, error: 'Link not found.' };
+      if (!link || !enabled(link.targetKind)) return { success: false, error: 'Link not found.' };
       const permission = checkKindPermission(actor, link.targetKind);
       if (!permission.ok) return { success: false, error: permission.error };
       // Same hierarchy rule as issuing, but a dead account no longer blocks revoking its link.
@@ -249,12 +257,25 @@ export function createPasswordResetService(deps: ResetServiceDeps) {
       return { success: true };
     },
 
-    /** Recent links for one account; empty (not an error) when the actor may not see them. */
+    /**
+     * Recent links for one account. Empty (not an error) unless the actor could also issue
+     * for it: same permission, a live account and the same hierarchy rule, so history is
+     * never exposed for accounts the caller may not act on. Viewing your own is allowed.
+     */
     async list(
       actor: ResetActor,
       params: { userId: string; kind: ResetTargetKind },
     ): Promise<IssuedLinkView[]> {
-      if (!checkKindPermission(actor, params.kind).ok) return [];
+      if (!enabled(params.kind) || !checkKindPermission(actor, params.kind).ok) return [];
+      const target = await store.getTarget(params.userId, params.kind);
+      if (!target?.active) return [];
+      if (
+        target.isStaff &&
+        target.userId !== actor.id &&
+        !canActOnMember(actor.highestRolePosition, actor.isOwner, target.highestRolePosition, target.isOwner)
+      ) {
+        return [];
+      }
       const now = clock();
       const rows = await store.listForUser(params.userId, RESET_LINK_HISTORY_LIMIT);
       return rows.filter((r) => r.targetKind === params.kind).map((r) => toView(r, now));

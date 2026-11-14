@@ -271,7 +271,6 @@ export function ActiveManagersTab({
             if (!open) setResetTarget(null);
           }}
           userId={resetTarget.userId}
-          kind="manager"
           subject={resetTarget.name}
         />
       )}

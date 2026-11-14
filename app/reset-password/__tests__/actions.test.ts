@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const redeem = vi.fn();
-const allowed = vi.fn();
+const blocked = vi.fn();
+const recordFailure = vi.fn();
 const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
 
 vi.mock('next/navigation', () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock('@/app/lib/password-reset/server', () => ({ passwordResetService: { redeem: (...a: unknown[]) => redeem(...a) } }));
-vi.mock('@/app/lib/password-reset/rate-limit', () => ({ checkResetAttemptAllowed: () => allowed() }));
+vi.mock('@/app/lib/password-reset/rate-limit', () => ({ isResetBlocked: () => blocked(), recordFailedResetAttempt: () => recordFailure() }));
 
 import { resetPassword } from '../actions';
 import { INVALID_RESET_LINK_MESSAGE } from '@/app/lib/password-reset/core';
@@ -23,7 +24,8 @@ describe('resetPassword action', () => {
   beforeEach(() => {
     redeem.mockReset();
     redirect.mockClear();
-    allowed.mockReset().mockResolvedValue(true);
+    blocked.mockReset().mockResolvedValue(false);
+    recordFailure.mockReset();
   });
 
   it('redirects a manager to the portal login with a notice and creates no session', async () => {
@@ -46,6 +48,7 @@ describe('resetPassword action', () => {
     const res = await resetPassword(form({ token: 'x', password: 'long-enough-1', confirm: 'long-enough-1' }));
     expect(res).toEqual({ error: INVALID_RESET_LINK_MESSAGE });
     expect(redirect).not.toHaveBeenCalled();
+    expect(recordFailure).toHaveBeenCalledTimes(1);
   });
 
   it('uses the generic message when the service throws', async () => {
@@ -62,10 +65,21 @@ describe('resetPassword action', () => {
       error: 'Passwords do not match.',
     });
     expect(redeem).not.toHaveBeenCalled();
+    expect(recordFailure).not.toHaveBeenCalled();
+  });
+
+  it('does not count a successful reset or a retryable password error against the throttle', async () => {
+    redeem.mockResolvedValue({ ok: false, error: 'Could not update', retryable: true });
+    await resetPassword(form({ token: 'x', password: 'long-enough-1', confirm: 'long-enough-1' }));
+    redeem.mockResolvedValue({ ok: true, kind: 'manager' });
+    await expect(
+      resetPassword(form({ token: 'x', password: 'long-enough-1', confirm: 'long-enough-1' })),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(recordFailure).not.toHaveBeenCalled();
   });
 
   it('is throttled per IP', async () => {
-    allowed.mockResolvedValue(false);
+    blocked.mockResolvedValue(true);
     const res = await resetPassword(form({ token: 'x', password: 'long-enough-1', confirm: 'long-enough-1' }));
     expect(res.error).toMatch(/Too many attempts/);
     expect(redeem).not.toHaveBeenCalled();
