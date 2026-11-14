@@ -1,6 +1,6 @@
 # spec-064: Staff-issued one-time password reset links
 
-- **Status:** Implemented on branch `worktree-agent-ab14843f5de9b677e` (unmerged). **Migration `0062` is written but NOT applied to production.**
+- **Status:** Shipped in PR #344 (merged 14 Nov 2026). **Migration `0062` applied to production on 14 Nov 2026.**
 - **Date:** 2026-11-13
 - **Scope:** table `password_reset_links`, the pure service in `app/lib/password-reset/`, three server actions (manager accounts only), the public `/reset-password` page and a dialog in the School Managers dialog.
 - **Staff-account resets are deliberately out of scope for now.** School managers have no other recovery path; a staff password can be reset by an Owner in the Supabase dashboard. The service is wired with `enabledKinds: ['manager']`, the actions accept no kind, and the staff row has no reset item. The table's `target_kind` column and CHECK and the service's staff support remain, so staff resets can return later without a migration.
