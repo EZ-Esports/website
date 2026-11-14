@@ -30,7 +30,29 @@ describe('form token', () => {
     expect(verifyFormToken(signFormToken({ kind: 'manager', inviteId: INVITE }).token)).toMatchObject({ kind: 'manager' });
   });
 
-  it('expires after six hours and says so (distinct from invalid)', () => {
+  it('uses the invite expiry as exp when given', () => {
+    const inviteExp = 1_000 + 3 * 86_400;
+    const { token, expiresAt } = signFormToken({ kind: 'player', inviteId: INVITE }, 1_000, inviteExp);
+    expect(expiresAt).toBe(inviteExp);
+    // Still ok after 7 hours, well past the old fixed lifetime.
+    expect(verifyFormToken(token, 1_000 + 7 * 3600).status).toBe('ok');
+    expect(verifyFormToken(token, inviteExp - 1).status).toBe('ok');
+    expect(verifyFormToken(token, inviteExp)).toEqual({ status: 'expired', kind: 'player', inviteId: INVITE });
+  });
+
+  it('falls back to six hours when the invite has no expiry', () => {
+    for (const none of [null, undefined, Number.NaN]) {
+      const { expiresAt } = signFormToken({ kind: 'player', inviteId: INVITE }, 1_000, none);
+      expect(expiresAt).toBe(1_000 + FORM_TOKEN_TTL_SECONDS);
+    }
+  });
+
+  it('refuses to sign a token that is already expired', () => {
+    expect(() => signFormToken({ kind: 'player', inviteId: INVITE }, 1_000, 1_000)).toThrow();
+    expect(() => signFormToken({ kind: 'player', inviteId: INVITE }, 1_000, 500)).toThrow();
+  });
+
+  it('fallback token expires after six hours and says so (distinct from invalid)', () => {
     const { token, expiresAt } = signFormToken({ kind: 'player', inviteId: INVITE }, 1_000);
     expect(verifyFormToken(token, expiresAt - 1).status).toBe('ok');
     expect(verifyFormToken(token, expiresAt)).toEqual({ status: 'expired', kind: 'player', inviteId: INVITE });
