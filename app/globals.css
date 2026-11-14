@@ -1,9 +1,5 @@
 @import "tailwindcss";
 
-html {
-  scrollbar-gutter: stable;
-}
-
 :root {
   /* Surfaces */
   --surface: #111111; /* Midnight graphite dark background */
@@ -13,7 +9,7 @@ html {
   /* Text */
   --foreground: #f8fafc; /* Soft white foreground */
   --foreground-secondary: #b8b8c0; /* zinc-400 improved contrast */
-  --foreground-muted: #71717a;
+  --foreground-muted: #8e8e96; /* Lightened to clear WCAG AA 4.5:1 on all surfaces */
 
   /* Lines */
   --line: #27272a; /* zinc-800 */
