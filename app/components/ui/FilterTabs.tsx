@@ -21,8 +21,8 @@ interface FilterTabsProps {
 // ring itself in engines that transition `outline`.
 const tabBase =
   'px-4 py-2.5 min-h-[44px] flex items-center text-sm font-bold rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
-const tabActive = 'bg-accent text-on-accent hover:bg-accent/80';
-const tabInactive = 'bg-surface-raised border border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40';
+const tabActive = 'border border-accent bg-surface-raised text-foreground shadow-sm hover:border-accent/80';
+const tabInactive = 'bg-surface border border-line text-foreground-secondary hover:text-foreground hover:border-foreground-muted/40';
 
 // These tabs navigate to new URLs, so plain links with aria-current are the
 // correct pattern here (not a RAC Tabs widget, which is for in-page panel
