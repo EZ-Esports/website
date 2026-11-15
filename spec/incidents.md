@@ -215,3 +215,4 @@ Same-day edits to not-yet-settled files are weaker: `0019`/`0020` rewritten hour
 - **`c35fc61`:** RAC SeasonSelect slugify broke filtering; reverted.
 - **`CLAUDE.md` vs gold:** header still says both seeds wipe. Gold does not, post-`9219ef5`. Hazard file is operator contract; `db/seed-gold.ts` is the mechanism.
 - **PR #146:** Applied `assertSeedTargetAllowed()` across `migrate.ts`, `drizzle.config.ts`, `seed-owner.ts`, `backfill-leadership.ts`, and `seed-phase2.ts` to prevent accidental non-loopback database mutations.
+- **14 Nov 2026:** `RIOT_ID_REGEX` used `[a-zA-Z0-9]` for the tagline, so a real Riot ID with a CJK tag (`cappyバラ#那一个`) was rejected on step 3. Riot's developer FAQ allows any Unicode letter in both fields. The tag class is now `[\p{L}\p{Nd}]`.

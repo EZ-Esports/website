@@ -110,6 +110,18 @@ describe('ManualRiotIdAdapter', () => {
     expect(result.trackerUrl).toBe('https://tracker.gg/valorant/profile/riot/TenZ%230001/overview');
   });
 
+  it('accepts Unicode letters in the name and tagline', async () => {
+    const riotId = 'cappyバラ#那一个';
+    const result = await adapter.resolveIdentity('valorant', riotId);
+    expect(result).toEqual({
+      gameId: riotId,
+      displayName: 'cappyバラ',
+      rawIdentifier: riotId,
+      isVerified: false,
+      trackerUrl: `https://tracker.gg/valorant/profile/riot/${encodeURIComponent(riotId)}/overview`,
+    });
+  });
+
   it('derives correct tracker URL for League of Legends', async () => {
     const result = await adapter.resolveIdentity('league-of-legends', 'Faker#KR1');
     expect(result.trackerUrl).toBe('https://tracker.gg/lol/profile/riot/Faker%23KR1/overview');
@@ -146,11 +158,16 @@ describe('ManualRiotIdAdapter', () => {
     expect(RIOT_ID_REGEX.test('Demon1#LFT1')).toBe(true);
     expect(RIOT_ID_REGEX.test('abc#123')).toBe(true);
     expect(RIOT_ID_REGEX.test('1234567890123456#abcde')).toBe(true);
+    expect(RIOT_ID_REGEX.test('cappyバラ#那一个')).toBe(true);
+    expect(RIOT_ID_REGEX.test('Player#１２３')).toBe(true);
 
     expect(RIOT_ID_REGEX.test('ab#123')).toBe(false);
     expect(RIOT_ID_REGEX.test('12345678901234567#123')).toBe(false);
     expect(RIOT_ID_REGEX.test('abc#12')).toBe(false);
     expect(RIOT_ID_REGEX.test('abc#123456')).toBe(false);
+    expect(RIOT_ID_REGEX.test('Player#12!')).toBe(false);
+    expect(RIOT_ID_REGEX.test('cappyバラ#那一')).toBe(false);
+    expect(RIOT_ID_REGEX.test('cappyバラ#那一个二三四')).toBe(false);
   });
 });
 
