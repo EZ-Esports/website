@@ -97,7 +97,7 @@ To guarantee that the platform launches without friction and without waiting mon
   ```
 - **V1 Adapter (`ManualRiotIdAdapter`)**:
   - Accepts Riot ID (`gameName#tagLine`).
-  - Validates format against regex `/^.{3,16}#[a-zA-Z0-9]{3,5}$/`.
+  - Validates format against `/^.{3,16}#[\p{L}\p{Nd}]{3,5}$/u`: a 3–16 character game name, then `#`, then a tagline of 3–5 Unicode letters or decimal digits. ASCII tags such as `Demon1#NA1` still pass. A CJK tag such as `那一个` passes. (Updated 2026-11-14. The previous tag class `[a-zA-Z0-9]` rejected real Riot IDs such as `cappyバラ#那一个`.)
   - Normalizes and stores the identity.
   - Automatically derives public `tracker.gg` URL for comp ops without requiring the player to paste links.
 - **V2 Forward-Compatibility (`RiotSignOnAdapter`)**:

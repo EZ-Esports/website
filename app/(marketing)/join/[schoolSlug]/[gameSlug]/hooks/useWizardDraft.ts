@@ -362,7 +362,7 @@ export function useWizardDraft(
     }
     if (!RIOT_ID_REGEX.test(riotId.trim())) {
       setErrorMessage(
-        'Invalid Riot ID format. Expected Name#Tag (e.g., Demon1#NA1), where name is 3-16 characters and tag is 3-5 alphanumeric characters.'
+        'Invalid Riot ID format. Expected Name#Tag (e.g., Demon1#NA1), where name is 3-16 characters and tag is 3-5 letters or numbers.'
       );
       return false;
     }

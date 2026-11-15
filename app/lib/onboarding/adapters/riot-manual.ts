@@ -1,12 +1,12 @@
 import type { GameIdentityPort, ResolvedGameIdentity } from '../ports';
 
 /**
- * Riot ID regex per specification:
- * - 3 to 16 characters for game name
- * - '#' separator
- * - 3 to 5 alphanumeric characters for tagline
+ * Riot ID format, matching Riot's developer FAQ:
+ * - Game name: 3 to 16 characters. '#' is the separator, not part of the name.
+ * - Tagline: 3 to 5 letters or digits. Any Unicode letter is allowed, so a
+ *   tag such as 那一个 is valid. Decimal digits include fullwidth digits.
  */
-export const RIOT_ID_REGEX = /^.{3,16}#[a-zA-Z0-9]{3,5}$/;
+export const RIOT_ID_REGEX = /^.{3,16}#[\p{L}\p{Nd}]{3,5}$/u;
 
 /**
  * Derives the public tracker.gg profile URL for the given game slug and raw Riot identifier.
@@ -43,7 +43,7 @@ export class ManualRiotIdAdapter implements GameIdentityPort {
 
     if (!trimmed || !RIOT_ID_REGEX.test(trimmed)) {
       throw new Error(
-        `Invalid Riot ID format: "${identifier}". Expected Name#Tag (e.g., Player#NA1), where name is 3-16 characters and tag is 3-5 alphanumeric characters.`
+        `Invalid Riot ID format: "${identifier}". Expected Name#Tag (e.g., Player#NA1), where name is 3-16 characters and tag is 3-5 letters or numbers.`
       );
     }
 
