@@ -13,7 +13,10 @@ import {
   createPlayerInvite,
   type SchoolInviteItem,
 } from '@/app/lib/onboarding/portal-actions';
+import { DEFAULT_INVITE_EXPIRY_DAYS, INVITE_EXPIRY_DAYS } from '@/app/lib/onboarding/invite-expiry';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import type { GameItem } from './GameTabs';
+import { useStaffActing } from './StaffActing';
 
 interface GenerateInviteCardProps {
   games: GameItem[];
@@ -21,6 +24,8 @@ interface GenerateInviteCardProps {
   schoolSlug: string;
   inviteGameId: string;
   setInviteGameId: (id: string) => void;
+  /** Games whose season is inactive: invites cannot be created for them (spec-028). */
+  viewOnlyGameIds?: string[];
   onInviteCreated: (invite: SchoolInviteItem) => void;
 }
 
@@ -30,11 +35,13 @@ export function GenerateInviteCard({
   schoolSlug,
   inviteGameId,
   setInviteGameId,
+  viewOnlyGameIds = [],
   onInviteCreated,
 }: GenerateInviteCardProps) {
+  const { confirmed } = useStaffActing();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [expiryDays, setExpiryDays] = useState(7);
+  const [expiryDays, setExpiryDays] = useState<number>(DEFAULT_INVITE_EXPIRY_DAYS);
   const [generatedInvite, setGeneratedInvite] = useState<{
     url: string;
     studentName: string;
@@ -54,7 +61,10 @@ export function GenerateInviteCard({
     }
   };
 
+  const isViewOnly = viewOnlyGameIds.includes(inviteGameId);
+
   const handleGenerateInvite = () => {
+    if (isViewOnly) return;
     if (!firstName.trim() || !lastName.trim()) {
       setGenerateError('Please enter student first and last name.');
       return;
@@ -65,13 +75,13 @@ export function GenerateInviteCard({
     }
 
     setGenerateError(null);
-    startGenerating(async () => {
+    confirmed(() => startGenerating(async () => {
       try {
         const result = await createPlayerInvite({
           schoolId,
           gameId: inviteGameId,
-          intendedFirstName: firstName.trim(),
-          intendedLastName: lastName.trim(),
+          intendedFirstName: capitalizeNameWords(firstName),
+          intendedLastName: capitalizeNameWords(lastName),
           expiresInDays: expiryDays,
         });
 
@@ -114,7 +124,7 @@ export function GenerateInviteCard({
       } catch (err: any) {
         setGenerateError(err.message || 'Failed to create invite link');
       }
-    });
+    }));
   };
 
   return (
@@ -149,6 +159,7 @@ export function GenerateInviteCard({
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
+              onBlur={(e) => setFirstName(capitalizeNameWords(e.target.value))}
               placeholder="Alex"
               className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
             />
@@ -161,6 +172,7 @@ export function GenerateInviteCard({
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
+              onBlur={(e) => setLastName(capitalizeNameWords(e.target.value))}
               placeholder="Chen"
               className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
             />
@@ -191,15 +203,23 @@ export function GenerateInviteCard({
             onChange={(e) => setExpiryDays(Number(e.target.value))}
             className="w-full px-3 py-2 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-[#f4cccc]"
           >
-            <option value={3}>3 Days</option>
-            <option value={7}>7 Days (Standard)</option>
-            <option value={14}>14 Days</option>
+            {INVITE_EXPIRY_DAYS.map((days) => (
+              <option key={days} value={days}>
+                {days} Days{days === DEFAULT_INVITE_EXPIRY_DAYS ? ' (Standard)' : ''}
+              </option>
+            ))}
           </select>
         </div>
 
+        {isViewOnly && (
+          <p role="status" className="text-xs text-amber-300">
+            This game&apos;s season is inactive and is view only, so new invites cannot be created.
+          </p>
+        )}
+
         <Button
           onPress={handleGenerateInvite}
-          isDisabled={isGenerating}
+          isDisabled={isGenerating || isViewOnly}
           className="w-full py-2.5 px-4 bg-[#f4cccc] hover:bg-[#e6b8b8] text-zinc-950 font-bold text-sm rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
         >
           {isGenerating ? (

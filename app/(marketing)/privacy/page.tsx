@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = 'September 2026';
+  const lastUpdated = 'November 2026';
 
   return (
     <main>
@@ -44,6 +44,20 @@ export default function PrivacyPage() {
                 <strong className="text-foreground">Contact and identification information:</strong> name,
                 school name, email address, phone number, Discord username, and role (e.g., student,
                 coach, administrator) submitted through application or contact forms.
+              </li>
+              <li>
+                <strong className="text-foreground">Discord sign-in:</strong> when a student player or
+                school manager connects Discord during onboarding, we use Discord sign-in to read your Discord user ID
+                and username and to add you to the official EZ Esports Discord server on your behalf.
+                We do not read your messages or other servers, and we do not store the access token
+                Discord gives us.
+              </li>
+              <li>
+                <strong className="text-foreground">School email and student ID:</strong> when a student
+                player or school manager completes onboarding, we collect the school email address
+                (ending in @nycstudents.net) you enter and a photo of your student ID, so staff can
+                confirm you are a current NYC student. The photo is kept in private storage and is used
+                only for that check.
               </li>
               <li>
                 <strong className="text-foreground">Staff application materials:</strong> if you apply
@@ -166,6 +180,8 @@ export default function PrivacyPage() {
               Resumes and other documents uploaded with a staff application are kept in private
               storage that is not publicly accessible. Only authorized EZ Esports staff and
               administrators can open them, through links that expire shortly after they are created.
+              Student ID photos are handled the same way, and are deleted when the related player
+              record is deleted.
             </p>
           </div>
 

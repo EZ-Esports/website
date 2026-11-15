@@ -1,33 +1,120 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { saveOnboardingDraft } from '@/app/lib/onboarding/wizard-actions';
+import { capitalizeNameWords } from '@/app/lib/onboarding/name-case';
 import { RIOT_ID_REGEX, deriveTrackerUrl } from '@/app/lib/onboarding/adapters/riot-manual';
+import {
+  calculateAge,
+  isMinorAge,
+  isPlausibleBirthDate,
+  isStudentAgeInRange,
+  STUDENT_AGE_RANGE_MESSAGE,
+  validateConsent,
+  type ConsentSubmission,
+} from '@/app/lib/onboarding/consent';
+import {
+  CONTENT_FIELDS,
+  CONTENT_FLAGGED_MESSAGE,
+  collectContentValues,
+  findFlaggedFields,
+  parseSavedOverrides,
+  type ContentFieldKey,
+} from '@/app/lib/onboarding/content-check';
+import { checkSchoolEmail } from '@/app/lib/onboarding/school-email';
+import { compressImage } from '@/app/lib/image-compression';
+import {
+  STUDENT_ID_REQUIRED_MESSAGE,
+  checkStudentIdFile,
+} from '@/app/lib/onboarding/student-id';
 import {
   DEFAULT_MANAGER_SEASON,
   GRADUATION_YEAR_OPTIONS,
   MANAGER_SEASON_OPTIONS,
+  type ContentFlagControls,
   type InviteData,
   type WizardFormData,
 } from '../types';
 
-export function useWizardDraft(token: string, inviteData: InviteData) {
+export function useWizardDraft(
+  token: string,
+  inviteData: InviteData,
+  options: {
+    initialError?: string | null;
+    discordVerified?: boolean;
+    /** Verified Discord username, screened like the typed fields. */
+    discordUsername?: string | null;
+  } = {}
+) {
   const initialDraft = inviteData.submissionDraft || {};
   const isManager = inviteData.role === 'manager';
 
   const [saveDraftPending, setSaveDraftPending] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(options.initialError ?? null);
 
   // Step 1: Account Information
   const [legalFirstName, setLegalFirstName] = useState(
-    initialDraft.legalFirstName || inviteData.intendedFirstName || ''
+    initialDraft.legalFirstName || capitalizeNameWords(inviteData.intendedFirstName) || ''
   );
   const [legalLastName, setLegalLastName] = useState(
-    initialDraft.legalLastName || inviteData.intendedLastName || ''
+    initialDraft.legalLastName || capitalizeNameWords(inviteData.intendedLastName) || ''
   );
   const [email, setEmail] = useState(initialDraft.email || '');
+  const [schoolEmail, setSchoolEmail] = useState<string>(
+    typeof initialDraft.schoolEmail === 'string' ? initialDraft.schoolEmail : ''
+  );
   const [password, setPassword] = useState(initialDraft.password || '');
+
+  // Student ID photo. The file is uploaded as soon as it is chosen and held by the server against this
+  // invite; the wizard only remembers that an upload exists (nothing about the file is drafted).
+  const [studentIdUploaded, setStudentIdUploaded] = useState<boolean>(inviteData.studentIdUploaded === true);
+  const [studentIdUploading, setStudentIdUploading] = useState(false);
+  const [studentIdError, setStudentIdError] = useState<string | null>(null);
+  const [studentIdLabel, setStudentIdLabel] = useState<string | null>(null);
+
+  async function uploadStudentId(file: File | null) {
+    setStudentIdError(null);
+    if (!file) {
+      setStudentIdError(STUDENT_ID_REQUIRED_MESSAGE);
+      return;
+    }
+    // Type and emptiness now; size after the browser has had a chance to shrink the photo.
+    const typeError = checkStudentIdFile({ size: Math.min(file.size, 1), type: file.type });
+    if (typeError || file.size === 0) {
+      setStudentIdError(typeError ?? 'That file is empty. Please choose a photo of your student ID.');
+      return;
+    }
+    // Oversized phone photos are shrunk in the browser first; the server still enforces its own limits.
+    // Falls back to the original if the browser never decodes the image, so the picker cannot hang.
+    const prepared = await Promise.race([
+      compressImage(file, { maxDimension: 2000, targetMimeType: 'image/jpeg', quality: 0.85 }),
+      new Promise<File>((resolve) => setTimeout(() => resolve(file), 8000)),
+    ]);
+    const problem = checkStudentIdFile(prepared);
+    if (problem) {
+      setStudentIdError(problem);
+      return;
+    }
+    setStudentIdUploading(true);
+    try {
+      const body = new FormData();
+      body.set('token', token);
+      body.set('file', prepared);
+      const res = await fetch('/api/onboarding/student-id', { method: 'POST', body });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setStudentIdError(json.error || 'Could not upload your photo. Please try again.');
+        return;
+      }
+      setStudentIdUploaded(true);
+      setStudentIdLabel(file.name);
+    } catch {
+      setStudentIdError('Could not upload your photo. Check your connection and try again.');
+    } finally {
+      setStudentIdUploading(false);
+    }
+  }
   // Drafts saved with a year that is no longer offered (e.g. 2026) start unset instead of blank-but-valid.
   const [graduationYear, setGraduationYear] = useState<number>(
     GRADUATION_YEAR_OPTIONS.some((o) => o.value === Number(initialDraft.graduationYear))
@@ -41,17 +128,18 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       : DEFAULT_MANAGER_SEASON
   );
 
-  // Step 2: Discord Connection
-  const [discordUsername, setDiscordUsername] = useState(
-    initialDraft.discordUsername || ''
-  );
-  const [discordJoinedConfirmed, setDiscordJoinedConfirmed] = useState<boolean>(
-    Boolean(
-      initialDraft.discordJoinedConfirmed ??
-        initialDraft.discordConnected ??
-        (initialDraft.discordUsername ? true : false)
-    )
-  );
+  // Manager only: "I also play in this league". The games are validated against the games table on submit.
+  const [alsoPlays, setAlsoPlays] = useState<boolean>(isManager && initialDraft.alsoPlays === true);
+  const [playGameIds, setPlayGameIds] = useState<string[]>(() => {
+    const known = new Set((inviteData.playableGames ?? []).map((g) => g.id));
+    return Array.isArray(initialDraft.playGameIds)
+      ? initialDraft.playGameIds.filter((id: unknown): id is string => typeof id === 'string' && known.has(id))
+      : [];
+  });
+
+  // Bumped on every failed attempt to leave step 1 without a game, so the group flags itself and takes focus again.
+  const [playGamesErrorTick, setPlayGamesErrorTick] = useState(0);
+  const flagPlayGamesError = () => setPlayGamesErrorTick((n) => n + 1);
 
   // Step 3: Riot Games Identity
   const [riotId, setRiotId] = useState(initialDraft.riotId || '');
@@ -59,85 +147,122 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     Boolean(initialDraft.ignConfirmed)
   );
 
-  // Step 4: Demographics & Research Survey
+  // Step 4: Date of birth (used for the guardian-authorization age check, never stored) and rules
   const [birthDate, setBirthDate] = useState(initialDraft.birthDate || '');
-  const [gender, setGender] = useState(initialDraft.gender || '');
-  const [selectedRaces, setSelectedRaces] = useState<string[]>(
-    Array.isArray(initialDraft.race) ? initialDraft.race : []
-  );
-  const [countryOfBirth, setCountryOfBirth] = useState(
-    initialDraft.countryOfBirth || ''
-  );
-  const [primaryLanguageAtHome, setPrimaryLanguageAtHome] = useState(
-    initialDraft.primaryLanguageAtHome || ''
-  );
-  const [isFreeOrReducedLunch, setIsFreeOrReducedLunch] = useState<boolean | undefined>(
-    initialDraft.isFreeOrReducedLunch
-  );
-  const [isFirstGenCollege, setIsFirstGenCollege] = useState<boolean | undefined>(
-    initialDraft.isFirstGenCollege
-  );
-  const [doePetitionConsent, setDoePetitionConsent] = useState<boolean>(
-    Boolean(initialDraft.doePetitionConsent ?? true)
-  );
-
-  // Tech & Gaming Survey
-  const [ping, setPing] = useState(initialDraft.surveyDetails?.ping || '');
-  const [hoursPerWeek, setHoursPerWeek] = useState(
-    initialDraft.surveyDetails?.hoursPerWeek || ''
-  );
-  const [internetReliability, setInternetReliability] = useState(
-    initialDraft.surveyDetails?.internetReliability || ''
-  );
-  const [careerInterests, setCareerInterests] = useState<string[]>(
-    Array.isArray(initialDraft.surveyDetails?.careerInterests)
-      ? initialDraft.surveyDetails.careerInterests
-      : []
-  );
-  const [feedback, setFeedback] = useState(
-    initialDraft.surveyDetails?.feedback || ''
-  );
 
   // Rules Acceptance
   const [codeOfConductAccepted, setCodeOfConductAccepted] = useState<boolean>(
     Boolean(initialDraft.codeOfConductAccepted)
   );
 
+  // Step 5: Terms of Service and (under 18) parent/guardian authorization.
+  // Deliberately not restored from drafts: guardian PII and the signature are only held in memory until submit.
+  const [tosAcknowledged, setTosAcknowledged] = useState(false);
+  const [participantNameEdit, setParticipantNameEdit] = useState<string | null>(null);
+  const [guardianFullName, setGuardianFullName] = useState('');
+  const [guardianRelationship, setGuardianRelationship] = useState('');
+  const [guardianEmail, setGuardianEmail] = useState('');
+  const [guardianSignature, setGuardianSignature] = useState('');
+
   // Computed state
+  const birthDateValue = birthDate ? new Date(birthDate) : null;
+  const age =
+    birthDateValue && isPlausibleBirthDate(birthDateValue) ? calculateAge(birthDateValue) : null;
+  const isMinor = age !== null && isMinorAge(age);
+  // Prefilled from the Step 1 legal name until the signer edits it.
+  const participantLegalName =
+    participantNameEdit ?? capitalizeNameWords(`${legalFirstName} ${legalLastName}`);
   const isRiotIdValid = RIOT_ID_REGEX.test(riotId.trim());
   const trackerUrl = isRiotIdValid
     ? deriveTrackerUrl(inviteData.gameSlug, riotId.trim())
     : null;
+
+  function buildConsent(): ConsentSubmission {
+    return {
+      tosAcknowledged,
+      // Normalized here too: a name edited right before Continue may not have blurred yet.
+      participantLegalName: capitalizeNameWords(participantLegalName),
+      guardianFullName: capitalizeNameWords(guardianFullName),
+      guardianRelationship,
+      guardianEmail,
+      guardianSignature,
+    };
+  }
+
+  // Offensive-content screen. An override is remembered together with the exact value it was given
+  // for, so editing a flagged field afterwards asks again instead of carrying the override over.
+  // The map is saved in the draft so it survives the Discord round trip; restored entries only count
+  // while the field still holds that exact value.
+  const [overrides, setOverrides] = useState<Partial<Record<ContentFieldKey, string>>>(() =>
+    parseSavedOverrides(initialDraft.contentOverrides)
+  );
+  // Guardian fields are hidden for adults, so stale text in them must not block anyone.
+  const consentForCheck = isMinor
+    ? buildConsent()
+    : { ...buildConsent(), guardianFullName: '', guardianRelationship: '', guardianSignature: '' };
+  const contentValues = collectContentValues(
+    {
+      legalFirstName,
+      legalLastName,
+      riotId,
+      consent: consentForCheck,
+    },
+    options.discordUsername
+  );
+  const contentKey = JSON.stringify(contentValues);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- contentKey is the serialized contentValues
+  const flaggedFields = useMemo(() => findFlaggedFields(contentValues), [contentKey]);
+
+  const contentFlags: ContentFlagControls = {
+    state(field) {
+      const hit = flaggedFields.find((f) => f.field === field);
+      return { flagged: Boolean(hit), overridden: Boolean(hit && overrides[field] === hit.value) };
+    },
+    setOverride(field, checked) {
+      const hit = flaggedFields.find((f) => f.field === field);
+      setOverrides((prev) => {
+        const next = { ...prev };
+        if (checked && hit) next[field] = hit.value;
+        else delete next[field];
+        return next;
+      });
+    },
+  };
+
+  /** Flagged fields on `step` that the person has not confirmed. */
+  function unresolvedFlags(step: number): ContentFieldKey[] {
+    return flaggedFields
+      .filter((f) => CONTENT_FIELDS[f.field].step === step && overrides[f.field] !== f.value)
+      .map((f) => f.field);
+  }
+
+  /** Fields to send as `contentOverrides`: flagged now and confirmed for exactly this value. */
+  function contentOverrideKeys(): ContentFieldKey[] {
+    return flaggedFields.filter((f) => overrides[f.field] === f.value).map((f) => f.field);
+  }
+
+  function blockedByContent(step: number): boolean {
+    if (unresolvedFlags(step).length === 0) return false;
+    setErrorMessage(CONTENT_FLAGGED_MESSAGE);
+    return true;
+  }
 
   function buildCurrentPayload(): WizardFormData {
     return {
       legalFirstName,
       legalLastName,
       email,
+      schoolEmail,
       password: isManager ? password : undefined,
       graduationYear,
       academicYear: isManager ? academicYear : undefined,
-      discordUsername,
-      discordJoinedConfirmed,
-      discordConnected: Boolean(discordUsername && discordJoinedConfirmed),
+      alsoPlays: isManager ? alsoPlays : undefined,
+      playGameIds: isManager && alsoPlays ? playGameIds : undefined,
       riotId,
       ignConfirmed,
       birthDate,
-      gender,
-      race: selectedRaces,
-      countryOfBirth,
-      primaryLanguageAtHome,
-      isFreeOrReducedLunch,
-      isFirstGenCollege,
-      doePetitionConsent,
-      surveyDetails: {
-        ping,
-        hoursPerWeek,
-        internetReliability,
-        careerInterests,
-        feedback,
-      },
       codeOfConductAccepted,
+      contentOverrides: overrides,
     };
   }
 
@@ -170,12 +295,29 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email.trim() && !email.includes('@')) {
+      setErrorMessage('Your email address must include an @ symbol.');
+      return false;
+    }
     if (!email.trim() || !emailRegex.test(email.trim())) {
       setErrorMessage(
         isManager
           ? 'Please enter a valid email address.'
           : 'Please enter a valid student email address.'
       );
+      return false;
+    }
+    const schoolEmailProblem = checkSchoolEmail(schoolEmail, email);
+    if (schoolEmailProblem) {
+      setErrorMessage(schoolEmailProblem);
+      return false;
+    }
+    if (studentIdUploading) {
+      setErrorMessage('Please wait for your student ID photo to finish uploading.');
+      return false;
+    }
+    if (!studentIdUploaded) {
+      setErrorMessage(STUDENT_ID_REQUIRED_MESSAGE);
       return false;
     }
     if (isManager && (!password || password.length < 8)) {
@@ -192,21 +334,23 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       setErrorMessage('Please select the season you are applying for.');
       return false;
     }
+    if (isManager && alsoPlays && playGameIds.length === 0) {
+      setErrorMessage('Please choose at least one game you will play.');
+      flagPlayGamesError();
+      return false;
+    }
+    if (blockedByContent(1)) return false;
     return true;
   }
 
   function validateStep2(): boolean {
     setErrorMessage(null);
-    if (!discordUsername.trim()) {
-      setErrorMessage('Please enter your Discord handle or username.');
+    // The verified state is read from the signed cookie on the server; the client only mirrors it.
+    if (!options.discordVerified) {
+      setErrorMessage('Please connect your Discord account to continue.');
       return false;
     }
-    if (!discordJoinedConfirmed) {
-      setErrorMessage(
-        'Please confirm that you have joined the official EZ Esports Discord server.'
-      );
-      return false;
-    }
+    if (blockedByContent(2)) return false;
     return true;
   }
 
@@ -228,6 +372,7 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       );
       return false;
     }
+    if (blockedByContent(3)) return false;
     return true;
   }
 
@@ -237,12 +382,40 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
       setErrorMessage('Please provide your date of birth.');
       return false;
     }
+    if (!isPlausibleBirthDate(new Date(birthDate))) {
+      setErrorMessage('Please enter a valid date of birth (4-digit year).');
+      return false;
+    }
+    if ((!isManager || alsoPlays) && !isStudentAgeInRange(calculateAge(new Date(birthDate)))) {
+      setErrorMessage(STUDENT_AGE_RANGE_MESSAGE);
+      return false;
+    }
     if (!codeOfConductAccepted) {
       setErrorMessage(
         'You must accept the EZ Esports Code of Conduct and Tournament Rules.'
       );
       return false;
     }
+    if (blockedByContent(4)) return false;
+    return true;
+  }
+
+  function validateStep5(): boolean {
+    setErrorMessage(null);
+    if (age === null) {
+      setErrorMessage('Please go back and provide your date of birth.');
+      return false;
+    }
+    try {
+      validateConsent(buildConsent(), {
+        age,
+        fallbackParticipantName: participantLegalName,
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message);
+      return false;
+    }
+    if (blockedByContent(5)) return false;
     return true;
   }
 
@@ -254,48 +427,48 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     setLegalLastName,
     email,
     setEmail,
+    schoolEmail,
+    setSchoolEmail,
+    studentIdUploaded,
+    studentIdUploading,
+    studentIdError,
+    studentIdLabel,
+    uploadStudentId,
     password,
     setPassword,
     graduationYear,
     setGraduationYear,
     academicYear,
     setAcademicYear,
-    discordUsername,
-    setDiscordUsername,
-    discordJoinedConfirmed,
-    setDiscordJoinedConfirmed,
+    alsoPlays,
+    setAlsoPlays,
+    playGameIds,
+    setPlayGameIds,
+    playGamesErrorTick,
+    flagPlayGamesError,
     riotId,
     setRiotId,
     ignConfirmed,
     setIgnConfirmed,
     birthDate,
     setBirthDate,
-    gender,
-    setGender,
-    selectedRaces,
-    setSelectedRaces,
-    countryOfBirth,
-    setCountryOfBirth,
-    primaryLanguageAtHome,
-    setPrimaryLanguageAtHome,
-    isFreeOrReducedLunch,
-    setIsFreeOrReducedLunch,
-    isFirstGenCollege,
-    setIsFirstGenCollege,
-    doePetitionConsent,
-    setDoePetitionConsent,
-    ping,
-    setPing,
-    hoursPerWeek,
-    setHoursPerWeek,
-    internetReliability,
-    setInternetReliability,
-    careerInterests,
-    setCareerInterests,
-    feedback,
-    setFeedback,
     codeOfConductAccepted,
     setCodeOfConductAccepted,
+
+    tosAcknowledged,
+    setTosAcknowledged,
+    participantLegalName,
+    setParticipantLegalName: setParticipantNameEdit,
+    guardianFullName,
+    setGuardianFullName,
+    guardianRelationship,
+    setGuardianRelationship,
+    guardianEmail,
+    setGuardianEmail,
+    guardianSignature,
+    setGuardianSignature,
+    age,
+    isMinor,
 
     // Status
     saveDraftPending,
@@ -306,12 +479,18 @@ export function useWizardDraft(token: string, inviteData: InviteData) {
     trackerUrl,
     isManager,
 
+    // Offensive-content screen
+    contentFlags,
+    contentOverrideKeys,
+
     // Actions
     buildCurrentPayload,
+    buildConsent,
     handleSaveDraft,
     validateStep1,
     validateStep2,
     validateStep3,
     validateStep4,
+    validateStep5,
   };
 }

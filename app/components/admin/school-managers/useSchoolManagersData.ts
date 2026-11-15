@@ -6,15 +6,19 @@ import {
   getSchoolManagerInvites,
   getRegisteredManagers,
   removeSchoolManager,
+  updateSchoolManagerAccess,
   revokeManagerInvite,
   type RegisteredManagerAccount,
 } from '@/app/(admin)/admin/schools/manager-actions';
+import { getManagerContentFlags } from '@/app/(admin)/admin/schools/content-flag-actions';
+import type { ContentFlagView } from '@/app/lib/db/content-flags';
 import type { ManagerItem, ManagerInviteItem } from './types';
 
 export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
   const [managers, setManagers] = useState<ManagerItem[]>([]);
   const [invites, setInvites] = useState<ManagerInviteItem[]>([]);
   const [registeredManagers, setRegisteredManagers] = useState<RegisteredManagerAccount[]>([]);
+  const [contentFlags, setContentFlags] = useState<Record<string, ContentFlagView[]>>({});
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isRemovingId, setIsRemovingId] = useState<string | null>(null);
@@ -33,6 +37,13 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
       setManagers(mgrs);
       setInvites(invs);
       setRegisteredManagers(regMgrs);
+      // Badges are optional extras: a failure here must never hide the managers themselves.
+      try {
+        const memberIds = mgrs.map((m: ManagerItem) => m.memberId).filter((id: string | null | undefined): id is string => Boolean(id));
+        setContentFlags(memberIds.length > 0 ? await getManagerContentFlags(memberIds) : {});
+      } catch {
+        setContentFlags({});
+      }
     } catch (err: any) {
       setFetchError(err.message || 'Failed to load school manager records.');
     } finally {
@@ -46,10 +57,8 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     }
   }, [isOpen, loadData]);
 
-  const handleRemoveManager = async (managerId: string, managerName: string) => {
-    if (!confirm(`Are you sure you want to remove manager access for ${managerName}?`)) {
-      return { success: false };
-    }
+  // Callers confirm first (ConfirmActionDialog); these run the action unconditionally.
+  const handleRemoveManager = async (managerId: string) => {
     setIsRemovingId(managerId);
     try {
       const res = await removeSchoolManager({ managerId });
@@ -65,10 +74,18 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     }
   };
 
-  const handleRevokeInvite = async (inviteId: string, name: string) => {
-    if (!confirm(`Are you sure you want to revoke the invite for ${name}?`)) {
-      return { success: false };
+  const handleUpdateManager = async (managerId: string, managedGames: string[] | null, isPrimaryContact: boolean) => {
+    try {
+      const res = await updateSchoolManagerAccess({ managerId, managedGames, isPrimaryContact });
+      if (!res.success) return { success: false, error: res.error || 'Failed to update manager.' };
+      await loadData();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update manager.' };
     }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
     setIsRevokingId(inviteId);
     try {
       const res = await revokeManagerInvite(inviteId);
@@ -86,6 +103,7 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
 
   return {
     managers,
+    contentFlags,
     invites,
     registeredManagers,
     loading,
@@ -95,6 +113,7 @@ export function useSchoolManagersData(schoolId: string, isOpen: boolean) {
     isRemovingId,
     isRevokingId,
     handleRemoveManager,
+    handleUpdateManager,
     handleRevokeInvite,
   };
 }

@@ -10,7 +10,8 @@ const connectionString = process.env.DATABASE_URL || '';
 // instances don't hold pooler slots open between requests.
 const client = postgres(connectionString, {
   prepare: false,
-  max: 10,
+  // Production keeps 10; the local PGlite server (db/local) sets DATABASE_POOL_MAX=1 because PGlite is a single connection.
+  max: Number(process.env.DATABASE_POOL_MAX) || 10,
   idle_timeout: 20,
 });
 

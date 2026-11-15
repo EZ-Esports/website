@@ -39,6 +39,8 @@ export interface SchoolDetailData {
 interface SchoolSnapshotsClientProps {
   school: SchoolDetailData;
   gameDisplayName: string;
+  /** Seasons whose outcomes are hidden; their records read "0-0" instead of the redacted "Unpublished". */
+  hiddenSeasonIds: string[];
 }
 
 /** Division sort helper: Varsity on top (1), Junior Varsity on bottom (100) */
@@ -52,7 +54,8 @@ export function sortRostersByDivision<T extends { name: string }>(rosters: T[]):
   return [...rosters].sort((a, b) => getRank(a.name) - getRank(b.name));
 }
 
-export default function SchoolSnapshotsClient({ school, gameDisplayName }: SchoolSnapshotsClientProps) {
+export default function SchoolSnapshotsClient({ school, gameDisplayName, hiddenSeasonIds }: SchoolSnapshotsClientProps) {
+  const hiddenSeasons = useMemo(() => new Set(hiddenSeasonIds), [hiddenSeasonIds]);
   // Determine default season: Active season if flagged, otherwise the first (most recent) season
   const defaultSeasonName = useMemo(() => {
     const active = school.seasons.find((s) => s.isSeasonActive);
@@ -209,13 +212,20 @@ export default function SchoolSnapshotsClient({ school, gameDisplayName }: Schoo
 
                 {/* Division Rosters (Varsity on top, Junior Varsity on bottom) */}
                 <div className="space-y-8">
+                  {sortedRosters.length === 0 && (
+                    <p className="text-xs text-foreground-muted italic pl-2">
+                      No rosters have been registered for this season yet.
+                    </p>
+                  )}
                   {sortedRosters.map((roster) => (
                     <div key={roster.id} className="space-y-4">
                       <div className="flex items-center justify-between border-b border-line/30 pb-2">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-foreground-secondary flex items-center gap-2">
                           <span>{roster.name === 'JV' ? 'Junior Varsity' : roster.name} Division</span>
                         </h3>
-                        <Badge size="sm" variant="neutral">Record: {roster.record}</Badge>
+                        <Badge size="sm" variant="neutral">
+                          Record: {hiddenSeasons.has(season.seasonId) ? '0-0' : roster.record}
+                        </Badge>
                       </div>
 
                       {roster.players.length === 0 ? (

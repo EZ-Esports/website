@@ -258,6 +258,28 @@ export default function RulesPage() {
                 occurring either on campus or within league competition.
               </p>
             </div>
+
+            <div id="submitted-information" className="space-y-3 scroll-mt-24">
+              <h3 className="text-lg font-bold text-foreground">3.4 Names, Usernames &amp; Submitted Information</h3>
+              <p>
+                Offensive, vulgar, hateful, or otherwise inappropriate content is prohibited in any name, username, in-game name, Riot ID,
+                Discord handle, or other information submitted to EZ Esports, including during onboarding, in any language and however it is
+                disguised (for example with substituted characters or spacing).
+              </p>
+              <ul className="list-disc pl-6 space-y-1.5 text-sm">
+                <li>
+                  Onboarding forms warn about entries that look offensive. A participant whose real information trips the warning may confirm it
+                  is genuine, and EZ Esports staff will review every confirmed entry.
+                </li>
+                <li>
+                  EZ Esports may change, hide, or reject any entry, and may require a participant to supply a different name or username, at
+                  staff&apos;s discretion. Confirming an entry does not guarantee it will be accepted.
+                </li>
+                <li>
+                  Knowingly submitting offensive information is a Section 3.2 violation and is handled under Section 5.
+                </li>
+              </ul>
+            </div>
           </section>
 
           {/* Section 4: Match Operations & Scheduling */}
@@ -301,17 +323,28 @@ export default function RulesPage() {
             <div className="space-y-3">
               <h3 className="text-lg font-bold text-foreground">4.3 Rescheduling Protocol</h3>
               <p>
-                Matches may only be rescheduled due to school-sanctioned events, campus closures, exam conflicts, or documented emergencies:
+                Reschedules are requested through the school manager portal and must be agreed to by both teams:
               </p>
               <ul className="list-disc pl-6 space-y-1.5 text-sm">
                 <li>
-                  Both team captains and/or faculty advisors must agree upon a proposed new match time in writing.
+                  <strong className="text-foreground">Proposal:</strong> The requesting team proposes at least two different dates and times,
+                  no two within one hour of each other. The opposing team must accept one of them.
                 </li>
                 <li>
-                  Reschedule requests must be submitted to League Operations via the designated portal at least 48 hours prior to the original match time.
+                  <strong className="text-foreground">On-Time Request (72+ hours):</strong> Requests must be submitted at least 72 hours before
+                  the scheduled start time. If a match rescheduled on time is still not played, the requesting team forfeits.
                 </li>
                 <li>
-                  All rescheduled matches must be completed before the subsequent week&apos;s round of regular season competition commences.
+                  <strong className="text-foreground">Late Request (under 72 hours):</strong> The opposing team may accept or decline at their
+                  discretion.
+                </li>
+                <li>
+                  <strong className="text-foreground">Final Once Agreed:</strong> Once both sides have agreed to reschedule, neither side may
+                  revert to the original date. A match cannot be rescheduled if both teams have already agreed to the original date.
+                </li>
+                <li>
+                  <strong className="text-foreground">Deadline:</strong> Rescheduled matches must be completed before the end of the regular
+                  season. Failure to report a score by the deadline results in a double forfeit.
                 </li>
               </ul>
             </div>

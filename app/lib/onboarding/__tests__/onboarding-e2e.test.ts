@@ -29,7 +29,6 @@ const mocks = vi.hoisted(() => {
     playerInvitesStore: [] as any[],
     managerInvitesStore: [] as any[],
     playerIdentitiesStore: [] as any[],
-    studentDemographicsStore: [] as any[],
     staffMembersStore: [] as any[],
     staffAuditLogsStore: [] as any[],
     rolesStore: [] as any[],
@@ -139,18 +138,18 @@ const mocks = vi.hoisted(() => {
         if (currentTable === schema.seasons) {
           return state.seasonsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
-        if (currentTable === schema.teams) {
+        if (currentTable === schema.seasonSchools) {
           return state.teamsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
         if (currentTable === schema.rosters) {
-          if (joins.length > 0 && joins[0].table === schema.teams) {
+          if (joins.length > 0 && joins[0].table === schema.seasonSchools) {
             const matchingRosters = state.rostersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
             return matchingRosters.map((r) => {
-              const team = state.teamsStore.find((t) => t.id === r.teamId);
-              return {
-                roster: r,
-                team,
-              };
+              // Membership is matched by the roster's own school, game and season (spec-060).
+              const team = state.teamsStore.find(
+                (t) => t.schoolId === r.schoolId && t.gameId === r.gameId && t.seasonId === r.seasonId,
+              );
+              return { roster: r, memberId: team?.id, team };
             });
           }
           return state.rostersStore.filter((r) => conds.every((c) => matchesRow(r, c)));
@@ -172,9 +171,6 @@ const mocks = vi.hoisted(() => {
         }
         if (currentTable === schema.playerIdentities) {
           return state.playerIdentitiesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
-        }
-        if (currentTable === schema.studentDemographics) {
-          return state.studentDemographicsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
         }
 
         if (currentTable === schema.schoolManagers) {
@@ -278,10 +274,6 @@ const mocks = vi.hoisted(() => {
           state.playerIdentitiesStore.push(record);
           return [record];
         }
-        if (tbl === schema.studentDemographics) {
-          state.studentDemographicsStore.push(record);
-          return [record];
-        }
         if (tbl === schema.players) {
           state.playersStore.push(record);
           return [record];
@@ -338,6 +330,8 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
 
+    // Advisory lock taken by roster enrollment; nothing to serialize in memory.
+    execute: vi.fn(async () => []),
     transaction: vi.fn(async (callback: (tx: any) => Promise<any>) => {
       return callback(mockDb);
     }),
@@ -359,6 +353,43 @@ const mocks = vi.hoisted(() => {
 });
 
 // Mock modules
+// Discord identity normally comes from the signed OAuth cookie (needs a request context).
+// Default: every invite token has a verified Discord account; `override` replaces it per test.
+const discordSession = vi.hoisted(() => ({ override: undefined as any }));
+vi.mock('@/app/lib/onboarding/discord-session', () => ({
+  readVerifiedDiscord: async (token: string) => {
+    if (discordSession.override !== undefined) return discordSession.override;
+    const { createHash } = await import('node:crypto');
+    return {
+      discordUserId: '123456789012345678',
+      discordUsername: 'alexchen',
+      inGuild: true,
+      inviteHash: createHash('sha256').update(token.trim()).digest('hex'),
+    };
+  },
+}));
+
+// Student ID photo (spec-056): the upload is held server-side against the invite. These tests exercise
+// the pipeline's decisions, so the persistence layer and Storage are stand-ins.
+const studentId = vi.hoisted(() => ({
+  pending: true,
+  linked: [] as Array<{ kind: string; inviteId: string; memberId: string }>,
+  replacedKey: null as string | null,
+  swept: 0,
+}));
+vi.mock('@/app/lib/db/student-ids', () => ({
+  findPendingUpload: async () => (studentId.pending ? { id: 'up1', storageKey: 'k.jpg', contentType: 'image/jpeg', sizeBytes: 10 } : null),
+  listMembersWithStudentId: async () => new Set<string>(),
+  linkUploadToMember: async (_tx: unknown, kind: string, inviteId: string, memberId: string) => {
+    if (!studentId.pending) return null;
+    studentId.linked.push({ kind, inviteId, memberId });
+    return { linkedKey: 'k.jpg', replacedKey: studentId.replacedKey };
+  },
+}));
+vi.mock('@/app/lib/onboarding/student-id-sweep', () => ({
+  sweepOrphanStudentIds: async () => { studentId.swept += 1; return 0; },
+}));
+
 vi.mock('@/app/lib/auth', () => ({
   requirePermission: mocks.mockRequirePermission,
 }));
@@ -424,11 +455,19 @@ import {
   createPlayerInvite,
   getPendingSubmissions,
   reviewPlayerInvite,
+  enrollPlayerToRoster,
 } from '@/app/lib/onboarding/portal-actions';
 import {
   getSchoolManagerContext,
   assertManagerForSchool,
 } from '@/app/lib/onboarding/manager-auth';
+
+/** Success-path wrapper: expected rejections come back as `{success:false}`; surface them as errors here. */
+async function submitOk(params: Parameters<typeof submitPlayerOnboarding>[0]) {
+  const result = await submitPlayerOnboarding(params);
+  if (!result.success) throw new Error(result.error);
+  return result;
+}
 
 describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
   const staffSuperAdmin = {
@@ -468,7 +507,9 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
 
   const stuyRoster = {
     id: 'roster-stuy-varsity-uuid',
-    teamId: stuyTeam.id,
+    schoolId: stuyTeam.schoolId,
+    gameId: stuyTeam.gameId,
+    seasonId: stuyTeam.seasonId,
     name: 'Varsity',
   };
 
@@ -496,7 +537,6 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
     mocks.state.playerInvitesStore = [];
     mocks.state.managerInvitesStore = [];
     mocks.state.playerIdentitiesStore = [];
-    mocks.state.studentDemographicsStore = [];
     mocks.state.staffMembersStore = [
       {
         userId: staffSuperAdmin.id,
@@ -587,19 +627,19 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       }
 
       // Step 3: Manager completes onboarding wizard with portal password
-      const subRes = await submitPlayerOnboarding({
+      const subRes = await submitOk({
         token,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'Alex',
           legalLastName: 'Chen',
           email: 'alex.chen@stuy.edu',
           password: 'SecretManagerPassword123!',
           graduationYear: 2026,
           riotId: 'DemonAlex#NA1',
-          discordUsername: 'DemonAlex#1234',
-          inGuild: true,
           birthDate: new Date('1990-05-15'),
           codeOfConductAccepted: true,
+          consent: { tosAcknowledged: true },
         },
       });
 
@@ -629,7 +669,9 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
         (i) => i.memberId === createdMember?.id && i.provider === 'discord'
       );
       expect(discordId).toBeDefined();
-      expect(discordId?.providerUsername).toBe('DemonAlex#1234');
+      // The verified OAuth username, never a typed handle.
+      expect(discordId?.providerUsername).toBe('alexchen');
+      expect(discordId?.inGuild).toBe(true);
 
       const riotId = mocks.state.playerIdentitiesStore.find(
         (i) => i.memberId === createdMember?.id && i.provider === 'riot'
@@ -712,18 +754,18 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       }
 
       // Step 4: Player submits onboarding
-      const submitPlayerRes = await submitPlayerOnboarding({
+      const submitPlayerRes = await submitOk({
         token: playerToken,
         submission: {
+          schoolEmail: 'student.school@nycstudents.net',
           legalFirstName: 'David',
           legalLastName: 'Kim',
           email: 'david.kim@nycstudents.net',
-          graduationYear: 2026,
+          graduationYear: 2027,
           riotId: 'DavidK#NA1',
-          discordUsername: 'DavidK#9999',
-          inGuild: true,
-          birthDate: new Date('2008-03-21'),
+          birthDate: new Date(Date.UTC(new Date().getUTCFullYear() - 19, 0, 1)), // always age 19
           codeOfConductAccepted: true,
+          consent: { tosAcknowledged: true },
         },
       });
 
@@ -740,18 +782,20 @@ describe('Hexagonal Architecture & E2E Onboarding Integration Flow', () => {
       expect(targetSubmission?.intendedFirstName).toBe('David');
       expect(targetSubmission?.status).toBe('submitted');
 
-      // Step 6: Manager approves submission and assigns to Varsity Roster
+      // Step 6: Manager approves the submission (accepts the student; no roster is chosen)
       const approveRes = await reviewPlayerInvite({
         inviteId: playerInviteRes.inviteId!,
         action: 'approve',
-        rosterId: stuyRoster.id,
       });
 
       expect(approveRes.success).toBe(true);
-
-      // Step 7: Verify student is on the official roster in players table
       const studentMember = mocks.state.membersStore.find((m) => m.email === 'david.kim@nycstudents.net');
       expect(studentMember).toBeDefined();
+      expect(mocks.state.playersStore.some((p) => p.memberId === studentMember?.id)).toBe(false);
+
+      // Step 7: Manager enrolls the accepted student onto the Varsity roster
+      const enrollRes = await enrollPlayerToRoster({ rosterId: stuyRoster.id, memberId: studentMember!.id });
+      expect(enrollRes.success).toBe(true);
 
       const rosterPlayer = mocks.state.playersStore.find(
         (p) => p.rosterId === stuyRoster.id && p.memberId === studentMember?.id

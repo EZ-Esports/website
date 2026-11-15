@@ -3,40 +3,25 @@
 import React from 'react';
 import { Button } from 'react-aria-components';
 import { HiOutlineUsers } from 'react-icons/hi2';
-import type {
-  PendingSubmission,
-  SchoolRosterDetails,
-} from '@/app/lib/onboarding/portal-actions';
+import type { PendingSubmission } from '@/app/lib/onboarding/portal-actions';
 
 interface PendingApprovalsCardProps {
   submissions: PendingSubmission[];
-  rosters: SchoolRosterDetails[];
   approvingId: string | null;
   rejectingId: string | null;
   approvalFeedback: string | null;
-  selectedRosterMap: Record<string, string>;
-  setSelectedRosterMap: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  selectedRoleMap: Record<string, 'player' | 'sub' | 'captain'>;
-  setSelectedRoleMap: React.Dispatch<
-    React.SetStateAction<Record<string, 'player' | 'sub' | 'captain'>>
-  >;
-  /** Games whose rosters are locked: approving enrolls onto a roster, so it is disabled. */
-  lockedGameIds?: string[];
+  /** Games whose season is inactive: approving and rejecting are both disabled (spec-028). */
+  viewOnlyGameIds?: string[];
   onApprove: (inviteId: string) => void;
   onReject: (inviteId: string) => void;
 }
 
 export function PendingApprovalsCard({
   submissions,
-  rosters,
   approvingId,
   rejectingId,
   approvalFeedback,
-  selectedRosterMap,
-  setSelectedRosterMap,
-  selectedRoleMap,
-  setSelectedRoleMap,
-  lockedGameIds = [],
+  viewOnlyGameIds = [],
   onApprove,
   onReject,
 }: PendingApprovalsCardProps) {
@@ -49,7 +34,7 @@ export function PendingApprovalsCard({
             {submissions.length}
           </span>
         </div>
-        <span className="text-xs text-zinc-500">Verified Onboarding Submissions</span>
+        <span className="text-xs text-zinc-500">Approve to accept, then Enroll on a roster</span>
       </div>
 
       {approvalFeedback && (
@@ -67,17 +52,17 @@ export function PendingApprovalsCard({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        // Capped height so a long queue scrolls in place instead of stretching the page.
+        <div className="max-h-[32rem] space-y-2.5 overflow-y-auto pr-1">
           {submissions.map((sub) => {
-            const gameRosters = rosters.filter((r) => r.gameId === sub.gameId);
             const isApproving = approvingId === sub.id;
             const isRejecting = rejectingId === sub.id;
-            const isLocked = !!sub.gameId && lockedGameIds.includes(sub.gameId);
+            const isViewOnly = !!sub.gameId && viewOnlyGameIds.includes(sub.gameId);
 
             return (
               <div
                 key={sub.id}
-                className="p-4 sm:p-5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-colors space-y-3.5"
+                className="p-3 sm:p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-colors space-y-2.5"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800/60">
                   <div>
@@ -99,13 +84,13 @@ export function PendingApprovalsCard({
 
                 {/* Verified Details Badges (Zero-PII: IGN + Discord only) */}
                 <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 text-xs">
-                  <div className="min-w-0 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
-                    <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">
+                  <div className="min-w-0 px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                    <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block">
                       In-Game ID (Riot)
                     </span>
                     <span className="font-mono font-semibold text-zinc-200 break-all">{sub.ign}</span>
                   </div>
-                  <div className="min-w-0 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                  <div className="min-w-0 px-2.5 py-2 rounded-lg bg-zinc-950 border border-zinc-800/80">
                     <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider block mb-0.5">
                       Discord Handle
                     </span>
@@ -113,88 +98,26 @@ export function PendingApprovalsCard({
                   </div>
                 </div>
 
-                {/* Actions: Assign Roster + Role + Approve / Reject */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-3">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="text-xs text-zinc-400 shrink-0">Roster:</span>
-                      <select
-                        value={
-                          selectedRosterMap[sub.id] !== undefined
-                            ? selectedRosterMap[sub.id]
-                            : (gameRosters[0]?.id || '')
-                        }
-                        onChange={(e) =>
-                          setSelectedRosterMap((prev) => ({
-                            ...prev,
-                            [sub.id]: e.target.value,
-                          }))
-                        }
-                        className="min-w-0 max-w-full min-h-[44px] sm:min-h-0 px-2.5 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
-                      >
-                        {gameRosters.length > 0 && (
-                          <optgroup label={`${sub.gameName} Rosters`}>
-                            {gameRosters.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name} ({r.division})
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {rosters.filter((r) => r.gameId !== sub.gameId).length > 0 && (
-                          <optgroup label="Other Rosters">
-                            {rosters
-                              .filter((r) => r.gameId !== sub.gameId)
-                              .map((r) => (
-                                <option key={r.id} value={r.id}>
-                                  {r.gameName} &bull; {r.name} ({r.division})
-                                </option>
-                              ))}
-                          </optgroup>
-                        )}
-                        <option value="">None (School Pool only)</option>
-                      </select>
-                    </div>
-
-                    {(selectedRosterMap[sub.id] || (selectedRosterMap[sub.id] === undefined && gameRosters[0]?.id)) && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-zinc-400 shrink-0">Role:</span>
-                        <select
-                          value={selectedRoleMap[sub.id] || 'player'}
-                          onChange={(e) =>
-                            setSelectedRoleMap((prev) => ({
-                              ...prev,
-                              [sub.id]: e.target.value as 'player' | 'sub' | 'captain',
-                            }))
-                          }
-                          className="min-h-[44px] sm:min-h-0 px-2 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded text-white focus:outline-none"
-                        >
-                          <option value="player">Starter</option>
-                          <option value="sub">Substitute</option>
-                          <option value="captain">Captain</option>
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
+                {/* Actions: Approve only accepts the student; rostering happens through each roster's Enroll. */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-1">
                   <div className="flex shrink-0 flex-wrap items-center gap-2 self-end sm:self-auto">
                     <Button
                       onPress={() => onReject(sub.id)}
-                      isDisabled={isRejecting || isApproving}
+                      isDisabled={isRejecting || isApproving || isViewOnly}
                       className="min-h-[44px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                     >
                       Reject
                     </Button>
                     <Button
                       onPress={() => onApprove(sub.id)}
-                      isDisabled={isApproving || isRejecting || isLocked}
+                      isDisabled={isApproving || isRejecting || isViewOnly}
                       className="min-h-[44px] sm:min-h-0 px-3.5 py-1.5 text-xs font-bold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
                     >
-                      {isApproving ? 'Approving...' : 'Approve & Enroll'}
+                      {isApproving ? 'Approving...' : 'Approve'}
                     </Button>
-                    {isLocked && (
+                    {isViewOnly && (
                       <p className="basis-full text-right text-[11px] text-amber-300">
-                        Rosters are locked, so players cannot be approved onto them right now.
+                        This season is inactive and is view only, so applications cannot be approved or rejected.
                       </p>
                     )}
                   </div>

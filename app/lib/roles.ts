@@ -11,8 +11,19 @@ export const Permissions = {
   MANAGE_APPLICATIONS: BigInt(1) << BigInt(9), // View and accept school and staff applications
   MANAGE_SCHOOLS: BigInt(1) << BigInt(10),     // Manage registered schools
   MANAGE_CONTENT: BigInt(1) << BigInt(11),     // Edit public page CMS text blocks
-  VIEW_STUDENT_DEMOGRAPHICS: BigInt(1) << BigInt(12), // Dedicated gate for minor student demographic & equity PII
 } as const;
+
+/**
+ * Permission bits that no longer mean anything. Bit 12 was VIEW_STUDENT_DEMOGRAPHICS, retired when
+ * the demographics survey was removed (spec-051). It must never be reused or renumbered because
+ * stored role bitmasks may still carry it, so it is reserved here instead of being deleted.
+ */
+export const RETIRED_PERMISSION_BITS = BigInt(1) << BigInt(12);
+
+/** A permission mask without the retired bits; the only form that may be compared, granted or shown. */
+export function withoutRetiredPermissionBits(permissions: bigint): bigint {
+  return permissions & ~RETIRED_PERMISSION_BITS;
+}
 
 /**
  * Checks whether user permissions satisfy a required permission.
@@ -142,7 +153,9 @@ export function nextRolePosition(args: {
 /**
  * Prevents privilege escalation:
  * - Owners can grant any permissions.
- * - Non-owners cannot grant VIEW_STUDENT_DEMOGRAPHICS (strictly Superadmin-only).
+ * - Retired bits (see RETIRED_PERMISSION_BITS) are ignored on the target: a role that still carries
+ *   one from before it was retired must stay assignable, because the bit grants nothing and the
+ *   actor can never possess it to satisfy the subset rule below.
  * - Non-owners can only grant permissions they currently possess (targetPermissions must be a subset of actorPermissions).
  */
 export function canGrantPermissions(
@@ -151,12 +164,8 @@ export function canGrantPermissions(
   targetPermissions: bigint
 ): boolean {
   if (actorIsOwner) return true;
-  // VIEW_STUDENT_DEMOGRAPHICS is strictly restricted to Superadmins (Owners)
-  if ((targetPermissions & Permissions.VIEW_STUDENT_DEMOGRAPHICS) !== BigInt(0)) {
-    return false;
-  }
   // targetPermissions & ~actorPermissions evaluates to all bits set in target but not in actor
-  return (targetPermissions & ~actorPermissions) === BigInt(0);
+  return (withoutRetiredPermissionBits(targetPermissions) & ~actorPermissions) === BigInt(0);
 }
 
 /**

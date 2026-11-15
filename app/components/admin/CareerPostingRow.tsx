@@ -113,7 +113,7 @@ export default function CareerPostingRow({
 
           {showConfirmDelete ? (
             <div role="group" aria-label="Confirm delete" className="admin-fade-in inline-flex h-8 items-center gap-1 rounded-lg bg-danger/10 pl-2.5 pr-1">
-              <span className="text-xs font-medium text-danger-on-tint">Delete?</span>
+              <span className="text-xs font-medium text-danger-on-tint">Delete this opening? It is hidden from the site and cannot be restored from the admin.</span>
               <button type="button" onClick={handleDelete} disabled={isDeleting} aria-busy={isDeleting} className={adminButton('danger', 'xs')}>
                 Yes
               </button>

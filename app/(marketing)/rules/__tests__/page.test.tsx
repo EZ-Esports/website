@@ -6,6 +6,17 @@ import RulesPage, { metadata } from '../page';
 import { FOOTER_LINKS, ROUTES } from '@/app/lib/constants';
 import sitemap from '@/app/sitemap';
 
+describe('Rule 3.4 (names, usernames and submitted information)', () => {
+  const html = renderToStaticMarkup(RulesPage());
+
+  it('prohibits offensive submitted information and says entries may be changed or rejected', () => {
+    expect(html).toContain('3.4 Names, Usernames &amp; Submitted Information');
+    expect(html).toContain('id="submitted-information"');
+    expect(html).toMatch(/Offensive, vulgar, hateful/);
+    expect(html).toMatch(/change, hide, or reject any entry/);
+  });
+});
+
 describe('League Rules Page (/rules)', () => {
   it('exports valid metadata for SEO and social sharing', () => {
     expect(metadata.title).toBe('League Rulebook & Code of Conduct | EZ Esports');

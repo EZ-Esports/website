@@ -9,6 +9,7 @@ import {
   standingsTeamLabel,
 } from '@/app/lib/db/match-page';
 import { buildFormGuide, type FormEntry } from '@/app/lib/game-hub-form';
+import { slugify } from '@/app/lib/text-utils';
 
 /**
  * The combined-standings behaviour end to end through the pure layer, on the
@@ -153,3 +154,38 @@ describe('form guides are keyed by the raw school name', () => {
     expect(guides.get(tech!.teamLabel)).toBeUndefined();
   });
 });
+
+describe('schoolSlug presence for overview roster links', () => {
+  it('preserves schoolSlug through rankComputedStandings when provided', () => {
+    const rows = [
+      { schoolName: 'Brooklyn Tech', schoolSlug: 'brooklyn-tech', division: 'Varsity', wins: 5, losses: 1 },
+      { schoolName: 'Stuyvesant', schoolSlug: 'stuyvesant', division: 'Varsity', wins: 4, losses: 2 },
+    ];
+    const ranked = rankComputedStandings(rows);
+    expect(ranked[0].schoolSlug).toBe('brooklyn-tech');
+    expect(ranked[1].schoolSlug).toBe('stuyvesant');
+  });
+
+  it('populates schoolSlug on topTeams projecting fallback slugify if omitted', () => {
+    const rows = rankComputedStandings(COMBINED_FIELD);
+    const topTeams = rows.slice(0, 5).map((r, i) => ({
+      rank: i + 1,
+      team: r.schoolName,
+      schoolSlug: r.schoolSlug ?? slugify(r.schoolName),
+      teamLabel: standingsTeamLabel(r, 'combined'),
+      division: canonicalDivision(r.division),
+      wins: r.wins ?? 0,
+      losses: r.losses ?? 0,
+      winPct: r.winPct ?? 0,
+    }));
+
+    expect(topTeams).toHaveLength(5);
+    for (const team of topTeams) {
+      expect(team.schoolSlug).toBeDefined();
+      expect(typeof team.schoolSlug).toBe('string');
+      expect(team.schoolSlug.length).toBeGreaterThan(0);
+    }
+    expect(topTeams[0].schoolSlug).toBe('brooklyn-technical-high-school');
+  });
+});
+

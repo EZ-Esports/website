@@ -1,6 +1,6 @@
 # spec-011: Player Onboarding, School Manager Portal, and Hexagonal Tournament Verification (V1)
 
-- **Status:** Shipped
+- **Status:** Shipped. **Demographics parts superseded by [spec-051](spec-051-google-form-onboarding.md)** (survey, `student_demographics`, `/admin/demographics` and permission bit 12 removed).
 - **PR:** #216 (merged 2026-10-02); follow-ups in #217 and #232
 - **Date:** 2026-09-30
 - **Implementation note (2026-10-16):** Only the V1 honor-system path shipped. `DiscordRestAdapter` (`adapters/discord-rest.ts`) and `RiotSignOnAdapter` were never written; only the `CommunityPlatformPort` interface and `riot-manual.ts` exist. There is no Discord OAuth, no `guilds.join`, no bot token, no Riot Sign-On and no stored PUUID. The wizard submits `inGuild: true` unconditionally, so the "Live Discord Guild Check" and "verified Riot ID" gates below are satisfied by self-report. Treat the Discord OAuth and RSO sections as design, not behaviour. Follow-ups: #249 (Discord OAuth), #247 (Riot Sign-On, blocked on the production Riot key).
@@ -134,7 +134,7 @@ To guarantee that the platform launches without friction and without waiting mon
 2. Clicks **"Create Player Invite"**.
 3. Inputs:
    - **Intended Student First & Last Name** (e.g. "Alex Chen").
-   - **Link Expiration**: Dropdown with options for 3, 7 (default), or 14 days.
+   - **Link Expiration**: Dropdown with options for 3, 5, or 7 (default) days; 14 was removed by [spec-045](spec-045-invite-copy-regenerate-and-delete.md).
 4. System creates a `player_invites` record and outputs:  
    `https://ezesports.org/join/stuyvesant/valorant?token=tok_8f92ab`
 5. The portal shows the invite under **Invites Sent** (`Alex Chen | Pending | Expires in 7 days`).
@@ -158,6 +158,8 @@ The student opens the link. The wizard renders 4 streamlined steps:
   - **Equity & Grant Demographics (Staff-Only Vault)**: Gender identity, Race/Ethnicity, Country of birth, Primary language spoken at home, Free/Reduced lunch eligibility (Title I metric), First-generation college student, NYCDOE esports petition consent.
   - **Tech & Gaming Survey**: Home internet reliability, average ping, gaming hours per week, peripherals, career interests, feedback.
 * **Submission**: Moves invite status to `submitted`. System saves draft if closed midway, allowing resumption using the same token until final submission.
+
+> **Update (28 Oct 2026, [spec-043](spec-043-manager-also-plays.md), issue #296):** a School Manager who also plays ticks "I also play in this league" in the manager wizard and picks their games. The same submission creates the manager role and a `submitted` player application on the same member (one Discord identity), which then appears in Flow 4 below and follows the same season-scope and roster-lock rules as any student.
 
 ### Flow 4: Manager Approve / Reject Queue
 1. In `/portal`, the student appears in the **Approve / Reject Queue** under that game.
@@ -183,8 +185,9 @@ When registering for an upcoming tournament season (e.g. *Fall 2026 Valorant Cha
      ⚠️ *"Cannot submit roster: Tyler Vance is not in the Discord server. Have them rejoin via discord.gg/ezesports."*
 3. Once all gates pass, Manager clicks **"Confirm Registration"**. Roster moves to `SUBMITTED`.
 
-### Flow 6: Match-Day Emergency Substitutions
-- If Starter #3's computer crashes 15 minutes before match start, the Manager or Team Captain can open the match fixture in `/portal` and click **"Emergency Sub"**.
+### Flow 6: Match-Day Emergency Substitutions (portal entry point removed)
+- Removed from the portal in the "remove Emergency Sub button" change (follow-up to #298): the **"Emergency Sub"** button and its swap modal are gone from roster cards. `emergencySwapSub` remains in the backend and is refused for managers during a season roster lock ([spec-020](spec-020-season-roster-lock.md)), but no portal UI reaches it.
+- The original intent, kept for reference: if Starter #3's computer crashes 15 minutes before match start, the Manager or Team Captain would swap them from the roster in `/portal`.
 - Manager swaps Starter #3 for any **pre-registered, approved Substitute** on the roster.
 - The platform atomically updates the match lineup and automatically broadcasts the change to the match ops room on Discord. Zero admin delays; zero unverified ringers.
 

@@ -1,7 +1,8 @@
 import 'server-only';
 import { db } from './index';
 import * as schema from './schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
+import { resolveManagerSeason } from '@/app/lib/onboarding/manager-season';
 
 /** Transaction handle passed to the onboarding write steps. */
 export type OnboardingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -16,6 +17,14 @@ export type ManagerInviteRow = typeof schema.managerInvites.$inferSelect;
  * their own table and carry no game, so they are only consulted when the hash
  * is not a player invite.
  */
+/**
+ * False when a player invite names a season the school is no longer a member of (staff removed it). Invites
+ * without a season (legacy rows) are not affected. Used when an invite is validated and again when it is submitted.
+ */
+function schoolInInviteSeason() {
+    return sql<boolean>`(${schema.playerInvites.seasonId} is null or exists (select 1 from ${schema.seasonSchools} where ${schema.seasonSchools.schoolId} = ${schema.playerInvites.schoolId} and ${schema.seasonSchools.gameId} = ${schema.playerInvites.gameId} and ${schema.seasonSchools.seasonId} = ${schema.playerInvites.seasonId}))`;
+}
+
 export async function findInviteForValidation(tokenHash: string) {
   const [playerRow] = await db
     .select({
@@ -26,6 +35,9 @@ export async function findInviteForValidation(tokenHash: string) {
       gameId: schema.games.id,
       gameName: schema.games.displayName,
       gameSlug: schema.games.slug,
+      // False when the invite names a season the school is no longer a member of (staff removed it):
+      // the link then stops working. Invites without a season (legacy rows) are not affected.
+      schoolInSeason: schoolInInviteSeason(),
     })
     .from(schema.playerInvites)
     .innerJoin(schema.schools, eq(schema.playerInvites.schoolId, schema.schools.id))
@@ -79,7 +91,7 @@ export async function findInviteByTokenHash(
  * their game slug; manager invites carry no game.
  */
 export async function findInviteForSubmission(tokenHash: string): Promise<
-  | { isManager: false; invite: PlayerInviteRow; gameSlug: string | null }
+  | { isManager: false; invite: PlayerInviteRow; gameSlug: string | null; schoolInSeason: boolean }
   | { isManager: true; invite: ManagerInviteRow; gameSlug: null }
   | undefined
 > {
@@ -87,6 +99,7 @@ export async function findInviteForSubmission(tokenHash: string): Promise<
     .select({
       invite: schema.playerInvites,
       gameSlug: schema.games.slug,
+      schoolInSeason: schoolInInviteSeason(),
     })
     .from(schema.playerInvites)
     .leftJoin(schema.games, eq(schema.playerInvites.gameId, schema.games.id))
@@ -94,7 +107,7 @@ export async function findInviteForSubmission(tokenHash: string): Promise<
     .limit(1);
 
   if (playerRow) {
-    return { isManager: false, invite: playerRow.invite, gameSlug: playerRow.gameSlug ?? null };
+    return { isManager: false, invite: playerRow.invite, gameSlug: playerRow.gameSlug ?? null, schoolInSeason: playerRow.schoolInSeason };
   }
 
   const [managerInvite] = await db
@@ -129,6 +142,8 @@ export async function upsertMemberRecord(
   tx: OnboardingTx,
   params: {
     email: string;
+    /** Lower-cased nycstudents.net address, already validated (spec-056). */
+    schoolEmail: string;
     legalFirstName: string;
     legalLastName: string;
     discordUsername: string;
@@ -136,7 +151,7 @@ export async function upsertMemberRecord(
     schoolId: string;
   }
 ): Promise<string> {
-  const { email, legalFirstName, legalLastName, discordUsername, gradYear, schoolId } = params;
+  const { email, schoolEmail, legalFirstName, legalLastName, discordUsername, gradYear, schoolId } = params;
 
   const [existingMember] = await tx
     .select()
@@ -150,6 +165,7 @@ export async function upsertMemberRecord(
       .set({
         firstName: legalFirstName,
         lastName: legalLastName,
+        schoolEmail,
         discord: discordUsername,
         graduationYear: gradYear,
         schoolId,
@@ -165,6 +181,7 @@ export async function upsertMemberRecord(
       firstName: legalFirstName,
       lastName: legalLastName,
       email,
+      schoolEmail,
       discord: discordUsername,
       graduationYear: gradYear,
       schoolId,
@@ -172,6 +189,44 @@ export async function upsertMemberRecord(
     .returning();
 
   return newMember.id;
+}
+
+/**
+ * The member whose school email is this address (case-insensitive), if any. Lets the pipeline answer
+ * with a readable rejection instead of surfacing the unique index error.
+ */
+export async function findSchoolEmailOwner(
+  tx: OnboardingTx,
+  schoolEmail: string
+): Promise<{ id: string; email: string | null } | null> {
+  const [row] = await tx
+    .select({ id: schema.members.id, email: schema.members.email })
+    .from(schema.members)
+    .where(sql`lower(${schema.members.schoolEmail}) = ${schoolEmail.toLowerCase()}`)
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Member id that already owns this Discord account, if any. One Discord account maps to one
+ * member; the unique (provider, provider_user_id) index backs this, but checking first lets the
+ * wizard show a readable error instead of a constraint violation.
+ */
+export async function findDiscordIdentityOwner(
+  tx: OnboardingTx,
+  discordUserId: string
+): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ memberId: schema.playerIdentities.memberId })
+    .from(schema.playerIdentities)
+    .where(
+      and(
+        eq(schema.playerIdentities.provider, 'discord'),
+        eq(schema.playerIdentities.providerUserId, discordUserId)
+      )
+    )
+    .limit(1);
+  return row?.memberId;
 }
 
 /** Upserts the Riot and Discord identities for a member. */
@@ -253,34 +308,9 @@ export async function upsertPlayerIdentities(
   }
 }
 
-/** Upserts the sensitive demographic survey in the FERPA / NY § 2-D vault. */
-export async function upsertStudentDemographics(
-  tx: OnboardingTx,
-  memberId: string,
-  values: Omit<typeof schema.studentDemographics.$inferInsert, 'memberId'>
-): Promise<void> {
-  const [existingDemo] = await tx
-    .select()
-    .from(schema.studentDemographics)
-    .where(eq(schema.studentDemographics.memberId, memberId))
-    .limit(1);
-
-  if (existingDemo) {
-    await tx
-      .update(schema.studentDemographics)
-      .set(values)
-      .where(eq(schema.studentDemographics.id, existingDemo.id));
-  } else {
-    await tx.insert(schema.studentDemographics).values({
-      memberId,
-      ...values,
-    });
-  }
-}
-
 /** Auth user id of the staff member with this email (case-insensitive), if any. */
 export async function findStaffUserIdByEmail(
-  tx: OnboardingTx,
+  tx: OnboardingTx | typeof db,
   email: string
 ): Promise<string | undefined> {
   const [staff] = await tx
@@ -373,4 +403,125 @@ export async function markPlayerInviteSubmitted(
       submittedAt: new Date(),
     })
     .where(eq(schema.playerInvites.id, inviteId));
+}
+
+/** Appends the signed consent record for an onboarding submission. */
+export async function insertOnboardingConsent(
+  tx: OnboardingTx,
+  values: typeof schema.onboardingConsents.$inferInsert
+): Promise<void> {
+  await tx.insert(schema.onboardingConsents).values(values);
+}
+
+export interface OnboardingGameOption {
+  id: string;
+  slug: string;
+  displayName: string;
+}
+
+/**
+ * Games a school manager can say they also play, in display-name order. Only games with at least one
+ * season are offered: rosters, and so player applications, only exist for those.
+ */
+export async function listOnboardingGames(): Promise<OnboardingGameOption[]> {
+  return db
+    .select({
+      id: schema.games.id,
+      slug: schema.games.slug,
+      displayName: schema.games.displayName,
+    })
+    .from(schema.games)
+    .where(sql`exists (select 1 from seasons where seasons.game_id = ${schema.games.id})`)
+    .orderBy(asc(schema.games.displayName));
+}
+
+/**
+ * Records that a member plays a game at a school as a `submitted` `player_invites` row, exactly what
+ * a player's own wizard submission leaves behind. It therefore waits in the manager review queue and
+ * goes through `reviewPlayerInvite` (season scope, roster lock, one tier per game, roster limits) like
+ * any other student. A member who already has a live (not rejected or expired) row for that school
+ * and game is left alone, so re-onboarding never duplicates it. Returns true when a row was created.
+ */
+export async function ensurePlayerSubmission(
+  tx: OnboardingTx,
+  params: {
+    memberId: string;
+    schoolId: string;
+    gameId: string;
+    invitedByUserId: string;
+    intendedFirstName: string;
+    intendedLastName: string;
+    tokenHash: string;
+  }
+): Promise<boolean> {
+  // The application belongs to the manager's own season of the game: the same season the portal
+  // resolves for them (`resolveManagerSeason`, spec-026) from their active manager rows at this
+  // school, which include the row provisioned moments ago in this transaction. If none resolves
+  // (no season named like their affiliation) it falls back to the game's active season; with
+  // neither it is stored seasonless, which the manager's queue will not show.
+  const [game] = await tx
+    .select({ id: schema.games.id, slug: schema.games.slug })
+    .from(schema.games)
+    .where(eq(schema.games.id, params.gameId));
+  const managerRows = await tx
+    .select({ academicYear: schema.schoolManagers.academicYear, managedGames: schema.schoolManagers.managedGames })
+    .from(schema.schoolManagers)
+    .where(
+      and(
+        eq(schema.schoolManagers.memberId, params.memberId),
+        eq(schema.schoolManagers.schoolId, params.schoolId),
+        eq(schema.schoolManagers.isActive, true)
+      )
+    );
+  const gameSeasons = await tx
+    .select({ id: schema.seasons.id, name: schema.seasons.name, isActive: schema.seasons.isActive })
+    .from(schema.seasons)
+    .where(eq(schema.seasons.gameId, params.gameId));
+  const season =
+    (game ? resolveManagerSeason(managerRows, game, gameSeasons) : null) ??
+    gameSeasons.find((s) => s.isActive) ??
+    null;
+
+  const existing = await tx
+    .select({
+      id: schema.playerInvites.id,
+      status: schema.playerInvites.status,
+      seasonId: schema.playerInvites.seasonId,
+    })
+    .from(schema.playerInvites)
+    .where(
+      and(
+        eq(schema.playerInvites.memberId, params.memberId),
+        eq(schema.playerInvites.schoolId, params.schoolId),
+        eq(schema.playerInvites.gameId, params.gameId)
+      )
+    );
+  // A live application only blocks a new one in the same season: a student re-applies each season.
+  if (
+    existing.some(
+      (row) =>
+        row.status !== 'rejected' &&
+        row.status !== 'expired' &&
+        (!season || row.seasonId === season.id)
+    )
+  ) {
+    return false;
+  }
+
+  const now = new Date();
+  await tx.insert(schema.playerInvites).values({
+    schoolId: params.schoolId,
+    gameId: params.gameId,
+    seasonId: season?.id ?? null,
+    tokenHash: params.tokenHash,
+    intendedFirstName: params.intendedFirstName,
+    intendedLastName: params.intendedLastName,
+    invitedByUserId: params.invitedByUserId,
+    status: 'submitted',
+    expiresAt: now,
+    submittedAt: now,
+    memberId: params.memberId,
+    submissionDraft: { source: 'manager_also_plays' },
+  });
+  return true;
 }

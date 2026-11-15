@@ -21,11 +21,14 @@ export default function PortalShell({ children, context }: PortalShellProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSchoolId = searchParams.get('schoolId') || context.managedSchools[0]?.schoolId;
+  const currentGameId = searchParams.get('gameId') ?? '';
 
   const handleSchoolChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSchoolId = e.target.value;
+    // A game belongs to a school's season, so a game picked for the old school is dropped.
     const params = new URLSearchParams(searchParams.toString());
     params.set('schoolId', newSchoolId);
+    params.delete('gameId');
     router.push(`/portal?${params.toString()}`);
   };
 
@@ -114,7 +117,9 @@ export default function PortalShell({ children, context }: PortalShellProps) {
 
       {/* Main Body */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {children}
+        {/* Remounting on a school or game change drops any client state (open dialogs, picked
+            times, draft form values) that was copied from the previous school's data. */}
+        <div key={`${currentSchoolId}|${currentGameId}`}>{children}</div>
       </main>
 
       {/* Footer */}

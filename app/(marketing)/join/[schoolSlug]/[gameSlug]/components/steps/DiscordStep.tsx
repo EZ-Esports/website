@@ -1,22 +1,34 @@
 'use client';
 
-import { FiCheck, FiExternalLink } from 'react-icons/fi';
+import { FiCheck, FiClock, FiExternalLink } from 'react-icons/fi';
 import { SiDiscord } from 'react-icons/si';
-import { RequiredMark } from '../RequiredMark';
+import { ContentFlagNotice } from '../ContentFlagNotice';
+import type { ContentFlagControls } from '../../types';
 
 interface DiscordStepProps {
-  discordUsername: string;
-  setDiscordUsername: (val: string) => void;
-  discordJoinedConfirmed: boolean;
-  setDiscordJoinedConfirmed: (val: boolean) => void;
+  /** Server-verified identity from Discord OAuth. */
+  verified: { username: string; inGuild: boolean } | null;
+  connecting: boolean;
+  onConnect: () => void;
+  /** Ends the wait for the other tab (and closes it) so a stuck sign-in never traps the person. */
+  onCancel?: () => void;
+  /** Offensive-content warnings and overrides for this step's fields. */
+  contentFlags?: ContentFlagControls;
 }
 
 export function DiscordStep({
-  discordUsername,
-  setDiscordUsername,
-  discordJoinedConfirmed,
-  setDiscordJoinedConfirmed,
+  verified,
+  connecting,
+  onConnect,
+  onCancel,
+  contentFlags,
 }: DiscordStepProps) {
+  // aria-disabled keeps the button focusable (native `disabled` would drop keyboard focus), so the
+  // handler itself ignores presses while a connection is already opening.
+  const handleConnect = () => {
+    if (!connecting) onConnect();
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -24,7 +36,7 @@ export function DiscordStep({
           Step 2: Discord Connection (Comms & Voice Gate)
         </h2>
         <p className="text-xs sm:text-sm text-foreground-muted mt-1">
-          EZ Esports requires all active competitors to be in the official Discord server for match voice communications, referee pings, and tournament operations.
+          EZ Esports requires every player and school manager to be in the official Discord server for match voice communications, referee pings, and tournament operations.
         </p>
       </div>
 
@@ -51,48 +63,68 @@ export function DiscordStep({
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-foreground-muted mb-1.5">
-            Your Discord Handle / Username<RequiredMark />
-          </label>
-          <input
-            type="text"
-            value={discordUsername}
-            onChange={(e) => setDiscordUsername(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-surface-elevated border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder="e.g. @alexchen or alex#1234"
-            required
-          />
+        {/* Always mounted so a screen reader announces both the banner and the waiting text when they appear. */}
+        <div role="status" aria-live="polite" className="space-y-2">
+          {verified?.inGuild && (
+            <div className="flex items-start gap-3 p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10">
+              <FiCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="text-xs sm:text-sm text-foreground">
+                <p>
+                  Connected as <strong>@{verified.username}</strong>, in the EZ Esports server.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleConnect}
+                  aria-disabled={connecting}
+                  className="mt-1 min-h-[44px] text-xs text-accent underline aria-disabled:opacity-50"
+                >
+                  Use a different Discord account (opens a new tab)
+                </button>
+              </div>
+            </div>
+          )}
+          {connecting && (
+            <p className="text-xs text-foreground-muted leading-relaxed">
+              Waiting for Discord in the other tab. When it says you are connected, come back here. If you do
+              not see it, check for a blocked pop-up.
+            </p>
+          )}
         </div>
+        {connecting && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-[44px] text-xs text-accent underline"
+          >
+            Cancel and stop waiting
+          </button>
+        )}
+        {verified?.inGuild && <ContentFlagNotice field="discordUsername" controls={contentFlags} />}
 
-        <label className="flex items-start gap-3 p-3.5 rounded-lg border border-border bg-surface-elevated/40 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={discordJoinedConfirmed}
-            onChange={(e) => setDiscordJoinedConfirmed(e.target.checked)}
-            className="mt-0.5 rounded border-border text-accent focus:ring-accent"
-          />
-          <span className="text-xs text-foreground-muted leading-relaxed">
-            I confirm that I have joined the official EZ Esports Discord server (
-            <a
-              href="https://discord.gg/ezesports"
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent underline inline-flex items-center gap-0.5"
-              onClick={(e) => e.stopPropagation()}
+        {!verified?.inGuild && (
+          <div className="space-y-3">
+            <p className="text-xs text-foreground-muted leading-relaxed">
+              Sign in with Discord and we will add you to the official server automatically. We only
+              read your Discord username and ID; we never see your password or messages. Discord opens in
+              a new tab: when it says you are connected, come back to this tab. Everything you have
+              entered here stays as it is.
+            </p>
+            <button
+              type="button"
+              onClick={handleConnect}
+              aria-disabled={connecting}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2.5 rounded-lg bg-[#5865F2] text-white text-sm font-semibold hover:bg-[#4752c4] transition-colors aria-disabled:opacity-60"
             >
-              discord.gg/ezesports <FiExternalLink className="w-2.5 h-2.5" />
-            </a>
-            ) with this account.
-          </span>
-        </label>
-
-        {discordUsername.trim() && discordJoinedConfirmed && (
-          <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
-            <FiCheck className="w-4 h-4 shrink-0" />
-            <span>
-              Linked: <strong>{discordUsername}</strong> will be registered on the EZ Esports Discord roster
-            </span>
+              {connecting ? (
+                <>
+                  <FiClock className="w-4 h-4 animate-spin" /> Waiting for Discord...
+                </>
+              ) : (
+                <>
+                  <SiDiscord className="w-4 h-4" /> Connect Discord
+                </>
+              )}
+            </button>
           </div>
         )}
       </div>

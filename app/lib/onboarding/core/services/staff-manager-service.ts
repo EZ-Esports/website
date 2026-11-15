@@ -92,6 +92,45 @@ export class StaffManagerService implements StaffManagerProvisioningUseCase {
     };
   }
 
+  /**
+   * Changes which games an existing, active manager may manage (null = all games) and whether
+   * they are the primary contact. A removed manager is refused, both up front and inside the
+   * write itself (the assignment upsert is not used: it forces is_active back on).
+   */
+  async updateSchoolManagerAccess(
+    actor: { id: string; email: string },
+    params: { managerId: string; managedGames: string[] | null; isPrimaryContact: boolean }
+  ) {
+    if (!params.managerId) return { success: false, error: 'Manager ID is required.' };
+
+    const existing = await this.repo.findManagerById(params.managerId);
+    if (!existing) return { success: false, error: 'School manager not found.' };
+    if (!existing.isActive) return { success: false, error: 'This manager was removed. Assign them again instead.' };
+
+    // Conditional on is_active inside the write, so a removal racing this call is never undone.
+    const manager = await this.repo.updateActiveSchoolManagerAccess(existing.id, {
+      managedGames: params.managedGames,
+      isPrimaryContact: params.isPrimaryContact,
+    });
+    if (!manager) return { success: false, error: 'This manager was removed. Assign them again instead.' };
+
+    await this.repo.writeStaffAuditLog({
+      event: 'update_school_manager_access',
+      userId: actor.id,
+      email: actor.email,
+      details: {
+        managerId: existing.id,
+        schoolId: existing.schoolId,
+        userId: existing.userId,
+        academicYear: existing.academicYear,
+        before: { managedGames: existing.managedGames, isPrimaryContact: existing.isPrimaryContact },
+        after: { managedGames: params.managedGames, isPrimaryContact: params.isPrimaryContact },
+      },
+    });
+
+    return { success: true, manager, message: 'Manager access updated.' };
+  }
+
   async getSchoolManagers(schoolId: string) {
     if (!schoolId) return [];
     return this.repo.findSchoolManagers(schoolId);

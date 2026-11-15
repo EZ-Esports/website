@@ -5,7 +5,7 @@ import { GAMES, GAME_SLUGS } from '@/app/lib/constants';
 import type { GameSlug } from '@/app/types';
 import Section from '@/app/components/ui/Section';
 import { slugify } from '@/app/lib/text-utils';
-import { getCachedSchools, getSchoolGameTeamsPageData } from '@/app/lib/db/queries';
+import { getCachedSchools, getSchoolGameTeamsPageData, getSeasonsWithGames } from '@/app/lib/db/queries';
 import SchoolSnapshotsClient from './SchoolSnapshotsClient';
 
 interface SchoolPageProps {
@@ -49,6 +49,11 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
     notFound();
   }
 
+  // Seasons whose outcomes are hidden: their team records read 0-0 (display only).
+  const hiddenSeasonIds = (await getSeasonsWithGames())
+    .filter((s) => s.gameSlug === game && !s.outcomesPublic)
+    .map((s) => s.id);
+
   return (
     <main>
       <Section className="pt-20 md:pt-24">
@@ -63,7 +68,11 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
           </Link>
         </div>
 
-        <SchoolSnapshotsClient school={schoolData} gameDisplayName={gameConfig.displayName} />
+        <SchoolSnapshotsClient
+          school={schoolData}
+          gameDisplayName={gameConfig.displayName}
+          hiddenSeasonIds={hiddenSeasonIds}
+        />
       </Section>
     </main>
   );

@@ -2,6 +2,8 @@
 
 import { FiCheck, FiExternalLink } from 'react-icons/fi';
 import { RequiredMark } from '../RequiredMark';
+import { ContentFlagNotice, contentFieldProps } from '../ContentFlagNotice';
+import type { ContentFlagControls } from '../../types';
 
 interface GameIdentityStepProps {
   riotId: string;
@@ -12,6 +14,8 @@ interface GameIdentityStepProps {
   trackerUrl: string | null;
   isManager: boolean;
   gameName: string;
+  /** Offensive-content warnings and overrides for this step's fields. */
+  contentFlags?: ContentFlagControls;
 }
 
 export function GameIdentityStep({
@@ -23,6 +27,7 @@ export function GameIdentityStep({
   trackerUrl,
   isManager,
   gameName,
+  contentFlags,
 }: GameIdentityStepProps) {
   return (
     <div className="space-y-6">
@@ -43,6 +48,7 @@ export function GameIdentityStep({
         </label>
         <input
           type="text"
+          {...contentFieldProps('riotId', contentFlags)}
           value={riotId}
           onChange={(e) => setRiotId(e.target.value)}
           className={`w-full px-3.5 py-2.5 rounded-lg bg-surface border text-foreground text-sm focus:outline-none focus:ring-2 ${
@@ -55,6 +61,7 @@ export function GameIdentityStep({
           placeholder="e.g. Demon1#LFT1 or Faker#T1"
           required
         />
+        <ContentFlagNotice field="riotId" controls={contentFlags} />
 
         <div className="mt-2 text-xs">
           {riotId && isRiotIdValid ? (

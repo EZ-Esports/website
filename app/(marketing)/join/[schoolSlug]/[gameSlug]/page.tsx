@@ -8,7 +8,11 @@ import {
   FiArrowLeft,
 } from 'react-icons/fi';
 import { validateInviteToken } from '@/app/lib/onboarding/wizard-actions';
+import { readVerifiedDiscord } from '@/app/lib/onboarding/discord-session';
+import { resolveOnboardingFormState } from '@/app/lib/onboarding/google-form-actions';
+import { DISCORD_FAILURE_MESSAGES, type DiscordFailureCode } from '@/app/lib/onboarding/adapters/discord-rest';
 import PlayerOnboardingWizard from './PlayerOnboardingWizard';
+import { DiscordPopupDone } from './components/DiscordPopupDone';
 
 interface JoinPageProps {
   params: Promise<{
@@ -17,6 +21,9 @@ interface JoinPageProps {
   }>;
   searchParams: Promise<{
     token?: string;
+    discord?: string;
+    discord_error?: string;
+    popup?: string;
   }>;
 }
 
@@ -100,7 +107,7 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
                 <p className="text-sm text-foreground-muted leading-relaxed">
                   {validation.role === 'manager' || gameSlug === 'manager'
                     ? 'Your School Manager account has been activated. Please sign in to access your school portal.'
-                    : 'This invite link has already been used and approved by your team manager. You are already registered on the active roster.'}
+                    : 'This invite link has already been used and your team manager has accepted you. They will add you to a roster.'}
                 </p>
               </div>
 
@@ -190,9 +197,50 @@ export default async function PlayerOnboardingPage(props: JoinPageProps) {
     );
   }
 
+  // The identity shown comes from the signed cookie, never from client state.
+  const verified = await readVerifiedDiscord(token);
+  const errorCode = searchParams.discord_error as DiscordFailureCode | undefined;
+  const discordError =
+    errorCode
+      ? (Object.prototype.hasOwnProperty.call(DISCORD_FAILURE_MESSAGES, errorCode)
+          ? DISCORD_FAILURE_MESSAGES[errorCode]
+          : DISCORD_FAILURE_MESSAGES.unknown)
+      : null;
+
+  // A Discord sign-in started from the wizard's second tab ends here instead of re-rendering the
+  // wizard, so the first tab keeps its fields and password. The outcome shown is the cookie's, not the URL's.
+  if (searchParams.popup === '1') {
+    const connected = !errorCode && Boolean(verified?.inGuild);
+    return (
+      <DiscordPopupDone
+        inviteId={validation.inviteId}
+        status={connected ? 'connected' : 'error'}
+        message={connected ? null : (discordError ?? DISCORD_FAILURE_MESSAGES.unknown)}
+      />
+    );
+  }
+
+  // Whether the wizard has the Google Form step, and whether it is already done (a student returning
+  // from Discord or a refresh). Read on the server; a failure must not take the wizard down. On failure
+  // the step starts hidden, and the server's `onboarding_form_required` rejection at submit reveals it
+  // (the wizard treats that rejection as authoritative), so nobody is left without a way forward.
+  let onboardingForm = { enabled: false, completed: false };
+  try {
+    onboardingForm = await resolveOnboardingFormState(validation.role, validation.inviteId);
+  } catch (err) {
+    console.error('Could not read the onboarding form state', err);
+  }
+
   return (
     <main className="min-h-[80vh] py-6">
-      <PlayerOnboardingWizard token={token} inviteData={validation} />
+      <PlayerOnboardingWizard
+        token={token}
+        inviteData={validation}
+        discord={verified ? { username: verified.discordUsername, inGuild: verified.inGuild } : null}
+        discordError={discordError}
+        resumeAtDiscord={Boolean(searchParams.discord || errorCode)}
+        onboardingForm={onboardingForm}
+      />
     </main>
   );
 }

@@ -4,9 +4,11 @@ import { requirePermission } from '@/app/lib/auth';
 import { Permissions } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
+import { inScope } from '@/app/lib/db/season-membership';
 import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath, updateTag } from 'next/cache';
 import { parseEastern } from '@/app/lib/dates';
+import { sameRosterDivision } from '@/app/lib/admin-match-list';
 
 export type MatchActionResult = { success: boolean; error?: string };
 
@@ -34,26 +36,36 @@ export async function createMatch(formData: FormData): Promise<MatchActionResult
   }
 
   try {
-    // Both rosters must belong to teams registered in the selected season (and the
+    // Both rosters must belong to the selected season (and the
     // same game) — guard against stale/crafted submits that would corrupt standings.
     const rosterTeams = await db
       .select({
         rosterId: schema.rosters.id,
-        seasonId: schema.teams.seasonId,
-        gameId: schema.teams.gameId,
+        seasonId: schema.rosters.seasonId,
+        gameId: schema.rosters.gameId,
+        division: schema.rosters.division,
+        memberId: schema.seasonSchools.id,
       })
       .from(schema.rosters)
-      .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
+      .leftJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
       .where(inArray(schema.rosters.id, [homeRosterId, awayRosterId]));
 
     if (rosterTeams.length !== 2) {
-      return { success: false, error: 'Both rosters must exist and belong to a registered team.' };
+      return { success: false, error: 'Both rosters must exist.' };
+    }
+    // Both schools must be members of the season: a school staff removed from it cannot be scheduled.
+    if (rosterTeams.some((r) => !r.memberId)) {
+      return { success: false, error: 'A selected school is not part of this season. Add it in League Setup first.' };
     }
     if (!rosterTeams.every((r) => r.seasonId === seasonId)) {
       return { success: false, error: 'Both rosters must belong to teams in the selected season.' };
     }
     if (rosterTeams[0].gameId !== rosterTeams[1].gameId) {
       return { success: false, error: 'Both rosters must be from the same game.' };
+    }
+    // Validated here, not only in the form: a crafted submit must not pair Varsity with JV.
+    if (!sameRosterDivision(rosterTeams[0].division, rosterTeams[1].division)) {
+      return { success: false, error: 'Both rosters must be in the same division.' };
     }
 
     const scheduledAt = parseEastern(scheduledAtStr);
@@ -122,4 +134,47 @@ export async function deleteMatch(id: string) {
   await db.delete(schema.matches).where(eq(schema.matches.id, id));
 
   revalidateMatches();
+}
+
+/** Upper bound for one bulk delete; the explorer pages 25 at a time, so this is generous. */
+const MAX_BULK_DELETE_MATCHES = 200;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type DeleteMatchesResult = { success: boolean; error?: string; deleted?: number };
+
+/**
+ * Deletes several matches at once. Same permission and cascade behaviour as
+ * deleteMatch (results, game data and reschedule requests go with each match via
+ * foreign keys), but all-or-nothing: ids are validated server-side and the delete
+ * runs in one transaction.
+ */
+export async function deleteMatches(ids: string[]): Promise<DeleteMatchesResult> {
+  await requirePermission(Permissions.MANAGE_MATCHES);
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { success: false, error: 'Select at least one match to delete.' };
+  }
+  if (!ids.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
+    return { success: false, error: 'One or more selected matches are invalid.' };
+  }
+  const unique = [...new Set(ids.map((id) => id.toLowerCase()))];
+  if (unique.length > MAX_BULK_DELETE_MATCHES) {
+    return { success: false, error: `You can delete at most ${MAX_BULK_DELETE_MATCHES} matches at once.` };
+  }
+
+  try {
+    const deleted = await db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(schema.matches)
+        .where(inArray(schema.matches.id, unique))
+        .returning({ id: schema.matches.id });
+      return rows.length;
+    });
+    revalidateMatches();
+    return { success: true, deleted };
+  } catch (error) {
+    console.error('Failed to delete matches', error);
+    return { success: false, error: 'Could not delete the selected matches. Please try again.' };
+  }
 }

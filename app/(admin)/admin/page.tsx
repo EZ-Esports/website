@@ -93,7 +93,7 @@ export default async function AdminDashboardPage() {
       label: 'Incomplete Teams',
       count: teamsWithNoRoster,
       message: `${teamsWithNoRoster} registered teams have no competitive rosters assigned.`,
-      link: '/admin/roster',
+      link: '/admin/schools',
       linkText: 'Assign Rosters',
     }] : []),
   ];
@@ -131,7 +131,7 @@ export default async function AdminDashboardPage() {
 
       <section aria-label="At a glance" className="admin-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {canLeague && <StatCard href="/admin/league" label="Competition games" value={dbConfigured ? stats.games : 'N/A'} icon={<HiOutlineTrophy className="h-5 w-5" />} />}
-        {canRosters && <StatCard href="/admin/roster" label="Registered teams" value={dbConfigured ? stats.teams : 'N/A'} icon={<HiOutlineUsers className="h-5 w-5" />} />}
+        {canRosters && <StatCard href="/admin/schools" label="Registered teams" value={dbConfigured ? stats.teams : 'N/A'} icon={<HiOutlineUsers className="h-5 w-5" />} />}
         {canMatches && <StatCard href="/admin/matches" label="Scheduled matches" value={dbConfigured ? stats.scheduledMatches : 'N/A'} icon={<HiOutlineCalendarDays className="h-5 w-5" />} />}
         {canNews && <StatCard href="/admin/news" label="Published articles" value={dbConfigured ? stats.publishedNews : 'N/A'} icon={<HiOutlineNewspaper className="h-5 w-5" />} />}
       </section>

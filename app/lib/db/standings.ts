@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { db } from './index';
 import * as schema from './schema';
+import { inScope, snapshotMember } from './season-membership';
 import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQLWrapper } from 'drizzle-orm';
 import {
   canonicalDivision,
@@ -17,6 +18,7 @@ import {
   type StandingsFormat,
 } from './match-page';
 import { areOutcomesPublic, redactStandingRows } from '../season-outcomes';
+import { slugify } from '../text-utils';
 
 /**
  * `canonicalDivision` as a SQL expression, so a division filter can be pushed
@@ -69,12 +71,13 @@ export async function getSeasonDivisions(seasonId: string): Promise<string[]> {
     db
       .selectDistinct({ division: schema.seasonStandings.division })
       .from(schema.seasonStandings)
+      .innerJoin(schema.seasonSchools, snapshotMember(schema.seasonStandings))
       .where(eq(schema.seasonStandings.seasonId, seasonId)),
     db
       .selectDistinct({ division: schema.rosters.division })
       .from(schema.rosters)
-      .innerJoin(schema.teams, eq(schema.rosters.teamId, schema.teams.id))
-      .where(eq(schema.teams.seasonId, seasonId)),
+      .innerJoin(schema.seasonSchools, inScope(schema.rosters, schema.seasonSchools))
+      .where(eq(schema.rosters.seasonId, seasonId)),
     // Folded into the same round trip rather than awaited first: the division
     // lists are needed either way, and the format only decides whether they get
     // collapsed.
@@ -97,6 +100,7 @@ export function buildSeasonStandingsSnapshotQuery(opts: {
   return db
     .select({
       schoolName: schema.schools.name,
+      schoolSlug: schema.schools.slug,
       division: schema.seasonStandings.division,
       rank: schema.seasonStandings.rank,
       wins: schema.seasonStandings.wins,
@@ -110,6 +114,7 @@ export function buildSeasonStandingsSnapshotQuery(opts: {
     })
     .from(schema.seasonStandings)
     .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+    .innerJoin(schema.seasonSchools, snapshotMember(schema.seasonStandings))
     .where(
       and(
         eq(schema.seasonStandings.seasonId, opts.seasonId),
@@ -130,16 +135,17 @@ export function buildSeasonStandingsComputedQuery(opts: {
   return db
     .select({
       schoolName: schema.schools.name,
+      schoolSlug: schema.schools.slug,
       division: schema.rosterStandings.division,
       wins: schema.rosterStandings.wins,
       losses: schema.rosterStandings.losses,
     })
     .from(schema.rosterStandings)
-    .innerJoin(schema.teams, eq(schema.rosterStandings.teamId, schema.teams.id))
-    .innerJoin(schema.schools, eq(schema.teams.schoolId, schema.schools.id))
+    .innerJoin(schema.seasonSchools, inScope(schema.rosterStandings, schema.seasonSchools))
+    .innerJoin(schema.schools, eq(schema.seasonSchools.schoolId, schema.schools.id))
     .where(
       and(
-        eq(schema.teams.seasonId, opts.seasonId),
+        eq(schema.seasonSchools.seasonId, opts.seasonId),
         ...(opts.combined
           ? []
           : [eq(canonicalDivisionSql(schema.rosterStandings.division), opts.division)]),
@@ -212,9 +218,10 @@ export async function getTeamStandingsRecords(
 ): Promise<Map<string, { wins: number; losses: number }>> {
   if (teamsList.length === 0) return new Map();
 
-  const teamIds = teamsList.map((t) => t.teamId);
+  const schoolIds = Array.from(new Set(teamsList.map((t) => t.schoolId)));
   const seasonIds = Array.from(new Set(teamsList.map((t) => t.seasonId)));
-  const teamById = new Map(teamsList.map((t) => [t.teamId, t]));
+  // A season belongs to one game, so (school, season) identifies the membership row.
+  const teamByScope = new Map(teamsList.map((t) => [`${t.schoolId}|${t.seasonId}`, t]));
 
   const [snapshotRows, seasonFormats, computedRows] = await Promise.all([
     seasonIds.length > 0
@@ -239,11 +246,16 @@ export async function getTeamStandingsRecords(
           .from(schema.seasons)
           .where(inArray(schema.seasons.id, seasonIds))
       : [],
-    teamIds.length > 0
+    schoolIds.length > 0
       ? db
           .select()
           .from(schema.rosterStandings)
-          .where(inArray(schema.rosterStandings.teamId, teamIds))
+          .where(
+            and(
+              inArray(schema.rosterStandings.schoolId, schoolIds),
+              inArray(schema.rosterStandings.seasonId, seasonIds),
+            ),
+          )
       : [],
   ]);
 
@@ -283,13 +295,12 @@ export async function getTeamStandingsRecords(
 
   // 2. Fall back to computed roster_standings for missing keys
   for (const comp of computedRows) {
-    if (!comp.teamId) continue;
-    const team = teamById.get(comp.teamId);
+    const team = teamByScope.get(`${comp.schoolId}|${comp.seasonId}`);
     if (!team || hiddenSeasonIds.has(team.seasonId)) continue;
 
     const canonical = canonicalDivision(comp.division);
-    const keyCanonical = `${comp.teamId}-${canonical}`;
-    const keyRaw = `${comp.teamId}-${comp.division}`;
+    const keyCanonical = `${team.teamId}-${canonical}`;
+    const keyRaw = `${team.teamId}-${comp.division}`;
 
     if (!recordMap.has(keyCanonical) && !recordMap.has(keyRaw)) {
       const val = { wins: comp.wins ?? 0, losses: comp.losses ?? 0 };
@@ -303,7 +314,13 @@ export async function getTeamStandingsRecords(
 
 export const getCachedRosters = unstable_cache(
   async () => {
-    return db.select().from(schema.rosterStandings);
+    // Rosters of members only: a school staff removed from a season is not offered for scheduling.
+    return db
+      .select()
+      .from(schema.rosterStandings)
+      .where(
+        sql`exists (select 1 from ${schema.seasonSchools} where ${schema.seasonSchools.schoolId} = ${schema.rosterStandings.schoolId} and ${schema.seasonSchools.gameId} = ${schema.rosterStandings.gameId} and ${schema.seasonSchools.seasonId} = ${schema.rosterStandings.seasonId})`,
+      );
   },
   ['rosters-list'],
   { tags: ['rosters'] }
@@ -314,6 +331,7 @@ export async function getGameSeasonSummary(seasonId: string) {
     db
       .select({
         schoolName: schema.schools.name,
+        schoolSlug: schema.schools.slug,
         division: schema.seasonStandings.division,
         rank: schema.seasonStandings.rank,
         wins: schema.seasonStandings.wins,
@@ -324,6 +342,7 @@ export async function getGameSeasonSummary(seasonId: string) {
       })
       .from(schema.seasonStandings)
       .innerJoin(schema.schools, eq(schema.seasonStandings.schoolId, schema.schools.id))
+      .innerJoin(schema.seasonSchools, snapshotMember(schema.seasonStandings))
       .where(eq(schema.seasonStandings.seasonId, seasonId))
       .orderBy(sql`${schema.seasonStandings.rank} asc nulls last`, asc(schema.schools.name)),
     readSeasonStandingsMeta(seasonId),
@@ -358,6 +377,7 @@ export async function getGameSeasonSummary(seasonId: string) {
     (outcomesPublic ? rows.slice(0, 5) : rows).map((r, i) => ({
       rank: outcomesPublic ? (r.rank ?? i + 1) : null,
       team: r.schoolName,
+      schoolSlug: r.schoolSlug ?? slugify(r.schoolName),
       teamLabel: r.playerName ? `${r.playerName} (${r.schoolName})` : standingsTeamLabel(r, standingsFormat),
       division: canonicalDivision(r.division),
       wins: outcomesPublic ? (r.wins ?? 0) : null,

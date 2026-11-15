@@ -1,12 +1,5 @@
+import type { PlayerSubmissionDraft } from '../domain/types';
 import type {
-  CompetitiveRole,
-  SchoolManagerContext,
-  SchoolPlayerPoolItem,
-  SchoolRosterWithPlayers,
-  PlayerSubmissionDraft,
-} from '../domain/types';
-import type {
-  PlayerInviteRecord,
   ManagerInviteRecord,
   SchoolManagerRecord,
   RegisteredManagerAccountRecord,
@@ -15,109 +8,6 @@ import type {
 // ============================================================================
 // HEXAGONAL ARCHITECTURE: INBOUND (USE CASE) PORTS
 // ============================================================================
-
-export interface SchoolManagerPortalUseCase {
-  getSchoolPortalData(context: SchoolManagerContext): Promise<{
-    schoolId: string;
-    schoolName: string;
-    academicYear: string;
-    rosters: SchoolRosterWithPlayers[];
-    pendingInvites: PlayerInviteRecord[];
-    pendingSubmissions: PlayerInviteRecord[];
-  }>;
-
-  getSchoolPlayerPool(
-    context: SchoolManagerContext,
-    gameId?: string
-  ): Promise<SchoolPlayerPoolItem[]>;
-
-  createPlayerInvite(
-    context: SchoolManagerContext,
-    params: {
-      gameId: string;
-      intendedFirstName: string;
-      intendedLastName: string;
-    }
-  ): Promise<{
-    success: boolean;
-    token?: string;
-    inviteUrl?: string;
-    invite?: PlayerInviteRecord;
-    error?: string;
-  }>;
-
-  reviewPlayerInvite(
-    context: SchoolManagerContext,
-    params: {
-      inviteId: string;
-      decision: 'approved' | 'rejected';
-      rejectionReason?: string;
-      targetRosterId?: string | null;
-      competitiveRole?: CompetitiveRole;
-    }
-  ): Promise<{
-    success: boolean;
-    error?: string;
-    enrolledPlayer?: {
-      playerId: string;
-      rosterId: string;
-      memberId: string;
-      role: string;
-      isCaptain: boolean;
-    };
-  }>;
-
-  enrollPlayerToRoster(
-    context: SchoolManagerContext,
-    params: {
-      rosterId: string;
-      memberId: string;
-      ign?: string | null;
-      role?: CompetitiveRole;
-    }
-  ): Promise<{
-    success: boolean;
-    error?: string;
-    enrolled?: {
-      playerId: string;
-      rosterId: string;
-      memberId: string;
-      role: string;
-      isCaptain: boolean;
-    };
-  }>;
-
-  removePlayerFromRoster(
-    context: SchoolManagerContext,
-    params: {
-      rosterId: string;
-      playerId: string;
-    }
-  ): Promise<{ success: boolean; error?: string }>;
-
-  updateRosterPlayerRole(
-    context: SchoolManagerContext,
-    params: {
-      rosterId: string;
-      playerId: string;
-      role: CompetitiveRole;
-    }
-  ): Promise<{ success: boolean; error?: string }>;
-
-  emergencySwapSub(
-    context: SchoolManagerContext,
-    params: {
-      rosterId: string;
-      currentStarterId: string;
-      substitutePlayerId: string;
-    }
-  ): Promise<{ success: boolean; error?: string }>;
-
-  revokePlayerInvite(
-    context: SchoolManagerContext,
-    inviteId: string
-  ): Promise<{ success: boolean; error?: string }>;
-}
 
 export interface CandidateOnboardingUseCase {
   validateInviteToken(params: {
