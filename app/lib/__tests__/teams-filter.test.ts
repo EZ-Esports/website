@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   sortSchoolsAlphabetically,
+  sortSchools,
+  filterSchoolsBySeason,
+  filterSchoolsByDivision,
+  filterSchoolsByQuery,
+  getAvailableSeasons,
+  getDefaultSeason,
   getSchoolDivisionBadges,
   getTeamRosterUrl,
-  filterSchoolsByQuery,
   type SchoolGroup,
   type TeamRosterGroup,
 } from '@/app/(marketing)/[game]/teams/TeamsFilterClient';
@@ -369,6 +374,157 @@ describe('Teams & Rosters Dedicated School Route Architecture', () => {
 
       it('returns empty array when query matches nothing', () => {
         expect(filterSchoolsByQuery(list, 'nonexistent high school xyz')).toEqual([]);
+      });
+    });
+
+    describe('Season Filtering (filterSchoolsBySeason)', () => {
+      const list = [schoolBoth, schoolVarsity, schoolJv, schoolBronx];
+
+      it('defaults to returning all schools when season filter is "all" or empty', () => {
+        expect(filterSchoolsBySeason(list, 'all')).toEqual(list);
+        expect(filterSchoolsBySeason(list, '')).toEqual(list);
+        expect(filterSchoolsBySeason(list, '   ')).toEqual(list);
+      });
+
+      it('filters schools by specific season name', () => {
+        // schoolBoth, schoolVarsity, schoolJv have 'Spring 2025'
+        const spring = filterSchoolsBySeason(list, 'Spring 2025');
+        expect(spring.map((s) => s.schoolName)).toEqual([
+          'Stuyvesant High School',
+          'Midwood High School',
+          'Brooklyn Technical High School',
+        ]);
+
+        // only schoolBoth has 'Fall 2024'
+        const fall = filterSchoolsBySeason(list, 'Fall 2024');
+        expect(fall.map((s) => s.schoolName)).toEqual(['Stuyvesant High School']);
+      });
+
+      it('returns empty array when season matches no schools', () => {
+        expect(filterSchoolsBySeason(list, 'Winter 2099')).toEqual([]);
+      });
+    });
+
+    describe('Season & Alphabetical Sorting (sortSchools)', () => {
+      const schoolOldSeason: SchoolGroup = {
+        schoolId: 'school-old',
+        schoolName: 'Abraham Lincoln High School',
+        seasons: [
+          {
+            seasonId: 's-2023',
+            seasonName: '2023-24',
+            isSeasonActive: false,
+            rosters: [],
+          },
+        ],
+      };
+
+      const schoolActiveSeason: SchoolGroup = {
+        schoolId: 'school-active',
+        schoolName: 'Zebra High School',
+        seasons: [
+          {
+            seasonId: 's-2026',
+            seasonName: '2026-27',
+            isSeasonActive: true,
+            rosters: [],
+          },
+        ],
+      };
+
+      it('sorts schools alphabetically A–Z by default (name-asc)', () => {
+        const sorted = sortSchools([schoolActiveSeason, schoolOldSeason, schoolBoth], 'name-asc');
+        expect(sorted.map((s) => s.schoolName)).toEqual([
+          'Abraham Lincoln High School',
+          'Stuyvesant High School',
+          'Zebra High School',
+        ]);
+      });
+
+      it('sorts schools reverse alphabetically Z–A (name-desc)', () => {
+        const sorted = sortSchools([schoolActiveSeason, schoolOldSeason, schoolBoth], 'name-desc');
+        expect(sorted.map((s) => s.schoolName)).toEqual([
+          'Zebra High School',
+          'Stuyvesant High School',
+          'Abraham Lincoln High School',
+        ]);
+      });
+
+      it('sorts schools by season (season-desc) prioritizing active seasons first', () => {
+        const sorted = sortSchools([schoolOldSeason, schoolActiveSeason], 'season-desc');
+        expect(sorted.map((s) => s.schoolName)).toEqual([
+          'Zebra High School',
+          'Abraham Lincoln High School',
+        ]);
+      });
+    });
+
+    describe('Available Seasons Extraction (getAvailableSeasons)', () => {
+      it('extracts unique seasons and sorts active seasons first', () => {
+        const seasons = getAvailableSeasons([schoolBoth, schoolVarsity, schoolJv, schoolBronx]);
+        expect(seasons).toEqual([
+          { seasonName: 'Spring 2025', isSeasonActive: true },
+          { seasonName: 'Fall 2024', isSeasonActive: false },
+        ]);
+      });
+    });
+
+    describe('Default Season Selection (getDefaultSeason)', () => {
+      it('defaults to current season 2026-27 when active', () => {
+        const seasons = [
+          { seasonName: '2026-27', isSeasonActive: true },
+          { seasonName: '2025-26', isSeasonActive: false },
+        ];
+        expect(getDefaultSeason(seasons)).toBe('2026-27');
+      });
+
+      it('defaults to 2026-27 even if another active flag is not present', () => {
+        const seasons = [
+          { seasonName: '2026-27', isSeasonActive: false },
+          { seasonName: '2024-25', isSeasonActive: false },
+        ];
+        expect(getDefaultSeason(seasons)).toBe('2026-27');
+      });
+
+      it('defaults to any active season when 2026-27 is absent', () => {
+        const seasons = [
+          { seasonName: 'Spring 2025', isSeasonActive: true },
+          { seasonName: 'Fall 2024', isSeasonActive: false },
+        ];
+        expect(getDefaultSeason(seasons)).toBe('Spring 2025');
+      });
+
+      it('returns all when no seasons are available', () => {
+        expect(getDefaultSeason([])).toBe('all');
+      });
+    });
+
+    describe('Division Filtering (filterSchoolsByDivision)', () => {
+      // schoolBoth has ['Varsity', 'Junior Varsity']
+      // schoolVarsity has ['Varsity']
+      // schoolJv has ['Junior Varsity']
+      // schoolBronx has ['Registered']
+      const list = [schoolBoth, schoolVarsity, schoolJv, schoolBronx];
+
+      it('defaults to showing all schools (both Varsity and JV) when division is "all"', () => {
+        expect(filterSchoolsByDivision(list, 'all')).toEqual(list);
+        expect(filterSchoolsByDivision(list, '')).toEqual(list);
+      });
+
+      it('filters to schools that field Varsity rosters (including schools with both)', () => {
+        const varsity = filterSchoolsByDivision(list, 'varsity');
+        expect(varsity.map((s) => s.schoolName)).toEqual([
+          'Stuyvesant High School',
+          'Midwood High School',
+        ]);
+      });
+
+      it('filters to schools that field Junior Varsity rosters (including schools with both)', () => {
+        const jv = filterSchoolsByDivision(list, 'jv');
+        expect(jv.map((s) => s.schoolName)).toEqual([
+          'Stuyvesant High School',
+          'Brooklyn Technical High School',
+        ]);
       });
     });
   });

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import Badge from '@/app/components/ui/Badge';
 import { slugify } from '@/app/lib/text-utils';
 
 export interface PlayerItem {
@@ -59,6 +58,121 @@ export function sortSchoolsAlphabetically<T extends { schoolName: string }>(scho
   );
 }
 
+export type SchoolSortOption = 'name-asc' | 'name-desc' | 'season-desc';
+
+/**
+ * Sorts schools based on specified sort criteria:
+ * - name-asc: Alphabetical (A-Z)
+ * - name-desc: Alphabetical (Z-A)
+ * - season-desc: Most recent / active season first, ties broken by school name
+ */
+export function sortSchools<T extends SchoolGroup>(
+  schools: T[],
+  sortBy: SchoolSortOption = 'name-asc'
+): T[] {
+  const copy = [...schools];
+  if (sortBy === 'name-desc') {
+    return copy.sort((a, b) =>
+      b.schoolName.localeCompare(a.schoolName, undefined, { sensitivity: 'base' })
+    );
+  }
+  if (sortBy === 'season-desc') {
+    return copy.sort((a, b) => {
+      const aHasActive = a.seasons?.some((s) => s.isSeasonActive) ? 1 : 0;
+      const bHasActive = b.seasons?.some((s) => s.isSeasonActive) ? 1 : 0;
+      if (bHasActive !== aHasActive) {
+        return bHasActive - aHasActive;
+      }
+      const aLatestSeason = a.seasons?.find((s) => s.isSeasonActive)?.seasonName || a.seasons?.[0]?.seasonName || '';
+      const bLatestSeason = b.seasons?.find((s) => s.isSeasonActive)?.seasonName || b.seasons?.[0]?.seasonName || '';
+      const seasonCompare = bLatestSeason.localeCompare(aLatestSeason, undefined, { numeric: true });
+      if (seasonCompare !== 0) {
+        return seasonCompare;
+      }
+      return a.schoolName.localeCompare(b.schoolName, undefined, { sensitivity: 'base' });
+    });
+  }
+  return copy.sort((a, b) =>
+    a.schoolName.localeCompare(b.schoolName, undefined, { sensitivity: 'base' })
+  );
+}
+
+/**
+ * Filters schools by season name or ID. If seasonFilter is 'all' or empty, returns all schools.
+ */
+export function filterSchoolsBySeason<T extends SchoolGroup>(
+  schools: T[],
+  seasonFilter: string
+): T[] {
+  const s = seasonFilter?.trim();
+  if (!s || s.toLowerCase() === 'all') return schools;
+
+  return schools.filter((school) =>
+    school.seasons?.some(
+      (season) =>
+        season.seasonName.toLowerCase() === s.toLowerCase() ||
+        season.seasonId.toLowerCase() === s.toLowerCase()
+    )
+  );
+}
+
+export interface AvailableSeason {
+  seasonName: string;
+  isSeasonActive?: boolean;
+}
+
+/**
+ * Extracts distinct seasons across all schools, ordered active first, then descending by season name.
+ */
+export function getAvailableSeasons(schools: SchoolGroup[]): AvailableSeason[] {
+  const map = new Map<string, AvailableSeason>();
+  for (const school of schools) {
+    for (const season of school.seasons || []) {
+      if (season.seasonName && !map.has(season.seasonName)) {
+        map.set(season.seasonName, {
+          seasonName: season.seasonName,
+          isSeasonActive: Boolean(season.isSeasonActive),
+        });
+      } else if (season.isSeasonActive && map.has(season.seasonName)) {
+        map.get(season.seasonName)!.isSeasonActive = true;
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.isSeasonActive && !b.isSeasonActive) return -1;
+    if (!a.isSeasonActive && b.isSeasonActive) return 1;
+    return b.seasonName.localeCompare(a.seasonName, undefined, { numeric: true });
+  });
+}
+
+/**
+ * Determines the default season to display.
+ * Defaults to the current active season (e.g. 2026-27 / 26-27), or any active season,
+ * or the most recent season, falling back to 'all'.
+ */
+export function getDefaultSeason(availableSeasons: AvailableSeason[]): string {
+  if (!availableSeasons || availableSeasons.length === 0) return 'all';
+
+  // 1. Current active season explicitly matching 2026-27 or 26-27
+  const currentActive = availableSeasons.find(
+    (s) => s.isSeasonActive && (s.seasonName === '2026-27' || s.seasonName.includes('26-27'))
+  );
+  if (currentActive) return currentActive.seasonName;
+
+  // 2. Any active season
+  const anyActive = availableSeasons.find((s) => s.isSeasonActive);
+  if (anyActive) return anyActive.seasonName;
+
+  // 3. Any season matching 2026-27 or 26-27
+  const currentNamed = availableSeasons.find(
+    (s) => s.seasonName === '2026-27' || s.seasonName.includes('26-27')
+  );
+  if (currentNamed) return currentNamed.seasonName;
+
+  // 4. Most recent season
+  return availableSeasons[0]?.seasonName || 'all';
+}
+
 /**
  * Builds the canonical roster page link for a given school and game.
  */
@@ -98,6 +212,37 @@ export function filterSchoolsByQuery<T extends SchoolGroup>(
   });
 }
 
+export type DivisionFilterOption = 'all' | 'varsity' | 'jv';
+
+/**
+ * Filters schools by division ('all', 'varsity', 'jv').
+ * - 'all' (default): returns all schools (both Varsity and JV)
+ * - 'varsity': returns schools fielding a Varsity roster
+ * - 'jv': returns schools fielding a Junior Varsity roster
+ */
+export function filterSchoolsByDivision<T extends SchoolGroup>(
+  schools: T[],
+  division: DivisionFilterOption | string,
+  targetSeason?: string
+): T[] {
+  const d = division?.trim().toLowerCase();
+  if (!d || d === 'all') return schools;
+
+  const wantVarsity = d === 'varsity';
+  const wantJv = d === 'jv' || d === 'junior-varsity' || d === 'junior varsity';
+
+  return schools.filter((school) => {
+    const badges = getSchoolDivisionBadges(school, true, targetSeason);
+    if (wantVarsity) {
+      return badges.includes('Varsity');
+    }
+    if (wantJv) {
+      return badges.includes('Junior Varsity');
+    }
+    return badges.some((b) => b.toLowerCase() === d);
+  });
+}
+
 /**
  * Determines the division badge labels for a school.
  * If a team fields both Varsity and Junior Varsity, returns both ['Varsity', 'Junior Varsity'].
@@ -107,14 +252,24 @@ export function filterSchoolsByQuery<T extends SchoolGroup>(
  */
 export function getSchoolDivisionBadges(
   school: SchoolGroup,
-  preferActiveSeasons = true
+  preferActiveSeasons = true,
+  targetSeason?: string
 ): string[] {
   if (school.divisionBadges && school.divisionBadges.length > 0) {
     return school.divisionBadges;
   }
 
   let seasonsToInspect = school.seasons || [];
-  if (preferActiveSeasons) {
+  if (targetSeason && targetSeason !== 'all') {
+    const matched = school.seasons?.filter(
+      (s) =>
+        s.seasonName.toLowerCase() === targetSeason.toLowerCase() ||
+        s.seasonId.toLowerCase() === targetSeason.toLowerCase()
+    );
+    if (matched && matched.length > 0) {
+      seasonsToInspect = matched;
+    }
+  } else if (preferActiveSeasons) {
     const activeWithRosters = school.seasons?.filter(
       (s) => s.isSeasonActive && s.rosters && s.rosters.length > 0
     );
@@ -230,18 +385,28 @@ export default function TeamsFilterClient({
     }));
   }, [schoolGroups, teamGroups]);
 
-  const sortedSchools = useMemo(() => {
-    return sortSchoolsAlphabetically(normalizedSchoolGroups);
+  const availableSeasons = useMemo(() => {
+    return getAvailableSeasons(normalizedSchoolGroups);
   }, [normalizedSchoolGroups]);
+
+  const defaultSeason = useMemo(() => {
+    return getDefaultSeason(availableSeasons);
+  }, [availableSeasons]);
+
+  const [selectedSeason, setSelectedSeason] = useState(defaultSeason);
+  const [selectedDivision, setSelectedDivision] = useState<DivisionFilterOption>('all');
+
+  // Combined filtering & sorting (always sorted Alphabetically A-Z)
+  const processedSchools = useMemo(() => {
+    const seasonFiltered = filterSchoolsBySeason(normalizedSchoolGroups, selectedSeason);
+    const divisionFiltered = filterSchoolsByDivision(seasonFiltered, selectedDivision, selectedSeason);
+    const searchFiltered = filterSchoolsByQuery(divisionFiltered, searchQuery);
+    return sortSchoolsAlphabetically(searchFiltered);
+  }, [normalizedSchoolGroups, selectedSeason, selectedDivision, searchQuery]);
 
   const resolvedGameSlug = gameSlug || slugify(gameDisplayName);
 
-  // Search filter
-  const filteredSchools = useMemo(() => {
-    return filterSchoolsByQuery(sortedSchools, searchQuery);
-  }, [sortedSchools, searchQuery]);
-
-  if (sortedSchools.length === 0) {
+  if (normalizedSchoolGroups.length === 0) {
     return (
       <div className="text-center p-8 sm:p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line space-y-2">
         <p className="font-semibold text-foreground-secondary">
@@ -256,82 +421,157 @@ export default function TeamsFilterClient({
 
   return (
     <div className="space-y-4">
-      {/* Search Bar */}
-      <div className="relative">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={`Search teams in ${gameDisplayName}...`}
-          aria-label={`Search teams in ${gameDisplayName}`}
-          className="w-full bg-surface-raised border border-line rounded-xl pl-10 pr-10 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-200"
-        />
-        <svg
-          className="absolute left-3.5 top-3 w-4 h-4 text-foreground-muted pointer-events-none"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      {/* Controls: Search Bar + Season Filter + Division Filter */}
+      <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+        {/* Search Bar */}
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={`Search teams in ${gameDisplayName}...`}
+            aria-label={`Search teams in ${gameDisplayName}`}
+            className="w-full min-h-[44px] bg-surface-raised border border-line rounded-xl pl-10 pr-10 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-200"
           />
-        </svg>
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-foreground-muted hover:text-foreground text-sm cursor-pointer"
-            aria-label="Clear search"
+          <svg
+            className="absolute left-3.5 top-3 w-4 h-4 text-foreground-muted pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
           >
-            ✕
-          </button>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-foreground-muted hover:text-foreground text-sm cursor-pointer"
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Season Filter Dropdown */}
+        {availableSeasons.length > 0 && (
+          <div className="relative shrink-0">
+            <label htmlFor="season-filter" className="sr-only">
+              Filter by season
+            </label>
+            <select
+              id="season-filter"
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(e.target.value)}
+              aria-label="Filter by season"
+              className="w-full sm:w-auto min-h-[44px] bg-surface-raised border border-line rounded-xl pl-3.5 pr-8 py-2 text-xs sm:text-sm font-semibold text-foreground focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all appearance-none cursor-pointer"
+            >
+              <option value="all">All Seasons</option>
+              {availableSeasons.map((season) => (
+                <option key={season.seasonName} value={season.seasonName}>
+                  {season.seasonName} {season.isSeasonActive ? '(Active)' : ''}
+                </option>
+              ))}
+            </select>
+            <svg
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         )}
+
+        {/* Division Filter Dropdown (Varsity / JV / Both) */}
+        <div className="relative shrink-0">
+          <label htmlFor="division-filter" className="sr-only">
+            Filter by division
+          </label>
+          <select
+            id="division-filter"
+            value={selectedDivision}
+            onChange={(e) => setSelectedDivision(e.target.value as DivisionFilterOption)}
+            aria-label="Filter by division"
+            className="w-full sm:w-auto min-h-[44px] bg-surface-raised border border-line rounded-xl pl-3.5 pr-8 py-2 text-xs sm:text-sm font-semibold text-foreground focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all appearance-none cursor-pointer"
+          >
+            <option value="all">All Divisions (Varsity & JV)</option>
+            <option value="varsity">Varsity</option>
+            <option value="jv">Junior Varsity (JV)</option>
+          </select>
+          <svg
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </div>
 
       {/* Team count header */}
       <div role="status" aria-live="polite" className="flex items-center justify-between text-xs text-foreground-muted px-1">
         <span>
-          Showing <strong className="text-foreground font-bold">{filteredSchools.length}</strong>{' '}
-          {searchQuery ? `matching team${filteredSchools.length === 1 ? '' : 's'}` : `team${sortedSchools.length === 1 ? '' : 's'}`}
-          {searchQuery && sortedSchools.length !== filteredSchools.length && (
-            <span className="text-foreground-muted"> (of {sortedSchools.length})</span>
+          Showing <strong className="text-foreground font-bold">{processedSchools.length}</strong>{' '}
+          {searchQuery || selectedSeason !== 'all' || selectedDivision !== 'all'
+            ? `matching team${processedSchools.length === 1 ? '' : 's'}`
+            : `team${normalizedSchoolGroups.length === 1 ? '' : 's'}`}
+          {(searchQuery || selectedSeason !== 'all' || selectedDivision !== 'all') && normalizedSchoolGroups.length !== processedSchools.length && (
+            <span className="text-foreground-muted"> (of {normalizedSchoolGroups.length})</span>
           )}
         </span>
         <span className="hidden sm:inline">Alphabetical (A–Z)</span>
       </div>
 
       {/* List of teams or empty filter state */}
-      {filteredSchools.length === 0 ? (
+      {processedSchools.length === 0 ? (
         <div className="text-center p-8 sm:p-12 text-foreground-muted text-sm bg-surface-raised/40 rounded-2xl border border-line space-y-3">
           <p className="font-semibold text-foreground-secondary">
-            No teams match &ldquo;{searchQuery}&rdquo;.
+            {searchQuery ? (
+              <>No teams match &ldquo;{searchQuery}&rdquo;.</>
+            ) : selectedDivision !== 'all' ? (
+              <>No {selectedDivision === 'jv' ? 'Junior Varsity' : 'Varsity'} teams found for the selected season.</>
+            ) : (
+              <>No teams found for the selected season.</>
+            )}
           </p>
           <button
             type="button"
-            onClick={() => setSearchQuery('')}
-            className="text-xs font-bold text-accent hover:underline cursor-pointer"
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedSeason(defaultSeason);
+              setSelectedDivision('all');
+            }}
+            className="min-h-[44px] inline-flex items-center text-xs font-bold text-accent hover:underline cursor-pointer"
           >
-            Clear search
+            Reset filters
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-line bg-surface-raised/60 divide-y divide-line overflow-hidden shadow-sm">
-          {filteredSchools.map((school) => {
-            const divisionBadges = getSchoolDivisionBadges(school);
+        <div className="rounded-xl border border-line bg-surface-raised/60 divide-y divide-line overflow-hidden shadow-sm">
+          {processedSchools.map((school) => {
             const rosterHref = getTeamRosterUrl(resolvedGameSlug, school);
+            const activeSeason = school.seasons?.find((s) => s.isSeasonActive);
+            const latestSeason = activeSeason?.seasonName || school.seasons?.[0]?.seasonName;
 
             return (
               <div
                 key={school.schoolId}
-                className="group flex items-center justify-between gap-4 p-4 sm:p-5 hover:bg-surface-sunken/50 transition-colors"
+                className="group relative flex items-center justify-between gap-3 px-3 py-2 sm:px-4 sm:py-2.5 hover:bg-surface-sunken/50 transition-colors"
               >
-                {/* School avatar & clickable team name */}
-                <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 bg-surface-sunken border border-line rounded-xl flex items-center justify-center text-foreground font-black text-base sm:text-lg shrink-0 group-hover:border-accent/40 group-hover:text-accent transition-colors overflow-hidden">
+                {/* School avatar & clickable school name */}
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-surface-sunken border border-line flex items-center justify-center text-foreground font-black text-sm shrink-0 group-hover:border-accent/40 group-hover:text-accent transition-colors overflow-hidden">
                     {school.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -339,7 +579,7 @@ export default function TeamsFilterClient({
                         alt=""
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-contain p-1"
+                        className="w-full h-full object-contain p-0.5"
                       />
                     ) : (
                       school.schoolName.charAt(0)
@@ -348,26 +588,25 @@ export default function TeamsFilterClient({
                   <div className="min-w-0">
                     <Link
                       href={rosterHref}
-                      className="text-base sm:text-lg font-bold text-foreground hover:text-accent focus:outline-none focus:underline transition-colors tracking-tight truncate block"
+                      className="text-sm sm:text-base font-semibold text-foreground hover:text-accent focus:outline-none focus:underline transition-colors tracking-tight truncate block after:absolute after:inset-0"
                     >
                       {school.schoolName}
                     </Link>
                   </div>
                 </div>
 
-                {/* Division indicator badges & navigation chevron */}
-                <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    {divisionBadges.map((badge) => (
-                      <Badge
-                        key={badge}
-                        variant="neutral"
-                        size="sm"
-                      >
-                        {badge}
-                      </Badge>
-                    ))}
-                  </div>
+                {/* Subtle season name & navigation chevron */}
+                <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                  {latestSeason && (
+                    <span className="text-xs text-foreground-muted hidden sm:inline">
+                      {latestSeason}
+                      {activeSeason && (
+                        <span className="ml-1 text-[10px] font-bold text-accent uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </span>
+                  )}
 
                   <Link
                     href={rosterHref}
@@ -375,7 +614,7 @@ export default function TeamsFilterClient({
                     aria-hidden="true"
                     className="text-foreground-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all p-1"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
