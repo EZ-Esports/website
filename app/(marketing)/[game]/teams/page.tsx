@@ -29,13 +29,14 @@ export default async function TeamsPage({ params }: TeamsPageProps) {
   }
 
   const gameConfig = GAMES[game as GameSlug];
+  const isTournament = gameConfig.competitionModel === 'tournament';
+
   const schoolGroups = await getGameTeamsPageData(game);
 
   if (schoolGroups === null) {
     notFound();
   }
 
-  const isTournament = gameConfig.competitionModel === 'tournament';
   const pageTitle = isTournament
     ? `${gameConfig.displayName} Participants & Rosters`
     : `${gameConfig.displayName} School Teams & Rosters`;

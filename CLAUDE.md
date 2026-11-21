@@ -32,6 +32,9 @@ production. Confirm first, every time, even though the code would technically al
 If you're testing seed/migration changes, do it against a local Postgres with
 an explicit `DATABASE_URL` — never by relying on `.env`.
 
+### Development Server Network Access
+The local dev server (`npm run dev`) connects to the remote Supabase Postgres database. Whenever launching the development server, run it with outbound network access (`BypassSandbox: true`) so DNS resolution to `aws-1-us-east-1.pooler.supabase.com` succeeds.
+
 ## The Vercel Data Cache survives redeploys
 
 `unstable_cache` entries (tags: `games`, `schools`, `members`, `teams`,

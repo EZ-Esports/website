@@ -74,8 +74,8 @@ export default function GameSubHeader() {
                   aria-current={isActive ? 'page' : undefined}
                   className={`px-3.5 min-h-[44px] flex items-center rounded-lg text-xs font-bold uppercase tracking-wider transition-all select-none cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? 'bg-accent text-on-accent shadow-sm'
-                      : 'text-foreground-secondary hover:text-foreground hover:bg-surface-raised/50'
+                      ? 'border border-accent bg-surface-raised text-foreground shadow-sm'
+                      : 'border border-transparent text-foreground-secondary hover:text-foreground hover:bg-surface-raised/50'
                   }`}
                 >
                   {item.label}
