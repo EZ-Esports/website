@@ -39,6 +39,17 @@ export function hasPermission(
   return (userPermissions & requiredPermission) !== BigInt(0);
 }
 
+/**
+ * Single source of truth for who may lift a staff revocation tombstone by inviting the revoked
+ * email again: Owners and anyone with the ADMINISTRATOR permission bit (the Dev role). It is keyed
+ * on the permission bit, not the role name, so renaming a role neither grants nor removes it, and
+ * a MANAGE_ROLES holder cannot mint it (canGrantPermissions only lets you grant bits you hold).
+ * Every other staff-invite check (hierarchy, permission-subset limits) is unchanged.
+ */
+export function canReinviteRevokedStaff(isOwner: boolean, permissions: bigint): boolean {
+  return hasPermission(permissions, isOwner, Permissions.ADMINISTRATOR);
+}
+
 export interface StaffRoleGrant {
   permissions: bigint;
   position: number;
