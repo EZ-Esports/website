@@ -81,7 +81,7 @@ export async function ensureStaffMember(userId: string, email: string | undefine
 
     if (revocation) {
       console.warn('Revoked staff identity attempted to authenticate', { userId, email: normalizedEmail });
-      throw new StaffSetupError('Your staff access has been revoked. Ask an Owner to explicitly restore the account.');
+      throw new StaffSetupError('Your staff access has been revoked. Ask an Owner or Dev to invite you again.');
     }
 
     const [existingById] = await tx

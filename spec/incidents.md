@@ -248,6 +248,16 @@ Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find
 
 ---
 
+## 26. Only an Owner could bring revoked staff back (spec-065, Nov 2026)
+
+**Symptom.** After Remove Access, re-inviting the email failed ("must be restored through a trusted Owner workflow"); only the Owner CLI `--restore-revoked` worked.
+
+**Root cause.** `inviteStaff` hard-refused any email with a `staff_revocations` tombstone for every actor.
+
+**Fix.** `canReinviteRevokedStaff` (Owner or Dev) lets the invite clear the tombstone atomically under the revocation lock and audit it. Regression tests in `team/__tests__/actions.test.ts`.
+
+---
+
 ## 16. Smaller scars
 
 - **`930299c`:** 389 matches imported `scheduled`/null — do not invent W–L from incomplete archives.

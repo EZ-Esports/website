@@ -23,7 +23,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const role = { id: 'r1', name: 'Ops', color: '#3b82f6', position: 10 };
+const role = { id: 'r1', name: 'Staff', color: '#3b82f6', position: 10 };
 
 function deferred<T>() {
   let resolve!: (v: T) => void;

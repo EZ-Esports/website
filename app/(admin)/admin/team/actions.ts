@@ -11,6 +11,7 @@ import {
   canGrantPermissions,
   calculateEffectiveStaffAccess,
   hasPermission,
+  canReinviteRevokedStaff,
 } from '@/app/lib/roles';
 import { db } from '@/app/lib/db';
 import * as schema from '@/app/lib/db/schema';
@@ -63,6 +64,7 @@ async function getFreshActorAccess(userId: string, txOrDb: DbOrTx = db) {
 
   const assignedRoles = await txOrDb
     .select({
+      name: schema.roles.name,
       permissions: schema.roles.permissions,
       position: schema.roles.position,
       isOwner: schema.roles.isOwner,
@@ -90,7 +92,12 @@ async function getFreshActorAccess(userId: string, txOrDb: DbOrTx = db) {
     throw new ActionError('FORBIDDEN', 'You do not have permission to manage roles.');
   }
 
-  return { id: userId, isOwner, permissions, highestRolePosition };
+  return {
+    id: userId,
+    isOwner,
+    permissions,
+    highestRolePosition,
+  };
 }
 
 /** Create a single-use staff invite, optionally mapping it to initial roles. */
@@ -162,16 +169,28 @@ export async function inviteStaff(formData: FormData): Promise<{
         throw new ActionError('STAFF_EXISTS', 'That email already belongs to a staff member.');
       }
 
-      const [revokedIdentity] = await tx
+      const revokedIdentities = await tx
         .select({ userId: schema.staffRevocations.userId })
         .from(schema.staffRevocations)
-        .where(sql`lower(${schema.staffRevocations.email}) = ${email}`)
-        .limit(1);
-      if (revokedIdentity) {
-        throw new ActionError(
-          'STAFF_REVOKED',
-          'That identity was explicitly revoked and must be restored through a trusted Owner workflow before it can be invited again.',
-        );
+        .where(sql`lower(${schema.staffRevocations.email}) = ${email}`);
+      if (revokedIdentities.length > 0) {
+        if (!canReinviteRevokedStaff(freshStaff.isOwner, freshStaff.permissions)) {
+          throw new ActionError(
+            'STAFF_REVOKED',
+            'That identity was explicitly revoked. Only an Owner or Dev can invite it again.',
+          );
+        }
+        // Inviting is the restore: the tombstone is cleared in this same locked transaction
+        // so acceptInvite() (which shares the lock) sees either the tombstone or the invite.
+        await tx
+          .delete(schema.staffRevocations)
+          .where(sql`lower(${schema.staffRevocations.email}) = ${email}`);
+        await tx.insert(schema.staffAuditLogs).values({
+          event: 'staff_revocation_cleared_by_invite',
+          userId: staff.id,
+          email,
+          details: `Revocation cleared by re-invite from ${staff.id}`,
+        });
       }
 
       // Re-verify requested roles under lock against fresh actor authority

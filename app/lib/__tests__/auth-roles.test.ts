@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Permissions, hasPermission, canActOnMember, canManageRole, nextRolePosition, filterAssignableRoles, canGrantPermissions, calculateEffectiveStaffAccess, RETIRED_PERMISSION_BITS, withoutRetiredPermissionBits } from '../roles';
+import { Permissions, hasPermission, canActOnMember, canManageRole, nextRolePosition, filterAssignableRoles, canGrantPermissions, calculateEffectiveStaffAccess, RETIRED_PERMISSION_BITS, withoutRetiredPermissionBits, canReinviteRevokedStaff } from '../roles';
 import { getAllowedAdminHrefs, hasAnyManagementPermission } from '../staff-access';
 import { buildStaffInviteRoleRows } from '../staff-invites';
 
@@ -229,5 +229,14 @@ describe('canGrantPermissions', () => {
       const actor = { permissions: Permissions.MANAGE_NEWS, isOwner: false, highestRolePosition: 5 };
       expect(filterAssignableRoles(roles, actor)).toHaveLength(1);
     });
+  });
+});
+
+describe('canReinviteRevokedStaff', () => {
+  it('allows Owners and ADMINISTRATOR holders only', () => {
+    expect(canReinviteRevokedStaff(true, BigInt(0))).toBe(true);
+    expect(canReinviteRevokedStaff(false, Permissions.ADMINISTRATOR)).toBe(true);
+    expect(canReinviteRevokedStaff(false, Permissions.MANAGE_ROLES)).toBe(false);
+    expect(canReinviteRevokedStaff(false, BigInt(0))).toBe(false);
   });
 });
