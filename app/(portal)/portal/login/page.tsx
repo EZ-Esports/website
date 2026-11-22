@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Card from '@/app/components/ui/Card';
 import Header from '@/app/components/layout/Header';
 import Footer from '@/app/components/layout/Footer';
+import { MESSAGE_MAP } from '@/app/(marketing)/login/messages';
 import PortalLoginForm from './PortalLoginForm';
 
 export const metadata: Metadata = {
@@ -15,7 +16,9 @@ interface PortalLoginPageProps {
 }
 
 export default async function PortalLoginPage({ searchParams }: PortalLoginPageProps) {
-  const { message, email } = await searchParams;
+  const { message: messageKey, email } = await searchParams;
+  // Allowlisted keys only, so arbitrary ?message= text is never reflected into the page.
+  const message = messageKey ? (MESSAGE_MAP[messageKey] ?? null) : null;
 
   return (
     <div className="bg-surface text-foreground">

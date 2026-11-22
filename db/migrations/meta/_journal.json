@@ -428,6 +428,13 @@
       "when": 1790882000031,
       "tag": "0061_rosters_scope_contract",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1790882000040,
+      "tag": "0062_password_reset_links",
+      "breakpoints": true
     }
   ]
 }

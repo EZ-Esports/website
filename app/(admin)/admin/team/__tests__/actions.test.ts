@@ -51,6 +51,8 @@ const mocks = vi.hoisted(() => {
     userRolesStore: [] as UserRoleRecord[],
     staffInvitesStore: [] as StaffInviteRecord[],
     staffInviteRolesStore: [] as StaffInviteRoleRecord[],
+    revocationsStore: [] as { userId: string; email: string }[],
+    auditEvents: [] as string[],
     onLockHook: null as (() => void) | null,
     executedLocks: [] as number[],
   };
@@ -177,6 +179,11 @@ const mocks = vi.hoisted(() => {
           }
           return results;
         }
+        if (currentTable === schema.staffRevocations) {
+          return state.revocationsStore
+            .filter((r) => conds.every((c) => matchesRow(r, c)))
+            .map((r) => ({ ...r }));
+        }
         if (currentTable === schema.staffInvites) {
           return state.staffInvitesStore
             .filter((i) => conds.every((c) => matchesRow(i, c)))
@@ -207,6 +214,8 @@ const mocks = vi.hoisted(() => {
           for (const r of rows) {
             state.staffInviteRolesStore.push({ ...r });
           }
+        } else if (table === schema.staffAuditLogs) {
+          for (const r of rows) state.auditEvents.push(r.event);
         }
         return {
           returning: vi.fn(async () => rows.map((r: any, idx: number) => ({ id: r.id ?? `id-${idx}` }))),
@@ -262,6 +271,11 @@ const mocks = vi.hoisted(() => {
           const removed = state.staffInvitesStore.filter((r) => conds.every((c) => matchesRow(r, c)));
           state.staffInvitesStore = state.staffInvitesStore.filter((r) => !conds.every((c) => matchesRow(r, c)));
           return removed.map((r) => ({ id: r.id }));
+        }
+        if (table === schema.staffRevocations) {
+          const removed = state.revocationsStore.filter((r) => conds.every((c) => matchesRow(r, c)));
+          state.revocationsStore = state.revocationsStore.filter((r) => !conds.every((c) => matchesRow(r, c)));
+          return removed;
         }
         return [{ id: 'deleted-id' }];
       }
@@ -723,6 +737,8 @@ describe('Owner role hierarchy (non-owners can never grant or manage Owner roles
     ];
     mocks.state.staffInvitesStore = [];
     mocks.state.staffInviteRolesStore = [];
+    mocks.state.revocationsStore = [];
+    mocks.state.auditEvents = [];
     mocks.mockRequirePermission.mockResolvedValue(devActor);
   });
 
@@ -731,6 +747,61 @@ describe('Owner role hierarchy (non-owners can never grant or manage Owner roles
 
     expect(result.success).toBe(false);
     expect(mocks.state.userRolesStore.some((ur) => ur.userId === 'user-target' && ur.roleId === owner.id)).toBe(false);
+  });
+
+  describe('re-inviting a revoked email', () => {
+    const reinvite = () => {
+      const form = new FormData();
+      form.set('email', 'Gone@Example.com');
+      return inviteStaff(form);
+    };
+    beforeEach(() => {
+      mocks.state.revocationsStore = [{ userId: 'old-user', email: 'gone@example.com' }];
+    });
+
+    it('lets a Dev re-invite, clearing the tombstone and auditing it', async () => {
+      const result = await reinvite();
+      expect(result.success).toBe(true);
+      expect(mocks.state.revocationsStore).toHaveLength(0);
+      expect(mocks.state.staffInvitesStore).toHaveLength(1);
+      expect(mocks.state.auditEvents).toContain('staff_revocation_cleared_by_invite');
+    });
+
+    it('lets an Owner re-invite', async () => {
+      mocks.mockRequirePermission.mockResolvedValue({ ...devActor, id: 'user-owner', isOwner: true });
+      const result = await reinvite();
+      expect(result.success).toBe(true);
+      expect(mocks.state.revocationsStore).toHaveLength(0);
+    });
+
+    it('keeps access after the Dev role is renamed (bit, not name)', async () => {
+      const row = mocks.state.rolesStore.find((r) => r.id === 'r-dev');
+      expect(row).toBeDefined();
+      row!.name = 'Platform';
+      const result = await reinvite();
+      expect(result.success).toBe(true);
+    });
+
+    it('refuses a MANAGE_ROLES role merely named "Dev" (name grants nothing)', async () => {
+      mocks.state.rolesStore.push({ ...role({ id: 'r-fake', name: 'Dev', position: 5, permissions: Permissions.MANAGE_ROLES }) });
+      mocks.state.staffMembersStore.push({ userId: 'user-fake', email: 'fake@example.com' });
+      mocks.state.userRolesStore.push({ userId: 'user-fake', roleId: 'r-fake' });
+      mocks.mockRequirePermission.mockResolvedValue({ ...devActor, id: 'user-fake', permissions: Permissions.MANAGE_ROLES, highestRolePosition: 5 });
+      const result = await reinvite();
+      expect(result.success).toBe(false);
+      expect(mocks.state.revocationsStore).toHaveLength(1);
+    });
+
+    it('refuses a staff member who is neither Owner nor Dev', async () => {
+      mocks.state.rolesStore.push({ ...role({ id: 'r-mgr', name: 'Staff', position: 5, permissions: Permissions.MANAGE_ROLES }) });
+      mocks.state.staffMembersStore.push({ userId: 'user-mgr', email: 'mgr@example.com' });
+      mocks.state.userRolesStore.push({ userId: 'user-mgr', roleId: 'r-mgr' });
+      mocks.mockRequirePermission.mockResolvedValue({ ...devActor, id: 'user-mgr', permissions: Permissions.MANAGE_ROLES, highestRolePosition: 5 });
+      const result = await reinvite();
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Owner or Dev/);
+      expect(mocks.state.revocationsStore).toHaveLength(1);
+    });
   });
 
   it('refuses to let a Dev ranked above Owner invite someone with the Owner role', async () => {
@@ -782,14 +853,14 @@ describe('Owner role hierarchy (non-owners can never grant or manage Owner roles
       highestRolePosition: 9999,
     });
     const form = new FormData();
-    form.set('name', 'Ops');
+    form.set('name', 'Staff');
     form.set('color', '#94a3b8');
     form.set('permissions', '0');
 
     const result = await createRole(form);
 
     expect(result.success).toBe(true);
-    const created = mocks.state.rolesStore.find((r) => r.name === 'Ops')!;
+    const created = mocks.state.rolesStore.find((r) => r.name === 'Staff')!;
     expect(created.position).toBe(2);
     expect(created.position).toBeLessThan(owner.position);
     expect(mocks.state.rolesStore.find((r) => r.id === owner.id)!.position).toBe(9999);
@@ -804,7 +875,7 @@ describe('Owner role hierarchy (non-owners can never grant or manage Owner roles
       highestRolePosition: 9999,
     });
     const form = new FormData();
-    form.set('name', 'Ops');
+    form.set('name', 'Staff');
     form.set('color', '#94a3b8');
     form.set('permissions', '0');
 
@@ -812,6 +883,6 @@ describe('Owner role hierarchy (non-owners can never grant or manage Owner roles
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/no room/i);
-    expect(mocks.state.rolesStore.find((r) => r.name === 'Ops')).toBeUndefined();
+    expect(mocks.state.rolesStore.find((r) => r.name === 'Staff')).toBeUndefined();
   });
 });

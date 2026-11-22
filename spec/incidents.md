@@ -234,6 +234,28 @@ Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find
 
 **Do not repeat.** A step that can "succeed" without doing its job must be loud (error level) and tolerant of cosmetic edits to Google-side text.
 
+## 25. Late form submission rejected, then blocked by the response limit (spec-051, spec-063, Nov 2026)
+
+**Symptom.** A student submitted the Google Form more than 6 hours after opening the link. Google recorded the response, but the webhook answered `token_expired` (400, not retried) and no completion row was written. Resubmitting is impossible because the form is set to "Limit to 1 response", so the student was stuck on Step 6.
+
+**Root cause.** The verification token had a fixed 6-hour lifetime, independent of the invite it was bound to (often valid for days).
+
+**Fix.** The token now expires at the same moment as its invite (`signFormToken(..., expiresAtSec)`); the 6-hour value is only a fallback for an invite without an expiry. The route still separately rejects non-pending or expired invites (409 `invite_expired`). Tokens issued before the change keep their old expiry.
+
+**Stragglers.** Anyone already caught can be checked off by hand with a database write to `onboarding_form_completions` using `source = 'manual'`. The owner does this personally; there is deliberately no admin override.
+
+**Do not repeat.** A token that can expire while the invite it protects is still usable will strand people whose action is recorded by a third party that cannot be rolled back.
+
+---
+
+## 26. Only an Owner could bring revoked staff back (spec-065, Nov 2026)
+
+**Symptom.** After Remove Access, re-inviting the email failed ("must be restored through a trusted Owner workflow"); only the Owner CLI `--restore-revoked` worked.
+
+**Root cause.** `inviteStaff` hard-refused any email with a `staff_revocations` tombstone for every actor.
+
+**Fix.** `canReinviteRevokedStaff` (Owner or Dev) lets the invite clear the tombstone atomically under the revocation lock and audit it. Regression tests in `team/__tests__/actions.test.ts`.
+
 ---
 
 ## 16. Smaller scars
@@ -247,3 +269,4 @@ Running `vercel link --yes` in a checkout with no `.vercel/` folder did not find
 - **PR #146:** Applied `assertSeedTargetAllowed()` across `migrate.ts`, `drizzle.config.ts`, `seed-owner.ts`, `backfill-leadership.ts`, and `seed-phase2.ts` to prevent accidental non-loopback database mutations.
 - **Stale members after roster removal (spec-042, 28 Oct 2026):** removing a player deleted only the `players` row, so the member, consents, identities and spent invite lingered and collided with later onboarding (unique Discord/Riot ids, email lookups finding old data). Fix: shared orphan cleanup in the same transaction, fail-closed (keep on any doubt), with the staff and portal confirmations stating what is deleted. A misleading string ("They stay in the school's member list") was removed, and the manager portal's one-click removal gained a confirmation.
 - **Student ID photos of minors (spec-056, 2 Nov 2026) - standing risk, no incident.** The photos are PII of minors in a public repo's product. Rules that must not regress: the bucket stays private with no policies; no `getPublicUrl`, no signed URL inside any cached data, page, action result or CSV; staff open it only via the audited 120 s route; keys never come from the browser; any new code path that deletes a member or invite must call `sweepOrphanStudentIds()` after commit. `student_id_uploads.member_id` is SET NULL on purpose; do not change it to CASCADE or the object loses its only pointer.
+- **14 Nov 2026:** `RIOT_ID_REGEX` used `[a-zA-Z0-9]` for the tagline, so a real Riot ID with a CJK tag (`cappyバラ#那一个`) was rejected on step 3. Riot's developer FAQ allows any Unicode letter in both fields. The tag class is now `[\p{L}\p{Nd}]`.

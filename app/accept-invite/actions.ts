@@ -98,7 +98,7 @@ export async function acceptInvite(formData: FormData): Promise<{ error: string 
       if (revokedIdentity) {
         throw new ActionError(
           'STAFF_REVOKED',
-          'This staff identity has been revoked. Ask an Owner to restore it before accepting an invite.',
+          'This staff identity has been revoked. Ask an Owner or Dev to invite you again.',
         );
       }
 

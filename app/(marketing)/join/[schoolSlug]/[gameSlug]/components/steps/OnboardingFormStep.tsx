@@ -142,7 +142,7 @@ export function OnboardingFormStep({ token, completed, onCompletedChange }: Onbo
             <div className="flex items-start gap-3 p-3.5 rounded-lg border border-amber-500/30 bg-amber-500/10">
               <FiAlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-xs sm:text-sm text-foreground">
-                The verification code in that link has expired, so a form submitted from it will not be
+                The verification code in that link has expired (it lasts as long as your invite), so a form submitted from it will not be
                 recognised. Use <strong>Open the form again</strong> for a fresh link and submit the form once more.
               </p>
             </div>

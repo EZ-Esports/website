@@ -157,7 +157,7 @@ async function findExistingAuthUserId(email: string): Promise<string | null> {
 }
 
 export const ONBOARDING_FORM_REQUIRED_MESSAGE =
-  'We have not received your onboarding form yet. Open the form from the last step, submit it, and wait for the green confirmation. If you opened the link more than 6 hours ago, use "Open the form again" to get a fresh one.';
+  'We have not received your onboarding form yet. Open the form from the last step, submit it, and wait for the green confirmation. If you submitted from an old link, or changed the verification code, use "Open the form again" and submit once more while your invite is still valid.';
 
 const DISCORD_ALREADY_LINKED_MESSAGE =
   'This Discord account is already linked to another EZ Esports member. Please reconnect with a different Discord account, or contact EZ Esports if you think this is a mistake.';

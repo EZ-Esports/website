@@ -273,3 +273,11 @@ Tracked on GitHub; listed here so a later agent knows they exist. Check `gh issu
 ## Manager create-roster (spec-061)
 
 - Resolved: `createSchoolRoster` now refuses non-staff callers (`Only EZ Esports staff can create rosters`), so the manager Create Roster control is enforced on the server as well as hidden in the UI. Not yet merged or deployed.
+
+## Password reset links (spec-064)
+
+- **Resolved: migration `0062_password_reset_links.sql` was applied to production on 14 Nov 2026** (new-table-only; dry run in a rolled-back transaction, then `npm run db:migrate` with its automatic full-schema backup; verified 56 migrations, RLS on, 4 indexes, table empty). PR #344 merged first, so the reset dialog briefly had no table behind it between merge and migration.
+- **Open: not exercised against a live Supabase project.** Unverified there: `auth.admin.updateUserById` with a password, and that the pooled database role may `delete from auth.sessions` (if not, the reset still works but old sessions are not ended; the failure is logged as "could not revoke existing sessions"). Access tokens already issued live until their normal expiry.
+- Not checked: a Supabase-level ban (`banned_until`) on the target. The in-process rate limiter resets on cold start; a persistent store would be the upgrade (same note as the login limiter).
+- The admin dialog was type-checked and unit-tested but not viewed in a browser (needs sign-in and the migrated table).
+- **Deliberate gap: no staff-account password reset.** Managers have no other recovery path; a staff password can be reset by an Owner in the Supabase dashboard. Re-enabling is a small change (add `'staff'` to `enabledKinds` in `app/lib/password-reset/server.ts`, a `kind` parameter on the actions and a menu item on `StaffRow`), with no migration.

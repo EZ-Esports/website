@@ -1,6 +1,6 @@
-# spec-063 — Public light and dark theme
+# spec-066 — Public light and dark theme
 
-- **Spec ID:** spec-063
+- **Spec ID:** spec-066
 - **Title:** Public light and dark theme
 - **Status:** In Progress
 - **PR / Commit:** branch `feat/light-dark-mode-v2`

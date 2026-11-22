@@ -50,7 +50,7 @@ export default function GameShowcase({ title, games }: GameShowcaseProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-surface-sunken/90 via-surface-sunken/40 to-transparent" aria-hidden="true" />
               <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 flex flex-col items-end justify-end">
                 <h3 className="text-foreground text-base sm:text-lg font-bold tracking-tight text-right">{game.title}</h3>
-                <div aria-hidden="true" className="inline-flex items-center gap-1 text-accent text-xs font-bold uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-all duration-200 text-right mt-1">
+                <div aria-hidden="true" className="inline-flex items-center gap-1 text-accent text-xs font-bold uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-all duration-200 text-right mt-1">
                   Explore Game <span className="text-sm">→</span>
                 </div>
               </div>

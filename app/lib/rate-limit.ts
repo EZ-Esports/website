@@ -49,6 +49,12 @@ export function rateLimit(
   };
 }
 
+/** Whether the key is already at its limit, without counting this call. */
+export function isRateLimited(key: string, limit: number, windowMs = 60_000): boolean {
+  const windowStart = Date.now() - windowMs;
+  return (store.get(key) ?? []).filter(t => t > windowStart).length >= limit;
+}
+
 /** Extract the best-effort client IP from a Next.js request. */
 export function getClientIp(req: Request): string {
   return (
