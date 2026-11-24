@@ -95,6 +95,9 @@ describe('authorization and input validation', () => {
     expect((await previewGenerateSeason(input({ startDate: '2026-02-30' }))).success).toBe(false);
     expect((await previewGenerateSeason(input({ division: 'All' }))).success).toBe(false);
     expect((await previewGenerateSeason(input({ schoolIds: ['x'] }))).success).toBe(false);
+    expect((await previewGenerateSeason(input({ matchCount: 0 }))).success).toBe(false);
+    expect((await previewGenerateSeason(input({ matchCount: 100 }))).success).toBe(false);
+    expect((await previewGenerateSeason(input({ daysOff: ['invalid-date'] }))).success).toBe(false);
   });
 
   it('explains odd and too-small selections', async () => {
@@ -323,5 +326,31 @@ describe('commitGenerateSeason', () => {
     const res = await commitGenerateSeason(input(), fp);
     mocks.db.transaction = original;
     expect((res as any).error).toMatch(/created by someone else/);
+  });
+
+  it('supports preview and commit with custom matchCount and daysOff', async () => {
+    // 8 schools, 5 matches per school, Thanksgiving skipped (2026-11-26)
+    const customInput = input({ matchCount: 5, daysOff: ['2026-11-26'] });
+    queueLoad();
+    const preview = await previewGenerateSeason(customInput);
+    expect(preview.success).toBe(true);
+    if (!preview.success) return;
+
+    expect(preview.preview.weeks).toHaveLength(5);
+    expect(preview.preview.skippedWeeks).toHaveLength(1);
+    expect(preview.preview.skippedWeeks[0].dateYmd).toBe('2026-11-23');
+    expect(preview.preview.matchCount).toBe(20);
+    expect(preview.preview.matchesPerSchool).toBe(5);
+    expect(preview.preview.totalCalendarWeeks).toBe(6);
+
+    // Commit with matching fingerprint
+    mocks.queue.push([{ id: SEASON }]);
+    queueLoad();
+    mocks.insertResults.push(
+      schoolIds.map((id, i) => ({ id: uuid(300 + i), schoolId: id })),
+      schoolIds.map((id, i) => ({ id: uuid(400 + i), schoolId: id }))
+    );
+    const commitRes = await commitGenerateSeason(customInput, preview.preview.fingerprint);
+    expect(commitRes).toEqual({ success: true, teamsCreated: 8, matchesCreated: 20 });
   });
 });

@@ -7,8 +7,10 @@
 import { canonicalDivision, type CanonicalDivision } from './db/match-page';
 import { storedDivision } from './school-roster-view';
 import {
+  computeSeasonDates,
   generateRegularSeasonRounds,
-  kickoffForRound,
+  isValidYmd,
+  REGULAR_SEASON_MATCHES,
   scheduleFingerprint,
   type ScheduleRound,
 } from './season-schedule';
@@ -46,6 +48,12 @@ export interface SeasonPlanMatch {
   awaySchoolId: string;
 }
 
+export interface SkippedWeekPlan {
+  dateYmd: string;
+  kickoffIso: string;
+  matchingDaysOff: string[];
+}
+
 export interface SeasonPlan {
   /** Schools that have no team in this season yet. */
   teamsToCreate: PlanSchool[];
@@ -57,8 +65,10 @@ export interface SeasonPlan {
   rosterDivision: string;
   rounds: ScheduleRound[];
   matches: SeasonPlanMatch[];
-  /** Matches per school, always 7 for a valid plan; surfaced so the preview can show it. */
+  skippedWeeks: SkippedWeekPlan[];
+  /** Matches per school; surfaced so the preview can show it. */
   matchesPerSchool: Record<string, number>;
+  matchesPerSchoolCount: number;
   fingerprint: string;
 }
 
@@ -69,10 +79,21 @@ export interface SeasonPlanInput {
   schools: PlanSchool[];
   existingTeams: PlanTeam[];
   existingRosters: PlanRoster[];
+  matchCount?: number;
+  daysOff?: string[];
 }
 
 export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
-  const { seasonId, startYmd, division, schools, existingTeams, existingRosters } = input;
+  const {
+    seasonId,
+    startYmd,
+    division,
+    schools,
+    existingTeams,
+    existingRosters,
+    matchCount = REGULAR_SEASON_MATCHES,
+    daysOff = [],
+  } = input;
 
   const teamBySchool = new Map(existingTeams.map((t) => [t.schoolId, t]));
 
@@ -99,10 +120,15 @@ export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
   // Seeded by season and division, so Varsity and JV differ and re-running the preview reproduces the same schedule.
   const rounds = generateRegularSeasonRounds(
     schools.map((s) => s.id),
-    `${seasonId}:${division}`
+    `${seasonId}:${division}`,
+    matchCount
   );
+
+  const { roundDates, skippedWeeks } = computeSeasonDates(startYmd, rounds.length, daysOff);
+  const roundDateMap = new Map(roundDates.map((rd) => [rd.round, rd.kickoff]));
+
   const matches: SeasonPlanMatch[] = rounds.flatMap((r) => {
-    const kickoff = kickoffForRound(startYmd, r.round);
+    const kickoff = roundDateMap.get(r.round)!;
     return r.pairs.map((p) => ({ round: r.round, kickoff, homeSchoolId: p.homeId, awaySchoolId: p.awayId }));
   });
 
@@ -112,6 +138,8 @@ export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
     matchesPerSchool[m.awaySchoolId] = (matchesPerSchool[m.awaySchoolId] ?? 0) + 1;
   }
 
+  const normalizedDaysOff = [...new Set(daysOff.filter(isValidYmd))].sort();
+
   return {
     teamsToCreate,
     rostersToCreate,
@@ -119,7 +147,13 @@ export function buildSeasonPlan(input: SeasonPlanInput): SeasonPlan {
     rosterDivision: storedDivision(division),
     rounds,
     matches,
+    skippedWeeks: skippedWeeks.map((sw) => ({
+      dateYmd: sw.dateYmd,
+      kickoffIso: sw.kickoff.toISOString(),
+      matchingDaysOff: sw.matchingDaysOff,
+    })),
     matchesPerSchool,
-    fingerprint: scheduleFingerprint(rounds, startYmd, [division]),
+    matchesPerSchoolCount: matchCount,
+    fingerprint: scheduleFingerprint(rounds, startYmd, [division, String(matchCount), ...normalizedDaysOff]),
   };
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({ preview: vi.fn(), commit: vi.fn() }));
@@ -53,12 +53,16 @@ async function fill(user: ReturnType<typeof userEvent.setup>) {
 describe('GenerateSeasonDialog', () => {
   it('locks the inputs while a preview is building', async () => {
     const user = userEvent.setup();
-    mocks.preview.mockReturnValue(new Promise(() => {}));
+    let resolve!: (v: unknown) => void;
+    mocks.preview.mockReturnValue(new Promise((r) => (resolve = r)));
     render(<Harness />);
     await fill(user);
     await user.click(screen.getByRole('button', { name: 'Preview schedule' }));
     await waitFor(() => expect(screen.getByLabelText('Game')).toBeDisabled());
     expect(screen.getByLabelText('School 0')).toBeDisabled();
+    await act(async () => {
+      resolve({ success: false, error: 'done' });
+    });
   });
 
   it('ignores a preview that resolves after the dialog was cancelled and reopened', async () => {
@@ -86,5 +90,53 @@ describe('GenerateSeasonDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Preview schedule' }));
     const text = await screen.findByText(/28 matches over/);
     expect(text.closest('[role="status"][aria-live="polite"]')).not.toBeNull();
+  });
+
+  it('allows configuring season length and adding/removing days off', async () => {
+    const user = userEvent.setup();
+    const previewWithDaysOff = {
+      ...fakePreview,
+      matchCount: 20,
+      totalCalendarWeeks: 6,
+      weeks: [{ round: 1, kickoffIso: '2026-11-02T00:00:00.000Z', matches: [{ homeName: 'A', awayName: 'B' }] }],
+      skippedWeeks: [{ dateYmd: '2026-11-23', kickoffIso: '2026-11-23T00:00:00.000Z', matchingDaysOff: ['2026-11-26'] }],
+    };
+    mocks.preview.mockResolvedValue({ success: true, preview: previewWithDaysOff });
+    render(<Harness />);
+    await fill(user);
+
+    // Change season length to 5
+    const matchInput = screen.getByLabelText(/Season length/);
+    await user.clear(matchInput);
+    await user.type(matchInput, '5');
+
+    // Add a day off (Thanksgiving 2026-11-26)
+    const dayOffInput = screen.getByLabelText(/Days off/);
+    await user.type(dayOffInput, '2026-11-26');
+    await user.click(screen.getByRole('button', { name: 'Add day off' }));
+
+    // Verify chip was added
+    expect(screen.getByText('2026-11-26')).toBeInTheDocument();
+
+    // Trigger preview
+    await user.click(screen.getByRole('button', { name: 'Preview schedule' }));
+
+    // Verify preview request received custom matchCount and daysOff
+    expect(mocks.preview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        matchCount: 5,
+        daysOff: ['2026-11-26'],
+      })
+    );
+
+    // Verify preview renders skipped week indicator
+    expect(await screen.findByText(/Skipped:/)).toBeInTheDocument();
+    expect(screen.getByText(/Day off \/ Holiday/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryAllByText(/Building preview/)).toHaveLength(0));
+
+    // Remove the day off chip
+    const removeBtn = screen.getByRole('button', { name: /Remove day off 2026-11-26/ });
+    await user.click(removeBtn);
+    expect(screen.queryByText('2026-11-26')).toBeNull();
   });
 });
