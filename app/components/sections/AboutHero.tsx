@@ -39,7 +39,7 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
   };
 
   return (
-    <section className="relative w-full min-h-[min(92vh,860px)] overflow-hidden [clip-path:polygon(0_0,100%_0,100%_94%,0_100%)]">
+    <section className="theme-dark relative w-full min-h-[min(92vh,860px)] overflow-hidden [clip-path:polygon(0_0,100%_0,100%_94%,0_100%)]">
       {/* Background image */}
       <div className="absolute inset-0 z-0 select-none pointer-events-none">
         <Image
@@ -52,16 +52,11 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
         />
         {/* Bottom-heavy gradient for legibility, plus a top scrim so the
             transparent header's nav text stays readable over the photo. */}
+        <div className="about-hero-scrim absolute inset-0" />
+        {/* Faint scanline texture: a light broadcast-overlay cue, not a load-bearing effect.
+            Light mode drops it so the photograph is not graded. */}
         <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(180deg, rgba(10,10,10,.72) 0%, rgba(10,10,10,.22) 30%, rgba(10,10,10,.5) 72%, rgba(10,10,10,.95) 100%)',
-          }}
-        />
-        {/* Faint scanline texture: a light broadcast-overlay cue, not a load-bearing effect. */}
-        <div
-          className="absolute inset-0 opacity-40 mix-blend-overlay"
+          className="about-hero-scanline absolute inset-0 opacity-40 mix-blend-overlay"
           style={{
             backgroundImage:
               'repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 3px)',
@@ -74,20 +69,20 @@ export default function AboutHero({ title, subtitle, backgroundImage, primaryCTA
       <div className="absolute inset-x-0 bottom-0 z-10 pb-14 sm:pb-16">
         <div className="container mx-auto px-6 sm:px-10 lg:px-16 xl:px-24">
           <h1
-            className="font-black uppercase tracking-tight leading-[0.94] text-foreground max-w-[16ch] drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+            className="hero-copy font-black uppercase tracking-tight leading-[0.94] text-foreground max-w-[16ch] drop-shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
             style={{ fontSize: 'clamp(38px, 8vw, 92px)' }}
           >
             {renderTitle(title)}
           </h1>
 
           {subtitle && (
-            <p className="mt-5 max-w-[62ch] text-base sm:text-lg leading-relaxed text-foreground-secondary font-medium">
+            <p className="hero-copy mt-5 max-w-[62ch] text-base sm:text-lg leading-relaxed text-foreground-secondary font-medium">
               {subtitle}
             </p>
           )}
 
           {(primaryCTA || secondaryCTA) && (
-            <div className="flex flex-wrap gap-3 mt-8">
+            <div className="hero-actions flex flex-wrap gap-3 mt-8">
               {primaryCTA && (
                 <CutCTA href={primaryCTA.href} variant="primary" external={primaryCTA.external}>
                   {primaryCTA.label}

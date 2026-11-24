@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { RouterProvider } from 'react-aria-components';
+import { ThemeProvider } from '@/app/components/theme/ThemeProvider';
+import type { ThemePreference } from '@/app/lib/theme';
 
 // Wires RAC's internal navigation (Link, Menu item hrefs, etc.) to the Next.js
 // App Router so client-side transitions go through router.push instead of a
@@ -15,7 +17,13 @@ import { RouterProvider } from 'react-aria-components';
 // RouterOptions with new fields the type error will surface here first.
 type NextNavigateOptions = Parameters<AppRouterInstance['push']>[1];
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({
+  initialTheme,
+  children,
+}: {
+  initialTheme: ThemePreference;
+  children: React.ReactNode;
+}) {
   const router = useRouter();
 
   useEffect(() => {
@@ -66,8 +74,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <RouterProvider navigate={(href, opts) => router.push(href, opts as NextNavigateOptions)}>
-      {children}
-    </RouterProvider>
+    <ThemeProvider initialPreference={initialTheme}>
+      <RouterProvider navigate={(href, opts) => router.push(href, opts as NextNavigateOptions)}>
+        {children}
+      </RouterProvider>
+    </ThemeProvider>
   );
 }

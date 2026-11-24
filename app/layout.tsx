@@ -4,7 +4,8 @@ import "./globals.css";
 import { CANONICAL_APP_URL, METADATA, SITE_CONFIG } from "@/app/lib/constants";
 import Providers from "@/app/components/ui/Providers";
 import { Analytics } from "@vercel/analytics/next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { THEME_COOKIE, htmlThemeClass, parseThemePreference } from "@/app/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,15 +68,21 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Awaiting headers opts the layout tree into dynamic rendering so Next.js
-  // can inject per-request CSP nonces into script tags during SSR.
+  // can inject per-request CSP nonces into its own scripts during SSR.
   await headers();
+  const themePreference = parseThemePreference((await cookies()).get(THEME_COOKIE)?.value);
+  const themeClass = htmlThemeClass(themePreference);
 
   return (
-    <html lang="en" className="notranslate" translate="no">
+    <html
+      lang="en"
+      className={["notranslate", themeClass].filter(Boolean).join(" ")}
+      translate="no"
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers initialTheme={themePreference}>{children}</Providers>
         {/* Renders nothing; injects the Vercel Analytics script. A sibling of
             Providers rather than a child because it reads route state straight
             from next/navigation and needs none of RAC's RouterProvider. */}

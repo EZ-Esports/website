@@ -75,7 +75,7 @@ export default async function CareerDetailPage({ params }: CareerDetailPageProps
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-foreground tracking-tight mb-4">
             {posting.title}
           </h1>
 
@@ -104,7 +104,7 @@ export default async function CareerDetailPage({ params }: CareerDetailPageProps
           {/* Main Description */}
           <div className="lg:col-span-7 space-y-8">
             <Card className="bg-surface-raised/30 border border-line p-6 sm:p-8">
-              <h2 className="text-xl font-black text-white uppercase tracking-wider mb-4 pb-3 border-b border-line/60">
+              <h2 className="text-xl font-black text-foreground uppercase tracking-wider mb-4 pb-3 border-b border-line/60">
                 Role Overview
               </h2>
               <p className="text-sm sm:text-base text-foreground-secondary leading-relaxed mb-6 font-medium">

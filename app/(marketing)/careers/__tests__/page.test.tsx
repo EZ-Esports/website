@@ -33,12 +33,13 @@ describe('CareersPage', () => {
 
     const html = renderToStaticMarkup(await CareersPage());
 
-    // The hero is the first section, fills the viewport, and carries the header-legibility scrim.
+    // The hero is the first section and fills the viewport. The header-legibility
+    // scrim lives in `.hero-band-scrim` (dark grade by default, white in light mode).
     expect(html.indexOf('<h1')).toBeLessThan(html.indexOf('Real-World Experience'));
     expect(html).toContain('h-screen');
     expect(html).toContain('hero-background.jpg');
     expect(html).toContain('<h1');
-    expect(html).toContain('linear-gradient(to_bottom,rgba(0,0,0,0.55)');
+    expect(html).toContain('hero-band-scrim');
     // The page body adds no spacer of its own to clear a solid header.
     expect(html).not.toContain('pt-[88px]');
   });

@@ -61,7 +61,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
   };
 
   return (
-    <section className="relative w-full min-h-[max(100vh,640px)] overflow-hidden">
+    <section className="theme-dark relative w-full min-h-[max(100vh,640px)] overflow-hidden">
       {/* Background image */}
       <div className="absolute inset-0 z-0 select-none pointer-events-none">
         <Image
@@ -73,13 +73,7 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
           className="object-cover object-center"
         />
         {/* Bottom-heavy gradient (legibility for bottom-aligned text) + top-right accent glow */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(0deg, rgba(13,8,9,.97) 0%, rgba(13,8,9,.6) 42%, rgba(13,8,9,.28) 70%, rgba(13,8,9,.62) 100%), radial-gradient(ellipse at 75% 15%, color-mix(in srgb, var(--color-accent) 18%, transparent) 0%, transparent 55%)',
-          }}
-        />
+        <div className="hero-photo-scrim absolute inset-0" />
       </div>
 
       {/* Content — anchored slightly below and left of dead-center: `top-[58%]`
@@ -89,20 +83,20 @@ export default function HomeHero({ title, subtitle, backgroundImage, primaryCTA,
       <div className="absolute inset-x-0 top-[58%] -translate-y-1/2 z-10">
         <div className="container mx-auto px-6 sm:px-10 lg:px-16 xl:px-24">
           <h1
-            className="font-black text-foreground tracking-[-0.02em] leading-[1.06] max-w-[19ch]"
+            className="hero-copy font-black text-foreground tracking-[-0.02em] leading-[1.06] max-w-[19ch]"
             style={{ fontSize: 'clamp(30px, 4.6vw, 54px)' }}
           >
             {renderTitle(title)}
           </h1>
 
           {subtitle && (
-            <p className="mt-4 text-base text-foreground-secondary max-w-[75ch] leading-[1.6]">
+            <p className="hero-copy mt-4 text-base text-foreground-secondary max-w-[75ch] leading-[1.6]">
               {subtitle}
             </p>
           )}
 
           {(primaryCTA || secondaryCTA) && (
-            <div className="flex flex-wrap gap-3 mt-[26px]">
+            <div className="hero-actions flex flex-wrap gap-3 mt-[26px]">
               {primaryCTA && (
                 <CutCTA href={primaryCTA.href} variant="primary" external={primaryCTA.external}>
                   {renderCTAIcon(primaryCTA.label)}
