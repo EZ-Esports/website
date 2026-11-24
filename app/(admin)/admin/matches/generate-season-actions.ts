@@ -11,7 +11,7 @@ import * as schema from '@/app/lib/db/schema';
 import { canonicalDivision } from '@/app/lib/db/match-page';
 import { allowedRosterDivisions } from '@/app/lib/school-roster-view';
 import { buildSeasonPlan, type SeasonPlan } from '@/app/lib/season-generation';
-import { isValidYmd, validateParticipantCount } from '@/app/lib/season-schedule';
+import { isValidYmd, REGULAR_SEASON_MATCHES, validateParticipantCount } from '@/app/lib/season-schedule';
 
 type Executor = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -29,7 +29,10 @@ export interface GeneratePreview {
   /** Schools whose existing team and roster are used as they are. */
   reusedSchools: string[];
   weeks: Array<{ round: number; kickoffIso: string; matches: GeneratePreviewMatch[] }>;
+  skippedWeeks: Array<{ dateYmd: string; kickoffIso: string; matchingDaysOff: string[] }>;
   matchCount: number;
+  matchesPerSchool: number;
+  totalCalendarWeeks: number;
   /** Echoed back on confirm so the write can prove it matches what staff reviewed. */
   fingerprint: string;
 }
@@ -47,6 +50,8 @@ const inputSchema = z.object({
   division: z.enum(['Varsity', 'JV']),
   schoolIds: z.array(z.string().uuid()).max(200),
   startDate: z.string().refine(isValidYmd, 'Enter a valid first-week date.'),
+  matchCount: z.coerce.number().int().min(1).max(50).default(REGULAR_SEASON_MATCHES).optional(),
+  daysOff: z.array(z.string().refine(isValidYmd, 'Enter valid dates.')).default([]).optional(),
 });
 
 /** Thrown to abort the transaction with a message staff can act on. */
@@ -78,7 +83,7 @@ interface Loaded {
 async function loadPlan(exec: Pick<typeof db, 'select'>, raw: z.infer<typeof inputSchema>): Promise<Loaded> {
   const unique = [...new Set(raw.schoolIds)];
   if (unique.length !== raw.schoolIds.length) throw new GenerateError('Each school can only be selected once.');
-  const countProblem = validateParticipantCount(unique.length);
+  const countProblem = validateParticipantCount(unique.length, raw.matchCount);
   if (countProblem) throw new GenerateError(countProblem);
 
   const [season] = await exec
@@ -143,6 +148,8 @@ async function loadPlan(exec: Pick<typeof db, 'select'>, raw: z.infer<typeof inp
     schools,
     existingTeams: teams,
     existingRosters: rosters,
+    matchCount: raw.matchCount,
+    daysOff: raw.daysOff,
   });
   return {
     plan,
@@ -186,7 +193,10 @@ export async function previewGenerateSeason(input: unknown): Promise<GenerateSea
           kickoffIso: plan.matches.find((m) => m.round === r.round)!.kickoff.toISOString(),
           matches: r.pairs.map((p) => ({ homeName: name(p.homeId), awayName: name(p.awayId) })),
         })),
+        skippedWeeks: plan.skippedWeeks,
         matchCount: plan.matches.length,
+        matchesPerSchool: plan.matchesPerSchoolCount,
+        totalCalendarWeeks: plan.rounds.length + plan.skippedWeeks.length,
         fingerprint: plan.fingerprint,
       },
     };

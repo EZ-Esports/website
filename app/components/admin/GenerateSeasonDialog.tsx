@@ -54,6 +54,9 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
   const [seasonId, setSeasonId] = useState('');
   const [division, setDivision] = useState<'Varsity' | 'JV'>('Varsity');
   const [startDate, setStartDate] = useState('');
+  const [matchCount, setMatchCount] = useState<number>(REGULAR_SEASON_MATCHES);
+  const [daysOff, setDaysOff] = useState<string[]>([]);
+  const [newDayOff, setNewDayOff] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<GeneratePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +75,9 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
     setSeasonId('');
     setDivision('Varsity');
     setStartDate('');
+    setMatchCount(REGULAR_SEASON_MATCHES);
+    setDaysOff([]);
+    setNewDayOff('');
     setSelected(new Set());
     setPreview(null);
     setError(null);
@@ -86,10 +92,18 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
   const game = teamGames.find((g) => g.id === gameId);
   const gameSeasons = seasons.filter((s) => s.gameId === gameId);
   const divisions = game ? allowedRosterDivisions(game.slug).filter((d): d is 'Varsity' | 'JV' => d !== 'All') : [];
-  const countProblem = selected.size === 0 ? null : validateParticipantCount(selected.size);
-  const ready = Boolean(seasonId) && isValidYmd(startDate) && selected.size > 0 && !countProblem;
+  const countProblem = selected.size === 0 ? null : validateParticipantCount(selected.size, matchCount);
+  const matchCountValid = Number.isInteger(matchCount) && matchCount >= 1 && matchCount <= 50;
+  const ready = Boolean(seasonId) && isValidYmd(startDate) && selected.size > 0 && !countProblem && matchCountValid;
 
-  const request = () => ({ seasonId, division, schoolIds: [...selected], startDate });
+  const request = () => ({
+    seasonId,
+    division,
+    schoolIds: [...selected],
+    startDate,
+    matchCount,
+    daysOff,
+  });
   // Any edit invalidates a shown preview so confirm can never act on stale choices.
   const edit = <T,>(set: (v: T) => void) => (v: T) => {
     previewSeq.current++;
@@ -98,12 +112,52 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
     setError(null);
   };
 
+  const handleAddDayOff = () => {
+    if (!isValidYmd(newDayOff)) return;
+    if (!daysOff.includes(newDayOff)) {
+      const updated = [...daysOff, newDayOff].sort();
+      edit(setDaysOff)(updated);
+    }
+    setNewDayOff('');
+  };
+
+  const handleRemoveDayOff = (day: string) => {
+    const updated = daysOff.filter((d) => d !== day);
+    edit(setDaysOff)(updated);
+  };
+
   const toggle = (id: string) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     edit(setSelected)(next);
   };
+
+  const timelineEntries = useMemo(() => {
+    if (!preview) return [];
+    const entries: Array<
+      | { type: 'match'; round: number; date: Date; matches: (typeof preview.weeks)[0]['matches'] }
+      | { type: 'skipped'; date: Date; dateYmd: string; matchingDaysOff: string[] }
+    > = [];
+
+    for (const w of preview.weeks) {
+      entries.push({
+        type: 'match',
+        round: w.round,
+        date: new Date(w.kickoffIso),
+        matches: w.matches,
+      });
+    }
+    for (const sw of preview.skippedWeeks ?? []) {
+      entries.push({
+        type: 'skipped',
+        date: new Date(sw.kickoffIso),
+        dateYmd: sw.dateYmd,
+        matchingDaysOff: sw.matchingDaysOff,
+      });
+    }
+    return entries.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [preview]);
 
   const runPreview = () =>
     startPreview(async () => {
@@ -148,7 +202,7 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
                   <div className="min-w-0">
                     <Heading className="text-base font-semibold text-foreground">Generate season</Heading>
                     <p className="mt-0.5 text-sm text-foreground-secondary">
-                      Every school plays {REGULAR_SEASON_MATCHES} different opponents, one match a week at 7:00 PM ET.
+                      Every school plays {matchCount || REGULAR_SEASON_MATCHES} different opponents, one match a week at 7:00 PM ET.
                     </p>
                   </div>
                   <button type="button" onClick={close} aria-label="Close" className={iconBtnSm}>
@@ -215,6 +269,66 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
                       className={cx(input, 'w-full')}
                     />
                   </div>
+                  <div>
+                    <label htmlFor="gen-matches" className={labelClass}>Season length (matches / school)</label>
+                    <input
+                      id="gen-matches"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={matchCount || ''}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        edit(setMatchCount)(Number.isNaN(val) ? 0 : val);
+                      }}
+                      className={cx(input, 'w-full')}
+                    />
+                    <p className={helpText}>Number of matches each school plays.</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="gen-day-off" className={labelClass}>Days off / Holidays (optional)</label>
+                    <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+                      <input
+                        id="gen-day-off"
+                        type="date"
+                        value={newDayOff}
+                        onChange={(e) => setNewDayOff(e.target.value)}
+                        className={cx(input, 'flex-1')}
+                      />
+                      <button
+                        type="button"
+                        disabled={!isValidYmd(newDayOff)}
+                        onClick={handleAddDayOff}
+                        className={cx(ghostBtn, 'min-h-[44px]')}
+                      >
+                        Add day off
+                      </button>
+                    </div>
+                    <p className={helpText}>
+                      Tournament will not run on these weeks (e.g. Christmas). A week is added to the end for each skipped week.
+                    </p>
+                    {daysOff.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5" role="list" aria-label="Days off">
+                        {daysOff.map((day) => (
+                          <span
+                            key={day}
+                            className="inline-flex items-center gap-1 rounded-md bg-surface-base pl-2.5 text-xs font-medium text-foreground ring-1 ring-line/80"
+                            role="listitem"
+                          >
+                            <span>{day}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDayOff(day)}
+                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-foreground-secondary hover:text-foreground"
+                              aria-label={`Remove day off ${day}`}
+                            >
+                              <HiXMark aria-hidden className="h-4 w-4" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 </fieldset>
 
@@ -248,7 +362,8 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
                   {preview && (
                   <div className="space-y-3">
                     <AdminNotice tone="info" title={`${preview.gameName} ${preview.seasonName}, ${preview.division}`}>
-                      {preview.matchCount} matches over {preview.weeks.length} weeks.
+                      {preview.matchCount} matches over {preview.totalCalendarWeeks ?? preview.weeks.length} weeks
+                      {(preview.skippedWeeks?.length ?? 0) > 0 ? ` (${preview.skippedWeeks!.length} skipped for days off)` : ''}.
                     </AdminNotice>
                     <ul className="space-y-1 rounded-xl bg-admin-panel p-3 text-sm text-foreground-secondary">
                       <li>
@@ -265,18 +380,34 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
                       </li>
                     </ul>
                     <ol className="max-h-64 space-y-3 overflow-auto rounded-xl bg-admin-panel p-3 text-sm">
-                      {preview.weeks.map((w) => (
-                        <li key={w.round}>
-                          <p className="font-medium text-foreground">
-                            Week {w.round}: {formatNY(new Date(w.kickoffIso), 'date-short')} {formatNY(new Date(w.kickoffIso), 'time')}
-                          </p>
-                          <ul className="mt-1 grid gap-x-4 text-foreground-secondary sm:grid-cols-2">
-                            {w.matches.map((m, i) => (
-                              <li key={i} className="truncate">{m.homeName} vs {m.awayName}</li>
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
+                      {timelineEntries.map((item) =>
+                        item.type === 'match' ? (
+                          <li key={`match-${item.round}`}>
+                            <p className="font-medium text-foreground">
+                              Week {item.round}: {formatNY(item.date, 'date-short')} {formatNY(item.date, 'time')}
+                            </p>
+                            <ul className="mt-1 grid gap-x-4 text-foreground-secondary sm:grid-cols-2">
+                              {item.matches.map((m, i) => (
+                                <li key={i} className="truncate">{m.homeName} vs {m.awayName}</li>
+                              ))}
+                            </ul>
+                          </li>
+                        ) : (
+                          <li key={`skipped-${item.dateYmd}`} className="rounded-lg bg-surface-base/60 p-2.5 ring-1 ring-amber-500/30">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-medium text-amber-400">
+                                Skipped: {formatNY(item.date, 'date-short')}
+                              </p>
+                              <span className="rounded bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-400">
+                                Day off / Holiday
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-foreground-secondary">
+                              No matches this week ({item.matchingDaysOff.join(', ')}). Added 1 week to end of season.
+                            </p>
+                          </li>
+                        )
+                      )}
                     </ol>
                   </div>
                   )}
@@ -312,7 +443,7 @@ export default function GenerateSeasonDialog({ isOpen, onOpenChange, games, seas
         title="Generate this season?"
         message={
           preview
-            ? `This creates ${preview.matchCount} scheduled matches${preview.teamsToCreate.length ? ` and ${preview.teamsToCreate.length} new teams` : ''} for ${preview.seasonName}. It cannot be repeated for a season that already has ${preview.division} matches.`
+            ? `This creates ${preview.matchCount} scheduled matches${preview.teamsToCreate.length ? ` and ${preview.teamsToCreate.length} new teams` : ''} for ${preview.seasonName} over ${preview.totalCalendarWeeks ?? preview.weeks.length} calendar weeks. It cannot be repeated for a season that already has ${preview.division} matches.`
             : ''
         }
         confirmLabel="Generate"

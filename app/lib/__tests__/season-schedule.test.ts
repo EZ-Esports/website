@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   addWeeksYmd,
+  computeSeasonDates,
   generateRegularSeasonRounds,
+  getMondayYmd,
+  isDayOffWeek,
   isValidYmd,
+  kickoffForDate,
   kickoffForRound,
   scheduleFingerprint,
   validateParticipantCount,
@@ -183,6 +187,132 @@ describe('buildSeasonPlan', () => {
         { id: 'r1', schoolId: 'school-00', name: 'Varsity 2', division: 'B' },
       ]);
       expect(created(p)?.rosterName).toBe('Varsity 3');
+    });
+  });
+
+  describe('configurable season length and days off', () => {
+    it('supports custom season length (e.g. 3, 5, or 9 matches)', () => {
+      const schools10 = ids(10);
+      const rounds5 = generateRegularSeasonRounds(schools10, 'seed', 5);
+      expect(rounds5).toHaveLength(5);
+
+      const opponents = new Map<string, Set<string>>(schools10.map((s) => [s, new Set()]));
+      for (const round of rounds5) {
+        expect(round.pairs).toHaveLength(5);
+        for (const { homeId, awayId } of round.pairs) {
+          expect(opponents.get(homeId)!.has(awayId)).toBe(false);
+          opponents.get(homeId)!.add(awayId);
+          opponents.get(awayId)!.add(homeId);
+        }
+      }
+      for (const set of opponents.values()) expect(set.size).toBe(5);
+
+      const plan5 = buildSeasonPlan({
+        ...base,
+        matchCount: 5,
+        existingTeams: [],
+        existingRosters: [],
+      });
+      expect(plan5.rounds).toHaveLength(5);
+      expect(plan5.matches).toHaveLength(20); // (8 schools * 5 matches) / 2
+      for (const s of schools) expect(plan5.matchesPerSchool[s.id]).toBe(5);
+    });
+
+    it('validates participant count against configurable matchCount', () => {
+      // 6 schools cannot play 7 matches (needs at least 8)
+      expect(validateParticipantCount(6, 7)).toMatch(/at least 8/);
+      // 6 schools CAN play 5 matches (6 >= 5 + 1 and even)
+      expect(validateParticipantCount(6, 5)).toBeNull();
+      // 6 schools cannot play 6 matches (needs even participant count >= 7, min 7 + 1 = 8)
+      expect(validateParticipantCount(6, 6)).toMatch(/at least 7/);
+      // 7 schools cannot play 5 matches (odd count)
+      expect(validateParticipantCount(7, 5)).toMatch(/odd number/);
+      // Invalid matchCount < 1
+      expect(validateParticipantCount(8, 0)).toMatch(/at least 1/);
+    });
+
+    it('resolves Monday for any date', () => {
+      expect(getMondayYmd('2026-11-02')).toBe('2026-11-02'); // Monday
+      expect(getMondayYmd('2026-11-04')).toBe('2026-11-02'); // Wednesday
+      expect(getMondayYmd('2026-11-08')).toBe('2026-11-02'); // Sunday
+      expect(getMondayYmd('2026-12-25')).toBe('2026-12-21'); // Friday (Christmas)
+    });
+
+    it('detects days off within the same calendar week', () => {
+      expect(isDayOffWeek('2026-12-21', ['2026-12-25'])).toBe(true);
+      expect(isDayOffWeek('2026-12-23', ['2026-12-25'])).toBe(true);
+      expect(isDayOffWeek('2026-12-14', ['2026-12-25'])).toBe(false);
+    });
+
+    it('skips weeks with days off and adds weeks to the end', () => {
+      // Start on Monday 2026-11-02.
+      // Thanksgiving week: Monday 2026-11-23 (Thanksgiving is 2026-11-26).
+      // Christmas week: Monday 2026-12-21 (Christmas is 2026-12-25).
+      const daysOff = ['2026-11-26', '2026-12-25'];
+      const { roundDates, skippedWeeks } = computeSeasonDates('2026-11-02', 7, daysOff);
+
+      // Total scheduled match rounds must be 7
+      expect(roundDates).toHaveLength(7);
+      // Exactly 2 skipped weeks
+      expect(skippedWeeks).toHaveLength(2);
+      expect(skippedWeeks[0].dateYmd).toBe('2026-11-23');
+      expect(skippedWeeks[0].matchingDaysOff).toEqual(['2026-11-26']);
+      expect(skippedWeeks[1].dateYmd).toBe('2026-12-21');
+      expect(skippedWeeks[1].matchingDaysOff).toEqual(['2026-12-25']);
+
+      // Round 1: 2026-11-02
+      // Round 2: 2026-11-09
+      // Round 3: 2026-11-16
+      // (2026-11-23 skipped)
+      // Round 4: 2026-11-30
+      // Round 5: 2026-12-07
+      // Round 6: 2026-12-14
+      // (2026-12-21 skipped)
+      // Round 7: 2026-12-28
+      expect(roundDates.map((r) => r.dateYmd)).toEqual([
+        '2026-11-02',
+        '2026-11-09',
+        '2026-11-16',
+        '2026-11-30',
+        '2026-12-07',
+        '2026-12-14',
+        '2026-12-28',
+      ]);
+    });
+
+    it('integrates days off into buildSeasonPlan and includes skippedWeeks in the plan', () => {
+      const plan = buildSeasonPlan({
+        ...base,
+        startYmd: '2026-12-07',
+        matchCount: 4,
+        daysOff: ['2026-12-25'], // Christmas in week of 2026-12-21
+        existingTeams: [],
+        existingRosters: [],
+      });
+
+      expect(plan.rounds).toHaveLength(4);
+      expect(plan.skippedWeeks).toHaveLength(1);
+      expect(plan.skippedWeeks[0].dateYmd).toBe('2026-12-21');
+      expect(plan.matchesPerSchoolCount).toBe(4);
+
+      // Matches run across 5 calendar weeks (4 rounds + 1 skipped)
+      const kickoffs = [...new Set(plan.matches.map((m) => m.kickoff.toISOString()))].sort();
+      expect(kickoffs).toHaveLength(4);
+      expect(kickoffs[0]).toBe(kickoffForDate('2026-12-07').toISOString());
+      expect(kickoffs[1]).toBe(kickoffForDate('2026-12-14').toISOString());
+      // 2026-12-21 was skipped, so next kickoff is 2026-12-28
+      expect(kickoffs[2]).toBe(kickoffForDate('2026-12-28').toISOString());
+      expect(kickoffs[3]).toBe(kickoffForDate('2027-01-04').toISOString());
+
+      // Fingerprint changes if days off change
+      const planNoDaysOff = buildSeasonPlan({
+        ...base,
+        startYmd: '2026-12-07',
+        matchCount: 4,
+        existingTeams: [],
+        existingRosters: [],
+      });
+      expect(plan.fingerprint).not.toBe(planNoDaysOff.fingerprint);
     });
   });
 });
