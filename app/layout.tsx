@@ -71,9 +71,10 @@ export default async function RootLayout({
   await headers();
 
   return (
-    <html lang="en" className="notranslate" translate="no">
+    <html lang="en" className="notranslate" translate="no" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <Providers>{children}</Providers>
         {/* Renders nothing; injects the Vercel Analytics script. A sibling of
