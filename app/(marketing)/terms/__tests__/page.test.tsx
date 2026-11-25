@@ -20,11 +20,17 @@ describe('Terms of Service Page (/terms)', () => {
   describe('Key Sections Rendering', () => {
     const html = renderToStaticMarkup(TermsPage());
 
-    it('renders Section 1: Acceptance & Eligibility covering students, advisors, and coaches', () => {
+    it('shows the effective date instead of a last-updated line', () => {
+      expect(html).toContain('Effective date: November 25, 2026');
+      expect(html).not.toContain('Last updated:');
+    });
+
+    it('renders Section 1: Acceptance & Eligibility, including minors and guardians', () => {
       expect(html).toContain('1. Acceptance &amp; Eligibility');
       expect(html).toContain('Student participants');
       expect(html).toContain('Advisors, coaches, and staff');
-      expect(html).toContain('Consent for minors');
+      expect(html).toContain('A person under 13 may not submit personal information');
+      expect(html).toContain('withdraw');
     });
 
     it('renders Section 2: Acceptable Use & Conduct', () => {
@@ -33,38 +39,57 @@ describe('Terms of Service Page (/terms)', () => {
       expect(html).toContain('Cheating');
       expect(html).toContain('Roster and identity fraud');
       expect(html).toContain('Match manipulation');
+      expect(html).toContain('Good-faith security reports');
     });
 
-    it('renders Section 3: In-Person / LAN Tournament Waiver & Event Disclaimers', () => {
-      expect(html).toContain('3. In-Person / LAN Tournament Waiver &amp; Event Disclaimers');
+    it('renders Section 3: In-Person Events, Tournament Waivers & Event Rules', () => {
+      expect(html).toContain('3. In-Person Events, Tournament Waivers &amp; Event Rules');
       expect(html).toContain('Assumption of risk');
       expect(html).toContain('Release of liability');
       expect(html).toContain('Medical and emergency treatment');
       expect(html).toContain('Media and photo release');
+      expect(html).toContain('Conduct at the venue');
     });
 
-    it('renders Section 4: Limitation of Liability & "As Is" Warranty', () => {
+    it('renders Section 4: Limitation of Liability & "As Is" Warranty without a damages cap', () => {
       expect(html).toContain('4. Limitation of Liability &amp; &quot;As Is&quot; Warranty');
-      expect(html).toContain('as is');
       expect(html).toContain('disclaim all warranties');
-      expect(html).toContain('liability for any claim');
+      expect(html).toContain('do not limit any rights or responsibilities that cannot be limited');
+      expect(html).not.toContain('one hundred U.S. dollars');
     });
 
     it('renders Section 5: Intellectual Property & Submissions', () => {
       expect(html).toContain('5. Intellectual Property &amp; Submissions');
-      expect(html).toContain('Your content and feedback');
+      expect(html).toContain('You retain ownership of your content.');
+      expect(html).toContain('nonexclusive, worldwide, royalty-free license');
     });
 
-    it('renders Section 6: Governing Law & Dispute Resolution', () => {
+    it('renders Section 6: Governing Law & Dispute Resolution with no arbitration', () => {
       expect(html).toContain('6. Governing Law &amp; Dispute Resolution');
       expect(html).toContain('State of New York');
-      expect(html).toContain('Binding arbitration');
+      expect(html).toContain('do not require binding arbitration');
+      expect(html).not.toContain('Binding arbitration.');
     });
 
-    it('renders Section 7 and 8: Changes and Contact', () => {
+    it('renders Sections 7 and 8: Changes and Contact with a mailto link', () => {
       expect(html).toContain('7. Changes to These Terms');
       expect(html).toContain('8. Contact Us');
-      expect(html).toContain('info@ezesports.org');
+      expect(html).toContain('href="mailto:info@ezesports.org"');
+    });
+
+    it('renders Sections 9 to 11', () => {
+      expect(html).toContain('9. Accounts, Security &amp; Access');
+      expect(html).toContain('10. Privacy, Cookies &amp; Third-Party Services');
+      expect(html).toContain('11. Enforcement, Notice &amp; Survival');
+    });
+
+    it('keeps stable section anchors', () => {
+      for (const id of [
+        'eligibility', 'conduct', 'events', 'liability', 'ip', 'disputes',
+        'changes', 'contact', 'accounts', 'privacy-third-party', 'enforcement',
+      ]) {
+        expect(html).toContain(`id="${id}"`);
+      }
     });
 
     it('renders cross-links to Privacy Policy and League Rules', () => {
